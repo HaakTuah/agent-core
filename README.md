@@ -31,8 +31,9 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 ## How a project takes the core
 
 1. **An exact copy under `core/`,** pinned to one commit of this repository, generated and never edited by hand. A
-   change reaches a project only through a sync PR in that project, which moves the pin, is reviewed like any other PR,
-   and changes nothing else; a check in the project fails a PR whose `core/` differs from this repository at its pin.
+   change reaches a project only through a sync PR in that project, which moves the pin (and, where point 5 says, the
+   workflow pins), is reviewed like any other PR, and changes nothing else; a check in the project fails a PR whose
+   `core/` differs from this repository at its pin.
 2. **A manifest of its own,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names
    for the core's words, and what fills each slot. Every session reads it at the start, with `floor/security.md`.
 3. **Pointer lines.** Its `AGENTS.md` names, as plain lines of their own (not in a table or a code block), the manifest
@@ -48,11 +49,13 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
    copy: its `.claude/settings.json` runs `core/scripts/work-saved.sh` as its work-saved hook and
    `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `develop`
    (floor rule 3); its copies check is `core/scripts/copies.mjs`, run with a config of its own (the *copies check*
-   slot names it). GitHub runs workflows only from a repository's own `.github/workflows/`, so the core's are reusable:
-   its own `personal-terms.yml` and `copies.yml` each hold one job that calls the core's
-   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`), pinned to the same commit as its
-   `core/` (floor rule 2), passing `PERSONAL_TERMS` alone to the first and its config's path to the second. Only the
-   sync PR moves those pins, with the copy: its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
+   slot names it), protected like the check. GitHub runs workflows only from a repository's own `.github/workflows/`,
+   so the core's are reusable: its own `personal-terms.yml` and `copies.yml` each call the core's in a job
+   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), passing
+   `PERSONAL_TERMS` alone to the first and its config's path to the second. Only a sync PR moves those pins, and only
+   when one of the core's workflows changed since the last: then it moves them to its new pin, and needs the owner's
+   yes, since it changes `.github/` (floor rule 3). Its review checks that the core's workflows at the workflow pins
+   are those at its pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
    marked there as a safety rule is out of reach of "Principles over rules", as the floor is), each file cut to that,
    with pointers into `core/`.

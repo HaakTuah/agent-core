@@ -2,8 +2,8 @@
 # a term from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and
 # never written into the repository, since the list itself would be personal. It prints only where a term was found
 # (file and line), never the term. Without the secret (a fork, Dependabot) it passes with a note.
-# It checks this repository, and every project that takes the core calls it (workflow_call), pinned to the full commit
-# SHA of its core pin, passing only that secret: the caller's event, checkout and token are the caller's own.
+# It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full commit SHA
+# (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
 
 on:

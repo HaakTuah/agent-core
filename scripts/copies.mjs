@@ -11,34 +11,38 @@
 //
 // The config, a JSON file the project keeps (its *copies check* slot names it), says what is checked: "baseline", the
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
-// to add the files the project's SECURITY.md names in rule 3, after "the rule files:", so that list stands in one place.
+// to add the files the project's SECURITY.md names in rule 3, after "the rule files:" (rule-files.mjs, beside this file).
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { ruleFiles } from "./rule-files.mjs";
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
-if (!configPath) { console.error("FAIL: name the config: node core/scripts/copies.mjs <config> [--write]"); process.exit(1); }
-const configFull = fs.realpathSync(configPath);
+if (!configPath) fail("name the config: node core/scripts/copies.mjs <config> [--write]");
+let config;
+try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON`); }
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
-const config = JSON.parse(fs.readFileSync(configFull, "utf8"));
+// A key it does not know, or one of the wrong shape, would check less without a word, so it fails.
+const KEYS = ["baseline", "code", "prose", "proseFromSecurity"];
+const unknown = Object.keys(config || {}).filter(k => !KEYS.includes(k));
+if (!config || typeof config !== "object" || Array.isArray(config)) fail("the config is not a JSON object");
+if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}`);
 const list = (v, key) => {
   if (v === undefined) return [];
-  if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) { console.error(`FAIL: the config's "${key}" is not a list of paths`); process.exit(1); }
+  if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths`);
   return v;
 };
-if (typeof config.baseline !== "string" || !config.baseline) { console.error('FAIL: the config names no "baseline"'); process.exit(1); }
+if (typeof config.baseline !== "string" || !config.baseline) fail('the config names no "baseline"');
+if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false');
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
-function ruleFiles() {
-  const rule = /\*\*the rule files:\*\*([^;]*);/.exec(fs.readFileSync("SECURITY.md", "utf8"));
-  const found = rule ? [...rule[1].matchAll(/`([^`]+)`/g)].map(m => m[1]) : [];
-  if (!found.length) { console.error('FAIL: SECURITY.md, rule 3, names no rule files ("the rule files:" line), and the config asks for them'); process.exit(1); }
-  return found.concat(rule[1].includes("this file") ? ["SECURITY.md"] : []);
-}
-const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity ? ruleFiles() : []);
-if (!CODE_SPECS.length && !proseSpecs.length) { console.error('FAIL: the config names nothing to check ("code", "prose")'); process.exit(1); }
+let fromSecurity = [];
+if (config.proseFromSecurity) try { fromSecurity = ruleFiles(); } catch (e) { fail(e.message); }
+const proseSpecs = PROSE_SPECS.concat(fromSecurity);
+if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check ("code", "prose")');
 const LINES = 8, MIN_CHARS = 240, WORDS = 12;
 const hash = s => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
 
