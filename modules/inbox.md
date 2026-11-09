@@ -6,16 +6,17 @@ his words are kept once, in the archive (core archive 7, 13 and 28). Read at the
 - **Don't stop to ask: the stand-in answers first** (core archive 8, 53 and 79), so the work follows the owner's likely
   answer from the start, not a builder's guess. Where the spec leaves something open, the builder writes the question
   with its own reading and goes on with the rest; once it has read the spec, it sends all of them in one call to **the
-  stand-in**, a fresh session that predicts the owner's answer from the *settling references* and his past words (the
-  project's archive and its closed `question` issues, searched, never read whole: only the stand-in reads them for
-  this). For each it returns the answer it predicts, what it rests on (his words or a rule, by pointer) and how sure it
-  is. The builder builds on that answer and lists it under "Readings taken" in the *report*. One the stand-in is not
-  sure of, or one of taste, or one that cannot be undone, also goes to the owner at once, as the next point says, with
-  the stand-in's answer as the reading taken: he says "yes" or corrects it, and a correction is built as any change is.
-  Readings taken later in the task go to the stand-in in a second call when the PR is marked ready (on the
-  *design-checked PRs*, the design check makes it). A task with nothing open calls it not at all. Each answer of his to
-  a predicted question is set beside the prediction, and the workshop check reports how often they matched, so how sure
-  the stand-in must be to answer alone follows its record.
+  stand-in**, a fresh session that predicts the owner's answer from the *settling references*, the design's decided
+  sections first, and his past words (the project's archive and its closed `question` issues, searched, never read
+  whole: only the stand-in reads them for this). For each it returns the answer it predicts, what it rests on (his words
+  or a rule, by pointer) and how sure it is. The builder builds on that answer and lists it under "Readings taken" in
+  the *report*. Only an answer it is highly sure of stands alone; one it is less sure of, or one of taste, or one that
+  cannot be undone, also goes to the owner at once, as the next point says, with the stand-in's answer as the reading
+  taken: he says "yes" or corrects it, and a correction is built as any change is. Readings taken later in the task go
+  to the stand-in in a second call when the PR is marked ready (on the *design-checked PRs*, the design check makes it).
+  A task with nothing open calls it not at all. Each answer of his to a predicted question is set beside the prediction,
+  and the workshop check reports how often they matched, so how sure the stand-in must be to answer alone follows its
+  record.
 - **One inbox: issues assigned to the owner** (`HaakTuah`). A question he must answer, or a reading he should see (a
   matter of taste, or one no rule settles), is an issue labelled `question`, with the reading taken and its
   alternative. An idea is a Feature request (`enhancement`); a bug the task at hand will not fix is a Bug report
