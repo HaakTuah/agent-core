@@ -15,6 +15,10 @@ builds it, and a wrong result shows itself; if only judgement can (taste, the de
   or more, or long measuring runs. Smaller work Claude does itself. The PR says which was chosen and why.
 - **Whole with Claude:** the orchestrator's own work (briefs, routing, readings, merges) and what the project names,
   where the code is the hard part and a brief cannot hold the decisions.
+- **Checks that run the work** (core archive 25): a Codex task also reruns the *measurements* a PR's claims rest on, and
+  confirms or corrects them.
+- **The review sums route the work:** a category where Codex's builds score lower moves back to Claude; one where they
+  do well gets more.
 - What runs one at a time stays so: a Codex lane runs beside the main lane, never in the same files. Codex's first task
   with a part of a helper's shape uses its subagents, to show whether they start in its cloud, keep to five at a time
   (its default allows six; if not, its settings set five), and what they give.

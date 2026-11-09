@@ -27,12 +27,12 @@ built, the fallback reviewer in place of Codex's code review.
    major issues", or every finding fixed or moved out as "Only a 10 passes" says) is Codex's 10. P0 and P1 are fixed
    first.
 5. **The design check, with a score:** on the design-checked PRs, once before the merge, the design checker, given its
-   brief (point 7 below), scores the work from 1 to 10 against the design alone, listing what keeps it from 10, since
-   Codex looks for faults and security: its first canary found every planted fault, but the broad feedback on the design
-   is the design check's (core archive 22). **Both at once:** the design check starts in the same turn as the request to
-   Codex, in the background, and the builder answers both lists in one round. **The readings too:** it judges the PR's
-   "Readings taken" as the stand-in does (`modules/inbox.md`), being the stand-in's second call: one the owner would
-   likely answer otherwise is a finding, built as the stand-in answers it and sent to him with that answer.
+   brief ("The briefs" below), scores the work from 1 to 10 against the design alone, listing what keeps it from 10,
+   since Codex looks for faults and security, and the broad feedback on the design is the design check's (core archive
+   22). **Both at once:** the design check starts in the same turn as the request to Codex, in the background, and the
+   builder answers both lists in one round. **The readings too:** it judges the PR's "Readings taken" as the stand-in
+   does (`modules/inbox.md`), being the stand-in's second call: one the owner would likely answer otherwise is a
+   finding, built as the stand-in answers it and sent to him with that answer.
 6. **Codex reviews only when asked. Security reviews: one by itself when a PR is ready; after that, the fallback
    reviewer** (core archive 47, 48, 50 and 51). Codex runs one security review by itself when a PR is opened for review
    or a draft is marked ready, never while a draft and never twice on one commit; asking runs a code review alone
@@ -48,10 +48,8 @@ built, the fallback reviewer in place of Codex's code review.
    of the ready mark, the fallback reviewer reviews the diff against the project's `SECURITY.md` with the floor, and its
    threat model, the PR says so, it may merge on that, and the next wake reports it to the owner; the same reviewer
    reviews, in the milestone PR, a commit that reached `develop` without the gate.
-7. **Checks that run the work, once Codex can build** (core archive 25). The native review reads the diff but runs
-   nothing, so it cannot check a measured claim. Once Codex's environments work, a Codex task also reruns the
-   *measurements* a PR's claims rest on and confirms or corrects them; until then CI and the fallback reviewer check
-   them.
+7. **Measured claims** (core archive 25): the native review reads the diff but runs nothing, so CI and the fallback
+   reviewer check the *measurements* a PR's claims rest on.
 
 ## Only a 10 passes
 
@@ -80,7 +78,7 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
      each reviewer and is never merged. Each fault not found is a miss.
    - **A slop check every month,** where the project has text its users read (core archive 49): a fresh reviewer reads
      only that text changed since the last check, scored against the *slop bar*, which says where its finds are fixed.
-     The slop audit's formula test runs on every code PR.
+
    - **Logged:** each check is a row in the calibration log, `docs/calibration.md`, and each milestone PR says in one
      line the misses since the last. Two misses in a row by one reviewer: its brief or guidelines are tightened with the
      owner, a test is added for each fault it missed, and a canary runs again at once. It keeps reviewing meanwhile,
@@ -89,8 +87,7 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
      than its interval (core archive 62).
 6. **One line in each PR:** `Review: <category> · <builder> · <each round's result>`, a score, or Codex's verdict
    (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`. The milestone PR sums them by category
-   and builder, with the rounds per PR: a category where Codex scores lower moves back to Claude, one where it does well
-   gets more, one that often needs three rounds needs better briefs.
+   and builder, with the rounds per PR: a category that often needs three rounds needs better briefs.
 7. **The briefs.** A reviewer starts cold and gets its brief and nothing more. **The fallback reviewer's:** the diff,
    the task's text, the *review reference*, and the review guidelines (the core's and the project's), whole. **The
    design checker's:** the same, and what the project's guidelines add for it; it sends the work back until it meets

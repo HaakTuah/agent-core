@@ -14,5 +14,5 @@ review reads both. Rules cited: the floor's.
   deploy, and GitHub Pages (rules 2, 3 and 12). **The project's users,** as its own model says.
 - **Lower stakes:** a slowdown or crash confined to one user's own tab, from input only that user chose, is Low; the
   same from input someone else shaped is not. The project's own model says what else is.
-- **The ways in:** the workflows and what triggers them (rule 2); dependencies and actions (rules 2, 7 and 10);
+- **The ways in:** the workflows and what triggers them (rule 2); dependencies and actions (rules 2, 7, 10, 15 and 17);
   outsiders' text reaching an agent (rule 4); the project's own inputs (rule 5).
