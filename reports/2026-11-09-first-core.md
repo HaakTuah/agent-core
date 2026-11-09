@@ -20,7 +20,9 @@ games were read only; nothing was written to either. Weekly usage read "unknown"
   on; six are read at the start of every task (with `claude.md` for Claude).
 - **The core's own files:** `README.md` (the two layers, how a project takes the core, the slots, the manifest's
   format), `AGENTS.md`, `CLAUDE.md`, `SECURITY.md`, `archive/instructions.md` (75 items, every quote checked by script
-  against the games' archives) and `.github/workflows/personal-terms.yml`, byte for byte as in both games.
+  against the games' archives) and `.github/workflows/personal-terms.yml`, as in both games but for one fix: Codex's code review found that it
+  checked only the newest commit's message when a PR has several (a record split left later hashes empty), so it now
+  checks each new commit in turn. Both games carry the same flaw; their next change to the check is theirs to make.
 
 ## Measurements
 
@@ -108,6 +110,9 @@ The owner's yes is also asked in the PR for `.github/workflows/personal-terms.ym
   written out of the floor (it is the repository's own address, the one exception rule 11 allows).
 - **Fresh reviewer (Opus, high), once,** given only both games' rule files and the core: its findings and what was done
   with each are below.
+- **Codex's code review** (round 1): one P1, the personal-terms check passing a term in any commit message but the
+  newest; reproduced on a test repository, fixed, and the fix shown to catch it. Its security review, and the fallback
+  reviewer's review of the workflow change, are in the PR.
 ## The fresh reviewer's findings, and what was done
 
 Given only both games' rule files and the core, the reviewer found the move faithful in most rules, and these points,
