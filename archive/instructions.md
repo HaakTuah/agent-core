@@ -362,3 +362,15 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     not have these rules which inhibit the models own creativity." To one repository in two layers, a safety floor
     every project takes whole and practice modules each picks in a manifest, the self-governing project taking only
     the floor: "This set-up sounds sensible to me."
+
+76. **9 November 2026** (Amarna Letters, item 242; Barkstreet Snakes, 9 November 2026), to the design session's
+    evaluation of this repository's first pull request: yes to its three questions as the design session advised (three
+    safety rules only one game had join the floor; where the games differ in substance, each keeps its own; the floor
+    in two files, the rules any task can break read at every start and the rest before a task touches them), to setting
+    Dependabot here to the workflow's actions, and to a last code review before the merge: "Yes, expertly to
+    absolutely everything you said. Only thing i want to add is that only Claude has to stop around 90%, its the only
+    license I use for other tasks. So codex or whatveer else I add will only be for project work. Ideally they time so
+    that 90% is never spent up before 100% of them are spent, but that depends on them being in an environment where
+    they can track it, like local on my pc, or server, even better on Herdr where I believe they can track and initiate
+    one another directly. So calibrate for that. Right now every cloud session wastes time establishing that they can
+    track their usage, and wastes tokens posting about it every PR, possibly more. Sounds good to you, expert?"

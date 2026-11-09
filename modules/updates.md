@@ -1,12 +1,12 @@
 # Updates: Dependabot, CodeQL and Node
 
 How packages, tools and Node are kept current, and what GitHub's checks do. Read when a task takes an update. The
-safety rules every update keeps: `floor/security.md`, rules 4 and 7.
+safety rules every update keeps: floor rules 7, 15 and 17 (`floor/topics.md`).
 
 **The newest stable version, unless there is a reason** (core archive 65), so fixes, security fixes above all, stay one
 small step away. Updates are upkeep, not ideas: they wait for no queue entry and no word from the owner, except his yes
 for `.github/` and the setup script (floor rule 3). Dependabot's version updates (weekly, grouped) come as PRs into
-`develop`, merged under floor rule 4 by the next free lane as ordinary small PRs: the checks, the code review, the
+`develop`, merged under floor rule 17 by the next free lane as ordinary small PRs: the checks, the code review, the
 release notes read for breaking changes, the licence gate (floor rule 10) (core archive 37). A new major version is its
 own PR (out of its group), with the *major version checks*. One is held back only for a reason: it breaks something,
 runs or loads worse, changes its licence, or its project is abandoned or changes hands; the reason is written in the

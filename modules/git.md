@@ -12,5 +12,5 @@ task. `main` itself: `floor/security.md`, rule 12; the calls from a cloud sessio
   the new work, saying what the owner can try, merged by the builder once CI is green, never left to him, and the work
   carries on without waiting (core archive 5 and 25). **Before pushing `develop`,** check the last milestone PR: still
   open, the push adds to it; merged, merge `main` back into `develop` first, then push and open a new one.
-- **Updates, Dependabot and CodeQL:** `modules/updates.md`; Dependabot's security PRs and findings: `floor/security.md`,
-  rules 4 and 9.
+- **Updates, Dependabot and CodeQL:** `modules/updates.md`; Dependabot's security PRs and findings: floor rules 17
+  and 9 (`floor/topics.md`).

@@ -14,9 +14,10 @@ imports them):
 @modules/inbox.md
 @modules/usage.md
 
-Read when needed: `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`,
-`modules/review-guidelines.md`, `modules/codex.md` and `modules/github-calls.md`. The rest describe work this repository
-does not do (lanes, milestones, updates, the orchestrator).
+Read when needed: `floor/topics.md` (before a task touches one of its topics), `floor/threat-model.md`,
+`modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md` and
+`modules/github-calls.md`. The rest describe work this repository does not do (lanes, milestones, updates, the
+orchestrator).
 
 What fills the slots here: the *progress file* and the *report*: this repository's open PRs, and `reports/` (one file
 per change, `<date>-<name>.md`); the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling
@@ -38,11 +39,11 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
   in its archive and its reports.
 - **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
   about a fifth of the core's lines changed since the last audit.
-- **Usage:** this repository has no `scripts/usage.sh`; a session uses the one its environment offers, or says
-  "unknown" as `modules/usage.md` says.
+- **Usage:** this repository has no `scripts/usage.sh`; a session uses the one its environment offers, if any, as
+  `modules/usage.md` says.
 
 ## Review guidelines
 
 Every reviewer, Codex's code review included, reads `modules/review-guidelines.md` whole and judges the change by it,
-with `floor/security.md`. Here, a rule that changes what any project must do without saying so in the PR is a
-departure from the PR's description, and blocks.
+with the floor (`floor/security.md` and `floor/topics.md`). Here, a rule that changes what any project must do without
+saying so in the PR is a departure from the PR's description, and blocks.

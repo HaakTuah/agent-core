@@ -35,7 +35,7 @@ owner's machine starts Codex, ever (core archive 52): once its tasks work, it is
   review off (core archive 18).
 - Its security review: Auto security review on, Review "Team PRs", Trigger "On PR open", reporting Medium and above. It
   reads the project's threat model with `floor/threat-model.md` as its threat model, and the project's `SECURITY.md`
-  with `floor/security.md` as its instructions. Under this trigger a request runs a code review alone; a security review
+  with the floor (`floor/security.md` and `floor/topics.md`) as its instructions. Under this trigger a request runs a code review alone; a security review
   comes with every request only under "Whenever code review runs" (core archive 51).
 - A Codex cloud environment of the newer kind, made in ChatGPT's Codex settings (the *Codex environment*), its setup
   script `bash scripts/cloud-setup.sh` (from `/workspace/<repository>`); tasks by comment fail either way.

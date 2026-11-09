@@ -11,7 +11,9 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
   project's own, and no reading of a rule's purpose ("Principles over rules"), loosens it. It points to no module, so a
   project that takes only the floor is safe with nothing else (core archive 75). When unsure whether a rule belongs
   here, ask: if a project dropped it, could the owner be harmed or something be lost for good? Then it is floor.
-  - `floor/security.md`: rules 1 to 13 and how to report a weakness.
+  - `floor/security.md`: what the floor is, and the rules any task can break, read at the start of every task.
+  - `floor/topics.md`: the rules for particular work (workflows, untrusted input, what ships and its dependencies,
+    alerts, licences, Dependabot's PRs) and how to report a weakness, read before a task touches one.
   - `floor/threat-model.md`: who might attack, what is protected and the ways in, the part every project shares.
 - **The practice modules** (`modules/`): everything else the projects share, one file per thing a reader looks up on its
   own, each saying at its top what it is for, when it is read and which others it leans on. A project picks the modules
@@ -32,7 +34,7 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
    change reaches a project only through a sync PR in that project, which moves the pin, is reviewed like any other PR,
    and changes nothing else; a check in the project fails a PR whose `core/` differs from this repository at its pin.
 2. **A manifest of its own,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names
-   for the core's words, and what fills each slot. Every session reads it at the start, with the floor.
+   for the core's words, and what fills each slot. Every session reads it at the start, with `floor/security.md`.
 3. **Pointer lines.** Its `AGENTS.md` names, as plain lines of their own (not in a table or a code block), the manifest
    and every file read at the start of every task: Claude Code imports them as `@` lines through `CLAUDE.md`, which
    imports `AGENTS.md` (and `core/modules/claude.md`); Codex, which follows no imports, reads them because `AGENTS.md`

@@ -606,3 +606,32 @@ lines at the source.
 | `SECURITY.md` | 109 | the core; the line's game part joins line 108 |
 | `SECURITY.md` | 121, in part; what stays: "The audit of every licence, with which list each is held to, is `tools/licences.json`." | the rest: the core, as the done table says |
 | `docs/review-guidelines.md` | 30, in part; what stays: "A mark in `tools/sizes.json` raised without its reason in the PR blocks." | the rest: the core, as the done table says |
+
+## The owner's answers, and what changed (9 November 2026, evening)
+
+The owner answered the three questions and the design session's evaluation in one message (core archive 76): yes to
+everything it advised, and Claude alone keeps a reserve. Made in this PR by the design session:
+
+- **#6, three safety rules into the floor:** rule 14 (stop before what cannot be undone, and at a failed safety check;
+  nothing spends the owner's money without his yes), rule 15 (dependencies, where a project takes packages) and rule 16
+  (the owner's share of Claude). Each game's own lists drop them at adoption: Amarna's "spending" among its own safety
+  rules, its `SECURITY.md` dependency line.
+- **#7, where the games differ:** each keeps its own, as the maps already say; the core keeps the workshop check's newer
+  wording, and the design session updates Amarna's design document so its builder rules match.
+- **#8, when the floor is read:** the floor is now two files, both floor and both taken whole. `floor/security.md`
+  (6,953 bytes), read at the start of every task, holds what the floor is and the rules any task can break (1, 3, 4, 8,
+  11 to 14 and 16); `floor/topics.md` holds the rules for particular work (2, 5, 6, 7, 9, 10, 15 and 17) and how to
+  report a weakness, read before a task touches one. Rule 4's Dependabot exception became rule 17, so it sits with the
+  update rules; every other number is unchanged. Rules are written as paragraphs ("**3. ...**"), so each file shows
+  the floor's own numbers. Each game's `AGENTS.md` section above names `core/floor/topics.md` among the files read when
+  needed.
+- **Usage by provider** (`modules/usage.md`, floor rule 16): only Claude keeps a reserve, from about 90% of its weekly
+  limit; Codex and any other provider kept for the projects is spent to its end, and where an environment can read
+  every provider's usage the orchestrator spreads the work so each is spent by its reset before Claude reaches 90%;
+  where usage cannot be read, one check at the start and nothing said about it. Both games took the same change at
+  once in their own rule files, since the core is not adopted yet.
+- **`.github/dependabot.yml`** now updates the workflow's GitHub actions weekly, a week after each release (it was
+  GitHub's empty template, which fails); this repository's `SECURITY.md` says so under rule 17.
+
+Read at the start of a session after adoption, Claude Code: Amarna Letters about 43,900 bytes (37,816 today; 49,759
+before the split), Barkstreet Snakes about 35,500 (26,531 today; 41,413 before). Codex: about 39,700 and 31,300.
