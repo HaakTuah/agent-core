@@ -68,9 +68,10 @@ A check on every PR, Dependabot's included, fails one that adds or updates a pac
 the owner wants anyway is a `question` issue, never merged on its own. The project names its audit of every
 licence. The owner's own work carries no licence file, by his choice: all rights reserved. Never add one.
 
-**15. Dependencies,** where a project takes packages (core archive 76): installed only from the lock file (`npm ci`, or
-the project's like), never running a package's own install scripts, new or old; every package pinned to one exact
-version; a new one only with a reason in its PR, from a known publisher; findings from CI's audit fixed, not silenced.
+**15. Dependencies,** where a project takes packages (core archive 76): installed from the lock file (`npm ci`, or the
+project's like), except where a PR adds or updates a package; never running a package's own install scripts, new or old;
+pinned as rule 7 says; a new one only with a reason in its PR, from a known publisher; findings from CI's audit fixed,
+not silenced.
 
 **17. Dependabot's own PRs,** the one exception to floor rule 4: its version PRs into `develop` merge only under (1) to
 (3) below (for an action, (2) is rule 3's narrow exception); its security PRs, which GitHub aims at `main`, the next

@@ -9,10 +9,9 @@ owner's, measured where it can be. Read at the start of every task.
   bigger task: finish the one at hand if nearly done, or bring it to a clean commit and a draft PR saying what is left;
   then only small things in the main lane, the *progress file* saying where you stopped. Only the measured share
   counts, never the app's warning (core archive 14).
-- **Every other provider is spent to its end** (core archive 76): Codex, and any the owner adds for the projects
-  only, keep no reserve. Where an environment can read every provider's usage (a machine of the owner's, a server, a
-  tool that starts agents and reads their usage), the orchestrator spreads the work so each of them is spent by its
-  weekly reset before Claude reaches 90%.
+- **Every other provider is spent to its end** (floor rule 16; core archive 76). Where an environment can read every
+  provider's usage (a machine of the owner's, a server, a tool that starts agents and reads their usage), the
+  orchestrator spreads the work so each of them is spent by its weekly reset before Claude reaches 90%.
 - **Measure it** with `scripts/usage.sh` at the start and, where it can read it, after every commit. Where it cannot
   (a cloud session today), it says so at the start; then check no more, and say nothing about it in any PR, report or
   message: the owner watches and pauses the work at about 90% (core archive 76).

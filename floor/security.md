@@ -40,15 +40,15 @@ posts ends what it writes with its own tool's attribution line (Claude Code's: "
 Code, linked; Codex posts as its own bot): a comment from `HaakTuah` without one is his (core archive 33).
 **Dependabot's own PRs** are the one exception, under floor rule 17.
 
-**8. Reviews look for these,** and for any new way in: a new input, a new external request, a new dependency or script,
-a weakened check. **No PR merges until its security review has run, and none with an open security finding;** a PR
-that changes a protected file also gets a code review. A milestone PR needs it only for a commit that reached
-`develop` without one (a merge of `main` back, a conflict resolution, a direct push). Nothing from this repository or
-its PRs runs on the owner's machine, and nothing there starts an agent (core archive 52). **Test data is never
-real:** fake keys and tokens are built when the test runs, from pieces (such as `"AIza" + "Sy" + "x".repeat(33)`),
+**8. Reviews look for breaks of any floor rule,** and for any new way in: a new input, a new external request, a new
+dependency or script, a weakened check. **No PR merges until its security review has run, and none with an open security
+finding;** a PR that changes a protected file also gets a code review. A milestone PR needs it only for a commit that
+reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push). Nothing from this
+repository or its PRs runs on the owner's machine, and nothing there starts an agent (core archive 52). **Test data is
+never real:** fake keys and tokens are built when the test runs, from pieces (such as `"AIza" + "Sy" + "x".repeat(33)`),
 never a literal that looks real, so no scanner takes one for a leak; sample names, paths and e-mail addresses are
-invented (`jdoe`, `/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning alert on a test's fake is
-closed as "Used in tests" once the literal is gone (core archive 29).
+invented (`jdoe`, `/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning alert on a test's fake is closed
+as "Used in tests" once the literal is gone (core archive 29).
 
 **11. Nothing personal, ever** (core archive 30 and 43). No file, commit message, PR, issue, comment, log or picture
 holds personal information about the owner or anyone in his life: no names (he is "the owner"), no profession,
@@ -62,7 +62,7 @@ keep what they hold: rewriting history is irreversible, and the owner's to decid
 
 **12. `main` is the owner's,** and what the live site runs: never push to it, never force-push. It changes only by a
 merged pull request: where the repository has `develop`, only the milestone PR from `develop` and Dependabot's
-security PRs (rule 4).
+security PRs (rule 17).
 
 **13. Each project's files stay in its own repository:** never write one project's notes, logs or files into another
 project's repository or folders, for any reason (core archive 4).

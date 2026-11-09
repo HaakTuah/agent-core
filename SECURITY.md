@@ -9,7 +9,8 @@ This repository takes the floor whole: `floor/security.md` and `floor/topics.md`
   floor rule 11.
 - **Rules 5, 6, 7, 10 and 15:** none. The repository holds documents and one workflow, ships nothing and takes no
   package. **Rule 17:** Dependabot updates only that workflow's GitHub actions (`.github/dependabot.yml`), under rule
-  3's narrow exception; this repository names no manifest or lock file, so no security PR of Dependabot's meets it.
+  3's narrow exception, into `main` (this repository has no `develop`); this repository names no manifest or lock file,
+  so no security PR of Dependabot's meets it.
 - **The threat model's part:** the core has no users of its own; what an attacker would want of it is a rule loosened
   here that every project then takes, so a change reaches a project only through a reviewed sync PR there.
 
