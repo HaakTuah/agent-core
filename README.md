@@ -20,8 +20,8 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
   it takes.
   - Read at the start of every task: `how-to-work.md` (the aim, the four pillars, the habits), `inbox.md` (questions,
     readings, ideas, bugs, and the owner's words), `work-flow.md` (reviews in the background, lanes, sessions),
-    `git.md` (branches, pushes, milestones), `usage.md` (measuring usage, the brake) and, for Claude, `claude.md`
-    (models, effort, helpers).
+    `git.md` (branches, pushes, milestones) and, for Claude, `claude.md` (models, effort, helpers, usage and the
+    brake).
   - Read when needed: `roles.md` (who does what, escalation, who merges), `helpers.md` (when helpers pay),
     `reviews.md` (which review, the security gate, only a 10 passes), `review-guidelines.md` (what reviewers judge by),
     `codex.md` (Codex's status, "For Codex", setup), `codex-building.md` (dormant until Codex can build),

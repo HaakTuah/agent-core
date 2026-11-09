@@ -12,7 +12,6 @@ imports them):
 @floor/security.md
 @modules/how-to-work.md
 @modules/inbox.md
-@modules/usage.md
 
 Read when needed: `floor/topics.md` (before a task touches one of its topics), `floor/threat-model.md`,
 `modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md` and
@@ -40,7 +39,7 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
 - **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
   about a fifth of the core's lines changed since the last audit.
 - **Usage:** this repository has no `scripts/usage.sh`; a session uses the one its environment offers, if any, as
-  `modules/usage.md` says.
+  "Usage" in `modules/claude.md` says.
 
 ## Review guidelines
 

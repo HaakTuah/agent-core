@@ -1,7 +1,8 @@
 # How work flows
 
 How a builder goes on to the next task without waiting, and how lanes run beside the main lane. Read at the start of
-every task. Leans on `modules/reviews.md` and `modules/usage.md`; the orchestrator's part: `modules/orchestrating.md`.
+every task. Leans on `modules/reviews.md` and, for Claude, "Usage" in `modules/claude.md`; the orchestrator's part:
+`modules/orchestrating.md`.
 
 Waiting is lost time and, past an hour, a lost cache (core archive 10).
 
@@ -15,7 +16,7 @@ Waiting is lost time and, past an hour, a lost cache (core archive 10).
    lane, with no shared measurement and no waiting on another's result; never what the project runs *one at a time*.
    Claim a lane with a draft PR from a fresh branch off `develop`, after checking the open PRs; merge `develop` into it
    before review; change the *progress file* only when it merges.
-4. **The brake:** `modules/usage.md`.
+4. **The brake,** for Claude: "Usage" in `modules/claude.md`.
 5. **Before opening the PR,** read the task's spec again (what the project's `AGENTS.md` says to re-read), since the
    owner's answers can change it while you work: build what changed, or, if that is large, say so in
    the PR and queue it where the project's `AGENTS.md` says.

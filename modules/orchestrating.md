@@ -32,7 +32,11 @@ The aim: as much work done as possible, for the fewest tokens, without losing qu
 - **Hand over at once:** start the next session as soon as a task merges, woken by the merge, with an hourly check as
   the fallback.
 - **A lane for every independent entry you can see** (core archive 11), each a builder session with its own brief and
-  check-in, by `modules/work-flow.md`; the brake (`modules/usage.md`) closes lanes first.
+  check-in, by `modules/work-flow.md`; the brake ("Usage" in `modules/claude.md`) closes lanes first.
+- **Every other provider is spent to its end** (floor rule 16; core archive 76): Codex, and any provider the owner keeps
+  only for the projects. Where an environment can read every provider's usage (a machine of the owner's, a server, a
+  tool that starts agents and reads their usage), the orchestrator spreads the work so each is spent by its weekly reset
+  before Claude reaches 90%.
 - **Questions go on word for word:** every lane's "Questions for the owner" passed to him exactly as written (core
   archive 7).
 - **No turn sits idle:** long runs and checks go in the background.
