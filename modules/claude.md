@@ -29,7 +29,7 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   of it no new side lane opens, and open ones finish; from about 90%, no bigger task: finish the one at hand if nearly
   done, or bring it to a clean commit and a draft PR saying what is left; then only small things in the main lane, the
   *progress file* saying where you stopped. Only the measured share counts, never the app's warning. **Measure it** with
-  `scripts/usage.sh` at the start and, where it can read it, after every commit; where it cannot (a cloud session
+  the core's `scripts/usage.sh` at the start and, where it can read it, after every commit; where it cannot (a cloud session
   today), it says so at the start: then check no more, and say nothing about it in any PR, report or message, since the
   owner watches and pauses the work at about 90%.
 - **No agent workflows and no ultracode,** except a process the project's own rules name. Long runs go in the
@@ -57,6 +57,6 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   answer or text and stops.
 - Sessions started from a Claude Code Project don't load `.claude/agents/`, so always pass `model` (and `effort`) in the
   call. Never max effort: it costs the most and tends to overthink.
-- **The work-saved hook** (`.claude/hooks/work-saved.sh`, run as merged into `develop`): a session starts with a report
+- **The work-saved hook** (the core's `scripts/work-saved.sh`, run as merged into `develop`): a session starts with a report
   of anything uncommitted, unpushed or stashed, and a reply that would end with any of it gets one nudge to push it, or
   say why it must stay; it runs after every reply, so a builder pushes after each step (core archive 59).

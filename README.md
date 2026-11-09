@@ -44,7 +44,16 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
    what the floor leaves to it (the protected files, the trusted builder, its inputs, what ships, its audit), and points
    to "Reporting a weakness" in the floor, since GitHub shows a repository's `SECURITY.md`. Its threat model adds its
    users, its ways in and its lower stakes. Codex's security review is set to read both, with the floor's.
-5. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
+5. **The shared scripts and workflows,** written once here. It runs the core's scripts (`scripts/`) from its `core/`
+   copy: its `.claude/settings.json` runs `core/scripts/work-saved.sh` as its work-saved hook and
+   `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `develop`
+   (floor rule 3); its copies check is `core/scripts/copies.mjs`, run with a config of its own (the *copies check*
+   slot names it). GitHub runs workflows only from a repository's own `.github/workflows/`, so the core's are reusable:
+   its own `personal-terms.yml` and `copies.yml` each hold one job that calls the core's
+   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`), pinned to the same commit as its
+   `core/` (floor rule 2), passing `PERSONAL_TERMS` alone to the first and its config's path to the second. Only the
+   sync PR moves those pins, with the copy: its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
+6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
    marked there as a safety rule is out of reach of "Principles over rules", as the floor is), each file cut to that,
    with pointers into `core/`.
 
@@ -52,7 +61,7 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 
 The core says what every project says alike; where projects differ only in a name, a path or an example, it leaves a
 **slot**, written in italics (*progress file*), and each project's manifest says what fills it. A path the core names
-outright (`develop`, `main`, `scripts/usage.sh`, `scripts/cloud-setup.sh`, `docs/calibration.md`,
+outright (`develop`, `main`, `scripts/cloud-setup.sh`, `docs/calibration.md`,
 `docs/archive/instructions.md`, `.github/ISSUE_TEMPLATE/`) is where both games keep it; a project that keeps it
 elsewhere says so in its manifest. A task is a project's unit of work (an item, an entry); the main lane is its queue of
 tasks taken in order.
@@ -64,7 +73,7 @@ tasks taken in order.
 | *archive citation* | how a rule file cites the project's archive |
 | *settling references* | what the stand-in checks a question against, with the owner's past words, before it goes to him |
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
-| *copies check* | the check on every PR that fails a new copy |
+| *copies check* | the check on every PR that fails a new copy, and its config for the core's `scripts/copies.mjs` |
 | *large file* | how large a file is before it is never read whole |
 | *size marks* | the marks of the files every session reads |
 | *one at a time* | what never runs as parallel lanes |
