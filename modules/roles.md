@@ -14,6 +14,8 @@ who fills each.
   holds the picture of the finished project and sends the work back until it meets it (core archive 18).
 - **The security reviewer:** Codex's automatic security review; its fallback, the fallback reviewer.
 - **The design checker** (today: Claude): the scored design check on the *design-checked PRs*.
+- **The stand-in** (today: Claude): predicts the owner's answer to a task's open questions from his past words, in one
+  call per batch, and the builder builds on it (`modules/inbox.md`).
 - **Planning design** (today: Claude): the *planning design*, asked directly when a task needs a new or better plan, at
   most once per task, with a self-contained brief (the problem, the measurements, the files and lines). It returns a
   design, which the builder builds and measures.

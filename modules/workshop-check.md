@@ -12,5 +12,6 @@ tools), archived or removed; (6) the rule files (`floor/security.md`, rule 3), a
 contradictions, duplication, stale lines, unclear instructions and broken pointers, and for what can be cut: rules that
 overlap, say more than they need, or have never prevented a real problem, merged or dropped, every cut named in its PR
 with its reason (core archive 67); once at the first milestone after 10 November 2026, then whenever more than about a
-fifth of their lines changed (core archive 54). A project audits its own rule files; the core's are audited in the core
-(core archive 68).
+fifth of their lines changed (core archive 54); and (7) the stand-in's record: how often its predictions matched the
+owner's answers, by kind, and how sure it must be to answer alone (`modules/inbox.md`; core archive 79). A project
+audits its own rule files; the core's are audited in the core (core archive 68).

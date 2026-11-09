@@ -28,9 +28,11 @@ built, the fallback reviewer in place of Codex's code review.
    first.
 5. **The design check, with a score:** on the design-checked PRs, once before the merge, the design checker, given its
    brief (point 7 below), scores the work from 1 to 10 against the design alone, listing what keeps it from 10, since
-   Codex looks for faults and security: its first canary found every planted fault, but the broad feedback on the
-   design is the design check's (core archive 22). **Both at once:** the design check starts in the same turn as the
-   request to Codex, in the background, and the builder answers both lists in one round.
+   Codex looks for faults and security: its first canary found every planted fault, but the broad feedback on the design
+   is the design check's (core archive 22). **Both at once:** the design check starts in the same turn as the request to
+   Codex, in the background, and the builder answers both lists in one round. **The readings too:** it judges the PR's
+   "Readings taken" as the stand-in does (`modules/inbox.md`), being the stand-in's second call: one the owner would
+   likely answer otherwise is a finding, built as the stand-in answers it and sent to him with that answer.
 6. **Codex reviews only when asked. Security reviews: one by itself when a PR is ready; after that, the fallback
    reviewer** (core archive 47, 48, 50 and 51). Codex runs one security review by itself when a PR is opened for review
    or a draft is marked ready, never while a draft and never twice on one commit; asking runs a code review alone

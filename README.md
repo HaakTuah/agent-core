@@ -62,7 +62,7 @@ tasks taken in order.
 | *progress file* | the file that holds the queue and what is done |
 | *report* | where a task's report, with its "Readings taken", goes |
 | *archive citation* | how a rule file cites the project's archive |
-| *settling references* | what a builder checks a question against before it goes to the owner |
+| *settling references* | what the stand-in checks a question against, with the owner's past words, before it goes to him |
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
 | *copies check* | the check on every PR that fails a new copy |
 | *large file* | how large a file is before it is never read whole |
