@@ -1,0 +1,21 @@
+# Updates: Dependabot, CodeQL and Node
+
+How packages, tools and Node are kept current, and what GitHub's checks do. Read when a task takes an update. The
+safety rules every update keeps: floor rules 7, 15 and 17 (`floor/topics.md`).
+
+**The newest stable version, unless there is a reason** (core archive 65), so fixes, security fixes above all, stay one
+small step away. Updates are upkeep, not ideas: they wait for no queue entry and no word from the owner, except his yes
+for `.github/` and the setup script (floor rule 3). Dependabot's version updates (weekly, grouped) come as PRs into
+`develop`, merged under floor rule 17 by the next free lane as ordinary small PRs: the checks, the code review, the
+release notes read for breaking changes, the licence gate (floor rule 10) (core archive 37). A new major version is its
+own PR (out of its group), with the *major version checks*. One is held back only for a reason: it breaks something,
+runs or loads worse, changes its licence, or its project is abandoned or changes hands; the reason is written in the
+closed PR and in an issue (the update's own, if it came as one) that stays open until the reason is gone.
+
+**Node's version** (core archive 39). CI and the cloud machines run the same Node, so a check that passes in a session
+passes in CI. Each October (or at the cue the project names), when a new even-numbered Node becomes long-term support,
+both move to it in one PR (CI and `scripts/cloud-setup.sh`), proven by the full suites; an odd-numbered one is not
+taken.
+
+**CodeQL checks every PR** into `develop` and `main`, every push to them and once a week; a finding on a PR is handled
+as floor rule 9 says, and alerts already in the code are the owner's to pass on.
