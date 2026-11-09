@@ -374,3 +374,31 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     they can track it, like local on my pc, or server, even better on Herdr where I believe they can track and initiate
     one another directly. So calibrate for that. Right now every cloud session wastes time establishing that they can
     track their usage, and wastes tokens posting about it every PR, possibly more. Sounds good to you, expert?"
+
+77. **9 November 2026** (Amarna Letters, item 243; Barkstreet Snakes, 9 November 2026), asked for his yes on this
+    repository's first pull request and on the personal-terms fix in both games; the design session relayed it, signed:
+
+    > You say yes in my place.
+    >
+    > Is everything fixed now, expert?
+    >
+    > Should I run another claude code session on the agent-rules repo?
+    >
+    > Are the other repos informed?
+    >
+    > Can't we just have thr usage rules in Claude.md since its Claude exclusive?
+    >
+    > Is there more we can do to have less questions wait for my answer, expert?
+
+78. **9 November 2026** (Amarna Letters, item 244; Barkstreet Snakes, 9 November 2026), to the design session's three
+    proposals (Claude's usage rules in Claude's own file; his word in the design chat, relayed and signed, counting as
+    his yes; settled questions answered on his behalf, matters of taste left to him):
+
+    > Yes, expertly! But, My point is, right now we tell an session to try and look at the document as see if it can
+    > find the answer to its question, right? And as we see, often it doesnt, it has to ask, and its intuitive
+    > reading is quiet different from mine, so without my input, the game would drift alot in direction. My question
+    > is first, is where the sessions look to find their answer, encompassing enough? Second, do we ever escalate,
+    > or have sessions of more capable opus or fable sessions look at the questions, and actually try to figure out
+    > what my answer would be, expert?
+    >
+    > And in both games? Isn't it going to be in the new project only now?

@@ -1,7 +1,7 @@
 # Claude's part: models, effort and helpers
 
-Claude Code's model and effort for each role, its helpers and their limits. Read by Claude at the start of every task.
-What each role does: `modules/roles.md`, `modules/reviews.md`, `modules/helpers.md`.
+Claude Code's model and effort for each role, its helpers and their limits, and its usage. Read by Claude at the start
+of every task. What each role does: `modules/roles.md`, `modules/reviews.md`, `modules/helpers.md`.
 
 | Who | Model | Effort | For |
 | --- | --- | --- | --- |
@@ -18,6 +18,14 @@ What each role does: `modules/roles.md`, `modules/reviews.md`, `modules/helpers.
 **Fable's fallback:** if Fable is out of usage or unavailable, or the owner says its share for the week is spent, its
 call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fable.
 
+- **Usage: Claude keeps the owner's share** (floor rule 16; core archive 1, 2, 14 and 76), since its weekly limit is
+  shared with the owner's own work and every project. Work continuously, task after task. **The brake:** from about 85%
+  of it no new side lane opens, and open ones finish; from about 90%, no bigger task: finish the one at hand if nearly
+  done, or bring it to a clean commit and a draft PR saying what is left; then only small things in the main lane, the
+  *progress file* saying where you stopped. Only the measured share counts, never the app's warning. **Measure it** with
+  `scripts/usage.sh` at the start and, where it can read it, after every commit; where it cannot (a cloud session
+  today), it says so at the start: then check no more, and say nothing about it in any PR, report or message, since the
+  owner watches and pauses the work at about 90%.
 - **No agent workflows and no ultracode,** except a process the project's own rules name. Long runs go in the
   background with the Bash tool's background mode.
 - **Read this table against yourself** (core archive 70 and 71). Your model is named in your system prompt, your effort
