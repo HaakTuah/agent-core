@@ -34,20 +34,18 @@ built, the fallback reviewer in place of Codex's code review.
 6. **Codex reviews only when asked. Security reviews: one by itself when a PR is ready; after that, the fallback
    reviewer** (core archive 47, 48, 50 and 51). Codex runs one security review by itself when a PR is opened for review
    or a draft is marked ready, never while a draft and never twice on one commit; asking runs a code review alone
-   ("Setup" in `modules/codex.md`), so no builder asks. When a later commit changes what a security review is for
-   (input from users, models or files, a workflow, the network, saved files or exports, a dependency newly added or
-   moved up a major version), or fixes a security finding, the fallback reviewer reviews that change against the floor
-   and the threat model, once, on the round expected to be the last, and the PR says so; never for a change proven
-   unchanged in what it does (a split by meaning, unused code removed, a rename) nor for docs.
+   ("Setup" in `modules/codex.md`), so no builder asks. When a later commit changes what a security review is for (input
+   from users, models or files, a workflow, the network, saved files or exports, a dependency newly added or moved up a
+   major version), or fixes a security finding, the fallback reviewer reviews that change against the project's
+   `SECURITY.md` with the floor, and its threat model, once, on the round expected to be the last, and the PR says so;
+   never for a change proven unchanged in what it does (a split by meaning, unused code removed, a rename) nor for docs.
    **A security review ran only if Codex's summary lists "🔒 Security Review" as completed, or the fallback reviewer's
    review is in the PR;** one with no findings posts nothing else. Its findings count as a code review's; a Codex
    finding fixed by a later commit is closed by the fallback reviewer's check of that commit, its thread answered and
-   resolved. **The security gate:** a PR merges only once its security review has
-   run. If none has completed within about 30 minutes of the ready mark, the fallback reviewer reviews the diff against
-   the floor and the threat model, the PR says so, it may merge on that, and the next wake reports it to the owner. A
-   PR with an open security finding never merges. A milestone PR's commits each passed the gate on their way into
-   `develop`; one that reached `develop` another way (a merge of `main` back with a regenerated lock file, a conflict
-   resolution, a direct push) is reviewed so by the fallback reviewer in the milestone PR before it merges.
+   resolved. **The security gate** is floor rule 8: if no completed security review appears within about 30 minutes
+   of the ready mark, the fallback reviewer reviews the diff against the project's `SECURITY.md` with the floor, and its
+   threat model, the PR says so, it may merge on that, and the next wake reports it to the owner; the same reviewer
+   reviews, in the milestone PR, a commit that reached `develop` without the gate.
 7. **Checks that run the work, once Codex can build** (core archive 25). The native review reads the diff but runs
    nothing, so it cannot check a measured claim. Once Codex's environments work, a Codex task also reruns the
    *measurements* a PR's claims rest on and confirms or corrects them; until then CI and the fallback reviewer check
@@ -69,7 +67,7 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
 4. **At most three rounds for each review, Codex's included, then escalation, then blocked;** a fourth round is never
    asked for. What is still open goes to escalation (`modules/roles.md`) with a self-contained brief, which fixes each
    point or rules it outside the task or wrong, with reasons. If anything is still open, the PR is **not merged:** it is
-   marked blocked in the progress file and filed as a `question` issue linked under "Questions for the owner", and the
+   marked blocked in the *progress file* and filed as a `question` issue linked under "Questions for the owner", and the
    work goes on with the next task that does not depend on it. Nothing is ever merged below 10.
 5. **The bar does not slip.** These checks, each a builder session the orchestrator starts:
    - **A blind re-review every week:** a PR merged at 10 the week before (each category in turn) goes to a fresh

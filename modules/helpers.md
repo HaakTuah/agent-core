@@ -10,8 +10,8 @@ A helper starts cold, rereads what it needs and returns only a summary, so it pa
   a helper each. Helpers that write run in parallel only when their briefs fix every choice their parts share (tests,
   interfaces, names, formats); otherwise one writer does it, since parallel writers make choices the others never see,
   and their work clashes (core archive 60).
-- **Competing approaches, judged by measurement:** two to four candidate fixes for one problem, each in its own worktree,
-  measured the same way (the *measurements*); the best kept, the rest dropped.
+- **Competing approaches, judged by measurement:** two to four candidate fixes for one problem, each in its own
+  worktree, measured the same way (the *measurements*); the best kept, the rest dropped.
 - **Bulk to brief:** about ten files or more read to answer one narrow question: a search helper per question or area,
   returning file:line and a sentence, so the builder's context stays clean.
 - **Fresh eyes:** a review, or a problem that has beaten the builder twice, one fresh helper each.

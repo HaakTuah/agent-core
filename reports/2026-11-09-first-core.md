@@ -12,7 +12,9 @@ games were read only; nothing was written to either. Weekly usage read "unknown"
   comments answer, agents sign (into rule 4, from both `AGENTS.md`); `main` is never pushed to (rule 12, from both); one
   project never writes into another's repository (rule 13, from both). The source check of what ships and the exact
   pins with the week's wait came from both `docs/developing.md` into rule 7, since rule 4's Dependabot conditions rest
-  on them and the floor may point to no module. Where a project fills in nothing, the floor's defaults are the safe
+  on them and the floor may point to no module. Rule 8 also says, as both games' review rules do, that no PR merges
+  before its security review has run (the fresh reviewer's finding: without it a project taking only the floor could
+  merge unreviewed changes). Where a project fills in nothing, the floor's defaults are the safe
   ones (everything protected; no Dependabot exception). `threat-model.md`: both threat models' shared part.
 - **Sixteen practice modules** (`modules/`), each saying at its top what it is for, when it is read and what it leans
   on; six are read at the start of every task (with `claude.md` for Claude).
@@ -25,7 +27,7 @@ games were read only; nothing was written to either. Weekly usage read "unknown"
 Rule files are those the brief names: `AGENTS.md`, `CLAUDE.md`, `SECURITY.md`, `docs/threat-model.md`,
 `docs/claude-and-codex.md`, `docs/codex-building.md`, `docs/orchestrating.md`, `docs/review-guidelines.md`,
 `docs/developing.md` and Amarna's `docs/builder-rules.md`. "After" is the core's floor and modules
-(63,871 bytes), plus what stays in the game (by the maps below; a line the core replaces in part counts with only the
+(64,836 bytes), plus what stays in the game (by the maps below; a line the core replaces in part counts with only the
 clause that stays), plus what adoption adds (the manifest, the "The core" section of `AGENTS.md`, and about 600 bytes
 of headings in the game's `SECURITY.md`, threat model and review guidelines). The core's `README.md`, `AGENTS.md`,
 `CLAUDE.md`, `SECURITY.md`, archive and this report are not rule files a game's sessions read, and are not counted.
@@ -33,15 +35,15 @@ of headings in the game's `SECURITY.md`, threat model and review guidelines). Th
 | | Amarna Letters | Barkstreet Snakes |
 | --- | --- | --- |
 | Rule files today | 94,474 | 111,708 |
-| What stays in the game | 26,048 | 44,509 |
+| What stays in the game | 25,742 | 42,393 |
 | What adoption adds | 3,079 | 3,148 |
-| **Rule files after (core + stays + adds)** | **92,998** | **111,528** |
+| **Rule files after (core + stays + adds)** | **93,657** | **110,377** |
 | Read at the start of a session today, Claude Code (`CLAUDE.md` and what it imports) | 37,816 | 26,531 |
-| Read at the start after, Claude Code | 48,772 | 40,426 |
+| Read at the start after, Claude Code | 49,759 | 41,413 |
 | Read at the start today, Codex (`AGENTS.md`, Amarna's builder rules, "For Codex") | 33,141 | 21,867 |
-| Read at the start after, Codex | 44,536 | 36,190 |
+| Read at the start after, Codex | 45,547 | 37,201 |
 
-The start reading grows because the floor (12,744 bytes) is read at the start, where `SECURITY.md` was not; without
+The start reading grows because the floor (13,337 bytes) is read at the start, where `SECURITY.md` was not; without
 it the start reading stays near today's. That choice is the owner's: [#8](https://github.com/HaakTuah/agent-rules/issues/8).
 Amarna's builder rules are counted as they stand, less the lines the core replaces, which the design session cuts at
 the source.
@@ -106,6 +108,41 @@ The owner's yes is also asked in the PR for `.github/workflows/personal-terms.ym
   written out of the floor (it is the repository's own address, the one exception rule 11 allows).
 - **Fresh reviewer (Opus, high), once,** given only both games' rule files and the core: its findings and what was done
   with each are below.
+## The fresh reviewer's findings, and what was done
+
+Given only both games' rule files and the core, the reviewer found the move faithful in most rules, and these points,
+all handled in one round:
+
+- **Lost, now in the core:** reading the spec again before opening the PR (`modules/work-flow.md`, point 5; what is
+  re-read and where a large change is queued stay each game's own); "read only the sections the task names"
+  (`modules/how-to-work.md`); the lower stakes' shared principle (`floor/threat-model.md`).
+- **Changed, now as the games say it:** the fallback security review checks against the project's `SECURITY.md` with
+  the floor, and its threat model (it had named only the floor); "the newest *stable* release" (floor rule 7,
+  `modules/updates.md`); a held-back update's reason goes in the closed PR and an issue that stays open (B's "or the
+  issue" kept as "the update's own, if it came as one"); Node moves "each October, or at the cue the project names"
+  (Amarna's `@types/node` cue stays in Amarna), with Barkstreet's reason restored; a session stops when its task is
+  merged "and whatever the project's `AGENTS.md` adds" (Amarna's milestone PR and passed-gate exit stay in Amarna).
+- **Reasons and conditions restored,** each dropped while condensing: no description left untrue (so no reader meets a
+  text the project no longer matches); split by meaning ("nothing it must read past"); Fable's usage running out first;
+  test data (no scanner takes one for a leak; never a real person's); rule 9 (an outsider's issue acted on only once the
+  owner passes it on; Codex's findings included); Dependabot condition (5) ("not a lane of its own"); the source check
+  (for the version in use as much as for a new one).
+- **The floor did not require a review before a merge,** so a project taking only the floor could merge unreviewed
+  changes. Floor rule 8 now says, as both games' review rules do: no PR merges until its security review has run, none
+  with an open security finding, and a PR that changes a protected file gets a code review; a milestone PR needs it only
+  for a commit that reached `develop` without one. `modules/reviews.md` keeps the mechanics and points to it.
+- **Pointers:** the personal-terms workflow's comment names "SECURITY.md, point 11" (it is taken unchanged), so the
+  core's `SECURITY.md` says that is floor rule 11; the core's `AGENTS.md` now names its archive's path, says it has no
+  `scripts/usage.sh`, and gives the rule-file audit its own trigger here (no milestones); floor rule 3 says what
+  "merged into `develop`" means where there is no `develop`; the week's wait cites core archive 37 and 65; slots written
+  without italics marked; the milestone PRs' exemption from the security gate said outright (floor rule 8).
+- **Kept as they are, with the reason:** the floor's default where a project names no protected files or trusted
+  builder (everything protected, only the owner changes it) is stricter than either game says, and is what lets the
+  floor stand alone; "two weeks for a script users' browsers load directly" is Barkstreet's case and reads as nothing
+  for a project with none; rule 5 merges both games' input rules into one principle, each game's inputs and checks
+  staying in its own `SECURITY.md`; "[...]" in two archive items is the games' own gap, now said in the archive's
+  header; the archive's mentions of "future projects" and "1 project" name none; the personal-terms check prints
+  matching files' paths, as in both games (taken unchanged).
 ## The done table: every rule of both games, and where it went
 
 A is Amarna Letters, B Barkstreet Snakes. "Stays in each game" and "A" or "B" mean the rule stays in that game's own
@@ -121,11 +158,11 @@ question.
 | 2 | Every role works from AGENTS.md whichever model fills it; Codex reads "For Codex" each task | both | `modules/roles.md` (principle) + project AGENTS pointer |
 | 3 | Where things are (table) | both | stays in each game |
 | 4 | Work from `develop` | A: yes (+ rule files reach main only with milestone); B: yes (+ check out develop if on main) | `modules/git.md` |
-| 5 | Find next item/entry in progress file; its text is the brief; read the sections it names via grep | both | stays in each game |
+| 5 | Find next item/entry in progress file; its text is the brief; read the sections it names via grep | both | stays in each game; "read only the sections it names" in `modules/how-to-work.md` ("Read little") |
 | 6 | Check for changes in the design copy (A) | A | A |
 | 7 | Read "The game in one page" before every item (A) | A | A |
 | 8 | Check weekly usage with `scripts/usage.sh` at start and after every commit; "unknown" → say so in first line of each PR, owner pauses at ~90% | both | `modules/usage.md` |
-| 9 | Before opening the PR, re-read the spec (A: the live design document, builder rules; B: its entry and question issues): build what changed, or if large say so in the PR and queue it (A: start of the next item touching it; B: its own entry right after) | both | A / B (they differ in where a large late change goes: [#7](https://github.com/HaakTuah/agent-rules/issues/7), point 3) |
+| 9 | Before opening the PR, re-read the spec (A: the live design document, builder rules; B: its entry and question issues): build what changed, or if large say so in the PR and queue it (A: start of the next item touching it; B: its own entry right after) | both | `modules/work-flow.md`, point 5 (re-read, build what changed, a large change said in the PR and queued); what is re-read and where a large change is queued stay in each game ([#7](https://github.com/HaakTuah/agent-rules/issues/7), point 3) |
 | 10 | Every rule says what it is for; the aim (max finished work of full quality per week's usage, lowest cost now and later); four pillars; reviews enforce first three; workshop check measures reading | both | `modules/how-to-work.md` |
 | 11 | A question is a question | both | `modules/how-to-work.md` |
 | 12 | Match effort to the task; docs/small fixes one pass, no helpers | both | `modules/how-to-work.md` |
@@ -219,7 +256,7 @@ question.
 | 85 | Who: anyone; issues, fork PRs, packages/actions, planted text; + per game (saves/links, model replies; room codes, shared records) | floor + A / B |
 | 86 | Protected: the owner's accounts (GitHub and tokens, ChatGPT and Claude logins; via workflows, checks, work handed to Codex), his machine runs nothing; branches and site (main, develop, deploy workflows, Pages); users (per game) | floor + A / B |
 | 87 | Ways in: workflows, dependencies and actions, outsiders' text reaching an agent; + per game | floor + A / B |
-| 88 | Lower stakes (per game) | stays in each game |
+| 88 | Lower stakes (per game) | floor (`floor/threat-model.md`: the shared principle) + stays in each game (their examples) |
 
 ### docs/claude-and-codex.md
 
@@ -288,7 +325,7 @@ question.
 | 134 | Source check of what ships (same publisher and repository, provenance, registry signature or key check, diff read against release notes); a check that cannot run leaves it waiting; one that fails holds it back; checks lower odds, CSP limits harm. Specifics: A Vite and its plugins, Rollup, esbuild; B PeerJS's readable build, SRI from the verified package, a preview round | floor (general) + A / B |
 | 135 | Held back only for a reason (breaks, runs/loads worse, licence change, abandoned or changes hands); written in the closed PR and an issue open until gone | `modules/updates.md` |
 | 136 | B: tools' packages and what Dependabot can't see (versions.json, monthly workflow) | B |
-| 137 | Node's version (A: @types/node major is the cue; even LTS from its October moves CI and setup script with full suites; odd closed. B: CI and cloud machines run the same Node; each October both move in one PR) | `modules/updates.md`; A's @types/node cue stays in A |
+| 137 | Node's version (A: @types/node major is the cue; even LTS from its October moves CI and setup script with full suites; odd closed. B: CI and cloud machines run the same Node; each October both move in one PR) | `modules/updates.md` ("each October, or at the cue the project names", with B's reason); A's @types/node cue stays in A |
 | 138 | B: the licence gate's mechanics | B |
 | 139 | CodeQL on every PR into develop and main, every push, weekly; finding → rule 9 | `modules/updates.md` |
 
@@ -476,10 +513,10 @@ lines at the source.
 | `docs/threat-model.md` | 14–18 | floor/threat-model.md |
 | `docs/claude-and-codex.md` | 1–84 | modules/codex.md, roles.md, helpers.md, reviews.md |
 | `docs/claude-and-codex.md` | 88–175 | modules/reviews.md |
-| `docs/claude-and-codex.md` | 182–198 | modules/reviews.md |
+| `docs/claude-and-codex.md` | 182–199 | modules/reviews.md; manifest slot: review reference |
 | `docs/claude-and-codex.md` | 203–251 | modules/reviews.md, codex.md |
 | `docs/codex-building.md` | 1–16 | modules/codex-building.md |
-| `docs/codex-building.md` | 36–66 | modules/codex-building.md |
+| `docs/codex-building.md` | 34–66 | modules/codex-building.md |
 | `docs/orchestrating.md` | 1–43 | modules/orchestrating.md |
 | `docs/review-guidelines.md` | 4–33 | modules/review-guidelines.md |
 | `docs/review-guidelines.md` | 56–63 | modules/review-guidelines.md |
@@ -489,8 +526,8 @@ lines at the source.
 | `docs/developing.md` | 50–52 | modules/updates.md |
 | `docs/builder-rules.md` | 16 | modules/git.md (milestones) |
 | `docs/builder-rules.md` | 19–20 | modules/workshop-check.md; modules/usage.md |
-| `docs/builder-rules.md` | 5, in part; what stays: "- **Branches.** Each item gets its own branch, its own tests and its own report. Its branch comes from `develop`, or, while the item before it is still in review, from that item's PR branch, since the next item depends on the last; that branch (or `develop`, once it is merged) is merged into it before its own pull request." | the rest: floor rule 12; `modules/git.md` |
-| `docs/builder-rules.md` | 17, in part; what stays: "- **Unattended work.** The design session checks the readings taken against the pillars at each milestone, bringing the owner those that break one (archive item 19). Stop only before anything irreversible." | the rest: `modules/inbox.md` |
+| `docs/builder-rules.md` | 5, in part; what stays: "- **Branches.** Each item gets its own branch, its own tests and its own report. Its branch comes from `develop`, or, while the item before it is still in review, from that item's PR branch, since the next item depends on the last; that branch (or `develop`, once it is merged) is merged into it before its own pull request." | the rest: the core, as the done table says |
+| `docs/builder-rules.md` | 17, in part; what stays: "- **Unattended work.** The design session checks the readings taken against the pillars at each milestone, bringing the owner those that break one (archive item 19). Stop only before anything irreversible." | the rest: the core, as the done table says |
 
 ### Barkstreet Snakes (`main` at 3383ad41)
 
@@ -518,17 +555,22 @@ lines at the source.
 | `CLAUDE.md` | 26–60 | modules/claude.md |
 | `SECURITY.md` | 3–5 | floor intro |
 | `SECURITY.md` | 9–24 | floor rules 1 to 3 |
+| `SECURITY.md` | 31 | floor rule 3 |
 | `SECURITY.md` | 32–44 | floor rules 3 and 4 |
-| `SECURITY.md` | 48–51 | floor rule 4 |
+| `SECURITY.md` | 46–51 | floor rule 4 |
 | `SECURITY.md` | 60 | floor rule 6 |
+| `SECURITY.md` | 62 | floor rule 6 |
 | `SECURITY.md` | 77–103 | floor rules 8 and 9 |
-| `SECURITY.md` | 110–118 | floor rule 10 |
+| `SECURITY.md` | 105–108 | floor rule 10 |
+| `SECURITY.md` | 110–120 | floor rule 10 |
 | `SECURITY.md` | 122–138 | floor rules 10 and 11; reporting |
 | `docs/threat-model.md` | 3–10 | floor/threat-model.md |
 | `docs/threat-model.md` | 14–18 | floor/threat-model.md |
 | `docs/claude-and-codex.md` | 1–29 | modules/codex.md, roles.md |
 | `docs/claude-and-codex.md` | 30–35 | manifest slots: planning design, hard work |
 | `docs/claude-and-codex.md` | 36–85 | modules/helpers.md, roles.md, codex-building.md |
+| `docs/claude-and-codex.md` | 98 | modules/codex-building.md |
+| `docs/claude-and-codex.md` | 101–102 | modules/codex-building.md |
 | `docs/claude-and-codex.md` | 103–141 | modules/codex-building.md, reviews.md |
 | `docs/claude-and-codex.md` | 142–143 | manifest slot: design-checked PRs |
 | `docs/claude-and-codex.md` | 144–235 | modules/reviews.md |
@@ -538,15 +580,21 @@ lines at the source.
 | `docs/claude-and-codex.md` | 290–304 | modules/codex.md |
 | `docs/orchestrating.md` | 1–4 | modules/orchestrating.md |
 | `docs/orchestrating.md` | 8–69 | modules/orchestrating.md; modules/workshop-check.md |
-| `docs/review-guidelines.md` | 4–28 | modules/review-guidelines.md |
+| `docs/review-guidelines.md` | 4–29 | modules/review-guidelines.md |
+| `docs/review-guidelines.md` | 31 | modules/review-guidelines.md |
+| `docs/review-guidelines.md` | 35–37 | modules/review-guidelines.md; manifest slot: slop bar |
 | `docs/review-guidelines.md` | 38–46 | modules/review-guidelines.md |
 | `docs/developing.md` | 25–47 | modules/github-calls.md, updates.md; floor rules 4 and 7 |
 | `docs/developing.md` | 51–57 | floor rule 7; modules/updates.md |
 | `docs/developing.md` | 63–67 | floor rule 7; modules/updates.md |
 | `docs/developing.md` | 78–79 | modules/updates.md |
 | `docs/developing.md` | 97–99 | modules/updates.md |
-| `CLAUDE.md` | 25, in part; what stays: "Fable's work by name here: the writing pass (entry 9 in `docs/PROGRESS.md`)." | the rest: `modules/claude.md` |
-| `AGENTS.md` | 66, in part; what stays: "A design call goes into its topic file in `docs/design/`." | the rest: `modules/how-to-work.md` |
-| `AGENTS.md` | 79, in part; what stays: "- Every file is also a script tag and an `sw.js` entry, so smaller is not better." | the rest: `modules/how-to-work.md` |
-| `AGENTS.md` | 207, in part; what stays: "A milestone PR's line of what is new also goes at the top of `version.js`'s news." | the rest: `modules/git.md`; `modules/workshop-check.md` |
-| `AGENTS.md` | 208 | `modules/git.md`; `modules/workshop-check.md` (the line joins 207) |
+| `CLAUDE.md` | 25, in part; what stays: "Fable's work by name here: the writing pass (entry 9 in `docs/PROGRESS.md`)." | the rest: the core, as the done table says |
+| `AGENTS.md` | 66, in part; what stays: "A design call goes into its topic file in `docs/design/`." | the rest: the core, as the done table says |
+| `AGENTS.md` | 79, in part; what stays: "- Every file is also a script tag and an `sw.js` entry, so smaller is not better." | the rest: the core, as the done table says |
+| `AGENTS.md` | 207, in part; what stays: "A milestone PR's line of what is new also goes at the top of `version.js`'s news." | the rest: the core, as the done table says |
+| `AGENTS.md` | 208 | the core; the line's game part joins line 207 |
+| `SECURITY.md` | 104, in part; what stays: "- **What ships** is the files the live site serves; its notices file is [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt)." | the rest: the core, as the done table says |
+| `SECURITY.md` | 109 | the core; the line's game part joins line 108 |
+| `SECURITY.md` | 121, in part; what stays: "The audit of every licence, with which list each is held to, is `tools/licences.json`." | the rest: the core, as the done table says |
+| `docs/review-guidelines.md` | 30, in part; what stays: "A mark in `tools/sizes.json` raised without its reason in the PR blocks." | the rest: the core, as the done table says |

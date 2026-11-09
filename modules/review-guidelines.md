@@ -23,7 +23,7 @@ and the sections it names; a broken rule of the project, the core or the floor; 
 beyond what the task forces (a forced change shows in the PR that every check is kept and none loosened) (core archive
 36); a protected file (`floor/security.md`, rule 3) changed by a Codex lane; and against the pillars of
 `modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead of pointed to, or an entry added
-to the copies check's baseline. A finding: anything the change leaves behind (code, files or settings made unused,
+to the *copies check*'s baseline. A finding: anything the change leaves behind (code, files or settings made unused,
 commented-out code, a description made untrue); content put where its readers must read past it; a fact left where a
 clearly better home exists; a pointer no reader needs.
 

@@ -25,6 +25,6 @@ who fills each.
   stuck branch whose description is the brief, merged into it if it works. Otherwise, and for one that has defeated
   Codex, Claude's escalation step, then its last escalation (`modules/claude.md`). What is still unsolved is blocked
   ("Don't loop" in `modules/how-to-work.md`).
-- **Who merges:** Claude's builders merge their own PRs (`modules/git.md`) once the review's verdict allows, applying the
-  score rules themselves. **Codex never merges:** the orchestrator merges its PRs. Codex never touches `main`, and never
-  pushes to a branch it was not given.
+- **Who merges:** Claude's builders merge their own PRs (`modules/git.md`) once the review's verdict allows, applying
+  the score rules themselves. **Codex never merges:** the orchestrator merges its PRs. Codex never touches `main`, and
+  never pushes to a branch it was not given.

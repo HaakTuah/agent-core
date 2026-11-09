@@ -6,13 +6,13 @@ What each role does: `modules/roles.md`, `modules/reviews.md`, `modules/helpers.
 | Who | Model | Effort | For |
 | --- | --- | --- | --- |
 | You, the builder | Opus for the main lane, engine rules, design readings and the hard work; Sonnet (`model: "sonnet"`) for routine lanes: polish, docs, splits, tests, news lines | the model and effort you were started at, read against this table (below it) | the task itself |
-| Orchestrator | Sonnet if it can set the model of each session it starts; Opus if its sessions take its own | medium | starting each lane at its model, watching PRs, merging at the gates |
+| Orchestrator | Sonnet if it can set each session's model; Opus if its sessions take its own | medium | starting each lane at its model, watching PRs, merging at the gates |
 | Search helper | Haiku (`model: "haiku"`) | as it comes | finding where things are across many files, the cheap way to look; it returns file:line and one-line conclusions |
-| Parallel helper | Sonnet (`model: "sonnet"`) for routine parts; Opus (`model: "opus"`) for parts that need design judgement | medium; high (`effort: "high"`) for the hard work | one part of the work with a shape from `modules/helpers.md`, briefed as it says |
+| Parallel helper | Sonnet (`model: "sonnet"`) for routine parts; Opus (`model: "opus"`) for parts that need design judgement | medium; high (`effort: "high"`) for the hard work | one part of the work, as `modules/helpers.md` says |
 | Reviewer | Opus (`model: "opus"`, `effort: "high"`) | high | the fallback reviewer (code and security review) and the blind re-review |
 | Design check | Opus (`model: "opus"`, `effort: "high"`) | high | the design checker, in one short call; not Fable, which drains the week's usage far faster (core archive 66) |
 | Planning design | Fable (`model: "fable"`, `effort: "high"`) | high | planning design; you build and measure what it returns with Opus |
-| Escalation | Opus (`model: "opus"`, `effort: "high"`, or `"xhigh"` if you already run at high or above) | high or extra high | the escalation step, when Codex is unavailable or has failed at it too (Codex comes first once it can build) |
+| Escalation | Opus (`model: "opus"`, `effort: "high"`, or `"xhigh"` if you already run at high or above) | high or extra high | the escalation step, when Codex is unavailable or has failed too (Codex first once it can build) |
 | Last escalation | Fable (`model: "fable"`, `effort: "high"`) | high | a problem the escalation step could not solve, with the same brief. Otherwise Fable only for planning design and work the owner gives it by name, since its usage runs out first |
 
 **Fable's fallback:** if Fable is out of usage or unavailable, or the owner says its share for the week is spent, its
@@ -37,7 +37,7 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   whenever it changes behaviour, rules or text a user reads, besides the reviews every PR gets. The workshop check
   compares review rounds and usage per lane by model: a kind of lane where Sonnet needs more rounds to reach a 10 goes
   back to Opus.
-- **A helper above you gets only what needs it,** Fable above all: you do the work before it (finding, measuring, and a
+- **A helper above you gets only what needs it,** Fable above all, since its usage runs out first: you do the work before it (finding, measuring, and a
   brief that points it only at what it must judge) and after it (building, testing, writing up); it returns its design,
   answer or text and stops.
 - Sessions started from a Claude Code Project don't load `.claude/agents/`, so always pass `model` (and `effort`) in the

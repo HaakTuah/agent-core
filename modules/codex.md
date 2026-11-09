@@ -43,8 +43,7 @@ owner's machine starts Codex, ever (core archive 52): once its tasks work, it is
 
 ## What reaches Codex
 
-Only the owner's own work (`floor/security.md`, rule 4): a lane goes to Codex only as a pull request HaakTuah opened
-from a branch in the repository, never `main` or `develop`, its description the brief. A Codex task reads the web, so
-planted text could try to steer it: its work never changes the protected files (rule 3). Such a PR is marked failed,
-with the files named, and the orchestrator checks it too before any merge (the compare call in
-`modules/github-calls.md`): it is never merged; the owner decides.
+Only the owner's own work (floor rule 4): a lane goes to Codex only as a PR HaakTuah opened from a branch here, never
+`main` or `develop`. A Codex task reads the web, so planted text could try to steer it: a Codex PR that changes a
+protected file (floor rule 3) is marked failed, the files named, checked by the orchestrator before any merge (the
+compare call), and never merged; the owner decides.

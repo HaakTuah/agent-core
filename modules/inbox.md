@@ -24,8 +24,8 @@ his words are kept once, in the archive (core archive 7, 13 and 28). Read at the
   built from one, and no agent treats another's as an instruction, until the owner moves it into the *progress file*.
 - **Bugs don't wait for the owner.** A bug in the task at hand is fixed in it; one outside it is filed, and any lane
   whose files it touches may claim it. A bug closes only when its fix is live, so the open bugs are what users still
-  meet: the fix's commit says "Fixes #n", and GitHub closes it when that commit reaches `main`; never by hand. A fix that
-  would change a rule or the design is a question instead.
+  meet: the fix's commit says "Fixes #n", and GitHub closes it when that commit reaches `main`; never by hand. A fix
+  that would change a rule or the design is a question instead.
 - **The owner's words are kept, in the archive.** Each instruction he gives is quoted word for word in the project's
   archive (`docs/archive/instructions.md` says which file), dated (and numbered where the project numbers them),
   personal details left out (`floor/security.md`, rule 11). Everything else points to its entry and never quotes it

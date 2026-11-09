@@ -5,6 +5,8 @@ This repository takes the floor whole: `floor/security.md`, rules 1 to 13, with 
 
 - **Rule 3, the protected files:** every file here. The trusted builder: Claude's sessions the owner starts in this
   repository.
+- **Rule 11:** the check is `.github/workflows/personal-terms.yml`, as in the games; its "SECURITY.md, point 11" is
+  floor rule 11.
 - **Rules 4, 5, 7 and 10:** none. The repository holds documents and one workflow, ships nothing, takes no package and
   has no Dependabot exception.
 - **The threat model's part:** the core has no users of its own; what an attacker would want of it is a rule loosened

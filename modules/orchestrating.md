@@ -5,7 +5,7 @@ For the orchestrator, the session that starts builder sessions. The builder's ow
 **The orchestrator builds nothing itself** (core archive 27). Every lane, the main lane included, goes to a builder
 session of its own, with its own brief, at the builder's model and effort. Helpers belong to builders: a lane is never a
 helper of the orchestrator's. It keeps its own context small, for what only it does: claims, starting and handing over
-sessions, merging Codex's work, and the owner's questions word for word. A session it starts runs at its own effort, and
+sessions, merging Codex's work, the owner's questions. A session it starts runs at its own effort, and
 it never waits for one at a higher effort: the builder gives the hard work more effort in its own session. Only if it
 cannot start builder sessions at all does it say so and stop, and the owner starts them. Why: its context is re-read on
 every turn, so building in it costs the most; it runs at its own effort, not the work's; and if it dies, every lane

@@ -1,11 +1,11 @@
 # The owner's words behind the core
 
-Every core rule rests on something the owner said. His words are quoted here word for word, numbered, each with the
-game and archive entry it came from: an Amarna Letters entry by its item number, a Barkstreet Snakes entry by its date.
-The text between his quotes is a short note of what he was answering, in plain words; only what is inside quotation
-marks is his. "[…]" marks a personal detail left out (`floor/security.md`, rule 11); "(…)" marks a part about one game
-only, left in that game's archive. "Core archive N" anywhere in the core is item N here. A new item goes at the end,
-numbered after the last, with its date and its source.
+Every core rule rests on something the owner said. His words are quoted here word for word, numbered, each with the game
+and archive entry it came from: an Amarna Letters entry by its item number, a Barkstreet Snakes entry by its date. The
+text between his quotes is a short note of what he was answering, in plain words; only what is inside quotation marks is
+his. "[…]" marks a personal detail left out (`floor/security.md`, rule 11); "(…)" marks a part about one game only, left
+in that game's archive; "[...]" is a gap the game's own archive left in the quote. "Core archive N" anywhere in the core
+is item N here. A new item goes at the end, numbered after the last, with its date and its source.
 
 1. **20 October 2026** (Amarna Letters, item 4). The usage plan: "Usage plan: both of my Claude Code sessions share
    the weekly limit, so check usage after every commit from now on."
@@ -194,8 +194,8 @@ numbered after the last, with its date and its source.
     notice has merged, at least daily): "Yes, expertly to both, if you advice."
 
 38. **2 November 2026** (Amarna Letters, item 159; for both games): "(…) are all the issues that are closed fixed or
-    being fixed, expert?" "What is best?" "Why should they be treated differently?" To open meaning it needs the owner, and a bug
-    closing when its fix is live: "agreed with your expert take."
+    being fixed, expert?" "What is best?" "Why should they be treated differently?" To open meaning it needs the owner,
+    and a bug closing when its fix is live: "agreed with your expert take."
 
 39. **2 November 2026** (Amarna Letters, item 160; for both games): "Why are we running an older version of Node?"
     "Why should we ignore, if we update?" To a new major of the Node types being the cue to move Node itself: "Yes,

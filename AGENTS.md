@@ -15,13 +15,13 @@ imports them):
 @modules/usage.md
 
 Read when needed: `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`,
-`modules/review-guidelines.md`, `modules/codex.md` and `modules/github-calls.md`. The rest describe the projects'
-work, not this repository's.
+`modules/review-guidelines.md`, `modules/codex.md` and `modules/github-calls.md`. The rest describe work this repository
+does not do (lanes, milestones, updates, the orchestrator).
 
 What fills the slots here: the *progress file* and the *report*: this repository's open PRs, and `reports/` (one file
-per change, `<date>-<name>.md`); the *archive citation*: "(core archive N)"; the *settling references*: `README.md` and
-`archive/instructions.md`; the *descriptions*: `README.md`; the *large file*: past about 50 KB; the *size marks*: about
-20 KB for each file a session reads at the start. No other slot applies.
+per change, `<date>-<name>.md`); the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling
+references*: `README.md` and `archive/instructions.md`; the *descriptions*: `README.md`; the *large file*: past about 50
+KB; the *size marks*: about 20 KB for each file a session reads at the start. No other slot applies.
 
 ## How changes are made here
 
@@ -36,7 +36,10 @@ per change, `<date>-<name>.md`); the *archive citation*: "(core archive N)"; the
   word for word, into `archive/instructions.md`. A rule only one project has stays in that project.
 - **Nothing personal and nothing exploitable** (`floor/security.md`, rules 1 and 11): the core names no project, except
   in its archive and its reports.
-- **The workshop check's sixth point** (`modules/workshop-check.md`) runs here on the core's own files.
+- **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
+  about a fifth of the core's lines changed since the last audit.
+- **Usage:** this repository has no `scripts/usage.sh`; a session uses the one its environment offers, or says
+  "unknown" as `modules/usage.md` says.
 
 ## Review guidelines
 
