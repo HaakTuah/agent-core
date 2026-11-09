@@ -55,7 +55,7 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
    `PERSONAL_TERMS` alone to the first and its config's path to the second. Only a sync PR moves those pins, and only
    when one of the core's workflows changed since the last: then it moves them to its new pin, and needs the owner's
    yes, since it changes `.github/` (floor rule 3). Its review checks that the core's workflows at the workflow pins
-   are those at its pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
+   are those at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
    marked there as a safety rule is out of reach of "Principles over rules", as the floor is), each file cut to that,
    with pointers into `core/`.

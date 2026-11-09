@@ -69,7 +69,8 @@ Barkstreet Snakes: a config `tools/copies.json` with `"baseline": "tools/copies-
 which runs on every PR, docs-only ones included; `tests.yml` skips notes alone, so they must not move there. They
 become a second job of Barkstreet's own in its `copies.yml`, beside the call (the base branch fetched, `SIZES_BASE` set
 to it as `COPIES_BASE` is today), and the `copies` suite of `scripts/test.sh` runs the core's check with the config and
-the two. The old path is named also in `AGENTS.md` (line 59), `SECURITY.md` (line 27), `tools/pointers-test.js`
+the two. That job loads `rule-files.mjs` by `require`, which needs Node 22.12 or later: it sets up Node as `tests.yml`
+does. The old path is named also in `AGENTS.md` (line 59), `SECURITY.md` (line 27), `tools/pointers-test.js`
 (line 13) and `tools/sizes-test.js` (lines 9 and 11).
 
 Each game's PR shows its copies check passing before and after, as here.
