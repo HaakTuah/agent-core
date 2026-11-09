@@ -402,8 +402,8 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     > what my answer would be, expert?
     >
     > And in both games? Isn't it going to be in the new project only now?
-79. **9 November 2026** (Amarna Letters, item 245; Barkstreet Snakes, 9 November 2026), to the design session's plan for a
-    stand-in that predicts his answers from his past words before a question reaches him, tested on his past answers:
+79. **9 November 2026** (Amarna Letters, item 245; Barkstreet Snakes, 9 November 2026), to the design session's plan
+    for a stand-in that predicts his answers from his past words before a question reaches him, tested on his past answers:
 
     > Yes, expertly. One thing though. Right now, the builder continues with its interpretation until I correct it?
     > Even a predictor that is wrong some of the time, would presumably steer the project in a more correct
