@@ -427,3 +427,63 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     > Important it specifically says newest version, so we never accidentally get an old version. And you say this
     > happens in round 3, but by who? Neither the snakes or amarna orchestrator can do stuff in the agent-rules
     > repo, yet you still say i shouldn't start any new claude code session for the agent-rules repo, expert?
+
+82. **11 October 2026** (Barkstreet Snakes, 11 October 2026, 21:21), on the computer players he wanted:
+
+    > I want 3 enemy AI's in the game. They shouldn't have super human reaction speed, but they should be very clever.
+
+83. **14 October 2026** (Barkstreet Snakes, 14 October 2026, 00:50), on making them better:
+
+    > If we can upgrade the AI, through making it do better future step planning, not by increasing reaction time, or
+    > making them all samey in strategy, nor decreasing performance below good gameplay levels, then I think we should
+    > do that.
+
+84. **Before 20 October 2026** (Barkstreet Snakes, set down on 3 November 2026; undated in its archive), in the notes
+    behind its round six A, on every new rule having a visible cue and a lesson, "a very important point":
+
+    > Add that!
+
+85. **27 October 2026** (Barkstreet Snakes, 27 October 2026, 09:35 UTC), asked whether that game should also test
+    each new feature by playing computer players that use it against ones that ignore it, as Amarna Letters does:
+
+    > If your expert opinion is that we should, then go ahead, expertly!
+
+86. **28 October 2026** (Amarna Letters, item 18), after a report found that script kings using an item's features won
+    no more than those ignoring them:
+
+    > But it is a big problem that using mechanics don't benefit the ai right now! Must pay careful attention to that!
+    > Can't draw conclusion right now, as the game isn't fully constructed yet, but once it starts being feature
+    > complete,  this cannot be the case.
+
+87. **28 October 2026** (Amarna Letters, item 21), answering an item's review questions:
+
+    > You figure all this out, expert. You know me by now. But models must be able to alter clauses also. Remember,
+    > everyone plays the same game!
+
+88. **29 October 2026** (Barkstreet Snakes, 29 October 2026, 12:21 UTC), on the new moves:
+
+    > And very important that the commin ai is updated to understand all these rule changes to maximize they use of
+    > all the playrules!!!
+
+89. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 19:13 to 19:15 UTC), on a use-against-ignore test of two
+    new moves coming out even:
+
+    > And I cannot believe that super flash and super jump isn't useful, then it must be the AI not properly being
+    > updated to understand its utility. Super jump essentially lets you fly for like 5 tiles, no? changing directions
+    > mid air like mario? and super flash let's you flash forward 3 tiles instead of 2 like regular flash, and can cut
+    > 2 tiles deep? how is that not useful?
+
+    To the design session's take (teach the computer players the move's uses until its users come out ahead):
+
+    > Yes, please, expertly!
+
+90. **3 November 2026** (Amarna Letters, item 205), on model kings:
+
+    > If scripts can manage a game, a model should also manage to play it, even if not very competently?
+
+    To the design session's answer (models play through text, so their failures can come from how the game tells
+    them things):
+
+    > Agreed. And interesting is what I want it to be. The models should absolutely aim to play as competently as they
+    > can. that's what we incentivize. but if they make interesting mistakes, i don't see that as an issue. I just want
+    > the source of that to be from the genuine complexity of the scenario, not the game communicating badly.

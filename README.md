@@ -27,6 +27,8 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
     `codex.md` (Codex's status, "For Codex", setup), `codex-building.md` (dormant until Codex can build),
     `orchestrating.md` (the orchestrator), `github-calls.md` (REST calls from a cloud session), `updates.md` (versions,
     Node, CodeQL) and `workshop-check.md` (the weekly check).
+  - Taken only by projects that are games, read before a task changes a rule, a feature or how the computer players
+    play: `game-design.md` (the design principles both games share; core archive 80).
 
 ## How a project takes the core
 
@@ -78,6 +80,12 @@ tasks taken in order.
 | *major version checks* | the extra checks a new major version gets |
 | *Codex's checks* | what Codex runs before it finishes |
 | *Codex environment* | whether a Codex cloud environment exists for the project |
+| *computer players* | a game's players that no person plays (`game-design.md`) |
+| *measured players* | the computer players whose use of a feature decides whether it is finished |
+| *what they are shown* | what the computer players see of the game |
+| *use-against-ignore measurement* | how players that use a feature are measured against ones that do not |
+| *where the numbers go* | where that measurement's numbers are shown |
+| *where rules are taught* | where a player learns each rule |
 
 ## The manifest's format
 
