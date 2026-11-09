@@ -16,6 +16,11 @@ of every task. What each role does: `modules/roles.md`, `modules/reviews.md`, `m
 | Escalation | Opus (`model: "opus"`, `effort: "high"`, or `"xhigh"` if you already run at high or above) | high or extra high | the escalation step, when Codex is unavailable or has failed too (Codex first once it can build) |
 | Last escalation | Fable (`model: "fable"`, `effort: "high"`) | high | a problem the escalation step could not solve, with the same brief. Otherwise Fable only for planning design and work the owner gives it by name, since its usage runs out first |
 
+**Always the newest version** (core archive 80 and 81), so no session or helper ever runs on an old one by accident:
+every model is named by its family alone (`haiku`, `sonnet`, `opus`, `fable`), which takes the newest version of that
+family; no rule, brief or call names a version number. The orchestrator starts every session on the newest version of
+its model, and a session started on an older one says so in its first message.
+
 **Fable's fallback:** if Fable is out of usage or unavailable, or the owner says its share for the week is spent, its
 call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fable.
 

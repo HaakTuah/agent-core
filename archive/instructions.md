@@ -403,10 +403,27 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     >
     > And in both games? Isn't it going to be in the new project only now?
 79. **9 November 2026** (Amarna Letters, item 245; Barkstreet Snakes, 9 November 2026), to the design session's plan
-    for a stand-in that predicts his answers from his past words before a question reaches him, tested on his past answers:
+    for a stand-in that predicts his answers from his past words before a question reaches him, tested on his past
+    answers:
 
     > Yes, expertly. One thing though. Right now, the builder continues with its interpretation until I correct it?
     > Even a predictor that is wrong some of the time, would presumably steer the project in a more correct
     > direction, if the initial builder gets its input quicker? As long as it can overrule such low confidence
     > answers later, like i do now anyways? So is the idea that this opus session is always the one to look through
     > the archive? Is it triggered for every question there is, or does it answer multiple in a bulk, expert?
+
+80. **9 November 2026** (the core), to the design session's plan for what follows the first core (each game taking its
+    copy, then a review of the rule files with a shared game-design module, then the scripts both games keep), and to
+    its finding that a writing pass named an old Fable:
+
+    > Yes, we need to do all of that! Do i run a fable 5.2 session for it now, expert?
+    >
+    > Also, do we state newest version on all? Haiku, Sonnet, opus, fable, so we never need to update numbers, they
+    > jsut use the latest iteration of each, expert?
+
+81. **9 November 2026** (the core), to the design session's answer that rules name models by family only and that he
+    need start no session for the core:
+
+    > Important it specifically says newest version, so we never accidentally get an old version. And you say this
+    > happens in round 3, but by who? Neither the snakes or amarna orchestrator can do stuff in the agent-rules
+    > repo, yet you still say i shouldn't start any new claude code session for the agent-rules repo, expert?
