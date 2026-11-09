@@ -11,6 +11,7 @@ of every task. What each role does: `modules/roles.md`, `modules/reviews.md`, `m
 | Parallel helper | Sonnet (`model: "sonnet"`) for routine parts; Opus (`model: "opus"`) for parts that need design judgement | medium; high (`effort: "high"`) for the hard work | one part of the work, as `modules/helpers.md` says |
 | Reviewer | Opus (`model: "opus"`, `effort: "high"`) | high | the fallback reviewer (code and security review) and the blind re-review |
 | Design check | Opus (`model: "opus"`, `effort: "high"`) | high | the design checker, in one short call; not Fable, which drains the week's usage far faster (core archive 66) |
+| Stand-in | Opus (`model: "opus"`, `effort: "high"`) | high | predicting the owner's answers to a task's open questions, one call per batch (`modules/inbox.md`); Fable (`effort: "high"`) only for a question that touches a design pillar and that Opus cannot call with confidence (core archive 79) |
 | Planning design | Fable (`model: "fable"`, `effort: "high"`) | high | planning design; you build and measure what it returns with Opus |
 | Escalation | Opus (`model: "opus"`, `effort: "high"`, or `"xhigh"` if you already run at high or above) | high or extra high | the escalation step, when Codex is unavailable or has failed too (Codex first once it can build) |
 | Last escalation | Fable (`model: "fable"`, `effort: "high"`) | high | a problem the escalation step could not solve, with the same brief. Otherwise Fable only for planning design and work the owner gives it by name, since its usage runs out first |
@@ -30,15 +31,16 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   background with the Bash tool's background mode.
 - **Read this table against yourself** (core archive 70 and 71). Your model is named in your system prompt, your effort
   is in `$CLAUDE_EFFORT` (unset: medium); a session another starts takes its model and effort. Models rank Haiku,
-  Sonnet, Opus, Fable; efforts low, medium, high, xhigh. A helper is above you when its model ranks
-  higher, or its model is yours and its effort higher. A helper for judgement (the hard work, which needs Opus at high;
-  planning design; a part that needs design judgement) is called only when it is above you: otherwise you do that work
-  yourself, since such a helper adds only a cold start. A helper for a fresh eye on finished work (the reviewer, the
-  design check) is used whatever your level, since its worth is that it did not write the work. An escalation step is a
-  fresh solver: one below your level is skipped, except the last, which runs at your level instead; one at your level
-  still pays, for its fresh eye. A helper for cost (search, routine parts) is used whatever your level. You can't change
-  your own model or effort; if you are not on Opus, say so in your first message. A problem that beats you twice goes
-  up the escalation chain; if its last step fails too, or Fable is unavailable, it is blocked ("Don't loop"); say so.
+  Sonnet, Opus, Fable; efforts low, medium, high, xhigh. A helper is above you when its model ranks higher, or its model
+  is yours and its effort higher. A helper for judgement (the hard work, which needs Opus at high; planning design; a
+  part that needs design judgement) is called only when it is above you: otherwise you do that work yourself, since such
+  a helper adds only a cold start. A helper for a fresh eye on finished work (the reviewer, the design check) is used
+  whatever your level, since its worth is that it did not write the work. So is the stand-in, whose worth is that it
+  reads the owner's past words, which the builder does not. An escalation step is a fresh solver: one below your level
+  is skipped, except the last, which runs at your level instead; one at your level still pays, for its fresh eye. A
+  helper for cost (search, routine parts) is used whatever your level. You can't change your own model or effort; if you
+  are not on Opus, say so in your first message. A problem that beats you twice goes up the escalation chain; if its
+  last step fails too, or Fable is unavailable, it is blocked ("Don't loop"); say so.
 - **Sonnet builds, Opus backs it** (core archive 73). A Sonnet builder hands what needs judgement to an Opus helper at
   high, and a lane that turns out to need it whole goes back to the orchestrator for an Opus builder; a problem that
   beats it twice escalates as for anyone. Its PR's first line says Sonnet built it, and it gets the design check
