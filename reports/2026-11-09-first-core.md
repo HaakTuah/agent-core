@@ -633,5 +633,7 @@ everything it advised, and Claude alone keeps a reserve. Made in this PR by the 
 - **`.github/dependabot.yml`** now updates the workflow's GitHub actions weekly, a week after each release (it was
   GitHub's empty template, which fails); this repository's `SECURITY.md` says so under rule 17.
 
-Read at the start of a session after adoption, Claude Code: Amarna Letters about 43,900 bytes (37,816 today; 49,759
+The core's floor and modules are now 67,050 bytes (64,836 before): the three new floor rules and usage by provider add
+about 2.2 KB, so each game's rule files after adoption come out about 1% above today's (Amarna Letters about 95,900,
+Barkstreet Snakes about 112,600). Read at the start of a session after adoption, Claude Code: Amarna Letters about 43,900 bytes (37,816 today; 49,759
 before the split), Barkstreet Snakes about 35,500 (26,531 today; 41,413 before). Codex: about 39,700 and 31,300.
