@@ -33,7 +33,7 @@ security gate's fallback or without passing it.
   check-in, by `modules/work-flow.md`; the brake ("Usage" in `modules/claude.md`) closes lanes first.
 - **Every other provider is spent to its end** (floor rule 16; core archive 76): Codex, and any provider the owner keeps
   only for the projects. Where an environment can read every provider's usage (a server, or a tool there that starts
-  agents and reads their usage; never the owner's machine, floor rule 8), the orchestrator spreads the work so each is
-  spent by its weekly reset before Claude reaches 90%.
+  agents and reads their usage, or the owner's own computer when he starts it there himself, as floor rule 8 allows),
+  the orchestrator spreads the work so each is spent by its weekly reset before Claude reaches 90%.
 - **Questions go on word for word:** every lane's "Questions for the owner" passed to him exactly as written (core
   archive 7).

@@ -30,8 +30,9 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
 - **Every PR here changes rule files,** all protected (`floor/security.md`, rule 3), so each gets Codex's code review
   ("Codex reviews" in `modules/reviews.md`) and its security review. **A change to the floor or to `.github/` needs
   the owner's yes in its PR.**
-- **The session that writes a change does not merge it:** the design session checks it against every project that
-  takes the core, and merges it. It reaches a project only through a sync PR there (`README.md`).
+- **The session that writes a change does not merge it:** the design session checks it against every project that takes
+  the core, and merges it. It reaches a project only through a sync PR there (`README.md`), and a change is done only
+  when the design session has opened one in every project that takes the core (core archive 80).
 - **A rule moves here only when it holds in every project that takes the core,** and its owner's words come with it,
   word for word, into `archive/instructions.md`. A rule only one project has stays in that project.
 - **Nothing personal and nothing exploitable** (`floor/security.md`, rules 1 and 11): the core names no project, except

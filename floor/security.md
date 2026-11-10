@@ -44,13 +44,16 @@ are the one exception, under floor rule 17.
 
 **8. Reviews look for breaks of any floor rule,** and for any new way in: a new input, a new external request, a new
 dependency or script, a weakened check. **No PR merges until its security review has run, and none with an open security
-finding;** a PR that changes a protected file also gets a code review. A milestone PR needs its security review only
-for a commit that reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push).
-Nothing from this repository or its PRs runs on the owner's machine, and nothing there starts an agent (core archive
-52). **Test data is never real:** fake keys and tokens are built when the test runs, from pieces (such as
-`"AIza" + "Sy" + "x".repeat(33)`), never a literal that looks real, so no scanner takes one for a leak; sample names,
-paths and e-mail addresses are invented (`jdoe`, `/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning
-alert on a test's fake is closed as "Used in tests" once the literal is gone (core archive 29).
+finding;** a PR that changes a protected file also gets a code review. A milestone PR needs its security review only for
+a commit that reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push). Nothing from
+this repository or its PRs runs on the owner's machine by itself, and nothing there starts an agent by itself: no
+poller, hook or schedule acts on his computer (core archive 52). The one exception is an orchestrator session he starts
+there himself, though he prefers the cloud or a server (core archive 91): it keeps every floor rule, works in a folder
+of its own, away from his other files, and holds no key beyond its own sign-in. **Test data is never real:** fake keys
+and tokens are built when the test runs, from pieces (such as `"AIza" + "Sy" + "x".repeat(33)`), never a literal that
+looks real, so no scanner takes one for a leak; sample names, paths and e-mail addresses are invented (`jdoe`,
+`/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning alert on a test's fake is closed as "Used in tests"
+once the literal is gone (core archive 29).
 
 **11. Nothing personal, ever** (core archive 30 and 43). No file, commit message, PR, issue, comment, log or picture
 holds personal information about the owner or anyone in his life: no names (he is "the owner"), no profession,

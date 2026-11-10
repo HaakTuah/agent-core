@@ -10,8 +10,10 @@ review reads both. Rules cited: the floor's.
   repository uses, or plant text on a page a builder or Codex reads; and whoever the project's own model adds.
 - **What is protected:** **the owner's accounts** (his GitHub account and its tokens, his ChatGPT and Claude logins),
   reached through a workflow, a PR's checks or work handed to Codex (rules 1 to 4); his own machine runs nothing from
-  the repository (rule 8). **The branches and the site:** `main` (the live project), `develop`, the workflows that
-  deploy, and GitHub Pages (rules 2, 3 and 12). **The project's users,** as its own model says.
+  the repository by itself, and the one thing he may run there, an orchestrator session he starts himself, works in a
+  folder of its own away from his other files and holds no key beyond its own sign-in (rule 8). **The branches and the
+  site:** `main` (the live project), `develop`, the workflows that deploy, and GitHub Pages (rules 2, 3 and 12). **The
+  project's users,** as its own model says.
 - **Lower stakes:** a slowdown or crash confined to one user's own tab, from input only that user chose, is Low; the
   same from input someone else shaped is not. The project's own model says what else is.
 - **The ways in:** the workflows and what triggers them (rule 2); dependencies and actions (rules 2, 7, 10, 15 and 17);
