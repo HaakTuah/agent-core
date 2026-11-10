@@ -5,8 +5,8 @@
 # past the split mark is split before it is changed), with the marks the project names. A project calls it
 # (workflow_call) on every pull request and push to main, docs-only changes included, since the rule files are what it
 # guards most, pinned to a full commit SHA ("How a project takes the core" in README.md, point 5). It runs the project's
-# own core/scripts/copies.mjs, pointers.mjs and reading-size.mjs with the configs the project names. Node's own modules
-# only: nothing is installed. Read-only, with no secret.
+# own core/scripts/copies.mjs, pointers.mjs and reading-size.mjs with the configs the project names, on the core's one
+# exact Node; Node's own modules only, no package installed. Read-only, with no secret.
 name: copies
 
 on:
@@ -32,6 +32,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false # nothing after the checkout needs the token
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
       - name: The base branch's latest commit, for its baseline and marks (not the whole history)
         if: github.event_name == 'pull_request'
         env:
