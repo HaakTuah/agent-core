@@ -116,7 +116,7 @@ Floor: whole. Modules: <all, or the list of those taken>.
 <one row per slot above, its value here; a slot left out means the project has no such thing>
 ```
 
-## Setting up Codex (the owner's part)
+## Setting up (the owner's part)
 
 - Codex's GitHub app given the owner's repositories, its own Code Review set to automatic review off (core archive
   18).
@@ -127,9 +127,7 @@ Floor: whole. Modules: <all, or the list of those taken>.
   51).
 - A Codex cloud environment for each project (the *Codex environment*), made in ChatGPT's Codex settings as a legacy
   environment: its setup script `bash scripts/cloud-setup.sh` (manual setup, the same as its maintenance script), and
-  internet access limited to read-only methods. A task by comment builds and tests there but cannot push
-  (`modules/codex-building.md`, "Status").
-- Codex runs on its default model and effort for cloud tasks (none can be chosen).
+  internet access limited to read-only methods.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
 
 ## This repository
