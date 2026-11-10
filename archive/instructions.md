@@ -556,3 +556,9 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      to high, since the builder sessions it starts run at its effort (core archive 99):
 
      > Yes, expertly!
+
+101. **10 November 2026** (the core), asked whether to fix four lines of `modules/claude.md` that today's answers left
+     out of date (the orchestrator's model fallback, what effort a started session runs at, passing `effort` in a call,
+     and "if you are not on Opus"):
+
+     > Yes, please, expert!
