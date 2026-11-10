@@ -654,3 +654,19 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      and to pass its checks before it merges tests each change on what it lands on, he answered:
 
      > Yes, please, expertly! Do I need to do anything, boss?
+
+114. **10 November 2026** (the core), sharing a fresh reviewer's review of `modules/game-design.md`, then, to the
+     design session's reading of it (the measurement in three groups; a feature that does not matter reworked or cut;
+     replays from a log of inputs and model answers where people or models play; a test for "Everything new belongs";
+     no cheating on a line of its own and no tells; what is shown from the past shows its age; the threshold of
+     "came out ahead"; and two choices put to him: a version that changes play waits until the game in play ends, and a
+     player's attention counts only for what he must follow, kept readable by teaching and showing it):
+
+     > Review of our game rules by a fellow Opus 5.5 (extra effort).
+
+     > Agreed to all, expert.
+
+115. **10 November 2026** (the core), in the same message, on how a player gets the newest version:
+
+     > but whenever you launch the webpage, you should start the newest version, or get a note that you can play the
+     > newest by clicking here if we can't auto-refresh, is my take. Yours, expert?
