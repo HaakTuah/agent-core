@@ -14,22 +14,22 @@ import { execFileSync } from "node:child_process";
 const CORE = "HaakTuah/agent-core";
 const URL = `https://github.com/${CORE}`;
 const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+class Failure extends Error {}
+const fail = msg => { throw new Failure(msg); };
 
-const manifest = "core-manifest.md";
-if (!fs.existsSync(manifest) || !fs.existsSync("core")) fail(`run it from a project's root, beside ${manifest} and core/`);
-const lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under core/`, "m");
-const text = fs.readFileSync(manifest, "utf8");
-const old = text.match(lineRe)?.[1] ?? fail(`${manifest} has no "Core: ${CORE} at <full commit SHA>, copied whole under core/" line`);
+function sync(tmp) {
+  const manifest = "core-manifest.md";
+  if (!fs.existsSync(manifest) || !fs.existsSync("core")) fail(`run it from a project's root, beside ${manifest} and core/`);
+  const lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under core/`, "m");
+  const text = fs.readFileSync(manifest, "utf8");
+  const old = text.match(lineRe)?.[1] ?? fail(`${manifest} has no "Core: ${CORE} at <full commit SHA>, copied whole under core/" line`);
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
-try {
   git(["clone", "--quiet", "--bare", URL, tmp]);
   const arg = process.argv[2];
   if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
   const pin = arg ?? git(["rev-parse", "refs/heads/main"], tmp);
   try { git(["cat-file", "-e", `${pin}^{commit}`], tmp); } catch { fail(`${pin} is not a commit of the core`); }
-  if (pin === old) { console.log(`core/ is already at ${pin}: nothing to sync`); process.exit(0); }
+  if (pin === old) { console.log(`core/ is already at ${pin}: nothing to sync`); return; }
 
   fs.rmSync("core", { recursive: true, force: true });
   fs.mkdirSync("core");
@@ -57,6 +57,15 @@ try {
   console.log(moved.length
     ? `Workflow calls moved, so the sync PR needs the owner's yes (floor rule 3):\n  ${moved.join("\n  ")}`
     : "No workflow call moved: the PR changes no workflow.");
+}
+
+// The clone lives in a temporary folder, removed however the sync ends.
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
+try {
+  sync(tmp);
+} catch (e) {
+  console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
+  process.exitCode = 1;
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
