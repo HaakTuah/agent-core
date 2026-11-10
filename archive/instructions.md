@@ -508,3 +508,9 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     approve: no solutions, only trade-offs.":
 
     > Maybe it include that one, so the builder understands xD
+
+94. **10 November 2026** (the core), asked "Yes to PR #19, and to the six readings in #20?" (#19: the last of what both
+    games keep twice, a pin check, and the core read whole before step 3; #20: its six readings), quoting with it the
+    design session's line on reading 2, that a session he starts on his own computer may run the project's hooks:
+
+    > Yes, expertly, but I don't understand what you mean here.
