@@ -1,8 +1,7 @@
 # agent-rules
 
 The shared core of the owner's agent-built projects: a floor every project takes whole and practice modules each
-project picks (`README.md`). Every role works from this file, whichever model fills it; Codex: read "For Codex" in
-`modules/codex.md` at the start of every task.
+project picks (`README.md`). Codex: read "For Codex" in `modules/codex.md` at the start of every task.
 
 ## The core this repository takes
 
@@ -13,15 +12,15 @@ imports them):
 @modules/how-to-work.md
 @modules/inbox.md
 
-Read when needed: `floor/topics.md` (before a task touches one of its topics), `floor/threat-model.md`,
-`modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md` and
-`modules/github-calls.md`. The rest describe work this repository does not do (lanes, milestones, updates, the
-orchestrator), but for the rule-file audit below.
+Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
+`modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md` and `modules/github-calls.md`. The rest
+describe work this repository does not do (lanes, milestones, updates, the orchestrator), but for the rule-file audit
+below.
 
 What fills the slots here: the *progress file* and the *report*: this repository's open PRs, and `reports/` (one file
 per change, `<date>-<name>.md`); the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling
-references*: `README.md` and `archive/instructions.md`; the *descriptions*: `README.md`; the *large file*: past about 50
-KB; the *size marks*: about 20 KB for each file a session reads at the start. No other slot applies.
+references* and the *descriptions*: `README.md`; the *large file*: past about 50 KB; the *size marks*: about 20 KB for
+each file a session reads at the start. No other slot applies.
 
 ## How changes are made here
 
@@ -31,16 +30,15 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
   ("Codex reviews" in `modules/reviews.md`) and its security review. **A change to the floor or to `.github/` needs
   the owner's yes in its PR,** as does one to `modules/review-guidelines.md`, which changes only on his word.
 - **The session that writes a change does not merge it:** the design session checks it against every project that takes
-  the core, and merges it. It reaches a project only through a sync PR there (`README.md`), and a change is done only
-  when the design session has opened one in every project that takes the core (core archive 80).
-- **A rule moves here only when it holds in every project that takes the core,** and its owner's words come with it,
-  word for word, into `archive/instructions.md`. A rule only one project has stays in that project.
-- **Nothing personal and nothing exploitable** (`floor/security.md`, rules 1 and 11): the core names no project, except
-  in its archive and its reports.
+  the core, and merges it. A change is done only when the design session has opened a sync PR in every project that
+  takes the core (core archive 80).
+- **A rule moves here only when it holds in every project that takes the core,** and the owner's words behind it
+  come with it into `archive/instructions.md`.
+- **The core names no project** outside its archive and its reports: it holds alike for every project.
 - **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
   about a fifth of the core's lines changed since the last audit.
-- **Usage:** no status line runs here, so `scripts/usage.sh` cannot read usage in this repository: a session checks no
-  more and says nothing about it ("Usage" in `modules/claude.md`).
+- **Usage:** no status line runs here, so a session neither measures usage nor mentions it ("Usage" in
+  `modules/claude.md`).
 
 ## Review guidelines
 

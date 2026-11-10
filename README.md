@@ -1,8 +1,7 @@
 # agent-rules
 
 The rules shared by the owner's agent-built projects, written once so that a change to them is made once and every
-project takes it the same way (core archive 68). Each rule says what it is for; the owner's words behind each are in
-`archive/instructions.md`, word for word.
+project takes it the same way (core archive 68). The owner's words behind each rule are in `archive/instructions.md`.
 
 ## Two layers
 
@@ -10,8 +9,7 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
   protects and how it binds: the top of `floor/security.md` (core archive 75). When unsure whether a rule belongs here,
   ask: if a project dropped it, could the owner be harmed or something be lost for good? Then it is floor.
   - `floor/security.md`: what the floor is, and the rules any task can break, read at the start of every task.
-  - `floor/topics.md`: the rules for particular work (workflows, untrusted input, what ships and its dependencies,
-    alerts, licences, Dependabot's PRs) and how to report a weakness, read before a task touches one.
+  - `floor/topics.md`: the rules for particular work, and how to report a weakness, read before a task touches one.
   - `floor/threat-model.md`: who might attack, what is protected and the ways in, the part every project shares.
 - **The practice modules** (`modules/`): everything else the projects share, one file per thing a reader looks up on its
   own, each saying at its top what it is for, when it is read and which others it leans on. A project picks the modules
@@ -46,23 +44,22 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
    what the floor leaves to it (the protected files, the trusted builder, its inputs, what ships, its audit), and points
    to "Reporting a weakness" in the floor, since GitHub shows a repository's `SECURITY.md`. Under rule 3 it lists its
    rule files after `**the rule files:**`, each path in backticks, the list ended by `;` ("this file" for itself), as
-   the core's `scripts/rule-files.mjs` reads them for the copies check. Its threat model adds its users, its ways in and
-   its lower stakes. Codex's security review is set to read both, with the floor's.
+   the core's `scripts/rule-files.mjs` reads them for the copies check. Its threat model adds to the floor's
+   (`floor/threat-model.md`).
 5. **The shared scripts and workflows,** written once here. It runs the core's scripts (`scripts/`) from its `core/`
    copy: its `.claude/settings.json` runs `core/scripts/work-saved.sh` as its work-saved hook and
    `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `develop`
-   (floor rule 3); its copies check is `core/scripts/copies.mjs` and its licence check `core/scripts/licences.mjs`
-   (floor rule 10's list for what ships read from the floor itself), each run with a config of its own (named by the
-   *copies check* slot and by its `SECURITY.md` under rule 10), protected like the checks. GitHub runs workflows only
-   from a repository's own `.github/workflows/`, so the core's are reusable: its own `core.yml`, `personal-terms.yml`,
-   `copies.yml`, `licences.yml`, `codeql.yml` and `delete-merged-branches.yml` each keep their triggers and call the
-   core's of the same name in a job (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor
-   rule 2), granting it the permissions the core's names and passing only what it asks: `PERSONAL_TERMS` alone, a
-   config's path, CodeQL's languages, or the dry-run choice. Issue templates and `.claude/` are read only from the
-   repository itself, so they stay its own. Only a sync PR moves those pins, and only when one of the core's workflows
-   changed since the last: then it moves them to its new pin, and needs the owner's yes, since it changes `.github/`
-   (floor rule 3). `core.yml` also fails a call pinned where the called workflow differs from the one at the core pin;
-   its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
+   (floor rule 3); its copies check is `core/scripts/copies.mjs` and its licence check `core/scripts/licences.mjs`, each
+   run with a config of its own (named by the *copies check* slot and by its `SECURITY.md` under rule 10), protected
+   like the checks. GitHub runs workflows only from a repository's own `.github/workflows/`, so the core's are reusable:
+   its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`, `codeql.yml` and `delete-merged-branches.yml`
+   each keep their triggers and call the core's of the same name in a job
+   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), granting it the
+   permissions the core's names and passing only the inputs and secret it declares. Issue templates and `.claude/` are
+   read only from the repository itself, so they stay its own. Only a sync PR moves those pins, and only when one of the
+   core's workflows changed since the last: then it moves them to its new pin, and needs the owner's yes, since it
+   changes `.github/` (floor rule 3). `core.yml` also fails a call pinned where the called workflow differs from the one
+   at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
    marked there as a safety rule is out of reach of "Principles over rules", as the floor is), each file cut to that,
    with pointers into `core/`.
@@ -72,9 +69,8 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 The core says what every project says alike; where projects differ only in a name, a path or an example, it leaves a
 **slot**, written in italics (*progress file*), and each project's manifest says what fills it. A path the core names
 outright (such as `develop`, `scripts/cloud-setup.sh` or `docs/calibration.md`) is where the projects keep it; a project
-that keeps it elsewhere says so in its manifest. A path into the core's own folders is under `core/` in a project, as
-each manifest says (format below). A task is a project's unit of work (an item, an entry); the main lane is its queue of
-tasks taken in order.
+that keeps it elsewhere says so in its manifest. A task is a project's unit of work (an item, an entry); the main lane
+is its queue of tasks taken in order.
 
 | Slot | What the project fills in |
 | --- | --- |
