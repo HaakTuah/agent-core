@@ -11,10 +11,10 @@ is its own PR (out of its group), with the *major version checks*. One is held b
 something, runs or loads worse, changes its licence, or its project is abandoned or changes hands; the reason is written
 in the closed PR and in an issue (the update's own, if it came as one) that stays open until the reason is gone.
 
-**Node's version** (core archive 39). CI and the cloud machines run the same Node, so a check that passes in a session
-passes in CI. Each October (or at the cue the project names), when a new even-numbered Node becomes long-term support,
-both move to it in one PR (CI and `scripts/cloud-setup.sh`), proven by the full suites; an odd-numbered one is not
-taken.
+**Node's version.** CI and the cloud machines run the same Node, so a check that passes in a session passes in CI. Each
+October (or at the cue the project names, such as a new major of the Node types, core archive 39), when a new
+even-numbered Node becomes long-term support, both move to it in one PR (CI and `scripts/cloud-setup.sh`), proven by the
+full suites; an odd-numbered one is not taken.
 
 **CodeQL checks every PR** into `develop` and `main`, every push to them and once a week; a finding on a PR is handled
 as floor rule 9 says, and alerts already in the code are the owner's to pass on.

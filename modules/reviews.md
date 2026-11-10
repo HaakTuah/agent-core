@@ -44,10 +44,10 @@ built, the fallback reviewer in place of Codex's code review.
    **A security review ran only if Codex's summary lists "🔒 Security Review" as completed, or the fallback reviewer's
    review is in the PR;** one with no findings posts nothing else. Its findings count as a code review's; a Codex
    finding fixed by a later commit is closed by the fallback reviewer's check of that commit, its thread answered and
-   resolved. **The security gate** is floor rule 8: if no completed security review appears within about 30 minutes
-   of the ready mark, the fallback reviewer reviews the diff against the project's `SECURITY.md` with the floor, and its
-   threat model, the PR says so, it may merge on that, and the next wake reports it to the owner; the same reviewer
-   reviews, in the milestone PR, a commit that reached `develop` without the gate.
+   resolved. **The security gate** is floor rule 8: if no completed security review appears within about 30 minutes of
+   the ready mark, the fallback reviewer reviews the whole diff the same way, the PR says so, it may merge on that, and
+   the next wake reports it to the owner; the same reviewer reviews, in the milestone PR, a commit that reached
+   `develop` without the gate.
 7. **Measured claims** (core archive 25): the native review reads the diff but runs nothing, so CI and the fallback
    reviewer check the *measurements* a PR's claims rest on.
 
@@ -56,11 +56,12 @@ built, the fallback reviewer in place of Codex's code review.
 Every review, in either direction, passes the work only at a 10 (for Codex, nothing open), with two guards: the rounds
 come to an end, and what a 10 means never slips (core archive 18 and 23).
 
-1. **The list decides the score,** as "How a review passes" in `modules/review-guidelines.md` defines it; only the
-   owner changes that definition.
+1. **The list decides the score,** as "How a review passes" in `modules/review-guidelines.md` defines it.
 2. **Every point is fixed, or moved out with a reason.** A point within the task is always fixed. One outside it may
-   become a follow-up (a `bug` issue if a bug, otherwise an entry in the *progress file*), with the reason in the PR. A
-   point the builder thinks wrong is answered in the PR with why. The next round's reviewer rules on each.
+   become a follow-up (a `bug` issue if a bug, otherwise an entry in the *progress file*), with the reason in the PR: a
+   follow-up finishes work already done, so it needs no word from the owner, while one that would add something new is
+   an idea (`modules/inbox.md`). A point the builder thinks wrong is answered in the PR with why. The next round's
+   reviewer rules on each.
 3. **Later rounds judge the change, and only the change** (core archive 74): the diff since the last round, the earlier
    lists and answers, and "How a review passes" and "What blocks" from the guidelines, with the same model and effort;
    a file the change touches may be read when the diff alone cannot settle a point.
@@ -89,6 +90,7 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
    (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`. The milestone PR sums them by category
    and builder, with the rounds per PR: a category that often needs three rounds needs better briefs.
 7. **The briefs.** A reviewer starts cold and gets its brief and nothing more. **The fallback reviewer's:** the diff,
-   the task's text, the *review reference*, and the review guidelines (the core's and the project's), whole. **The
-   design checker's:** the same, and what the project's guidelines add for it; it sends the work back until it meets
-   the task and the *review reference*. **A later round's:** point 3's. **An escalation's:** `modules/roles.md`.
+   the task's text, the *review reference*, the review guidelines (the core's and the project's), whole, and the
+   project's `SECURITY.md` with the floor. **The design checker's:** the same, and what the project's guidelines add for
+   it; it sends the work back until it meets the task and the *review reference*. **A later round's:** point 3's. **An
+   escalation's:** `modules/roles.md`.

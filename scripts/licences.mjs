@@ -15,7 +15,8 @@
 // those lockfiles) whose runtime dependencies, and those of the workspaces it declares, ship ([] if no package ships);
 // "data" and "fonts", the packages checked by hand to be data or assets, or fonts; "audit", the project's audit of what
 // no lockfile holds, a JSON file whose "entries" each have a "name", a "licence", "ships": true if it ships, and "kind":
-// "data", "asset" or "font" where that widens its list; and "ignoreScriptsIn", the .npmrc files that must keep
+// "data", "asset" or "font" where that widens its list ("github-service" with LicenseRef-GitHub-Terms: one of GitHub's
+// own services, GITHUB_SERVICES below, which never ships); and "ignoreScriptsIn", the .npmrc files that must keep
 // packages' own install scripts off (floor rule 15). The .npmrc at the root and beside each lockfile may hold only
 // settings that leave where npm fetches from alone, since a data or font package is known by its registry address.
 import { execFileSync } from "node:child_process";

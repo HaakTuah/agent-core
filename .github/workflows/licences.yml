@@ -5,8 +5,8 @@
 # entries, each to its own list: what ships to floor rule 10's, tools that only run to the tools'. Both lists come from
 # that script, so they stand in one place. A project calls it (workflow_call) from its own
 # .github/workflows/licences.yml on every pull request, pinned to a full commit SHA ("How a project takes the core" in
-# README.md, point 5), passing its config's path. Reads only, with no secret: nothing is installed, and nothing runs but
-# the caller's own core/scripts/licences.mjs.
+# README.md, point 5), passing its config's path. Reads only, with no secret: nothing is installed, and besides GitHub's
+# dependency review nothing runs but the caller's own core/scripts/licences.mjs, which core.yml holds to the core pin.
 name: licences
 
 on:

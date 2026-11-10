@@ -30,22 +30,22 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   done, or bring it to a clean commit and a draft PR saying what is left; then only small things in the main lane, the
   *progress file* saying where you stopped. Only the measured share counts, never the app's warning. **Measure it** with
   the core's `scripts/usage.sh` at the start and, where it can read it, after every commit; where it cannot (a cloud
-  session today), it says so at the start: then check no more, and say nothing about it in any PR, report or message,
-  since the owner watches and pauses the work at about 90%.
+  session today), the script says so at the start: then check no more, and say nothing about it in any PR, report or
+  message, since the owner watches and pauses the work at about 90%.
 - **No agent workflows and no ultracode,** except a process the project's own rules name. Long runs go in the
   background with the Bash tool's background mode.
 - **Read this table against yourself** (core archive 70 and 71). Your model is named in your system prompt, your effort
-  is in `$CLAUDE_EFFORT` (unset: medium); a session another starts takes its model and effort. Models rank Haiku,
-  Sonnet, Opus, Fable; efforts low, medium, high, xhigh. A helper is above you when its model ranks higher, or its model
-  is yours and its effort higher. A helper for judgement (the hard work, which needs Opus at high; planning design; a
-  part that needs design judgement) is called only when it is above you: otherwise you do that work yourself, since such
-  a helper adds only a cold start. A helper for a fresh eye on finished work (the reviewer, the design check) is used
-  whatever your level, since its worth is that it did not write the work. So is the stand-in, whose worth is that it
-  reads the owner's past words, which the builder does not. An escalation step is a fresh solver: one below your level
-  is skipped, except the last, which runs at your level instead; one at your level still pays, for its fresh eye. A
-  helper for cost (search, routine parts) is used whatever your level. You can't change your own model or effort; if you
-  are not on Opus, say so in your first message. A problem that beats you twice goes up the escalation chain; if its
-  last step fails too, it is blocked ("Don't loop"); say so.
+  is in `$CLAUDE_EFFORT` (unset: medium); a session another starts runs at the model and effort it was started with.
+  Models rank Haiku, Sonnet, Opus, Fable; efforts low, medium, high, xhigh. A helper is above you when its model ranks
+  higher, or its model is yours and its effort higher. A helper for judgement (the hard work, which needs Opus at high;
+  planning design; a part that needs design judgement) is called only when it is above you: otherwise you do that work
+  yourself, since such a helper adds only a cold start. A helper for a fresh eye on finished work (the reviewer, the
+  design check) is used whatever your level, since its worth is that it did not write the work. So is the stand-in,
+  whose worth is that it reads the owner's past words, which the builder does not. An escalation step is a fresh solver:
+  one below your level is skipped, except the last, which runs at your level instead; one at your level still pays, for
+  its fresh eye. A helper for cost (search, routine parts) is used whatever your level. You can't change your own model
+  or effort; if you are not on Opus, say so in your first message. A problem that beats you twice goes up the escalation
+  chain; if its last step fails too, it is blocked ("Don't loop"); say so.
 - **Sonnet builds, Opus backs it** (core archive 73). A Sonnet builder hands what needs judgement to an Opus helper at
   high, and a lane that turns out to need it whole goes back to the orchestrator for an Opus builder; a problem that
   beats it twice escalates as for anyone. Its PR's first line says Sonnet built it, and it gets the design check

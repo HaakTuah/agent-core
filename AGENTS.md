@@ -29,7 +29,7 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
   has no `develop`. A PR that changes a rule says, for each, what it changes in every project and why.
 - **Every PR here changes rule files,** all protected (`floor/security.md`, rule 3), so each gets Codex's code review
   ("Codex reviews" in `modules/reviews.md`) and its security review. **A change to the floor or to `.github/` needs
-  the owner's yes in its PR.**
+  the owner's yes in its PR,** as does one to `modules/review-guidelines.md`, which changes only on his word.
 - **The session that writes a change does not merge it:** the design session checks it against every project that takes
   the core, and merges it. It reaches a project only through a sync PR there (`README.md`), and a change is done only
   when the design session has opened one in every project that takes the core (core archive 80).
@@ -39,8 +39,8 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
   in its archive and its reports.
 - **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
   about a fifth of the core's lines changed since the last audit.
-- **Usage:** no status line runs here, so `scripts/usage.sh` cannot read usage in this repository; a session uses
-  what its environment offers, if any, as "Usage" in `modules/claude.md` says.
+- **Usage:** no status line runs here, so `scripts/usage.sh` cannot read usage in this repository: a session checks no
+  more and says nothing about it ("Usage" in `modules/claude.md`).
 
 ## Review guidelines
 
