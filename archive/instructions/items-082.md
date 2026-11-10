@@ -310,3 +310,49 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      it before the games take it at step 3 involves:
 
      > Renamed the repo to [agent-core](https://github.com/HaakTuah/agent-core).
+
+122. **10 November 2026** (the core), on Codex building. Told that Codex's cloud tasks cannot push, that a capped OpenAI
+     API key in a cloud environment would let Claude call Codex there, and that it is no less safe than the same key
+     on a machine of his:
+
+     > But how is it any safer then to have it run locally on my computer or server like this?
+
+     > I don't pay API prices, that's pissing money out the window. I want to use my subsidized subscription, expert.
+
+     Told that his ChatGPT login opens his account, so it is kept where no agent that reads outsiders' text can read
+     it, and that a cloud session's machine is reclaimed too often to keep a login it was given:
+
+     > So nothing needs changing then for now? Codex stays the reviewer, just until I either do the server setup or
+     > decide for a good local setup, expert? Anything we must update? check.
+
+123. **10 November 2026** (the core), on the stand-in's sources:
+
+     > will the Opus session in Snakes that answers on my behalf have much data to base it on? Will these sessions have
+     > access to decisions across projects?
+
+     > But doesn't agent-core contain quite a bit of decisions from amarna in archive? If so, why one, but not the
+     > other, when what you just said seemed to suggest otherwise, expert?
+
+     To the design session's answer (the core's archive holds his words behind the rules every project shares, so the
+     stand-in searches it too, reading each for the rule it backs rather than the game it was said in):
+
+     > Agreed, expertly!
+
+124. **10 November 2026** (the core), on step 3 and on keeping each project's copy of the core current:
+
+     > Will the builders be able to discern exactly what matches, so we don't get functional duplication, just phrased
+     > differently?
+
+     > And shouldn't we have script or something to auto import agent-core into the 2 repos, when it updates, expert?
+
+     To the design session's answers (each rule line a game keeps is listed with why the core does not hold it, and a
+     fresh reviewer looks for restatements; a script a session runs makes each sync PR, and the orchestrator's wake
+     starts it), and to the rule-file audit's fixes:
+
+     > Yes, expertly to everything, expert!
+
+125. **10 November 2026** (the core), on the rule-file audit (#47), its floor change included, and its two readings
+     (#48: where the orchestrator can set effort, builders at high and Sonnet lanes at medium; the README's heading
+     "Setting up (the owner's part)"):
+
+     > Yes, expertly to everything, expert!

@@ -43,9 +43,9 @@ builds it, and a wrong result shows itself; if only judgement can (taste, the de
    PR into `main` whose **description is the brief,** standing alone, since Codex sees only it and the repository:
    the task, the sections and files to read, the tests it must pass, what not to touch, and what its report must say
    ("Readings taken", "Questions for the owner").
-2. **Start Codex beside Claude's sessions** (`modules/orchestrating.md`): its command line in a clone of its own on the
-   PR's branch, the PR's description as its brief, at its newest model and high effort, never its maximum. It pushes to
-   the PR's branch itself and reports on the PR.
+2. **Start Codex beside Claude's sessions** (`modules/orchestrating.md`), the PR's description as its brief, at its
+   newest model and high effort, never its maximum. How it is started and how its work reaches the PR's branch are
+   written once it can build, from what its test shows: its command line runs commands without network by default.
 3. **Questions go on the PR,** both ways: Codex's in its report or as it asks them; the orchestrator answers with a
    section added to the description ("Round 2: ...") and gives Codex the answer, while it runs or by starting it again.
    At most **two rounds** per question; then the orchestrator takes the most reasonable reading under "Readings taken".

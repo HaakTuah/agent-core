@@ -3,18 +3,20 @@
 Everything for the owner lives in the repository's issues, so nothing is lost or said twice and he never has to hunt;
 his words are kept once, in the archive (core archive 7, 13 and 28). Read at the start of every task.
 
-- **Don't stop to ask: the stand-in answers first** (core archive 8, 53 and 79), so the work follows the owner's likely
-  answer, not a builder's guess. Where the spec leaves something open, the builder writes the question with its own
-  reading and goes on with the rest; once it has read the spec, it sends all of them in one call to **the stand-in**, a
-  fresh session that predicts the owner's answer from the *settling references*, the design's decided sections first,
-  and his past words (the project's archive and its closed `question` issues, searched, never read whole: only the
-  stand-in reads them for this). For each it returns the answer it predicts, what it rests on (his words or a rule, by
-  pointer) and how sure it is. The builder builds on that answer and lists it under "Readings taken" in the *report*.
-  Only an answer it is highly sure of stands alone; one it is less sure of, or one of taste, also goes to the owner at
-  once, as the next point says, with the stand-in's answer as the reading taken: he says "yes" or corrects it, and a
-  correction is built as any change is. A step that cannot be undone, or that needs his yes (floor rules 3 and 14), goes
-  to him too and waits for his own word, whatever the stand-in predicts. Readings taken later in the task go to the
-  stand-in in a second call when the PR is marked ready (on the *design-checked PRs*, the design check makes it).
+- **Don't stop to ask: the stand-in answers first** (core archive 8, 53, 79 and 123), so the work follows the owner's
+  likely answer, not a builder's guess. Where the spec leaves something open, the builder writes the question with its
+  own reading and goes on with the rest; once it has read the spec, it sends all of them in one call to **the
+  stand-in**, a fresh session that predicts the owner's answer from the *settling references*, the design's decided
+  sections first, and his past words (the project's archive, the core's, which keeps his words behind the rules every
+  project shares and is read for the rule each backs rather than the project it was said in, and the project's closed
+  `question` issues, searched, never read whole: only the stand-in reads them for this). For each it returns the answer
+  it predicts, what it rests on (his words or a rule, by pointer) and how sure it is. The builder builds on that answer
+  and lists it under "Readings taken" in the *report*. Only an answer it is highly sure of stands alone; one it is less
+  sure of, or one of taste, also goes to the owner at once, as the next point says, with the stand-in's answer as the
+  reading taken: he says "yes" or corrects it, and a correction is built as any change is. A step that cannot be undone,
+  or that needs his yes (floor rules 3 and 14), goes to him too and waits for his own word, whatever the stand-in
+  predicts. Readings taken later in the task go to the stand-in in a second call when the PR is marked ready (on the
+  *design-checked PRs*, the design check makes it).
 - **One inbox: issues assigned to the owner** (`HaakTuah`). A question he must answer, or a reading he should see, is an
   issue labelled `question`, with the reading taken and its alternative. An idea is a Feature request (`enhancement`), a
   bug a Bug report (`bug`), each with its template's label, its headings in the body (`.github/ISSUE_TEMPLATE/`), since
