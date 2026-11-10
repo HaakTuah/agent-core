@@ -21,12 +21,14 @@ no other session reads it.
    project's code or packages runs (its install, build and tests, script games and simulations, the smoke test, a dev
    server, `npx`); only Git, `gh` and the core's sync script, which uses Node's own modules and Git alone, run outside
    it (floor rule 18). It is rootless Podman (or Docker) under a user of its own (such as `box`), which holds no
-   sign-in and cannot read the agents' account, so even a way out of the container finds none. The agents' account
-   hands it a copy of the clone without `.git`, through one `sudo` rule that runs the box's wrapper as that user and
-   nothing else; the wrapper runs the command in a fresh container, with network only for installing packages,
-   returns its output (and the files a command such as adding a package changed, which the agent checks before
-   committing) and removes the container. On the agents' account, `npm` and `npx` are wrappers that run them in the
-   box, so the instructions are not the only guard. Written and tested when the machine is set up.
+   sign-in and cannot read any agent's account, Codex's included, so even a way out of the container finds none. The
+   agents' account hands it a copy of the clone without `.git`, through one `sudo` rule that runs the box's wrapper as
+   that user and nothing else; the wrapper runs the command in a fresh container, with network only for installing
+   packages, returns its output and removes the container. Nothing else comes back from the box, except, for a command
+   that adds or updates a package, the project's package list and lock file, which the agent checks before committing;
+   so no file the box wrote can run on the host. Packages live only in the box: the clone on the host holds none, so a
+   `node` run there by mistake has none to load. On the agents' account, `npm` and `npx` are wrappers that run them in
+   the box, so the instructions are not the only guard. Written and tested when the machine is set up.
 8. **The agents' instructions** (below) copied to where each tool reads its own at the start of every session there:
    `~/.claude/CLAUDE.md` for Claude Code, and Codex's (such as `~/.codex/AGENTS.md`) once its part is written.
 9. **Each project's orchestrator** started by him, in the tool, from that project's folder: Claude Code on Sonnet.
@@ -43,7 +45,8 @@ You run on the machine floor rule 18 describes: your sign-ins are on it.
 - Start sessions through Herdr, with its own command line and socket API: each in a pane and a clone of its own.
 - Starting Claude Code, pass its model (`--model`), and its effort where its command line takes one.
 - Run every command that runs a project's code or packages (its install, build and tests, script games and
-  simulations, the smoke test, a dev server, `npx`) through the test box's wrapper, never directly. Only Git, `gh` and
-  the core's sync script run outside it.
+  simulations, the smoke test, a dev server, `npx`) through the test box's wrapper, never directly, with plain `node`
+  or with npm by its full path. Only Git, `gh` and the core's sync script run outside it; no package is ever installed
+  on the host.
 - GitHub works normally here (`git push`, `gh`); `modules/github-calls.md` is for cloud sessions only.
 ```
