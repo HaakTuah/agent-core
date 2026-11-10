@@ -29,6 +29,10 @@ security gate's fallback or without passing it.
   the fallback.
 - **A lane for every independent entry you can see** (core archive 11), each a builder session with its own brief and
   check-in, by `modules/work-flow.md`; the brake ("Usage" in `modules/claude.md`) closes lanes first.
+- **Where the agents run side by side** (floor rule 18), it starts every session, Claude's builders and Codex alike,
+  through the tool that runs them, each with a clone of its own, at the model and, where it can be set, the effort its
+  table gives (`modules/claude.md`; Codex's: `modules/codex-building.md`). It watches their states there (working,
+  blocked, done), and a state that changes wakes it as a merge does.
 - **Every other provider is spent to its end** (core archive 76): Codex, and any provider the owner keeps only for the
   projects. Where an environment can read every provider's usage (a server, or a tool there that starts agents and reads
   their usage, or the owner's own computer), the orchestrator spreads the work so each is spent by its weekly reset

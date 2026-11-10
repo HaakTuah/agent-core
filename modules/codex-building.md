@@ -7,7 +7,8 @@ work. The project's own table of what goes to whom, and its trials, are its own 
 task started by an `@codex` comment builds and tests in it, but its checkout has no remote: its commit reaches GitHub
 only when the owner clicks it through in ChatGPT, so it cannot work unattended. It runs on the default model and effort
 (light), which no setting changes, and the full suites run several times slower than ours. So no lane goes to Codex
-until the owner says it can build; until then all building is Claude's, and this file is dormant.
+until it runs beside Claude's sessions (floor rule 18) and the owner says it can build; until then all building is
+Claude's, and this file is dormant.
 
 ## What reaches Codex
 
@@ -41,11 +42,13 @@ builds it, and a wrong result shows itself; if only judgement can (taste, the de
    PR into `main` whose **description is the brief,** standing alone, since Codex sees only it and the repository:
    the task, the sections and files to read, the tests it must pass, what not to touch, and what its report must say
    ("Readings taken", "Questions for the owner").
-2. **Start Codex from the PR** (how, written here once its tasks work). It works in its cloud, pushes to the PR's branch
-   itself, and reports on the PR.
-3. **Questions go on the PR,** both ways: Codex's in its report; the orchestrator answers with a section added to the
-   description ("Round 2: ...") and starts Codex again. At most **two rounds** per question; then the orchestrator takes
-   the most reasonable reading under "Readings taken". What only the owner can settle is a `question` issue, linked.
+2. **Start Codex beside Claude's sessions** (`modules/orchestrating.md`): its command line in a clone of its own on the
+   PR's branch, the PR's description as its brief, at its newest model and high effort, never its maximum. It pushes to
+   the PR's branch itself and reports on the PR.
+3. **Questions go on the PR,** both ways: Codex's in its report or as it asks them; the orchestrator answers with a
+   section added to the description ("Round 2: ...") and gives Codex the answer, while it runs or by starting it again.
+   At most **two rounds** per question; then the orchestrator takes the most reasonable reading under "Readings taken".
+   What only the owner can settle is a `question` issue, linked.
 4. **The PR is reviewed** as `modules/reviews.md` says, sent back the same way, marked ready, and merged by the
    orchestrator.
 
