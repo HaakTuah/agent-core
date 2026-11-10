@@ -7,7 +7,7 @@ pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lea
 and 57).
 
 - **The work never waits** (core archive 134). Where something is open, take the best reading, build on it, say it under
-  "Readings taken" in the *report*, and go on. Only what floor rule 14 names waits for the owner.
+  "Readings taken" in the *report*, and go on. Only the yeses floor rules 3 and 14 name wait for the owner.
 - **A question from the owner is a question:** answer it; act on it when he says so (core archive 25).
 - **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and config in one pass.
 - **Read little, print little:** read only what the task names, never a *large file* whole (grep, then read that range);
@@ -27,7 +27,8 @@ and 57).
   goes in its own PR, behaviour proven unchanged; a file past about 50 KB is split before it is changed (core archive
   45).
 - **Principles over rules** (core archive 25): where a rule's letter would defeat its purpose, follow the purpose, say
-  so under "Readings taken", and flag the rule to be fixed. Never for the floor.
+  so under "Readings taken", and flag the rule to be fixed. Never for the floor, nor for a rule the project's
+  `AGENTS.md` marks as a safety rule.
 - **The smallest setup that tests the rule** (core archive 12): each test sets up only what it needs; long measurements
   run outside the suite and CI.
 - **Rule files state rules,** briefly, with at most a pointer to the archive (core archive 74); a new rule replaces text

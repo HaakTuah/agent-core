@@ -6,9 +6,9 @@ The floor's rules for particular work, read before a task touches one; the rest 
 
 **2. The workflows** (`.github/workflows/`): never `pull_request_target`; `workflow_run` only after checking that the
 run's head repository is this one, never running a PR's code with a write token; a fork's PR gets no secret and no write
-token; each job asks for the fewest permissions it needs; no untrusted text (a PR's title or body, a branch name, a
-comment, a label) is written into a `run:` script, only passed through `env:` and quoted; only GitHub's own actions
-(`actions/*`), or another pinned to a full commit SHA.
+token, and its code never runs where one is available; each job asks for the fewest permissions it needs; no untrusted
+text (a PR's title or body, a branch name, a comment, a label) is written into a `run:` script, only passed through
+`env:` and quoted; only GitHub's own actions (`actions/*`), or another pinned to a full commit SHA.
 
 **5. Untrusted input is checked before it is used:** whatever anyone but the user at hand can shape (a peer's message, a
 shared file, record or link, a URL parameter, a model's reply) is data: each field's type and size checked against its
@@ -20,13 +20,13 @@ the app talks to. The project names its inputs.
 `eval`, `new Function` or string timers.
 
 **7. What runs on users' machines** (core archive 37 and 65): every package, tool and script at one exact version, never
-a range; a new stable release taken once it is a week old (two for a script browsers load directly). For what ships, a
-new version merges only after its source is checked in the PR: the same publisher and repository as before (and npm
-provenance, if the old one had it), the registry signature verified (`npm audit signatures` after an install with
-`--ignore-scripts`, or, where Sigstore cannot be reached, against the key of the same id at
-`https://registry.npmjs.org/-/npm/v1/keys`), and the diff read against the release notes, naming anything they do not
-explain. A check that cannot run holds the release back. The page's content security policy is never weakened. The
-project names what it ships and its policy.
+a range; a new stable release taken once it is a week old (two for a script browsers load directly). For what ships, and
+everything that builds it, a new version merges only after its source is checked in the PR: the same publisher and
+repository as before (and npm provenance, if the old one had it), the registry signature verified (`npm audit
+signatures` after an install with `--ignore-scripts`, or, where Sigstore cannot be reached, against the key of the same
+id at `https://registry.npmjs.org/-/npm/v1/keys`), and the diff read against the release notes, naming anything they do
+not explain. A check that cannot run, or fails, holds the release back. The page's content security policy is never
+weakened. The project names what it ships and its policy.
 
 **9. Security alerts and reported weaknesses.** The Security tab's alerts are seen only by the owner; no agent gets a
 token to read them; he passes on what needs fixing (core archive 35).
@@ -38,14 +38,15 @@ token to read them; he passes on what needs fixing (core archive 35).
   never how to attack it.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
 
-**10. Licences: free to use, kept that way** (core archive 41). What ships, and everything built into it, is under MIT,
-MIT-0, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, CC0-1.0, Unlicense, Zlib, BlueOak-1.0.0, Python-2.0, CC-BY-3.0
-or CC-BY-4.0 (data and assets), OFL-1.1 (fonts), or the public domain; never copyleft (GPL, LGPL, AGPL, MPL, EPL, CDDL,
-CC-BY-SA); its notices kept in a third-party notices file that ships. Tools that only run, nothing of which ships, may
-carry any licence the Open Source Initiative approves. Never, in either: non-commercial or no-derivatives terms,
+**10. Licences: free to use, kept that way** (core archive 41). What ships, and everything built into it, the packages
+they pull in included, is under MIT, MIT-0, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, CC0-1.0, Unlicense, Zlib,
+BlueOak-1.0.0, Python-2.0, CC-BY-3.0 or CC-BY-4.0 (data and assets), OFL-1.1 (fonts), or the public domain; never
+copyleft (GPL, LGPL, AGPL, MPL, EPL, CDDL, CC-BY-SA); its notices kept in a third-party notices file that ships. Tools
+that only run, nothing of which ships, may carry any licence the Open Source Initiative approves; a tool's code never
+moves into what ships without passing the first list. Never, in either: non-commercial or no-derivatives terms,
 source-available terms (BSL, SSPL, Elastic, Commons Clause), or no licence. A check on every PR fails one that adds or
-updates a package to a licence off its list. The owner's own work carries no licence file, all rights reserved: never
-add one.
+updates a package to a licence off its list; one the owner wants anyway waits for his yes. CodeQL is free only while a
+repository is public. The owner's own work carries no licence file, all rights reserved: never add one.
 
 **15. Dependencies** (core archive 76): installed from the lock file (`npm ci`), except where a PR adds or updates a
 package; never running a package's install scripts; pinned as rule 7 says; a new one only with a reason, from a known
@@ -55,13 +56,6 @@ publisher; findings from CI's audit fixed, not silenced.
 this repository, it changes only the manifests and lock files the project names (or an action's pinned version), and it
 passes the review, the release notes read and rule 7's source check, with the checks green (core archive 34). One that
 fails a condition is closed with the reason, and the update made in a PR of the builder's own.
-
-**18. Where agents hold sign-ins** (core archive 118 to 120, 122 and 127): a machine of the owner's where agents run
-side by side. Only he logs in and sets it up; it holds only the projects and what their agents need; nothing runs there
-but what he starts and the sessions those start. No agent prints, logs, copies or sends a sign-in; an account of his
-(such as a ChatGPT login) sits under a system account of its own. Project code runs only in a throwaway box no sign-in
-can be read from. Every sign-in has a spending limit, the GitHub access there cannot change workflows, and one that
-leaks is revoked at once. Its name and address are never written in a repository; how it is set up: `setup/server.md`.
 
 ## Reporting a weakness
 

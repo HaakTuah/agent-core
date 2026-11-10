@@ -16,8 +16,8 @@ the floor. Changes only on the owner's word (core archive 56).
 
 ## What blocks
 
-**For every reviewer,** blocking (P1 in Codex's priorities): a departure from the design or from the PR's description;
-a broken rule of the project, the core or the floor; a test weakened or skipped, or changed beyond what the task forces
+**For every reviewer,** blocking (P1 in Codex's priorities): a departure from the design or from the PR's description; a
+broken rule of the project, the core or the floor; a test weakened or skipped, or changed beyond what the task forces
 (core archive 36); and against the pillars of `modules/how-to-work.md`, a fact, rule or piece of logic written a second
 time instead of pointed to. A finding, not blocking: anything the change leaves behind (unused code, files or settings,
 commented-out code, a description made untrue); content put where its readers must read past it; a pointer no reader
@@ -28,4 +28,4 @@ again, filler, clichés, two voices alike). The project's guidelines set its ful
 
 **A rule file changed:** P1 for a rule that departs from the owner's archived words it cites, so a rule never drifts
 from what he said; and a finding for a rule that adds text without replacing any, or makes anyone wait for the owner
-beyond floor rule 14 (core archive 134).
+beyond floor rules 3 and 14 (core archive 134).
