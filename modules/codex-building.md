@@ -1,8 +1,19 @@
 # When Codex builds
 
-What goes to Codex, the hand-over, and what happens when it is not there. **Dormant until the owner says Codex can
-build** ("Status" in `modules/codex.md`). The project's own table of what goes to whom, and its trials, are its own
-(core archive 18).
+What goes to Codex, the hand-over, and what happens when it is not there; read by the orchestrator when it routes
+work. **Dormant until the owner says Codex can build** (the status below). The project's own table of what goes to
+whom, and its trials, are its own (core archive 18).
+
+**Status (3 November 2026): Codex reviews, Claude builds.** Codex cannot build yet: its GitHub tasks and its command
+line need a "Codex Cloud (Legacy)" environment, which can no longer be created. So no lane goes to Codex until the owner
+says it can build; until then all building is Claude's, and this file is dormant.
+
+## What reaches Codex
+
+Only the owner's own work (floor rule 4): a lane goes to Codex only as a PR HaakTuah opened from a branch here, never
+`main`. A Codex task reads the web, so planted text could try to steer it: a Codex PR that changes a
+protected file (floor rule 3) is marked failed, the files named, checked by the orchestrator before any merge (the
+compare call), and never merged; the owner decides.
 
 ## What goes to Codex
 

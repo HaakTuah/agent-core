@@ -31,7 +31,7 @@ built, the fallback reviewer in place of Codex's code review.
    finding, built as the stand-in answers it and sent to him with that answer.
 6. **Security reviews: Codex's one by itself, then the fallback reviewer** (core archive 47, 48, 50 and 51). Codex runs
    one security review by itself when a PR is opened for review or a draft is marked ready, never while a draft and
-   never twice on one commit; asking runs a code review alone ("Setup" in `modules/codex.md`), so no builder asks. When
+   never twice on one commit; asking in a comment runs a code review alone, so no builder asks (core archive 51). When
    a later commit changes what a security review is for (input from users, models or files, a workflow, the network,
    saved files or exports, a dependency newly added or moved up a major version), or fixes a security finding, the
    fallback reviewer reviews that change against the project's `SECURITY.md` with the floor, and its threat model, once,
@@ -64,21 +64,8 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
    wrong, with reasons. If anything is still open, the PR is **not merged:** it is marked blocked in the *progress file*
    and filed as a `question` issue linked under "Questions for the owner", and the work goes on with the next task that
    does not depend on it.
-5. **The bar does not slip.** These checks, each a builder session the orchestrator starts:
-   - **A blind re-review every week:** a PR merged at 10 the week before (each category in turn) goes to a fresh
-     fallback reviewer with the standard brief and nothing of its rounds; each blocking point it finds is a **miss**,
-     and becomes a follow-up.
-   - **A canary now and then:** about every two weeks, and whenever a reviewer's model, settings or guidelines change, a
-     test PR with planted faults (a bug, a broken standing rule, a security hole, a departure from the design) goes to
-     each reviewer and is never merged. Each fault not found is a miss.
-   - **A slop check every month,** where the project has text its users read (core archive 49): a fresh reviewer reads
-     only that text changed since the last check, scored against the *slop bar*, which says where its finds are fixed.
-   - **Logged:** each check is a row in the calibration log, `docs/calibration.md`, and the workshop check's line says
-     the misses since the last. Two misses in a row by one reviewer: its brief or guidelines are tightened with the
-     owner, a test is added for each fault it missed, and a canary runs again at once. It keeps reviewing meanwhile,
-     since Claude's usage is the scarcer and a reviewer that catches most faults beats none (core archive 72).
-   - **The log is the schedule:** the workshop check opens a lane for each check whose last row is older
-     than its interval (core archive 62).
+5. **The bar does not slip:** the checks on the reviewers themselves, run as lanes of their own:
+   `modules/calibration.md`.
 6. **One line in each PR:** `Review: <category> · <builder> · <each round's result>`, a score, or Codex's verdict
    (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`. The workshop check sums them by category
    and builder, with the rounds per PR: a category that often needs three rounds needs better briefs.

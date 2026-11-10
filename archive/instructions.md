@@ -670,3 +670,16 @@ is item N here. A new item goes at the end, numbered after the last, with its da
 
      > but whenever you launch the webpage, you should start the newest version, or get a note that you can play the
      > newest by clicking here if we can't auto-refresh, is my take. Yours, expert?
+
+116. **10 November 2026** (the core), on `modules/codex.md`, which held Codex's own instructions beside the owner's
+     setup and the orchestrator's routing:
+
+     > "Claude and Codex" contains rules for just Codex, needless reading for Claude? This is a core principle we have,
+     > we don't bundle stuff that doesn't concern all, expert... [...] Just for humans? What use is most of this to an
+     > agent? Is there anything else odd in the documents that is out of place, expert?
+
+     To the design session's split of that file by reader, and the move of the reviewers' calibration checks out of
+     `modules/reviews.md`:
+
+     > Yes, expertly! Do we need another Claude Code pass on agent-rules, to ensure the repo follows its own rules,
+     > expert?
