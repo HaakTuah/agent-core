@@ -1,7 +1,7 @@
 # The copy of the core ("How a project takes the core" in README.md, points 1 and 5), for every project that takes it:
 # fails a change whose core/ is not this repository, whole and unchanged, at the commit its core-manifest.md pins, or
 # whose calls to the core's workflows are pinned to a commit where the called workflow differs from the one at that pin.
-# A project calls it (workflow_call) on every pull request and push to its main branches, docs-only changes included,
+# A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
 # pinned to a full commit SHA. Reads only, with no secret: it fetches this public repository at the pin it reads, which
 # must be a full commit SHA before it is used, and runs nothing from either repository.
 name: core
