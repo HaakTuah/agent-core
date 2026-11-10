@@ -1,6 +1,6 @@
 // The reading-size check ("Read little" and "Split by meaning" in modules/how-to-work.md), for every project that takes
-// the core, measured on every PR. Its marks are in the project's config, a JSON file (its SECURITY.md names it under
-// rule 3, with the checks on the work), and it fails:
+// the core, measured on every PR. Its marks are the project's *size marks*, a JSON file (its SECURITY.md names it under
+// rule 3, among the checks on the work), and it fails:
 //   - when a file every session reads ("read") is past its mark (about 20 KB, "each"; one past that has a mark of its
 //     own, its size, which may only shrink: when the file shrinks, the mark comes down with it), or their total is
 //     past "total";
@@ -13,17 +13,26 @@
 // new changes too. Node's own modules only. It checks the project it lies in (core/scripts/ there), whatever the
 // directory it is started from; the config's own path is read from that directory.
 //
-//   node core/scripts/sizes.mjs <config>
+//   node core/scripts/reading-size.mjs <config>
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
-if (!MARKS) { console.error("FAIL: name the config: node core/scripts/sizes.mjs <config>"); process.exit(1); }
+if (!MARKS) { console.error("FAIL: name the config: node core/scripts/reading-size.mjs <config>"); process.exit(1); }
 const marks = JSON.parse(fs.readFileSync(MARKS, "utf8"));
+const num = v => Number.isInteger(v) && v > 0, nums = o => o && typeof o === "object" && !Array.isArray(o) && Object.values(o).every(num);
+const shape = [num(marks.each), nums(marks.read), num(marks.total), num(marks.split), marks.past === undefined || nums(marks.past),
+  marks.skip === undefined || Array.isArray(marks.skip) && marks.skip.every(s => typeof s === "string" && s.length)];
+if (shape.includes(false)) {
+  console.error(`FAIL: ${MARKS} must hold "each", "total" and "split" (byte counts), "read" (each file to its mark), and may hold "past" (each file to its mark) and "skip" (paths)`);
+  process.exit(1);
+}
+marks.past ??= {};
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+const tracked = new Set(git(["ls-files", "-z"]).split("\0").filter(Boolean));
 const kb = n => (n / 1024).toFixed(1);
 const size = f => fs.existsSync(f) ? fs.statSync(f).size : 0;
 const skip = ["core/", ...(marks.skip ?? [])];
@@ -32,7 +41,7 @@ const fail = [], notes = [];
 // the files every session reads
 let total = 0;
 for (const [f, mark] of Object.entries(marks.read)) {
-  if (!fs.existsSync(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is gone: update ${MARKS}`); continue; }
+  if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file: update ${MARKS}`); continue; }
   const n = size(f);
   total += n;
   if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}: make it smaller, or raise its mark in ${MARKS} and say why in the PR`);
@@ -41,7 +50,7 @@ for (const [f, mark] of Object.entries(marks.read)) {
 if (total > marks.total) fail.push(`the files every session reads total ${total} bytes, past their mark of ${marks.total}: make them smaller, or raise the mark in ${MARKS} and say why in the PR`);
 
 // Step 0: files past the split mark that the PR changes
-const big = git(["ls-files", "-z"]).split("\0").filter(f => f && !skip.some(s => f.startsWith(s)) && size(f) > marks.split
+const big = [...tracked].filter(f => !skip.some(s => f.startsWith(s)) && size(f) > marks.split
   && !fs.readFileSync(f).subarray(0, 8000).includes(0));
 let base = process.env.SIZES_BASE;
 if (!base) try { base = git(["merge-base", "origin/main", "HEAD"]).trim(); } catch { base = ""; }

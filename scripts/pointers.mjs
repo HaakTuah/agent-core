@@ -23,8 +23,10 @@ import { ruleFiles } from "./rule-files.mjs";
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
-const RULES = ruleFiles();
 const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
+const RULES = ruleFiles();
+for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: the rule file ${rf} is no tracked file`); process.exitCode = 1; }
+if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
 

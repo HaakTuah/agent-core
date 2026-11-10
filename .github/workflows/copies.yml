@@ -5,7 +5,7 @@
 # past the split mark is split before it is changed), with the marks the project names. A project calls it
 # (workflow_call) on every pull request and push to main, docs-only changes included, since the rule files are what it
 # guards most, pinned to a full commit SHA ("How a project takes the core" in README.md, point 5). It runs the project's
-# own core/scripts/copies.mjs, pointers.mjs and sizes.mjs with the configs the project names. Node's own modules only:
+# own core/scripts/copies.mjs, pointers.mjs and reading-size.mjs with the configs the project names. Node's own modules only:
 # nothing is installed. Read-only, with no secret.
 name: copies
 
@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       sizes:
-        description: The reading-size check's marks, a JSON file in the calling repository (core/scripts/sizes.mjs).
+        description: The reading-size check's marks, a JSON file in the calling repository (core/scripts/reading-size.mjs).
         required: true
         type: string
 
@@ -50,4 +50,4 @@ jobs:
         env:
           SIZES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           SIZES: ${{ inputs.sizes }}
-        run: node core/scripts/sizes.mjs "$SIZES"
+        run: node core/scripts/reading-size.mjs "$SIZES"
