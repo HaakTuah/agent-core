@@ -690,3 +690,39 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      workflow comments):
 
      > Yes, expertly to all!
+
+118. **10 November 2026** (the core). Told that Codex's cloud tasks cannot push, that a machine of his own could run
+     Claude Code and Codex side by side, what the rules would need for it, and that the tool he named for it is under a
+     copyleft licence:
+
+     > Yes, we must fully accommodate this in the rules. It is the end-goal. Also:
+
+     > "Its licence is AGPL. That's a copyleft licence: anyone who distributes the software, or offers it to others as
+     > a service over a network, must share their source. Using it as your own tool on your own server should be fine,
+     > since it never goes into the games' code. But your rule says every package must allow free use without
+     > restrictions, so it's your call whether a tool counts or only what ships in the games."
+
+     > It only matters if it matters, otherwise, it doesn't matter, expert. And you know which. Now, carry out my will,
+     > expertly!
+
+119. **10 November 2026** (the core), on the first draft of those rules, which named the machine's tool and its setup:
+
+     > Does it help to let the models know where they run, and is it wise to show it off in a public repo, expert?
+     > Answer expertly, don't act before you have told me.
+
+     To the design session's answer (a short, general floor rule; the machine telling its own agents where they run,
+     in a file of its own outside every repository; his setup checklist kept out of the repository):
+
+     > Yes, expertly!
+
+120. **10 November 2026** (the core), on the setup checklist and the agents' instructions, sent to him privately and
+     kept out of the repository:
+
+     > Ehh. WIll disappear. Is it important? Is it sensitive? Should it just be in the repo and only read by agents on
+     > set-up of server, expert?
+
+     To the design session's answer (nothing in it is secret, every defence in it holds when known, and it is the one
+     place that says how; a guide in the core that only the setup reads, and floor rule 18 keeping out of repositories
+     only the machine's name and address):
+
+     > Yes, expertly. Just remember, no read of anything anyone doesn't need, expert!
