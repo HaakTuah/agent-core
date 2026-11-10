@@ -5,10 +5,10 @@ This repository takes the floor whole: `floor/security.md` and `floor/topics.md`
 
 - **Rule 3, the protected files:** every file here. The trusted builder: Claude's sessions the owner starts in this
   repository.
-- **Rule 11:** the check is `.github/workflows/personal-terms.yml`, as in the games; its "SECURITY.md, point 11" is
-  floor rule 11.
-- **Rules 5, 6, 7, 10 and 15:** none. The repository holds documents and one workflow, ships nothing and takes no
-  package. **Rule 17:** Dependabot updates only that workflow's GitHub actions (`.github/dependabot.yml`), under rule
+- **Rule 11:** the check is `.github/workflows/personal-terms.yml`, which every project that takes the core calls.
+- **Rules 5, 6, 7, 10 and 15:** none. The repository holds documents, the scripts projects run from their `core/` copy
+  (`scripts/`, Node's and the shell's own tools only) and the workflows projects call; it ships nothing and takes no
+  package. **Rule 17:** Dependabot updates only the workflows' GitHub actions (`.github/dependabot.yml`), under rule
   3's narrow exception, into `main` (this repository has no `develop`); this repository names no manifest or lock file,
   so no security PR of Dependabot's meets it.
 - **The threat model's part:** the core has no users of its own; what an attacker would want of it is a rule loosened

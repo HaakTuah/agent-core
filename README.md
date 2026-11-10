@@ -32,8 +32,9 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 ## How a project takes the core
 
 1. **An exact copy under `core/`,** pinned to one commit of this repository, generated and never edited by hand. A
-   change reaches a project only through a sync PR in that project, which moves the pin, is reviewed like any other PR,
-   and changes nothing else; a check in the project fails a PR whose `core/` differs from this repository at its pin.
+   change reaches a project only through a sync PR in that project, which moves the pin (and, where point 5 says, the
+   workflow pins), is reviewed like any other PR, and changes nothing else; a check in the project fails a PR whose
+   `core/` differs from this repository at its pin.
 2. **A manifest of its own,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names
    for the core's words, and what fills each slot. Every session reads it at the start, with `floor/security.md`.
 3. **Pointer lines.** Its `AGENTS.md` names, as plain lines of their own (not in a table or a code block), the manifest
@@ -45,7 +46,18 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
    what the floor leaves to it (the protected files, the trusted builder, its inputs, what ships, its audit), and points
    to "Reporting a weakness" in the floor, since GitHub shows a repository's `SECURITY.md`. Its threat model adds its
    users, its ways in and its lower stakes. Codex's security review is set to read both, with the floor's.
-5. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
+5. **The shared scripts and workflows,** written once here. It runs the core's scripts (`scripts/`) from its `core/`
+   copy: its `.claude/settings.json` runs `core/scripts/work-saved.sh` as its work-saved hook and
+   `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `develop`
+   (floor rule 3); its copies check is `core/scripts/copies.mjs`, run with a config of its own (the *copies check*
+   slot names it), protected like the check. GitHub runs workflows only from a repository's own `.github/workflows/`,
+   so the core's are reusable: its own `personal-terms.yml` and `copies.yml` each call the core's in a job
+   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), passing
+   `PERSONAL_TERMS` alone to the first and its config's path to the second. Only a sync PR moves those pins, and only
+   when one of the core's workflows changed since the last: then it moves them to its new pin, and needs the owner's
+   yes, since it changes `.github/` (floor rule 3). Its review checks that the core's workflows at the workflow pins
+   are those at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
+6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
    marked there as a safety rule is out of reach of "Principles over rules", as the floor is), each file cut to that,
    with pointers into `core/`.
 
@@ -64,7 +76,7 @@ is its queue of tasks taken in order.
 | *archive citation* | how a rule file cites the project's archive |
 | *settling references* | what the stand-in checks a question against, with the owner's past words, before it goes to him |
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
-| *copies check* | the check on every PR that fails a new copy |
+| *copies check* | the check on every PR that fails a new copy, and its config for the core's `scripts/copies.mjs` |
 | *large file* | how large a file is before it is never read whole |
 | *size marks* | the marks of the files every session reads |
 | *one at a time* | what never runs as parallel lanes |
