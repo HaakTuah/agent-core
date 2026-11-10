@@ -5,7 +5,7 @@ of every task. What each role does: `modules/roles.md`, `modules/reviews.md`, `m
 
 | Who | Model | Effort | For |
 | --- | --- | --- | --- |
-| You, the builder | Opus for the main lane, engine rules, design readings and the hard work; Sonnet (`model: "sonnet"`) for routine lanes: polish, docs, splits, tests, news lines | the model and effort you were started at, read against this table (below it) | the task itself |
+| You, the builder | Opus for the main lane, design readings and the *hard work*; Sonnet (`model: "sonnet"`) for routine lanes: polish, docs, splits, tests | the model and effort you were started at, read against this table (below it) | the task itself |
 | Orchestrator | Sonnet if it can set each session's model; Opus if its sessions take its own | medium | starting each lane at its model, watching PRs, merging at the gates |
 | Search helper | Haiku (`model: "haiku"`) | as it comes | finding where things are across many files, the cheap way to look; it returns file:line and one-line conclusions |
 | Parallel helper | Sonnet (`model: "sonnet"`) for routine parts; Opus (`model: "opus"`) for parts that need design judgement | medium; high (`effort: "high"`) for the hard work | one part of the work, as `modules/helpers.md` says |
@@ -45,13 +45,13 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   is skipped, except the last, which runs at your level instead; one at your level still pays, for its fresh eye. A
   helper for cost (search, routine parts) is used whatever your level. You can't change your own model or effort; if you
   are not on Opus, say so in your first message. A problem that beats you twice goes up the escalation chain; if its
-  last step fails too, or Fable is unavailable, it is blocked ("Don't loop"); say so.
+  last step fails too, it is blocked ("Don't loop"); say so.
 - **Sonnet builds, Opus backs it** (core archive 73). A Sonnet builder hands what needs judgement to an Opus helper at
   high, and a lane that turns out to need it whole goes back to the orchestrator for an Opus builder; a problem that
   beats it twice escalates as for anyone. Its PR's first line says Sonnet built it, and it gets the design check
   whenever it changes behaviour, rules or text a user reads, besides the reviews every PR gets. The workshop check
-  compares review rounds and usage per lane by model: a kind of lane where Sonnet needs more rounds to reach a 10 goes
-  back to Opus.
+  compares review rounds per lane by model (its point 9): a kind of lane where Sonnet needs more rounds to reach a 10
+  goes back to Opus.
 - **A helper above you gets only what needs it,** Fable above all, since its usage runs out first: you do the work before it (finding, measuring, and a
   brief that points it only at what it must judge) and after it (building, testing, writing up); it returns its design,
   answer or text and stops.

@@ -1,8 +1,7 @@
 # Who does what
 
-The roles, who fills each today, escalation and who merges; read when a task needs a role's part. Every rule names a
-role, never a model, so any model can fill one, working from the project's `AGENTS.md`; this is the one place that says
-who fills each.
+The roles, who fills each today, escalation and who merges; read when a task needs a role's part. A role can be filled
+by any model, working from the project's `AGENTS.md`; this is the one place that says who fills each.
 
 - **The orchestrator** (today: Claude): writes Codex's briefs, routes the work, takes the readings, merges Codex's PRs,
   and brings the owner his questions (`modules/orchestrating.md`).
@@ -19,8 +18,8 @@ who fills each.
 - **Planning design** (today: Claude): the *planning design*, asked directly when a task needs a new or better plan, at
   most once per task, with a self-contained brief (the problem, the measurements, the files and lines). It returns a
   design, which the builder builds and measures.
-- **The hard work:** the *hard work*. The builder gives it more effort inside its own session, never by waiting for
-  another session.
+- **The hard work:** the *hard work*, done in the builder's own session, through a helper above it where its tool's file
+  says one pays, never by waiting for another session.
 - **Escalation** (core archive 25): a problem that has defeated a builder twice goes to a fresh solver with a
   self-contained brief (the problem, what was tried, the files and lines); the stuck builder applies and checks the
   answer. Once Codex can build it comes first: a problem that has defeated Claude goes to Codex as a draft PR from the

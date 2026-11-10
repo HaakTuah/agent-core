@@ -24,6 +24,5 @@ alone: its goal; what it returns, in what form (file:line and a sentence, a diff
 files it may change and the sources it reads; where its task ends. A vague brief brings back duplicated work and gaps.
 Check every result before using it. Never stop to ask about helpers: decide by these shapes.
 
-**Measured:** every PR lists the helpers that ran and what each gave; the week's first milestone PR sums them in one
-line (helpers per PR, their shapes, what paid and what did not, how often the cap held work back). A shape that never
-pays, or a cap that often holds work back, becomes a `question` issue for the owner.
+**Measured:** every PR lists the helpers that ran and what each gave, and the workshop check sums them (its point 8). A
+shape that never pays, or a cap that often holds work back, becomes a `question` issue for the owner.

@@ -5,7 +5,7 @@ The aim, the four pillars and the habits that serve them, for every builder. Rea
 Every rule here says what it is for. The aim behind them all: as much finished work of full quality as the week's usage
 allows, at the lowest cost now and later. Four are the pillars that hold the rest up: **one fact, one place**, **split
 by meaning**, **keep it lean** and **read little**. Every review enforces the first three, and the workshop check
-measures what every session reads (core archive 57).
+measures what every session reads (core archive 17 and 57).
 
 - **A question is a question.** Answer it; act on it only when the owner says so (core archive 25).
 - **Match effort to the task,** and take the cheapest approach that does the job well, since usage is limited. Docs,
@@ -43,9 +43,9 @@ measures what every session reads (core archive 57).
   an override. Size is only a warning: a file past about 20 KB probably holds more than one thing. A split goes in its
   own PR, with behaviour proven unchanged and what it saves said. **Step 0:** before a task or lane changes a file past
   about 50 KB, that file is split by meaning first, in its own PR; new work for such a file goes in as a new file (core
-  archive 45). The workshop check and the file-by-file reviews still run.
+  archive 45). The workshop check's search for files to split (its point 3) still runs.
 - **Principles over rules** (core archive 25). Where a rule's letter would defeat what it is for, follow its purpose,
-  say so in the PR under "Readings taken", and flag the rule to be fixed. Never for the floor, nor for a rule the
+  say so under "Readings taken" in the *report*, and flag the rule to be fixed. Never for the floor, nor for a rule the
   project's `AGENTS.md` marks as a safety rule.
 - **The smallest setup that tests the rule** (core archive 12), so checks stay fast as the project grows: each test sets
   up only what the rule needs. Full-size runs only in the few tests that guard the whole; long measurements in the

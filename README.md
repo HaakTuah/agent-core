@@ -7,10 +7,9 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 ## Two layers
 
 - **The floor** (`floor/`): what protects the owner's accounts, repositories, systems, money, privacy and rights, and
-  what cannot be undone. Every project takes it whole and never edits or leaves out any part of it; no rule of a
-  project's own, and no reading of a rule's purpose ("Principles over rules"), loosens it. It points to no module, so a
-  project that takes only the floor is safe with nothing else (core archive 75). When unsure whether a rule belongs
-  here, ask: if a project dropped it, could the owner be harmed or something be lost for good? Then it is floor.
+  what cannot be undone, taken whole by every project and loosened by nothing; how it binds: the top of
+  `floor/security.md` (core archive 75). When unsure whether a rule belongs here, ask: if a project dropped it, could
+  the owner be harmed or something be lost for good? Then it is floor.
   - `floor/security.md`: what the floor is, and the rules any task can break, read at the start of every task.
   - `floor/topics.md`: the rules for particular work (workflows, untrusted input, what ships and its dependencies,
     alerts, licences, Dependabot's PRs) and how to report a weakness, read before a task touches one.
@@ -54,10 +53,9 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 
 The core says what every project says alike; where projects differ only in a name, a path or an example, it leaves a
 **slot**, written in italics (*progress file*), and each project's manifest says what fills it. A path the core names
-outright (`develop`, `main`, `scripts/usage.sh`, `scripts/cloud-setup.sh`, `docs/calibration.md`,
-`docs/archive/instructions.md`, `.github/ISSUE_TEMPLATE/`) is where both games keep it; a project that keeps it
-elsewhere says so in its manifest. A task is a project's unit of work (an item, an entry); the main lane is its queue of
-tasks taken in order.
+outright (such as `develop`, `scripts/cloud-setup.sh` or `docs/calibration.md`) is where both games keep it; a project
+that keeps it elsewhere says so in its manifest. A task is a project's unit of work (an item, an entry); the main lane
+is its queue of tasks taken in order.
 
 | Slot | What the project fills in |
 | --- | --- |
@@ -76,7 +74,7 @@ tasks taken in order.
 | *planning design* | what planning design plans |
 | *hard work* | what counts as the hard work |
 | *measurements* | how a claim about behaviour is measured |
-| *slop bar* | the bar for text users read, and where the monthly slop check's finds are fixed |
+| *slop bar* | the bar for text users read, where the monthly slop check's finds are fixed, and any check of that text on every PR |
 | *major version checks* | the extra checks a new major version gets |
 | *Codex's checks* | what Codex runs before it finishes |
 | *Codex environment* | whether a Codex cloud environment exists for the project |
@@ -106,6 +104,4 @@ Floor: whole. Modules: <all, or the list of those taken>.
 
 ## This repository
 
-The core takes its own floor and the modules that fit a repository of documents (`AGENTS.md`). A change to the floor
-needs the owner's yes in its PR. Nothing personal and nothing exploitable is ever written here (`floor/security.md`,
-rules 1 and 11); the core names no project except in its archive and its reports (`reports/`).
+How this repository takes its own core, and how changes are made here: `AGENTS.md`; its security: `SECURITY.md`.

@@ -8,8 +8,8 @@ can break (1, 3, 4, 8, 11 to 14 and 16); `floor/topics.md` holds those for parti
 one: workflows (2), untrusted input and markup (5 and 6), what runs on users' machines and the dependencies (7 and 15),
 alerts and reported weaknesses (9), licences (10) and Dependabot's PRs (17). "Floor rule N" anywhere means rule N, in
 whichever file holds it. A project's `SECURITY.md` adds under the same numbers what only it has and what is left to it
-("the project names"), never removes. Who might attack: `floor/threat-model.md`. A break of a rule here blocks in every
-review, P0 or P1 in Codex's terms (core archive 21).
+("the project names"), never removes. Who might attack: `floor/threat-model.md`. A break of any floor rule blocks in
+every review, P0 or P1 in Codex's terms (core archive 21).
 
 ## The rules
 
@@ -44,23 +44,23 @@ are the one exception, under floor rule 17.
 
 **8. Reviews look for breaks of any floor rule,** and for any new way in: a new input, a new external request, a new
 dependency or script, a weakened check. **No PR merges until its security review has run, and none with an open security
-finding;** a PR that changes a protected file also gets a code review. A milestone PR needs it only for a commit that
-reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push). Nothing from this
-repository or its PRs runs on the owner's machine, and nothing there starts an agent (core archive 52). **Test data is
-never real:** fake keys and tokens are built when the test runs, from pieces (such as `"AIza" + "Sy" + "x".repeat(33)`),
-never a literal that looks real, so no scanner takes one for a leak; sample names, paths and e-mail addresses are
-invented (`jdoe`, `/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning alert on a test's fake is closed
-as "Used in tests" once the literal is gone (core archive 29).
+finding;** a PR that changes a protected file also gets a code review. A milestone PR needs its security review only
+for a commit that reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push).
+Nothing from this repository or its PRs runs on the owner's machine, and nothing there starts an agent (core archive
+52). **Test data is never real:** fake keys and tokens are built when the test runs, from pieces (such as
+`"AIza" + "Sy" + "x".repeat(33)`), never a literal that looks real, so no scanner takes one for a leak; sample names,
+paths and e-mail addresses are invented (`jdoe`, `/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning
+alert on a test's fake is closed as "Used in tests" once the literal is gone (core archive 29).
 
 **11. Nothing personal, ever** (core archive 30 and 43). No file, commit message, PR, issue, comment, log or picture
 holds personal information about the owner or anyone in his life: no names (he is "the owner"), no profession,
 employer or workplace, no family, home or age, no health, memberships or money, and nothing else about his life
 outside the project. His words in the archive are kept word for word except such details, left out as "[…]". The
-one exception is the GitHub account in the repository's own address and links. Test data uses made-up names. A
-check on every PR (`.github/workflows/personal-terms.yml`) fails one whose files, new commit messages, title or
-description hold a term from the Actions secret `PERSONAL_TERMS`, kept out of the repository since the list itself
-is personal; it prints where, never what. Reviewers report a personal detail as P1. Commits made before this rule
-keep what they hold: rewriting history is irreversible, and the owner's to decide.
+one exception is the GitHub account in the repository's own address and links. A check on every PR
+(`.github/workflows/personal-terms.yml`) fails one whose files, new commit messages, title or description hold a term
+from the Actions secret `PERSONAL_TERMS`, kept out of the repository since the list itself is personal; it prints where,
+never what. Reviewers report a personal detail as P1. Commits made before this rule keep what they hold: rewriting
+history is irreversible, and the owner's to decide.
 
 **12. `main` is the owner's,** and what the live site runs: never push to it, never force-push. It changes only by a
 merged pull request: where the repository has `develop`, only the milestone PR from `develop` and Dependabot's

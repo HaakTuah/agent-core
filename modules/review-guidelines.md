@@ -36,5 +36,4 @@ guidelines set its full bar.
 
 **One idea,** for every reviewer of a change to the project (not docs, design copies or Dependabot's updates): end with
 one thing outside this change that would make the project better, or "none", the usual answer. It never blocks (P3 at
-most). The builder searches the open ideas first: a new one is filed as an `enhancement` issue and linked in the PR, a
-repeat becomes a comment on it. Nothing is built from it until the owner queues it (core archive 40).
+most); the builder files it as `modules/inbox.md` says (core archive 40).
