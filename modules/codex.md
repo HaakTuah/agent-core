@@ -19,7 +19,7 @@ says it can build; until then all building is Claude's, and `modules/codex-build
 - **The tests you are given are the contract:** make them pass; never change, skip or weaken them. If you think one is
   wrong, say why in your report and leave that part.
 - Run *Codex's checks* before you finish.
-- Push your work to the PR's branch, never to `main` or `develop`, and open no new pull request.
+- Push your work to the PR's branch, never to `main`, and open no new pull request.
 - Your environment's setup script installs what the suites need; report anything missing, never work around it.
 - **Questions, readings and ideas go to the issues** (`modules/inbox.md`), filed by you if your access allows; if not,
   list them in your report under "Questions for the owner", "Ideas" and "Bugs", and the orchestrator files them. Either
@@ -41,6 +41,6 @@ says it can build; until then all building is Claude's, and `modules/codex-build
 ## What reaches Codex
 
 Only the owner's own work (floor rule 4): a lane goes to Codex only as a PR HaakTuah opened from a branch here, never
-`main` or `develop`. A Codex task reads the web, so planted text could try to steer it: a Codex PR that changes a
+`main`. A Codex task reads the web, so planted text could try to steer it: a Codex PR that changes a
 protected file (floor rule 3) is marked failed, the files named, checked by the orchestrator before any merge (the
 compare call), and never merged; the owner decides.

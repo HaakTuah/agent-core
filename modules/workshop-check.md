@@ -1,9 +1,9 @@
 # The workshop check
 
-Read by the builder who opens the week's first milestone PR.
+Read by the builder of the first task begun seven days or more after the last check.
 
-At the first milestone seven days or more after the last check (not every milestone, since what it measures changes
-slowly; core archive 9 and 74), one line of that PR says what slows the work, and what passes its mark is fixed: (1) how
+Weekly (not more often, since what it measures changes slowly; core archive 9 and 74), in a PR of its own whose line
+says what slows the work, and what passes its mark is fixed: (1) how
 long the checks take for a docs-only and a code PR, finding out why if either grew by over a fifth; (2) the files every
 session reads, each under its mark (the *size marks*), done entries moved to `docs/archive/` with a pointer; (3) files
 that should be split by meaning, each in its own PR with behaviour proven unchanged (core archive 26); (4) merged
@@ -11,7 +11,7 @@ branches, deleted from GitHub; (5) leftovers nobody uses (study scripts, logs, t
 files (`floor/security.md`, rule 3), audited by a fresh reviewer for contradictions, duplication, stale lines, unclear
 instructions and broken pointers, and for what can be cut: rules that overlap, say more than they need, or have never
 prevented a real problem, merged or dropped, every cut named in its PR with its reason (core archive 67); once at the
-first milestone after 10 November 2026, then whenever more than about a fifth of their lines changed (core archive 54);
+first check after 10 November 2026, then whenever more than about a fifth of their lines changed (core archive 54);
 (7) the stand-in's record: how often its predictions matched the owner's answers, by kind, and how sure it must be to
 answer alone (`modules/inbox.md`; core archive 79); (8) the helpers that ran since the last check: helpers per PR, their
 shapes, what paid and what did not, how often the cap held work back (`modules/helpers.md`); and (9) review rounds per

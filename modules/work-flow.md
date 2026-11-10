@@ -15,8 +15,8 @@ Waiting is lost time and, past an hour, a lost cache (core archive 10).
    on another's branch.
 3. **Lanes beside the main lane** (core archive 11): independent work in parallel, in different files from every open
    lane, with no shared measurement and no waiting on another's result; never what the project runs *one at a time*.
-   Claim a lane with a draft PR from a fresh branch off `develop`, after checking the open PRs; merge `develop` into it
-   before review; change the *progress file* only when it merges.
+   Claim a lane with a draft PR from a fresh branch off `main`, after checking the open PRs; bring it up to date with
+   `main` before review; change the *progress file* only when it merges.
 
 **Sessions:** when they are started for you task by task, stop when your task is merged, saying in your last message
 what merged and what is next; otherwise carry on with the next task.

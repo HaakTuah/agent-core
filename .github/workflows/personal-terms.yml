@@ -8,10 +8,10 @@ name: Personal terms
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     types: [opened, edited, synchronize, reopened]
   push:
-    branches: [main, develop]
+    branches: [main]
   workflow_call:
     secrets:
       PERSONAL_TERMS:

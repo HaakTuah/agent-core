@@ -1,6 +1,6 @@
 # CodeQL, for every project that takes the core (modules/updates.md, "CodeQL checks every PR"). A project
-# calls it (workflow_call) from its own .github/workflows/codeql.yml, which keeps the triggers (every PR into develop and
-# main, every push to them, and weekly), pinned to a full commit SHA ("How a project takes the core" in README.md,
+# calls it (workflow_call) from its own .github/workflows/codeql.yml, which keeps the triggers (every PR into main, every
+# push to it, and weekly), pinned to a full commit SHA ("How a project takes the core" in README.md,
 # point 5), passing its languages and granting the job actions: read, contents: read and security-events: write.
 # Findings on a PR show on it as notes, which builders can read and fix in the same PR.
 name: CodeQL

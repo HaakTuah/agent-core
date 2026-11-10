@@ -10,7 +10,7 @@ Only if it cannot start builder sessions at all does it say so and stop, and the
 re-read on every turn, so building in it costs the most, and if it dies, every lane stops with it.
 
 **The rules, re-read when they change** (core archive 42 and 44). A running orchestrator remembers the rules as they
-stood when it started, so on every wake, the hourly check included, it pulls `develop`; if any rule file
+stood when it started, so on every wake, the hourly check included, it pulls `main`; if any rule file
 (`floor/security.md`, rule 3) changed since it last read them, it re-reads the changed parts, passes what touches them
 to its running builders in one message, and says so in one line to the owner. The same wake reads the *progress file*'s
 diff and acts on what is new (an entry added or moved, an answer of the owner's, a lane opened or a bug put first),
@@ -19,8 +19,7 @@ is not running, each with its reason ("waits on 2y's files" is one, none given i
 reviewer's security reviews since the last wake, each with its PR and why it qualified; and every PR merged on the
 security gate's fallback or without passing it.
 
-- **Keep the cache warm** (core archive 10). One session per task, continued for its review fixes and its milestone
-  while its context is under an hour old. A new task goes to whichever session does the most work for the fewest tokens
+- **Keep the cache warm** (core archive 10). One session per task, continued for its review fixes while its context is under an hour old. A new task goes to whichever session does the most work for the fewest tokens
   without losing quality: one already open when the task touches the same files, its context is under an hour old and
   still small, and its last task has merged; otherwise a fresh one, always when a session's context has grown large.
 - **Bigger review fixes in a session of their own:** more than about an hour's work goes to a fresh session with the PR,
