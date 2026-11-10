@@ -10,8 +10,8 @@ these. A feature here is any move, rule or power a player can choose to use.
   that answer at once (core archive 114).
 - **The computer players never cheat** (core archive 87 and 114). They hold nothing a player in their place could not
   see or know: no sight through what hides the game from a player, no knowledge it was not given.
-- **Using a feature must pay, measured three ways** (core archive 85, 86, 89 and 114). For every feature, the *use-
-  against-ignore measurement* plays *measured players* that use it where it fits, as they play, against copies that
+- **Using a feature must pay, measured three ways** (core archive 85, 86, 89 and 114). For every feature, the
+  *use-against-ignore measurement* plays *measured players* that use it where it fits, as they play, against copies that
   always use it and copies that never do, the rule itself unchanged, and *where the numbers go* shows how often each
   used it, how often it worked and who came out ahead, by more than chance (its threshold a first guess, listed). If
   those that use it where it fits do not come out ahead of those that never do, the change says which it is: the feature
