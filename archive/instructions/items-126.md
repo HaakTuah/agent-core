@@ -76,3 +76,10 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > requiring them without it can block every merge."
      >
      > If I don't have it, then surely it won't trigger.
+
+131. **10 November 2026** (the core). Told that a game's builder had skipped the design session's comments on its PR,
+     taking every comment from his account with Claude Code's attribution line for its own, and asked whether to add a
+     rule that such a comment is not necessarily the reader's own:
+
+     > Yes, though you could just drop the signature also? But if I use another chat session, then I'd have to remember
+     > to tell it, so your fix is probably better, expert.
