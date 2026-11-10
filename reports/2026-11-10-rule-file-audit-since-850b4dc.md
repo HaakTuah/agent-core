@@ -68,7 +68,8 @@ its links to #41 and #42 name `HaakTuah/agent-core`; its pointer to the README's
 - Every backticked path (each resolves here or is a project's own), every archive citation (items up to 121, each
   exists; those on changed lines support their rule), every quoted section name and numbered point, and every slot
   (each in the table is used, each used is in the table). The copies check (`scripts/copies.mjs`) over the core's prose:
-  no copy, before or after. Lines over 120 columns: tables, commands, the manifest's format, an accented letter and an emoji, as before.
+  no copy, before or after. Lines over 120 columns: tables, commands, the manifest's format, an accented letter and an
+  emoji, as before.
 
 ## What each game changes at step 3
 
