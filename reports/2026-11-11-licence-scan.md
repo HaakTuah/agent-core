@@ -18,9 +18,11 @@ too).
 - **`scripts/licences.mjs`:** reads and checks `"scan"` (only its three keys, paths inside the project, an audit
   beside it). Adds the kind `own` with `LicenseRef-Owner`, for the owner's own work, all rights reserved as floor rule
   10 ends, and only for it. The summary counts the files scanned. **`scripts/licences.d.mts`:** the new key.
-- **`scripts/licences-test.mjs`:** the check had no test here. It stages a small project in a temporary git repository
-  and checks that it passes as it is, passes six allowed forms, and fails 39 others: the licence lists, the owner's
-  kind, actions, every form of fetch, copied code, assets, an entry covering nothing, and a bad `"scan"`.
+- **`scripts/licences-test.mjs`:** the check had no test here; Amarna tested its lists and readers in its own suite.
+  Those tests come here, on invented names: how a licence expression is read, which list allows what, a package known
+  by its registry address, npm's settings. Then it stages a small project in a temporary git repository and checks
+  that it passes as it is, passes six allowed forms, and fails 39 others: the licence lists, the owner's kind, actions,
+  every form of fetch, copied code, assets, an entry covering nothing, and a bad `"scan"`.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use (four actions, CodeQL, the GitHub CLI, Node and npm). A project's scan leaves its copy of the core out,
   since this audit holds it, so the games stop listing the core's actions.
@@ -29,7 +31,7 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the test passes (45 checks), and the core's own audit passes over its 91 files. A dry run on each game with
+Tested: the test passes (53 checks), and the core's own audit passes over its 91 files. A dry run on each game with
 the new scripts: Snakes passes, with only its own scan and that scan's test flagged, since they name the forms they
 look for; both go in its sync PR. Amarna fails on 149 items, all real: seven actions, its sounds, icons and map
 pictures, and two `npx vitest` lines that would fetch if nothing were installed.
@@ -37,7 +39,8 @@ pictures, and two `npx vitest` lines that would fetch if nothing were installed.
 What changes in every project: nothing until its config adds `"scan"`. Its sync PR then adds it, with an audit entry
 for each thing the scan finds. Snakes drops the half of its own scan that moved here, keeps its game's own checks (the
 addresses the game loads, its notices, `sw.js`), and drops its audit's entries for the core's actions and for lockfile
-packages the check already reads. Amarna gains an audit, and its notices are written from that audit's entries.
+packages the check already reads. Amarna gains an audit, its notices are written from that audit's entries, and its
+suite drops the tests of the core's functions that moved here.
 
 Readings taken: lockfile packages need no audit entry, since the check reads each one's licence from the lockfile at
 every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of its own rather than a list of
