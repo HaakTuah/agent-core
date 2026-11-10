@@ -7,9 +7,9 @@
 # holds the official binary, which takes the place of the machine's own node, so every shell's PATH finds it; npm stays
 # as it is. No package's install script runs (floor rule 15): the package is only fetched (`npm pack`) and its binary
 # taken out and checked against its SHA-256, then run once to show its version, before it replaces anything; a version
-# with no checksum here is never installed, whatever `.node-version` says. The sums are those of the binary in
-# nodejs.org's node-v<version>-linux-<arch>.tar.xz, checked against its SHASUMS256.txt when the pin was set; a new pin
-# repeats that. Safe to run twice; always exits 0 and says what it could not do.
+# with no checksum here is never installed, whatever `.node-version` says. The sums are the SHA-256 of `bin/node` in
+# that version's node-linux-<arch> packages, published by the Node.js project, recomputed in the PR that sets the pin.
+# Safe to run twice; always exits 0 and says what it could not do.
 have() { command -v "$1" >/dev/null 2>&1; }
 want=$(tr -d '[:space:]' 2>/dev/null <core/.node-version)
 if [ -n "$want" ] && [ "$(node -v 2>/dev/null)" = "v$want" ]; then echo "node: v$want present"; exit 0; fi
