@@ -125,9 +125,11 @@ Floor: whole. Modules: <all, or the list of those taken>.
   with the floor (`floor/security.md` and `floor/topics.md`) as its instructions. Under this trigger a request runs a
   code review alone; a security review comes with every request only under "Whenever code review runs" (core archive
   51).
-- A Codex cloud environment of the newer kind, made in ChatGPT's Codex settings (the *Codex environment*), its setup
-  script `bash scripts/cloud-setup.sh` (from `/workspace/<repository>`); tasks by comment fail either way.
-- Codex runs on its default model for cloud tasks (none can be chosen).
+- A Codex cloud environment for each project (the *Codex environment*), made in ChatGPT's Codex settings as a legacy
+  environment: its setup script `bash scripts/cloud-setup.sh` (manual setup, the same as its maintenance script), and
+  internet access limited to read-only methods. A task by comment builds and tests there but cannot push
+  (`modules/codex-building.md`, "Status").
+- Codex runs on its default model and effort for cloud tasks (none can be chosen).
 
 ## This repository
 

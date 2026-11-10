@@ -3,9 +3,11 @@
 What goes to Codex, the hand-over, and what happens when it is not there; read by the orchestrator when it routes
 work. The project's own table of what goes to whom, and its trials, are its own (core archive 18).
 
-**Status (3 November 2026): Codex reviews, Claude builds.** Codex cannot build yet: its GitHub tasks and its command
-line need a "Codex Cloud (Legacy)" environment, which can no longer be created. So no lane goes to Codex until the owner
-says it can build; until then all building is Claude's, and this file is dormant.
+**Status (10 November 2026): Codex reviews, Claude builds.** A Codex cloud environment exists for each project, and a
+task started by an `@codex` comment builds and tests in it, but its checkout has no remote: its commit reaches GitHub
+only when the owner clicks it through in ChatGPT, so it cannot work unattended. It runs on the default model and effort
+(light), which no setting changes, and the full suites run several times slower than ours. So no lane goes to Codex
+until the owner says it can build; until then all building is Claude's, and this file is dormant.
 
 ## What reaches Codex
 
