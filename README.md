@@ -35,9 +35,10 @@ alike (core archive 68). The owner's words behind each rule: `archive/instructio
 5. **The shared scripts and workflows,** run from its `core/` copy: `work-saved.sh` as its work-saved hook,
    `statusline.sh` as its status line (read by `usage.sh`), `copies.mjs` and `licences.mjs` as its copies and licence
    checks with configs of its own (the *copies check*). Its own `core.yml`, `personal-terms.yml`, `copies.yml`,
-   `licences.yml`, `codeql.yml` and `delete-merged-branches.yml` keep their triggers and call the core's of the same
-   name (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`). Only a sync PR moves those pins,
-   and only when the called workflow changed; `core.yml` fails a call pinned where it differs from the core's pin. Its
+   `licences.yml`, `codeql.yml`, `delete-merged-branches.yml` and, if it has versions Dependabot cannot see,
+   `versions.yml` keep their triggers and call the core's of the same name (`uses:
+   HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`). Only a sync PR moves those pins, and only when
+   the called workflow changed; `core.yml` fails a call pinned where it differs from the core's pin. Its
    `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
    into `core/`.

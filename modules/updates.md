@@ -8,6 +8,10 @@ entry. Dependabot's version updates (weekly, grouped) come as PRs under floor ru
 version is its own PR, with the *major version checks*. One is held back only for a reason (it breaks something, runs
 worse, changes its licence, or its project is abandoned or changes hands), written in the closed PR and an open issue.
 
+**Versions Dependabot cannot see** (a script loaded from elsewhere, the core's Node): each is listed, where it is
+written, in a config the core's versions workflow reads monthly from a schedule of the project's (the core runs it for
+its own pins), opening an `enhancement` issue for each one behind.
+
 **Node:** CI and the cloud machines run the same Node, the exact version in the core's `.node-version`: CI's setup-node
 reads it (`node-version-file: core/.node-version`), and every project's cloud setup runs `scripts/node.sh`, which holds
 its checksums. When a new even-numbered Node becomes long-term support, both move to it, proven by the full suites
