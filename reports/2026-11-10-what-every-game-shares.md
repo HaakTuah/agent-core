@@ -68,7 +68,8 @@ sync PR does. Lines are those at the commits above.
 | `builder-rules.md` 22, "No stopgaps" | inventing no rule for the meantime; a lever and its counterweight built together | its examples (letters until item 11b, gold until item 13, the mutinous unit; the tax rate with hunger; city-states early); the build order as a guide (its item 13); taking the reading that builds the final game best |
 | `builder-rules.md` 9, "Balance" | first guesses listed in the report, untuned while the game is built, tuned together at the tuning pass, the unplayable exception | balance frozen in every item; item 18 as its tuning pass; the benchmarks as a regression check, never to tune; "Seeds replay exactly within a save version" (until the question below is answered) |
 | `builder-rules.md` 11, "No model games" | "a mistake is welcome when it comes from the genuine complexity of the scenario, never from the game telling it badly", as "No rule untaught" now says for every game | the rest of the bullet |
-| `design-pillars.md` 31, "The order of resolution never decides"; 17, 19 and the pillars the PR #34 took | (PR #34's cuts) | as that PR's report says |
+
+What PR #34 took from its pillars (such as "The order of resolution never decides") is not mapped here.
 
 New for it: a change to the script kings' play checks that their temperaments stay distinct, before and after; every
 chance a king meets leaves the king a lever; everything new works online once its live multiplayer comes; the newest

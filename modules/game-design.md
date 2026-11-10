@@ -54,9 +54,9 @@ these. A feature here is any move, rule or power a player can choose to use.
   work if need be.
 - **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets that neither
   reality nor its causes fix (a time, a cost, a chance) is a first guess, listed as one in the change, and is tuned by
-  measured play, never just picked.
-  While the systems that change its effect are still being built it stays untuned, and a tuning pass takes them
-  together once they stand; anything that makes the game unplayable for testing is fixed at once.
+  measured play, never just picked. While the systems that change its effect are still being built it stays untuned,
+  and a tuning pass takes them together once they stand; anything that makes the game unplayable for testing is fixed
+  at once.
 - **Code decides facts; models phrase them,** in a game with language-model players or characters (core archive 105).
   The game's code decides what is true and what each seat learns; a model adds only voice, personality and judgement
   within its own seat.
