@@ -31,7 +31,6 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   never the app's warning. **Measure it** with the core's `scripts/usage.sh` at the start and, where it can read it,
   after every commit; where it cannot, the script says so: then check no more, and say nothing about it in any PR,
   report or message, since the owner watches and pauses the work at about 90%.
-- **No agent workflows and no ultracode,** except a process the project's own rules name.
 - **Read this table against yourself** (core archive 70 and 71). Your model is named in your system prompt, your effort
   is in `$CLAUDE_EFFORT` (unset: medium). A builder runs at the model the orchestrator gave it, and at the effort it
   gave it where it can set one, otherwise at its own; a helper runs at the model and effort its builder gave it (core

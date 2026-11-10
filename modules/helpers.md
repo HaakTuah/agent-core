@@ -1,7 +1,8 @@
 # Helpers: when they pay
 
-When a builder starts helpers (Claude's, and Codex's subagents once it builds), how many, and how to brief them. Read
-before starting one.
+When a builder starts helpers (Claude's, and Codex's subagents once it builds), how many, and how to brief them, however
+they are started: one at a time, or many by a workflow, which is welcome where it does a shape below within the cap
+(core archive 126). Read before starting one.
 
 A helper starts cold, rereads what it needs and returns only a summary, so it pays only for work of one of these shapes
 (core archive 25):
