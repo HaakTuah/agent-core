@@ -526,3 +526,10 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     scheduled tasks on his computer, and shown the rule cut to half its words, he answered:
 
     > Yes, expertly!
+
+96. **10 November 2026** (the core), asked whether to queue one review of the core, for what to add or improve, once
+    both games have worked on it for about a week after step 3, built on what they report (what builders tripped over,
+    what was asked of him that the core could have settled, which rules were broken or ignored), or to leave it to each
+    game's workshop check:
+
+    > Sure, expertly!
