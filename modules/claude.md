@@ -52,5 +52,4 @@ call goes to Opus (`model: "opus"`, `effort: "high"`); nothing ever waits for Fa
   brief that points it only at what it must judge) and after it (building, testing, writing up); it returns its design,
   answer or text and stops.
 - Sessions started from a Claude Code Project don't load `.claude/agents/`, so always pass `model` in the call, and
-  `effort` too when a builder starts a helper (an orchestrator cannot set it). Never max effort: it costs the most and
-  tends to overthink.
+  `effort` too when a builder starts a helper. Never max effort: it costs the most and tends to overthink.
