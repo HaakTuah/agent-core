@@ -13,15 +13,19 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const DAY = 864e5;
 const STABLE = /^(\d+)\.(\d+)\.(\d+)$/;
 
-// Each entry with the version its file holds now: exactly one, or it throws (a pattern that no longer finds it).
+// Each entry with the version its file holds now: exactly one, or it throws (a pattern that no longer finds it, an
+// entry without its wait or its "how", or a file outside the project).
 export function current(entries, root) {
   return entries.map(e => {
-    const file = path.join(root, e.file);
-    if (path.relative(root, file).startsWith("..")) throw new Error(`${e.name}: ${e.file} is outside the project`);
+    if (!/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/.test(e.name ?? "")) throw new Error(`${e.name}: no npm package name`);
+    if (!Number.isInteger(e.days) || e.days < 7 || typeof e.how !== "string" || !e.how.trim()) throw new Error(`${e.name}: needs "days" (7 or more, floor rule 7) and "how"`);
+    const file = fs.realpathSync(path.join(root, e.file)), rel = path.relative(fs.realpathSync(root), file);
+    if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`${e.name}: ${e.file} is outside the project`);
     const found = new Set([...fs.readFileSync(file, "utf8").matchAll(new RegExp(e.pattern, "g"))].map(m => m[1]));
     if (found.size !== 1) throw new Error(`${e.name}: ${e.file} holds ${found.size ? [...found].join(", ") : "no version"} by ${e.pattern}, not one`);
     return { ...e, version: [...found][0] };
@@ -53,14 +57,13 @@ export const issue = (e, to, config) => ({
   ].join("\n"),
 });
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   const config = process.argv[2];
   if (!config) { console.error("FAIL: name the config: node <core>/scripts/versions.mjs <config> [--issues]"); process.exit(1); }
   const { entries } = JSON.parse(fs.readFileSync(config, "utf8"));
   const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
   const now = Date.now(), behind = [];
   for (const e of current(entries, root)) {
-    if (!/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/.test(e.name)) throw new Error(`${e.name}: no npm package name`);
     const times = JSON.parse(execFileSync("npm", ["view", e.name, "time", "--json"], { encoding: "utf8" }));
     const to = newest(times, e, now);
     if (to && later(to, e.version) > 0) behind.push(issue(e, to, config));
