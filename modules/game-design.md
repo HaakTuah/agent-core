@@ -17,10 +17,16 @@ these. A feature here is any move, rule or power a player can choose to use.
   ahead. If they did not, the change says which it is: the feature does not matter, or they play it badly, which is
   fixed in the same change.
 - **No rule untaught** (core archive 84 and 90). Every rule a player needs is in *where rules are taught*, added or
-  changed in the same change as the rule, so no player loses to a rule the game never told it.
+  changed in the same change as the rule, and when a rule acts on a player, the game shows it where and when that
+  player could know it; nothing the game itself shows implies what is untrue (a player may still lie). So no player
+  loses to a rule the game never told or showed it, nor errs because of how the game told it something. Every
+  mistake a player makes in testing is sorted by one question (core archive 112): could a careful player, seeing the
+  same, have known better? If so it is the game's, and kept; if not, the game told it badly: a bug, fixed before the
+  next test.
 - **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
-  instead): the rules are measured through their play, and weak play hides what is wrong with a rule.
+  instead): the rules are measured through their play, and weak play hides what is wrong with a rule. Stronger is
+  never samier: where there are several, each keeps its own style, checked before and after a change to their play.
 - **Don't prohibit; give it its real cost** (core archive 91 and 92), so the player keeps his agency. An action a player
   could realistically take is never forbidden because it seems unwise; the game's own rules make it as costly, risky and
   rare as it really was, so the rare exception stays possible, as Hannibal crossed the Alps.
@@ -36,6 +42,8 @@ these. A feature here is any move, rule or power a player can choose to use.
   chance standing in only for causes too small to model; nothing appears or vanishes without a cause it could name.
   Depth stops where more simulation no longer pays for what it costs to build and run; a cause hard to convey is a
   reason to teach it better, never to make it shallower.
+- **Levers, not luck** (core archive 110 and 111). Where chance enters, players have levers to prepare for it or answer
+  it, so no outcome is decided by chance alone.
 - **Different data, same rules** (core archive 105). No rule checks which player, faction or character it is: what sets
   one apart lives in its data and starting conditions, which every rule reads alike, never in a rule that names it;
   only presentation and voice may name one.
@@ -43,6 +51,26 @@ these. A feature here is any move, rule or power a player can choose to use.
   depend on which the game settles first: they share, or a seeded draw decides.
 - **Everything new belongs** (core archive 105). Every new feature feels balanced, cohesive and purposeful, and fits
   the rest of the game.
+- **No stopgaps** (core archive 107). The work serves the finished game, so nothing is built for the meantime: where a
+  change comes before a feature it would want, the game stays as it is until that feature comes, and the change says
+  so. A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
+  work if need be.
+- **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets that neither
+  reality nor its causes fix (a time, a cost, a chance) is a first guess, listed as one in the change, and is tuned by
+  measured play, never just picked. While the systems that change its effect are still being built it stays untuned,
+  and a tuning pass takes them together once they stand; anything that makes the game unplayable for testing is fixed
+  at once.
 - **Code decides facts; models phrase them,** in a game with language-model players or characters (core archive 105).
   The game's code decides what is true and what each seat learns; a model adds only voice, personality and judgement
-  within its own seat.
+  within its own seat. A model is called only where its judgement can change what happens; the obvious, the routine
+  and the mechanical are the code's (core archive 112).
+- **In a game played online, everything new works online** (core archive 106), the same on every screen, with the
+  protocol's version raised when its messages change.
+- **Players always play the newest version** (core archive 109), in a game they keep installed or cached: a new version
+  takes over by itself, without asking, as soon as it interrupts no game in play; only one that a game in play cannot
+  carry on in waits until that game ends.
+- **Same seed, same game** (core archive 112). A game replays exactly from its seed within one version of its rules: a
+  change that should change no play proves it by replaying the same seeds, and one that changes play says what it
+  changes and starts a new version.
+- **Readable by every player** (core archive 112). Nothing is told apart by colour alone, reduced motion keeps whatever
+  informs, and each thing has one name everywhere the game shows it.
