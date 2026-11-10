@@ -533,3 +533,8 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     game's workshop check:
 
     > Sure, expertly!
+
+97. **10 November 2026** (the core), asked "Yes to the twelve safety-rule cuts in #26?" and "Yes to the four readings
+    in #24?" (the lean pass: the floor, review-guideline and issue-template cuts, and its four readings):
+
+    > Yes, expertly to all!
