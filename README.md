@@ -60,9 +60,8 @@ project takes it the same way (core archive 68). The owner's words behind each r
    core's workflows changed since the last: then it moves them to its new pin, and needs the owner's yes, since it
    changes `.github/` (floor rule 3). `core.yml` also fails a call pinned where the called workflow differs from the one
    at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
-6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules (a rule
-   marked there as a safety rule is out of reach of "Principles over rules", as the floor is), each file cut to that,
-   with pointers into `core/`.
+6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules, each
+   file cut to that, with pointers into `core/`.
 
 ## Slots
 

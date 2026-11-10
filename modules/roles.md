@@ -3,8 +3,7 @@
 The roles, who fills each today, escalation and who merges; read when a task needs a role's part. A role can be filled
 by any model, working from the project's `AGENTS.md`.
 
-- **The orchestrator** (today: Claude): writes Codex's briefs, routes the work, takes the readings, merges Codex's PRs,
-  and brings the owner his questions (`modules/orchestrating.md`).
+- **The orchestrator** (today: Claude): the session that starts builder sessions (`modules/orchestrating.md`).
 - **The builders:** Claude's builder sessions, and, once it can build, Codex, started from a draft PR whose description
   is its brief (`modules/codex-building.md`). **The trusted builder,** whose lanes alone may change the protected files
   (`floor/security.md`, rule 3): Claude's builder sessions.
