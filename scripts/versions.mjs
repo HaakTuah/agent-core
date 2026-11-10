@@ -1,12 +1,12 @@
-// The versions check ("Versions Dependabot cannot see" in modules/updates.md), for every project that takes the core
-// and for the core itself: each version in the config is read from its file and compared with the npm registry's newest
-// stable release old enough to take (floor rule 7). The config, a JSON file its versions workflow names, holds
-// "entries", each with "name" (the npm package whose releases count), "file" and "pattern" (a regular expression whose
-// first group is the version, found exactly once), "days" (the wait: 7, or 14 for a script browsers load), "sameMajor"
-// (true to stay within the major the project chose) and "how" (what a builder does to take it). Run monthly by the
-// versions workflow (.github/workflows/versions.yml), which opens an enhancement issue for each one behind. Node's own
-// modules and npm. It reads files of the project it is run in (its git root), the config's path from the directory it
-// starts in.
+// The versions check ("The newest stable version, unless there is a reason" in modules/updates.md), for every project
+// that takes the core and for the core itself: each version in the config is read from its file and compared with the
+// npm registry's newest stable release old enough to take (floor rule 7). The config, a JSON file its versions workflow
+// names, holds "entries", each with "name" (the npm package whose releases count), "file" and "pattern" (a regular
+// expression whose first group is the version, found exactly once), "days" (the wait: 7, or 14 for a script browsers
+// load), "sameMajor" (true to stay within the major the project chose) and "how" (what a builder does to take it). Run
+// monthly by the versions workflow (.github/workflows/versions.yml), which opens an enhancement issue for each one
+// behind. Node's own modules and npm. It reads files of the project it is run in (its git root), the config's path from
+// the directory it starts in.
 //
 //   node <core>/scripts/versions.mjs <config>            one line each: up to date, or behind
 //   node <core>/scripts/versions.mjs <config> --issues   JSON: an issue's key, title and body for each one behind

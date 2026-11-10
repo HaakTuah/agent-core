@@ -13,8 +13,8 @@ Snakes' `tools/versions.js` (one issue each, and a test). Amarna's watched only 
   config, and run by the core itself on its own schedule for the pins it holds (`.github/versions.json`: Node, in
   `.node-version`). It may open issues and nothing else; titles and bodies pass through a file and jq. A change to what
   runs by itself: Codex's and the fallback reviewer's security reviews (floor rule 3).
-- **`modules/updates.md`:** the paragraph "Versions Dependabot cannot see". **`README.md`:** point 5 names the
-  workflow.
+- **`modules/updates.md`:** "The newest stable version, unless there is a reason" names the check, in place of no new
+  paragraph (Codex's P2). **`README.md`:** point 5 names the workflow.
 
 Tested: the test passes; the check reads the core's Node (26.13.0, the newest old enough) and asks for nothing.
 
