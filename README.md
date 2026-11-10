@@ -2,6 +2,7 @@
 
 The rules shared by the owner's agent-built projects, written once so that a change to them is made once and every
 project takes it the same way (core archive 68). The owner's words behind each rule are in `archive/instructions.md`.
+Read by whoever sets a project up on the core or moves its pin, and by the owner for his own part ("Setting up Codex").
 
 ## Two layers
 
@@ -16,14 +17,13 @@ project takes it the same way (core archive 68). The owner's words behind each r
   it takes.
   - Read at the start of every task: `how-to-work.md` (the aim, the four pillars, the habits), `inbox.md` (questions,
     readings, ideas, bugs, and the owner's words), `work-flow.md` (reviews in the background, lanes, sessions),
-    `git.md` (branches and pushes) and, for Claude, `claude.md` (models, effort, helpers, usage and the
-    brake).
+    `git.md` (branches and pushes), and each tool's own: for Claude, `claude.md` (models, effort, helpers, usage and
+    the brake); for Codex, `codex.md` (its own instructions).
   - Read when needed: `roles.md` (who does what, escalation, who merges), `helpers.md` (when helpers pay),
     `reviews.md` (which review, the security gate, only a 10 passes), `review-guidelines.md` (what reviewers judge by),
-    `codex.md` (Codex's own instructions, read only by Codex), `codex-building.md` (Codex's status, what reaches it,
-    and how work goes to it once it can build), `calibration.md` (the checks on the reviewers),
-    `orchestrating.md` (the orchestrator), `github-calls.md` (REST calls from a cloud session), `updates.md` (versions,
-    Node, CodeQL) and `workshop-check.md` (the weekly check).
+    `codex-building.md` (Codex's status, what reaches it, and how work goes to it once it can build), `calibration.md`
+    (the checks on the reviewers), `orchestrating.md` (the orchestrator), `github-calls.md` (REST calls from a cloud
+    session), `updates.md` (versions, Node, CodeQL) and `workshop-check.md` (the weekly check).
   - Taken only by projects that are games, read before a task changes a rule, a feature or how the computer players
     play: `game-design.md` (the design principles every game shares; core archive 80).
 
@@ -95,7 +95,7 @@ is its queue of tasks taken in order.
 | *computer players* | a game's players that no person plays (`game-design.md`) |
 | *measured players* | the computer players whose use of a feature decides whether it is finished |
 | *what they are shown* | what the computer players see of the game |
-| *use-against-ignore measurement* | how players that use a feature are measured against ones that do not |
+| *use-against-ignore measurement* | how players that use a feature where it fits are measured against copies that always and never use it |
 | *where the numbers go* | where that measurement's numbers are shown |
 | *where rules are taught* | where a player learns each rule |
 

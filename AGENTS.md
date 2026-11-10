@@ -13,8 +13,8 @@ imports them):
 @modules/inbox.md
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
-`modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md` (Codex only) and `modules/github-calls.md`. The
-rest describe work this repository does not do (lanes, updates, the orchestrator), but for the rule-file audit below.
+`modules/reviews.md`, `modules/review-guidelines.md` and `modules/github-calls.md`. The rest describe work this
+repository does not do (lanes, updates, the orchestrator), but for the rule-file audit below.
 
 What fills the slots here: the *progress file* and the *report*: this repository's open PRs, and `reports/` (one file
 per change, `<date>-<name>.md`); the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling
