@@ -683,3 +683,10 @@ is item N here. A new item goes at the end, numbered after the last, with its da
 
      > Yes, expertly! Do we need another Claude Code pass on agent-rules, to ensure the repo follows its own rules,
      > expert?
+
+117. **10 November 2026** (the core), asked "Yes to the nine readings in #42, with my rewording of 6?" (the core read
+     whole after the day's merges; reading 6 reworded so that a fix takes over as soon as it interrupts no game in play,
+     and a version that changes play waits until the game in play ends or the game is next opened) and "Yes to #41?" (two
+     workflow comments):
+
+     > Yes, expertly to all!

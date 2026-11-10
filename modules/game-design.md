@@ -72,10 +72,12 @@ these. A feature here is any move, rule or power a player can choose to use.
   the mechanical are the code's (core archive 112).
 - **In a game played online, everything new works online** (core archive 106), the same on every screen, with the
   protocol's version raised when its messages change.
-- **Players always play the newest version** (core archive 109 and 115). Opening the game starts its newest version;
-  where it cannot load itself anew, the game says a newer one is out, with one click to play it. A version that only
-  fixes or looks different takes over at once, without asking; one that changes play waits until the game in play ends.
-  A saved game opened in a newer version carries on in the newer rules, and its log marks where they changed.
+- **Players always play the newest version** (core archive 109, 115 and 117). Opening the game starts its newest
+  version; where it cannot load itself anew, the game says a newer one is out, with one click to play it. A version that
+  only fixes or looks different takes over by itself, without asking, as soon as it interrupts no game in play (between
+  rounds, at a turn of the game's clock, or at the next launch); one that changes play waits until the game in play ends
+  or the game is next opened. A saved game opened in a newer version carries on in the newer rules, and its log marks
+  where they changed.
 - **Same seed, same game** (core archive 112 and 114). A game replays exactly from its seed within one version of its
   rules, and where people or language models play, from its log of every input and every model answer, the model and its
   prompts counting as part of the version: a change that should change no play proves it by the same seeds and logs, and
