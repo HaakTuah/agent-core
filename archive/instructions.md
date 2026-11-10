@@ -514,3 +514,15 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     design session's line on reading 2, that a session he starts on his own computer may run the project's hooks:
 
     > Yes, expertly, but I don't understand what you mean here.
+
+95. **10 November 2026** (the core), of floor rule 8's ban on what runs on his computer by itself and of the
+    exception for sessions he starts there:
+
+    > But nothing does start without me? Why do we have rules for scheduled or service calls, when this is project
+    > specs? They won't see that? Is this just jumbo you have decided to add without running it by me, expert?
+    > Remember about keeping things lean and mean? No useless fat, expert!
+
+    Told that the ban rests on his words of 3 November (core archive 52), that agents have tools that can set up
+    scheduled tasks on his computer, and shown the rule cut to half its words, he answered:
+
+    > Yes, expertly!
