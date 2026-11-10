@@ -104,7 +104,7 @@ is its queue of tasks taken in order.
 # Core manifest
 
 Core: HaakTuah/agent-rules at <full commit SHA>, copied whole under core/ (never edited here).
-Paths: in the core's files, one into floor/, modules/, scripts/, archive/ or reports/ is under core/; any other is ours.
+Paths: in the core's files, one into floor/, modules/, scripts/, setup/, archive/ or reports/ is under core/; any other is ours.
 Floor: whole. Modules: <all, or the list of those taken>.
 
 ## Names
