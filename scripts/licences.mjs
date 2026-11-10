@@ -17,10 +17,10 @@
 // no lockfile holds, a JSON file whose "entries" each have a "name", a "licence", "ships": true if it ships, and "kind":
 // "data", "asset" or "font" where that widens its list ("github-service" with LicenseRef-GitHub-Terms: one of GitHub's
 // own services, GITHUB_SERVICES below, which never ships); and "ignoreScriptsIn", the .npmrc files that must keep
-// packages' own install scripts off (floor rule 15). The .npmrc at the root and beside each lockfile may hold only
-// settings that leave where npm fetches from alone, since a data or font package is known by its registry address.
+// packages' own install scripts off (floor rule 15). Every .npmrc in the project may hold only settings that leave
+// where npm fetches from alone, since a data or font package is known by its registry address.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -198,6 +198,15 @@ export function scriptsOff(npmrc) {
   return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
+/** Every `.npmrc` under `root`, but in `node_modules` and `.git`. */
+function npmrcFiles(root, dir = "") {
+  return readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
+    if (e.name === "node_modules" || e.name === ".git") return [];
+    const path = dir ? `${dir}/${e.name}` : e.name;
+    return e.isDirectory() ? npmrcFiles(root, path) : e.name === ".npmrc" ? [path] : [];
+  });
+}
+
 /** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word. */
 export function loadConfig(path) {
   let config;
@@ -255,8 +264,7 @@ export function check(config, root) {
       if (!licenceOk(e.licence, allowedFor(e.name, e.ships === true, e.kind ?? null))) failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}`);
     }
   }
-  const npmrcs = [...new Set(["", ...(config.lockfiles ?? []).map((f) => posix.dirname(f))].map((d) => posix.join(d, ".npmrc")))];
-  for (const f of npmrcs.filter((f) => existsSync(join(root, f)))) {
+  for (const f of npmrcFiles(root)) {
     for (const l of registryOverrides(readFileSync(join(root, f), "utf8"))) failures.push(`${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}`);
   }
   for (const f of config.ignoreScriptsIn ?? []) {
