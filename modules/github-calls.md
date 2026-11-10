@@ -13,4 +13,5 @@ gh api -X PUT repos/HaakTuah/<repo>/pulls/<n>/update-branch                     
 gh api -X PUT repos/HaakTuah/<repo>/pulls/<n>/ccr/auto_merge                                 # auto-merge on (DELETE: off)
 gh api repos/HaakTuah/<repo>/compare/main...<branch>    --jq '.files[].filename'             # the files a branch changes
 gh api repos/HaakTuah/<repo>/pulls/<n> --jq '{state, merged}'                                 # was it merged?
+gh api repos/HaakTuah/agent-core/compare/<sha>...main --jq .status                         # behind or identical: <sha> is on the core's main
 ```
