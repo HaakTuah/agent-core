@@ -19,7 +19,10 @@ these. A feature here is any move, rule or power a player can choose to use.
 - **No rule untaught** (core archive 84 and 90). Every rule a player needs is in *where rules are taught*, added or
   changed in the same change as the rule, and when a rule acts on a player, the game shows it where and when that
   player could know it; nothing the game itself shows implies what is untrue (a player may still lie). So no player
-  loses to a rule the game never told or showed it, nor errs because of how the game told it something.
+  loses to a rule the game never told or showed it, nor errs because of how the game told it something. Every
+  mistake a player makes in testing is sorted by one question (core archive 112): could a careful player, seeing the
+  same, have known better? If so it is the game's, and kept; if not, the game told it badly: a bug, fixed before the
+  next test.
 - **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule. Stronger is
@@ -59,9 +62,15 @@ these. A feature here is any move, rule or power a player can choose to use.
   at once.
 - **Code decides facts; models phrase them,** in a game with language-model players or characters (core archive 105).
   The game's code decides what is true and what each seat learns; a model adds only voice, personality and judgement
-  within its own seat.
+  within its own seat. A model is called only where its judgement can change what happens; the obvious, the routine
+  and the mechanical are the code's (core archive 112).
 - **In a game played online, everything new works online** (core archive 106), the same on every screen, with the
   protocol's version raised when its messages change.
 - **Players always play the newest version** (core archive 109), in a game they keep installed or cached: a new version
   takes over by itself, without asking, as soon as it interrupts no game in play; only one that a game in play cannot
   carry on in waits until that game ends.
+- **Same seed, same game** (core archive 112). A game replays exactly from its seed within one version of its rules: a
+  change that should change no play proves it by replaying the same seeds, and one that changes play says what it
+  changes and starts a new version.
+- **Readable by every player** (core archive 112). Nothing is told apart by colour alone, reduced motion keeps whatever
+  informs, and each thing has one name everywhere the game shows it.

@@ -636,3 +636,11 @@ is item N here. A new item goes at the end, numbered after the last, with its da
 
      > (…) and i also think when there is just a little bit of space, it should slow down again, so it isn't and rng
      > competition where it is who's island it pecks at next that decides it, capiche? Whats your take?
+
+112. **10 November 2026** (the core), asked "Yes to the nine readings, with my additions to 7, 8 and 9?" (#36, on PR
+     #35, what every game shares: 1, same seed, same game, added; 2 to 6 as built; 7, the test of a player's mistake
+     added for every game; 8, models called only where their judgement can change what happens, added to "Code decides
+     facts"; 9, nothing told apart by colour alone, reduced motion keeping what informs, and one name for each thing,
+     added for every game):
+
+     > Yes, expertly to all!
