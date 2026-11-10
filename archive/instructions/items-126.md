@@ -103,3 +103,28 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Enough. They are asking nonsense. I don't want another question where the answer is obviously yes. Handle it,
      > expert.
+
+134. **10 November 2026** (the core). After a day of orchestrators asking him what the rules already settled:
+
+     > What rules have you added that make them ask this much nonsense? We need removal of unnecessary rules that I
+     > don't care about. I care about my work loop and pillars of good program and game design, I don't care about
+     > these stuff you keep adding, and I have humored it for long enough. How will you handle it, expert. Lay it out
+     > for me, and what guarantees can you give me?
+
+     Shown the plan (the rules that made agents ask; what to keep: his safety words, his work loop and the pillars; what
+     to cut; one pass; a size cap in CI; what can and cannot be guaranteed):
+
+     > Yes, expertly to everything, and make it good! My sanity depends on it!
+     >
+     > "Readings go to you as question issues. The stand-in (the helper that predicts your answer from your past
+     > words) answers, but anything it’s less than highly sure of, or that’s a matter of taste, still lands in your
+     > inbox."
+     > I thought they were still not supposed to stop? I have over and over emphasized that the machinery keeps
+     > churning!
+
+135. **10 November 2026** (the core), having turned on auto-merge as an option in every repository:
+
+     > I have turned on auto-complete as an option for all repositories, should we utilize it as a rule, expert?
+
+     Told yes, once Codex's reviews are clean on the head commit, since auto-merge waits only for the checks GitHub
+     knows of, and the reviews are not among them.
