@@ -41,8 +41,9 @@ jobs:
           set -euo pipefail
           bad=0
           if ! diff -r -q --exclude=.git .core-at-pin core; then echo "core/ differs from the core at its pin (above)"; bad=1; fi
-          calls=$(grep -h -i -E '^[[:space:]-]*uses:[[:space:]]*["'\'']?haaktuah/agent-rules/' .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \
-            | sed -E 's/^[[:space:]-]*uses:[[:space:]]*["'\'']?//; s/["'\''[:space:]].*$//' | sort -u || true)
+          # (every mention outside a comment, in whatever form the YAML writes the call)
+          calls=$(sed 's/#.*//' .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \
+            | grep -o -i -E 'haaktuah/agent-rules/[^"'\''[:space:]},]*' | sort -u || true)
           while IFS= read -r call; do
             [ -n "$call" ] || continue
             if ! [[ "$call" =~ ^HaakTuah/agent-rules/\.github/workflows/([A-Za-z0-9._-]+\.ya?ml)@([0-9a-f]{40})$ ]]; then

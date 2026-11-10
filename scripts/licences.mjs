@@ -5,7 +5,8 @@
 // that only runs, to the tools' list: every licence the Open Source Initiative approves (OSI below), one on the same
 // terms, and everything what ships may be under. CC-BY is allowed only for what is named as data or assets, OFL only
 // for fonts, as the floor says. No licence, or an expression it cannot read, fails. Node's own modules only, so the
-// check needs no install. It runs from the project's root, whatever the directory it is started from.
+// check needs no install. It checks the project it lies in (core/scripts/ there), whatever the directory it is started
+// from; the config's own path is read from that directory, the paths inside it from the project's root.
 //
 //   node core/scripts/licences.mjs <config>            the check
 //   node core/scripts/licences.mjs <config> --action   the dependency review's lists, as lines for $GITHUB_OUTPUT
@@ -157,9 +158,10 @@ export function registryName(resolved) {
 
 /**
  * The lockfile paths of everything a package.json's runtime dependencies, and its workspaces', pull in, worked out from
- * the package.json files (`manifest(dir)`, dir "" for its own), not the lockfile's `dev` flags, which a PR could edit;
- * each name resolved as Node resolves it, from the nearest node_modules folder up. Peer and optional dependencies
- * count, since they may be bundled.
+ * the package.json files (`manifest(dir)`, dir "" for its own), not the lockfile's `dev` flags; each name resolved as
+ * Node resolves it, from the nearest node_modules folder up. Peer and optional dependencies count, since they may be
+ * bundled. Each package's own `dependencies` and `license` are the lockfile's, as npm wrote them: npm checks a
+ * package's bytes against the lockfile, never those fields, so a hand edit to them is a review finding.
  */
 export function shippedPaths(packages, workspaces, manifest) {
   const deps = (m) => Object.keys({ ...m.dependencies, ...m.optionalDependencies, ...m.peerDependencies });
@@ -207,6 +209,14 @@ function npmrcFiles(root, dir = "") {
   });
 }
 
+/** One spelling for every path in a config ("./package.json" is "package.json"), so "ships" matches its lockfile's. */
+function normalised(config) {
+  const out = { ...config };
+  for (const key of ["lockfiles", "ships", "ignoreScriptsIn"]) if (Array.isArray(out[key])) out[key] = out[key].map((p) => posix.normalize(p));
+  if (typeof out.audit === "string") out.audit = posix.normalize(out.audit);
+  return out;
+}
+
 /** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word. */
 export function loadConfig(path) {
   let config;
@@ -222,9 +232,13 @@ export function loadConfig(path) {
   if (!Array.isArray(config.ships)) throw new Error('the config does not say what ships ("ships": [] if no package does)');
   if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path');
   if (!config.lockfiles?.length && !config.audit) throw new Error('the config names nothing to check ("lockfiles", "audit")');
-  const dirs = (config.lockfiles ?? []).map((f) => posix.dirname(f));
-  const loose = config.ships.filter((m) => posix.basename(m) !== "package.json" || !dirs.includes(posix.dirname(m)));
+  config = normalised(config);
+  const beside = (config.lockfiles ?? []).map((f) => posix.join(posix.dirname(f), "package.json"));
+  const loose = config.ships.filter((m) => !beside.includes(m));
   if (loose.length) throw new Error(`"ships" names a file that is no package.json beside a lockfile: ${loose.join(", ")}`);
+  const npmName = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/u;
+  const odd = [...(config.data ?? []), ...(config.fonts ?? [])].filter((n) => !npmName.test(n));
+  if (odd.length) throw new Error(`"data" or "fonts" names what is no npm package name: ${odd.join(", ")}`);
   return config;
 }
 
@@ -234,8 +248,9 @@ function lockfilePackages(root, lockPath, ships) {
   const read = (p) => JSON.parse(readFileSync(join(root, base, p), "utf8"));
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object") throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3)`);
-  const workspaces = read("package.json").workspaces ?? [];
-  if (!Array.isArray(workspaces) || workspaces.some((w) => typeof w !== "string" || /[*?[{]/u.test(w))) throw new Error(`${posix.join(base, "package.json")}: name each workspace by its path`);
+  const named = read("package.json").workspaces ?? [];
+  if (!Array.isArray(named) || named.some((w) => typeof w !== "string" || /[*?[{]/u.test(w))) throw new Error(`${posix.join(base, "package.json")}: name each workspace by its path`);
+  const workspaces = named.map((w) => posix.normalize(w));
   const shipped = ships ? shippedPaths(lock.packages, workspaces, (dir) => read(posix.join(dir, "package.json"))) : new Set();
   return Object.entries(lock.packages)
     .filter(([path, entry]) => path.includes("node_modules/") && !(entry.link && workspaces.includes(entry.resolved)))
@@ -248,6 +263,7 @@ function lockfilePackages(root, lockPath, ships) {
 
 /** The check, on the project at `root`: { failures, summary }. */
 export function check(config, root) {
+  config = normalised(config);
   const { allowedFor } = policy(config);
   const failures = [];
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
@@ -260,6 +276,8 @@ export function check(config, root) {
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list`);
     for (const e of entries) {
       if (!e || typeof e.name !== "string" || !e.name || typeof e.licence !== "string" || !e.licence) { failures.push(`${config.audit}: an entry without a name or licence: ${JSON.stringify(e)}`); continue; }
+      // (a "ships" or "kind" of the wrong shape would check less without a word)
+      if ((e.ships !== undefined && typeof e.ships !== "boolean") || (e.kind !== undefined && typeof e.kind !== "string")) { failures.push(`${config.audit}: ${e.name}: "ships" must be true or false, and "kind" a word`); continue; }
       if (e.licence === GITHUB_TERMS && e.kind === "github-service" && GITHUB_SERVICES.has(e.name) && !e.ships) continue;
       if (!licenceOk(e.licence, allowedFor(e.name, e.ships === true, e.kind ?? null))) failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}`);
     }

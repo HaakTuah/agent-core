@@ -9,7 +9,7 @@ on:
   workflow_call:
     inputs:
       languages:
-        description: 'The languages to analyze, a JSON list, such as ["actions", "javascript-typescript"].'
+        description: 'The languages to analyze, a JSON list, such as ["actions", "javascript-typescript"]; each one CodeQL analyzes without a build.'
         required: true
         type: string
 
