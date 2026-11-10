@@ -15,7 +15,9 @@ alone get no code review. Codex's usage can run out without a word (core archive
 3. **Security:** Codex runs one security review by itself when a PR is marked ready. A later commit that fixes a
    security finding, or changes what the review is for (input, a workflow, the network, saved files, a dependency), gets
    the fallback reviewer's check of that change; a security review not finished within about 30 minutes of the ready
-   mark is done by the fallback reviewer over the whole diff (core archive 47 to 51).
+   mark is done by the fallback reviewer over the whole diff (core archive 47 to 51). A PR that changes what runs by
+   itself or with credentials (floor rule 3) gets both: Codex's and the fallback reviewer's, each over the whole diff,
+   and both must pass (core archive 138).
 4. **The design check:** on the design-checked PRs, once before the merge, a fresh reviewer judges the work against the
    design alone, and its "Readings taken" as the stand-in would (core archive 22).
 5. **When a PR passes:** every P0 and P1 fixed; every lower point fixed if it lies in the change, otherwise filed as a
