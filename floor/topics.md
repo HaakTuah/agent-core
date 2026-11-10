@@ -1,7 +1,7 @@
 # The floor, by topic
 
 The floor's rules for particular work, read before a task touches one; what the floor is, and the rules any task can
-break, are in `floor/security.md`. Taken whole, like all the floor.
+break, are in `floor/security.md`.
 
 ## The rules
 
@@ -23,35 +23,30 @@ attribute, a URL, a style or an event handler unescaped; no `eval`, `new Functio
 
 **7. What runs on users' machines.** Every package, tool and script is held at one exact version, never a range, and a
 new stable release is taken only once it is a week old (two for a script users' browsers load directly), so a bad or
-hijacked one is usually pulled first (core archive 37 and 65). **What ships** (what is bundled or loaded, and
-everything that builds it) has its source checked before a new version merges, each check shown in the PR: the same
-publisher and repository as before, and npm's provenance naming the same repository if the version before had it;
-npm's registry signature verified (`npm audit signatures` after an install with `--ignore-scripts`, or, where that
-cannot reach Sigstore, the signature over `name@version:integrity` checked against the key of the same id at
+hijacked one is usually pulled first (core archive 37 and 65). **What ships** (what is bundled or loaded, and everything
+that builds it) has its source checked before a new version merges, each check shown in the PR: the same publisher and
+repository as before, and npm's provenance naming the same repository if the version before had it; npm's registry
+signature verified (`npm audit signatures` after an install with `--ignore-scripts`, or, where that cannot reach
+Sigstore, the signature over `name@version:integrity` checked against the key of the same id at
 `https://registry.npmjs.org/-/npm/v1/keys`); and its diff from the old version (for a built file, its readable build)
-read against the release notes, naming anything they do not explain, such as a new address it contacts or code it
-builds from text. A check that cannot be run leaves the release waiting, never skipped; one that fails holds it back.
-These checks lower the odds of a bad release, never rule one out, for the version in use as much as for a new one;
-the page's content security policy, which nothing weakens, limits the harm. The project names what it ships, its
-policy and what else runs on users' machines.
+read against the release notes, naming anything they do not explain, such as a new address it contacts or code it builds
+from text. A check that cannot be run leaves the release waiting, never skipped; one that fails holds it back. The
+page's content security policy, which limits the harm of a bad release that gets through, is never weakened. The project
+names what it ships, its policy and what else runs on users' machines.
 
 **9. Security alerts and reported weaknesses,** handled by what they could reach. The Security tab's alerts (code
 scanning, Dependabot, secret scanning) are seen only by the owner; no agent is given a token to read them; he passes
-on what needs fixing (core archive 35).
+on what needs fixing (core archive 35), and closes one on a test's fake (floor rule 8) as "Used in tests" once the
+literal is gone.
 - **In a PR's own change:** it blocks the merge until fixed, wherever it was reported, Codex's findings on the PR
-  included. A CodeQL finding that is a
-  false alarm is no weakness: once explained in the PR and confirmed there by whoever gave the PR its security
-  review, with no suppression comment added to the code, the PR may merge, and the owner alone dismisses the alert.
-- **In merged code, where it could reach what the threat model protects beyond its lower stakes (the owner's
-  accounts or tokens, `main`, `develop` or the site: a workflow, a CI permission, a secret, a dependency; and what
-  the project's threat model adds), or whose kind the owner has not said:** reported privately first, if the
-  reporter can (an outsider through "Reporting a weakness" below; an agent only in its session's last message to the
-  owner, never in a file, commit, PR, issue, comment or report), and fixed before any other work, in a PR that says
-  what it hardens, never how to attack it. A reporter who cannot report privately opens an issue as "Reporting a
-  weakness" says: a report that reaches the owner matters most, but not at the price of publishing how to attack.
-- **Any other weakness in merged code:** a `bug` issue, fixed with priority (rule 4 still holds: an outsider's
-  issue is acted on only once the owner passes it on).
-- A real secret that reaches the repository is the owner's to replace; a fix only removes it from the files.
+  included. A CodeQL finding that is a false alarm is no weakness: once explained in the PR and confirmed there by
+  whoever gave the PR its security review, with no suppression comment added to the code, the PR may merge, and the
+  owner alone dismisses the alert.
+- **In merged code, where it could reach what the threat model protects beyond its lower stakes, or whose kind the owner
+  has not said:** reported privately first, if the reporter can (an outsider through "Reporting a weakness" below; an
+  agent only in its session's last message to the owner, never in a file, commit, PR, issue, comment or report), and
+  fixed before any other work, in a PR that says what it hardens, never how to attack it.
+- **Any other weakness in merged code:** a `bug` issue, fixed with priority.
 
 **10. Licences: free to use, kept that way** (core archive 41). **What ships, or is built into it** (the project names
 what that is): every package, the ones it pulls in included, and every font, image, sound and data set, is under
@@ -80,8 +75,8 @@ fork; (2) it changes only the package manifests and lock files the project names
 is reviewed like any PR: its code review, the release notes read for breaking changes, the source check of what ships
 (rule 7), and the checks green; (4) right after, `main` is merged back into `develop`, a conflicting lock file
 regenerated by re-applying only the PR's named versions (`npm install <package>@<version>`) and the full suites run
-before pushing; (5) it is ordinary work for the next free lane, not a lane of its own. One that fails a condition is
-closed with the reason, and the update is made on `develop` instead (core archive 34).
+before pushing. One that fails a condition is closed with the reason, and the update is made on `develop` instead (core
+archive 34).
 
 ## Reporting a weakness
 

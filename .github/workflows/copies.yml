@@ -1,9 +1,7 @@
-# The copies check ("One fact, one place" in the core's modules/how-to-work.md), for every project that takes the core:
-# a new copy of code, or of the rule files' prose, fails; the old ones its baseline lists are removed over time, and
-# against the branch a PR merges into the baseline may only shrink. A project calls it (workflow_call) on every pull
-# request and push to main, docs-only changes included, since the rule files are what it guards most, pinned to a full
-# commit SHA ("How a project takes the core" in README.md, point 5). It runs the project's own core/scripts/copies.mjs
-# with the config the project names.
+# The copies check, for every project that takes the core: the project's own core/scripts/copies.mjs (which says what
+# it checks) with the config the project names. A project calls it (workflow_call) on every pull request and push to
+# main, docs-only changes included, since the rule files are what it guards most, pinned to a full commit SHA ("How a
+# project takes the core" in README.md, point 5).
 # Node's own modules only: nothing is installed. Read-only, with no secret.
 name: copies
 
