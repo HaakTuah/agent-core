@@ -22,7 +22,7 @@ const ok = (args, cwd) => { try { git(args, cwd); return true; } catch { return 
 const PIN = /^Core: HaakTuah\/agent-core at ([0-9a-f]{40}), copied whole under core\//mu;
 // the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
 const PIN_REF = /^(Core: HaakTuah\/agent-core at )([0-9a-f]{40})(?=, copied whole under core\/)/gu;
-const CALL = /(HaakTuah\/agent-core\/\.github\/workflows\/[\w.-]+@)([0-9a-f]{40})(?![0-9a-f])/giu;
+const CALL = /(?<![\w./-])(HaakTuah\/agent-core\/\.github\/workflows\/[\w.-]+@)([0-9a-f]{40})(?![\w./-])/giu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
 
