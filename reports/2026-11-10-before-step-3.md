@@ -138,10 +138,10 @@ root `package.json`, whose workspaces' runtime dependencies ship; `data`: `caniu
 
 Barkstreet Snakes: `.github/dependency-review-config.yml` goes, and `tools/licences.json` loses its copy of the list;
 `tools/licence-check.json` (`lockfiles`: `tools/package-lock.json`; `ships`: `[]`; `audit`: `tools/licences.json`);
-`tools/licences.js` keeps its scan of what is used, runs the core's check, and counts `HaakTuah/` actions as the owner's;
-its test drops the three cases about the lists; `licences.yml` and `copies.yml` each call the core's and keep a job of
-their own (the scan and its test; the pointer and sizes checks) with Node set up as `tests.yml` does; the pointer,
-sizes and pages changes above; `tools/sizes.json` names the core files read at the start (total 54,799 bytes).
+`tools/licences.js` keeps its scan of what is used, runs the core's check, and counts `HaakTuah/` actions as the
+owner's; its test drops the three cases about the lists; `licences.yml` and `copies.yml` each call the core's and keep a
+job of their own (the scan and its test; the pointer and sizes checks) with Node set up as `tests.yml` does; the
+pointer, sizes and pages changes above; `tools/sizes.json` names the core files read at the start (total 54,799 bytes).
 
 ## Point 7: the core read whole
 
@@ -208,7 +208,9 @@ together, and this session pushes one branch), Q10 (the paths line in each manif
   are trusted as npm wrote them) and nine P3, of which seven fixed (the pin check sees a call in any YAML form; branch
   deletion matches names exactly, deletes only branches, counts only what it deleted, and says "newest commit"; the
   data and font names are checked; two comments) and two for later (a test suite for the core's scripts, run here; a
-  way to record a hand-checked licence for a lockfile package).
+  way to record a hand-checked licence for a lockfile package). Round 2, on the change alone: 10, nothing open (one
+  limit accepted: the pin check cannot see a call written after a quoted `#` on the same line, a form no YAML file here
+  uses; only a YAML parser could tell).
 
 ## Questions for the owner
 
