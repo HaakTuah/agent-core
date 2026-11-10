@@ -16,7 +16,7 @@ project takes it the same way (core archive 68). The owner's words behind each r
   it takes.
   - Read at the start of every task: `how-to-work.md` (the aim, the four pillars, the habits), `inbox.md` (questions,
     readings, ideas, bugs, and the owner's words), `work-flow.md` (reviews in the background, lanes, sessions),
-    `git.md` (branches, pushes, milestones) and, for Claude, `claude.md` (models, effort, helpers, usage and the
+    `git.md` (branches and pushes) and, for Claude, `claude.md` (models, effort, helpers, usage and the
     brake).
   - Read when needed: `roles.md` (who does what, escalation, who merges), `helpers.md` (when helpers pay),
     `reviews.md` (which review, the security gate, only a 10 passes), `review-guidelines.md` (what reviewers judge by),
@@ -48,7 +48,7 @@ project takes it the same way (core archive 68). The owner's words behind each r
    (`floor/threat-model.md`).
 5. **The shared scripts and workflows,** written once here. It runs the core's scripts (`scripts/`) from its `core/`
    copy: its `.claude/settings.json` runs `core/scripts/work-saved.sh` as its work-saved hook and
-   `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `develop`
+   `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `main`
    (floor rule 3); its copies check is `core/scripts/copies.mjs` and its licence check `core/scripts/licences.mjs`, each
    run with a config of its own (named by the *copies check* slot and by its `SECURITY.md` under rule 10), protected
    like the checks. GitHub runs workflows only from a repository's own `.github/workflows/`, so the core's are reusable:
@@ -67,7 +67,7 @@ project takes it the same way (core archive 68). The owner's words behind each r
 
 The core says what every project says alike; where projects differ only in a name, a path or an example, it leaves a
 **slot**, written in italics (*progress file*), and each project's manifest says what fills it. A path the core names
-outright (such as `develop`, `scripts/cloud-setup.sh` or `docs/calibration.md`) is where the projects keep it; a project
+outright (such as `scripts/cloud-setup.sh` or `docs/calibration.md`) is where the projects keep it; a project
 that keeps it elsewhere says so in its manifest. A task is a project's unit of work (an item, an entry); the main lane
 is its queue of tasks taken in order.
 
@@ -82,7 +82,6 @@ is its queue of tasks taken in order.
 | *large file* | how large a file is before it is never read whole |
 | *size marks* | the marks of the files every session reads |
 | *one at a time* | what never runs as parallel lanes |
-| *milestone due* | when a milestone PR is due |
 | *design-checked PRs* | which PRs get the design check besides the code review |
 | *review reference* | what reviewers judge the work against besides the task's text |
 | *planning design* | what planning design plans |

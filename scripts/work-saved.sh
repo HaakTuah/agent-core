@@ -3,7 +3,7 @@
 # ("start") and whenever a reply is about to end ("stop"). start reports work left uncommitted, unpushed or stashed;
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
 # made never traps a session. It only reads the repository, with the git settings that run commands (fsmonitor, hooks)
-# turned off. Claude Code runs the copy merged into develop, or main where there is none (the project's
+# turned off. Claude Code runs the copy merged into main (the project's
 # .claude/settings.json; floor rule 3), never the working tree's, so an edit runs once it is reviewed.
 mode=$1
 input=$(cat 2>/dev/null || true)

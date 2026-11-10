@@ -14,8 +14,7 @@ imports them):
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md` and `modules/github-calls.md`. The rest
-describe work this repository does not do (lanes, milestones, updates, the orchestrator), but for the rule-file audit
-below.
+describe work this repository does not do (lanes, updates, the orchestrator), but for the rule-file audit below.
 
 What fills the slots here: the *progress file* and the *report*: this repository's open PRs, and `reports/` (one file
 per change, `<date>-<name>.md`); the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling
@@ -24,8 +23,8 @@ each file a session reads at the start. No other slot applies.
 
 ## How changes are made here
 
-- **A change goes on a branch of its own, with a draft PR into `main`, pushed after every commit.** This repository
-  has no `develop`. A PR that changes a rule says, for each, what it changes in every project and why.
+- **A change goes on a branch of its own, with a draft PR into `main`, pushed after every commit.** A PR that changes
+  a rule says, for each, what it changes in every project and why.
 - **Every PR here changes rule files,** all protected (`floor/security.md`, rule 3), so each gets Codex's code review
   ("Codex reviews" in `modules/reviews.md`) and its security review. **A change to the floor or to `.github/` needs
   the owner's yes in its PR,** as does one to `modules/review-guidelines.md`, which changes only on his word.

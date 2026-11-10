@@ -644,3 +644,13 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      added for every game):
 
      > Yes, expertly to all!
+
+113. **10 November 2026** (the core), on the games' `develop` branch, from which a milestone PR carried work to `main`:
+
+     > I don't really like the develop branch. I feel it just makes thing more complicated. Why don't we just merge
+     > into main, expert?
+
+     Told that the milestone PR adds no review, only a lag, and that requiring every PR to be up to date with `main`
+     and to pass its checks before it merges tests each change on what it lands on, he answered:
+
+     > Yes, please, expertly! Do I need to do anything, boss?

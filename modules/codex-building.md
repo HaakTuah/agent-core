@@ -25,8 +25,8 @@ builds it, and a wrong result shows itself; if only judgement can (taste, the de
 
 ## Handing work to Codex
 
-1. **Claim the lane with a draft PR:** a fresh branch from `develop` with one empty commit ("Claim: ..."), and a draft
-   PR into `develop` whose **description is the brief,** standing alone, since Codex sees only it and the repository:
+1. **Claim the lane with a draft PR:** a fresh branch from `main` with one empty commit ("Claim: ..."), and a draft
+   PR into `main` whose **description is the brief,** standing alone, since Codex sees only it and the repository:
    the task, the sections and files to read, the tests it must pass, what not to touch, and what its report must say
    ("Readings taken", "Questions for the owner").
 2. **Start Codex from the PR** (how, written here once its tasks work). It works in its cloud, pushes to the PR's branch

@@ -9,7 +9,7 @@ Codex's usage can run out without a word (core archive 20), so nothing waits on 
 
 **Which PR gets which review:** the *design-checked PRs* get the code review and the design check, at once (point 5);
 every other PR that changes the project, its data, tests, tools or config, and Dependabot's updates, the code review;
-docs-only PRs and the milestone PRs none, unless one changes a protected file (`floor/security.md`, rule 3), which gets
+docs-only PRs none, unless one changes a protected file (`floor/security.md`, rule 3), which gets
 the code review (core archive 47); every PR, its one security review when it is marked ready (point 6); a PR Codex
 built, the fallback reviewer in place of Codex's code review.
 
@@ -41,8 +41,7 @@ built, the fallback reviewer in place of Codex's code review.
    nothing else. Its findings count as a code review's; a Codex finding fixed by a later commit is closed by the
    fallback reviewer's check of that commit, its thread answered and resolved. **The security gate** is floor rule 8: if
    no completed security review appears within about 30 minutes of the ready mark, the fallback reviewer reviews the
-   whole diff the same way, the PR says so, and it may merge on that; the same reviewer reviews, in the milestone PR, a
-   commit that reached `develop` without the gate.
+   whole diff the same way, the PR says so, and it may merge on that.
 7. **Measured claims** (core archive 25): Codex's review reads the diff but runs nothing, so CI and the fallback
    reviewer check the *measurements* a PR's claims rest on.
 
@@ -74,14 +73,14 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
      each reviewer and is never merged. Each fault not found is a miss.
    - **A slop check every month,** where the project has text its users read (core archive 49): a fresh reviewer reads
      only that text changed since the last check, scored against the *slop bar*, which says where its finds are fixed.
-   - **Logged:** each check is a row in the calibration log, `docs/calibration.md`, and each milestone PR says in one
-     line the misses since the last. Two misses in a row by one reviewer: its brief or guidelines are tightened with the
+   - **Logged:** each check is a row in the calibration log, `docs/calibration.md`, and the workshop check's line says
+     the misses since the last. Two misses in a row by one reviewer: its brief or guidelines are tightened with the
      owner, a test is added for each fault it missed, and a canary runs again at once. It keeps reviewing meanwhile,
      since Claude's usage is the scarcer and a reviewer that catches most faults beats none (core archive 72).
-   - **The log is the schedule:** the week's first milestone PR opens a lane for each check whose last row is older
+   - **The log is the schedule:** the workshop check opens a lane for each check whose last row is older
      than its interval (core archive 62).
 6. **One line in each PR:** `Review: <category> · <builder> · <each round's result>`, a score, or Codex's verdict
-   (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`. The milestone PR sums them by category
+   (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`. The workshop check sums them by category
    and builder, with the rounds per PR: a category that often needs three rounds needs better briefs.
 7. **The briefs.** A reviewer starts cold and gets its brief and nothing more. **The fallback reviewer's:** the diff,
    the task's text, the *review reference*, the review guidelines (the core's and the project's), whole, and the
