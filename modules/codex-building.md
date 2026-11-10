@@ -1,8 +1,7 @@
 # When Codex builds
 
 What goes to Codex, the hand-over, and what happens when it is not there; read by the orchestrator when it routes
-work. **Dormant until the owner says Codex can build** (the status below). The project's own table of what goes to
-whom, and its trials, are its own (core archive 18).
+work. The project's own table of what goes to whom, and its trials, are its own (core archive 18).
 
 **Status (3 November 2026): Codex reviews, Claude builds.** Codex cannot build yet: its GitHub tasks and its command
 line need a "Codex Cloud (Legacy)" environment, which can no longer be created. So no lane goes to Codex until the owner

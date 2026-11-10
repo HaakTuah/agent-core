@@ -67,8 +67,7 @@ come to an end, and what a 10 means never slips (core archive 18 and 23).
 5. **The bar does not slip:** the checks on the reviewers themselves, run as lanes of their own:
    `modules/calibration.md`.
 6. **One line in each PR:** `Review: <category> · <builder> · <each round's result>`, a score, or Codex's verdict
-   (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`. The workshop check sums them by category
-   and builder, with the rounds per PR: a category that often needs three rounds needs better briefs.
+   (`clean`, or findings such as `P1×2`): `Review: rules · Claude · 7, 9, 10`.
 7. **The briefs.** A reviewer starts cold and gets its brief and nothing more. **The fallback reviewer's:** the diff,
    the task's text, the *review reference*, the review guidelines (the core's and the project's), whole, and the
    project's `SECURITY.md` with the floor. **The design checker's:** the same, and what the project's guidelines add for

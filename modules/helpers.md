@@ -1,7 +1,7 @@
 # Helpers: when they pay
 
 When a builder starts helpers (Claude's, and Codex's subagents once it builds), how many, and how to brief them. Read
-before starting one. Each tool's models: `modules/claude.md`, `modules/codex.md`.
+before starting one.
 
 A helper starts cold, rereads what it needs and returns only a summary, so it pays only for work of one of these shapes
 (core archive 25):

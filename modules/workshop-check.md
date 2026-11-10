@@ -14,6 +14,8 @@ prevented a real problem, merged or dropped, every cut named in its PR with its 
 first check after 10 November 2026, then whenever more than about a fifth of their lines changed (core archive 54);
 (7) the stand-in's record: how often its predictions matched the owner's answers, by kind, and how sure it must be to
 answer alone (`modules/inbox.md`; core archive 79); (8) the helpers that ran since the last check: helpers per PR, their
-shapes, what paid and what did not, how often the cap held work back (`modules/helpers.md`); and (9) review rounds per
-lane by the builder's model, with usage only where it can be read ("Sonnet builds, Opus backs it" in
-`modules/claude.md`). A project audits its own rule files; the core's are audited in the core (core archive 68).
+shapes, what paid and what did not, how often the cap held work back (`modules/helpers.md`); (9) the PRs' review lines
+("Only a 10 passes" in `modules/reviews.md`, point 6), summed by category and by the builder's model, with the rounds
+per PR (a category that often needs three needs better briefs) and usage only where it can be read ("Sonnet builds,
+Opus backs it" in `modules/claude.md`); and (10) the checks on the reviewers, as `modules/calibration.md` says. A
+project audits its own rule files; the core's are audited in the core (core archive 68).

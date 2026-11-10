@@ -1,6 +1,6 @@
 # Running builder sessions and lanes
 
-For the orchestrator, the session that starts builder sessions. The builder's own part: `modules/work-flow.md`.
+Read by the orchestrator, the session that starts builder sessions, when it starts.
 
 **The orchestrator builds nothing itself** (core archive 27). Every lane, the main lane included, goes to a builder
 session of its own, with its own brief; every session it starts runs at the builder's model (`modules/claude.md`), never
@@ -19,9 +19,10 @@ is not running, each with its reason ("waits on 2y's files" is one, none given i
 reviewer's security reviews since the last wake, each with its PR and why it qualified; and every PR merged on the
 security gate's fallback or without passing it.
 
-- **Keep the cache warm** (core archive 10). One session per task, continued for its review fixes while its context is under an hour old. A new task goes to whichever session does the most work for the fewest tokens
-  without losing quality: one already open when the task touches the same files, its context is under an hour old and
-  still small, and its last task has merged; otherwise a fresh one, always when a session's context has grown large.
+- **Keep the cache warm** (core archive 10). One session per task, continued for its review fixes while its context
+  is under an hour old. A new task goes to whichever session does the most work for the fewest tokens without losing
+  quality: one already open when the task touches the same files, its context is under an hour old and still small, and
+  its last task has merged; otherwise a fresh one, always when a session's context has grown large.
 - **Bigger review fixes in a session of their own:** more than about an hour's work goes to a fresh session with the PR,
   the review and nothing else; the builder goes on.
 - **Hand over at once:** start the next session as soon as a task merges, woken by the merge, with an hourly check as

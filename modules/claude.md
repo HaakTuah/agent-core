@@ -6,7 +6,7 @@ of every task. What each role does: `modules/roles.md`, `modules/reviews.md`, `m
 | Who | Model | Effort | For |
 | --- | --- | --- | --- |
 | You, the builder | Opus for the main lane, design readings and the *hard work*; Sonnet (`model: "sonnet"`) for routine lanes: polish, docs, splits, tests | the model and effort you were started at, read against this table (below it) | the task itself |
-| Orchestrator | Sonnet (`model: "sonnet"`) | high, since every session it starts runs at its effort (core archive 99 and 100) | starting each lane at its model, watching PRs, merging at the gates |
+| Orchestrator | Sonnet (`model: "sonnet"`) | high, since every session it starts runs at its effort (core archive 99 and 100) | starting each lane at its model, watching PRs, merging Codex's PRs |
 | Search helper | Haiku (`model: "haiku"`) | as it comes | finding where things are across many files |
 | Parallel helper | Sonnet (`model: "sonnet"`) for routine parts; Opus (`model: "opus"`) for parts that need design judgement | medium; high (`effort: "high"`) for the hard work | one part of the work, as `modules/helpers.md` says |
 | Reviewer | Opus (`model: "opus"`) | high (`effort: "high"`) | the fallback reviewer (code and security review) and the blind re-review |
