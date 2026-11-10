@@ -1,8 +1,8 @@
 # The floor
 
 What protects the owner's accounts, repositories, systems, money, privacy and rights, and what cannot be undone. Every
-project takes it whole and unedited, and nothing of its own loosens it, nor any reading of a rule's purpose; it points
-to no part of the core outside `floor/`, so a project with nothing else is still safe. This file, read at the start of
+project takes it whole and unedited, and nothing of its own loosens it, nor any reading of a rule's purpose; it needs
+no part of the core outside `floor/`, so a project with nothing else is still safe. This file, read at the start of
 every task, holds the rules any task can break; `floor/topics.md`, read before a task touches one of its topics, holds
 the rest: workflows (2), untrusted input and markup (5 and 6), what runs on users' machines and the dependencies (7 and
 15), alerts and reported weaknesses (9), licences (10) and Dependabot's PRs (17). "Floor rule N" anywhere means rule N,

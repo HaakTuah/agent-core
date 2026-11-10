@@ -33,6 +33,6 @@ guidelines set its full bar.
 **A protected file changed,** for every reviewer: P1 for a rule that departs from the owner's archived words it cites
 (the project's archive, or the core's), so a rule never drifts from what he said.
 
-**One idea,** for every reviewer of a change to the project (not docs, design copies or Dependabot's updates): end with
+**One idea,** for every reviewer of a change to the project (not docs or Dependabot's updates): end with
 one thing outside this change that would make the project better, or "none", the usual answer. It never blocks (P3 at
 most); the builder files it as `modules/inbox.md` says (core archive 40).
