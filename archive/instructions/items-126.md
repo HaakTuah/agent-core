@@ -41,3 +41,11 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Told yes: the escalation step keeps extra effort where the stuck builder already runs at high, as Claude's table
      sets it.
+
+129. **10 November 2026** (the core). Told that the fallback security review of a game's sync to the core found three
+     gaps left in the setup guide's test box (it covered only a project's install, build and tests; its instructions
+     reached only Claude, though Codex runs the tests too; and only an instruction made the agents use it), that a
+     security finding in a PR's own change blocks it until fixed, so the game's PR cannot merge with them open, and
+     asked whether to fix the guide in the core now:
+
+     > Yes, expertly!
