@@ -551,3 +551,8 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     > No... A orchestrator cannot set a different effort than what it itself have for any sub/builder session, this I
     > told you. I can set whatever model it wants, but not effort. However, a builder session that initiates
     > sub-agents, can both set them to whatever model and effort they want, to the best of my knowledge, expert.
+
+100. **10 November 2026** (the core), asked whether the orchestrator's effort in the model table should go from medium
+     to high, since the builder sessions it starts run at its effort (core archive 99):
+
+     > Yes, expertly!
