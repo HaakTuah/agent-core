@@ -128,3 +128,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Told yes, once Codex's reviews are clean on the head commit, since auto-merge waits only for the checks GitHub
      knows of, and the reviews are not among them.
+
+     > Yes, to everything, expertly!
+
+136. **10 November 2026** (the core), on Claude's table of models and effort:
+
+     > Why is everything high, does it warrant it, and why is haiku effort not set? Haven't we just seen that means it
+     > takes whatever I last used instead then?
+
+     Told that the search helper's effort was indeed left unset, against the rule to pass both model and effort, and
+     that it gets low, since searching needs little thinking; the rest is high only where judgement decides the cost.
