@@ -75,7 +75,7 @@ these. A feature here is any move, rule or power a player can choose to use.
 - **Players always play the newest version** (core archive 109 and 115). Opening the game starts its newest version;
   where it cannot load itself anew, the game says a newer one is out, with one click to play it. A version that only
   fixes or looks different takes over at once, without asking; one that changes play waits until the game in play ends.
-  A saved game opened in a newer version carries on in its rules, and its log marks where they changed.
+  A saved game opened in a newer version carries on in the newer rules, and its log marks where they changed.
 - **Same seed, same game** (core archive 112 and 114). A game replays exactly from its seed within one version of its
   rules, and where people or language models play, from its log of every input and every model answer, the model and its
   prompts counting as part of the version: a change that should change no play proves it by the same seeds and logs, and
