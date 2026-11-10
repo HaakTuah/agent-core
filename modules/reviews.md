@@ -14,9 +14,9 @@ the code review (core archive 47); every PR, its one security review when it is 
 built, the fallback reviewer in place of Codex's code review.
 
 1. **Ask:** a comment `@codex review` alone. Codex reads the PR's description, so the task's text and the sections it
-   names go there. **Write the Codex mention only to ask for a code review:** any other request fails (its tasks need an
-   environment it cannot have yet), and its bot answers every mention it finds, even in backticks, so text that only
-   talks about it says "the Codex mention".
+   names go there. **Write the Codex mention only to ask for a code review:** any other request starts a task in its
+   cloud, which cannot push (`modules/codex-building.md`, "Status"), and its bot answers every mention it finds, even in
+   backticks, so text that only talks about it says "the Codex mention".
 2. **It starts within seconds** (its 👀 reaction and a "Codex Review Summary" comment) **and finishes within
    minutes.** No sign within about 5 minutes, or an answer that is not a review (no usage left, an error): the fallback
    reviewer takes the PR at once (core archive 19 and 20).
