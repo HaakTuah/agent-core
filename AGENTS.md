@@ -29,8 +29,8 @@ each file a session reads at the start. No other slot applies.
   ("Codex reviews" in `modules/reviews.md`) and its security review. **A change to the floor or to `.github/` needs
   the owner's yes in its PR,** as does one to `modules/review-guidelines.md`, which changes only on his word.
 - **The session that writes a change does not merge it:** the design session checks it against every project that takes
-  the core, and merges it. A change is done only when the design session has opened a sync PR in every project that
-  takes the core (core archive 80).
+  the core, and merges it. A change is done only when a sync PR carries it in every project that takes the core: each
+  project's orchestrator opens one on its next wake, and the design session checks it (core archive 80).
 - **A rule moves here only when it holds in every project that takes the core,** and the owner's words behind it
   come with it into `archive/instructions.md`.
 - **Never create a repository named `agent-rules`,** the core's old name: links to it redirect here (core archive 121).

@@ -29,10 +29,10 @@ project takes it the same way (core archive 68). The owner's words behind each r
 ## How a project takes the core
 
 1. **An exact copy under `core/`,** pinned to one commit of this repository, generated and never edited by hand. A
-   change reaches a project only through a sync PR in that project, which moves the pin (and, where point 5 says, the
-   workflow pins), is reviewed like any other PR, and changes nothing else; the core's `core.yml`, which the project
-   calls on every PR (point 5) and the owner makes a required check, fails one whose `core/` differs from this
-   repository at its pin.
+   change reaches a project only through a sync PR in that project, made by the core's `scripts/sync.mjs`, which moves
+   the pin (and, where point 5 says, the workflow pins), is reviewed like any other PR, and changes nothing else; the
+   core's `core.yml`, which the project calls on every PR (point 5) and the owner makes a required check, fails one
+   whose `core/` differs from this repository at its pin.
 2. **A manifest of its own,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names
    for the core's words, and what fills each slot. Every session reads it at the start, with `floor/security.md`.
 3. **Pointer lines.** Its `AGENTS.md` names, as plain lines of their own (not in a table or a code block), the manifest
