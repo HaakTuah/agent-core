@@ -27,3 +27,12 @@ these. A feature here is any move, rule or power a player can choose to use.
 - **No solutions, only trade-offs** (core archive 91 and 93). Every feature helps in some situations and costs in
   others: none is always right or always wrong to use, and the *use-against-ignore measurement* checks that neither
   always using it nor never using it wins.
+- **Reality first** (core archive 102 and 104). Where the real world, or the history a game is set in, is interesting
+  enough on its own, the game takes it as it was and invents nothing in its place; invention fills only what reality
+  leaves silent, or what play cannot bear, and only after trying to keep both.
+- **Effects from causes, as deep as pays** (core archive 102 to 104). Every effect comes from a cause, and the deeper and
+  better grounded the cause, the more compelling the outcome, even where a player never sees every link: a quantity
+  follows what drives it, never a flat share; what goes wrong for a player comes from a cause it could reason about,
+  chance standing in only for causes too small to model; nothing appears or vanishes without a cause it could name.
+  Depth stops where more simulation no longer pays for what it costs to build and run; a cause hard to convey is a
+  reason to teach it better, never to make it shallower.

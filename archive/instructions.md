@@ -562,3 +562,31 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      and "if you are not on Opus"):
 
      > Yes, please, expert!
+
+102. **10 November 2026** (the core), whether the shared rules should hold some version of two principles of his:
+
+     > Should we have some version these 2 pillars, expert?
+     >
+     > "Where reality/history is interesting enough on its own, there is no need to invent fact"
+     > "The deeper the grounding for a cause, the more compelling it is" (my simulationist tendency/bias)
+
+103. **10 November 2026** (the core), on the design session's proposed wording, which stopped depth where a player could
+     no longer follow the cause:
+
+     > Agreed, expertly! However, a model such not automatically assume that its inability to convey the mechanics
+     > clearly is the same as a player being incapable of following to real depths. I believe as deep simulation as
+     > possible gives more compelling outcomes, even when the player can't fully understand or appreciate the
+     > mechanics. But what you rightly point out is the trade-off, there comes a point of diminishing returns, where we
+     > must settle at a floor for simulation that gives the player the most, without needing a data center to run. Just
+     > a bit of nuance to my stance.
+     >
+     > These rules you identified from Amarna, can they also apply more widely to all the games that I make, expert?
+     > ""Period first": the period as it was, given up for playability only after trying to keep both.
+     >
+     > * "Numbers come from their causes", "Every error has a motive" and "Nothing appears or vanishes without a
+     >   cause.""
+
+104. **10 November 2026** (the core), to the two principles reworded with his nuance and with those Amarna Letters
+     rules folded in as their forms:
+
+     > Yes, please, expertly!
