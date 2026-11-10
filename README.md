@@ -2,7 +2,6 @@
 
 The rules shared by the owner's agent-built projects, written once so that a change to them is made once and every
 project takes it the same way (core archive 68). The owner's words behind each rule are in `archive/instructions.md`.
-Read by whoever sets a project up on the core or moves its pin, and by the owner for his own part ("Setting up Codex").
 
 ## Two layers
 
