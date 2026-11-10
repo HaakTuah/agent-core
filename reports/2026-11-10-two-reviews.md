@@ -10,6 +10,8 @@ permission. His yes there guarded nothing he could judge better than the reviews
   action's pinned version alone keeps Dependabot's rule. This also answers Codex's point on the cut-down (Amarna
   Letters' #879) that a change to the steps of a job that already writes merged on one review.
 - **`modules/reviews.md`, point 3:** such a PR gets both reviews over the whole diff, and both must pass.
+- **`modules/work-flow.md`, point 1:** auto-merge waits until both reviews are clean on the head commit (Codex's
+  code review found that it waited for Codex's alone).
 - **`modules/inbox.md`** lists what still waits for him: a step that cannot be undone or costs money, a change to the
   floor or the review guidelines, and rule 10's licence exception.
 - **`modules/orchestrating.md` and `scripts/sync.mjs`:** a sync PR needs no new yes (one given on the core's PR carries
