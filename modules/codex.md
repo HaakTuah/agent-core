@@ -9,7 +9,7 @@ Codex's own instructions, read by Codex at the start of every task; no other age
 - **The tests you are given are the contract:** make them pass; never change, skip or weaken them. If you think one is
   wrong, say why in your report and leave that part.
 - Run *Codex's checks* before you finish.
-- Push your work to the PR's branch, never to `main`, and open no new pull request.
+- Your work goes to the PR's branch, never to `main`, as your brief says; open no new pull request.
 - Report anything the suites need that is missing; never work around it.
 - **Questions, readings and ideas go to the issues** (`modules/inbox.md`), filed by you if your access allows; if not,
   list them in your report under "Questions for the owner", "Ideas" and "Bugs", and the orchestrator files them. Either
