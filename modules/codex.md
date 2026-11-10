@@ -10,7 +10,7 @@ Codex's own instructions, read by Codex at the start of every task; no other age
   wrong, say why in your report and leave that part.
 - Run *Codex's checks* before you finish.
 - Push your work to the PR's branch, never to `main`, and open no new pull request.
-- Your environment's setup script installs what the suites need; report anything missing, never work around it.
+- Report anything the suites need that is missing; never work around it.
 - **Questions, readings and ideas go to the issues** (`modules/inbox.md`), filed by you if your access allows; if not,
   list them in your report under "Questions for the owner", "Ideas" and "Bugs", and the orchestrator files them. Either
   way the PR carries only the links (core archive 31).
