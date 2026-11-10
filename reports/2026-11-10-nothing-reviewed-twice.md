@@ -15,8 +15,11 @@ the core's own PR: never review twice without reason (core archive 139).
   checked, and the merge call passes it as `sha` (`modules/github-calls.md`), so nothing pushed after the check merges;
   a pure sync never merges by auto-merge (`modules/orchestrating.md`). It replaces the merger's compare call, which the
   fallback reviewer found backwards (P1), and answers his P2 that nothing checked the diff itself. Tested on the
-  Snakes sync of 6302f73 (passes) and on eight altered copies of it (an extra workflow line, an unmerged pin, an older
-  pin, a changed core file, a file outside, a new workflow, a mode change, the pin moved back: each fails).
+  Snakes sync of 6302f73 (passes) and on thirteen altered copies of it, each of which fails: an extra workflow line,
+  an unmerged pin, an older pin, the pin moved back, a changed core file, a file outside, a new workflow, a mode change,
+  text beside the manifest's pin, a NUL byte making the manifest "binary" (with and without a `binary` attribute) or
+  beside its pin, and two calls swapped between jobs (the fallback reviewer's second-round P1 and P3: every file is
+  diffed as text, and lines pair by position within each hunk).
 - **`.github/workflows/core.yml`:** the core check now also fails a pin, or a call's pin, that is not a commit of the
   core's `main` (fetched as `refs/heads/main`, so a tag named `main` can't stand in for it), for every PR, sync or not
   (Codex's P1 and the fallback reviewer's two P2s on the first round).

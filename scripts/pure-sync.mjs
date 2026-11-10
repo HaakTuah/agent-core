@@ -33,25 +33,30 @@ const pin = show(head, "core-manifest.md").match(PIN)?.[1];
 if (!oldPin || !pin) fail.push("core-manifest.md has no \"Core: HaakTuah/agent-core at <full SHA>, copied whole under core/\" line on both sides");
 
 // what the merge would bring: only the copy, the manifest's pin and the workflows' call pins, each moved to the new pin
-const files = git(["diff", "--no-renames", "--name-only", base, head]).split("\n").filter(Boolean);
-for (const line of git(["diff", "--no-renames", "--summary", base, head]).split("\n").filter(Boolean)) {
+// every file as text (a NUL byte can't hide a change as "binary"), with no diff driver of the project's own
+const diff = (opt, ...paths) => git(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", opt, base, head, "--", ...paths]);
+const files = diff("--name-only").split("\n").filter(Boolean);
+for (const line of diff("--summary").split("\n").filter(Boolean)) {
   if (!line.trim().replace(/^.*\b\d{6} /u, "").startsWith("core/")) fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
 }
 for (const f of files) {
   if (f.startsWith("core/")) continue;
   if (f !== "core-manifest.md" && !WORKFLOW.test(f)) { fail.push(`${f}: not the core's copy, its pin or a workflow`); continue; }
-  const diff = git(["diff", "--no-renames", "-U0", base, head, "--", f]).split("\n");
-  const count = new Map();
-  const hunks = diff.findIndex((d) => d.startsWith("@@"));
-  for (const l of hunks < 0 ? [] : diff.slice(hunks)) {
-    if (l[0] !== "+" && l[0] !== "-") continue;
-    const shas = l.slice(1).match(SHA);
-    if (!shas) { fail.push(`${f}: a changed line with no commit SHA: ${l.slice(0, 80)}`); continue; }
-    if (l[0] === "+" && shas.some((s) => s !== pin)) fail.push(`${f}: a new SHA that is not the new pin: ${l.slice(0, 80)}`);
-    const key = l.slice(1).replace(SHA, "<sha>");
-    count.set(key, (count.get(key) ?? 0) + (l[0] === "+" ? 1 : -1));
+  // each hunk's removed lines, then its added ones: the nth added line must be the nth removed with only its SHAs moved
+  const hunks = [];
+  for (const l of diff("-U0", f).split("\n")) {
+    if (l.startsWith("@@")) hunks.push({ "-": [], "+": [] });
+    else if (hunks.length && (l[0] === "-" || l[0] === "+")) hunks.at(-1)[l[0]].push(l.slice(1));
   }
-  for (const [key, n] of count) if (n !== 0) fail.push(`${f}: a change beyond a pin: ${key.slice(0, 80)}`);
+  if (!hunks.length) fail.push(`${f}: changed, but with no line to check`);
+  for (const h of hunks) {
+    if (h["-"].length !== h["+"].length) { fail.push(`${f}: lines added or removed, not only a pin moved: ${(h["+"][0] ?? h["-"][0]).slice(0, 80)}`); continue; }
+    h["+"].forEach((line, i) => {
+      const shas = line.match(SHA);
+      if (!shas || shas.some((s) => s !== pin)) fail.push(`${f}: a changed line whose new SHA is not the new pin: ${line.slice(0, 80)}`);
+      else if (line.replace(SHA, "<sha>") !== h["-"][i].replace(SHA, "<sha>")) fail.push(`${f}: a change beyond a pin: ${line.slice(0, 80)}`);
+    });
+  }
 }
 
 // every pin the branch ends with: the manifest's and each call's
@@ -73,7 +78,7 @@ try {
 }
 
 if (fail.length) {
-  for (const f of fail) console.log(`  NOT PURE ${f}`);
+  for (const f of fail) console.log(`  NOT PURE ${f.replace(/[\u0000-\u001f\u007f]/gu, "?")}`);
   console.log("not a pure sync: it gets its reviews as any PR (floor rule 8)");
   process.exit(1);
 }
