@@ -1,0 +1,5 @@
+{
+  "ships": [],
+  "audit": ".github/licences-audit.json",
+  "scan": { "skip": ["scripts/licence-scan.mjs", "scripts/licences-test.mjs"] }
+}
