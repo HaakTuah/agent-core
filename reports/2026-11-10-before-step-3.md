@@ -80,8 +80,8 @@ say, then each game's own checks run.
 | Licence check | as before (above) | as before, once its scan counts the core's workflows as the owner's own |
 | Pin check (run locally) | passes | passes |
 | Pointers (Barkstreet's checker, borrowed for Amarna) | one broken: below | all resolve |
-| Read at the start, Claude Code (bytes) | 38,703 before, 45,888 after | 26,774 before, 37,165 after |
-| Read at the start, Codex | 34,030 before, 40,124 after | 22,112 before, 31,396 after |
+| Read at the start, Claude Code (bytes) | 38,703 before, 45,888 after | 26,774 before, 37,533 after |
+| Read at the start, Codex | 34,030 before, 40,124 after | 22,112 before, 31,734 after |
 
 The start reading grows because the floor and four modules are read at every start (the owner's choice, #8); the
 first core's estimate was 43,900 and 35,500 for Claude Code. Amarna's figure counts its builder rules as the maps leave
@@ -212,5 +212,6 @@ together, and this session pushes one branch), Q10 (the paths line in each manif
 
 ## Questions for the owner
 
-To come: one `question` issue with the six fairly sure readings; and his yes in the PR for the `.github/` changes and
-the floor's wording (rules 3 and 8, and the threat model's pointer).
+- [#20](https://github.com/HaakTuah/agent-rules/issues/20): six readings to confirm or correct (floor rules 3 and 8's
+  wording, review follow-ups, AND/OR without brackets, one PR, the paths line in each manifest).
+- His yes in the PR for the `.github/` changes and the floor's wording (rules 3 and 8, and the threat model's pointer).
