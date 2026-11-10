@@ -714,3 +714,15 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      in a file of its own outside every repository; his setup checklist kept out of the repository):
 
      > Yes, expertly!
+
+120. **10 November 2026** (the core), on the setup checklist and the agents' instructions, sent to him privately and
+     kept out of the repository:
+
+     > Ehh. WIll disappear. Is it important? Is it sensitive? Should it just be in the repo and only read by agents on
+     > set-up of server, expert?
+
+     To the design session's answer (nothing in it is secret, every defence in it holds when known, and it is the one
+     place that says how; a guide in the core that only the setup reads, and floor rule 18 keeping out of repositories
+     only the machine's name and address):
+
+     > Yes, expertly. Just remember, no read of anything anyone doesn't need, expert!

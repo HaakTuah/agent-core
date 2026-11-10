@@ -1,11 +1,12 @@
 # Where agents hold sign-ins
 
 The owner's end goal (core archive 118): agents of every provider running side by side on a machine of his, each signed
-in, so Codex can build, push and be watched as it works, which its cloud tasks cannot. The core holds it in general
-terms only (core archive 119): floor rule 18 and the threat model say what such a machine may hold and run and how its
-agents treat their sign-ins; `modules/orchestrating.md` and `modules/codex-building.md` say how sessions are started
-and watched there; `modules/claude.md` lets the orchestrator set each session's effort where it can. What the machine
-is, its tools and its setup stay out of every repository: the machine tells its own agents where they run.
+in, so Codex can build, push and be watched as it works, which its cloud tasks cannot. Floor rule 18 and the threat
+model say what such a machine may hold and run and how its agents treat their sign-ins, and keep its name and address
+out of every repository (core archive 119); `modules/orchestrating.md` and `modules/codex-building.md` say how sessions
+are started and watched there; `modules/claude.md` lets the orchestrator set each session's effort where it can. How it
+is set up is in `setup/server.md`, which only its setup reads (core archive 120); its agents learn where they run from
+the instruction files that guide places on the machine itself.
 
 ## Readings taken
 
