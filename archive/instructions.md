@@ -590,3 +590,14 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      rules folded in as their forms:
 
      > Yes, please, expertly!
+
+105. **10 November 2026** (the core), asked whether four more principles of his games hold for every game he makes:
+     Amarna Letters' "Different data, same rules" (its design pillars, decided 19 October 2026), "The order of
+     resolution never decides" (decided 28 October 2026) and "Code decides facts; language models phrase them" (design
+     pillar 6), and Barkstreet Snakes' "Everything new belongs", from his words of 13 October 2026, 23:11 UTC:
+
+     > Very important everything feels balanced, cohesive, purposeful and like it belongs!
+
+     His answer, to adding all four to the shared game-design principles:
+
+     > Yes, expertly. Do we run a new session on this, expert?

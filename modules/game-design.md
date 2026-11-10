@@ -36,3 +36,13 @@ these. A feature here is any move, rule or power a player can choose to use.
   chance standing in only for causes too small to model; nothing appears or vanishes without a cause it could name.
   Depth stops where more simulation no longer pays for what it costs to build and run; a cause hard to convey is a
   reason to teach it better, never to make it shallower.
+- **Different data, same rules** (core archive 105). No rule checks which player, faction or character it is: what sets
+  one apart lives in its data and starting conditions, which every rule reads alike, never in a rule that names it;
+  only presentation and voice may name one.
+- **The order of resolution never decides** (core archive 105). When two act at the same moment, the outcome does not
+  depend on which the game settles first: they share, or a seeded draw decides.
+- **Everything new belongs** (core archive 105). Every new feature feels balanced, cohesive and purposeful, and fits
+  the rest of the game.
+- **Code decides facts; models phrase them,** in a game with language-model players or characters (core archive 105).
+  The game's code decides what is true and what each seat learns; a model adds only voice, personality and judgement
+  within its own seat.
