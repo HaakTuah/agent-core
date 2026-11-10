@@ -38,5 +38,11 @@ security gate's fallback or without passing it.
 - **Every other provider is spent to its end** (core archive 76): Codex, and any provider the owner keeps only for the
   projects. Where an environment can read every provider's usage (where the agents run side by side, or the owner's own
   computer), the orchestrator spreads the work so each is spent by its weekly reset before Claude reaches 90%.
+- **A lane whose session is gone** (core archive 133): one whose session it cannot reach (started elsewhere, such as on
+  another account, or ended), with no push to its branch for a few hours, goes to a fresh builder from its branch,
+  without asking. The branch holds the work, and the hours without a push keep it from doubling a session still alive.
+- **Ask the owner only what is open** (core archive 133). What the rules, his past words or the stand-in
+  (`modules/inbox.md`) settle, the orchestrator does and reports in a line, never as a question; it asks him only what
+  they leave open, and for a yes that floor rules 3 and 14 need.
 - **Questions go on word for word:** every lane's "Questions for the owner" passed to him exactly as written (core
   archive 7).

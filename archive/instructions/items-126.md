@@ -90,3 +90,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      from Codex's account), and asked whether to fix them in the core before the game merges:
 
      > Yes, expertly.
+
+133. **10 November 2026** (the core). A game's orchestrator asked whether to start fresh builders for two PRs whose
+     sessions, started on another account, it could not reach, and another held a PR for an answer the owner had already
+     given:
+
+     > Why are they still asking about the other account... have you put anything into the rules about watching out
+     > for it...
+
+     Told that no rule did, and asked whether to add one (a lane whose session cannot be reached, with no push for a few
+     hours, goes to a fresh builder from its branch):
+
+     > Enough. They are asking nonsense. I don't want another question where the answer is obviously yes. Handle it,
+     > expert.
