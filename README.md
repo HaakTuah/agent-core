@@ -49,11 +49,15 @@ project takes it the same way (core archive 68). Each rule says what it is for; 
 5. **The shared scripts and workflows,** written once here. It runs the core's scripts (`scripts/`) from its `core/`
    copy: its `.claude/settings.json` runs `core/scripts/work-saved.sh` as its work-saved hook and
    `core/scripts/statusline.sh` as its status line, which `core/scripts/usage.sh` reads, each as merged into `develop`
-   (floor rule 3); its copies check is `core/scripts/copies.mjs`, run with a config of its own (the *copies check*
-   slot names it), protected like the check. GitHub runs workflows only from a repository's own `.github/workflows/`,
-   so the core's are reusable: its own `personal-terms.yml` and `copies.yml` each call the core's in a job
-   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), passing
-   `PERSONAL_TERMS` alone to the first and its config's path to the second. Only a sync PR moves those pins, and only
+   (floor rule 3); its copies check is `core/scripts/copies.mjs` and its licence check `core/scripts/licences.mjs`
+   (floor rule 10's lists, read from the floor), each run with a config of its own (named by the *copies check* slot
+   and by its `SECURITY.md` under rule 10), protected like the checks. GitHub runs workflows only from a repository's
+   own `.github/workflows/`, so the core's are reusable: its own `personal-terms.yml`, `copies.yml`, `licences.yml`,
+   `codeql.yml` and `delete-merged-branches.yml` each keep their triggers and call the core's of the same name in a
+   job (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), granting it the
+   permissions the core's names and passing only what it asks: `PERSONAL_TERMS` alone, a config's path, CodeQL's
+   languages, or the dry-run choice. Issue templates and `.claude/` are read only from the repository itself, so they
+   stay its own. Only a sync PR moves those pins, and only
    when one of the core's workflows changed since the last: then it moves them to its new pin, and needs the owner's
    yes, since it changes `.github/` (floor rule 3). Its review checks that the core's workflows at the workflow pins
    are those at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
