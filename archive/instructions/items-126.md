@@ -121,3 +121,10 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > inbox."
      > I thought they were still not supposed to stop? I have over and over emphasized that the machinery keeps
      > churning!
+
+135. **10 November 2026** (the core), having turned on auto-merge as an option in every repository:
+
+     > I have turned on auto-complete as an option for all repositories, should we utilize it as a rule, expert?
+
+     Told yes, once Codex's reviews are clean on the head commit, since auto-merge waits only for the checks GitHub
+     knows of, and the reviews are not among them.
