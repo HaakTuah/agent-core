@@ -14,6 +14,8 @@ permission. His yes there guarded nothing he could judge better than the reviews
   floor or the review guidelines, and rule 10's licence exception.
 - **`modules/orchestrating.md` and `scripts/sync.mjs`:** a sync PR needs no new yes (one given on the core's PR carries
   over), and a moved workflow call gets the two reviews.
+- **The fallback reviewer's brief** is point 7 of `modules/reviews.md` again, where Amarna Letters' review guidelines
+  point to it; the cut-down had left it unnumbered, and that game's new pointer check found the broken pointer.
 
 What changes in every project: no PR asks the owner about workflows or the cloud setup again; those PRs get a second,
 independent security review instead.

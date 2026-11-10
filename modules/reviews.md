@@ -26,6 +26,5 @@ alone get no code review. Codex's usage can run out without a word (core archive
 6. **Rounds end:** a later round judges only the change since the last (core archive 74). After three rounds, what is
    still open goes to escalation (`modules/roles.md`); what escalation cannot settle leaves the PR unmerged and marked
    blocked, and the work goes on with the next task.
-
-**The fallback reviewer's brief:** the diff, the task's text, the *review reference*, the review guidelines (the core's
-and the project's) and the project's `SECURITY.md` with the floor, and nothing else.
+7. **The fallback reviewer's brief:** the diff, the task's text, the *review reference*, the review guidelines (the
+   core's and the project's) and the project's `SECURITY.md` with the floor, and nothing else.
