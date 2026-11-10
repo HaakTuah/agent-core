@@ -12,9 +12,9 @@ it ("the project names"), never removes. Who might attack: `floor/threat-model.m
 ## The rules
 
 **1. Nothing secret in the repository,** its history, a PR, an issue, a comment, a log or a picture: no key, token,
-password, environment id, personal path or address. The owner is told at once of a secret pushed by mistake, and revokes
-and replaces it: a later commit does not remove it from history. Nor does a key or secret ever go into an environment
-variable of a session or a cloud environment.
+password, environment id, personal path or address. The owner is told at once of a secret pushed by mistake, to revoke
+and replace it at once: a later commit does not remove it from history. Nor does a key or secret ever go into an
+environment variable of a session or a cloud environment.
 
 **3. The protected files:** only the trusted builder's lanes, never one given to another agent (such as a Codex task),
 change **what runs by itself or with credentials** (`.github/`, `.claude/`, the cloud setup and status line scripts, any
@@ -70,7 +70,8 @@ for any reason (core archive 4).
 **14. Stop before what cannot be undone** (core archive 76). Anything irreversible waits for the owner's yes, and
 nothing spends his money without it. A check that guards against something unsafe or irreversible that fails (the
 isolation of agents before any agent starts, anything touching `main`, keys and secrets, spending) stops that step: ask
-the owner, and go on with other work meanwhile.
+the owner, and go on with other work meanwhile. An ordinary failing test is no reason to stop: fix it, or mark the task
+blocked and go on.
 
 **16. The owner's share of Claude** (core archive 2 and 76). Claude's weekly limit is shared with the owner's own work:
 from about 90% of it, no project starts bigger work on Claude, so the last of the week stays his.

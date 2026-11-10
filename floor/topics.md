@@ -45,7 +45,8 @@ literal is gone.
 - **In merged code, where it could reach what the threat model protects beyond its lower stakes, or whose kind the owner
   has not said:** reported privately first, if the reporter can (an outsider through "Reporting a weakness" below; an
   agent only in its session's last message to the owner, never in a file, commit, PR, issue, comment or report), and
-  fixed before any other work, in a PR that says what it hardens, never how to attack it.
+  fixed before any other work, in a PR that says what it hardens, never how to attack it. One who cannot report
+  privately opens the bare issue "Reporting a weakness" describes.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
 
 **10. Licences: free to use, kept that way** (core archive 41). **What ships, or is built into it** (the project names
