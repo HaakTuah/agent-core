@@ -17,11 +17,10 @@ his words are kept once, in the archive (core archive 7, 13 and 28). Read at the
   stand-in in a second call when the PR is marked ready (on the *design-checked PRs*, the design check makes it).
 - **One inbox: issues assigned to the owner** (`HaakTuah`). A question he must answer, or a reading he should see, is an
   issue labelled `question`, with the reading taken and its alternative. An idea is a Feature request (`enhancement`), a
-  bug a Bug report (`bug`), each with its template's label, and its headings copied into the body
-  (`.github/ISSUE_TEMPLATE/`), since the API applies none (core archive 32). Search the open issues first and add to one
-  rather than file twice. Each issue holds the whole of it, answerable from a phone, saying in plain words what each
-  thing is and why it matters, by the project's own names, never only by a title a builder made up; so does each line
-  that points to one (core archive 55).
+  bug a Bug report (`bug`), each with its template's label, its headings in the body (`.github/ISSUE_TEMPLATE/`), since
+  the API applies none (core archive 32). Search the open issues first and add to one rather than file twice. Each issue
+  holds the whole of it, answerable from a phone, saying in plain words what each thing is and why it matters, by the
+  project's own names, never only by a title a builder made up; so does each line that points to one (core archive 55).
 - **Everywhere else, only a pointer.** A PR, a report and a session's last message never repeat an issue: under
   "Questions for the owner" they list the issues they opened or touched, one line and a link each ("Questions for the
   owner: none" if none).
