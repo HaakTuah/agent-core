@@ -49,3 +49,30 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      asked whether to fix the guide in the core now:
 
      > Yes, expertly!
+
+130. **10 November 2026** (the core), on a game's ruleset page, which required neither code scanning nor code quality
+     results:
+
+     > Why not require quality and scanning checks, and such, expert?
+
+     Told that code scanning results are worth requiring (a false alarm then waits for him to dismiss it), that code
+     quality results would block every merge, as no Code Quality check runs, and that Copilot's code review spends his
+     Copilot credits on every PR and is no review the rules count; shown his choice (code scanning blocking on security
+     alerts High or higher and alerts Errors, status checks with branches up to date, Copilot's review on):
+
+     > I think I'll set it like this then, expert.
+
+     Told to leave code quality off, and asked whether the floor's false-alarm line should say the PR waits for his
+     dismissal where the ruleset blocks on the alert, with the same setting in every project, and whether Copilot's
+     review should be advisory in the rules:
+
+     > Yes, expertly to all!
+
+     On the report's line that code quality results are not required, since no project runs GitHub's Code Quality
+     check and GitHub warns that requiring them without it can block every merge:
+
+     > I did set it this to required:
+     > "Code quality results are not required: no project runs GitHub's Code Quality check, and GitHub warns that
+     > requiring them without it can block every merge."
+     >
+     > If I don't have it, then surely it won't trigger.
