@@ -9,8 +9,8 @@ different models have different blind spots (core archive 18).
 **Status (3 November 2026): Codex reviews, Claude builds.** Codex cannot build yet: its GitHub tasks and its command
 line need a "Codex Cloud (Legacy)" environment, which can no longer be created. So no lane goes to Codex until the owner
 says it can build; until then all building is Claude's, and `modules/codex-building.md` is dormant. Nothing on the
-owner's computer starts Codex unless he starts it (floor rule 8): once its tasks work, it is started from the pull request, or by
-an orchestrator the owner starts himself.
+owner's computer starts Codex unless he starts it (floor rule 8): once its tasks work, it is started from the pull
+request, or by an orchestrator the owner starts himself.
 
 ## For Codex
 
@@ -21,19 +21,16 @@ an orchestrator the owner starts himself.
 - **The tests you are given are the contract:** make them pass; never change, skip or weaken them. If you think one is
   wrong, say why in your report and leave that part.
 - Run *Codex's checks* before you finish.
-- Push your work to the PR's branch, never to `main` or `develop`, and open no new pull request. Never change the
-  protected files (`floor/security.md`, rule 3); never put a key or secret anywhere.
+- Push your work to the PR's branch, never to `main` or `develop`, and open no new pull request.
 - Your environment's setup script installs what the suites need; report anything missing, never work around it.
-- **Questions, readings and ideas go to the issues** (`modules/inbox.md`), filed by you with their template's headings,
-  label and `HaakTuah` assigned, if your access allows; if not, list them in your report under "Questions for the
-  owner", "Ideas" and "Bugs", and the orchestrator files them. Either way the PR carries only the links (core archive
-  31).
-- Your review of Claude's PRs gives findings by priority (`modules/review-guidelines.md`); every one counts.
+- **Questions, readings and ideas go to the issues** (`modules/inbox.md`), filed by you if your access allows; if not,
+  list them in your report under "Questions for the owner", "Ideas" and "Bugs", and the orchestrator files them. Either
+  way the PR carries only the links (core archive 31).
 
 ## Setup
 
-- Codex on its own subscription, its GitHub app given the owner's repositories, its own Code Review set to automatic
-  review off (core archive 18).
+- Codex's GitHub app given the owner's repositories, its own Code Review set to automatic review off (core archive
+  18).
 - Its security review: Auto security review on, Review "Team PRs", Trigger "On PR open", reporting Medium and above. It
   reads the project's threat model with `floor/threat-model.md` as its threat model, and the project's `SECURITY.md`
   with the floor (`floor/security.md` and `floor/topics.md`) as its instructions. Under this trigger a request runs a
@@ -41,7 +38,7 @@ an orchestrator the owner starts himself.
   51).
 - A Codex cloud environment of the newer kind, made in ChatGPT's Codex settings (the *Codex environment*), its setup
   script `bash scripts/cloud-setup.sh` (from `/workspace/<repository>`); tasks by comment fail either way.
-- Codex runs on its default model for cloud tasks (none can be chosen); the review scores show whether that is enough.
+- Codex runs on its default model for cloud tasks (none can be chosen).
 
 ## What reaches Codex
 

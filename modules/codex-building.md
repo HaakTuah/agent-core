@@ -35,7 +35,7 @@ builds it, and a wrong result shows itself; if only judgement can (taste, the de
    description ("Round 2: ...") and starts Codex again. At most **two rounds** per question; then the orchestrator takes
    the most reasonable reading under "Readings taken". What only the owner can settle is a `question` issue, linked.
 4. **The PR is reviewed** as `modules/reviews.md` says, sent back the same way, marked ready, and merged by the
-   orchestrator. The Codex mention is written only to ask for a review.
+   orchestrator.
 
 ## When Codex is not there
 
@@ -48,4 +48,3 @@ Codex's usage can run out with no alert, so the orchestrator never waits on it f
   Claude builder, and a push that arrives later is never merged.
 - **After a take-back for no usage, an error or silence, Codex counts as unavailable:** it gets nothing until a small
   test task gets through, tried at most every few hours. A take-back for a slow PR alone does not count.
-- These times are first guesses, changed here when the first weeks show better ones.

@@ -1,7 +1,7 @@
 # Who does what
 
 The roles, who fills each today, escalation and who merges; read when a task needs a role's part. A role can be filled
-by any model, working from the project's `AGENTS.md`; this is the one place that says who fills each.
+by any model, working from the project's `AGENTS.md`.
 
 - **The orchestrator** (today: Claude): writes Codex's briefs, routes the work, takes the readings, merges Codex's PRs,
   and brings the owner his questions (`modules/orchestrating.md`).
@@ -13,8 +13,7 @@ by any model, working from the project's `AGENTS.md`; this is the one place that
   holds the picture of the finished project and sends the work back until it meets it (core archive 18).
 - **The security reviewer:** Codex's automatic security review; its fallback, the fallback reviewer.
 - **The design checker** (today: Claude): the scored design check on the *design-checked PRs*.
-- **The stand-in** (today: Claude): predicts the owner's answer to a task's open questions from his past words, in one
-  call per batch, and the builder builds on it (`modules/inbox.md`).
+- **The stand-in** (today: Claude): predicts the owner's answers to a task's open questions (`modules/inbox.md`).
 - **Planning design** (today: Claude): the *planning design*, asked directly when a task needs a new or better plan, at
   most once per task, with a self-contained brief (the problem, the measurements, the files and lines). It returns a
   design, which the builder builds and measures.
@@ -26,6 +25,5 @@ by any model, working from the project's `AGENTS.md`; this is the one place that
   stuck branch whose description is the brief, merged into it if it works. Otherwise, and for one that has defeated
   Codex, Claude's escalation step, then its last escalation (`modules/claude.md`). What is still unsolved is blocked
   ("Don't loop" in `modules/how-to-work.md`).
-- **Who merges:** Claude's builders merge their own PRs (`modules/git.md`) once the review's verdict allows, applying
-  the score rules themselves. **Codex never merges:** the orchestrator merges its PRs. Codex never touches `main`, and
-  never pushes to a branch it was not given.
+- **Who merges:** Claude's builders merge their own PRs (`modules/work-flow.md`, point 1). **Codex never merges:** the
+  orchestrator merges its PRs.

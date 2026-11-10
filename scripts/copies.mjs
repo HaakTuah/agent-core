@@ -132,8 +132,7 @@ const counted = (w, where) => {
 counted(base.windows, BASELINE);
 // The baseline holds the old copies window by window: each run of lines or words that is copied, by its hash, and how
 // many places it stands in. Every copied window must be listed with at least as many places, so a copy that is new,
-// spreads to another place, grows, or is copied in part fails. A listed window that is gone or in fewer places fails
-// too, until --write lowers it; --write only ever lowers, never lists a window that is not listed already.
+// spreads to another place, grows, or is copied in part fails.
 // The baseline only shrinks against the branch a PR merges into (COPIES_BASE, set by the workflow): a window it adds or a
 // count it raises there fails, whoever wrote it.
 const from = process.env.COPIES_BASE;
