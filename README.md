@@ -130,6 +130,7 @@ Floor: whole. Modules: <all, or the list of those taken>.
   internet access limited to read-only methods. A task by comment builds and tests there but cannot push
   (`modules/codex-building.md`, "Status").
 - Codex runs on its default model and effort for cloud tasks (none can be chosen).
+- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
 
 ## This repository
 
