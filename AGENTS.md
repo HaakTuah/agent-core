@@ -38,8 +38,8 @@ KB; the *size marks*: about 20 KB for each file a session reads at the start. No
   in its archive and its reports.
 - **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
   about a fifth of the core's lines changed since the last audit.
-- **Usage:** this repository has no `scripts/usage.sh`; a session uses the one its environment offers, if any, as
-  "Usage" in `modules/claude.md` says.
+- **Usage:** no status line runs here, so `scripts/usage.sh` cannot read usage in this repository; a session uses
+  what its environment offers, if any, as "Usage" in `modules/claude.md` says.
 
 ## Review guidelines
 
