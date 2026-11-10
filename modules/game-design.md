@@ -19,8 +19,7 @@ these. A feature here is any move, rule or power a player can choose to use.
 - **No rule untaught** (core archive 84 and 90). Every rule a player needs is in *where rules are taught*, added or
   changed in the same change as the rule, and when a rule acts on a player, the game shows it where and when that
   player could know it; nothing the game itself shows implies what is untrue (a player may still lie). So no player
-  loses to a rule the game never told or showed it, and its mistakes come from the game's real complexity, never from
-  how the game tells it things.
+  loses to a rule the game never told or showed it, nor errs because of how the game told it something.
 - **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule. Stronger is
@@ -51,9 +50,11 @@ these. A feature here is any move, rule or power a player can choose to use.
   the rest of the game.
 - **No stopgaps** (core archive 107). The work serves the finished game, so nothing is built for the meantime: where a
   change comes before a feature it would want, the game stays as it is until that feature comes, and the change says
-  so. A lever and the counterweight that answers it are built together, one moved in the order of work if need be.
-- **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets (a time, a
-  cost, a chance) is a first guess, listed as one in the change, and is tuned by measured play, never just picked.
+  so. A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
+  work if need be.
+- **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets that neither
+  reality nor its causes fix (a time, a cost, a chance) is a first guess, listed as one in the change, and is tuned by
+  measured play, never just picked.
   While the systems that change its effect are still being built it stays untuned, and a tuning pass takes them
   together once they stand; anything that makes the game unplayable for testing is fixed at once.
 - **Code decides facts; models phrase them,** in a game with language-model players or characters (core archive 105).

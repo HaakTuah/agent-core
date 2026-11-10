@@ -28,12 +28,12 @@ A candidate is added only when all three hold:
 
 | Candidate | Where it stands today | His words | Verdict |
 | --- | --- | --- | --- |
-| **No stopgaps:** nothing for the meantime; a lever and its counterweight together | Amarna Letters, builder rules, "No stopgaps" | Amarna item 13 (core archive 107) | **added.** Any game built in steps meets it; Barkstreet Snakes has nothing like it |
-| **Numbers are first guesses until play tunes them** | Amarna Letters, "Balance: first guesses during the build, tuning at the end"; Barkstreet Snakes marks first guesses and measures each change on fresh seeds (`docs/design/39-the-rivals.md`) | Barkstreet's polish brief (core archive 108); core archive 86 | **added,** worded so both fit: a number waits for tuning only while the systems that change its effect are still being built, so Amarna's balance pass and Barkstreet's tuning on arrival (its systems stand) are the same rule |
+| **No stopgaps:** nothing for the meantime; a lever and its counterweight together | Amarna Letters, builder rules, "No stopgaps" | Amarna item 13 (core archive 107) | **added.** Any game built in steps meets it; Barkstreet Snakes has nothing like it. The lever built with its counterweight is Amarna's own form of his words: a lever built alone would need a stand-in to hold it in check |
+| **Numbers are first guesses until play tunes them** | Amarna Letters, "Balance: first guesses during the build, tuning at the end"; Barkstreet Snakes marks first guesses and measures each change on fresh seeds (`docs/design/39-the-rivals.md`) | Barkstreet's polish brief (core archive 108); core archive 86 | **added,** worded so both fit: a number waits for tuning only while the systems that change its effect are still being built, so Amarna's balance pass and Barkstreet's tuning on arrival (its systems stand) are the same rule; only a number neither reality nor its causes fix is a guess ("Reality first", "Effects from causes") |
 | **Same seed, same game:** a game replays exactly; a change that changes no play proves it by the replay; one that does says so | both: Amarna's "Seeds replay exactly within a save version" and its determinism lint (`docs/intent/engine-and-models/tech-stack.md`); Barkstreet's fingerprints and "Optimizations may change decisions only if nothing noticeable is lost" | none found on determinism | **held for his word** (the question issue). The stand-in: not sure; predicts he takes a smaller form, folded into the use-against-ignore measurement, which plays on the same seeds |
 | **A visible cue for every rule;** every death says why | Barkstreet Snakes, "Every new rule needs a visible cue and a lesson"; `docs/design/41-crashes.md` | core archive 84 and 90 | **folded into "No rule untaught":** when a rule acts on a player, the game shows it where and when that player could know it (Amarna's delayed and hidden news stay so); nothing the game itself shows implies what is untrue |
-| **Requests are rules too; uncertainty about how uncertain something is, is not part of the game** (and the careful-player test of model mistakes) | Amarna Letters, builder rules | core archive 90 | **general part added** to "No rule untaught" (nothing shown implies what is untrue; mistakes from real complexity, never from how the game tells it); the rest: see "Readings taken" |
-| **Models only where they matter** | Amarna Letters, its pillars' list | none found | see "Readings taken" |
+| **Requests are rules too; uncertainty about how uncertain something is, is not part of the game** (and the careful-player test of model mistakes) | Amarna Letters, builder rules | core archive 90 | **general part added** to "No rule untaught" (nothing the game shows implies what is untrue; no player errs because of how the game told it something); **the rest stays in Amarna Letters:** for a model, a request is part of what the game shows it, and keeping outcomes apart from a character's words is "Code decides facts" (core archive 105), so what is left is how one game writes its requests. The careful-player test would hold for people too, and is put to him |
+| **Models only where they matter** | Amarna Letters, its pillars' list | none found | **stays in Amarna Letters:** "Code decides facts" already holds a model to its own seat's judgement, and the cost side is "Match effort to the task" (`modules/how-to-work.md`); he did not take it among the four of core archive 105 |
 | **Who wrote it, fallbacks never silent; models are settings; the debrief question; no model games until the build is done** | Amarna Letters, `docs/design/04-models.md`, `06-file-seats-and-the-agent-simulation.md`, builder rules | none found | **stay in Amarna Letters:** how one game builds, runs and pays for its model layer |
 | **Never samier:** a stronger computer player is never a samier one | core archive 83 (already the core's words); Barkstreet's trademarks; Amarna's script kings' temperaments | core archive 83 | **added** to "Strong computer players", checked before and after; Barkstreet's `--signatures` measure stays its own |
 | **Levers, not luck:** where chance enters, players have levers to prepare for it or answer it | Amarna Letters, "Players read people, not dice" and pillar 3; Barkstreet Snakes' woodpecker endgame | Amarna item 65 and Barkstreet 31 October (core archive 110 and 111) | **added:** his words in both games reject an outcome no lever answers; it needs no warning, so Amarna's unwarned catastrophes still fit |
@@ -51,7 +51,7 @@ A candidate is added only when all three hold:
 | Difficulty from the setup, never weaker players; conditional goods; don't prohibit | both | core archive 82, 83, 91 to 93 | **already the core's** |
 | A state shown on the snake, not in a bar above it | Barkstreet Snakes, `docs/design/37-one-stamina.md` | Barkstreet 4 November | **stays:** one game's look |
 
-What the core now says: `modules/game-design.md` (its diff in this PR). It grows from 4,515 to 6,335 bytes and is
+What the core now says: `modules/game-design.md` (its diff in this PR). It grows from 4,515 to 6,354 bytes and is
 read only before a task that changes a rule, a feature or how the computer players play, never at every start.
 
 ## What each game's step 3 changes
@@ -71,7 +71,7 @@ sync PR does. Lines are those at the commits above.
 | `design-pillars.md` 31, "The order of resolution never decides"; 17, 19 and the pillars the PR #34 took | (PR #34's cuts) | as that PR's report says |
 
 New for it: a change to the script kings' play checks that their temperaments stay distinct, before and after; every
-chance a king meets leaves him a lever; everything new works online once its live multiplayer comes; the newest
+chance a king meets leaves the king a lever; everything new works online once its live multiplayer comes; the newest
 version as `update.ts` already plays it.
 
 ### Barkstreet Snakes, `AGENTS.md`
@@ -98,6 +98,16 @@ folded into "No rule untaught", with nothing shown implying what is untrue; onli
 word for each thing and "Different data, same rules" left in their games (the last since taken by PR #34). Not sure:
 "Levers, not luck" (built on, and put to him); "Same seed, same game" (held for his word, having none behind it).
 
+The second, once PR #34 had merged, on what it changed. Core archive 105 shows he takes a principle that only a game
+with language-model players meets, so the condition alone no longer kept "Requests are rules too" out; the stand-in
+still left it, and "Models only where they matter", in Amarna Letters (fairly sure; above), and put the careful-player
+test to him (not sure, taste). Fairly sure, built on: "Levers, not luck" stands on its own beside "Effects from
+causes", since one asks for a cause a player can reason about and the other for a lever it can pull (core archive
+110); a first guess is only a number that neither reality nor its causes fix, so it never overrides "Reality first";
+"No rule untaught" no longer says again what "Effects from causes" says of mistakes. Highly sure: "Same seed, same
+game" goes to him, and, if he takes it, may belong outside the game-design module, being as much how a game is built as
+how it is designed.
+
 ## Helpers
 
 - Two search helpers (Sonnet, medium), one per game, swept the design notes and archives by theme. Every quote carried
@@ -105,3 +115,8 @@ word for each thing and "Different data, same rules" left in their games (the la
 - The stand-in (Opus, high), twice.
 
 ## Questions for the owner
+
+- [#36](https://github.com/HaakTuah/agent-rules/issues/36): nine readings to confirm or correct: "Same seed, same game"
+  (waits for his word), numbers as first guesses, a rule showing itself when it acts, stronger never samier, levers not
+  luck, online, and what stays in its game (requests and the model-mistake test, models only where they matter,
+  accessibility and one word for each thing).
