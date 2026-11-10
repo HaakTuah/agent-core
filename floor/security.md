@@ -18,8 +18,8 @@ password, environment id, personal path or address. A secret pushed by mistake i
 does not remove it from history), and the owner is told. Nor does a key or secret ever go into an environment
 variable of a session or a cloud environment.
 
-**3. The protected files:** only the trusted builder's lanes, never a lane handed to an agent as a cloud task, change
-**what runs by itself or with credentials** (`.github/`, `.claude/`, the cloud setup and status line scripts, any
+**3. The protected files:** only the trusted builder's lanes, never one given to another agent (such as a Codex task),
+change **what runs by itself or with credentials** (`.github/`, `.claude/`, the cloud setup and status line scripts, any
 file of the credentialed GitHub calls builders run), **the rule files** (`AGENTS.md`, `CLAUDE.md`, `SECURITY.md`, the
 threat model, the core manifest, the copy of the core under `core/`, and the project's others) and **the checks on
 the work** (the copies check, the calibration log, and the project's others). The project names its trusted builder
@@ -47,8 +47,9 @@ dependency or script, a weakened check. **No PR merges until its security review
 finding;** a PR that changes a protected file also gets a code review. A milestone PR needs its security review only for
 a commit that reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push). Nothing from
 this repository or its PRs runs on the owner's machine by itself, and nothing there starts an agent by itself: no
-poller, hook or schedule acts on his computer (core archive 52). The one exception is an orchestrator session he starts
-there himself, though he prefers the cloud or a server (core archive 91): it keeps every floor rule, works in a folder
+poller, hook or schedule acts on his computer (core archive 52). The one exception is a session he starts there
+himself, an orchestrator's included, though he prefers the cloud or a server (core archive 91), with the hooks and
+status line Claude Code runs in it from the merged copy (rule 3): it keeps every floor rule, works in a folder
 of its own, away from his other files, and holds no key beyond its own sign-in. **Test data is never real:** fake keys
 and tokens are built when the test runs, from pieces (such as `"AIza" + "Sy" + "x".repeat(33)`), never a literal that
 looks real, so no scanner takes one for a leak; sample names, paths and e-mail addresses are invented (`jdoe`,
