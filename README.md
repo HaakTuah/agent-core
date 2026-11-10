@@ -24,7 +24,7 @@ project takes it the same way (core archive 68). The owner's words behind each r
     `orchestrating.md` (the orchestrator), `github-calls.md` (REST calls from a cloud session), `updates.md` (versions,
     Node, CodeQL) and `workshop-check.md` (the weekly check).
   - Taken only by projects that are games, read before a task changes a rule, a feature or how the computer players
-    play: `game-design.md` (the design principles both games share; core archive 80).
+    play: `game-design.md` (the design principles every game shares; core archive 80).
 
 ## How a project takes the core
 

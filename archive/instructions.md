@@ -601,3 +601,38 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      His answer, to adding all four to the shared game-design principles:
 
      > Yes, expertly. Do we run a new session on this, expert?
+
+106. **13 October 2026** (Barkstreet Snakes, 13 October 2026, 23:11), in the message that core archive 105 quotes for
+     "Everything new belongs":
+
+     > Very important that all the new stuff works across online play, cheif!
+
+107. **27 October 2026** (Amarna Letters, item 13), on whether the build order is a rule in itself:
+
+     > You decide what makes more sense, the build order is simply to guideline claude code. I only care about the
+     > final product and that we don't introduce temporary features
+
+108. **12 October 2026** (Barkstreet Snakes, the polish brief, given 12 October 2026 and again on 14 October), among
+     its rules for the game's dynamics:
+
+     > - **Difficulty curve.** Speed should increase gently, never feeling unfair. Tune it by playing; don't just pick
+     >   numbers.
+
+109. **30 October 2026** (Amarna Letters, item 70; Barkstreet Snakes, 30 October 2026, 07:15 to 07:16 UTC), on new
+     versions, for both games:
+
+     > No, i havent. I just figured it should've updated itself, and not have to ask me.
+
+     Then:
+
+     > It should update when you start game. It always pops up when I havent even started a game yet. Like why would I
+     > not want the latest version?
+
+110. **30 October 2026** (Amarna Letters, item 65), on a king correcting for corruption in the taxes he is paid:
+
+     > (…) There must be levers for him to pull, or it is just rng.
+
+111. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 19:55 to 20:02 UTC), on the woodpecker's endgame:
+
+     > (…) and i also think when there is just a little bit of space, it should slow down again, so it isn't and rng
+     > competition where it is who's island it pecks at next that decides it, capiche? Whats your take?
