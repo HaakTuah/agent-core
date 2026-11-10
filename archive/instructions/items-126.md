@@ -67,3 +67,12 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      review should be advisory in the rules:
 
      > Yes, expertly to all!
+
+     On the report's line that code quality results are not required, since no project runs GitHub's Code Quality
+     check and GitHub warns that requiring them without it can block every merge:
+
+     > I did set it this to required:
+     > "Code quality results are not required: no project runs GitHub's Code Quality check, and GitHub warns that
+     > requiring them without it can block every merge."
+     >
+     > If I don't have it, then surely it won't trigger.
