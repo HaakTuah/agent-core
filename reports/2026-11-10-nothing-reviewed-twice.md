@@ -7,6 +7,8 @@ the core's own PR: never review twice without reason (core archive 139).
   workflows, which the core check proves identical to a commit on the core's `main`) gets no code review of its own,
   since the core's PR reviewed that code; its security review still runs, as on every PR, and floor rule 3's reviews
   of a moved workflow call stand. A later commit is reviewed only for what it changes.
+- **`.github/workflows/core.yml`:** the core check now also fails a pin that is not a commit of the core's `main`, so
+  a pure sync can only carry what passed the core's own reviews (Codex's P1 on the first round).
 - **`modules/reviews.md`:** a pure sync gets no code review (the "Which" paragraph); point 6: after a fix, one
   `@codex review` for it and a security check only as point 3 says; never a draft-and-ready toggle to rerun a PR's
   reviews; a branch brought up to date with `main` without a conflict is not reviewed again.

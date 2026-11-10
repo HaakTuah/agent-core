@@ -1,5 +1,6 @@
 # The copy of the core ("How a project takes the core" in README.md, points 1 and 5), for every project that takes it:
-# fails a change whose core/ is not this repository, whole and unchanged, at the commit its core-manifest.md pins, or
+# fails a change whose core/ is not this repository, whole and unchanged, at the commit its core-manifest.md pins, whose
+# pin is not a commit of this repository's main (so what a project takes passed the core's reviews; floor rule 8), or
 # whose calls to the core's workflows are pinned to a commit where the called workflow differs from the one at that pin.
 # A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
 # pinned to a full commit SHA. Reads only, with no secret: it fetches this public repository at the pin it reads, which
@@ -36,11 +37,17 @@ jobs:
           path: .core-at-pin
           fetch-depth: 0 # (the workflow pins are older commits of it)
           persist-credentials: false
-      - name: core/ is the core at its pin, and each call to a core workflow is pinned where that workflow is the same
+      - name: core/ is the core at its pin, the pin is on the core's main, and each call to a core workflow is pinned where that workflow is the same
+        env:
+          PIN: ${{ steps.pin.outputs.sha }}
         run: |
           set -euo pipefail
           bad=0
           if ! diff -r -q --exclude=.git .core-at-pin core; then echo "core/ differs from the core at its pin (above)"; bad=1; fi
+          if ! git -C .core-at-pin fetch -q --no-tags origin main \
+            || ! git -C .core-at-pin merge-base --is-ancestor "$PIN" FETCH_HEAD; then
+            echo "the pin $PIN is not a commit of the core's main"; bad=1
+          fi
           # (every mention outside a comment, in whatever form the YAML writes the call)
           calls=$(sed 's/#.*//' .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \
             | grep -o -i -E 'haaktuah/agent-core/[^"'\''[:space:]},]*' | sort -u || true)
