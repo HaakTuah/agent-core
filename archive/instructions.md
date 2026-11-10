@@ -726,3 +726,13 @@ is item N here. A new item goes at the end, numbered after the last, with its da
      only the machine's name and address):
 
      > Yes, expertly. Just remember, no read of anything anyone doesn't need, expert!
+
+121. **10 November 2026** (the core), on the core repository's name:
+
+     > Should it be called agent-core or core-rules instead? I just feel agent-rules is a bit of an akward name for a
+     > repo, expert?
+
+     Told that agent-core matches what every file already calls it (the core, `core/`, `core.yml`), and what renaming
+     it before the games take it at step 3 involves:
+
+     > Renamed the repo to [agent-core](https://github.com/HaakTuah/agent-core).

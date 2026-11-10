@@ -1,4 +1,4 @@
-# agent-rules
+# agent-core
 
 The rules shared by the owner's agent-built projects, written once so that a change to them is made once and every
 project takes it the same way (core archive 68). The owner's words behind each rule are in `archive/instructions.md`.
@@ -54,12 +54,12 @@ project takes it the same way (core archive 68). The owner's words behind each r
    like the checks. GitHub runs workflows only from a repository's own `.github/workflows/`, so the core's are reusable:
    its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`, `codeql.yml` and `delete-merged-branches.yml`
    each keep their triggers and call the core's of the same name in a job
-   (`uses: HaakTuah/agent-rules/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), granting it the
+   (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`, floor rule 2), granting it the
    permissions the core's names and passing only the inputs and secret it declares. Issue templates and `.claude/` are
    read only from the repository itself, so they stay its own. Only a sync PR moves those pins, and only when one of the
    core's workflows changed since the last: then it moves them to its new pin, and needs the owner's yes, since it
    changes `.github/` (floor rule 3). `core.yml` also fails a call pinned where the called workflow differs from the one
-   at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-rules*`.
+   at the core pin; its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own standing rules, each
    file cut to that, with pointers into `core/`.
 
@@ -103,7 +103,7 @@ is its queue of tasks taken in order.
 ```markdown
 # Core manifest
 
-Core: HaakTuah/agent-rules at <full commit SHA>, copied whole under core/ (never edited here).
+Core: HaakTuah/agent-core at <full commit SHA>, copied whole under core/ (never edited here).
 Paths: in the core's files, one into floor/, modules/, scripts/, setup/, archive/ or reports/ is under core/; any other is ours.
 Floor: whole. Modules: <all, or the list of those taken>.
 
