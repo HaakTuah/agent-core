@@ -1,4 +1,4 @@
-# agent-rules
+# agent-core
 
 The shared core of the owner's agent-built projects: a floor every project takes whole and practice modules each
 project picks (`README.md`). Codex: read `modules/codex.md` at the start of every task.
@@ -33,6 +33,7 @@ each file a session reads at the start. No other slot applies.
   takes the core (core archive 80).
 - **A rule moves here only when it holds in every project that takes the core,** and the owner's words behind it
   come with it into `archive/instructions.md`.
+- **Never create a repository named `agent-rules`,** the core's old name: links to it redirect here (core archive 121).
 - **The core names no project** outside its archive and its reports: it holds alike for every project.
 - **The rule-file audit** (point 6 of `modules/workshop-check.md`) runs here, in a PR of its own, whenever more than
   about a fifth of the core's lines changed since the last audit.
