@@ -8,9 +8,7 @@ different models have different blind spots (core archive 18).
 
 **Status (3 November 2026): Codex reviews, Claude builds.** Codex cannot build yet: its GitHub tasks and its command
 line need a "Codex Cloud (Legacy)" environment, which can no longer be created. So no lane goes to Codex until the owner
-says it can build; until then all building is Claude's, and `modules/codex-building.md` is dormant. Nothing on the
-owner's computer starts Codex unless he starts it (floor rule 8): once its tasks work, it is started from the pull
-request, or by an orchestrator the owner starts himself.
+says it can build; until then all building is Claude's, and `modules/codex-building.md` is dormant.
 
 ## For Codex
 

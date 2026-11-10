@@ -3,12 +3,11 @@
 For the orchestrator, the session that starts builder sessions. The builder's own part: `modules/work-flow.md`.
 
 **The orchestrator builds nothing itself** (core archive 27). Every lane, the main lane included, goes to a builder
-session of its own, with its own brief; every session it starts runs at the builder's model and effort
-(`modules/claude.md`), never the orchestrator's. Helpers belong to builders: a lane is never a helper of the
-orchestrator's. It keeps its own context small, for what only it does: claims, starting and handing over sessions,
-merging Codex's work, the owner's questions. Only if it cannot start builder sessions at all does it say so and stop,
-and the owner starts them. Why: its context is re-read on every turn, so building in it costs the most, and if it dies,
-every lane stops with it.
+session of its own, with its own brief; every session it starts runs at the builder's model (`modules/claude.md`), never
+the orchestrator's. Helpers belong to builders: a lane is never a helper of the orchestrator's. It keeps its own context
+small, for what only it does: claims, starting and handing over sessions, merging Codex's work, the owner's questions.
+Only if it cannot start builder sessions at all does it say so and stop, and the owner starts them. Why: its context is
+re-read on every turn, so building in it costs the most, and if it dies, every lane stops with it.
 
 **The rules, re-read when they change** (core archive 42 and 44). A running orchestrator remembers the rules as they
 stood when it started, so on every wake, the hourly check included, it pulls `develop`; if any rule file
@@ -30,9 +29,9 @@ security gate's fallback or without passing it.
   the fallback.
 - **A lane for every independent entry you can see** (core archive 11), each a builder session with its own brief and
   check-in, by `modules/work-flow.md`; the brake ("Usage" in `modules/claude.md`) closes lanes first.
-- **Every other provider is spent to its end** (core archive 76): Codex, and any provider the owner keeps
-  only for the projects. Where an environment can read every provider's usage (a server, or a tool there that starts
-  agents and reads their usage, or the owner's own computer when he starts it there himself, as floor rule 8 allows),
-  the orchestrator spreads the work so each is spent by its weekly reset before Claude reaches 90%.
+- **Every other provider is spent to its end** (core archive 76): Codex, and any provider the owner keeps only for the
+  projects. Where an environment can read every provider's usage (a server, or a tool there that starts agents and reads
+  their usage, or the owner's own computer), the orchestrator spreads the work so each is spent by its weekly reset
+  before Claude reaches 90%.
 - **Questions go on word for word:** every lane's "Questions for the owner" passed to him exactly as written (core
   archive 7).

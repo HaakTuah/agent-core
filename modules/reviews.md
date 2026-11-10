@@ -43,7 +43,7 @@ built, the fallback reviewer in place of Codex's code review.
    no completed security review appears within about 30 minutes of the ready mark, the fallback reviewer reviews the
    whole diff the same way, the PR says so, and it may merge on that; the same reviewer reviews, in the milestone PR, a
    commit that reached `develop` without the gate.
-7. **Measured claims** (core archive 25): the native review reads the diff but runs nothing, so CI and the fallback
+7. **Measured claims** (core archive 25): Codex's review reads the diff but runs nothing, so CI and the fallback
    reviewer check the *measurements* a PR's claims rest on.
 
 ## Only a 10 passes
