@@ -9,8 +9,8 @@ Waiting is lost time and, past an hour, a lost cache (core archive 10).
    to re-read), since the owner's answers can change it while you work: build what changed, or, if that is large, say so
    in the PR and queue it where the project's `AGENTS.md` says. Then mark its draft PR ready; ask for the code review
    and the design check, where the PR gets them, at once; go on with what comes next. Fix what the reviews find in one
-   round. Merge only at a 10 from each review it gets (none: on green checks), and only past the security gate (floor
-   rule 8).
+   round. Merge only once the suites pass and the checks are green, at a 10 from each review it gets, and only past the
+   security gate (floor rule 8).
 2. **The next task** goes on while this one is reviewed, branched as the project's `AGENTS.md` says; no lane is stacked
    on another's branch.
 3. **Lanes beside the main lane** (core archive 11): independent work in parallel, in different files from every open
