@@ -6,7 +6,7 @@ Claude Code's model and effort for each role, and its usage. Read by Claude at t
 | --- | --- | --- |
 | Builder | Opus for the main lane, design readings and the *hard work*; Sonnet for routine lanes (polish, docs, splits, tests) | high |
 | Orchestrator | Sonnet | high |
-| Search helper | Haiku | as it comes |
+| Search helper | Haiku | low |
 | Parallel helper (`modules/helpers.md`) | Sonnet; Opus where it needs design judgement | medium; high for the hard work |
 | Fallback reviewer, design check, stand-in | Opus | high |
 | Planning design | Fable | high |
