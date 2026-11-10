@@ -20,7 +20,8 @@ project takes it the same way (core archive 68). The owner's words behind each r
     brake).
   - Read when needed: `roles.md` (who does what, escalation, who merges), `helpers.md` (when helpers pay),
     `reviews.md` (which review, the security gate, only a 10 passes), `review-guidelines.md` (what reviewers judge by),
-    `codex.md` (Codex's status, "For Codex", setup), `codex-building.md` (dormant until Codex can build),
+    `codex.md` (Codex's own instructions, read only by Codex), `codex-building.md` (Codex's status, what reaches it,
+    and how work goes to it once it can build), `calibration.md` (the checks on the reviewers),
     `orchestrating.md` (the orchestrator), `github-calls.md` (REST calls from a cloud session), `updates.md` (versions,
     Node, CodeQL) and `workshop-check.md` (the weekly check).
   - Taken only by projects that are games, read before a task changes a rule, a feature or how the computer players
@@ -115,6 +116,19 @@ Floor: whole. Modules: <all, or the list of those taken>.
 | --- | --- |
 <one row per slot above, its value here; a slot left out means the project has no such thing>
 ```
+
+## Setting up Codex (the owner's part)
+
+- Codex's GitHub app given the owner's repositories, its own Code Review set to automatic review off (core archive
+  18).
+- Its security review: Auto security review on, Review "Team PRs", Trigger "On PR open", reporting Medium and above. It
+  reads the project's threat model with `floor/threat-model.md` as its threat model, and the project's `SECURITY.md`
+  with the floor (`floor/security.md` and `floor/topics.md`) as its instructions. Under this trigger a request runs a
+  code review alone; a security review comes with every request only under "Whenever code review runs" (core archive
+  51).
+- A Codex cloud environment of the newer kind, made in ChatGPT's Codex settings (the *Codex environment*), its setup
+  script `bash scripts/cloud-setup.sh` (from `/workspace/<repository>`); tasks by comment fail either way.
+- Codex runs on its default model for cloud tasks (none can be chosen).
 
 ## This repository
 
