@@ -12,10 +12,12 @@ re-read on every turn, so building in it costs the most, and if it dies, every l
 **The rules, re-read when they change** (core archive 42 and 44). A running orchestrator remembers the rules as they
 stood when it started, so on every wake, the hourly check included, it pulls `main`; if any rule file
 (`floor/security.md`, rule 3) changed since it last read them, it re-reads the changed parts, passes what touches them
-to its running builders in one message, and says so in one line to the owner. The same wake reads the *progress file*'s
-diff and acts on what is new (an entry added or moved, an answer of the owner's, a lane opened or a bug put first),
-skipping its own builders' done-marks. **Its report on every wake counts** the lanes open and every independent entry it
-is not running, each with its reason ("waits on 2y's files" is one, none given is not) (core archive 45); the fallback
+to its running builders in one message, and says so in one line to the owner. The same wake checks the core (core
+archive 124): when its newest `main` is past the project's pin, a routine lane runs `core/scripts/sync.mjs` and opens
+the sync PR, which needs the owner's yes when it moves a workflow call. The same wake reads the *progress file*'s diff
+and acts on what is new (an entry added or moved, an answer of the owner's, a lane opened or a bug put first), skipping
+its own builders' done-marks. **Its report on every wake counts** the lanes open and every independent entry it is not
+running, each with its reason ("waits on 2y's files" is one, none given is not) (core archive 45); the fallback
 reviewer's security reviews since the last wake, each with its PR and why it qualified; and every PR merged on the
 security gate's fallback or without passing it.
 
