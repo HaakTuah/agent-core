@@ -45,12 +45,10 @@ are the one exception, under floor rule 17.
 **8. Reviews look for breaks of any floor rule,** and for any new way in: a new input, a new external request, a new
 dependency or script, a weakened check. **No PR merges until its security review has run, and none with an open security
 finding;** a PR that changes a protected file also gets a code review. A milestone PR needs its security review only for
-a commit that reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push). Nothing from
-this repository or its PRs runs on the owner's machine by itself, and nothing there starts an agent by itself: no
-poller, hook or schedule acts on his computer (core archive 52). The one exception is a session he starts there
-himself, an orchestrator's included, though he prefers the cloud or a server (core archive 91), with the hooks and
-status line Claude Code runs in it from the merged copy (rule 3): it keeps every floor rule, works in a folder
-of its own, away from his other files, and holds no key beyond its own sign-in. **Test data is never real:** fake keys
+a commit that reached `develop` without one (a merge of `main` back, a conflict resolution, a direct push). **Nothing
+runs on the owner's computer unless he starts it:** no poller, scheduled task or service of an agent's making (core
+archive 52). A session he starts there, an orchestrator's included (core archive 91), works in a folder of its own,
+away from his other files, and holds no key beyond its own sign-in. **Test data is never real:** fake keys
 and tokens are built when the test runs, from pieces (such as `"AIza" + "Sy" + "x".repeat(33)`), never a literal that
 looks real, so no scanner takes one for a leak; sample names, paths and e-mail addresses are invented (`jdoe`,
 `/home/jdoe`, `jdoe@example.com`), never a real person's. A scanning alert on a test's fake is closed as "Used in tests"
