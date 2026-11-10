@@ -5,22 +5,24 @@
 //
 // It reads the branch's head commit, not the working tree, and passes only when, against the project's main, the diff
 // touches only core/, core-manifest.md and .github/workflows/*.yml; outside core/, each changed line differs from the
-// one it replaces only in a commit SHA, and each new SHA is the new pin; the new pin is a commit of the core's main at
-// or past the old one; core/ is the core's tree at that pin exactly; and every call to a core workflow is pinned to a
-// commit of the core's main. It prints the head it checked, for the merge call's `sha` (`modules/github-calls.md`), so
-// nothing pushed after the check can merge. Git and Node's own modules only; it changes nothing.
+// one it replaces only in the manifest's pin or a call's to a core workflow, each moved to the new pin; the new pin is
+// a commit of the core's main at or past the old one; core/ is the core's tree at that pin exactly; and every call to a
+// core workflow is pinned to a commit of the core's main. It prints the head it checked, for the merge call's `sha`
+// (`modules/github-calls.md`), so nothing pushed after the check can merge. Git and Node's own modules only; it changes
+// nothing.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const CORE = "https://github.com/HaakTuah/agent-core.git";
-const git = (args, cwd) =>
-  execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 }).trim();
+const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
+const git = (args, cwd) => raw(args, cwd).trim();
 const ok = (args, cwd) => { try { git(args, cwd); return true; } catch { return false; } };
-const SHA = /\b[0-9a-f]{40}\b/gu;
 const PIN = /^Core: HaakTuah\/agent-core at ([0-9a-f]{40}), copied whole under core\//mu;
-const CALL = /HaakTuah\/agent-core\/\.github\/workflows\/[\w.-]+@([0-9a-f]{40})/gu;
+// the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
+const PIN_REF = /^(Core: HaakTuah\/agent-core at )([0-9a-f]{40})(?=, copied whole under core\/)/gu;
+const CALL = /(HaakTuah\/agent-core\/\.github\/workflows\/[\w.-]+@)([0-9a-f]{40})(?![0-9a-f])/giu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
 
@@ -34,7 +36,8 @@ if (!oldPin || !pin) fail.push("core-manifest.md has no \"Core: HaakTuah/agent-c
 
 // what the merge would bring: only the copy, the manifest's pin and the workflows' call pins, each moved to the new pin
 // every file as text (a NUL byte can't hide a change as "binary"), with no diff driver of the project's own
-const diff = (opt, ...paths) => git(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", opt, base, head, "--", ...paths]);
+const diff = (opt, ...paths) => // only the last newline dropped, so a line's trailing whitespace still counts
+  raw(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", opt, base, head, "--", ...paths]).replace(/\n$/u, "");
 const files = diff("--name-only").split("\n").filter(Boolean);
 for (const line of diff("--summary").split("\n").filter(Boolean)) {
   if (!line.trim().replace(/^.*\b\d{6} /u, "").startsWith("core/")) fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
@@ -42,7 +45,7 @@ for (const line of diff("--summary").split("\n").filter(Boolean)) {
 for (const f of files) {
   if (f.startsWith("core/")) continue;
   if (f !== "core-manifest.md" && !WORKFLOW.test(f)) { fail.push(`${f}: not the core's copy, its pin or a workflow`); continue; }
-  // each hunk's removed lines, then its added ones: the nth added line must be the nth removed with only its SHAs moved
+  // each hunk's removed lines, then its added ones: the nth added line must be the nth removed with only its pins moved
   const hunks = [];
   for (const l of diff("-U0", f).split("\n")) {
     if (l.startsWith("@@")) hunks.push({ "-": [], "+": [] });
@@ -52,9 +55,10 @@ for (const f of files) {
   for (const h of hunks) {
     if (h["-"].length !== h["+"].length) { fail.push(`${f}: lines added or removed, not only a pin moved: ${(h["+"][0] ?? h["-"][0]).slice(0, 80)}`); continue; }
     h["+"].forEach((line, i) => {
-      const shas = line.match(SHA);
-      if (!shas || shas.some((s) => s !== pin)) fail.push(`${f}: a changed line whose new SHA is not the new pin: ${line.slice(0, 80)}`);
-      else if (line.replace(SHA, "<sha>") !== h["-"][i].replace(SHA, "<sha>")) fail.push(`${f}: a change beyond a pin: ${line.slice(0, 80)}`);
+      const ref = f === "core-manifest.md" ? PIN_REF : CALL;
+      const shas = [...line.matchAll(ref)].map((m) => m[2]);
+      if (!shas.length || shas.some((s) => s !== pin)) fail.push(`${f}: a changed line with no pin, or one not the new pin: ${line.slice(0, 80)}`);
+      else if (line.replace(ref, "$1<sha>") !== h["-"][i].replace(ref, "$1<sha>")) fail.push(`${f}: a change beyond a pin: ${line.slice(0, 80)}`);
     });
   }
 }
@@ -62,7 +66,7 @@ for (const f of files) {
 // every pin the branch ends with: the manifest's and each call's
 const pins = new Set(pin ? [pin] : []);
 for (const f of git(["ls-tree", "--name-only", head, "--", ".github/workflows/"]).split("\n").filter((n) => WORKFLOW.test(n))) {
-  for (const m of show(head, f).matchAll(CALL)) pins.add(m[1]);
+  for (const m of show(head, f).matchAll(CALL)) pins.add(m[2]);
 }
 const dir = mkdtempSync(join(tmpdir(), "core-main-"));
 try {
