@@ -21,11 +21,10 @@ the floor; another rule file only where a line here names it. Changes only on th
 **For every reviewer,** blocking (P1 in Codex's priorities): a departure from the design or from the PR's description
 and the sections it names; a broken rule of the project, the core or the floor; a test weakened or skipped, or changed
 beyond what the task forces (a forced change shows in the PR that every check is kept and none loosened) (core archive
-36); a protected file (`floor/security.md`, rule 3) changed by a Codex lane; and against the pillars of
-`modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead of pointed to, or an entry added
-to the *copies check*'s baseline. A finding: anything the change leaves behind (code, files or settings made unused,
-commented-out code, a description made untrue); content put where its readers must read past it; a fact left where a
-clearly better home exists; a pointer no reader needs.
+36); and against the pillars of `modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead
+of pointed to, or an entry added to the *copies check*'s baseline. A finding: anything the change leaves behind (code,
+files or settings made unused, commented-out code, a description made untrue); content put where its readers must read
+past it; a fact left where a clearly better home exists; a pointer no reader needs.
 
 **Text users read,** for every reviewer of a change that adds or rewrites it (core archive 49): a finding for any line
 that reads machine-made (one sentence shape filled in again and again, filler, clichés, two voices alike). The project's
