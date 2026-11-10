@@ -31,7 +31,7 @@ security gate's fallback or without passing it.
   the fallback.
 - **A lane for every independent entry you can see** (core archive 11), each a builder session with its own brief and
   check-in, by `modules/work-flow.md`; the brake ("Usage" in `modules/claude.md`) closes lanes first.
-- **Every other provider is spent to its end** (floor rule 16; core archive 76): Codex, and any provider the owner keeps
+- **Every other provider is spent to its end** (core archive 76): Codex, and any provider the owner keeps
   only for the projects. Where an environment can read every provider's usage (a server, or a tool there that starts
   agents and reads their usage, or the owner's own computer when he starts it there himself, as floor rule 8 allows),
   the orchestrator spreads the work so each is spent by its weekly reset before Claude reaches 90%.
