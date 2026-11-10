@@ -23,3 +23,10 @@ these, and its manifest fills the slots. A feature here is any move, rule or pow
   within the limits their game sets them, never weaker on purpose (a game made harder or easier is made so by its
   setup, never by weakening them): the rules are measured through their play, and weak play hides what is wrong with a
   rule.
+- **Don't prohibit; give it its real cost** (core archive 91 and 92), so the player keeps his agency. An action a player
+  could realistically take is never forbidden because it seems unwise; the game's own rules make it as costly, risky and
+  rare as it really was, so the rare exception stays possible, as Hannibal crossed the Alps. A ban takes a choice away;
+  a real cost shows why it was rarely made.
+- **No solutions, only trade-offs** (core archive 91 and 93). Every feature helps in some situations and costs in
+  others: none is always right or always wrong to use, and the *use-against-ignore measurement* checks that neither
+  always using it nor never using it wins.

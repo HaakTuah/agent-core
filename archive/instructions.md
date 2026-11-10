@@ -487,3 +487,24 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     > Agreed. And interesting is what I want it to be. The models should absolutely aim to play as competently as they
     > can. that's what we incentivize. but if they make interesting mistakes, i don't see that as an issue. I just want
     > the source of that to be from the genuine complexity of the scenario, not the game communicating badly.
+
+91. **10 November 2026** (the core), asked for his yes on the core's rule-file audit and its shared scripts, and on two
+    questions (#14: one shared rule for "conditional goods" and "don't prohibit, give it its real cost"; #16: may an
+    orchestrator run on his own computer):
+
+    > Yes, expertly. And a orchestrator may run on my computer, even though I prefer cloud and server. As for the 2
+    > rules, they are not fully the same. One is about free game design, as in, don't disallow an action juat
+    > because it seems not sensible, like marching through the mountains in the winter, because then you are
+    > inhibiting player agency, rather you should reflect in game mechanics why this was a rarely done move. And
+    > then, you open up for that rare exception like Hannibal. The other principle is Thomas Sowell "there are no
+    > solution, only trade-offs." In a sense, I think both principles already apply to both games, don't you,
+    > expert?
+
+92. **28 October 2026** (Amarna Letters, item 19), among the principles that answer most questions:
+
+    > - Dont prohibit an action, reflect its real cost
+
+93. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 20:04 UTC), of the design session's line "Sowell would
+    approve: no solutions, only trade-offs.":
+
+    > Maybe it include that one, so the builder understands xD

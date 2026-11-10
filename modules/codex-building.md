@@ -29,8 +29,8 @@ builds it, and a wrong result shows itself; if only judgement can (taste, the de
    PR into `develop` whose **description is the brief,** standing alone, since Codex sees only it and the repository:
    the task, the sections and files to read, the tests it must pass, what not to touch, and what its report must say
    ("Readings taken", "Questions for the owner").
-2. **Start Codex from the PR** (how, written here once its tasks work; never by a program on the owner's machine). It
-   works in its cloud, pushes to the PR's branch itself, and reports on the PR.
+2. **Start Codex from the PR** (how, written here once its tasks work; never by a program on the owner's machine that
+   runs by itself, floor rule 8). It works in its cloud, pushes to the PR's branch itself, and reports on the PR.
 3. **Questions go on the PR,** both ways: Codex's in its report; the orchestrator answers with a section added to the
    description ("Round 2: ...") and starts Codex again. At most **two rounds** per question; then the orchestrator takes
    the most reasonable reading under "Readings taken". What only the owner can settle is a `question` issue, linked.
