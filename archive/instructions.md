@@ -538,3 +538,16 @@ is item N here. A new item goes at the end, numbered after the last, with its da
     in #24?" (the lean pass: the floor, review-guideline and issue-template cuts, and its four readings):
 
     > Yes, expertly to all!
+
+98. **10 November 2026** (the core), asked "Yes to the two fixes in #30?" (the rule-file audit's fixes to the floor and
+    the review guidelines) and "Yes to the two readings in #28?" (the orchestrator starts builders at the builder's
+    model, with "and effort" cut; the roles file names the orchestrator as the session that starts builder sessions):
+
+    > Yes, expertly! You can set effort for agents though, I am pretty sure. So that should remain, expert.
+
+99. **10 November 2026** (the core), on the design session reading 98 as keeping "and effort" for the sessions an
+    orchestrator starts:
+
+    > No... A orchestrator cannot set a different effort than what it itself have for any sub/builder session, this I
+    > told you. I can set whatever model it wants, but not effort. However, a builder session that initiates
+    > sub-agents, can both set them to whatever model and effort they want, to the best of my knowledge, expert.
