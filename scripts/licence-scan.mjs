@@ -72,23 +72,34 @@ function executable(text, f) {
     if (first === Infinity) { markup += text.slice(at); break; }
     const b = next.indexOf(first), [open, close] = blocks[b];
     markup += text.slice(at, first);
-    // (an opening tag ends at its first ">" outside a quoted value: <script title="a>b">)
+    // (an opening tag ends at its first ">" outside a quoted value, a value quoted only where it starts with its quote,
+    // as HTML reads it: <script title="a>b">, but x=a"b> ends there; one with no end is read to the file's end)
     let body = first + open.length;
     if (b > 0) {
-      for (let quote = ""; body < text.length && (quote || text[body] !== ">"); body++)
-        if (quote ? text[body] === quote : text[body] === '"' || text[body] === "'") quote = quote ? "" : text[body];
-      body = body < text.length ? body + 1 : 0;
+      for (let quote = "", value = false; body < text.length; body++) {
+        const ch = text[body];
+        if (quote) { if (ch === quote) quote = ""; continue; }
+        if (ch === ">") break;
+        if (value && (ch === '"' || ch === "'")) quote = ch;
+        value = ch === "=" || (value && /\s/u.test(ch));
+      }
+      if (body >= text.length) {
+        if (b === 1) parts.push(text.slice(first + open.length));
+        else markup += text.slice(first);
+        break;
+      }
+      body++;
     }
     // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
-    let stop = body === 0 ? -1 : lower.indexOf(close, body);
+    let stop = lower.indexOf(close, body);
     while (stop >= 0 && b > 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
     // (a script of data or a template, as JSON-LD, an import map or text/template, runs nothing; any other type may:
     // its own type attribute, the first one named so, read attribute by attribute, never a value that only says so)
-    const type = [...text.slice(first + open.length, body).matchAll(/([^\s=>"'/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']*)))?/gu)]
+    const type = [...text.slice(first + open.length, body).matchAll(/([^\s/>][^\s/>=]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*)))?/gu)]
       .find((a) => a[1].toLowerCase() === "type");
     const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test((type?.[2] ?? type?.[3] ?? type?.[4] ?? "").trim());
-    if (b === 1 && body > 0 && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
-    if (body === 0 || stop < 0) break;
+    if (b === 1 && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
+    if (stop < 0) break;
     at = stop + close.length;
   }
   for (const m of markup.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
