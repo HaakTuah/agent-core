@@ -2,8 +2,10 @@
 // a range"), for every project that takes the core, on every PR. It fails a package list of npm's (a tracked
 // package.json outside core/) that asks for a package by a range, a tag or an address that can move. What passes:
 //   - one exact version (1.2.3, with or without a pre-release or build part), also behind an alias (npm:name@1.2.3);
-//   - a package of the project's own: one a package.json of the project names, or a file: or link: path;
-//   - a git address at a full commit SHA.
+//   - a package of the project's own: a file: or link: path that stays inside the project, or a workspace (a
+//     package.json that a package list's "workspaces" names) asked for as * or by workspace:, by that list or another
+//     of its workspaces, which npm then fills from the project itself;
+//   - a git address, in any form npm reads as one, at a full commit SHA.
 // What another installer holds, the project's own checks do (README.md, "How a project takes the core", point 5). Reads
 // only; Node's own modules. It checks the project it lies in, whatever the directory it is started from. Run by the
 // copies workflow (.github/workflows/copies.yml).
@@ -16,14 +18,47 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const VERSION = "\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?";
 const EXACT = new RegExp(`^(?:npm:(?:@[^/@]+/)?[^/@]+@)?${VERSION}$`, "u");
 const FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
-const exact = spec => EXACT.test(spec) || /^(file|link):/u.test(spec) || /^(git\+|git:|github:)[^#]*#[0-9a-f]{40}$/u.test(spec);
+const GIT = /^(?:git\+[a-z]+:\/\/\S+|git:\/\/\S+|git@\S+|(?:github|gitlab|bitbucket|gist):\S+|https?:\/\/\S+\.git|[\w.-]+\/[\w.-]+)$/u;
+const git = spec => { const at = spec.lastIndexOf("#"); return at > 0 && /^[0-9a-f]{40}$/u.test(spec.slice(at + 1)) && GIT.test(spec.slice(0, at)); };
+const dirOf = file => file.includes("/") ? file.slice(0, file.lastIndexOf("/")) : "";
+// A file: or link: path, read from the package list's folder (dir), that names a place inside the project.
+const inside = (spec, dir) => {
+  const to = /^(?:file|link):(.*)$/u.exec(spec)?.[1];
+  if (!to || /^([/\\~]|[A-Za-z]:)/u.test(to)) return false;
+  const parts = [];
+  for (const part of [...dir.split("/"), ...to.split(/[/\\]/u)].filter(p => p && p !== ".")) {
+    if (part !== "..") parts.push(part);
+    else if (!parts.length) return false;
+    else parts.pop();
+  }
+  return true;
+};
+const exact = (spec, dir) => EXACT.test(spec) || inside(spec, dir) || git(spec);
 
-// What is wrong in one package list, each as a line of text; own is the set of the project's own packages' names.
-export function problems(pkg, own = new Set()) {
+// The project's workspaces: for each package list given (each { file, pkg }) that names "workspaces", and for each of
+// those workspaces, the names npm fills from the project itself when that list asks for them. A file to its names.
+export function workspaces(lists) {
+  const own = new Map();
+  const quote = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  for (const { file, pkg } of lists) {
+    const globs = Array.isArray(pkg?.workspaces) ? pkg.workspaces : Array.isArray(pkg?.workspaces?.packages) ? pkg.workspaces.packages : [];
+    const members = globs.filter(g => typeof g === "string").map(glob => {
+      const inner = glob.replace(/^\.\//u, "").replace(/\/+$/u, "").split("**").map(piece => piece.split("*").map(quote).join("[^/]*")).join(".*");
+      return new RegExp(`^${[quote(dirOf(file)), inner].filter(Boolean).join("/")}$`, "u");
+    });
+    const mine = lists.filter(l => l.file !== file && typeof l.pkg?.name === "string" && members.some(m => m.test(dirOf(l.file))));
+    for (const at of mine.length ? [file, ...mine.map(l => l.file)] : []) own.set(at, new Set([...own.get(at) ?? [], ...mine.map(l => l.pkg.name)]));
+  }
+  return own;
+}
+
+// What is wrong in one package list, each as a line of text; own is the set of workspaces' names it may ask for as its
+// project's own, and dir the folder it lies in.
+export function problems(pkg, own = new Set(), dir = "") {
   const found = [];
   const check = (field, name, spec) => {
-    if (own.has(name)) return;
-    if (typeof spec !== "string" || !exact(spec)) found.push(`${field}: "${name}" at ${JSON.stringify(spec)} is no one exact version (floor rule 7)`);
+    if (own.has(name) && typeof spec === "string" && (spec === "*" || spec.startsWith("workspace:"))) return;
+    if (typeof spec !== "string" || !exact(spec, dir)) found.push(`${field}: "${name}" at ${JSON.stringify(spec)} is no one exact version (floor rule 7)`);
   };
   for (const field of FIELDS) for (const [name, spec] of Object.entries(pkg[field] ?? {})) check(field, name, spec);
   const overrides = (node, field) => {
@@ -40,18 +75,18 @@ export function problems(pkg, own = new Set()) {
 export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") && /(^|\/)package\.json$/u.test(f));
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  const run = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-  process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
-  const files = reads(git(["ls-files", "-z"]).split("\0").filter(Boolean));
+  process.chdir(run(["rev-parse", "--show-toplevel"]).trim());
+  const files = reads(run(["ls-files", "-z"]).split("\0").filter(Boolean));
   const lists = files.map(file => {
     try { return { file, pkg: JSON.parse(fs.readFileSync(file, "utf8")) }; }
     catch { return { file, pkg: null }; }
   });
-  const own = new Set(lists.map(l => l.pkg?.name).filter(n => typeof n === "string"));
+  const own = workspaces(lists);
   let failed = 0;
   for (const { file, pkg } of lists) {
-    const found = pkg && typeof pkg === "object" && !Array.isArray(pkg) ? problems(pkg, own) : ["cannot be read as a package list, so what it asks for is unknown"];
+    const found = pkg && typeof pkg === "object" && !Array.isArray(pkg) ? problems(pkg, own.get(file), dirOf(file)) : ["cannot be read as a package list, so what it asks for is unknown"];
     for (const what of found) { failed++; console.log(`FAIL ${file}: ${what}`); }
   }
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} package lists of npm's read: ${failed} asking for no one exact version`);

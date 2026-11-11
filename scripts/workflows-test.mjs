@@ -19,15 +19,22 @@ ok(fails("      - uses: mossgrip/cache\n"), "no version at all fails");
 ok(fails("    uses: owner/repo/.github/workflows/x.yml@main\n"), "another's workflow at a branch fails");
 ok(fails(`      - uses: "mossgrip/cache@v3"\n`) && fails("      - { uses: 'mossgrip/cache@v3' }\n"), "a quoted name, or one in braces, is read too");
 ok(fails("      - uses: actions-rs/toolchain@v1\n"), "a name that only starts like GitHub's own fails");
+ok(fails(`      - "uses": mossgrip/cache@v3\n`) && fails("      - 'uses': mossgrip/cache@v3\n") && fails("      - uses : mossgrip/cache@v3\n") && fails("      ? uses\n      : mossgrip/cache@v3\n      - uses:\n          mossgrip/cache@v3\n"), "a quoted key and a spaced one are read; a value on the next line fails as unreadable");
+ok(fails("      - uses: |\n          mossgrip/cache@v3\n") && fails("      - uses: *cache\n"), "a value in a block, or behind an alias, fails");
+ok(fails(`      - "\\x75ses": mossgrip/cache@v3\n`) && fails(`on: ["pull_request\\x5ftarget"]\n`) && fails(`on: ["pull_request\\u005ftarget"]\n`), "a name spelled with a YAML escape is read as what it spells");
+ok(fails(`on: ["pull_request_\\\n      target"]\n`) && fails("    steps: [uses: mossgrip/cache@v3]\n"), "a name broken over two lines by an escape, and a use in a list in brackets, are read");
+ok(fails("# ci\ron:\r  pull_request_target:\r") && fails("# ci\rjobs:\r      - uses: mossgrip/cache@v3\r"), "lines that end in a lone carriage return are lines");
+ok(!fails("      - run: |\n          node a.mjs \\\n            --target x\n"), "a script's own line that goes on to the next is no finding");
+ok(!fails(`      - "uses": actions/checkout@v7\n      - run: echo 'no uses here'\n`), "a quoted key with one of GitHub's own passes; the word alone is no key");
 ok(!fails(`      - uses: docker://alpine@sha256:${"a".repeat(64)}\n`) && fails("      - uses: docker://alpine:3.20\n"), "a container image passes only at its digest");
 ok(fails("on:\n  pull_request_target:\n"), "pull_request_target fails");
 ok(fails("on: [push, pull_request_target] # the labeller\n"), "also in a list, with a comment after it");
 ok(!fails("# never pull_request_target, nor uses: mossgrip/cache@v3\n"), "a line that is all comment is not read");
 ok(problems("a\nb\n      - uses: mossgrip/cache@v3\n")[0].line === 3, "a finding names its line");
 
-const files = [".github/workflows/a.yml", ".github/workflows/b.yaml", ".github/actions/setup/action.yml", ".github/dependabot.yml",
-  ".github/ISSUE_TEMPLATE/config.yml", "core/.github/workflows/a.yml", "docs/a.yml"];
-ok(reads(files).join() === files.slice(0, 3).join(), "it reads the project's own workflows and actions, and not the core's copy");
+const files = [".github/workflows/a.yml", ".github/workflows/b.yaml", ".github/actions/setup/action.yml", ".github/actions/setup/steps.yml", "tools/act/action.yaml", "action.yml",
+  ".github/dependabot.yml", ".github/ISSUE_TEMPLATE/config.yml", "core/.github/workflows/a.yml", "core/tools/action.yml", "tools/node_modules/a/action.yml", "docs/a.yml", "docs/reaction.yml"];
+ok(reads(files).join() === files.slice(0, 6).join(), "it reads the project's own workflows and its actions wherever they lie, and neither the core's copy nor an installed package's");
 
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
