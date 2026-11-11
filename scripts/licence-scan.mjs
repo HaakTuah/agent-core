@@ -77,45 +77,41 @@ function attributesOf(text, at) {
  * frontmatter, its event handlers and bound attributes (onclick, @click, :value, v-if, x-data, quoted or not),
  * javascript: addresses and, but in a plain page, its expressions in braces (Vue's, Svelte's, Astro's), each brace read
  * to its match. Its text, markup, comments and style blocks run nothing, so a page showing a command fetches nothing.
- * One pass, finding each next comment, script or style block from where the last one ended.
+ * One pass over its tags, each read whole (attributesOf), so a "<!--" or "<script" inside another tag's value is text.
  */
 function executable(text, f) {
   const lower = text.toLowerCase(), parts = [];
   if (/\.astro$/iu.test(f)) { const front = /^\s*---\r?\n([\s\S]*?)(?:\r?\n---|$)/u.exec(text); if (front) parts.push(front[1]); }
-  const blocks = [["<!--", "-->"], ["<script", "</script"], ["<style", "</style"]];
-  const next = blocks.map(() => -1);
   let markup = "";
   for (let at = 0; at < text.length; ) {
-    for (const [b, [open]] of blocks.entries()) if (next[b] !== Infinity && next[b] < at) {
-      // (an opening tag's name ends there: "<scripts" is no script)
-      let k = lower.indexOf(open, at);
-      while (k >= 0 && open !== "<!--" && /[\w-]/u.test(lower[k + open.length] ?? "")) k = lower.indexOf(open, k + 1);
-      next[b] = k < 0 ? Infinity : k;
+    const lt = text.indexOf("<", at);
+    if (lt < 0) { markup += text.slice(at); break; }
+    markup += text.slice(at, lt);
+    if (text.startsWith("<!--", lt)) { // (a comment, to its end or the file's)
+      const end = text.indexOf("-->", lt + 4);
+      if (end < 0) break;
+      at = end + 3;
+      continue;
     }
-    const first = Math.min(...next);
-    if (first === Infinity) { markup += text.slice(at); break; }
-    const b = next.indexOf(first), [open, close] = blocks[b];
-    markup += text.slice(at, first);
-    // (an opening tag's attributes and end, read as HTML reads them; one with no end is read to the file's end)
-    let body = first + open.length, attributes = [];
-    if (b > 0) {
-      const tag = attributesOf(text, body);
-      if (tag.end < 0) {
-        if (b === 1) parts.push(text.slice(body));
-        else markup += text.slice(first);
-        break;
-      }
-      ({ attributes } = tag);
-      body = tag.end + 1;
+    // (a tag, read whole, so what its values hold, "<!--" or "<script", is only text; a "<" that opens none is text)
+    const name = /^[a-z][^\s/>]*/iu.exec(text.slice(lt + 1, lt + 65))?.[0];
+    if (!name) { markup += "<"; at = lt + 1; continue; }
+    const kind = name.toLowerCase(), tag = attributesOf(text, lt + 1 + name.length);
+    if (tag.end < 0) { // (one with no end: a script's rest is read as code, any other's as markup)
+      if (kind === "script") parts.push(text.slice(lt + 1 + name.length));
+      else markup += text.slice(lt);
+      break;
     }
+    if (kind !== "script" && kind !== "style") { markup += text.slice(lt, tag.end + 1); at = tag.end + 1; continue; }
     // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
+    const body = tag.end + 1, close = `</${kind}`;
     let stop = lower.indexOf(close, body);
-    while (stop >= 0 && b > 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
+    while (stop >= 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
     // (a script of data or a template, as JSON-LD, an import map or text/template, runs nothing; any other type may:
     // its own type attribute, the first one named so)
-    const type = attributes.find(([name]) => name.toLowerCase() === "type")?.[1] ?? "";
+    const type = tag.attributes.find(([n]) => n.toLowerCase() === "type")?.[1] ?? "";
     const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.trim());
-    if (b === 1 && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
+    if (kind === "script" && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
     if (stop < 0) break;
     at = stop + close.length;
   }

@@ -143,8 +143,12 @@ for (const [what, change, why] of [
   ...["<script x=a\"b>execSync('npx -y mossgrip-cli')</script><p title=\"moss\">", "<script x=a\"b>execSync('npx -y mossgrip-cli')</script>",
     "<script x=a\"b></script><button onclick=\"execSync('npx -y mossgrip-cli')\">", "<script x=a\"type=json\">execSync('npx -y mossgrip-cli')</script>",
     "<script \"type=json\">execSync('npx -y mossgrip-cli')</script>", "<script title=\"open>execSync('npx -y mossgrip-cli')",
-    "<script x=a=\"b>execSync('npx -y mossgrip-cli')</script><p title=\"end\">"]
+    "<script x=a=\"b>execSync('npx -y mossgrip-cli')</script><p title=\"end\">",
+    "<div title=\"<!--\"><script>execSync('npx -y mossgrip-cli')</script><p title=\"-->\">",
+    "<div title=\"<style>\"><script>execSync('npx -y mossgrip-cli')</script><p title=\"</style>\">",
+    "<div title=\"<!--\"><button onclick=\"execSync('npx -y mossgrip-cli')\">moss</button><p title=\"-->\">"]
     .map((page) => [`npx in a page whose script tag has a quote inside a value or no end: ${page}`, write("site/moss.html", `${page}\n`), /cannot be audited/]),
+  ["npx in a component's script after a tag whose value opens a comment", write("site/Moss.vue", "<template><div title=\"<!--\">moss</div></template>\n<script setup>\nexecSync('npx -y mossgrip-cli');\n</script>\n"), /cannot be audited/],
   ["npx in a page's module script", write("site/moss.html", "<script type=\"module\">execSync('npx -y mossgrip-cli');</script>\n"), /cannot be audited/],
   ["npx in a page's script left open", write("site/moss.html", "<p>moss</p>\n<script>\nexecSync('npx -y mossgrip-cli');\n"), /cannot be audited/],
   ["npx in a config with comments", write("site/jsconfig.json", "{\n  // a comment\n  \"run\": \"npx -y mossgrip-cli\"\n}\n"), /cannot be audited/],
