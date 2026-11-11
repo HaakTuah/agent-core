@@ -47,11 +47,11 @@ too).
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
 Tested: the tests pass (8 and 123 checks), and so does the core's own audit of its 95 files. Codex's review and the
-fallback reviewer's found ways round the first two versions: `package.json` scripts, hooks, tasks and launches, other
-spellings and fetchers, an option's value hiding the command, another registry, curl in a quoted command, comments
-that hid commands, folded YAML, tools' hooks in package.json, unread file kinds and #! lines, lockfiles left out, scripts of other languages
-that ship, `own` covering too much. Each is now closed and tested. A dry run on each game with
-the new scripts:
+fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
+spellings and fetchers, an option's value hiding the command, another registry, curl in a quoted command, comments that
+hid commands, folded YAML, tools' hooks in package.json, unread file kinds and #! lines, lockfiles left out, scripts of
+other languages that ship, `own` covering too much. Each is now closed and tested. A dry run on each game with the new
+scripts:
 - Snakes passes, but for its own scan and that scan's test, which name the forms they look for; both go in its sync
   PR.
 - Amarna passes with the audit its sync PR adds, but for two `npx vitest` lines, which would fetch if nothing were
