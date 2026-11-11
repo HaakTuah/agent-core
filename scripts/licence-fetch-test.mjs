@@ -111,9 +111,13 @@ for (const [what, change, why] of [
   ["playwright install", append(".github/workflows/ci.yml", "      - run: npx --no-install playwright install chromium\n"), /fetches what no entry/],
   ["a script in a language the scan cannot read", write("scripts/render.py", "import numpy\n"), /language the scan cannot read/],
   ["npm install named in pieces of a string joined in code", write("scripts/run.mjs", "execSync('npm ' + 'install -g mossgrip-widgets@1.2.3');\n"), /mossgrip-widgets .* is not in/],
-  ["a word after npm that is no npm command, where npm stands as one", append("scripts/setup.sh", "npm $VERB mossgrip-widgets@1.2.3\nif npm \"$VERB\" x; then :; fi\nsh -c 'npm $VERB x'\n"), /no npm command/],
+  ...["npm $VERB mossgrip-widgets@1.2.3", 'if npm "$VERB" x; then :; fi', "sh -c 'npm $VERB x'", 'NODE_ENV=production npm "$VERB" x',
+    'sudo -E npm "$VERB" x', 'timeout 60 npm "$VERB" x', 'nice npm "$VERB" x', '/usr/bin/npm "$VERB" x',
+  ].map((line) => [`a word after npm that is no npm command, where npm stands as one: ${line}`, append("scripts/setup.sh", `${line}\n`), /no npm command/]),
+  ["a word after npm that is no npm command, in a string built in code", write("scripts/run.mjs", 'execSync("A=1 npm " + verb + " mossgrip-widgets");\n'), /no npm command/],
   ["npx in a component's script block", write("site/Moss.vue", "<script setup>\nexecSync('npx -y mossgrip-cli');\n</script>\n"), /cannot be audited/],
-  ["npm install without its lockfile", append("scripts/setup.sh", "npm install --ignore-scripts --no-package-lock\nnpm i --package-lock=false\n"), /without the lockfile/],
+  ...["npm install --ignore-scripts --no-package-lock", "npm i --package-lock=false", "npm i --package-lock false"]
+    .map((line) => [`npm install without its lockfile: ${line}`, append("scripts/setup.sh", `${line}\n`), /without the lockfile/]),
   ["npm install with the lockfile turned off by its environment", append("scripts/setup.sh", "npm_config_package_lock=false npm install --ignore-scripts\n"), /without the lockfile/],
   ["npx in a config with comments", write("site/jsconfig.json", "{\n  // a comment\n  \"run\": \"npx -y mossgrip-cli\"\n}\n"), /cannot be audited/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }

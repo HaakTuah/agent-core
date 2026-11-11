@@ -37,6 +37,10 @@ for (const [what, change] of [
   ["npm named in a message, not as a command", (dir) => { write("scripts/say.mjs", "console.log(`${file}: npm setting not allowed`);\n")(dir); append("scripts/setup.sh", "if npm ci; then echo \"npm packages: installed\"; fi\n")(dir); }],
   ["npm exec of an audited package after --", append("scripts/setup.sh", "npm exec --package=mossgrip-cli@1.2.3 -- moss build\n")],
 ]) { const f = run(change); ok(f.length === 0, `passes ${what}`, f.join("\n")); }
+{ // (a long line naming npm many times, as a bundle may, read in time: what stands before each is read only so far back)
+  const start = Date.now(), f = run(write("scripts/long.js", `const notes = '${`${"x".repeat(240)} npm run build; `.repeat(8000)}';\n`));
+  ok(f.length === 0 && Date.now() - start < 5000, "passes a 2 MB line naming npm 8000 times, in under 5 seconds", f.join("\n") || `${Date.now() - start} ms`);
+}
 
 for (const [what, change, why] of [
   ["a tool under a licence that is not open source", entry({ name: "mossgrip-widgets", licence: "LicenseRef-Mossgrip-Proprietary" }), /not on the list for tools/],

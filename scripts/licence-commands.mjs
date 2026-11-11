@@ -18,10 +18,13 @@ const INSTALL = new Set(["install", "i", "in", "ins", "inst", "insta", "instal",
 const RUN = new Set(["exec", "x"]);
 const BY_OTHER_NAME = new Set(["create", "init", "innit"]);
 const UPDATE = new Set(["update", "up", "upgrade", "udpate"]);
-// Where a word stands as a command: at a line's start, after ; & | ( { [ = or !, in "$(", after "run:" or "- ", after a
-// word that runs the next (sudo, exec, env, time, nohup, xargs, if, then, do, else and the like), or at the start of a
-// string that opens a line or follows ( { [ = : , -c or run: (a message, echo "npm ...", is only words).
-const AT_COMMAND = /(?:^|[;&|({[=!]|\$\(|\brun:|^\s*-|(?:^|[({[=:,]|\s-c|\s--command|\brun:)\s*['"`]|\b(?:sudo|exec|env(?:\s+\w+=\S*)*|time|nohup|xargs|if|elif|while|until|then|do|else))\s*$/u;
+// Where a word stands as a command: at a line's start, after ; & | ( { [ = or !, in "$(", after "run:" or "- ", after
+// if, then, do, else and the like, or at the start of a string that opens a line or follows ( { [ = : , -c or run:;
+// each perhaps followed by variables set for it (A=1), words that run the next with their options (sudo -E, env,
+// cross-env, time, nohup, nice, timeout 60, xargs -0, stdbuf, exec, command) and a path (/usr/bin/). A message, echo
+// "npm ...", is only words.
+const RUNNER = String.raw`(?:sudo|doas)(?:\s+-[ugChDpRrTU]\s*\S+|\s+-\S+)*|env(?:\s+-[uSC]\s*\S+|\s+-\S+)*|cross-env(?:-shell)?|time(?:\s+-\S+)*|nohup|nice(?:\s+-n\s*\S+|\s+-\S+)*|ionice(?:\s+-[cnp]\s*\S+|\s+-\S+)*|timeout(?:\s+-[sk]\s*\S+|\s+-\S+)*\s+\S+|xargs(?:\s+-[IinPLdaEs]\s*\S+|\s+-\S+)*|stdbuf(?:\s+-\S+)*|exec(?:\s+-a\s*\S+|\s+-\S+)*|command|builtin`;
+const AT_COMMAND = new RegExp(String.raw`(?:^|[;&|({[=!]|\$\(|\brun:|^\s*-|(?:^|[({[=:,]|\s-c|\s--command|\brun:)\s*['"\x60]|\b(?:if|elif|while|until|then|do|else))\s*(?:(?:\w+=\S*|${RUNNER})\s+)*(?:[\w.~$\{\}-]*[\/\\])*$`, "u");
 const LINK = new Set(["link", "ln"]);
 const CONFIG = new Set(["config", "c", "set"]);
 const NO_FETCH = new Set([
@@ -97,7 +100,7 @@ export function fetched(line, atCommand = false) {
     // built in code; elsewhere, in prose, it is only a word)
     if (atCommand && command !== undefined && !fetching(command) && !NO_FETCH.has(command))
       return { specs: [], unreadable: `npm ${command}: no npm command, so what it runs cannot be read` };
-    if (INSTALL.has(command) && command !== "pack" && words.slice(i).some((w) => /^--no-(package-lock|shrinkwrap)$|^--(package-lock|shrinkwrap)=false$/iu.test(w)))
+    if (INSTALL.has(command) && command !== "pack" && words.slice(i).some((w, k, rest) => /^--no-(package-lock|shrinkwrap)$|^--(package-lock|shrinkwrap)=false$/iu.test(w) || (/^--(package-lock|shrinkwrap)$/iu.test(w) && /^false$/iu.test(rest[k + 1] ?? ""))))
       return { specs: [], unreadable: "it installs without the lockfile, so what it installs is not what the lockfile's check read" };
     if (command === undefined || !fetching(command)) return { specs: [] };
     if (UPDATE.has(command)) return { specs: [], unreadable: `npm ${command} fetches the newest release a range allows, which cannot be audited` };
@@ -184,7 +187,10 @@ export function commands(text, code = false) {
   // (each npx or npm, nested ones too, as in npx -c 'npm install ...', starts a line of its own; an array, below)
   // (a command runs to the next ; | && || or & that is no redirection; a redirection is read past in fetched())
   for (const m of joined.matchAll(/\b(?=(npx|npm)(\.cmd)?\b(?!['"`]\s*,))/giu)) {
-    const before = joined.slice(joined.lastIndexOf("\n", m.index) + 1, m.index);
+    // (what stands just before it on its line, at most 256 characters, so a long line is read in time; a "\0" marks a
+    // line that starts further back, so no pattern takes the cut for its start)
+    const cut = joined.slice(Math.max(0, m.index - 256), m.index), nl = cut.lastIndexOf("\n");
+    const before = nl >= 0 || m.index <= 256 ? cut.slice(nl + 1) : `\0${cut}`;
     // (a shell's check that it is there, as a statement of its own, never one whose answer is kept: $(command -v npx))
     if (!code && /(?:^|[;&|!]|\b(?:if|elif|while|until|then|do|else))\s*(?:command\s+-v|which|type|hash)\s+$/u.test(before)) continue;
     out.push(Object.assign(new String(/^(?:[^\n;|&]|&(?=>)|(?<=[<>])&)*/u.exec(joined.slice(m.index))[0]), { atCommand: AT_COMMAND.test(before) }));

@@ -10,7 +10,7 @@
 //     workflows among them) and the project's (./), by its name (owner/repo), at whatever version it is pinned to;
 //   - an entry for each package a command fetches (licence-commands.mjs, beside this file, reads them: npx, npm exec,
 //     npm install, npm link and npm pack, in any workflow, script or tool, a file with no extension read as a shell
-//     script, the script blocks of a page or component, any command in a JSON or TOML file), written
+//     script, a page or component read whole, any command in a JSON or TOML file), written
 //     name@exact.version and audited at that version, one entry for each version used, so an update is audited again,
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and the like): each of those passes
@@ -35,7 +35,7 @@ import { OTHER_FETCHER, commandLines, commands, fetched } from "./licence-comman
 const OWN = "HaakTuah/";
 const SHELL = /\.(ya?ml|sh|bash|zsh|fish|mk|toml|envrc)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile|\.envrc)$/iu;
 const JS = /\.([cm]?[jt]sx?)$/iu;
-const WEB = /\.(html?|vue|svelte|astro)$/iu; // (pages and components, whose script blocks run too)
+const WEB = /\.(html?|vue|svelte|astro)$/iu; // (pages and components, whose scripts run too: read whole, their text too)
 const YAML = /\.ya?ml$/iu;
 const OTHER_LANGUAGE = /\.(py|pyw|rb|ps1|psm1|bat|cmd|pl|pm|php|lua|r|jl|tcl|vbs|groovy|gradle|kts)$/iu;
 const CODE = /\.(html?|[cm]?[jt]sx?|css|scss|sass|less|vue|svelte|astro)$/iu;
