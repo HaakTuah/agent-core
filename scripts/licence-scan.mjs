@@ -163,6 +163,26 @@ function folded(text) {
   return out.join("\n");
 }
 
+/** The strings of an array written only of string literals ("[", literals and commas, "]"), or null: read by hand. */
+function literalArray(src) {
+  if (src[0] !== "[") return null;
+  const out = [], space = () => { while (/\s/u.test(src[i] ?? "")) i++; };
+  let i = 1;
+  for (;;) {
+    space();
+    if (src[i] === "]") return i === src.length - 1 ? out : null;
+    const quote = src[i];
+    if (quote !== "'" && quote !== '"' && quote !== "`") return null;
+    const end = src.indexOf(quote, i + 1);
+    if (end < 0 || (quote === "`" && src.slice(i, end).includes("${"))) return null;
+    out.push(src.slice(i + 1, end));
+    i = end + 1;
+    space();
+    if (src[i] === ",") i++;
+    else if (src[i] !== "]") return null;
+  }
+}
+
 /**
  * The command lines in a text: each npx or npm and what follows it on its line, and each written as an array. A line
  * continued on the next (a shell's "\\" at its end, or a YAML folded block, "key: >") is read as one.
@@ -173,9 +193,9 @@ function commands(text) {
   for (const m of joined.matchAll(/\b(npx|npm)\b(?!['"`]\s*,)[^\n;&|>]*/gu)) out.push(m[0]); // (an array, below)
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
   for (const m of joined.matchAll(/['"`](npx|npm)['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/gu)) {
-    const literal = /^\[((?:\s*(?:'[^']*'|"[^"]*"|`[^`$]*`)\s*,?)*)\]$/u.exec(m[2]);
+    const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
-    if (literal) out.push([m[1], ...[...literal[1].matchAll(/['"`]([^'"`]*)['"`]/gu)].map((x) => x[1])].join(" "));
+    if (literal) out.push([m[1], ...literal].join(" "));
     else if (!(m[1] === "npm" && NO_FETCH.has(command))) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<its-arguments,-not-written-out>`); // (npm view with a variable: no fetch)
   }
   return out;
