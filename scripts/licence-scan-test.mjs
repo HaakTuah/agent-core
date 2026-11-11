@@ -33,6 +33,8 @@ for (const [what, change] of [
   ["an audited install nested in npx -c", append("scripts/setup.sh", "npx -c 'npm install -g mossgrip-cli@1.2.3'\n")],
   ["an audited package written as an array", write("scripts/crop.mjs", "execFileSync('npx', ['mossgrip-cli@1.2.3']);\n")],
   ["npm view with a variable, which fetches nothing", write("scripts/times.mjs", "execFileSync('npm', ['view', name, 'time', '--json']);\n")],
+  ["npx and npm asked their version, and a check that npx is there", append("scripts/setup.sh", "npx --version\nnpm exec --help\nif ! command -v npx >/dev/null; then exit 1; fi\nwhich npm\n")],
+  ["npm named in a message, not as a command", (dir) => { write("scripts/say.mjs", "console.log(`${file}: npm setting not allowed`);\n")(dir); append("scripts/setup.sh", "if npm ci; then echo \"npm packages: installed\"; fi\n")(dir); }],
   ["npm exec of an audited package after --", append("scripts/setup.sh", "npm exec --package=mossgrip-cli@1.2.3 -- moss build\n")],
 ]) { const f = run(change); ok(f.length === 0, `passes ${what}`, f.join("\n")); }
 
