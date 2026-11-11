@@ -28,6 +28,7 @@ for (const [what, change] of [
   ["a lockfile the config names, a tool in it under GPL", LOCK("GPL-3.0-only")],
   ["an audited install with a comment after it", append("scripts/setup.sh", "npm install -g mossgrip-cli@1.2.3 # the one we audited\n")],
   ["npm run after an option", append("scripts/setup.sh", "npm --silent run build\n")],
+  ["npm config get registry, which sets nothing", append("scripts/setup.sh", "npm config get registry\n")],
   ["an audited package written as an array", write("scripts/crop.mjs", "execFileSync('npx', ['mossgrip-cli@1.2.3']);\n")],
   ["npm view with a variable, which fetches nothing", write("scripts/times.mjs", "execFileSync('npm', ['view', name, 'time', '--json']);\n")],
   ["npm exec of an audited package after --", append("scripts/setup.sh", "npm exec --package=mossgrip-cli@1.2.3 -- moss build\n")],

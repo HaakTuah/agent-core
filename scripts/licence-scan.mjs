@@ -10,15 +10,16 @@
 //     workflows among them) and the project's (./), by its name (owner/repo), at whatever version it is pinned to;
 //   - an entry for each package npx, npm exec (Windows' npx.cmd and npm.cmd too), npm install (and its other spellings)
 //     or npm pack fetches, in any workflow, script or tool (a file with no extension read as a shell script), any
-//     command in a JSON or TOML file (package.json's "scripts", a hook's "command") and any command written as an array
-//     (execFileSync("npx", [...])): written name@exact.version, and audited at that version, one entry for each version
-//     used, so an update is audited again, with what it pulls in. npx --no-install (or --no) never fetches, so a bare
-//     name passes there. A word that is no command, straight after an option, is read as that option's value. A fetch
-//     it cannot read (a bare name, a range or tag, an alias, a URL, git, a variable, npm init or create, which fetch by
-//     another name, npm update or npm audit fix, which take the newest a range allows, npm config set pointing at
-//     another registry) fails, but npm pack's, which runs nothing it fetches, and another fetcher's (curl, wget, pip,
-//     pnpm, yarn, bun, playwright install, git clone and the like): each of those passes only in a file an entry's
-//     "files" names, that entry its hand audit;
+//     command in a JSON or TOML file (package.json's "scripts", a hook's "command") any command nested in another (npx
+//     -c '...') and any command written as an array (execFileSync("npx", [...]), or by a path to the program): written
+//     name@exact.version, and audited at that version, one entry for each version used, so an update is audited again,
+//     with what it pulls in. npx --no-install (or --no) never fetches, so a bare name passes there. A word that is no
+//     command, straight after an option, is read as that option's value. A fetch it cannot read (a bare name, a range
+//     or tag, an alias, a URL, git, a variable, npm init or create, which fetch by another name, npm update or npm
+//     audit fix, which take the newest a range allows, npm config set pointing at another registry, a program named in
+//     a string and run from a variable) fails, but npm pack's, which runs nothing it fetches, and another fetcher's
+//     (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and the like): each of those passes only in a
+//     file an entry's "files" names, that entry its hand audit;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
@@ -120,7 +121,8 @@ export function fetched(line) {
     }
     // (npm config set registry, and the like, points every later fetch at another registry; npm audit fix installs
     // releases the lockfile does not hold)
-    if (CONFIG.has(command) && words.slice(i).some((w) => /(^|:)registry\b|^replace-registry-host\b|^(user|global)config\b/iu.test(w)))
+    const sets = command === "set" || words.slice(i).some((w) => w === "set" || w === "edit");
+    if (CONFIG.has(command) && sets && words.slice(i).some((w) => /(^|:)registry\b|^replace-registry-host\b|^(user|global)config\b/iu.test(w)))
       return { specs: [], unreadable: "it points npm at another registry or config, so no audited name can be trusted after it" };
     if (command === "audit" && words.slice(i).includes("fix")) return { specs: [], unreadable: "npm audit fix installs releases the lockfile does not hold" };
     if (command === undefined || !fetching(command)) return { specs: [] };
@@ -136,7 +138,7 @@ export function fetched(line) {
     const w = words[i];
     if (w === "--") { if (runs && !npx) { command ??= words[i + 1]; break; } continue; }
     if (w === "-p" || w === "--package") { specs.push(words[++i] ?? ""); continue; }
-    if (w.startsWith("--package=")) { specs.push(w.slice(10)); continue; }
+    if (w.startsWith("--package=") || w.startsWith("-p=")) { specs.push(w.slice(w.indexOf("=") + 1)); continue; }
     if (runs && (w === "--no-install" || w === "--no")) { local = true; continue; }
     if (runs && (w === "--yes" || w === "-y")) { local = false; continue; }
     if (VALUED.has(w)) { i++; continue; }
@@ -198,9 +200,11 @@ function literalArray(src) {
 function commands(text) {
   const out = [];
   const joined = folded(text.replace(/\\\r?\n/gu, " "));
-  for (const m of joined.matchAll(/\b(npx|npm)(\.cmd)?\b(?!['"`]\s*,)[^\n;&|>]*/giu)) out.push(m[0]); // (an array, below)
+  // (each npx or npm, nested ones too, as in npx -c 'npm install ...', starts a line of its own; an array, below)
+  for (const m of joined.matchAll(/\b(?=(npx|npm)(\.cmd)?\b(?!['"`]\s*,))/giu)) out.push(/^[^\n;&|>]*/u.exec(joined.slice(m.index))[0]);
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
-  for (const m of joined.matchAll(/['"`](npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
+  for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`](?!\s*,)/giu)) out.push(`${m[1]} <a-program-held-in-a-variable>`);
+  for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
     if (literal) out.push([m[1], ...literal].join(" "));
@@ -230,9 +234,10 @@ function commandLines(v) {
     else if (!Array.isArray(v) && COMMAND.test(k)) out.push(...strings(x)); // (package.json's "scripts": every one, a "help" too)
     else out.push(...commandLines(x));
   }
-  // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are)
+  // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are,
+  // each with any arguments beside them)
   if (programs.length === 1) return [[programs[0], ...args].join(" "), ...out];
-  return [...programs, ...(args.length ? [args.join(" ")] : []), ...out];
+  return [...programs.map((p) => [p, ...args].join(" ")), ...(args.length ? [args.join(" ")] : []), ...out];
 }
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
