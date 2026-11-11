@@ -39,9 +39,17 @@ for (const [what, change] of [
     write("site/tutorial.html", "<p>Run npx mossgrip-cli to start, or curl -o moss.tgz https://mossgrip.example/moss.tgz.</p>\n<pre>npx create-moss my-app</pre>\n<script>const moss = 1;</script>\n")(dir);
     write("site/Guide.vue", "<template><p>Run npx mossgrip-cli to start.</p></template>\n<script setup>const moss = 1;</script>\n")(dir);
   }],
+  ["a page's comment around text, and a component's style block", (dir) => {
+    write("site/guide.html", "<!-- <script> --><p>Run npx mossgrip-cli to start.</p>\n<script>const moss = 1;</script>\n")(dir);
+    write("site/Moss.vue", "<template><p>{{ moss }}</p></template>\n<style>.moss { content: \"npx mossgrip-cli\" }</style>\n")(dir);
+  }],
   ["npm diff, cache and publish of what is local or audited", append("scripts/setup.sh", "npm diff --diff=mossgrip-cli@1.2.3 --diff=.\nnpm cache clean --force\nnpm publish ./moss.tgz\n")],
   ["npm exec of an audited package after --", append("scripts/setup.sh", "npm exec --package=mossgrip-cli@1.2.3 -- moss build\n")],
 ]) { const f = run(change); ok(f.length === 0, `passes ${what}`, f.join("\n")); }
+{ // (a line of many options before npm, read in time: what stands before npm is walked once, never tried two ways)
+  const start = Date.now(), f = run(append("scripts/setup.sh", `sudo${" -ux".repeat(60)} X npm ci\n`));
+  ok(f.length === 0 && Date.now() - start < 5000, "passes 60 options before npm, in under 5 seconds", f.join("\n") || `${Date.now() - start} ms`);
+}
 { // (a long line naming npm many times, as a bundle may, read in time: what stands before each is read only so far back)
   const start = Date.now(), f = run(write("scripts/long.js", `const notes = '${`${"x".repeat(240)} npm run build; `.repeat(8000)}';\n`));
   ok(f.length === 0 && Date.now() - start < 5000, "passes a 2 MB line naming npm 8000 times, in under 5 seconds", f.join("\n") || `${Date.now() - start} ms`);

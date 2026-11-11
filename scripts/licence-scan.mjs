@@ -50,23 +50,43 @@ const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
 /**
  * The parts of a page or component that run: its script blocks (an unclosed one to the end), an Astro component's
- * frontmatter, its event handlers and bound attributes (onclick, @click, :value, v-if, x-data), javascript: addresses
- * and, but in a plain page, its expressions in braces (Vue's, Svelte's, Astro's), each brace read to its match. Its
- * text and markup run nothing, so a page showing a command as an example fetches nothing.
+ * frontmatter, its event handlers and bound attributes (onclick, @click, :value, v-if, x-data, quoted or not),
+ * javascript: addresses and, but in a plain page, its expressions in braces (Vue's, Svelte's, Astro's), each brace read
+ * to its match. Its text, markup, comments and style blocks run nothing, so a page showing a command fetches nothing.
+ * One pass, finding each next comment, script or style block from where the last one ended.
  */
 function executable(text, f) {
-  const parts = [];
-  for (const m of text.matchAll(/<script\b[^>]*>([\s\S]*?)(?:<\/script\s*>|$)/giu)) parts.push(m[1]);
+  const lower = text.toLowerCase(), parts = [];
   if (/\.astro$/iu.test(f)) { const front = /^\s*---\r?\n([\s\S]*?)(?:\r?\n---|$)/u.exec(text); if (front) parts.push(front[1]); }
-  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/giu)) parts.push(m[1] ?? m[2]);
-  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
+  const blocks = [["<!--", "-->"], ["<script", "</script"], ["<style", "</style"]];
+  const next = blocks.map(() => -1);
+  let markup = "";
+  for (let at = 0; at < text.length; ) {
+    for (const [b, [open]] of blocks.entries()) if (next[b] !== Infinity && next[b] < at) {
+      // (an opening tag's name ends there: "<scripts" is no script)
+      let k = lower.indexOf(open, at);
+      while (k >= 0 && open !== "<!--" && /[\w-]/u.test(lower[k + open.length] ?? "")) k = lower.indexOf(open, k + 1);
+      next[b] = k < 0 ? Infinity : k;
+    }
+    const first = Math.min(...next);
+    if (first === Infinity) { markup += text.slice(at); break; }
+    const b = next.indexOf(first), [open, close] = blocks[b];
+    markup += text.slice(at, first);
+    const body = b === 0 ? first + open.length : lower.indexOf(">", first) + 1;
+    const stop = body === 0 ? -1 : lower.indexOf(close, body);
+    if (b === 1 && body > 0) parts.push(text.slice(body, stop < 0 ? text.length : stop));
+    if (body === 0 || stop < 0) break;
+    at = stop + close.length;
+  }
+  for (const m of markup.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
+  for (const m of markup.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
   if (!/\.html?$/iu.test(f)) {
     let depth = 0, start = 0;
-    for (let k = 0; k < text.length; k++) {
-      if (text[k] === "{" && depth++ === 0) start = k;
-      else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
+    for (let k = 0; k < markup.length; k++) {
+      if (markup[k] === "{" && depth++ === 0) start = k;
+      else if (markup[k] === "}" && depth > 0 && --depth === 0) parts.push(markup.slice(start, k + 1));
     }
-    if (depth > 0) parts.push(text.slice(start));
+    if (depth > 0) parts.push(markup.slice(start));
   }
   return parts.join("\n");
 }

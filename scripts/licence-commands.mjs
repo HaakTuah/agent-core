@@ -8,8 +8,8 @@
 // straight after an option, is read as that option's value. What cannot be read: a variable, npx naming nothing to run
 // here ("npx -y" in a variable), npm init or create, which fetch by another name, npm update or npm audit fix, which
 // take the newest a range allows, another registry or npm config, npm install without its lockfile, a word that is no
-// npm command where npm stands as one. Other fetchers (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone
-// and the like): OTHER_FETCHER. Node's own modules only (none).
+// npm command where npm stands as one (atCommand), a command running on past 16 KB. Other fetchers (curl, wget, pip,
+// pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER. Node's own modules only (none).
 
 // npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own,
 // or none); and options known to take a value. A word that is no command, straight after an option, is read as that
@@ -18,13 +18,15 @@ const INSTALL = new Set(["install", "i", "in", "ins", "inst", "insta", "instal",
 const RUN = new Set(["exec", "x"]);
 const BY_OTHER_NAME = new Set(["create", "init", "innit"]);
 const UPDATE = new Set(["update", "up", "upgrade", "udpate"]);
-// Where a word stands as a command: at a line's start, after ; & | ( { [ = or !, in "$(", after "run:" or "- ", after
-// if, then, do, else and the like, or at the start of a string that opens a line or follows ( { [ = : , -c or run:;
-// each perhaps followed by variables set for it (A=1), words that run the next with their options (sudo -E, env,
-// cross-env, time, nohup, nice, timeout 60, xargs -0, stdbuf, exec, command) and a path (/usr/bin/). A message, echo
-// "npm ...", is only words.
-const RUNNER = String.raw`(?:sudo|doas)(?:\s+-[ugChDpRrTU]\s*\S+|\s+-\S+)*|env(?:\s+-[uSC]\s*\S+|\s+-\S+)*|cross-env(?:-shell)?|time(?:\s+-\S+)*|nohup|nice(?:\s+-n\s*\S+|\s+-\S+)*|ionice(?:\s+-[cnp]\s*\S+|\s+-\S+)*|timeout(?:\s+-[sk]\s*\S+|\s+-\S+)*\s+\S+|xargs(?:\s+-[IinPLdaEs]\s*\S+|\s+-\S+)*|stdbuf(?:\s+-\S+)*|exec(?:\s+-a\s*\S+|\s+-\S+)*|command|builtin`;
-const AT_COMMAND = new RegExp(String.raw`(?:^|[;&|({[=!]|\$\(|\brun:|^\s*-|(?:^|[({[=:,]|\s-c|\s--command|\brun:)\s*['"\x60]|\b(?:if|elif|while|until|then|do|else))\s*(?:(?:\w+=\S*|${RUNNER})\s+)*(?:[\w.~$\{\}-]*[\/\\])*$`, "u");
+// The words that run the next word as a command, each with the letters of its short options that take a value (sudo
+// -u root, env -u NAME, timeout -s KILL 60, xargs -I {}, npx -p pkg); and the words after which a command starts.
+const RUNNERS = new Map([
+  ["sudo", "ugChDpRrtTU"], ["doas", "uC"], ["env", "uSC"], ["cross-env", ""], ["cross-env-shell", ""], ["time", "fo"],
+  ["nohup", ""], ["nice", "n"], ["ionice", "cnp"], ["timeout", "sk"], ["xargs", "InPLdaEs"], ["stdbuf", "ioe"],
+  ["exec", "a"], ["command", ""], ["builtin", ""], ["npx", "pcw"],
+]);
+const KEYWORDS = new Set(["if", "elif", "while", "until", "then", "do", "else"]);
+const SPACE = new Set([" ", "\t", "\r", "\v", "\f"]);
 const LINK = new Set(["link", "ln"]);
 const CONFIG = new Set(["config", "c", "set"]);
 const NO_FETCH = new Set([
@@ -76,7 +78,7 @@ export function fetched(line, atCommand = false) {
   // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
   if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^--(user|global)config\b|^npm_config_.*(registry|config)/iu.test(w)))
     return { specs: [], unreadable: "it fetches from another registry than npm's, or reads another npm config that may name one" };
-  let i = 0;
+  let i = 0, args = words.slice(1);
   const options = () => { while (i < words.length && words[i].startsWith("-")) i += VALUED.has(words[i]) ? 2 : 1; };
   let runs = false, npx = false, local = false, packs = false, linking = false;
   if (words[0] === "npx") { runs = npx = true; i = 1; } else if (words[0] === "npm") {
@@ -90,6 +92,8 @@ export function fetched(line, atCommand = false) {
       if (fetching(w) || NO_FETCH.has(w) || !afterOption) { command = w; break; }
       afterOption = false;
     }
+    // (npm reads the options before its command as its config, as it reads those after: npm --diff=x diff)
+    const early = command === undefined ? [] : words.slice(1, i - 1);
     // (npm config set registry, and the like, points every later fetch at another registry; npm audit fix installs
     // releases the lockfile does not hold)
     const sets = command === "set" || words.slice(i).some((w) => w === "set" || w === "edit");
@@ -99,7 +103,9 @@ export function fetched(line, atCommand = false) {
     // (npm diff --diff=<spec>, npm cache add <spec> and npm publish <spec> fetch what they name, and prepare a git
     // package, running its scripts: each but a local folder or tarball is a package to audit)
     if (command === "diff" || command === "cache" || command === "publish") {
-      const rest = words.slice(i), specs = [], localSpec = (w) => /^(\.|\/|~|file:)/u.test(w) || /\.(tgz|tar\.gz)$/iu.test(w);
+      // (a local folder or tarball: a path, never an address, https://x/y.tgz, or a git remote)
+      const localSpec = (w) => (w.includes(":") ? w.startsWith("file:") : /^(\.|\/|~)/u.test(w) || /\.(tgz|tar\.gz)$/iu.test(w));
+      const rest = command === "diff" ? [...early, ...words.slice(i)] : words.slice(i), specs = [];
       let adding = command !== "cache";
       for (let k = 0; k < rest.length; k++) {
         const w = rest[k], diff = /^--diff(?:=(.*))?$/u.exec(w);
@@ -118,18 +124,19 @@ export function fetched(line, atCommand = false) {
       return { specs: [], unreadable: "it installs without the lockfile, so what it installs is not what the lockfile's check read" };
     if (command === undefined || !fetching(command)) return { specs: [] };
     if (UPDATE.has(command)) return { specs: [], unreadable: `npm ${command} fetches the newest release a range allows, which cannot be audited` };
-    if (RUN.has(command)) runs = true;
+    if (RUN.has(command)) { runs = true; args = [...early, ...words.slice(i)]; } else args = words.slice(i);
     if (LINK.has(command)) linking = true; // (npm link <package> installs it if missing; a folder is linked as it is)
     else if (BY_OTHER_NAME.has(command)) { options(); return words[i] ? { specs: [], unreadable: `npm ${command} fetches a package by another name` } : { specs: [] }; }
     else packs = command === "pack";
   } else return { specs: [] };
-  // (npx reads its options up to the command it runs; npm exec reads them, --package among them, up to "--")
-  const specs = [], from = i;
+  // (npx reads its options up to the command it runs; npm exec reads them, --package among them, up to "--", and
+  // those before "exec" too)
+  const specs = [];
   let command, called = false;
-  for (; i < words.length; i++) {
-    const w = words[i];
-    if (w === "--") { if (runs && !npx) { command ??= words[i + 1]; break; } continue; }
-    if (w === "-p" || w === "--package") { specs.push(words[++i] ?? ""); continue; }
+  for (i = 0; i < args.length; i++) {
+    const w = args[i];
+    if (w === "--") { if (runs && !npx) { command ??= args[i + 1]; break; } continue; }
+    if (w === "-p" || w === "--package") { specs.push(args[++i] ?? ""); continue; }
     if (w.startsWith("--package=") || w.startsWith("-p=")) { specs.push(w.slice(w.indexOf("=") + 1)); continue; }
     // (--no-install is --yes=false; --yes, -y or --yes=<anything but false> installs; the last one given counts)
     const yes = /^(?:--yes|-y)(?:=(.*))?$/u.exec(w), no = /^(?:--no-install|--no|--no-yes)(?:=(.*))?$/u.exec(w);
@@ -144,9 +151,88 @@ export function fetched(line, atCommand = false) {
   }
   if (runs && !specs.length && command !== undefined && !local && !called) specs.push(command);
   // (npx with no package and nothing to run here takes them from elsewhere: a variable, "npx -y" + a package later)
-  const asks = from < words.length && words.slice(from).every((w) => /^(--version|-v|--help|-h)$/u.test(w)); // (npx --version)
+  const asks = args.length > 0 && args.every((w) => /^(--version|-v|--help|-h)$/u.test(w)); // (npx --version)
   if (runs && !specs.length && command === undefined && !called && !asks) return { specs: [], unreadable: "it names nothing to run here, so what it runs comes from elsewhere" };
   return { specs, packs };
+}
+
+/** What runs the word at `words[k]` as its program: [name, its valued short options, words it takes], or undefined. */
+function runnerAt(words, k) {
+  const name = words[k].replace(/^.*[\/\\]/u, "");
+  if (name === "npm" && RUN.has(words[k + 1])) return ["npm exec", "pcw", 2];
+  if (/^\$(\w+|\{\w+\})$/u.test(name)) return ["$", "", 1]; // (a variable may hold any of them: $SUDO npm ...)
+  const valued = RUNNERS.get(name);
+  return valued === undefined ? undefined : [name, valued, 1];
+}
+
+/** Whether the words before a command are all set for it: variables (A=1) and runners with their options. */
+function prefixes(words) {
+  for (let k = 0; k < words.length; ) {
+    if (/^\w+=/u.test(words[k])) { k++; continue; }
+    const runner = runnerAt(words, k);
+    if (!runner) return false;
+    const [name, valued, size] = runner;
+    k += size;
+    while (k < words.length && words[k].startsWith("-")) {
+      const option = words[k++];
+      if (option === "--") break;
+      if ((/^-\w$/u.test(option) && valued.includes(option[1])) || (/^(npx|npm exec)$/u.test(name) && /^--(package|call|workspace)$/u.test(option))) k++;
+    }
+    if (name === "timeout") k++; // (its duration)
+  }
+  return true;
+}
+
+/**
+ * Whether the npm or npx at `at` in `text` stands as a command, read by walking back over its line: past a path
+ * (/usr/bin/), variables set for it (A=1) and runners with their options (sudo -E, timeout 60, npx --no-install
+ * cross-env), to a line's start, ; & | ( ) { [ or !, "=", "run:", a list's "- ", if, then, do, else and the like, or a
+ * quote: one that opens the string npm stands in, a command if the string opens a line or follows ( { [ = : , -c or
+ * run:, or one that closes a quoted word before it ("$SUDO" npm), read as that word; either reading counts. A message,
+ * echo "npm ...", is only words. The walk stops at its first word that can be no part of what runs it, and reads at
+ * most 64 words or 4096 characters: past those, a line whose words could all be such parts counts as a command.
+ */
+function atCommand(text, at) {
+  const lineStart = (k) => k === 0 || text[k - 1] === "\n";
+  const words = [];
+  let end = at, walked = 0;
+  const possible = (k) => k === 0 || /^\w+=|^-|^\$/u.test(words[k]) || runnerAt(words, k) !== undefined
+    || (RUN.has(words[k]) && words[k - 1] === "npm") || /^-|(^|[\/\\])timeout$/u.test(words[k - 1]);
+  if (end && "/\\".includes(text[end - 1])) while (end && !lineStart(end) && /[\w.~${}\/\\-]/u.test(text[end - 1]) && walked++ < 4096) end--;
+  for (;;) {
+    if (words.length > 64 || walked > 4096) return words.every((w, k) => possible(k));
+    while (!lineStart(end) && SPACE.has(text[end - 1])) end--;
+    if (lineStart(end)) return prefixes(words);
+    const c = text[end - 1];
+    if (";&|(){[!".includes(c)) return prefixes(words);
+    if ("],".includes(c)) return false;
+    if ("'\"`".includes(c)) {
+      let k = end - 1;
+      while (!lineStart(k) && SPACE.has(text[k - 1])) k--;
+      const opener = lineStart(k) || "({[=:,".includes(text[k - 1]) || /(?:^|\s)(?:-c|--command|run:)$/u.test(text.slice(Math.max(0, k - 10), k));
+      if (opener && prefixes(words)) return true;
+      if (end === at || !SPACE.has(text[end])) return false; // (a quote right before npm opens its string)
+      let open = end - 2;
+      while (open >= 0 && text[open] !== c && text[open] !== "\n" && walked++ < 4096) open--;
+      if (open < 0 || text[open] !== c) return false;
+      // (the word the quoted part ends, with what stands before it: PAD="x y" npm, "$SUDO" npm)
+      let start = open;
+      while (!lineStart(start) && !SPACE.has(text[start - 1]) && walked++ < 4096
+        && !(";&|()[]!,'\"`".includes(text[start - 1]) || (text[start - 1] === "{" && text[start - 2] !== "$"))) start--;
+      words.unshift(text.slice(start, end).replace(/['"`]/gu, ""));
+      end = start;
+      continue;
+    }
+    let start = end;
+    while (!lineStart(start) && !SPACE.has(text[start - 1]) && walked++ < 4096
+      && !(";&|()[]!,'\"`".includes(text[start - 1]) || (text[start - 1] === "{" && text[start - 2] !== "$"))) start--;
+    const w = text.slice(start, end);
+    end = start;
+    let k = start;
+    while (!lineStart(k) && SPACE.has(text[k - 1])) k--;
+    if (w === "=" || w === "run:" || KEYWORDS.has(w) || (w === "-" && lineStart(k))) return prefixes(words);
+    words.unshift(w);
+  }
 }
 
 /**
@@ -201,13 +287,15 @@ export function commands(text, code = false) {
   // (each npx or npm, nested ones too, as in npx -c 'npm install ...', starts a line of its own; an array, below)
   // (a command runs to the next ; | && || or & that is no redirection; a redirection is read past in fetched())
   for (const m of joined.matchAll(/\b(?=(npx|npm)(\.cmd)?\b(?!['"`]\s*,))/giu)) {
-    // (what stands just before it on its line, at most 256 characters, so a long line is read in time; a "\0" marks a
-    // line that starts further back, so no pattern takes the cut for its start)
-    const cut = joined.slice(Math.max(0, m.index - 256), m.index), nl = cut.lastIndexOf("\n");
-    const before = nl >= 0 || m.index <= 256 ? cut.slice(nl + 1) : `\0${cut}`;
+    // (what stands just before it on its line, at most 64 characters: a "\0" marks a line that starts further back)
+    const cut = joined.slice(Math.max(0, m.index - 64), m.index), nl = cut.lastIndexOf("\n");
+    const before = nl >= 0 || m.index <= 64 ? cut.slice(nl + 1) : `\0${cut}`;
     // (a shell's check that it is there, as a statement of its own, never one whose answer is kept: $(command -v npx))
     if (!code && /(?:^|[;&|!]|\b(?:if|elif|while|until|then|do|else))\s*(?:command\s+-v|which|type|hash)\s+$/u.test(before)) continue;
-    out.push(Object.assign(new String(/^(?:[^\n;|&]|&(?=>)|(?<=[<>])&)*/u.exec(joined.slice(m.index))[0]), { atCommand: AT_COMMAND.test(before) }));
+    // (a command read at most 16384 characters on: one longer, with no end, cannot be read, so it fails as such)
+    const rest = joined.slice(m.index, m.index + 16384), command = /^(?:[^\n;|&]|&(?=>)|(?<=[<>])&)*/u.exec(rest)[0];
+    const whole = command.length < rest.length || m.index + rest.length === joined.length;
+    out.push(Object.assign(new String(whole ? command : `${m[1].toLowerCase()} install a-command-too-long-to-read`), { atCommand: atCommand(joined, m.index) }));
   }
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
   // (in code, a string that is only npx or npm, not called with its arguments right there, is a program held in a
