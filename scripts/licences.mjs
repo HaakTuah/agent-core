@@ -204,12 +204,12 @@ export function scriptsOff(npmrc) {
   return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
-/** Every `.npmrc` under `root`, but in `node_modules` and `.git`. */
+/** Every npm config file under `root` (`.npmrc`, or any name ending in it), but in `node_modules` and `.git`. */
 function npmrcFiles(root, dir = "") {
   return readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
     if (e.name === "node_modules" || e.name === ".git") return [];
     const path = dir ? `${dir}/${e.name}` : e.name;
-    return e.isDirectory() ? npmrcFiles(root, path) : e.name === ".npmrc" ? [path] : [];
+    return e.isDirectory() ? npmrcFiles(root, path) : /npmrc$/iu.test(e.name) ? [path] : [];
   });
 }
 

@@ -31,13 +31,12 @@ too).
   `LicenseRef-Owner` for the owner's own work, all rights reserved as floor rule 10 ends, and only for it. Such an
   entry names its files one by one, and never stands in for an action, a package or a file carrying someone's
   notice. The summary counts the files scanned. **`scripts/licences.d.mts`:** the new key.
-- **`scripts/licences-test.mjs`** and **`scripts/licence-scan-test.mjs`:** the check had no test here; Amarna tested
-  its lists and readers in its own suite. Those tests come into the first, on invented names: how a licence expression
-  is read, which list allows what, a package known by its registry address, npm's settings. The second stages a small
-  project in a temporary git repository for each case. The project passes as it is, passes 19 allowed forms, and fails
-  103 others, each for the reason it names: the licence lists, a lockfile's package, the owner's kind, actions, every
-  form of fetch, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, and a bad
-  `"scan"`.
+- **The tests:** the check had no test here; Amarna tested its lists and readers in its own suite. Those come into
+  `scripts/licences-test.mjs`, on invented names. `scripts/licence-scan-stage.mjs` writes a small project into a fresh
+  temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it
+  is and passes 21 allowed forms, and fails 40 others for the reason each names: the licence lists, a lockfile's
+  package, the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, a
+  bad `"scan"`. `scripts/licence-fetch-test.mjs` fails 75 forms of a fetch, each for its reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
   leaves its copy of the core out, since this audit holds it, so the games stop listing the core's actions.
@@ -46,16 +45,16 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8 and 123 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8, 62 and 75 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
-spellings and fetchers, an option's value hiding the command, another registry, curl in a quoted command, comments that
-hid commands, folded YAML, tools' hooks in package.json, unread file kinds and #! lines, lockfiles left out, scripts of
-other languages that ship, `own` covering too much. Each is now closed and tested. A dry run on each game with the new
-scripts:
-- Snakes passes, but for its own scan and that scan's test, which name the forms they look for; both go in its sync
-  PR.
-- Amarna passes with the audit its sync PR adds, but for two `npx vitest` lines, which would fetch if nothing were
-  installed and become `npx --no-install vitest` there.
+spellings and fetchers, an option's value hiding the command, another registry or npm config, npm update, npm exec's
+later packages, curl in a quoted command, arrays it cannot read, comments that hid commands, folded YAML, tools' hooks
+in package.json, unread file kinds and #! lines, lockfiles left out, scripts of other languages that ship, `own`
+covering too much or someone's notice. Each is now closed and tested. A dry run on each game with the new scripts:
+- Snakes passes with its sync PR's side applied: its own scan cut to its game's checks, its test to theirs, and its
+  audit to what no lockfile holds.
+- Amarna passes with its sync PR's side applied: the audit, and its two `npx vitest` lines, which would fetch if
+  nothing were installed, made `npx --no-install vitest`.
 
 What changes in every project: nothing until its config adds `"scan"`. Its sync PR then adds it, with an audit entry
 for each thing the scan finds. Snakes drops the half of its own scan that moved here, keeps its game's own checks (the
