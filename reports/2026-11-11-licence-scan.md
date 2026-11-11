@@ -8,33 +8,49 @@ sounds rendered from two sample libraries, its icons and its map pictures are he
 them by hand. Floor rule 10 asks the same of both (core archive 41: every package used free to use, and every update
 too).
 
-- **`scripts/licence-scan.mjs`:** the general half of Snakes' scan, run by `licences.mjs` when a config has `"scan"`.
-  It reads the tracked files (but the copy of the core, and what `skip` names) and needs an audit entry for every
-  action but the owner's own and the project's; every package npx, npm exec or npm install fetches, at the exact version
-  audited (npx `--no-install` never fetches, so a bare name passes there); every code file carrying a licence notice;
-  and every font, image, sound, video or data file. What lies under `served` but not `tools` reaches users, so an entry
-  covering it ships. An entry covers files by its name or its `files` (paths, or folders ending in `/`), and a `files`
-  path that names no tracked file fails, so no entry outlives what it covered.
-- **`scripts/licences.mjs`:** reads and checks `"scan"` (only its three keys, paths inside the project, an audit
-  beside it). Adds the kind `own` with `LicenseRef-Owner`, for the owner's own work, all rights reserved as floor rule
-  10 ends, and only for it. The summary counts the files scanned. **`scripts/licences.d.mts`:** the new key.
+- **`scripts/licence-scan.mjs`:** Snakes' scan made general and wider, run by `licences.mjs` when a config has
+  `"scan"`. It reads every tracked file (but what `skip` names and, in a project, its copy of the core) and needs:
+  - every lockfile, and every `package.json` with dependencies, to be one the config's `lockfiles` checks;
+  - an entry for every action but the owner's own and the project's;
+  - an entry for every package npx, npm exec, npm install (by any spelling, after any option) or npm pack fetches, at
+    the exact version audited. This covers workflows, scripts and tools of any kind (TypeScript components, Dockerfiles,
+    files that start with `#!`), a JSON file's commands (package.json's `scripts`, a hook's `command`) and commands
+    written as arrays. npx `--no-install` never fetches, so a bare name passes there. Any other fetch that cannot be
+    read fails, but npm pack's and another fetcher's (curl, wget, pip, playwright install and the like). Each of
+    those passes only in a file an entry's `files` names, as its hand audit;
+  - an entry covering every script in a language it cannot read (Python and the like): the entries of what it uses;
+  - an entry covering every code file with a licence notice, and every font, image, sound, video, model, data or other
+    binary file.
+
+  What lies under `served` but not `tools` reaches users, so an entry covering it ships. A `files` path or a `"scan"`
+  path that names no tracked file fails, so nothing is misspelt or outlives what it covered.
+- **`scripts/licences.mjs`:** reads and checks `"scan"`: only its three keys, `served` always said (`[]` if nothing
+  reaches users), each path written as git lists it, and an audit beside it. It adds the kind `own` with
+  `LicenseRef-Owner` for the owner's own work, all rights reserved as floor rule 10 ends, and only for it. Such an
+  entry names its files one by one, and never stands in for an action, a package or a file carrying someone's
+  notice. The summary counts the files scanned. **`scripts/licences.d.mts`:** the new key.
 - **`scripts/licences-test.mjs`:** the check had no test here; Amarna tested its lists and readers in its own suite.
   Those tests come here, on invented names: how a licence expression is read, which list allows what, a package known
-  by its registry address, npm's settings. Then it stages a small project in a temporary git repository and checks
-  that it passes as it is, passes six allowed forms, and fails 39 others: the licence lists, the owner's kind, actions,
-  every form of fetch, copied code, assets, an entry covering nothing, and a bad `"scan"`.
+  by its registry address, npm's settings. Then it stages a small project in a temporary git repository. The project
+  passes as it is, passes 16 allowed forms, and fails 78 others, each for the reason it names: the licence lists, a
+  lockfile's package, the owner's kind, actions, every form of fetch, copied code, assets and binaries, lockfiles left
+  unchecked, an entry covering nothing, and a bad `"scan"`.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
-  scripts use (four actions, CodeQL, the GitHub CLI, Node and npm). A project's scan leaves its copy of the core out,
-  since this audit holds it, so the games stop listing the core's actions.
+  scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
+  leaves its copy of the core out, since this audit holds it, so the games stop listing the core's actions.
 - **`.github/workflows/tests.yml`:** runs the test and the core's own audit. **`.github/workflows/licences.yml`:** its
   header names the scan. Both are changes to what runs by itself, so they get Codex's and the fallback reviewer's
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the test passes (53 checks), and the core's own audit passes over its 91 files. A dry run on each game with
-the new scripts: Snakes passes, with only its own scan and that scan's test flagged, since they name the forms they
-look for; both go in its sync PR. Amarna fails on 149 items, all real: seven actions, its sounds, icons and map
-pictures, and two `npx vitest` lines that would fetch if nothing were installed.
+Tested: the test passes (103 checks), and so does the core's own audit of its 94 files. Codex's review and the
+fallback reviewer's found ways round the first version: `package.json` scripts, hooks, other spellings and fetchers,
+comments that hid commands, unread file kinds, lockfiles left out, `own` covering too much. Each is now closed and
+tested. A dry run on each game with the new scripts:
+- Snakes passes, but for its own scan and that scan's test, which name the forms they look for; both go in its sync
+  PR.
+- Amarna passes with the audit its sync PR adds. That leaves only two `npx vitest` lines, which would fetch if nothing
+  were installed and become `npx --no-install vitest`, and one Python script for that audit to name.
 
 What changes in every project: nothing until its config adds `"scan"`. Its sync PR then adds it, with an audit entry
 for each thing the scan finds. Snakes drops the half of its own scan that moved here, keeps its game's own checks (the

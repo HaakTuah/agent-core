@@ -20,8 +20,8 @@
 // own services, GITHUB_SERVICES below, which never ships; "own" with LicenseRef-Owner: the owner's own work, all rights
 // reserved, as floor rule 10 ends); "ignoreScriptsIn", the .npmrc files that must keep packages' own install scripts off
 // (floor rule 15); and "scan", which folders reach users, for the scan that nothing used is left out of the audit
-// (licence-scan.mjs, beside this file, which says what it finds). Every .npmrc in the project may hold only settings that leave
-// where npm fetches from alone, since a data or font package is known by its registry address.
+// (licence-scan.mjs, beside this file, which says what it finds). Every .npmrc in the project may hold only settings
+// that leave where npm fetches from alone, since a data or font package is known by its registry address.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
@@ -243,9 +243,11 @@ export function loadConfig(path) {
     if (odd.length) throw new Error(`the config's "scan" holds keys it does not know: ${odd.join(", ")}`);
     for (const key of ["served", "tools", "skip"]) {
       const v = s[key];
-      const ok = (p) => typeof p === "string" && (p !== "" || key === "served") && !p.startsWith("/") && !p.split("/").includes("..");
+      // (each written as git lists it: "site/" for a folder, never "./site/" or "site//", which would match nothing)
+      const ok = (p) => typeof p === "string" && (p === "" ? key === "served" : posix.normalize(p) === p && p !== "." && !p.startsWith("/") && !p.startsWith("../"));
       if (v !== undefined && (!Array.isArray(v) || !v.every(ok))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project`);
     }
+    if (!Array.isArray(s.served)) throw new Error('the config\'s "scan" does not say what reaches users ("served": [] if nothing does)');
     if (!config.audit) throw new Error('the config\'s "scan" needs an "audit" to hold what it finds');
   }
   config = normalised(config);
@@ -302,7 +304,7 @@ export function check(config, root) {
       if (!licenceOk(e.licence, allowedFor(e.name, e.ships === true, e.kind ?? null))) failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}`);
     }
   }
-  const scanned = config.scan ? scan(config.scan, root, entries, config.audit) : undefined;
+  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? []) : undefined;
   if (scanned) failures.push(...scanned.failures);
   for (const f of npmrcFiles(root)) {
     for (const l of registryOverrides(readFileSync(join(root, f), "utf8"))) failures.push(`${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}`);
