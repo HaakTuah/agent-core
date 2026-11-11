@@ -114,11 +114,13 @@ for (const [what, change, why] of [
   ...["npm $VERB mossgrip-widgets@1.2.3", 'if npm "$VERB" x; then :; fi', "sh -c 'npm $VERB x'", 'NODE_ENV=production npm "$VERB" x',
     'sudo -E npm "$VERB" x', 'timeout 60 npm "$VERB" x', 'nice npm "$VERB" x', '/usr/bin/npm "$VERB" x',
     `PAD="${"x ".repeat(200)}" npm "$VERB" x`, 'npx --no-install cross-env A=1 npm "$VERB" x', '"$SUDO" npm "$VERB" x',
-    '${SUDO} npm "$VERB" x', `sudo${" -ux".repeat(70)} npm "$VERB" x`,
+    '${SUDO} npm "$VERB" x', `sudo${" -ux".repeat(70)} npm "$VERB" x`, 'sudo -Hu root npm "$VERB" x', 'sudo --user root npm "$VERB" x',
+    'timeout --signal KILL 60 npm "$VERB" x', 'eval npm "$VERB" x', 'eval "npm $VERB x"', 'flock /tmp/moss.lock npm "$VERB" x',
+    'npx concurrently -k "npm run moss" "npm $VERB x"', 'nodemon --exec "npm $VERB x"',
   ].map((line) => [`a word after npm that is no npm command, where npm stands as one: ${line}`, append("scripts/setup.sh", `${line}\n`), /no npm command/]),
   ["a word after npm that is no npm command, in a string built in code", write("scripts/run.mjs", 'execSync("A=1 npm " + verb + " mossgrip-widgets");\n'), /no npm command/],
   ["npx in a component's script block", write("site/Moss.vue", "<script setup>\nexecSync('npx -y mossgrip-cli');\n</script>\n"), /cannot be audited/],
-  ...["npm install --ignore-scripts --no-package-lock", "npm i --package-lock=false", "npm i --package-lock false"]
+  ...["npm install --ignore-scripts --no-package-lock", "npm i --package-lock=false", "npm i --package-lock false", "npm --no-package-lock install --ignore-scripts"]
     .map((line) => [`npm install without its lockfile: ${line}`, append("scripts/setup.sh", `${line}\n`), /without the lockfile/]),
   ["npm install with the lockfile turned off by its environment", append("scripts/setup.sh", "npm_config_package_lock=false npm install --ignore-scripts\n"), /without the lockfile/],
   ["npm diff of a git package, which prepares it", append("scripts/setup.sh", "npm diff --diff=git+https://mossgrip.example/widgets.git --diff=.\n"), /cannot be audited/],
@@ -126,6 +128,7 @@ for (const [what, change, why] of [
   ...["npm cache add https://mossgrip.example/widgets.tgz", "npm diff --diff=https://mossgrip.example/widgets.tgz --diff=.",
     "npm --diff=git+https://mossgrip.example/widgets.git --diff=. diff"]
     .map((line) => [`a remote package fetched by npm: ${line}`, append("scripts/setup.sh", `${line}\n`), /cannot be audited/]),
+  ["npm in a component's script after a string naming its closing tag", write("site/Moss.vue", "<script setup>\nconst text = '</scripts>';\nexecSync('npm install -g mossgrip-widgets@1.2.3');\n</script>\n"), /mossgrip-widgets .* is not in/],
   ["npx in a page's handler written without quotes", write("site/moss.html", "<button onclick=execSync('npx -y mossgrip-cli')>moss</button>\n"), /cannot be audited/],
   ["a command running on too long to read", append("scripts/setup.sh", `npm ci${" --moss".repeat(4000)}\n`), /a-command-too-long-to-read/],
   ["npm publish of a git package", append("scripts/setup.sh", "npm publish git+https://mossgrip.example/widgets.git\n"), /cannot be audited/],

@@ -34,6 +34,7 @@ for (const [what, change] of [
   ["an audited package written as an array", write("scripts/crop.mjs", "execFileSync('npx', ['mossgrip-cli@1.2.3']);\n")],
   ["npm view with a variable, which fetches nothing", write("scripts/times.mjs", "execFileSync('npm', ['view', name, 'time', '--json']);\n")],
   ["npx and npm asked their version, and a check that npx is there", append("scripts/setup.sh", "npx --version\nnpm exec --help\nif ! command -v npx >/dev/null; then exit 1; fi\nwhich npm\n")],
+  ["npm named in a long line of data, with no end within 16 KB", write("scripts/words.js", `const words = ["${"moss ".repeat(5000)}npm named here ${"bark ".repeat(1000)}"];\n`)],
   ["npm named in a message, not as a command", (dir) => { write("scripts/say.mjs", "console.log(`${file}: npm setting not allowed`);\n")(dir); append("scripts/setup.sh", "if npm ci; then echo \"npm packages: installed\"; fi\n")(dir); }],
   ["a page and a component showing commands in their text", (dir) => {
     write("site/tutorial.html", "<p>Run npx mossgrip-cli to start, or curl -o moss.tgz https://mossgrip.example/moss.tgz.</p>\n<pre>npx create-moss my-app</pre>\n<script>const moss = 1;</script>\n")(dir);

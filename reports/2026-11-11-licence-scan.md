@@ -38,9 +38,9 @@ too).
 - **The tests:** the check had no test here; Amarna tested its lists and readers in its own suite. Those come into
   `scripts/licences-test.mjs`, on invented names. `scripts/licence-scan-stage.mjs` writes a small project into a fresh
   temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it is
-  and passes 31 allowed forms (two of them long lines, read in time), and fails 44 others for the reason each names: the
+  and passes 32 allowed forms (two of them long lines, read in time), and fails 44 others for the reason each names: the
   licence lists, a lockfile's package, the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an
-  entry covering nothing, a bad `"scan"`. `scripts/licence-fetch-test.mjs` fails 136 forms of a fetch, each for its
+  entry covering nothing, a bad `"scan"`. `scripts/licence-fetch-test.mjs` fails 146 forms of a fetch, each for its
   reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
@@ -50,7 +50,7 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8, 76 and 136 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8, 77 and 146 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
 spellings and fetchers, an option's value hiding the command, another registry or npm config (by option or by npm config
 set), npm update and npm audit fix, Windows' npx.cmd, a command nested in npx -c or named by its path or held in a
@@ -64,8 +64,9 @@ block, an install without its lockfile (by option, by a separate `false` or by e
 it, a runner with its options (`sudo -E`, `timeout 60`) or a path, a long line read too slowly, npm diff, cache add and
 publish of a git package, a page's text read as code, a pattern open to catastrophic backtracking, a long assignment
 hiding where npm stands, npx cross-env before npm, npm's options before its command, a remote tarball taken for a local
-one, a commented-out script, a style block, an unquoted handler and a command too long to read. Each is now closed and
-tested. A dry run on each game with the new scripts:
+one, a commented-out script, a style block, an unquoted handler, a command too long to read, runner options in other
+forms (`-Hu`, `--user`, `--signal`), `eval` and other runners, a string naming a closing tag, and lockfile options
+before npm's command. Each is now closed and tested. A dry run on each game with the new scripts:
 - Snakes passes with its sync PR's side applied: its own scan cut to its game's checks, its test to theirs, and its
   audit to what no lockfile holds.
 - Amarna passes with its sync PR's side applied: the audit, and its two `npx vitest` lines, which would fetch if
@@ -87,15 +88,17 @@ only "npx" or "npm", not called with its arguments right there, fails, as does a
 (with export, local, readonly and the like), and npx naming nothing to run where it is written ("npx -y" held for later,
 $(command -v npx)), since the scan cannot follow any of them into the variable; a shell's own check that npx is there
 (`command -v npx` as a statement) and `npx --version` pass. Where npm stands as a command (a line's start, after `;`,
-`&&` or `if`, or opening a string that opens a call or a value, past variables set for it, runners with their options
-and a path, read by one walk back over the line), a word after it that is no npm command fails, since it may be a
-variable or a string built in code: a message that opens a call's string, `console.log("npm x")`, fails too and is
-reworded (neither game has one), while `echo "npm x"` and a message mid-string pass. npx is held to more: any mention of
-it with a bare name fails, prose too (`echo "no npx here"`), as before. A page's or component's text and markup run
-nothing and are not read, so a page may show a command as an example; Svelte's, Vue's and Astro's expressions in braces
-are read as code, a plain page's are not; comments and style blocks are skipped. A command running on past 16 KB with no
-end fails, since it cannot be read whole. A wrapper that hands its own arguments to npm (`exec npm "$@"`) fails, and no
-hand audit passes it, since what it fetches is chosen by its callers, whose calls the scan cannot read. Lockfile
-packages need no audit entry, since the check reads each one's licence from the lockfile at every version; Snakes' hand
-list of them repeated it. The owner's own work gets a kind of its own rather than a list of folders the scan passes
-over, so every asset's origin stands in one place. Questions for the owner: none.
+`&&` or `if`, or opening a string that opens a call or a value, past variables set for it, a path and a runner, whose
+arguments are all taken as its own (`sudo -Hu root`, `eval`, `flock FILE`, `npx cross-env`), read by one walk back over
+the line; a project's own wrapper (`retry npm "$X"`) is not followed), a word after it that is no npm command fails,
+since it may be a variable or a string built in code: a message that opens a call's string, `console.log("npm x")`,
+fails too and is reworded (neither game has one), while `echo "npm x"` and a message mid-string pass. npx is held to
+more: any mention of it with a bare name fails, prose too (`echo "no npx here"`), as before. A page's or component's
+text and markup run nothing and are not read, so a page may show a command as an example; Svelte's, Vue's and Astro's
+expressions in braces are read as code, a plain page's are not; comments and style blocks are skipped. A command running
+on past 16 KB with no end fails, since it cannot be read whole; npm named elsewhere, as in a message, is read 1 KB on,
+for a fetch it names. A wrapper that hands its own arguments to npm (`exec npm "$@"`) fails, and no hand audit passes
+it, since what it fetches is chosen by its callers, whose calls the scan cannot read. Lockfile packages need no audit
+entry, since the check reads each one's licence from the lockfile at every version; Snakes' hand list of them repeated
+it. The owner's own work gets a kind of its own rather than a list of folders the scan passes over, so every asset's
+origin stands in one place. Questions for the owner: none.

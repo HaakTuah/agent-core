@@ -73,7 +73,9 @@ function executable(text, f) {
     const b = next.indexOf(first), [open, close] = blocks[b];
     markup += text.slice(at, first);
     const body = b === 0 ? first + open.length : lower.indexOf(">", first) + 1;
-    const stop = body === 0 ? -1 : lower.indexOf(close, body);
+    // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
+    let stop = body === 0 ? -1 : lower.indexOf(close, body);
+    while (stop >= 0 && b > 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
     if (b === 1 && body > 0) parts.push(text.slice(body, stop < 0 ? text.length : stop));
     if (body === 0 || stop < 0) break;
     at = stop + close.length;
