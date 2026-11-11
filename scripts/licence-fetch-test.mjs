@@ -77,6 +77,8 @@ for (const [what, change, why] of [
   ["a package given to npx by -p=", append("scripts/setup.sh", "npx -p=mossgrip-widgets@1.2.3 --package=mossgrip-cli@1.2.3 moss\n"), /mossgrip-widgets .* is not in/],
   ["npx named by its path, as an array", write("scripts/run.mjs", "execFileSync('/usr/bin/npx', ['mossgrip-widgets@1.2.3']);\n"), /mossgrip-widgets .* is not in/],
   ["npm named by its path, as an array", write("scripts/run.mjs", "execFileSync('/usr/local/bin/npm', ['install', '-g', 'mossgrip-widgets@1.2.3']);\n"), /mossgrip-widgets .* is not in/],
+  ["npx with --no-install undone by --yes=true", append("scripts/setup.sh", "npx --no-install --yes=true mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
+  ["npm held in a variable", write("scripts/run.mjs", "const bin = '/usr/bin/npm';\nspawnSync(bin, ['install', 'mossgrip-widgets']);\n"), /program-held-in-a-variable|cannot be audited/],
   ["npx held in a variable", write("scripts/run.mjs", "const bin = 'npx';\nspawnSync(bin, ['-y', 'mossgrip-cli']);\n"), /program-held-in-a-variable|cannot be audited/],
   ["one argument list beside two programs", write("tools/run.json", JSON.stringify({ command: "npx", script: "echo", args: ["-y", "mossgrip-widgets"] })), /mossgrip-widgets cannot be audited/],
   ["npm update, which takes the newest a range allows", append("scripts/setup.sh", "npm update -g mossgrip-cli\n"), /newest release a range allows/],

@@ -24,7 +24,7 @@
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
 //     asset (an SVG), and each font, image, sound, video, model or data file, and each binary file whatever its name;
-//   - what lies under "served" but not "tools" reaches users, so an entry covering it there ships.
+//   - what lies under "served" but not "tools" reaches users, so every entry covering it there ships.
 // The owner's own work (kind "own") covers only files it names one by one, never a file carrying someone's licence
 // notice, an action or a package. Each "files" path, and each path of "scan", must name a tracked file or a folder
 // holding one, so none is left covering nothing (or, misspelt, missing what it meant).
@@ -133,21 +133,24 @@ export function fetched(line) {
   } else return { specs: [] };
   // (npx reads its options up to the command it runs; npm exec reads them, --package among them, up to "--")
   const specs = [];
-  let command;
+  let command, called = false;
   for (; i < words.length; i++) {
     const w = words[i];
     if (w === "--") { if (runs && !npx) { command ??= words[i + 1]; break; } continue; }
     if (w === "-p" || w === "--package") { specs.push(words[++i] ?? ""); continue; }
     if (w.startsWith("--package=") || w.startsWith("-p=")) { specs.push(w.slice(w.indexOf("=") + 1)); continue; }
-    if (runs && (w === "--no-install" || w === "--no")) { local = true; continue; }
-    if (runs && (w === "--yes" || w === "-y")) { local = false; continue; }
+    // (--no-install is --yes=false; --yes, -y or --yes=<anything but false> installs; the last one given counts)
+    const yes = /^(?:--yes|-y)(?:=(.*))?$/u.exec(w), no = /^(?:--no-install|--no|--no-yes)(?:=(.*))?$/u.exec(w);
+    if (runs && yes) { local = yes[1] === "false"; continue; }
+    if (runs && no) { local = no[1] !== "false"; continue; }
+    if (runs && /^(-c|--call)(=|$)/u.test(w)) { called = true; if (!w.includes("=")) i++; continue; } // (the shell line it runs: read as a line of its own)
     if (VALUED.has(w)) { i++; continue; }
     if (w.startsWith("-")) continue;
     if (!runs) { specs.push(w); continue; }
     command ??= w;
     if (npx) break;
   }
-  if (runs && !specs.length && command !== undefined && !local) specs.push(command);
+  if (runs && !specs.length && command !== undefined && !local && !called) specs.push(command);
   return { specs, packs };
 }
 
@@ -197,13 +200,15 @@ function literalArray(src) {
  * The command lines in a text: each npx or npm and what follows it on its line, and each written as an array. A line
  * continued on the next (a shell's "\\" at its end, or a YAML folded block, "key: >") is read as one.
  */
-function commands(text) {
+function commands(text, code = false) {
   const out = [];
   const joined = folded(text.replace(/\\\r?\n/gu, " "));
   // (each npx or npm, nested ones too, as in npx -c 'npm install ...', starts a line of its own; an array, below)
   for (const m of joined.matchAll(/\b(?=(npx|npm)(\.cmd)?\b(?!['"`]\s*,))/giu)) out.push(/^[^\n;&|>]*/u.exec(joined.slice(m.index))[0]);
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
-  for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`](?!\s*,)/giu)) out.push(`${m[1]} <a-program-held-in-a-variable>`);
+  // (in code, a string that is only npx or npm, not called with its arguments right there, is a program held in a
+  // variable, which cannot be followed; in a workflow or a config, "npm" names npm, as an ecosystem or a cache)
+  if (code) for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`](?!\s*,)/giu)) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<a-program-held-in-a-variable>`);
   for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
@@ -262,11 +267,11 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const needFile = (f, what, { own = true } = {}) => {
     const by = covering(f).filter((e) => own || e.kind !== "own");
     if (!by.length) fail(`${f} (${what}) is not in ${auditPath}${own ? "" : ", by an entry not the owner's own"}`);
-    else if (served(f) && !by.some((e) => e.ships === true)) fail(`${f} (${what}) reaches users, so an entry covering it ships`);
+    else if (served(f) && !by.every((e) => e.ships === true)) fail(`${f} (${what}) reaches users, so every entry covering it ships`);
   };
   const byHand = (f) => covering(f).some((e) => e.kind !== "own");
   const fetches = (text, f) => {
-    for (const line of commands(text)) {
+    for (const line of commands(text, JS.test(f))) {
       const { specs, unreadable, packs } = fetched(line);
       const where = `${f}, ${line.trim().slice(0, 120)}`;
       if (unreadable) fail(`${where}: ${unreadable}, which cannot be audited (fetch it as npx -p <name>@<exact version>)`);
@@ -315,15 +320,16 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         // (a config with comments, as jsconfig.json and the like may hold: read whole, but a package.json must parse)
         if (posix.basename(f) === "package.json") fail(`${f} cannot be read as JSON, so the commands in it cannot be scanned`);
         else fetches(text.split("\n").map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
-        continue;
       }
-      fetches(commandLines(json).join("\n"), f);
-      const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
-      if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
-        fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences`);
+      if (json !== undefined) {
+        fetches(commandLines(json).join("\n"), f);
+        const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
+        if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
+          fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences`);
+      }
     } else if (other) {
       if (!byHand(f)) fail(`${f} is in a language the scan cannot read: name it in the "files" of the entries of what it uses`);
-      else if (served(f) && !covering(f).some((e) => e.kind !== "own" && e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so an entry covering it ships`);
+      else if (served(f) && !covering(f).every((e) => e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so every entry covering it ships`);
     }
     // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
     if (!binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });
