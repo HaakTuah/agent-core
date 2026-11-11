@@ -3,10 +3,12 @@
 // under .github/actions/), in which the word pull_request_target stands anywhere at all, a comment included. It searches the
 // whole text for the word and reads no YAML, so no way of writing a key, a comment or a line break hides it; the two
 // ways YAML has of spelling a word otherwise are undone first: an escape (\x, \u, \U) is read as what it spells, and
-// a word broken over lines by an escaped line break is joined. A third way, a value given as binary (a tag ending
-// in binary), holds a word no search can see, so a file with such a tag fails too, as does a file that is a link,
-// since the check reads only the project's own text. A comment or a script that needs to speak of the trigger calls
-// it something else.
+// a word broken over lines by an escaped line break is joined. A file the check cannot read as the project's own
+// UTF-8 text fails too: a link, and one in another encoding, in which the word would stand unseen. A comment or a
+// script that needs to speak of the trigger calls it something else.
+// What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
+// spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
+// belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
 // in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
@@ -50,8 +52,9 @@ export function lines(text) {
   return found;
 }
 
-// Whether the text gives a value as binary, which hides what it spells: a tag that ends in binary.
-export const binary = text => /![^\s!]*!?binary(?![\w-])|tag:yaml\.org,2002:binary/u.test(text);
+// Whether the text is one the search can trust: UTF-8 with no character that marks another encoding or bytes that are
+// no text (a workflow in UTF-16 reads as letters with a zero byte between them, and the word is not found).
+export const readable = text => !/[\0\ufffd]/u.test(text);
 
 // The files the check reads, of those git tracks.
 export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") &&
@@ -66,7 +69,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   for (const file of files) {
     if (fs.lstatSync(file).isSymbolicLink()) { failed++; console.log(`FAIL ${file}: a link, not a file: the check reads the project's own text only`); continue; }
     const text = fs.readFileSync(file, "utf8"), found = lines(text);
-    if (binary(text)) { failed++; console.log(`FAIL ${file}: a value given as binary hides what it spells: write it as text`); }
+    if (!readable(text)) { failed++; console.log(`FAIL ${file}: not UTF-8 text, so it cannot be searched: save it as UTF-8`); }
     failed += found.length;
     for (const line of found.slice(0, 5)) console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets: never (floor rule 2)`);
     if (found.length > 5) console.log(`FAIL ${file}: and on ${found.length - 5} more lines`);
