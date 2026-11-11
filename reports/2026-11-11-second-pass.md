@@ -14,6 +14,9 @@ What changes in every project:
   "Which"), where a builder marking a PR ready looks; `modules/inbox.md` says only what they are.
 - **The weekly sweep of ideas** moves from `modules/inbox.md` into the orchestrator's wake (`modules/orchestrating.md`),
   the list of what it does when it wakes.
+- **A blocked task gives way to the next that does not depend on it** (`modules/how-to-work.md`, "Don't loop"): Amarna
+  Letters' builder rules said it, and lost it when they were cut down to what is that game's own (its #907, the
+  fallback reviewer's one point).
 - **A reading says what it rests on** (`modules/how-to-work.md`, "The work never waits"; core archive 144): Amarna
   Letters' design document asked it of that game's builders; it holds for every project, so it moves here.
 
