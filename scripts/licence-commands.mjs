@@ -57,9 +57,10 @@ const VALUED = new Set([
   "--which", "--workspace",
 ]);
 // Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments),
-// past any options before their subcommand (pip --isolated install, git -C dir clone, cargo +nightly install), eight
-// at most: past eight, a fetcher with options counts as a fetch.
-const OPTION = String.raw`(?:\s+[-+]\S+(?:\s+[^\s+-]\S*)?)`;
+// past any options before their subcommand (pip --isolated install, git -C "vendor dir" clone, cargo +nightly
+// install), each word read with its quoted parts, eight at most: past eight, a fetcher with options counts as a fetch.
+const PART = String.raw`(?:[^\s"']|"[^"\n]*"|'[^'\n]*')`;
+const OPTION = String.raw`(?:\s+[-+]${PART}+(?:\s+(?:[^\s"'+-]|"[^"\n]*"|'[^'\n]*')${PART}*)?)`;
 const fetcher = (name, then) => `${name}(?:${OPTION}{0,8}\\s+${then}|${OPTION}{8})`;
 export const OTHER_FETCHER = new RegExp(
   "(?:^|[\\s;&|(`$\'\"/\\\\])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +

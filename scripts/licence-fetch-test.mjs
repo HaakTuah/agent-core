@@ -107,7 +107,8 @@ for (const [what, change, why] of [
   ["a script in another language that reaches users, audited as a tool", (dir) => { write("site/lib.py", "import moss\n")(dir); handAudited("site/lib.py")(dir); }, /reaches users/],
   ["a licence notice in a script of another language", write("scripts/lichen.py", "# SPDX-License-Identifier: GPL-3.0-only\n"), /language the scan cannot read|licence notice/],
   ["curl run by a tool", write("scripts/tiles.mjs", "execFileSync(\"curl\", [\"-sSf\", \"https://mossgrip.example/tile.png\"]);\n"), /fetches what no entry/],
-  ...["pip --isolated install mosspy", "git -C vendor clone https://mossgrip.example/moss.git", "cargo +nightly install mossgrip"]
+  ...["pip --isolated install mosspy", "git -C vendor clone https://mossgrip.example/moss.git", "cargo +nightly install mossgrip",
+    'git -C "vendor dir" clone https://mossgrip.example/moss.git', "pip --proxy='http://a b' install mosspy"]
     .map((line) => [`another fetcher with options before its command: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
   ["playwright install", append(".github/workflows/ci.yml", "      - run: npx --no-install playwright install chromium\n"), /fetches what no entry/],
