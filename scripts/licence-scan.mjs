@@ -147,7 +147,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const fetches = (text, f, literal = false) => {
     for (const line of commands(text, JS.test(f) || WEB.test(f), literal)) {
       const { specs, unreadable, packs } = fetched(String(line), line.atCommand === true, literal || line.literal === true);
-      const where = `${f}, ${line.trim().slice(0, 120)}`;
+      const where = `${f}, ${line.trim().replaceAll("\u0000", " ").slice(0, 120)}`;
       if (unreadable) fail(`${where}: ${unreadable}, which cannot be audited (fetch it as npx -p <name>@<exact version>)`);
       for (const spec of specs) {
         const exact = EXACT.exec(spec);

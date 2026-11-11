@@ -31,6 +31,9 @@ const RUNNERS = new Set([
 const STRING_RUNNERS = /^(?:-c|--command|--exec|run:|eval|concurrently|watch|cross-env-shell|parallel|su)$/u;
 const KEYWORDS = new Set(["if", "elif", "while", "until", "then", "do", "else"]);
 const SPACE = new Set([" ", "\t", "\r", "\v", "\f"]);
+// (an argument of a list keeps its own spaces as this mark when the list is written as one line, so it stays one word)
+const KEPT = "\u0000";
+const whole = (argument) => argument.replace(/\s/gu, KEPT);
 const LINK = new Set(["link", "ln"]);
 const CONFIG = new Set(["config", "c", "set"]);
 const NO_FETCH = new Set([
@@ -102,7 +105,7 @@ export function fetched(line, atCommand = false, literal = false) {
   const kept = (end < 0 ? raw : raw.slice(0, end)).filter((w, k) => !operator(k) && !(operator(k - 1) && /^\d*[<>&]+$/u.test(raw[k - 1])));
   // (then each word loses the quotes, brackets and commas of the string or call it sits in; a "+" between the pieces of
   // a string built in code joins them: npm ' + 'install x)
-  const words = kept.map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "")).filter((w) => w && w !== "+");
+  const words = kept.map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "").replaceAll(KEPT, " ")).filter((w) => w && w !== "+");
   if (/^(npx|npm)\.cmd$/iu.test(words[0] ?? "")) words[0] = words[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
   // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
   if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^--(user|global)config\b|^npm_config_.*(registry|config)/iu.test(w)))
@@ -358,7 +361,7 @@ export function commands(text, code = false, literal = false) {
   for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
-    if (literal) out.push(Object.assign(new String([m[1], ...literal].join(" ")), { literal: true }));
+    if (literal) out.push(Object.assign(new String([m[1], ...literal.map(whole)].join(" ")), { literal: true }));
     else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && !/^(audit|cache|diff|publish)$/u.test(command))) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}its-arguments-not-written-out`); // (npm view with a variable: no fetch)
   }
   return out;
@@ -389,6 +392,7 @@ export function commandLines(v) {
   // each with any arguments beside them)
   // (a line built from an argument list is literal: no shell reads it, so "#" or ">" there is an argument)
   const line = (words) => (args.length ? Object.assign(new String(words.join(" ")), { literal: true }) : words.join(" "));
-  if (programs.length === 1) return [line([programs[0], ...args]), ...out];
-  return [...programs.map((p) => line([p, ...args])), ...(args.length ? [line(args)] : []), ...out];
+  const listed = args.map(whole);
+  if (programs.length === 1) return [line([programs[0], ...listed]), ...out];
+  return [...programs.map((p) => line([p, ...listed])), ...(args.length ? [line(listed)] : []), ...out];
 }
