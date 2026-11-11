@@ -21,9 +21,10 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # One queue per pull request, so a publish never lands after the removal that its close started.
+    # One queue per pull request (its repository and branch), so a publish never lands after the removal that its close
+    # started.
     concurrency:
-      group: preview-${{ github.event.workflow_run.head_branch }}
+      group: preview-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
       cancel-in-progress: false
     permissions:
       contents: write # site-publish.sh pushes gh-pages, with the token this checkout keeps
