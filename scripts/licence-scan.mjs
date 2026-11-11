@@ -48,8 +48,8 @@ const ASSET = new RegExp(
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
-// npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own, or
-// none); and options known to take a value. A word that is no command, straight after an option, is read as that
+// npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own,
+// or none); and options known to take a value. A word that is no command, straight after an option, is read as that
 // option's value, so an option it does not know cannot hide the command after it.
 const INSTALL = new Set(["install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal", "isntall", "add", "install-test", "it", "pack"]);
 const RUN = new Set(["exec", "x"]);
