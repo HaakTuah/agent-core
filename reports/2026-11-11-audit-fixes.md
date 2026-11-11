@@ -8,12 +8,13 @@ An independent audit of the core and both games, run once the licence scan had m
   of its own, a path before it allowed. Seven forms are added to `licence-fetch-test.mjs`. In `licence-scan-test.mjs`, a
   quoted name followed by plain words still passes. The fallback reviewer found the same miss for a quoted subcommand
   (`pip "install"`) and for a quoted program inside a string of code (`\"pip\"`); both are read now, with four more
-  forms. `bunx` counts only before a word, so code that compares a name with `"bunx"` passes.
-- **`scripts/licences.mjs`:** every audit entry that ships, but the owner's own, must have its notice (floor rule 10).
-  A project that builds its notices from the audit gives the entry a `notice`. A project that keeps a notices file
-  names that file in its config (`notices`), and the entry's name must appear in it. Each game had checked this in a
-  script of its own. A notices file the config names but the project lacks fails once. Six tests cover it in
-  `licence-scan-test.mjs`, three of them the config's mistakes.
+  forms. `bunx` counts only before what can start an argument, so code that names `"bunx"` in a comparison or a list
+  passes.
+- **`scripts/licences.mjs`:** every audit entry that ships, but the owner's own, must have its notice (floor rule 10). A
+  project that builds its notices from the audit gives the entry a `notice`. A project that keeps a notices file names
+  that file in its config (`notices`), and the entry's name must appear in it. Each game had checked this in a script of
+  its own. A notices file the config names but the project lacks, or a folder there, fails once. Seven tests cover it in
+  `licence-scan-test.mjs`, four of them the config's mistakes.
 - **`.github/licences-audit.json`:** `jq`, which `versions.yml` runs beside `gh`.
 - **`modules/how-to-work.md`:** "The smallest setup that tests the rule" now also says that a test runs only where a
   change can affect it (core archive 9). That item was given for both games, yet no rule cited it, and each game quoted
