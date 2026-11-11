@@ -6,8 +6,8 @@ The aim: as much finished work of full quality as the week's usage allows, at th
 pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lean** and **read little** (core archive 17
 and 57).
 
-- **The work never waits** (core archive 134). Where something is open, take the best reading, build on it, say it under
-  "Readings taken" in the *report*, and go on. Only the yeses floor rules 3 and 14 name wait for the owner.
+- **The work never waits** (floor rule 14; core archive 134). Where something is open, take the best reading, build on
+  it, say it under "Readings taken" in the *report* with what it rests on (core archive 144), and go on.
 - **A question from the owner is a question:** answer it; act on it when he says so (core archive 25).
 - **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and config in one pass.
 - **Read little, print little:** read only what the task names, never a *large file* whole (grep, then read that range);
