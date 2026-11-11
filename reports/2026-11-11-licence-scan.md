@@ -36,7 +36,7 @@ too).
   temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it is
   and passes 21 allowed forms, and fails 41 others for the reason each names: the licence lists, a lockfile's package,
   the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, a bad
-  `"scan"`. `scripts/licence-fetch-test.mjs` fails 77 forms of a fetch, each for its reason.
+  `"scan"`. `scripts/licence-fetch-test.mjs` fails 83 forms of a fetch, each for its reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
   leaves its copy of the core out, since this audit holds it, so the games stop listing the core's actions.
@@ -45,13 +45,14 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8, 63 and 77 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8, 63 and 83 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
-spellings and fetchers, an option's value hiding the command, another registry or npm config, npm update, npm exec's
-later packages, curl in a quoted command, arrays it cannot read, comments that hid commands, folded YAML, tools' hooks
-in package.json, unread file kinds and #! lines, lockfiles left out, scripts of other languages that ship, `own`
-covering too much or someone's notice, a notice in code of a language it does not run, two scripts read as one. Each is
-now closed and tested. A dry run on each game with the new scripts:
+spellings and fetchers, an option's value hiding the command, another registry or npm config (by option or by npm config
+set), npm update and npm audit fix, Windows' npx.cmd, npm exec's later packages, curl in a quoted command, arrays it
+cannot read, comments that hid commands, folded YAML, tools' hooks in package.json, unread file kinds and #! lines,
+lockfiles left out, scripts of other languages that ship, `own` covering too much or someone's notice, a notice in code
+of a language it does not run, two scripts read as one. Each is now closed and tested. A dry run on each game with the
+new scripts:
 - Snakes passes with its sync PR's side applied: its own scan cut to its game's checks, its test to theirs, and its
   audit to what no lockfile holds.
 - Amarna passes with its sync PR's side applied: the audit, and its two `npx vitest` lines, which would fetch if

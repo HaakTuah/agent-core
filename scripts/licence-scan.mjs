@@ -8,16 +8,17 @@
 //     workspace of one, so the check reads every package any of them installs;
 //   - an entry for each action a workflow or action file uses (`uses:`), but the owner's own (HaakTuah/, the core's
 //     workflows among them) and the project's (./), by its name (owner/repo), at whatever version it is pinned to;
-//   - an entry for each package npx, npm exec, npm install (and its other spellings) or npm pack fetches, in any
-//     workflow, script or tool (a file with no extension read as a shell script), any command in a JSON or TOML file
-//     (package.json's "scripts", a hook's "command") and any command written as an array (execFileSync("npx", [...])):
-//     written name@exact.version, and audited at that version, one entry for each version used, so an update is audited
-//     again, with what it pulls in. npx --no-install (or --no) never fetches, so a bare name passes there. A word that
-//     is no command, straight after an option, is read as that option's value. A fetch it cannot read (a bare name, a
-//     range or tag, an alias, a URL, git, a variable, npm init or create, which fetch by another name, npm update,
-//     which takes the newest a range allows) fails, but npm pack's, which runs nothing it fetches, and another
-//     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and the like): each of those passes
-//     only in a file an entry's "files" names, that entry its hand audit;
+//   - an entry for each package npx, npm exec (Windows' npx.cmd and npm.cmd too), npm install (and its other spellings)
+//     or npm pack fetches, in any workflow, script or tool (a file with no extension read as a shell script), any
+//     command in a JSON or TOML file (package.json's "scripts", a hook's "command") and any command written as an array
+//     (execFileSync("npx", [...])): written name@exact.version, and audited at that version, one entry for each version
+//     used, so an update is audited again, with what it pulls in. npx --no-install (or --no) never fetches, so a bare
+//     name passes there. A word that is no command, straight after an option, is read as that option's value. A fetch
+//     it cannot read (a bare name, a range or tag, an alias, a URL, git, a variable, npm init or create, which fetch by
+//     another name, npm update or npm audit fix, which take the newest a range allows, npm config set pointing at
+//     another registry) fails, but npm pack's, which runs nothing it fetches, and another fetcher's (curl, wget, pip,
+//     pnpm, yarn, bun, playwright install, git clone and the like): each of those passes only in a file an entry's
+//     "files" names, that entry its hand audit;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
@@ -56,6 +57,7 @@ const INSTALL = new Set(["install", "i", "in", "ins", "inst", "insta", "instal",
 const RUN = new Set(["exec", "x"]);
 const BY_OTHER_NAME = new Set(["create", "init", "innit"]);
 const UPDATE = new Set(["update", "up", "upgrade", "udpate"]);
+const CONFIG = new Set(["config", "c", "set"]);
 const NO_FETCH = new Set([
   "access", "adduser", "audit", "author", "bugs", "issues", "cache", "ci", "clean-install", "ic", "install-clean", "isntall-clean",
   "cit", "clean-install-test", "completion", "config", "c", "get", "set", "dedupe", "ddp", "deprecate", "diff", "dist-tag",
@@ -96,6 +98,7 @@ const OTHER_FETCHER = new RegExp(
  */
 export function fetched(line) {
   const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`([]+|['"`),;\]]+$/gu, "")).filter(Boolean);
+  if (/^(npx|npm)\.cmd$/iu.test(all[0] ?? "")) all[0] = all[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
   const end = all.findIndex((w) => w.startsWith("#") || w.startsWith("//")); // (a comment after the command)
   const words = end < 0 ? all : all.slice(0, end);
   // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
@@ -115,6 +118,11 @@ export function fetched(line) {
       if (fetching(w) || NO_FETCH.has(w) || !afterOption) { command = w; break; }
       afterOption = false;
     }
+    // (npm config set registry, and the like, points every later fetch at another registry; npm audit fix installs
+    // releases the lockfile does not hold)
+    if (CONFIG.has(command) && words.slice(i).some((w) => /(^|:)registry\b|^replace-registry-host\b|^(user|global)config\b/iu.test(w)))
+      return { specs: [], unreadable: "it points npm at another registry or config, so no audited name can be trusted after it" };
+    if (command === "audit" && words.slice(i).includes("fix")) return { specs: [], unreadable: "npm audit fix installs releases the lockfile does not hold" };
     if (command === undefined || !fetching(command)) return { specs: [] };
     if (UPDATE.has(command)) return { specs: [], unreadable: `npm ${command} fetches the newest release a range allows, which cannot be audited` };
     if (RUN.has(command)) runs = true;
@@ -190,13 +198,13 @@ function literalArray(src) {
 function commands(text) {
   const out = [];
   const joined = folded(text.replace(/\\\r?\n/gu, " "));
-  for (const m of joined.matchAll(/\b(npx|npm)\b(?!['"`]\s*,)[^\n;&|>]*/gu)) out.push(m[0]); // (an array, below)
+  for (const m of joined.matchAll(/\b(npx|npm)(\.cmd)?\b(?!['"`]\s*,)[^\n;&|>]*/giu)) out.push(m[0]); // (an array, below)
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
-  for (const m of joined.matchAll(/['"`](npx|npm)['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/gu)) {
+  for (const m of joined.matchAll(/['"`](npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
     if (literal) out.push([m[1], ...literal].join(" "));
-    else if (!(m[1] === "npm" && NO_FETCH.has(command))) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<its-arguments,-not-written-out>`); // (npm view with a variable: no fetch)
+    else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && command !== "audit")) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<its-arguments,-not-written-out>`); // (npm view with a variable: no fetch)
   }
   return out;
 }
