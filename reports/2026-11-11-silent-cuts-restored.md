@@ -20,10 +20,12 @@ when the fallback reviewer takes Claude's PRs (`modules/reviews.md`, point 2); `
 for when the security review runs, and to floor rule 8 without restating it. The floor and modules are 45,015 bytes of
 the 45,056 cap.
 
-The cuts the report did name, and which went against earlier words of his (the clean-up passes and rule-file audit,
+The cuts the report did name, though they went against earlier words of his (the clean-up passes and rule-file audit,
 core archive 26, 54 and 67; the guard on what a 10 is, 23; each reviewer's one idea, 40; the monthly check of what
-players read, 49), stay cut unless he says otherwise; they were put to him with this PR. So were the one review of the
-core he agreed to for about a week after step 3 (core archive 96), which nothing tracks, and the review-guideline block
-on an entry added to the copies baseline (core archive 56), which only his word can bring back.
+players read, 49), stay cut, on his word of 11 November: "The candidates you mentioned now first can probably stay cut,
+agreed?", ideas having moved to issues ("Weren't suggestions moved to issue?"). So does the review-guideline block on an
+entry added to the copies baseline (core archive 56): the baseline is a protected file, so any entry added to it gets a
+code review. The one review of the core he agreed to for about a week after step 3 (core archive 96) already has a
+scheduled reminder, set on 10 November, that wakes the design session on 18 November.
 
-Readings taken: none. Questions for the owner: the decisions above, in the design chat.
+Readings taken: none. Questions for the owner: none.
