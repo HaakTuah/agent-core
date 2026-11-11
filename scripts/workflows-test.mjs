@@ -4,7 +4,7 @@
 //   node scripts/workflows-test.mjs
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { lines, reads } from "./workflows.mjs";
+import { binary, lines, reads } from "./workflows.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -20,9 +20,12 @@ ok(fails("# never pull_request_target\n") && fails("      - run: echo pull_reque
 ok(!fails("      - run: |\n          node a.mjs \\\n            --target x\n") && !fails(`      - run: echo "\\U99999999 \\xZZ \\u12"\n`), "a script's own line that goes on to the next, and an escape that spells nothing, are no finding");
 ok(lines("a\nb\non: pull_request_target\n").join() === "3" && lines(`a\non: ["pull_request_\\\n  target"]\nb\non: pull_request_target\n`).join() === "3,5" && lines("pull_request_target pull_request_target\n").join() === "1", "a finding names its line, a joined word the line it ends on, and a line is named once");
 
+ok(fails("on: { push: { branches: ['x\n  #'] }, pull_request_target: {} }\n") && fails("on:\n\u00a0# a comment\u0085  pull_request_target:\n"), "a line that only looks like a comment hides nothing");
+ok(binary("on: !!binary cHVsbF9yZXF1ZXN0X3RhcmdldA==\n") && binary("on: !<tag:yaml.org,2002:binary> cHVs\n") && binary("%TAG !b! tag:yaml.org,2002:\n---\non: !b!binary cHVs\n"), "a value given as binary is seen, however its tag is written");
+ok(!binary("      - run: test ! -f binary && ./binary --x\n") && !binary("      - run: echo '!binaryfile' '!!binary-ish'\n") && !binary("on: !!str push\n"), "the word binary in a script, a longer word, and another tag are no finding");
 const files = [".github/workflows/a.yml", ".github/workflows/b.yaml", ".github/actions/setup/action.yml", ".github/actions/setup/steps.yml", "tools/act/action.yaml", "action.yml",
-  ".github/dependabot.yml", ".github/ISSUE_TEMPLATE/config.yml", "core/.github/workflows/a.yml", "core/tools/action.yml", "tools/node_modules/a/action.yml", "docs/a.yml", "docs/reaction.yml"];
-ok(reads(files).join() === files.slice(0, 6).join(), "it reads the project's own workflows and its actions wherever they lie, and neither the core's copy nor an installed package's");
+  ".github/workflows/c.YML", ".github/dependabot.yml", ".github/ISSUE_TEMPLATE/config.yml", "core/.github/workflows/a.yml", "core/tools/action.yml", "tools/node_modules/a/action.yml", "docs/a.yml", "docs/reaction.yml"];
+ok(reads(files).join() === files.slice(0, 7).join(), "it reads the project's own workflows and its actions wherever they lie, whatever the case of the ending, and neither the core's copy nor an installed package's");
 
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));

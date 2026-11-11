@@ -1,10 +1,12 @@
 // The workflow check (floor rule 2, floor/topics.md), for every project that takes the core, on every PR: it fails a
-// workflow (.github/workflows/), or an action of the project's own (an action.yml anywhere in it, or any file under
-// .github/actions/), in which the word pull_request_target stands anywhere at all, a comment included. It searches the
+// workflow (.github/workflows/), or an action of the project's own (an action.yml anywhere in it, or any YAML file
+// under .github/actions/), in which the word pull_request_target stands anywhere at all, a comment included. It searches the
 // whole text for the word and reads no YAML, so no way of writing a key, a comment or a line break hides it; the two
 // ways YAML has of spelling a word otherwise are undone first: an escape (\x, \u, \U) is read as what it spells, and
-// a word broken over lines by an escaped line break is joined. A comment or a script that needs to speak of the
-// trigger calls it something else.
+// a word broken over lines by an escaped line break is joined. A third way, a value given as binary (a tag ending
+// in binary), holds a word no search can see, so a file with such a tag fails too, as does a file that is a link,
+// since the check reads only the project's own text. A comment or a script that needs to speak of the trigger calls
+// it something else.
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
 // in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
@@ -48,9 +50,12 @@ export function lines(text) {
   return found;
 }
 
+// Whether the text gives a value as binary, which hides what it spells: a tag that ends in binary.
+export const binary = text => /![^\s!]*!?binary(?![\w-])|tag:yaml\.org,2002:binary/u.test(text);
+
 // The files the check reads, of those git tracks.
 export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") &&
-  (/^\.github\/(workflows\/[^/]+|actions\/.+)\.ya?ml$/u.test(f) || /(^|\/)action\.ya?ml$/u.test(f)));
+  (/^\.github\/(workflows\/[^/]+|actions\/.+)\.ya?ml$/iu.test(f) || /(^|\/)action\.ya?ml$/iu.test(f)));
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -59,11 +64,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const files = reads(git(["ls-files", "-z"]).split("\0").filter(Boolean));
   let failed = 0;
   for (const file of files) {
-    const found = lines(fs.readFileSync(file, "utf8"));
+    if (fs.lstatSync(file).isSymbolicLink()) { failed++; console.log(`FAIL ${file}: a link, not a file: the check reads the project's own text only`); continue; }
+    const text = fs.readFileSync(file, "utf8"), found = lines(text);
+    if (binary(text)) { failed++; console.log(`FAIL ${file}: a value given as binary hides what it spells: write it as text`); }
     failed += found.length;
     for (const line of found.slice(0, 5)) console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets: never (floor rule 2)`);
     if (found.length > 5) console.log(`FAIL ${file}: and on ${found.length - 5} more lines`);
   }
-  console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} naming ${WORD}`);
+  console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} against floor rule 2`);
   process.exit(failed ? 1 : 0);
 }
