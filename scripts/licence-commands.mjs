@@ -78,11 +78,23 @@ export const OTHER_FETCHER = new RegExp(
  * is npm pack, which only fetches.
  * Others: { specs: [] }.
  */
-export function fetched(line, atCommand = false) {
+export function fetched(line, atCommand = false, literal = false) {
   // (a comment after the command, and a redirection, ">log", "2> log", "&>log", "<in", with its target wherever it
-  // stands, are known by the word as written: a quoted '#x' or '>' is an argument)
-  const raw = line.trim().split(/\s+/u), end = raw.findIndex((w) => w.startsWith("#") || w.startsWith("//"));
-  const kept = (end < 0 ? raw : raw.slice(0, end)).filter((w, k, all) => !/^\d*[<>&]/u.test(w) && !/^\d*[<>&]+$/u.test(all[k - 1] ?? ""));
+  // stands, are known by the word as written and only outside quotes: a quoted '#x', "release #1" or '>' is an
+  // argument; in a line built from an argument list, where no shell reads it, every word is one)
+  const raw = line.trim().split(/\s+/u);
+  let quote = "";
+  const quoted = raw.map((w) => {
+    const was = quote !== "";
+    for (let k = 0; k < w.length; k++) {
+      if (w[k] === "\\" && quote !== "'") k++;
+      else if (quote) { if (w[k] === quote) quote = ""; } else if ("'\"`".includes(w[k])) quote = w[k];
+    }
+    return was;
+  });
+  const end = literal ? -1 : raw.findIndex((w, k) => !quoted[k] && (w.startsWith("#") || w.startsWith("//")));
+  const operator = (k) => !literal && !quoted[k] && /^\d*[<>&]/u.test(raw[k] ?? "");
+  const kept = (end < 0 ? raw : raw.slice(0, end)).filter((w, k) => !operator(k) && !(operator(k - 1) && /^\d*[<>&]+$/u.test(raw[k - 1])));
   // (then each word loses the quotes, brackets and commas of the string or call it sits in; a "+" between the pieces of
   // a string built in code joins them: npm ' + 'install x)
   const words = kept.map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "")).filter((w) => w && w !== "+");
@@ -312,7 +324,7 @@ function literalArray(src) {
  * The command lines in a text: each npx or npm and what follows it on its line, and each written as an array. A line
  * continued on the next (a shell's "\\" at its end, or a YAML folded block, "key: >") is read as one.
  */
-export function commands(text, code = false) {
+export function commands(text, code = false, literal = false) {
   const out = [];
   const joined = folded(text.replace(/\\\r?\n/gu, " "));
   // (each npx or npm, nested ones too, as in npx -c 'npm install ...', starts a line of its own; an array, below)
@@ -326,9 +338,11 @@ export function commands(text, code = false) {
     // (where it stands as a command, it is read at most 16384 characters on, and one longer, with no end, cannot be
     // read, so it fails as such; elsewhere, as in a message, 1024 characters on are read, for a fetch it names)
     const at = atCommand(joined, m.index), size = at ? 16384 : 1024;
-    const rest = joined.slice(m.index, m.index + size), command = /^(?:[^\n;|&]|&(?=>)|(?<=[<>])&)*/u.exec(rest)[0];
+    const rest = joined.slice(m.index, m.index + size), command = (literal ? /^[^\n]*/u : /^(?:[^\n;|&]|&(?=>)|(?<=[<>])&)*/u).exec(rest)[0];
     const whole = command.length < rest.length || m.index + rest.length === joined.length;
-    out.push(Object.assign(new String(whole || !at ? command : `${m[1].toLowerCase()} install a-command-too-long-to-read`), { atCommand: at }));
+    // (the quote that opens a string it stands in goes with it, so its quotes are read in pairs: '...') // note)
+    const prev = joined[m.index - 1] ?? "", opener = prev && "'\"`".includes(prev) ? prev : "";
+    out.push(Object.assign(new String(whole || !at ? opener + command : `${m[1].toLowerCase()} install a-command-too-long-to-read`), { atCommand: at }));
   }
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
   // (in code, a string that is only npx or npm, not called with its arguments right there, is a program held in a
@@ -339,7 +353,7 @@ export function commands(text, code = false) {
   for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
-    if (literal) out.push([m[1], ...literal].join(" "));
+    if (literal) out.push(Object.assign(new String([m[1], ...literal].join(" ")), { literal: true }));
     else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && !/^(audit|cache|diff|publish)$/u.test(command))) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}its-arguments-not-written-out`); // (npm view with a variable: no fetch)
   }
   return out;
@@ -368,6 +382,8 @@ export function commandLines(v) {
   }
   // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are,
   // each with any arguments beside them)
-  if (programs.length === 1) return [[programs[0], ...args].join(" "), ...out];
-  return [...programs.map((p) => [p, ...args].join(" ")), ...(args.length ? [args.join(" ")] : []), ...out];
+  // (a line built from an argument list is literal: no shell reads it, so "#" or ">" there is an argument)
+  const line = (words) => (args.length ? Object.assign(new String(words.join(" ")), { literal: true }) : words.join(" "));
+  if (programs.length === 1) return [line([programs[0], ...args]), ...out];
+  return [...programs.map((p) => line([p, ...args])), ...(args.length ? [line(args)] : []), ...out];
 }

@@ -144,9 +144,9 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
     else if (served(f) && !by.every((e) => e.ships === true)) fail(`${f} (${what}) reaches users, so every entry covering it ships`);
   };
   const byHand = (f) => covering(f).some((e) => e.kind !== "own");
-  const fetches = (text, f) => {
-    for (const line of commands(text, JS.test(f) || WEB.test(f))) {
-      const { specs, unreadable, packs } = fetched(String(line), line.atCommand === true);
+  const fetches = (text, f, literal = false) => {
+    for (const line of commands(text, JS.test(f) || WEB.test(f), literal)) {
+      const { specs, unreadable, packs } = fetched(String(line), line.atCommand === true, literal || line.literal === true);
       const where = `${f}, ${line.trim().slice(0, 120)}`;
       if (unreadable) fail(`${where}: ${unreadable}, which cannot be audited (fetch it as npx -p <name>@<exact version>)`);
       for (const spec of specs) {
@@ -199,7 +199,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         else fetches(text.split("\n").map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
       }
       if (json !== undefined) {
-        fetches(commandLines(json).join("\n"), f);
+        for (const line of commandLines(json)) fetches(String(line), f, line.literal === true);
         const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
         if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
           fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences`);

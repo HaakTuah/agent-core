@@ -26,6 +26,7 @@ for (const [what, change] of [
   ["a fetch it cannot read, in a file an entry audits by hand", (dir) => { handAudited("scripts/setup.sh")(dir); append("scripts/setup.sh", 'npm pack --ignore-scripts "moss-linux-$ARCH@$V"\ncurl -sSfo moss.tgz https://mossgrip.example/moss.tgz\n')(dir); }],
   ["a script in another language, named by the entries of what it uses", (dir) => { write("scripts/render.py", "import numpy\n")(dir); handAudited("scripts/render.py")(dir); }],
   ["a lockfile the config names, a tool in it under GPL", LOCK("GPL-3.0-only")],
+  ["an audited install in a string of code, with a comment after it", write("scripts/run.mjs", "execSync('npm install -g mossgrip-cli@1.2.3') // the one we audited\n")],
   ["an audited install with a comment after it", append("scripts/setup.sh", "npm install -g mossgrip-cli@1.2.3 # the one we audited\n")],
   ["npm run after an option", append("scripts/setup.sh", "npm --silent run build\n")],
   ["npm config get registry, which sets nothing", append("scripts/setup.sh", "npm config get registry\n")],

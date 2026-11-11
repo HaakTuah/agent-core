@@ -130,6 +130,11 @@ for (const [what, change, why] of [
   ["npm cache add of a package held in a variable", write("scripts/cache.mjs", "const spec = 'mossgrip-widgets@1.2.3';\nexecFileSync('npm', ['cache', 'add', spec]);\n"), /its-arguments-not-written-out/],
   ...["npm install --cache '#cache' -g mossgrip-widgets@1.2.3", "npm install --cache '>' -g mossgrip-widgets@1.2.3"]
     .map((line) => [`a quoted value that only looks like a comment or a redirection: ${line}`, append("scripts/setup.sh", `${line}\n`), /mossgrip-widgets .* is not in/]),
+  ...["['install', '>', 'mossgrip-widgets@1.2.3']", "['install', '#', 'mossgrip-widgets@1.2.3']", "['install', 'a|b', 'mossgrip-widgets@1.2.3']"]
+    .map((list) => [`npm with an argument list holding what a shell would read: ${list}`, write("scripts/run.mjs", `execFileSync('npm', ${list});\n`), /mossgrip-widgets .* is not in/]),
+  ["a task's argument list holding what a shell would read", write(".vscode/tasks.json", JSON.stringify({ type: "process", command: "npm", args: ["install", "#", "a|b", "mossgrip-widgets@1.2.3"] })), /mossgrip-widgets .* is not in/],
+  ...['npm install --message "release #1" -g mossgrip-widgets@1.2.3', "npm install --cache 'moss #cache' -g mossgrip-widgets@1.2.3", "npm install --cache 'moss > bark' -g mossgrip-widgets@1.2.3"]
+    .map((line) => [`a # or > inside a quoted value of several words: ${line}`, append("scripts/setup.sh", `${line}\n`), /mossgrip-widgets .* is not in/]),
   ["npm diff of a git package, which prepares it", append("scripts/setup.sh", "npm diff --diff=git+https://mossgrip.example/widgets.git --diff=.\n"), /cannot be audited/],
   ["npm cache add of a package", append("scripts/setup.sh", "npm cache add mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
   ...["npm cache add https://mossgrip.example/widgets.tgz", "npm diff --diff=https://mossgrip.example/widgets.tgz --diff=.",
