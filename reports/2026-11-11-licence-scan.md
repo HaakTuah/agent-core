@@ -34,7 +34,7 @@ too).
 - **The tests:** the check had no test here; Amarna tested its lists and readers in its own suite. Those come into
   `scripts/licences-test.mjs`, on invented names. `scripts/licence-scan-stage.mjs` writes a small project into a fresh
   temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it is
-  and passes 21 allowed forms, and fails 41 others for the reason each names: the licence lists, a lockfile's package,
+  and passes 22 allowed forms, and fails 41 others for the reason each names: the licence lists, a lockfile's package,
   the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, a bad
   `"scan"`. `scripts/licence-fetch-test.mjs` fails 89 forms of a fetch, each for its reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
@@ -67,8 +67,10 @@ suite drops the tests of the core's functions that moved here.
 Readings taken: a hand audit (an entry's `files` naming a file, for npm pack's or another fetcher's fetches the scan
 cannot read) covers the whole file, so a later fetch added to that file passes the scan; the review of that PR is what
 sees it, as for any edit to an audit. A file with no extension is read as shell, so a prose file such as a bare
-`LICENSE` naming an npm command would fail; a project skips it if it has one (neither game does). The scan's test file
-is a little past 20 KB: it is one list of cases, read only by whoever changes the scan. Lockfile packages need no audit
-entry, since the check reads each one's licence from the lockfile at every version; Snakes' hand list of them repeated
-it. The owner's own work gets a kind of its own rather than a list of folders the scan passes over, so every asset's
-origin stands in one place. Questions for the owner: none.
+`LICENSE` naming an npm command would fail; a project skips it if it has one (neither game does). A licence notice in
+any file but prose counts, so a `# Copyright` line in a workflow, or credits quoting a licence in a JSON or HTML file,
+need an entry not the owner's (his own work carries none; credits belong in a prose file). A string that is only "npx"
+or "npm", not called with its arguments right there, fails, since the scan cannot follow it into a variable. Lockfile
+packages need no audit entry, since the check reads each one's licence from the lockfile at every version; Snakes' hand
+list of them repeated it. The owner's own work gets a kind of its own rather than a list of folders the scan passes
+over, so every asset's origin stands in one place. Questions for the owner: none.
