@@ -1,9 +1,10 @@
 // The workflow check (floor rule 2, floor/topics.md), for every project that takes the core, on every PR: it fails a
 // workflow (.github/workflows/), or an action of the project's own (an action.yml anywhere in it, or any file under
-// .github/actions/), that names pull_request_target on any line that is not all comment. It searches for the word, not
-// for a key, so no way of writing YAML hides it: a name spelled with a YAML escape (\x, \u, \U) is read as what it
-// spells, and one broken over two lines by an escape is joined. A line of a script's own text that holds the word is
-// reported too, and reworded.
+// .github/actions/), in which the word pull_request_target stands anywhere at all, a comment included. It searches the
+// whole text for the word and reads no YAML, so no way of writing a key, a comment or a line break hides it; the two
+// ways YAML has of spelling a word otherwise are undone first: an escape (\x, \u, \U) is read as what it spells, and
+// a word broken over lines by an escaped line break is joined. A comment or a script that needs to speak of the
+// trigger calls it something else.
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
 // in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
@@ -16,21 +17,34 @@ import fs from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const WORD = "pull_request_target";
-const plain = line => line.replace(/\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/gu, (whole, x, u, U) => {
-  const code = parseInt(x ?? u ?? U, 16);
-  return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
-});
+const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
+// What is undone before the search, and what ends a line: an escaped line break with the blanks after it, an escape
+// that spells a character, a line break.
+const PIECES = new RegExp(`\\\\(?:${BREAK})[ \\t]*|\\\\(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})|${BREAK}`, "gu");
+const spelt = escape => { const code = parseInt(escape.slice(2), 16); return code <= 0x10ffff ? String.fromCodePoint(code) : escape; };
 
-// The lines of one file's text that name the word, each as its number.
+// The lines of one file's text on which the word stands, each as its number, once escapes are read as what they spell
+// and words broken over lines are joined (a joined word counts for the line it ends on).
 export function lines(text) {
-  const found = [];
-  let carried = "";
-  text.split(/\r\n|\r|\n/u).forEach((raw, i) => {
-    if (/^\s*#/u.test(raw)) { carried = ""; return; }
-    const line = plain(raw), joined = carried + line.trimStart();
-    carried = /\\$/u.test(raw) ? joined.slice(0, -1).slice(-WORD.length) : ""; // the end is enough to find the word across the break
-    if (line.includes(WORD) || joined.includes(WORD)) found.push(i + 1);
-  });
+  const out = [], starts = [[0, 1]]; // starts: where in the undone text each line of the file begins
+  let length = 0, line = 1, i = 0;
+  const add = piece => { out.push(piece); length += piece.length; };
+  for (const m of text.matchAll(PIECES)) {
+    add(text.slice(i, m.index));
+    const piece = m[0];
+    if (piece[0] !== "\\") add("\n");
+    else if ("xuU".includes(piece[1])) add(spelt(piece));
+    if (piece[0] !== "\\" || !"xuU".includes(piece[1])) starts.push([length, ++line]);
+    i = m.index + piece.length;
+  }
+  add(text.slice(i));
+  const undone = out.join(""), found = [];
+  let s = 0;
+  for (let at = undone.indexOf(WORD); at >= 0; at = undone.indexOf(WORD, at + 1)) {
+    const end = at + WORD.length - 1;
+    while (s + 1 < starts.length && starts[s + 1][0] <= end) s++;
+    if (found.at(-1) !== starts[s][1]) found.push(starts[s][1]);
+  }
   return found;
 }
 
@@ -45,10 +59,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const files = reads(git(["ls-files", "-z"]).split("\0").filter(Boolean));
   let failed = 0;
   for (const file of files) {
-    for (const line of lines(fs.readFileSync(file, "utf8"))) {
-      failed++;
-      console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets: never (floor rule 2)`);
-    }
+    const found = lines(fs.readFileSync(file, "utf8"));
+    failed += found.length;
+    for (const line of found.slice(0, 5)) console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets: never (floor rule 2)`);
+    if (found.length > 5) console.log(`FAIL ${file}: and on ${found.length - 5} more lines`);
   }
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} naming ${WORD}`);
   process.exit(failed ? 1 : 0);
