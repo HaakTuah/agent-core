@@ -95,10 +95,13 @@ function executable(text, f) {
     if (tag.end < 0) { parts.push(text.slice(k + 7)); break; }
     while (c < closes.length && closes[c] <= tag.end) c++;
     let stop = c < closes.length ? closes[c] : text.length;
-    if (text.slice(tag.end + 1, stop).includes("<!--")) stop = text.length;
+    // (a script of data covers only to its first closing tag, so it never hides what follows; one that runs, holding
+    // "<!--", is read to the file's end)
     const type = tag.attributes.find(([n]) => n.toLowerCase() === "type")?.[1] ?? "";
-    if (!/json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, "")))
+    if (!/json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, ""))) {
+      if (text.slice(tag.end + 1, stop).includes("<!--")) stop = text.length;
       parts.push(text.slice(tag.end + 1, stop));
+    }
     covered = stop;
   }
   for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
