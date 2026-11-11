@@ -115,7 +115,7 @@ for (const [what, change, why] of [
   ...['"curl" -sSfo moss.tgz https://mossgrip.example/moss.tgz', "'wget' https://mossgrip.example/moss.tgz", '"pip" install mosspy',
     "'git' clone https://mossgrip.example/moss.git", '"node_modules/.bin/playwright" install chromium',
     '"$here/tools/node_modules/.bin/playwright" install --with-deps chromium', '"/usr/bin/curl" "$URL"', 'pip "install" mosspy',
-    "git 'clone' https://mossgrip.example/moss.git", 'pnpm "add" mossgrip-cli']
+    "git 'clone' https://mossgrip.example/moss.git", 'pnpm "add" mossgrip-cli', "bunx \\\n  mossgrip-cli", "bunx ~/moss", "bunx `which moss`"]
     .map((line) => [`another fetcher named as a quoted word: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["playwright install", append(".github/workflows/ci.yml", "      - run: npx --no-install playwright install chromium\n"), /fetches what no entry/],
   ["a script in a language the scan cannot read", write("scripts/render.py", "import numpy\n"), /language the scan cannot read/],

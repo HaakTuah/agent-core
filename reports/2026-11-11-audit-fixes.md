@@ -7,9 +7,9 @@ An independent audit of the core and both games, run once the licence scan had m
   cloud setup with no hand audit. `OTHER_FETCHER` now reads a program's name either as a bare word or as a quoted word
   of its own, a path before it allowed. Seven forms are added to `licence-fetch-test.mjs`. In `licence-scan-test.mjs`, a
   quoted name followed by plain words still passes. The fallback reviewer found the same miss for a quoted subcommand
-  (`pip "install"`) and for a quoted program inside a string of code (`\"pip\"`); both are read now, with four more
-  forms. `bunx` counts only before what can start an argument, so code that names `"bunx"` in a comparison or a list
-  passes.
+  (`pip "install"`) and for a quoted program inside a string of code (`\"pip\"`); both are read now, with seven more
+  forms. `bunx` counts only before what can start an argument (a word, a path, a quote, a variable, a backslash or a
+  backtick), so code that names `"bunx"` in a comparison or a list passes.
 - **`scripts/licences.mjs`:** every audit entry that ships, but the owner's own, must have its notice (floor rule 10). A
   project that builds its notices from the audit gives the entry a `notice`. A project that keeps a notices file names
   that file in its config (`notices`), and the entry's name must appear in it. Each game had checked this in a script of
