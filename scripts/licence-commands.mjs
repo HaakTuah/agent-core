@@ -81,17 +81,22 @@ export const OTHER_FETCHER = new RegExp(
 export function fetched(line, atCommand = false, literal = false) {
   // (a comment after the command, and a redirection, ">log", "2> log", "&>log", "<in", with its target wherever it
   // stands, are known by the word as written and only outside quotes: a quoted '#x', "release #1" or '>' is an
-  // argument; in a line built from an argument list, where no shell reads it, every word is one)
+  // argument; in a line built from an argument list, where no shell reads it, every word is one. Quotes are followed
+  // twice, a backslash escaping the next character and not, since it may belong to a string around the command
+  // ("npm i --cache \"a #c\" x" in code); a word counts as outside only where both readings say so)
   const raw = line.trim().split(/\s+/u);
-  let quote = "";
-  const quoted = raw.map((w) => {
-    const was = quote !== "";
-    for (let k = 0; k < w.length; k++) {
-      if (w[k] === "\\" && quote !== "'") k++;
-      else if (quote) { if (w[k] === quote) quote = ""; } else if ("'\"`".includes(w[k])) quote = w[k];
-    }
-    return was;
-  });
+  const inside = (escapes) => {
+    let quote = "";
+    return raw.map((w) => {
+      const was = quote !== "";
+      for (let k = 0; k < w.length; k++) {
+        if (escapes && w[k] === "\\" && quote !== "'") k++;
+        else if (quote) { if (w[k] === quote) quote = ""; } else if ("'\"`".includes(w[k])) quote = w[k];
+      }
+      return was;
+    });
+  };
+  const escaped = inside(true), plain = inside(false), quoted = raw.map((w, k) => escaped[k] || plain[k]);
   const end = literal ? -1 : raw.findIndex((w, k) => !quoted[k] && (w.startsWith("#") || w.startsWith("//")));
   const operator = (k) => !literal && !quoted[k] && /^\d*[<>&]/u.test(raw[k] ?? "");
   const kept = (end < 0 ? raw : raw.slice(0, end)).filter((w, k) => !operator(k) && !(operator(k - 1) && /^\d*[<>&]+$/u.test(raw[k - 1])));
