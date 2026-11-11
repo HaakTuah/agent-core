@@ -23,11 +23,13 @@ const REGISTRIES = {
   npm: { name: /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/, page: (n, v) => `https://www.npmjs.com/package/${n}/v/${v}` },
   pypi: { name: /^[A-Za-z0-9]([\w.-]*[A-Za-z0-9])?$/, page: (n, v) => `https://pypi.org/project/${n}/${v}/` },
 };
-const registry = e => {
+// The one place an entry's registry is decided.
+const registryOf = e => {
   const key = e.registry ?? Object.keys(REGISTRIES)[0];
-  if (!Object.hasOwn(REGISTRIES, key)) throw new Error(`${e.name}: no registry ${key}`);
-  return REGISTRIES[key];
+  if (typeof key !== "string" || !Object.hasOwn(REGISTRIES, key)) throw new Error(`${e.name}: no registry ${key}`);
+  return key;
 };
+const registry = e => REGISTRIES[registryOf(e)];
 
 // Each entry with the version its file holds now: exactly one, or it throws (a pattern that no longer finds it, an
 // entry without its wait or its "how", or a file outside the project).
@@ -54,8 +56,8 @@ export function newest(times, { days, sameMajor, version }, now) {
 }
 
 // PyPI's release times from its JSON API, as npm gives them ({ version: ISO date }): each release's first upload, a
-// release with no files, or only withdrawn ("yanked") ones, left out. An answer that lists no releases fails, so a
-// change to PyPI's answer is never read as "up to date".
+// release with no files, or only withdrawn ("yanked") ones, left out. An answer that lists or dates no release fails,
+// so a change to PyPI's answer is never read as "up to date".
 export function pypiTimes(json) {
   const releases = json?.releases;
   if (!releases || typeof releases !== "object" || !Object.keys(releases).length) throw new Error("PyPI's answer lists no releases");
@@ -65,10 +67,11 @@ export function pypiTimes(json) {
       .filter(u => typeof u === "string").sort();
     if (up.length) out[v] = up[0];
   }
+  if (!Object.keys(out).length) throw new Error("PyPI's answer dates no release");
   return out;
 }
 async function times(e) {
-  if (e.registry === "pypi") {
+  if (registryOf(e) === "pypi") {
     const res = await fetch(`https://pypi.org/pypi/${encodeURIComponent(e.name)}/json`);
     if (!res.ok) throw new Error(`${e.name}: PyPI answered ${res.status}`);
     return pypiTimes(await res.json());
