@@ -103,11 +103,11 @@ closed, not to match HTML's parser case by case: every script element's tag and 
 comment, an attribute's value or a textarea too, and to the file's end where it holds `<!--`), but a script of data or a
 template by its own type attribute (JSON-LD, an import map, text/template); every handler and bound attribute anywhere;
 and, in Svelte, Vue and Astro, every expression in braces, a style block's rules among them. Its other text runs nothing
-and is not read, so a page may show a command in its text or in a comment, but a commented-out script, a style rule or a
-data block's text quoting a script, naming a fetch, fails. A command running on past 16 KB with no end fails, since it
-cannot be read whole; npm named elsewhere, as in a message, is read 1 KB on, for a fetch it names. A wrapper that hands
-its own arguments to npm (`exec npm "$@"`) fails, and no hand audit passes it, since what it fetches is chosen by its
-callers, whose calls the scan cannot read. Lockfile packages need no audit entry, since the check reads each one's
-licence from the lockfile at every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of
-its own rather than a list of folders the scan passes over, so every asset's origin stands in one place. Questions for
-the owner: none.
+and is not read, so a page may show a command in its text or in a comment, but a commented-out script, a style rule, a
+data block's text quoting a script or a script tag's own attribute, naming a fetch, fails. A command running on past 16
+KB with no end fails, since it cannot be read whole; npm named elsewhere, as in a message, is read 1 KB on, for a fetch
+it names. A wrapper that hands its own arguments to npm (`exec npm "$@"`) fails, and no hand audit passes it, since what
+it fetches is chosen by its callers, whose calls the scan cannot read. Lockfile packages need no audit entry, since the
+check reads each one's licence from the lockfile at every version; Snakes' hand list of them repeated it. The owner's
+own work gets a kind of its own rather than a list of folders the scan passes over, so every asset's origin stands in
+one place. Questions for the owner: none.
