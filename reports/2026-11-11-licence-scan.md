@@ -92,23 +92,25 @@ any file but prose counts, so a `# Copyright` line in a workflow, or credits quo
 need an entry not the owner's (his own work carries none; credits belong in a prose file). In code, a string that is
 only "npx" or "npm", not called with its arguments right there, fails, as does a shell variable set to only one of them
 (with export, local, readonly and the like), and npx naming nothing to run where it is written ("npx -y" held for later,
-$(command -v npx)), since the scan cannot follow any of them into the variable; a shell's own check that npx is there
-(`command -v npx` as a statement) and `npx --version` pass. Where npm stands as a command (a line's start, after `;`,
-`&&` or `if`, or opening a string that opens a call or a value, past variables set for it, a path and a runner, whose
-arguments are all taken as its own (`sudo -Hu root`, `eval`, `flock FILE`, `npx cross-env`), read by one walk back over
-the line; a project's own wrapper (`retry npm "$X"`) is not followed; a message opening a string with a word that also
-names a runner, `log("nice npm work")`, fails and is reworded), a word after it that is no npm command fails, since it
-may be a variable or a string built in code: a message that opens a call's string, `console.log("npm x")`, fails too and
-is reworded (neither game has one), while `echo "npm x"` and a message mid-string pass. npx is held to more: any mention
-of it with a bare name fails, prose too (`echo "no npx here"`), as before. A page or component is read so as to fail
-closed, not to match HTML's parser case by case: every script element's tag and body wherever `<script` stands (in a
-comment, an attribute's value or a textarea too, and to the file's end where it holds `<!--`), but a script of data or a
-template by its own type attribute (JSON-LD, an import map, text/template); every handler and bound attribute anywhere;
-and, in Svelte, Vue and Astro, every expression in braces, a style block's rules among them. Its other text runs nothing
-and is not read, so a page may show a command in its text or in a comment, but a commented-out script, a style rule, a
-data block's text quoting a script or a script tag's own attribute, naming a fetch, fails. A command running on past 16
-KB with no end fails, since it cannot be read whole; npm named elsewhere, as in a message, is read 1 KB on, for a fetch
-it names. Quotes in a shell line are followed both with and without backslash escapes, since a backslash may belong to a
+$(command -v npx)), since the scan cannot follow any of them into the variable; nor can it follow a command the shell
+builds as it runs (`npx${IFS}-y`, `n"p"x`, a string decoded or put together from variables), which the review of the PR
+that adds it is what sees; a shell's own check that npx is there (`command -v npx` as a statement) and `npx --version`
+pass. Where npm stands as a command (a line's start, after `;`, `&&` or `if`, or opening a string that opens a call or a
+value, past variables set for it, a path and a runner, whose arguments are all taken as its own (`sudo -Hu root`,
+`eval`, `flock FILE`, `npx cross-env`), read by one walk back over the line; a project's own wrapper (`retry npm "$X"`)
+is not followed; a message opening a string with a word that also names a runner, `log("nice npm work")`, fails and is
+reworded), a word after it that is no npm command fails, since it may be a variable or a string built in code: a message
+that opens a call's string, `console.log("npm x")`, fails too and is reworded (neither game has one), while `echo "npm
+x"` and a message mid-string pass. npx is held to more: any mention of it with a bare name fails, prose too (`echo "no
+npx here"`), as before. A page or component is read so as to fail closed, not to match HTML's parser case by case: every
+script element's tag and body wherever `<script` stands (in a comment, an attribute's value or a textarea too, and to
+the file's end where it holds `<!--`), but a script of data or a template by its own type attribute (JSON-LD, an import
+map, text/template); every handler and bound attribute anywhere; and, in Svelte, Vue and Astro, every expression in
+braces, a style block's rules among them. Its other text runs nothing and is not read, so a page may show a command in
+its text or in a comment, but a commented-out script, a style rule, a data block's text quoting a script, a script tag's
+own attribute or an argument list's argument holding spaces, naming a fetch, fails. A command running on past 16 KB with
+no end fails, since it cannot be read whole; npm named elsewhere, as in a message, is read 1 KB on, for a fetch it
+names. Quotes in a shell line are followed both with and without backslash escapes, since a backslash may belong to a
 string around the command, and a `#` or `>` there counts only where both readings put it outside; so an escaped quote in
 a shell line before a real comment (`--cache \"a #c`) fails falsely. A wrapper that hands its own arguments to npm
 (`exec npm "$@"`) fails, and no hand audit passes it, since what it fetches is chosen by its callers, whose calls the
