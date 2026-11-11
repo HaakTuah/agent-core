@@ -76,7 +76,9 @@ function executable(text, f) {
     // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
     let stop = body === 0 ? -1 : lower.indexOf(close, body);
     while (stop >= 0 && b > 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
-    if (b === 1 && body > 0) parts.push(text.slice(body, stop < 0 ? text.length : stop));
+    // (a script of data or a template, as JSON-LD, an import map or text/template, runs nothing; any other type may)
+    const inert = /\btype\s*=\s*["']?[^"'\s>]*(json|template|importmap|speculationrules|text\/(html|plain|markdown))/iu.test(text.slice(first, body));
+    if (b === 1 && body > 0 && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
     if (body === 0 || stop < 0) break;
     at = stop + close.length;
   }

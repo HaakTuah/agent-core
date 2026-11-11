@@ -56,12 +56,18 @@ const VALUED = new Set([
   "--searchopts", "--searchstaleness", "--shell", "--tag", "--tag-version-prefix", "--umask", "--userconfig", "--viewer",
   "--which", "--workspace",
 ]);
-// Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments).
+// Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments),
+// past any options before their subcommand (pip --isolated install, git -C dir clone, cargo +nightly install), eight
+// at most: past eight, a fetcher with options counts as a fetch.
+const OPTION = String.raw`(?:\s+[-+]\S+(?:\s+[^\s+-]\S*)?)`;
+const fetcher = (name, then) => `${name}(?:${OPTION}{0,8}\\s+${then}|${OPTION}{8})`;
 export const OTHER_FETCHER = new RegExp(
   "(?:^|[\\s;&|(`$\'\"/\\\\])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
     "['\"`](?:[^'\"`\\s]*[/\\\\])?git['\"`]\\s*,\\s*\\[\\s*['\"`]clone|" +
-    "\\b(?:pipx?3?\\s+install|pnpm\\s+(?:dlx|add|install|i)\\s|yarn\\s+(?:dlx|add)\\s|bunx\\s|bun\\s+(?:add|x|install)\\s|playwright\\s+install|" +
-    "git\\s+clone|gem\\s+install|cargo\\s+install|go\\s+install|apt(?:-get)?\\s+install|brew\\s+install|deno\\s+(?:install|run))",
+    `\\b(?:${fetcher("pipx?3?", "install")}|${fetcher("pnpm", "(?:dlx|add|install|i)\\s")}|${fetcher("yarn", "(?:dlx|add)\\s")}|bunx\\s|` +
+    `${fetcher("bun", "(?:add|x|install)\\s")}|${fetcher("playwright", "install")}|${fetcher("git", "clone")}|${fetcher("gem", "install")}|` +
+    `${fetcher("cargo", "install")}|${fetcher("go", "install")}|${fetcher("apt(?:-get)?", "install")}|${fetcher("brew", "install")}|` +
+    `${fetcher("deno", "(?:install|run)")})`,
   "mu",
 );
 

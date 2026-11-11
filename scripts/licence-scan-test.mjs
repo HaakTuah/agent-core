@@ -40,6 +40,7 @@ for (const [what, change] of [
     write("site/tutorial.html", "<p>Run npx mossgrip-cli to start, or curl -o moss.tgz https://mossgrip.example/moss.tgz.</p>\n<pre>npx create-moss my-app</pre>\n<script>const moss = 1;</script>\n")(dir);
     write("site/Guide.vue", "<template><p>Run npx mossgrip-cli to start.</p></template>\n<script setup>const moss = 1;</script>\n")(dir);
   }],
+  ["a page's structured data and template in script tags", write("site/howto.html", "<script type=\"application/ld+json\">{\"@type\":\"HowTo\",\"text\":\"npx mossgrip-cli\"}</script>\n<script type=\"text/template\"><p>npx mossgrip-cli</p></script>\n")],
   ["a page's comment around text, and a component's style block", (dir) => {
     write("site/guide.html", "<!-- <script> --><p>Run npx mossgrip-cli to start.</p>\n<script>const moss = 1;</script>\n")(dir);
     write("site/Moss.vue", "<template><p>{{ moss }}</p></template>\n<style>.moss { content: \"npx mossgrip-cli\" }</style>\n")(dir);

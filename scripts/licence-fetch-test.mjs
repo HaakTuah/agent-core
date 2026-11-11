@@ -107,6 +107,8 @@ for (const [what, change, why] of [
   ["a script in another language that reaches users, audited as a tool", (dir) => { write("site/lib.py", "import moss\n")(dir); handAudited("site/lib.py")(dir); }, /reaches users/],
   ["a licence notice in a script of another language", write("scripts/lichen.py", "# SPDX-License-Identifier: GPL-3.0-only\n"), /language the scan cannot read|licence notice/],
   ["curl run by a tool", write("scripts/tiles.mjs", "execFileSync(\"curl\", [\"-sSf\", \"https://mossgrip.example/tile.png\"]);\n"), /fetches what no entry/],
+  ...["pip --isolated install mosspy", "git -C vendor clone https://mossgrip.example/moss.git", "cargo +nightly install mossgrip"]
+    .map((line) => [`another fetcher with options before its command: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
   ["playwright install", append(".github/workflows/ci.yml", "      - run: npx --no-install playwright install chromium\n"), /fetches what no entry/],
   ["a script in a language the scan cannot read", write("scripts/render.py", "import numpy\n"), /language the scan cannot read/],
@@ -136,6 +138,7 @@ for (const [what, change, why] of [
   ["npx in an Astro component's frontmatter", write("site/Moss.astro", "---\nexecSync('npx -y mossgrip-cli');\n---\n<p>moss</p>\n"), /cannot be audited/],
   ["npm in a Svelte component's expression", write("site/Moss.svelte", "<p>{execSync('npm install -g mossgrip-widgets@1.2.3')}</p>\n"), /mossgrip-widgets .* is not in/],
   ["npx in a page's event handler", write("site/moss.html", "<button onclick=\"execSync('npx -y mossgrip-cli')\">moss</button>\n"), /cannot be audited/],
+  ["npx in a page's module script", write("site/moss.html", "<script type=\"module\">execSync('npx -y mossgrip-cli');</script>\n"), /cannot be audited/],
   ["npx in a page's script left open", write("site/moss.html", "<p>moss</p>\n<script>\nexecSync('npx -y mossgrip-cli');\n"), /cannot be audited/],
   ["npx in a config with comments", write("site/jsconfig.json", "{\n  // a comment\n  \"run\": \"npx -y mossgrip-cli\"\n}\n"), /cannot be audited/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
