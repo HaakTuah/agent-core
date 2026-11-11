@@ -52,6 +52,8 @@ for (const [what, change, why] of [
   ["npm install folded over two lines of YAML", append(".github/workflows/ci.yml", "      - run: >\n          npm install -g\n          mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
   ["npx in the step after a folded block", append(".github/workflows/ci.yml", "      - run: >\n          echo moss\n      - run: npx --no-install vitest run\n      - run: npx -y mossgrip-widgets\n"), /mossgrip-widgets cannot be audited/],
   ["npx in the step after a folded condition and npm ci", append(".github/workflows/ci.yml", "      - if: >\n          github.event_name == 'push'\n        run: npm ci\n      - run: npx -y mossgrip-widgets\n"), /mossgrip-widgets cannot be audited/],
+  ["a second script whose name looks like a command key", write("package.json", JSON.stringify({ scripts: { "build:scripts": "npx mossgrip-cli@1.2.3", "test:scripts": "npx mossgrip-widgets@1.2.3" } })), /mossgrip-widgets .* is not in/],
+  ["two programs side by side at an object's top", write("tools/run.json", JSON.stringify({ "build:script": "npx mossgrip-cli@1.2.3", "test:script": "npx mossgrip-widgets@1.2.3" })), /mossgrip-widgets .* is not in/],
   ["npx in package.json's lint-staged", write("package.json", JSON.stringify({ "lint-staged": { "*.js": "npx -y mossgrip-cli" } })), /cannot be audited/],
   ["npx in package.json's hooks", write("package.json", JSON.stringify({ husky: { hooks: { "pre-commit": "npx -y mossgrip-cli" } } })), /cannot be audited/],
   ["npx in a lint-staged file", write(".lintstagedrc.json", JSON.stringify({ "*.ts": ["npx -y mossgrip-cli"] })), /cannot be audited/],

@@ -20,8 +20,8 @@
 //     only in a file an entry's "files" names, that entry its hand audit;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
-//   - an entry covering each code file or text asset (an SVG) carrying a licence notice, and each font, image, sound,
-//     video, model or data file, and each binary file whatever its name;
+//   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
+//     asset (an SVG), and each font, image, sound, video, model or data file, and each binary file whatever its name;
 //   - what lies under "served" but not "tools" reaches users, so an entry covering it there ships.
 // The owner's own work (kind "own") covers only files it names one by one, never a file carrying someone's licence
 // notice, an action or a package. Each "files" path, and each path of "scan", must name a tracked file or a folder
@@ -45,6 +45,7 @@ const ASSET = new RegExp(
     "webm|mp4|mov|ogv|glb|gltf|fbx|blend|stl|wasm|pdf|csv|tsv|geojson|topojson|parquet|sqlite|db)$",
   "iu",
 );
+const PROSE_FILE = /\.(md|markdown|txt|rst|adoc)$/iu;
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
@@ -192,14 +193,18 @@ const PROSE = /^(\$?comment|about|description|summary|how|used|why|notes?|help|m
 const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
 function commandLines(v) {
   if (!v || typeof v !== "object") return typeof v === "string" ? [v] : [];
-  const line = [], out = [];
+  const programs = [], args = [], out = [];
   for (const [k, x] of Object.entries(v)) {
     if (!Array.isArray(v) && PROSE.test(k)) continue;
-    if (!Array.isArray(v) && COMMAND.test(k) && (typeof x === "string" || (Array.isArray(x) && x.every((y) => typeof y === "string")))) line.push(...strings(x));
+    const listed = Array.isArray(x) && x.every((y) => typeof y === "string");
+    if (!Array.isArray(v) && COMMAND.test(k) && typeof x === "string") programs.push(x);
+    else if (!Array.isArray(v) && COMMAND.test(k) && listed) args.push(...x);
     else if (!Array.isArray(v) && COMMAND.test(k)) out.push(...strings(x)); // (package.json's "scripts": every one, a "help" too)
     else out.push(...commandLines(x));
   }
-  return line.length ? [line.join(" "), ...out] : out;
+  // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are)
+  if (programs.length === 1) return [[programs[0], ...args].join(" "), ...out];
+  return [...programs, ...(args.length ? [args.join(" ")] : []), ...out];
 }
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
@@ -287,7 +292,8 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
       if (!byHand(f)) fail(`${f} is in a language the scan cannot read: name it in the "files" of the entries of what it uses`);
       else if (served(f) && !covering(f).some((e) => e.kind !== "own" && e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so an entry covering it ships`);
     }
-    if ((CODE.test(f) || runs || other || ASSET.test(f)) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });
+    // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
+    if (!binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });
     if (ASSET.test(f) || binary.has(f)) needFile(f, binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
   }
   return { failures, scanned: files.length };

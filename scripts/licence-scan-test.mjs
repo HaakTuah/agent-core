@@ -59,6 +59,7 @@ for (const [what, change, why] of [
   ["third-party code that ships, audited as a tool", (dir) => { write("site/lib/mossgrip.min.js", "/*! mossgrip v1 | MIT */\nvar m=1;\n")(dir); entry({ name: "site/lib/mossgrip.min.js", licence: "MIT" })(dir); }, /reaches users/],
   ["third-party code copied into a tool", write("scripts/lichen.mjs", "// SPDX-License-Identifier: MIT\nexport const l = 1;\n"), /licence notice/],
   ["a notice written as a year", write("site/lib/moss.css", "/* Copyright 2020 Mossgrip Ltd. */\n"), /licence notice/],
+  ["code copied in, in a language it does not run", write("site/lib.c", "/* SPDX-License-Identifier: GPL-3.0-only */\nint moss;\n"), /lib\.c \(a file carrying a licence notice\)/],
   ["a font, image or sound not in the audit", write("site/bark.png", ""), /bark\.png .* is not in/],
   ["a font kept with a tool, not in the audit", write("scripts/mossface.ttf", ""), /mossface\.ttf/],
   ["a WebAssembly module not in the audit", write("site/moss.wasm", ""), /moss\.wasm/],
