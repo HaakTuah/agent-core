@@ -23,7 +23,9 @@ jobs:
           node-version-file: .node-version
       - name: The versions check
         run: node scripts/versions-test.mjs
-      - name: The licence check and its scan
+      - name: The licence check's lists and readers
         run: node scripts/licences-test.mjs
+      - name: The licence check on a whole project, and its scan
+        run: node scripts/licence-scan-test.mjs
       - name: What the core's own workflows and scripts use, each to its list
         run: node scripts/licences.mjs .github/licences.json

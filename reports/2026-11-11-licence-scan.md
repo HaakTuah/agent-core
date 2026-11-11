@@ -29,12 +29,13 @@ too).
   `LicenseRef-Owner` for the owner's own work, all rights reserved as floor rule 10 ends, and only for it. Such an
   entry names its files one by one, and never stands in for an action, a package or a file carrying someone's
   notice. The summary counts the files scanned. **`scripts/licences.d.mts`:** the new key.
-- **`scripts/licences-test.mjs`:** the check had no test here; Amarna tested its lists and readers in its own suite.
-  Those tests come here, on invented names: how a licence expression is read, which list allows what, a package known
-  by its registry address, npm's settings. Then it stages a small project in a temporary git repository. The project
-  passes as it is, passes 16 allowed forms, and fails 78 others, each for the reason it names: the licence lists, a
-  lockfile's package, the owner's kind, actions, every form of fetch, copied code, assets and binaries, lockfiles left
-  unchecked, an entry covering nothing, and a bad `"scan"`.
+- **`scripts/licences-test.mjs`** and **`scripts/licence-scan-test.mjs`:** the check had no test here; Amarna tested
+  its lists and readers in its own suite. Those tests come into the first, on invented names: how a licence expression
+  is read, which list allows what, a package known by its registry address, npm's settings. The second stages a small
+  project in a temporary git repository for each case. The project passes as it is, passes 18 allowed forms, and fails
+  88 others, each for the reason it names: the licence lists, a lockfile's package, the owner's kind, actions, every
+  form of fetch, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, and a bad
+  `"scan"`.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
   leaves its copy of the core out, since this audit holds it, so the games stop listing the core's actions.
@@ -43,14 +44,15 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the test passes (103 checks), and so does the core's own audit of its 94 files. Codex's review and the
-fallback reviewer's found ways round the first version: `package.json` scripts, hooks, other spellings and fetchers,
-comments that hid commands, unread file kinds, lockfiles left out, `own` covering too much. Each is now closed and
-tested. A dry run on each game with the new scripts:
+Tested: the tests pass (8 and 107 checks), and so does the core's own audit of its 95 files. Codex's review and the
+fallback reviewer's found ways round the first two versions: `package.json` scripts, hooks, tasks and launches, other
+spellings and fetchers, an option's unknown value hiding the command, comments that hid commands, folded YAML, unread
+file kinds, lockfiles left out, `own` covering too much. Each is now closed and tested. A dry run on each game with
+the new scripts:
 - Snakes passes, but for its own scan and that scan's test, which name the forms they look for; both go in its sync
   PR.
-- Amarna passes with the audit its sync PR adds. That leaves only two `npx vitest` lines, which would fetch if nothing
-  were installed and become `npx --no-install vitest`, and one Python script for that audit to name.
+- Amarna passes with the audit its sync PR adds, but for two `npx vitest` lines, which would fetch if nothing were
+  installed and become `npx --no-install vitest` there.
 
 What changes in every project: nothing until its config adds `"scan"`. Its sync PR then adds it, with an audit entry
 for each thing the scan finds. Snakes drops the half of its own scan that moved here, keeps its game's own checks (the
@@ -58,6 +60,9 @@ addresses the game loads, its notices, `sw.js`), and drops its audit's entries f
 packages the check already reads. Amarna gains an audit, its notices are written from that audit's entries, and its
 suite drops the tests of the core's functions that moved here.
 
-Readings taken: lockfile packages need no audit entry, since the check reads each one's licence from the lockfile at
-every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of its own rather than a list of
-folders the scan passes over, so every asset's origin stands in one place. Questions for the owner: none.
+Readings taken: a hand audit (an entry's `files` naming a file, for npm pack's or another fetcher's fetches the scan
+cannot read) covers the whole file, so a later fetch added to that file passes the scan; the review of that PR is what
+sees it, as for any edit to an audit. Lockfile packages need no audit entry, since the check reads each one's licence
+from the lockfile at every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of its own
+rather than a list of folders the scan passes over, so every asset's origin stands in one place. Questions for the
+owner: none.

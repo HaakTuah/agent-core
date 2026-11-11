@@ -9,13 +9,15 @@
 //   - an entry for each action a workflow or action file uses (`uses:`), but the owner's own (HaakTuah/, the core's
 //     workflows among them) and the project's (./), by its name (owner/repo), at whatever version it is pinned to;
 //   - an entry for each package npx, npm exec, npm install (and its other spellings) or npm pack fetches, in any
-//     workflow, script, tool, command in a JSON file (package.json's "scripts", a hook's "command") or command
-//     written as an array (execFileSync("npx", [...])): written name@exact.version, and audited at that version, one
-//     entry for each version used, so an update is audited again, with what it pulls in. npx --no-install (or --no)
-//     never fetches, so a bare name passes there. A fetch it cannot read (a bare name, a range or tag, an alias, a
-//     URL, git, a variable, npm init or create, which fetch by another name) fails, but npm pack's, which runs
-//     nothing it fetches, and another fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and
-//     the like): each of those passes only in a file an entry's "files" names, that entry its hand audit;
+//     workflow, script or tool (a file with no extension read as a shell script), any command in a JSON or TOML file
+//     (package.json's "scripts", a hook's "command") and any command written as an array (execFileSync("npx", [...])):
+//     written name@exact.version, and audited at that version, one entry for each version used, so an update is audited
+//     again, with what it pulls in. npx --no-install (or --no) never fetches, so a bare name passes there. A word that
+//     is no command, straight after an option, is read as that option's value. A fetch it cannot read (a bare name, a
+//     range or tag, an alias, a URL, git, a variable, npm init or create, which fetch by another name) fails, but npm
+//     pack's, which runs nothing it fetches, and another fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright
+//     install, git clone and the like): each of those passes only in a file an entry's "files" names, that entry its
+//     hand audit;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each code file carrying a licence notice (code copied in), and each font, image, sound,
@@ -33,7 +35,7 @@ import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 
 const OWN = "HaakTuah/";
-const SHELL = /\.(ya?ml|sh|bash|zsh|mk)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile)$/iu;
+const SHELL = /\.(ya?ml|sh|bash|zsh|mk|toml)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile)$/iu;
 const JS = /\.([cm]?[jt]sx?)$/iu;
 const YAML = /\.ya?ml$/iu;
 const OTHER_LANGUAGE = /\.(py|pyw|rb|ps1|psm1|bat|cmd|pl|pm|php|lua|r|jl|tcl|vbs|groovy|gradle|kts)$/iu;
@@ -46,10 +48,22 @@ const ASSET = new RegExp(
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
-// npm's commands that fetch a package, by every spelling npm takes, and its options that take a value.
+// npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own, or
+// none); and options known to take a value. A word that is no command, straight after an option, is read as that
+// option's value, so an option it does not know cannot hide the command after it.
 const INSTALL = new Set(["install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal", "isntall", "add", "install-test", "it", "pack"]);
 const RUN = new Set(["exec", "x"]);
 const BY_OTHER_NAME = new Set(["create", "init", "innit"]);
+const NO_FETCH = new Set([
+  "access", "adduser", "audit", "author", "bugs", "issues", "cache", "ci", "clean-install", "ic", "install-clean", "isntall-clean",
+  "cit", "clean-install-test", "completion", "config", "c", "get", "set", "dedupe", "ddp", "deprecate", "diff", "dist-tag",
+  "docs", "home", "doctor", "edit", "explain", "why", "explore", "find-dupes", "fund", "help", "hlp", "help-search", "hook",
+  "link", "ln", "ll", "la", "login", "logout", "ls", "list", "org", "outdated", "owner", "ping", "pkg", "prefix", "profile",
+  "prune", "publish", "query", "rebuild", "rb", "repo", "restart", "root", "run", "run-script", "rum", "urn", "sbom",
+  "search", "find", "s", "se", "shrinkwrap", "star", "stars", "start", "stop", "team", "test", "t", "tst", "token",
+  "undeprecate", "uninstall", "unlink", "remove", "rm", "r", "un", "unpublish", "unstar", "update", "up", "upgrade",
+  "udpate", "version", "verison", "v", "view", "info", "show", "whoami",
+]);
 const VALUED = new Set(["--prefix", "-C", "--loglevel", "--registry", "--cache", "-w", "--workspace", "--userconfig", "--globalconfig", "--tag", "--omit", "--include"]);
 // Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments).
 const OTHER_FETCHER = new RegExp(
@@ -67,16 +81,26 @@ const OTHER_FETCHER = new RegExp(
  * Others: { specs: [] }.
  */
 export function fetched(line) {
-  const words = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`(]+|['"`),;]+$/gu, "")).filter(Boolean);
+  const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`(]+|['"`),;]+$/gu, "")).filter(Boolean);
+  const end = all.findIndex((w) => w.startsWith("#") || w.startsWith("//")); // (a comment after the command)
+  const words = end < 0 ? all : all.slice(0, end);
   let i = 0;
   const options = () => { while (i < words.length && words[i].startsWith("-")) i += VALUED.has(words[i]) ? 2 : 1; };
   let runs = false, local = false, packs = false;
   if (words[0] === "npx") { runs = true; i = 1; } else if (words[0] === "npm") {
-    i = 1; options();
-    const command = words[i++];
+    // (after npm, its options; a word that is no command, straight after an option, is taken as that option's value)
+    const fetching = (w) => INSTALL.has(w) || RUN.has(w) || BY_OTHER_NAME.has(w);
+    i = 1;
+    let command;
+    for (let afterOption = false; i < words.length; ) {
+      const w = words[i++];
+      if (w.startsWith("-")) { if (VALUED.has(w)) i++; afterOption = !VALUED.has(w) && !w.includes("="); continue; }
+      if (fetching(w) || NO_FETCH.has(w) || !afterOption) { command = w; break; }
+      afterOption = false;
+    }
+    if (command === undefined || !fetching(command)) return { specs: [] };
     if (RUN.has(command)) runs = true;
     else if (BY_OTHER_NAME.has(command)) { options(); return words[i] ? { specs: [], unreadable: `npm ${command} fetches a package by another name` } : { specs: [] }; }
-    else if (!INSTALL.has(command)) return { specs: [] };
     else packs = command === "pack";
   } else return { specs: [] };
   const specs = [];
@@ -85,6 +109,7 @@ export function fetched(line) {
     if (w === "-p" || w === "--package") { specs.push(words[++i] ?? ""); continue; }
     if (w.startsWith("--package=")) { specs.push(w.slice(10)); continue; }
     if (runs && (w === "--no-install" || w === "--no")) { local = true; continue; }
+    if (runs && (w === "--yes" || w === "-y")) { local = false; continue; }
     if (VALUED.has(w)) { i++; continue; }
     if (w === "--" || w.startsWith("-")) continue;
     if (runs) { if (!specs.length && !local) specs.push(w); break; }
@@ -93,23 +118,37 @@ export function fetched(line) {
   return { specs, packs };
 }
 
-/** The command lines in a text: each npx or npm and what follows it on its line, and each written as an array. */
+/**
+ * The command lines in a text: each npx or npm and what follows it on its line, and each written as an array. A line
+ * continued on the next (a shell's "\\" at its end, or a YAML folded block, "key: >") is read as one.
+ */
 function commands(text) {
   const out = [];
-  const joined = text.replace(/\\\r?\n/gu, " "); // (a shell line continued on the next)
+  const joined = text.replace(/\\\r?\n/gu, " ").replace(/:[ \t]*>[-+]?[ \t]*\r?\n((?:[ \t]+\S.*(?:\r?\n|$))+)/gu, (_, block) => `: ${block.replace(/\s*\r?\n\s*/gu, " ")}\n`);
   for (const m of joined.matchAll(/\b(npx|npm)\b[^\n;&|>]*/gu)) out.push(m[0]);
   for (const m of joined.matchAll(/['"`](npx|npm)['"`]\s*,\s*\[([^\]]*)\]/gu)) out.push([m[1], ...[...m[2].matchAll(/['"`]([^'"`]*)['"`]/gu)].map((s) => s[1])].join(" "));
   return out;
 }
 
 /**
- * The commands in a JSON value: every string under a key that holds one (package.json's "scripts", a hook's "command",
- * a step's "run" and the like), not its prose (an "about" or a "how" may name a command without running it).
+ * The commands in a JSON value, one line each: in every object, the strings and lists under its keys that hold a command
+ * (package.json's "scripts", a hook's "command", a task's "command" and "args", a launch's "runtimeExecutable" and
+ * "runtimeArgs", a container's "postCreateCommand" and the like) read together, so a program meets its arguments; an
+ * object under such a key gives one line for each of its strings. Prose (an "about", a "how") is left alone, since it
+ * may name a command without running it.
  */
-const COMMAND = new Set(["scripts", "command", "commands", "run", "cmd", "exec", "args", "script"]);
+const COMMAND = /command|cmd|script|exec|args|^run$/iu;
 const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
-const commandStrings = (v) =>
-  v && typeof v === "object" ? Object.entries(v).flatMap(([k, x]) => (COMMAND.has(k) ? strings(x) : commandStrings(x))) : [];
+function commandLines(v) {
+  if (!v || typeof v !== "object") return [];
+  const line = [], out = [];
+  for (const [k, x] of Object.entries(v)) {
+    if (COMMAND.test(k) && (typeof x === "string" || Array.isArray(x))) line.push(...strings(x));
+    else if (COMMAND.test(k) && x && typeof x === "object") out.push(...strings(x));
+    else out.push(...commandLines(x));
+  }
+  return line.length ? [line.join(" "), ...out] : out;
+}
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
 export function scan(settings, root, entries, auditPath, lockfiles = []) {
@@ -161,7 +200,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   for (const f of files) {
     if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences`);
     const text = binary.has(f) ? "" : readFileSync(join(root, f), "utf8");
-    const runs = SHELL.test(f) || JS.test(f) || (!/\.\w+$/u.test(posix.basename(f)) && text.startsWith("#!"));
+    const runs = SHELL.test(f) || JS.test(f) || (!binary.has(f) && !/\.\w+$/u.test(posix.basename(f))); // (a file with no extension: a hook, a script, read as shell)
     if (runs) {
       // (a line that is only a comment fetches nothing; a comment after code stays, since a # or // in a string is none)
       const comment = JS.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
@@ -174,7 +213,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         }
       }
       fetches(src, f);
-    } else if (f.endsWith(".json") && f !== auditPath && !LOCKFILE.test(f)) {
+    } else if (/\.json[c5]?$/u.test(f) && f !== auditPath && !LOCKFILE.test(f)) {
       let json;
       try { json = JSON.parse(text); } catch {
         // (a config with comments, as jsconfig.json and the like may hold: read whole, but a package.json must parse)
@@ -182,7 +221,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         else fetches(text.split("\n").map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
         continue;
       }
-      fetches(commandStrings(json).join("\n"), f);
+      fetches(commandLines(json).join("\n"), f);
       const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
       if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
         fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences`);
