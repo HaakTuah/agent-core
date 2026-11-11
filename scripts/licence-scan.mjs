@@ -8,12 +8,13 @@
 //     workspace of one, so the check reads every package any of them installs;
 //   - an entry for each action a workflow or action file uses (`uses:`), but the owner's own (HaakTuah/, the core's
 //     workflows among them) and the project's (./), by its name (owner/repo), at whatever version it is pinned to;
-//   - an entry for each package npx, npm exec (Windows' npx.cmd and npm.cmd too), npm install (and its other spellings)
-//     or npm pack fetches, in any workflow, script or tool (a file with no extension read as a shell script), any
-//     command in a JSON or TOML file (package.json's "scripts", a hook's "command") any command nested in another (npx
-//     -c '...') and any command written as an array (execFileSync("npx", [...]), or by a path to the program): written
-//     name@exact.version, and audited at that version, one entry for each version used, so an update is audited again,
-//     with what it pulls in. npx --no-install (or --no) never fetches, so a bare name passes there. A word that is no
+//   - an entry for each package npx, npm exec (Windows' npx.cmd and npm.cmd too), npm install (and its other
+//     spellings), npm link or npm pack fetches, past any redirection, in any workflow, script or tool (a file with no
+//     extension read as a shell script), any command in a JSON or TOML file (package.json's "scripts", a hook's
+//     "command") any command nested in another (npx -c '...') and any command written as an array (execFileSync("npx",
+//     [...]), or by a path to the program): written name@exact.version, and audited at that version, one entry for each
+//     version used, so an update is audited again, with what it pulls in. npx --no-install (or --no) never fetches, so
+//     a bare name passes there, but npx naming nothing to run here ("npx -y" in a variable) fails. A word that is no
 //     command, straight after an option, is read as that option's value. A fetch it cannot read (a bare name, a range
 //     or tag, an alias, a URL, git, a variable, npm init or create, which fetch by another name, npm update or npm
 //     audit fix, which take the newest a range allows, npm config set pointing at another registry, a program named in
@@ -58,12 +59,13 @@ const INSTALL = new Set(["install", "i", "in", "ins", "inst", "insta", "instal",
 const RUN = new Set(["exec", "x"]);
 const BY_OTHER_NAME = new Set(["create", "init", "innit"]);
 const UPDATE = new Set(["update", "up", "upgrade", "udpate"]);
+const LINK = new Set(["link", "ln"]);
 const CONFIG = new Set(["config", "c", "set"]);
 const NO_FETCH = new Set([
   "access", "adduser", "audit", "author", "bugs", "issues", "cache", "ci", "clean-install", "ic", "install-clean", "isntall-clean",
   "cit", "clean-install-test", "completion", "config", "c", "get", "set", "dedupe", "ddp", "deprecate", "diff", "dist-tag",
   "docs", "home", "doctor", "edit", "explain", "why", "explore", "find-dupes", "fund", "help", "hlp", "help-search", "hook",
-  "link", "ln", "ll", "la", "login", "logout", "ls", "list", "org", "outdated", "owner", "ping", "pkg", "prefix", "profile",
+  "ll", "la", "login", "logout", "ls", "list", "org", "outdated", "owner", "ping", "pkg", "prefix", "profile",
   "prune", "publish", "query", "rebuild", "rb", "repo", "restart", "root", "run", "run-script", "rum", "urn", "sbom",
   "search", "find", "s", "se", "shrinkwrap", "star", "stars", "start", "stop", "team", "test", "t", "tst", "token",
   "undeprecate", "uninstall", "unlink", "remove", "rm", "r", "un", "unpublish", "unstar", "version", "verison", "v",
@@ -101,16 +103,18 @@ export function fetched(line) {
   const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`([]+|['"`),;\]]+$/gu, "")).filter(Boolean);
   if (/^(npx|npm)\.cmd$/iu.test(all[0] ?? "")) all[0] = all[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
   const end = all.findIndex((w) => w.startsWith("#") || w.startsWith("//")); // (a comment after the command)
-  const words = end < 0 ? all : all.slice(0, end);
+  const kept = end < 0 ? all : all.slice(0, end);
+  // (a redirection, ">log", "2> log", "&>log", "<in", goes with its target, wherever it stands)
+  const words = kept.filter((w, k) => !/^\d*[<>&]/u.test(w) && !/^\d*[<>&]+$/u.test(kept[k - 1] ?? ""));
   // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
   if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^--(user|global)config\b|^npm_config_.*(registry|config)/iu.test(w)))
     return { specs: [], unreadable: "it fetches from another registry than npm's, or reads another npm config that may name one" };
   let i = 0;
   const options = () => { while (i < words.length && words[i].startsWith("-")) i += VALUED.has(words[i]) ? 2 : 1; };
-  let runs = false, npx = false, local = false, packs = false;
+  let runs = false, npx = false, local = false, packs = false, linking = false;
   if (words[0] === "npx") { runs = npx = true; i = 1; } else if (words[0] === "npm") {
     // (after npm, its options; a word that is no command, straight after an option, is taken as that option's value)
-    const fetching = (w) => INSTALL.has(w) || RUN.has(w) || BY_OTHER_NAME.has(w) || UPDATE.has(w);
+    const fetching = (w) => INSTALL.has(w) || RUN.has(w) || BY_OTHER_NAME.has(w) || UPDATE.has(w) || LINK.has(w);
     i = 1;
     let command;
     for (let afterOption = false; i < words.length; ) {
@@ -128,6 +132,7 @@ export function fetched(line) {
     if (command === undefined || !fetching(command)) return { specs: [] };
     if (UPDATE.has(command)) return { specs: [], unreadable: `npm ${command} fetches the newest release a range allows, which cannot be audited` };
     if (RUN.has(command)) runs = true;
+    if (LINK.has(command)) linking = true; // (npm link <package> installs it if missing; a folder is linked as it is)
     else if (BY_OTHER_NAME.has(command)) { options(); return words[i] ? { specs: [], unreadable: `npm ${command} fetches a package by another name` } : { specs: [] }; }
     else packs = command === "pack";
   } else return { specs: [] };
@@ -146,11 +151,13 @@ export function fetched(line) {
     if (runs && /^(-c|--call)(=|$)/u.test(w)) { called = true; if (!w.includes("=")) i++; continue; } // (the shell line it runs: read as a line of its own)
     if (VALUED.has(w)) { i++; continue; }
     if (w.startsWith("-")) continue;
-    if (!runs) { specs.push(w); continue; }
+    if (!runs) { if (!(linking && /^(\.|\/|~|file:)/u.test(w))) specs.push(w); continue; }
     command ??= w;
     if (npx) break;
   }
   if (runs && !specs.length && command !== undefined && !local && !called) specs.push(command);
+  // (npx with no package and nothing to run here takes them from elsewhere: a variable, "npx -y" + a package later)
+  if (runs && !specs.length && command === undefined && !called) return { specs: [], unreadable: "it names nothing to run here, so what it runs comes from elsewhere" };
   return { specs, packs };
 }
 
@@ -204,18 +211,19 @@ function commands(text, code = false) {
   const out = [];
   const joined = folded(text.replace(/\\\r?\n/gu, " "));
   // (each npx or npm, nested ones too, as in npx -c 'npm install ...', starts a line of its own; an array, below)
-  for (const m of joined.matchAll(/\b(?=(npx|npm)(\.cmd)?\b(?!['"`]\s*,))/giu)) out.push(/^[^\n;&|>]*/u.exec(joined.slice(m.index))[0]);
+  // (a command runs to the next ; | && || or & that is no redirection; a redirection is read past in fetched())
+  for (const m of joined.matchAll(/\b(?=(npx|npm)(\.cmd)?\b(?!['"`]\s*,))/giu)) out.push(/^(?:[^\n;|&]|&(?=>)|(?<=[<>])&)*/u.exec(joined.slice(m.index))[0]);
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
   // (in code, a string that is only npx or npm, not called with its arguments right there, is a program held in a
   // variable, which cannot be followed; in a workflow or a config, "npm" names npm, as an ecosystem or a cache)
   // (in a shell script, a variable set to only npx or npm, "$NPX -y x", is a program held in a variable too)
-  if (!code) for (const m of joined.matchAll(/^\s*(?:export\s+)?\w+=["']?(?:\S*\/)?(npx|npm)(?:\.cmd)?["']?\s*$/gimu)) out.push(`${m[1].toLowerCase()} ${m[1].toLowerCase() === "npm" ? "install " : ""}<a-program-held-in-a-variable>`);
-  if (code) for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`](?!\s*,)/giu)) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<a-program-held-in-a-variable>`);
+  if (!code) for (const m of joined.matchAll(/^\s*(?:(?:export|local|readonly|declare|typeset)(?:\s+-\w+)*\s+)?\w+=["']?(?:\S*\/)?(npx|npm)(?:\.cmd)?["']?\s*$/gimu)) out.push(`${m[1].toLowerCase()} ${m[1].toLowerCase() === "npm" ? "install " : ""}a-program-held-in-a-variable`);
+  if (code) for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`](?!\s*,)/giu)) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}a-program-held-in-a-variable`);
   for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
     if (literal) out.push([m[1], ...literal].join(" "));
-    else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && command !== "audit")) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<its-arguments,-not-written-out>`); // (npm view with a variable: no fetch)
+    else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && command !== "audit")) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}its-arguments-not-written-out`); // (npm view with a variable: no fetch)
   }
   return out;
 }
@@ -293,6 +301,8 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
     if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text`);
     if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version`);
     for (const p of e.files ?? []) if (!tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file`);
+    const shipped = files.find((f) => served(f) && covers(e, f));
+    if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships`);
   }
   const locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) {
