@@ -5,9 +5,10 @@
 #   core/scripts/site-publish.sh pr-<n> <site-dir>    a PR's preview: replaces pr-<n>/ only
 #   core/scripts/site-publish.sh pr-<n> --remove      removes pr-<n>/ only
 # Run only from workflows that run main's own copy (never a PR's code): the game's publish of main, and the core's
-# preview workflow. Each publish is one fresh commit with no parent, so the branch does not grow with every build; it
-# is pushed with a lease on the commit it was built from, and redone from the new tip if another run moved the branch
-# first.
+# preview workflow. The root is published only from main's newest commit: run for any other (GITHUB_SHA, such as an
+# older run re-run), it is skipped, so the live game never goes back. Each publish is one fresh commit with no parent,
+# so the branch does not grow with every build; it is pushed with a lease on the commit it was built from, and redone
+# from the new tip if another run moved the branch first.
 set -euo pipefail
 target=$1 src=$2
 [[ $target =~ ^(root|pr-[0-9]+)$ ]] || { echo "bad target: $target" >&2; exit 2; }
@@ -22,6 +23,11 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 for attempt in 1 2 3 4 5; do
+  if [ "$target" = root ] && [ -n "${GITHUB_SHA:-}" ]; then
+    git fetch -q origin "+refs/heads/main:refs/remotes/origin/main"
+    main=$(git rev-parse refs/remotes/origin/main)
+    [ "$main" = "$GITHUB_SHA" ] || { echo "gh-pages: main is now at ${main:0:7}, not this run's ${GITHUB_SHA:0:7}; root skipped"; exit 0; }
+  fi
   rm -rf "$work/tree" && mkdir "$work/tree"
   if git fetch -q origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null; then
     old=$(git rev-parse "refs/remotes/origin/$branch")
