@@ -19,12 +19,12 @@ the app talks to. The project names its inputs.
 (`&`, `<`, `>`, `"`, `'`) where markup is built; never into an attribute, URL, style or event handler unescaped; no
 `eval`, `new Function` or string timers.
 
-**7. What runs on users' machines** (core archive 37 and 65): every package, tool and script at one exact version, never
+**7. What runs on users' machines** (core archive 37, 65 and 151): every package, tool and script at one exact version, never
 a range; a new stable release taken once it is a week old (two for a script browsers load directly). For what ships, and
 everything that builds it, a new version merges only after its source is checked in the PR: the same publisher and
 repository as before (and its provenance, if the old one had it), the registry's signature verified (npm: `npm audit
 signatures` after an install with `--ignore-scripts`, or, where Sigstore cannot be reached, against the key of the same
-id at `https://registry.npmjs.org/-/npm/v1/keys`; elsewhere, the project's own check), and the diff read against the
+id at `https://registry.npmjs.org/-/npm/v1/keys`; elsewhere, by the registry's own tool), and the diff read against the
 release notes, naming anything they do not explain. A check that cannot run, or fails, holds the release back. A page's
 content security policy is never weakened. The project names what it ships and its policy.
 
