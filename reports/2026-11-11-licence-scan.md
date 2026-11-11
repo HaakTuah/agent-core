@@ -65,7 +65,7 @@ suite drops the tests of the core's functions that moved here.
 
 Readings taken: a hand audit (an entry's `files` naming a file, for npm pack's or another fetcher's fetches the scan
 cannot read) covers the whole file, so a later fetch added to that file passes the scan; the review of that PR is what
-sees it, as for any edit to an audit. The scan's test file is a little past 20 KB: it is one list of cases, read only by whoever changes the scan. Lockfile packages need no audit entry, since the check reads each one's licence
-from the lockfile at every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of its own
-rather than a list of folders the scan passes over, so every asset's origin stands in one place. Questions for the
-owner: none.
+sees it, as for any edit to an audit. The scan's test file is a little past 20 KB: it is one list of cases, read only by
+whoever changes the scan. Lockfile packages need no audit entry, since the check reads each one's licence from the
+lockfile at every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of its own rather
+than a list of folders the scan passes over, so every asset's origin stands in one place. Questions for the owner: none.
