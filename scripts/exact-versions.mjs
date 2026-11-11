@@ -3,9 +3,10 @@
 // package.json outside core/) that asks for a package by a range, a tag or an address that can move. What passes:
 //   - one exact version (1.2.3, with or without a pre-release or build part), also behind an alias (npm:name@1.2.3);
 //   - a package of the project's own: a file: or link: path that stays inside the project, or a workspace (a
-//     package.json that a package list's "workspaces" names) asked for as * or by workspace:, by that list or another
-//     of its workspaces, which npm then fills from the project itself;
-//   - a git address, in any form npm reads as one, at a full commit SHA.
+//     package.json that a package list's "workspaces" names and no "!" there leaves out) asked for as * or by
+//     workspace:, by that list or another of its workspaces, which npm then fills from the project itself;
+//   - a git address, in a form npm reads as one, at a full commit SHA (a plain https address only on the hosts npm
+//     knows: elsewhere npm downloads it as a file, so there it is written git+https://).
 // What another installer holds, the project's own checks do (README.md, "How a project takes the core", point 5). Reads
 // only; Node's own modules. It checks the project it lies in, whatever the directory it is started from. Run by the
 // copies workflow (.github/workflows/copies.yml).
@@ -18,7 +19,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const VERSION = "\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?";
 const EXACT = new RegExp(`^(?:npm:(?:@[^/@]+/)?[^/@]+@)?${VERSION}$`, "u");
 const FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
-const GIT = /^(?:git\+[a-z]+:\/\/\S+|git:\/\/\S+|git@\S+|(?:github|gitlab|bitbucket|gist):\S+|https?:\/\/\S+\.git|[\w.-]+\/[\w.-]+)$/u;
+// The forms npm reads as a git address. A plain https address is one only on the hosts npm knows; anywhere else npm
+// downloads it as a file, whatever follows the #, so there a git address says so (git+https://).
+const GIT = new RegExp(`^(?:${[
+  "git\\+(?:ssh|https?|file):\\/\\/\\S+", "git:\\/\\/\\S+", "(?:github|gitlab|bitbucket|gist):\\S+", "[^@\\s/]+@[^:.\\s/]+\\.[^:\\s/]+:\\S+",
+  "https:\\/\\/(?:github\\.com|gitlab\\.com|bitbucket\\.org)\\/[\\w.-]+\\/[\\w.-]+", "[A-Za-z0-9][\\w-]*\\/[\\w.-]+",
+].join("|")})$`, "u");
 const git = spec => { const at = spec.lastIndexOf("#"); return at > 0 && /^[0-9a-f]{40}$/u.test(spec.slice(at + 1)) && GIT.test(spec.slice(0, at)); };
 const dirOf = file => file.includes("/") ? file.slice(0, file.lastIndexOf("/")) : "";
 // A file: or link: path, read from the package list's folder (dir), that names a place inside the project.
@@ -42,11 +48,14 @@ export function workspaces(lists) {
   const quote = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   for (const { file, pkg } of lists) {
     const globs = Array.isArray(pkg?.workspaces) ? pkg.workspaces : Array.isArray(pkg?.workspaces?.packages) ? pkg.workspaces.packages : [];
-    const members = globs.filter(g => typeof g === "string").map(glob => {
-      const inner = glob.replace(/^\.\//u, "").replace(/\/+$/u, "").split("**").map(piece => piece.split("*").map(quote).join("[^/]*")).join(".*");
+    const folders = glob => {
+      const inner = glob.replace(/^!/u, "").replace(/^\.\//u, "").replace(/\/+$/u, "").split("**").map(piece => piece.split("*").map(quote).join("[^/]*")).join(".*");
       return new RegExp(`^${[quote(dirOf(file)), inner].filter(Boolean).join("/")}$`, "u");
-    });
-    const mine = lists.filter(l => l.file !== file && typeof l.pkg?.name === "string" && members.some(m => m.test(dirOf(l.file))));
+    };
+    const named = globs.filter(g => typeof g === "string");
+    const members = named.filter(g => !g.startsWith("!")).map(folders), left = named.filter(g => g.startsWith("!")).map(folders);
+    const member = folder => members.some(m => m.test(folder)) && !left.some(m => m.test(folder)); // a folder a "!" leaves out is none, wherever it stands
+    const mine = lists.filter(l => l.file !== file && typeof l.pkg?.name === "string" && member(dirOf(l.file)));
     for (const at of mine.length ? [file, ...mine.map(l => l.file)] : []) own.set(at, new Set([...own.get(at) ?? [], ...mine.map(l => l.pkg.name)]));
   }
   return own;

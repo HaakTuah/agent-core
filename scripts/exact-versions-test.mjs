@@ -13,7 +13,9 @@ const fails = (spec, own) => problems({ dependencies: { mossgrip: spec } }, own)
 ok(!fails("1.5.4") && !fails("2.0.0-rc.1") && !fails("1.5.4+build.7"), "one exact version passes, with a pre-release or build part too");
 ok(["^1.5.4", "~1.5.4", ">=1.5.4", "1.5.x", "1.5", "1", "*", "", "1.5.4 || 2.0.0", "1.5.4 - 1.6.0", "latest", "next"].every(s => fails(s)), "a range, a partial version, a star, nothing and a tag each fail");
 ok(!fails("npm:barkbite@1.5.4") && !fails("npm:@log/barkbite@1.5.4") && fails("npm:barkbite@^1.5.4") && fails("npm:barkbite"), "an alias passes only at one exact version");
-ok([`git+https://example.com/log/mossgrip.git#${sha}`, `github:log/mossgrip#${sha}`, `log/mossgrip#${sha}`, `https://example.com/log/mossgrip.git#${sha}`, `git@example.com:log/mossgrip.git#${sha}`, `git+ssh://git@example.com/log/mossgrip.git#${sha}`].every(s => !fails(s)), "a git address at a full commit SHA passes, in each form npm reads as one");
+ok([`git+https://example.com/log/mossgrip.git#${sha}`, `github:log/mossgrip#${sha}`, `log/mossgrip#${sha}`, `https://github.com/log/mossgrip.git#${sha}`, `https://gitlab.com/log/mossgrip#${sha}`, `git@example.com:log/mossgrip.git#${sha}`, `git+https://example.com/log/mossgrip.git#${sha}`, `git+ssh://git@example.com/log/mossgrip.git#${sha}`].every(s => !fails(s)), "a git address at a full commit SHA passes, in each form npm reads as one");
+ok(fails(`https://example.com/log/mossgrip.git#${sha}`) && fails(`https://github.com.example.com/log/mossgrip.git#${sha}`) && fails(`http://github.com/log/mossgrip.git#${sha}`), "a plain web address off the hosts npm knows is a download, whatever follows it, and fails");
+ok(fails(`../mossgrip#${sha}`) && fails(`./log/mossgrip#${sha}`) && fails(`.log/mossgrip#${sha}`), "a path with a SHA after it is no git address");
 ok(fails(`https://example.com/mossgrip.tgz#${sha}`) && fails(`log/mossgrip#semver:^1.0.0`) && fails(`log/mossgrip#${sha.slice(0, 7)}`), "a file on the web with a SHA after it, a range of tags and a short SHA each fail");
 ok(fails("git+https://example.com/log/mossgrip.git#main") && fails("github:log/mossgrip") && fails("log/mossgrip") && fails("https://example.com/mossgrip.tgz"), "a git address at a branch or at nothing, and a file on the web, each fail");
 const at = (spec, dir) => problems({ dependencies: { mossgrip: spec } }, new Set(), dir).length > 0;
@@ -26,6 +28,8 @@ const lists = [{ file: "package.json", pkg: { name: "log", workspaces: ["src/*",
   { file: "src/web/deep/package.json", pkg: { name: "too-deep" } }, { file: "tools/sim/package.json", pkg: { name: "barkbite" } },
   { file: "docs/sample/package.json", pkg: { name: "unrelated" } }, { file: "kit/package.json", pkg: { name: "kit", workspaces: { packages: ["parts/**"] } } },
   { file: "kit/parts/a/b/package.json", pkg: { name: "kit-part" } }, { file: "broken/package.json", pkg: null }];
+const left = workspaces([{ file: "package.json", pkg: { workspaces: ["!packages/outside", "packages/*"] } }, { file: "packages/inside/package.json", pkg: { name: "inside" } }, { file: "packages/outside/package.json", pkg: { name: "outside" } }]);
+ok([...left.get("package.json")].join() === "inside" && !left.has("packages/outside/package.json"), "a folder a \"!\" leaves out is no workspace, wherever the \"!\" stands");
 const mine = workspaces(lists), names = file => [...mine.get(file) ?? []].sort().join();
 ok(names("package.json") === "barkbite,mossgrip" && names("src/engine/package.json") === "barkbite,mossgrip" && names("kit/package.json") === "kit-part" && names("kit/parts/a/b/package.json") === "kit-part",
   "a list that names \"workspaces\", and each of them, may ask for them as the project's own");
