@@ -142,7 +142,8 @@ for (const [what, change, why] of [
   ["npx in a page's script whose other attributes name a type of data", write("site/moss.html", "<script data-type=\"json\" title='type=json' alt=\"type=json>\">execSync('npx -y mossgrip-cli');</script>\n"), /cannot be audited/],
   ...["<script x=a\"b>execSync('npx -y mossgrip-cli')</script><p title=\"moss\">", "<script x=a\"b>execSync('npx -y mossgrip-cli')</script>",
     "<script x=a\"b></script><button onclick=\"execSync('npx -y mossgrip-cli')\">", "<script x=a\"type=json\">execSync('npx -y mossgrip-cli')</script>",
-    "<script \"type=json\">execSync('npx -y mossgrip-cli')</script>", "<script title=\"open>execSync('npx -y mossgrip-cli')"]
+    "<script \"type=json\">execSync('npx -y mossgrip-cli')</script>", "<script title=\"open>execSync('npx -y mossgrip-cli')",
+    "<script x=a=\"b>execSync('npx -y mossgrip-cli')</script><p title=\"end\">"]
     .map((page) => [`npx in a page whose script tag has a quote inside a value or no end: ${page}`, write("site/moss.html", `${page}\n`), /cannot be audited/]),
   ["npx in a page's module script", write("site/moss.html", "<script type=\"module\">execSync('npx -y mossgrip-cli');</script>\n"), /cannot be audited/],
   ["npx in a page's script left open", write("site/moss.html", "<p>moss</p>\n<script>\nexecSync('npx -y mossgrip-cli');\n"), /cannot be audited/],

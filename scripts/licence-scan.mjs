@@ -49,6 +49,30 @@ const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
 /**
+ * An opening tag's attributes ([name, value] pairs) and the index of the ">" that ends it, from `at` just after its
+ * name, read by the states HTML's tokenizer reads them in: a value is quoted only where it starts with its quote, an
+ * unquoted one runs to a space or ">" whatever it holds (x=a="b>), and a name may hold quotes ("type=json is no type).
+ * `end` is -1 where the tag has none.
+ */
+function attributesOf(text, at) {
+  const attributes = [];
+  let state = "before", name = "", value = "", quote = "";
+  const done = () => { if (name) attributes.push([name, value]); name = value = ""; };
+  for (let k = at; k < text.length; k++) {
+    const ch = text[k], space = /\s/u.test(ch);
+    if (state === "quoted") { if (ch === quote) { state = "before"; done(); } else value += ch; continue; }
+    if (state === "unquoted") { if (space || ch === ">") { done(); state = "before"; if (ch === ">") return { attributes, end: k }; } else value += ch; continue; }
+    if (ch === ">") { done(); return { attributes, end: k }; }
+    if (state === "value") { if (ch === '"' || ch === "'") { quote = ch; state = "quoted"; } else if (!space) { value = ch; state = "unquoted"; } continue; }
+    if (state === "name") { if (ch === "=") state = "value"; else if (space) state = "after"; else if (ch === "/") { done(); state = "before"; } else name += ch; continue; }
+    if (state === "after") { if (ch === "=") { state = "value"; continue; } if (space) continue; done(); state = "before"; }
+    if (space || ch === "/") continue;
+    name = ch; state = "name"; // ("before": a name starts, "=" itself among what may start one)
+  }
+  return { attributes, end: -1 };
+}
+
+/**
  * The parts of a page or component that run: its script blocks (an unclosed one to the end), an Astro component's
  * frontmatter, its event handlers and bound attributes (onclick, @click, :value, v-if, x-data, quoted or not),
  * javascript: addresses and, but in a plain page, its expressions in braces (Vue's, Svelte's, Astro's), each brace read
@@ -72,32 +96,25 @@ function executable(text, f) {
     if (first === Infinity) { markup += text.slice(at); break; }
     const b = next.indexOf(first), [open, close] = blocks[b];
     markup += text.slice(at, first);
-    // (an opening tag ends at its first ">" outside a quoted value, a value quoted only where it starts with its quote,
-    // as HTML reads it: <script title="a>b">, but x=a"b> ends there; one with no end is read to the file's end)
-    let body = first + open.length;
+    // (an opening tag's attributes and end, read as HTML reads them; one with no end is read to the file's end)
+    let body = first + open.length, attributes = [];
     if (b > 0) {
-      for (let quote = "", value = false; body < text.length; body++) {
-        const ch = text[body];
-        if (quote) { if (ch === quote) quote = ""; continue; }
-        if (ch === ">") break;
-        if (value && (ch === '"' || ch === "'")) quote = ch;
-        value = ch === "=" || (value && /\s/u.test(ch));
-      }
-      if (body >= text.length) {
-        if (b === 1) parts.push(text.slice(first + open.length));
+      const tag = attributesOf(text, body);
+      if (tag.end < 0) {
+        if (b === 1) parts.push(text.slice(body));
         else markup += text.slice(first);
         break;
       }
-      body++;
+      ({ attributes } = tag);
+      body = tag.end + 1;
     }
     // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
     let stop = lower.indexOf(close, body);
     while (stop >= 0 && b > 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
     // (a script of data or a template, as JSON-LD, an import map or text/template, runs nothing; any other type may:
-    // its own type attribute, the first one named so, read attribute by attribute, never a value that only says so)
-    const type = [...text.slice(first + open.length, body).matchAll(/([^\s/>][^\s/>=]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*)))?/gu)]
-      .find((a) => a[1].toLowerCase() === "type");
-    const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test((type?.[2] ?? type?.[3] ?? type?.[4] ?? "").trim());
+    // its own type attribute, the first one named so)
+    const type = attributes.find(([name]) => name.toLowerCase() === "type")?.[1] ?? "";
+    const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.trim());
     if (b === 1 && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
     if (stop < 0) break;
     at = stop + close.length;
