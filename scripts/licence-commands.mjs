@@ -392,7 +392,9 @@ export function commandLines(v) {
   // each with any arguments beside them)
   // (a line built from an argument list is literal: no shell reads it, so "#" or ">" there is an argument)
   const line = (words) => (args.length ? Object.assign(new String(words.join(" ")), { literal: true }) : words.join(" "));
-  const listed = args.map(whole);
-  if (programs.length === 1) return [line([programs[0], ...listed]), ...out];
-  return [...programs.map((p) => line([p, ...listed])), ...(args.length ? [line(listed)] : []), ...out];
+  // (an argument holding spaces is kept whole for the list's program, and also read as a command line of its own,
+  // since a list may hand a shell one: ["bash", "-c", "npx -y x"])
+  const listed = args.map(whole), lines = args.filter((a) => /\s/u.test(a));
+  if (programs.length === 1) return [line([programs[0], ...listed]), ...lines, ...out];
+  return [...programs.map((p) => line([p, ...listed])), ...(args.length ? [line(listed)] : []), ...lines, ...out];
 }
