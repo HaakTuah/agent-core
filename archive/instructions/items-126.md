@@ -245,3 +245,10 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      that assume a game or a live site, one of them in floor rule 12, are made to fit any project):
 
      > Yes, expertly to all, expertly!
+
+150. **11 November 2026** (the core, in the design chat, 21:56 UTC), once a project of another owner, not a game, could
+     take the core; behind "Rules are written for any project" and the words check:
+
+     > Yes, and we have to make sure rule changes made to agent-core from now on, is general enough, and accounts for
+     > this? How do we ensure it expert? I want my rules to be general, but implementers are so easily biased in
+     > phrasing by the only 2 projects in front of them.

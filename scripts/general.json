@@ -1,0 +1,11 @@
+{
+  "paths": ["floor", "modules"],
+  "exempt": ["modules/game-design.md"],
+  "words": [
+    { "pattern": "\\bgames?\\b", "say": "the project; what holds only for games goes in modules/game-design.md" },
+    { "pattern": "\\bplayers?\\b", "say": "its users" },
+    { "pattern": "\\bplay(s|ed|ing)?\\b", "say": "what it does, or its behaviour" },
+    { "pattern": "live (site|build)", "say": "what its users get, or its newest build: a project may release by tag" },
+    { "pattern": "HaakTuah", "say": "the *owner's account*, or the repository's own address" }
+  ]
+}
