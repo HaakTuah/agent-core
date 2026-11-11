@@ -53,5 +53,5 @@ jobs:
             title=$(jq -r ".[$i].title" "$behind")
             if grep -qF -- "$(jq -r ".[$i].key" "$behind")" <<<"$open"; then echo "already open: $title"; continue; fi
             jq -r ".[$i].body" "$behind" > "$RUNNER_TEMP/body.md"
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/body.md" --label enhancement --assignee HaakTuah
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/body.md" --label enhancement --assignee "$GITHUB_REPOSITORY_OWNER"
           done
