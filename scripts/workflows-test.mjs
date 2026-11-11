@@ -31,6 +31,10 @@ ok(!fails("      - run: |\n          node a.mjs \\\n            --target x\n"), 
 ok(!fails("      - run: |\n          ? a\n          : b\n          **Note**: text\n          *.js: ok\n\n          - ? maybe\n      - run: >-\n          *k : v\n    body: | # the comment\n      *bold*: text\n"), "in the text of a block no key is looked for");
 ok(fails("      - run: |\n          echo\n        ? uses\n        : mossgrip/cache@v3\n") && fails("      - run: |\n          echo\n      - ? uses\n        : mossgrip/cache@v3\n") && fails("    a: |\n      text\n    *k : mossgrip/cache@v3\n"),
   "a line no more indented than the block's key is past the block, and read again");
+ok(fails("x: &k uses\njobs:\n  a:\n    steps: # one step: |\n      - *k : mossgrip/cache@v3\n") && fails("jobs: # all of them: |\n  a:\n    steps:\n      - ? uses\n        : mossgrip/cache@v3\n")
+  && fails("    steps: # see - >\n      - *k : mossgrip/cache@v3\n") && fails("steps: [ { name: x - |\n  , *k : mossgrip/cache@v3 } ]\n") && fails(`    name: "a: | # x"\n      ? uses\n`),
+  "a | or > in a comment, after a value or inside brackets opens no block");
+ok(!fails(`      - "run": |\n          ? a\n      - 'run': >2-\n          *k : v\n      - |\n            ? a\n`), "a quoted key, signs after the |, and a block that is itself an item, each open one");
 ok(fails("      - run: |\n          echo\n          uses: mossgrip/cache@v3\n") && fails("      - run: |\n          pull_request_target\n"), "the two words themselves are read in a block too");
 ok(!fails(`      - "uses": actions/checkout@v7\n      - run: echo 'no uses here'\n`), "a quoted key with one of GitHub's own passes; the word alone is no key");
 ok(!fails(`      - uses: docker://alpine@sha256:${"a".repeat(64)}\n`) && fails("      - uses: docker://alpine:3.20\n"), "a container image passes only at its digest");

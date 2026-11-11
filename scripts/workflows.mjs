@@ -22,7 +22,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const KEY = /(?:^|[\s{,[?-])(?:(?:"uses"|'uses')\s*:|uses\s*:(?=\s|$))[ \t]*(?:"([^"]*)"|'([^']*)'|([^\s#},]+))?/gu;
 const AT_KEY = "(?:^\\s*(?:-\\s+)*|[{,[]\\s*)"; // where a key may start: a line, after its dashes, or inside braces or brackets
 const LONG_KEY = new RegExp(`${AT_KEY}\\?(?:\\s|$)`, "u"), ALIAS_KEY = new RegExp(`${AT_KEY}(?:\\?\\s+)?\\*[^\\s,[\\]{}:]+\\s*:(?:\\s|$)`, "u");
-const BLOCK = /(?::|-)\s+[|>][0-9+-]{0,2}\s*(?:\s#.*)?$/u; // a line that opens a block of text
+// A line that opens a block of text: after its dashes, at most one plain or quoted key, and then nothing but the | or >
+// with its signs and a comment. Anything else before the sign (a comment, a value, a bracket) opens no block.
+const BLOCK = /^\s*(?:-\s+)*(?:(?:[\w.][\w.-]*|"[^"]*"|'[^']*')\s*:\s+)?[|>][0-9+-]{0,2}\s*(?:\s#.*)?$/u;
 const column = line => /^\s*(?:-\s+)*/u.exec(line)[0].length; // where its key starts, past the dashes
 const plain = line => line.replace(/\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/gu, (_, x, u, U) => String.fromCodePoint(parseInt(x ?? u ?? U, 16)));
 const pinned = uses =>
