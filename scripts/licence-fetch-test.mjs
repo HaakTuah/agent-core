@@ -1,7 +1,7 @@
-// Checks the licence scan (licence-scan.mjs, beside this file) on every form of a fetch: each package npx, npm exec,
-// npm install or npm pack fetches, and other fetchers, wherever a command can be written (scripts, workflows, JSON and
-// TOML files, arrays, files with no extension), each staged in the project licence-scan-stage.mjs writes, and each
-// failing for the reason it names. Run by the core's tests workflow (.github/workflows/tests.yml).
+// Checks the licence scan (licence-scan.mjs, beside this file, with its command reader, licence-commands.mjs) on every
+// form of a fetch: each package npx, npm exec, npm install or npm pack fetches, and other fetchers, wherever a command
+// can be written (scripts, workflows, JSON and TOML files, arrays, files with no extension, pages and components), each
+// staged in the project licence-scan-stage.mjs writes, and each failing for the reason it names. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/licence-fetch-test.mjs
 import { LOCK, append, done, entry, handAudited, json, ok, run, write } from "./licence-scan-stage.mjs";

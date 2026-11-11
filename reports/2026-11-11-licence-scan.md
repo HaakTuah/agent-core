@@ -9,14 +9,16 @@ them by hand. Floor rule 10 asks the same of both (core archive 41: every packag
 too).
 
 - **`scripts/licence-scan.mjs`:** Snakes' scan made general and wider, run by `licences.mjs` when a config has
-  `"scan"`. It reads every tracked file (but what `skip` names and, in a project, its copy of the core) and needs:
+  `"scan"`, with its command reader in a file of its own, `scripts/licence-commands.mjs`. It reads every tracked file (but what `skip` names and, in a project, its copy of the core) and needs:
   - every lockfile, and every `package.json` with dependencies, to be one the config's `lockfiles` checks;
   - an entry for every action but the owner's own and the project's;
   - an entry for every package npx, npm exec, npm install (by any spelling, after any options) or npm pack fetches, at
     the exact version audited, from npm's own registry (a command naming another fails). This covers workflows, scripts
     and tools of any kind (TypeScript components, Dockerfiles, files with no extension, read by their `#!` line), every
     string of a JSON file but its prose (package.json's `scripts` and tools' hooks, tasks, launches), TOML files, YAML
-    folded over lines, and commands written as arrays. npx `--no-install` never fetches, so a bare name passes there.
+    folded over lines, commands written as arrays, and the script blocks of pages and components (HTML, Vue, Svelte,
+    Astro). An install without its lockfile fails, as does a word after npm that is no npm command where npm stands as
+    one. npx `--no-install` never fetches, so a bare name passes there.
     Any other fetch that cannot be read fails, but npm pack's and another fetcher's (curl, wget, pip, playwright install
     and the like). Each of those passes only in a file an entry's `files` names, as its hand audit;
   - an entry covering every script in a language it cannot read (Python and the like, by its extension or its `#!`
@@ -34,9 +36,9 @@ too).
 - **The tests:** the check had no test here; Amarna tested its lists and readers in its own suite. Those come into
   `scripts/licences-test.mjs`, on invented names. `scripts/licence-scan-stage.mjs` writes a small project into a fresh
   temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it is
-  and passes 24 allowed forms, and fails 44 others for the reason each names: the licence lists, a lockfile's package,
+  and passes 26 allowed forms, and fails 44 others for the reason each names: the licence lists, a lockfile's package,
   the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, a bad
-  `"scan"`. `scripts/licence-fetch-test.mjs` fails 103 forms of a fetch, each for its reason.
+  `"scan"`. `scripts/licence-fetch-test.mjs` fails 109 forms of a fetch, each for its reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
   leaves its copy of the core out, since this audit holds it, so the games stop listing the core's actions.
@@ -45,7 +47,7 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8, 69 and 103 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8, 71 and 109 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
 spellings and fetchers, an option's value hiding the command, another registry or npm config (by option or by npm config
 set), npm update and npm audit fix, Windows' npx.cmd, a command nested in npx -c or named by its path or held in a
@@ -54,7 +56,8 @@ folded YAML, tools' hooks in package.json, unread file kinds and #! lines, lockf
 languages that ship, `own` covering too much or someone's notice, a shipped file covered by a tool's entry beside a
 shipping one, a notice in commented JSON, --yes=true, a fetcher named by its path, a program held in a shell variable, a
 redirection before the package, npm link, a tool's entry over a shipped file, a notice in code of a language it does not
-run, two scripts read as one. Each is now closed and tested. A dry run on each game with the new scripts:
+run, two scripts read as one, npm's command written in pieces of a string, a variable after npm, a component's script
+block, an install without its lockfile (by option or by environment). Each is now closed and tested. A dry run on each game with the new scripts:
 - Snakes passes with its sync PR's side applied: its own scan cut to its game's checks, its test to theirs, and its
   audit to what no lockfile holds.
 - Amarna passes with its sync PR's side applied: the audit, and its two `npx vitest` lines, which would fetch if
@@ -74,7 +77,11 @@ any file but prose counts, so a `# Copyright` line in a workflow, or credits quo
 need an entry not the owner's (his own work carries none; credits belong in a prose file). In code, a string that is
 only "npx" or "npm", not called with its arguments right there, fails, as does a shell variable set to only one of them
 (with export, local, readonly and the like), and npx naming nothing to run where it is written ("npx -y" held for later,
-$(command -v npx)), since the scan cannot follow any of them into the variable. Lockfile packages need no audit entry,
+$(command -v npx)), since the scan cannot follow any of them into the variable; a shell's own check that npx is there
+(`command -v npx` as a statement) and `npx --version` pass. Where npm stands as a command (a line's start, after `;`,
+`&&` or `if`, or opening a string that opens a call or a value), a word after it that is no npm command fails, since it
+may be a variable or a string built in code: a message that opens a call's string, `console.log("npm x")`, fails too
+and is reworded (neither game has one), while `echo "npm x"` and a message mid-string pass. Lockfile packages need no audit entry,
 since the check reads each one's licence from the lockfile at every version; Snakes' hand list of them repeated it. The
 owner's own work gets a kind of its own rather than a list of folders the scan passes over, so every asset's origin
 stands in one place. Questions for the owner: none.
