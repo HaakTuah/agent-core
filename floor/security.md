@@ -13,8 +13,8 @@ password, environment id, personal path or address. A secret pushed by mistake i
 and replace; a later commit does not remove it from history. No key or secret goes into a session's or a cloud
 environment's variables.
 
-**3. The protected files:** what runs by itself or with credentials (`.github/`, `.claude/`, the cloud setup and status
-line scripts, any file of the credentialed GitHub calls builders run), the rule files (`AGENTS.md`, `CLAUDE.md`,
+**3. The protected files:** what runs by itself or with credentials (`.github/`, `.claude/`, the cloud setup
+script, any file of the credentialed GitHub calls builders run), the rule files (`AGENTS.md`, `CLAUDE.md`,
 `SECURITY.md`, the threat model, the core manifest, the copy of the core under `core/`) and the checks on the work (the
 copies and licence checks and their configs) are changed only by the trusted builder, Claude's builder sessions, never
 by a task given to another agent; where a project names none, only the owner changes them. **His yes in the PR** is
@@ -59,9 +59,6 @@ undone or costs money, the changes rule 3 names, and rule 10's licence exception
 on. Everything else is done on the best reading, said in the PR, and stays correctable. A failing check that guards
 against harm (agents' isolation, `main`, keys, spending) stops its step, and the owner is told; a failing test is fixed,
 or its task marked blocked, and the work goes on.
-
-**16. The owner's share of Claude** (core archive 2 and 76): from about 90% of Claude's weekly limit, no project starts
-bigger work on Claude, so the last of the week stays his.
 
 **18. Where agents hold sign-ins** (core archive 118 to 120, 122 and 127): a machine of the owner's where agents run
 side by side. Only he logs in and sets it up; it holds only the projects and what their agents need; nothing runs there
