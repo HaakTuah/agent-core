@@ -1,12 +1,12 @@
 // The versions check ("The newest stable version, unless there is a reason" in modules/updates.md), for every project
-// that takes the core and for the core itself: each version in the config is read from its file and compared with the
-// npm registry's newest stable release old enough to take (floor rule 7). The config, a JSON file its versions workflow
-// names, holds "entries", each with "name" (the npm package whose releases count), "file" and "pattern" (a regular
-// expression whose first group is the version, found exactly once), "days" (the wait: 7, or 14 for a script browsers
-// load), "sameMajor" (true to stay within the major the project chose) and "how" (what a builder does to take it). Run
-// monthly by the versions workflow (.github/workflows/versions.yml), which opens an enhancement issue for each one
-// behind. Node's own modules and npm. It reads files of the project it is run in (its git root), the config's path from
-// the directory it starts in.
+// that takes the core and for the core itself: each version in the config is read from its file and compared with its
+// registry's newest stable release old enough to take (floor rule 7). The config, a JSON file its versions workflow
+// names, holds "entries", each with "name" (the package whose releases count), "registry" ("npm", the default, or
+// "pypi"), "file" and "pattern" (a regular expression whose first group is the version, found exactly once), "days" (the
+// wait: 7, or 14 for a script browsers load), "sameMajor" (true to stay within the major the project chose) and "how"
+// (what a builder does to take it). Run monthly by the versions workflow (.github/workflows/versions.yml), which opens an
+// enhancement issue for each one behind. Node's own modules, npm, and PyPI's JSON API for a "pypi" entry. It reads files
+// of the project it is run in (its git root), the config's path from the directory it starts in.
 //
 //   node <core>/scripts/versions.mjs <config>            one line each: up to date, or behind
 //   node <core>/scripts/versions.mjs <config> --issues   JSON: an issue's key, title and body for each one behind
@@ -17,12 +17,22 @@ import { pathToFileURL } from "node:url";
 
 const DAY = 864e5;
 const STABLE = /^(\d+)\.(\d+)\.(\d+)$/;
+// A package's name as its registry spells it, and where a release of it is shown.
+const REGISTRIES = {
+  npm: { name: /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/, page: (n, v) => `https://www.npmjs.com/package/${n}/v/${v}` },
+  pypi: { name: /^[A-Za-z0-9]([\w.-]*[A-Za-z0-9])?$/, page: (n, v) => `https://pypi.org/project/${n}/${v}/` },
+};
+const registry = e => {
+  const r = REGISTRIES[e.registry ?? "npm"];
+  if (!r) throw new Error(`${e.name}: no registry ${e.registry}`);
+  return r;
+};
 
 // Each entry with the version its file holds now: exactly one, or it throws (a pattern that no longer finds it, an
 // entry without its wait or its "how", or a file outside the project).
 export function current(entries, root) {
   return entries.map(e => {
-    if (!/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/.test(e.name ?? "")) throw new Error(`${e.name}: no npm package name`);
+    if (!registry(e).name.test(e.name ?? "")) throw new Error(`${e.name}: no ${e.registry ?? "npm"} package name`);
     if (!Number.isInteger(e.days) || e.days < 7 || typeof e.how !== "string" || !e.how.trim()) throw new Error(`${e.name}: needs "days" (7 or more, floor rule 7) and "how"`);
     const file = fs.realpathSync(path.join(root, e.file)), rel = path.relative(fs.realpathSync(root), file);
     if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`${e.name}: ${e.file} is outside the project`);
@@ -42,6 +52,22 @@ export function newest(times, { days, sameMajor, version }, now) {
   return ok.sort(later).pop() || null;
 }
 
+// PyPI's release times from its JSON API, as npm gives them ({ version: ISO date }): each release's first upload, a
+// release with no files, or only withdrawn ("yanked") ones, left out.
+export function pypiTimes(json) {
+  const out = {};
+  for (const [v, files] of Object.entries(json?.releases ?? {})) {
+    const up = (files ?? []).filter(f => !f.yanked).map(f => f.upload_time_iso_8601).filter(Boolean).sort();
+    if (up.length) out[v] = up[0];
+  }
+  return out;
+}
+async function times(e) {
+  if ((e.registry ?? "npm") === "npm") return JSON.parse(execFileSync("npm", ["view", e.name, "time", "--json"], { encoding: "utf8" }));
+  const res = await fetch(`https://pypi.org/pypi/${encodeURIComponent(e.name)}/json`);
+  if (!res.ok) throw new Error(`${e.name}: PyPI answered ${res.status}`);
+  return pypiTimes(await res.json());
+}
 // What an issue says for an entry behind: the Feature request template's headings (.github/ISSUE_TEMPLATE/).
 export const issue = (e, to, config) => ({
   key: `Version check: ${e.name} `,
@@ -52,7 +78,7 @@ export const issue = (e, to, config) => ({
     "", "**Describe the solution you'd like**", e.how,
     "", "**Describe alternatives you've considered**", "Staying on the pinned version, if the release notes show nothing worth the change.",
     "", "**Why it matters, and a rough cost**", "Fixes and security updates arrive; a small PR, with floor rule 7's checks and the licence audited again (floor rule 10).",
-    "", "**Additional context**", `Newest stable release: https://www.npmjs.com/package/${e.name}/v/${to}`,
+    "", "**Additional context**", `Newest stable release: ${registry(e).page(e.name, to)}`,
     "", "---", "_Opened by the monthly version check (the core's `.github/workflows/versions.yml`)._",
   ].join("\n"),
 });
@@ -64,8 +90,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process
   const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
   const now = Date.now(), behind = [];
   for (const e of current(entries, root)) {
-    const times = JSON.parse(execFileSync("npm", ["view", e.name, "time", "--json"], { encoding: "utf8" }));
-    const to = newest(times, e, now);
+    const to = newest(await times(e), e, now);
     if (to && later(to, e.version) > 0) behind.push(issue(e, to, config));
     if (!process.argv.includes("--issues")) console.log(`${e.name}: ${e.version} in ${e.file}; newest at least ${e.days} days old: ${to}${to && later(to, e.version) > 0 ? " (behind)" : ""}`);
   }
