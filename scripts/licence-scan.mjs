@@ -74,8 +74,8 @@ function attributesOf(text, at) {
 }
 
 /**
- * The parts of a page or component that run, read so as to fail closed rather than to match HTML's parser case by
- * case: every script element's tag and body wherever "<script" stands (in a comment, an attribute's value or a textarea too),
+ * The parts of a page or component that run, read so as to fail closed rather than to match HTML's parser case by case:
+ * every script element's tag and body wherever "<script" stands (in a comment, an attribute's value or a textarea too),
  * to the first "</script" that ends its name, or to the file's end where the body holds "<!--" (as HTML may read it on)
  * or the tag has no end, but a script of data or a template by its own type attribute (JSON-LD, an import map,
  * text/template); every event handler and bound attribute (onclick, @click, :value, v-if, x-data, quoted or not) and
