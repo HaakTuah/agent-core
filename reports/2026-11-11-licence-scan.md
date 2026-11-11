@@ -36,7 +36,7 @@ too).
   temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it is
   and passes 23 allowed forms, and fails 43 others for the reason each names: the licence lists, a lockfile's package,
   the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, a bad
-  `"scan"`. `scripts/licence-fetch-test.mjs` fails 91 forms of a fetch, each for its reason.
+  `"scan"`. `scripts/licence-fetch-test.mjs` fails 95 forms of a fetch, each for its reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
   leaves its copy of the core out, since this audit holds it, so the games stop listing the core's actions.
@@ -45,15 +45,16 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8, 67 and 91 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8, 67 and 95 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
 spellings and fetchers, an option's value hiding the command, another registry or npm config (by option or by npm config
 set), npm update and npm audit fix, Windows' npx.cmd, a command nested in npx -c or named by its path or held in a
 variable, -p=, npm exec's later packages, curl in a quoted command, arrays it cannot read, comments that hid commands,
 folded YAML, tools' hooks in package.json, unread file kinds and #! lines, lockfiles left out, scripts of other
 languages that ship, `own` covering too much or someone's notice, a shipped file covered by a tool's entry beside a
-shipping one, a notice in commented JSON, --yes=true, a notice in code of a language it does not run, two scripts read
-as one. Each is now closed and tested. A dry run on each game with the new scripts:
+shipping one, a notice in commented JSON, --yes=true, a fetcher named by its path, a program held in a shell variable, a
+notice in code of a language it does not run, two scripts read as one. Each is now closed and tested. A dry run on each
+game with the new scripts:
 - Snakes passes with its sync PR's side applied: its own scan cut to its game's checks, its test to theirs, and its
   audit to what no lockfile holds.
 - Amarna passes with its sync PR's side applied: the audit, and its two `npx vitest` lines, which would fetch if
@@ -71,7 +72,8 @@ sees it, as for any edit to an audit. A file with no extension is read as shell,
 `LICENSE` naming an npm command would fail; a project skips it if it has one (neither game does). A licence notice in
 any file but prose counts, so a `# Copyright` line in a workflow, or credits quoting a licence in a JSON or HTML file,
 need an entry not the owner's (his own work carries none; credits belong in a prose file). In code, a string that is
-only "npx" or "npm", not called with its arguments right there, fails, since the scan cannot follow it into a variable.
-Lockfile packages need no audit entry, since the check reads each one's licence from the lockfile at every version;
-Snakes' hand list of them repeated it. The owner's own work gets a kind of its own rather than a list of folders the
-scan passes over, so every asset's origin stands in one place. Questions for the owner: none.
+only "npx" or "npm", not called with its arguments right there, fails, as does a shell variable set to only one of them,
+since the scan cannot follow either into the variable. Lockfile packages need no audit entry, since the check reads each
+one's licence from the lockfile at every version; Snakes' hand list of them repeated it. The owner's own work gets a
+kind of its own rather than a list of folders the scan passes over, so every asset's origin stands in one place.
+Questions for the owner: none.

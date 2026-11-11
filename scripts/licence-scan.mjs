@@ -84,8 +84,8 @@ const VALUED = new Set([
 ]);
 // Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments).
 const OTHER_FETCHER = new RegExp(
-  "(?:^|[\\s;&|(`$\'\"])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
-    "['\"`]git['\"`]\\s*,\\s*\\[\\s*['\"`]clone|" +
+  "(?:^|[\\s;&|(`$\'\"/\\\\])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:[^'\"`\\s]*[/\\\\])?(?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
+    "['\"`](?:[^'\"`\\s]*[/\\\\])?git['\"`]\\s*,\\s*\\[\\s*['\"`]clone|" +
     "\\b(?:pipx?3?\\s+install|pnpm\\s+(?:dlx|add|install|i)\\s|yarn\\s+(?:dlx|add)\\s|bunx\\s|bun\\s+(?:add|x|install)\\s|playwright\\s+install|" +
     "git\\s+clone|gem\\s+install|cargo\\s+install|go\\s+install|apt(?:-get)?\\s+install|brew\\s+install|deno\\s+(?:install|run))",
   "mu",
@@ -208,6 +208,8 @@ function commands(text, code = false) {
   // (an array of literal strings is read as its words; any other arguments, a variable or a spread, cannot be)
   // (in code, a string that is only npx or npm, not called with its arguments right there, is a program held in a
   // variable, which cannot be followed; in a workflow or a config, "npm" names npm, as an ecosystem or a cache)
+  // (in a shell script, a variable set to only npx or npm, "$NPX -y x", is a program held in a variable too)
+  if (!code) for (const m of joined.matchAll(/^\s*(?:export\s+)?\w+=["']?(?:\S*\/)?(npx|npm)(?:\.cmd)?["']?\s*$/gimu)) out.push(`${m[1].toLowerCase()} ${m[1].toLowerCase() === "npm" ? "install " : ""}<a-program-held-in-a-variable>`);
   if (code) for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`](?!\s*,)/giu)) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}<a-program-held-in-a-variable>`);
   for (const m of joined.matchAll(/['"`](?:[^'"`\s]*[/\\])?(npx|npm)(?:\.cmd)?['"`]\s*,\s*(\[[^\]]*\]?|[^\s)]*)/giu)) {
     const literal = literalArray(m[2]);
