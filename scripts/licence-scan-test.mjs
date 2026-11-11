@@ -41,9 +41,9 @@ for (const [what, change] of [
     write("site/Guide.vue", "<template><p>Run npx mossgrip-cli to start.</p></template>\n<script setup>const moss = 1;</script>\n")(dir);
   }],
   ["a page's structured data and template in script tags", write("site/howto.html", "<script type=\"application/ld+json\">{\"@type\":\"HowTo\",\"text\":\"npx mossgrip-cli\"}</script>\n<script type=\"text/template\"><p>npx mossgrip-cli</p></script>\n")],
-  ["a page's comment around text, and a component's style block", (dir) => {
-    write("site/guide.html", "<!-- <script> --><p>Run npx mossgrip-cli to start.</p>\n<script>const moss = 1;</script>\n")(dir);
-    write("site/Moss.vue", "<template><p>{{ moss }}</p></template>\n<style>.moss { content: \"npx mossgrip-cli\" }</style>\n")(dir);
+  ["a page's comment naming a command, and a component's style block", (dir) => {
+    write("site/guide.html", "<!-- Run npx mossgrip-cli to start. --><p>moss</p>\n<script>const moss = 1;</script>\n")(dir);
+    write("site/Moss.vue", "<template><p>{{ moss }}</p></template>\n<style>.moss { color: green }</style>\n")(dir);
   }],
   ["npm diff, cache and publish of what is local or audited", append("scripts/setup.sh", "npm diff --diff=mossgrip-cli@1.2.3 --diff=.\nnpm cache clean --force\nnpm publish ./moss.tgz\n")],
   ["npm exec of an audited package after --", append("scripts/setup.sh", "npm exec --package=mossgrip-cli@1.2.3 -- moss build\n")],

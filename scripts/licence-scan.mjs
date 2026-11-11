@@ -74,57 +74,42 @@ function attributesOf(text, at) {
 }
 
 /**
- * The parts of a page or component that run: its script blocks (an unclosed one to the end), an Astro component's
- * frontmatter, its event handlers and bound attributes (onclick, @click, :value, v-if, x-data, quoted or not),
- * javascript: addresses and, but in a plain page, its expressions in braces (Vue's, Svelte's, Astro's), each brace read
- * to its match. Its text, markup, comments and style blocks run nothing, so a page showing a command fetches nothing.
- * One pass over its tags, each read whole (attributesOf), so a "<!--" or "<script" inside another tag's value is text.
+ * The parts of a page or component that run, read so as to fail closed rather than to match HTML's parser case by
+ * case: every script element's body wherever "<script" stands (in a comment, an attribute's value or a textarea too),
+ * to the first "</script" that ends its name, or to the file's end where the body holds "<!--" (as HTML may read it on)
+ * or the tag has no end, but a script of data or a template by its own type attribute (JSON-LD, an import map,
+ * text/template); every event handler and bound attribute (onclick, @click, :value, v-if, x-data, quoted or not) and
+ * javascript: address anywhere; an Astro component's frontmatter; and, but in a plain page, every expression in braces
+ * (Vue's, Svelte's, Astro's, a style block's rules among them), each brace read to its match. Text outside these runs
+ * nothing, so a page showing a command in its text fetches nothing.
  */
 function executable(text, f) {
   const lower = text.toLowerCase(), parts = [];
   if (/\.astro$/iu.test(f)) { const front = /^\s*---\r?\n([\s\S]*?)(?:\r?\n---|$)/u.exec(text); if (front) parts.push(front[1]); }
-  let markup = "";
-  for (let at = 0; at < text.length; ) {
-    const lt = text.indexOf("<", at);
-    if (lt < 0) { markup += text.slice(at); break; }
-    markup += text.slice(at, lt);
-    if (text.startsWith("<!--", lt)) { // (a comment, to its end or the file's)
-      const end = text.indexOf("-->", lt + 4);
-      if (end < 0) break;
-      at = end + 3;
-      continue;
-    }
-    // (a tag, read whole, so what its values hold, "<!--" or "<script", is only text; a "<" that opens none is text)
-    const name = /^[a-z][^\t\n\f\r />]*/iu.exec(text.slice(lt + 1, lt + 65))?.[0];
-    if (!name) { markup += "<"; at = lt + 1; continue; }
-    const kind = name.toLowerCase(), tag = attributesOf(text, lt + 1 + name.length);
-    if (tag.end < 0) { // (one with no end: a script's rest is read as code, any other's as markup)
-      if (kind === "script") parts.push(text.slice(lt + 1 + name.length));
-      else markup += text.slice(lt);
-      break;
-    }
-    if (kind !== "script" && kind !== "style") { markup += text.slice(lt, tag.end + 1); at = tag.end + 1; continue; }
-    // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
-    const body = tag.end + 1, close = `</${kind}`;
-    let stop = lower.indexOf(close, body);
-    while (stop >= 0 && /[^\t\n\f\r />]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
-    // (a script of data or a template, as JSON-LD, an import map or text/template, runs nothing; any other type may:
-    // its own type attribute, the first one named so)
+  const ends = (k, length) => !/[^\t\n\f\r />]/u.test(lower[k + length] ?? ">"); // (a tag's name ends there)
+  const closes = [];
+  for (let k = lower.indexOf("</script"); k >= 0; k = lower.indexOf("</script", k + 8)) if (ends(k, 8)) closes.push(k);
+  for (let k = lower.indexOf("<script"), covered = 0, c = 0; k >= 0; k = lower.indexOf("<script", k + 7)) {
+    if (k < covered || !ends(k, 7)) continue; // (one inside a body or tag already read is part of it)
+    const tag = attributesOf(text, k + 7);
+    if (tag.end < 0) { parts.push(text.slice(k + 7)); break; }
+    while (c < closes.length && closes[c] <= tag.end) c++;
+    let stop = c < closes.length ? closes[c] : text.length;
+    if (text.slice(tag.end + 1, stop).includes("<!--")) stop = text.length;
     const type = tag.attributes.find(([n]) => n.toLowerCase() === "type")?.[1] ?? "";
-    const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, ""));
-    if (kind === "script" && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
-    if (stop < 0) break;
-    at = stop + close.length;
+    if (!/json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, "")))
+      parts.push(text.slice(tag.end + 1, stop));
+    covered = stop;
   }
-  for (const m of markup.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
-  for (const m of markup.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
+  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
+  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
   if (!/\.html?$/iu.test(f)) {
     let depth = 0, start = 0;
-    for (let k = 0; k < markup.length; k++) {
-      if (markup[k] === "{" && depth++ === 0) start = k;
-      else if (markup[k] === "}" && depth > 0 && --depth === 0) parts.push(markup.slice(start, k + 1));
+    for (let k = 0; k < text.length; k++) {
+      if (text[k] === "{" && depth++ === 0) start = k;
+      else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
     }
-    if (depth > 0) parts.push(markup.slice(start));
+    if (depth > 0) parts.push(text.slice(start));
   }
   return parts.join("\n");
 }
