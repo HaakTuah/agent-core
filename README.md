@@ -41,9 +41,8 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    with its audit of what no lockfile holds, which `licence-scan.mjs` holds whole, every action, fetched package, asset
    and copied-in code it uses, and each entry that ships with its notice), and with the copies check `pointers.mjs` and
    `reading-size.mjs`, the pointer check and the reading-size check, the second with marks of its own (the *size
-   marks*), and `workflows.mjs` and `exact-versions.mjs`, which need no config: the first fails `pull_request_target`
-   and an action not GitHub's own that is not pinned to a full commit SHA (floor rule 2), the second a package npm is
-   asked for by a range (floor rule 7). Its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`, `codeql.yml`,
+   marks*), and `workflows.mjs`, which needs no config and fails `pull_request_target` and an action not GitHub's own
+   that is not pinned to a full commit SHA (floor rule 2). Its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`, `codeql.yml`,
    `delete-merged-branches.yml` and, if it has versions Dependabot cannot see, `versions.yml` keep their triggers and
    call the core's of the same name (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`). Only a
    sync PR moves those pins, and only when the called workflow changed; `core.yml` fails a call pinned where it differs

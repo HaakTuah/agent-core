@@ -31,8 +31,6 @@ jobs:
         run: node scripts/licence-fetch-test.mjs
       - name: The workflow check
         run: node scripts/workflows-test.mjs
-      - name: The exact-versions check
-        run: node scripts/exact-versions-test.mjs
       - name: The core's own workflows keep floor rule 2
         run: node scripts/workflows.mjs
       - name: What the core's own workflows and scripts use, each to its list
