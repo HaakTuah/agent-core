@@ -40,7 +40,7 @@ too).
   temporary git repository for each case. On it, `scripts/licence-scan-test.mjs` checks that the project passes as it is
   and passes 33 allowed forms (two of them long lines, read in time), and fails 44 others for the reason each names: the
   licence lists, a lockfile's package, the owner's kind, copied code, assets and binaries, lockfiles left unchecked, an
-  entry covering nothing, a bad `"scan"`. `scripts/licence-fetch-test.mjs` fails 184 forms of a fetch, each for its
+  entry covering nothing, a bad `"scan"`. `scripts/licence-fetch-test.mjs` fails 187 forms of a fetch, each for its
   reason.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
   scripts use: four actions, CodeQL, the GitHub CLI, Node (which `scripts/node.sh` fetches) and npm. A project's scan
@@ -50,7 +50,7 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8, 78 and 184 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8, 78 and 187 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first versions: `package.json` scripts, hooks, tasks and launches, other
 spellings and fetchers, an option's value hiding the command, another registry or npm config (by option or by npm config
 set), npm update and npm audit fix, Windows' npx.cmd, a command nested in npx -c or named by its path or held in a
@@ -67,9 +67,10 @@ hiding where npm stands, npx cross-env before npm, npm's options before its comm
 one, a commented-out script, a style block, an unquoted handler, a command too long to read, runner options in other
 forms (`-Hu`, `--user`, `--signal`), `eval` and other runners, a string naming a closing tag, lockfile options before
 npm's command, a quoted string too long to read hiding where npm stands, a page's structured data read as code, another
-fetcher's options before its command, and a page's tags read unlike HTML (a comment, a raw-text element, an end tag's or
-another tag's value holding `<!--`, `<style>` or `<script`). Each is now closed and tested. A dry run on each game with
-the new scripts:
+fetcher's options before its command, a page's tags read unlike HTML (a comment, a raw-text element, an end tag's or
+another tag's value holding `<!--`, `<style>` or `<script`), npm cache, diff or publish with an argument held in a
+variable, and a quoted value that only looks like a comment or a redirection (`--cache '#x'`). Each is now closed and
+tested. A dry run on each game with the new scripts:
 - Snakes passes with its sync PR's side applied: its own scan cut to its game's checks, its test to theirs, and its
   audit to what no lockfile holds.
 - Amarna passes with its sync PR's side applied: the audit, and its two `npx vitest` lines, which would fetch if

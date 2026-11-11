@@ -75,17 +75,18 @@ export const OTHER_FETCHER = new RegExp(
 /**
  * What one command line fetches: { specs, unreadable, packs } where specs are the packages written for npx, npm exec,
  * npm install (and its other spellings) or npm pack, unreadable says why a fetch could not be read, and packs that it
- * is npm pack, which only fetches. Each word loses the quotes, brackets and commas of the string or call it sits in.
+ * is npm pack, which only fetches.
  * Others: { specs: [] }.
  */
 export function fetched(line, atCommand = false) {
-  // (a "+" between the pieces of a string built in code joins them: npm ' + 'install x)
-  const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "")).filter((w) => w && w !== "+");
-  if (/^(npx|npm)\.cmd$/iu.test(all[0] ?? "")) all[0] = all[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
-  const end = all.findIndex((w) => w.startsWith("#") || w.startsWith("//")); // (a comment after the command)
-  const kept = end < 0 ? all : all.slice(0, end);
-  // (a redirection, ">log", "2> log", "&>log", "<in", goes with its target, wherever it stands)
-  const words = kept.filter((w, k) => !/^\d*[<>&]/u.test(w) && !/^\d*[<>&]+$/u.test(kept[k - 1] ?? ""));
+  // (a comment after the command, and a redirection, ">log", "2> log", "&>log", "<in", with its target wherever it
+  // stands, are known by the word as written: a quoted '#x' or '>' is an argument)
+  const raw = line.trim().split(/\s+/u), end = raw.findIndex((w) => w.startsWith("#") || w.startsWith("//"));
+  const kept = (end < 0 ? raw : raw.slice(0, end)).filter((w, k, all) => !/^\d*[<>&]/u.test(w) && !/^\d*[<>&]+$/u.test(all[k - 1] ?? ""));
+  // (then each word loses the quotes, brackets and commas of the string or call it sits in; a "+" between the pieces of
+  // a string built in code joins them: npm ' + 'install x)
+  const words = kept.map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "")).filter((w) => w && w !== "+");
+  if (/^(npx|npm)\.cmd$/iu.test(words[0] ?? "")) words[0] = words[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
   // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
   if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^--(user|global)config\b|^npm_config_.*(registry|config)/iu.test(w)))
     return { specs: [], unreadable: "it fetches from another registry than npm's, or reads another npm config that may name one" };
@@ -339,7 +340,7 @@ export function commands(text, code = false) {
     const literal = literalArray(m[2]);
     const first = /^\[\s*(?:'([^']*)'|"([^"]*)"|`([^`$]*)`)/u.exec(m[2]), command = first && (first[1] ?? first[2] ?? first[3]);
     if (literal) out.push([m[1], ...literal].join(" "));
-    else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && command !== "audit")) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}its-arguments-not-written-out`); // (npm view with a variable: no fetch)
+    else if (!(m[1] === "npm" && NO_FETCH.has(command) && !CONFIG.has(command) && !/^(audit|cache|diff|publish)$/u.test(command))) out.push(`${m[1]} ${m[1] === "npm" ? "install " : ""}its-arguments-not-written-out`); // (npm view with a variable: no fetch)
   }
   return out;
 }

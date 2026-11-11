@@ -127,6 +127,9 @@ for (const [what, change, why] of [
   ...["npm install --ignore-scripts --no-package-lock", "npm i --package-lock=false", "npm i --package-lock false", "npm --no-package-lock install --ignore-scripts"]
     .map((line) => [`npm install without its lockfile: ${line}`, append("scripts/setup.sh", `${line}\n`), /without the lockfile/]),
   ["npm install with the lockfile turned off by its environment", append("scripts/setup.sh", "npm_config_package_lock=false npm install --ignore-scripts\n"), /without the lockfile/],
+  ["npm cache add of a package held in a variable", write("scripts/cache.mjs", "const spec = 'mossgrip-widgets@1.2.3';\nexecFileSync('npm', ['cache', 'add', spec]);\n"), /its-arguments-not-written-out/],
+  ...["npm install --cache '#cache' -g mossgrip-widgets@1.2.3", "npm install --cache '>' -g mossgrip-widgets@1.2.3"]
+    .map((line) => [`a quoted value that only looks like a comment or a redirection: ${line}`, append("scripts/setup.sh", `${line}\n`), /mossgrip-widgets .* is not in/]),
   ["npm diff of a git package, which prepares it", append("scripts/setup.sh", "npm diff --diff=git+https://mossgrip.example/widgets.git --diff=.\n"), /cannot be audited/],
   ["npm cache add of a package", append("scripts/setup.sh", "npm cache add mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
   ...["npm cache add https://mossgrip.example/widgets.tgz", "npm diff --diff=https://mossgrip.example/widgets.tgz --diff=.",
