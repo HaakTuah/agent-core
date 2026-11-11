@@ -30,6 +30,11 @@ const lists = [{ file: "package.json", pkg: { name: "log", workspaces: ["src/*",
   { file: "kit/parts/a/b/package.json", pkg: { name: "kit-part" } }, { file: "broken/package.json", pkg: null }];
 const left = workspaces([{ file: "package.json", pkg: { workspaces: ["!packages/outside", "packages/*"] } }, { file: "packages/inside/package.json", pkg: { name: "inside" } }, { file: "packages/outside/package.json", pkg: { name: "outside" } }]);
 ok([...left.get("package.json")].join() === "inside" && !left.has("packages/outside/package.json"), "a folder a \"!\" leaves out is no workspace, wherever the \"!\" stands");
+const slow = Date.now();
+workspaces([{ file: "package.json", pkg: { workspaces: [`${"*a".repeat(40)}b`, `${"**/".repeat(40)}b`] } }, { file: `${"a".repeat(80)}/package.json`, pkg: { name: "a" } }, { file: `${"a/".repeat(80)}package.json`, pkg: { name: "b" } }]);
+ok(Date.now() - slow < 2000, "a pattern of many stars is read in no time");
+ok(workspaces([{ file: "kit/package.json", pkg: { workspaces: ["*"] } }, { file: "kitten/package.json", pkg: { name: "kitten" } }, { file: "kit/a/package.json", pkg: { name: "a" } }]).get("kit/package.json").has("a")
+  && !workspaces([{ file: "kit/package.json", pkg: { workspaces: ["*", "../kitten"] } }, { file: "kitten/package.json", pkg: { name: "kitten" } }]).has("kit/package.json"), "a pattern names folders under its own package list only");
 const mine = workspaces(lists), names = file => [...mine.get(file) ?? []].sort().join();
 ok(names("package.json") === "barkbite,mossgrip" && names("src/engine/package.json") === "barkbite,mossgrip" && names("kit/package.json") === "kit-part" && names("kit/parts/a/b/package.json") === "kit-part",
   "a list that names \"workspaces\", and each of them, may ask for them as the project's own");

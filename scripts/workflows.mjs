@@ -4,9 +4,10 @@
 //   - names pull_request_target on any line that is not all comment;
 //   - uses an action or a workflow that is neither the project's own (./), nor one of GitHub's own (actions/*), nor
 //     pinned to a full commit SHA (a container image: to its sha256 digest);
-//   - writes a `uses` key in any form but the plain one, its value on the same line: with no YAML reader among Node's
-//     own modules the check reads lines, so what it cannot read it fails. A quoted key is read, and so is a name
-//     spelled with a YAML escape (\x, \u, \U) or broken over two lines by one.
+//   - writes a `uses` key in a form the check cannot read: with no YAML reader among Node's own modules it reads
+//     lines, so it fails a `uses` whose value is not on its line, a key written the long way (`? key`) and a key
+//     that is an alias (`*name:`), which a workflow never needs. A quoted key is read, and so is a name spelled with a
+//     YAML escape (\x, \u, \U) or broken over two lines by one.
 // The rest of rule 2 (workflow_run, the fewest permissions, untrusted text in a script) takes judgement and stays with
 // the reviews, and with CodeQL where the repository has it. The copy of the core (core/) is checked in the core, which
 // runs this on itself. Reads only; Node's own modules. It checks the project it lies in, whatever the directory it is
@@ -17,7 +18,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const KEY = /(?:^|[\s{,[?-])(?:"uses"|'uses'|uses)\s*:(?=\s|$)[ \t]*(?:"([^"]*)"|'([^']*)'|([^\s#},]+))?/gu;
+const KEY = /(?:^|[\s{,[?-])(?:(?:"uses"|'uses')\s*:|uses\s*:(?=\s|$))[ \t]*(?:"([^"]*)"|'([^']*)'|([^\s#},]+))?/gu;
+const AT_KEY = "(?:^\\s*(?:-\\s+)*|[{,[]\\s*)"; // where a key may start: a line, after its dashes, or inside braces or brackets
+const LONG_KEY = new RegExp(`${AT_KEY}\\?(?:\\s|$)`, "u"), ALIAS_KEY = new RegExp(`${AT_KEY}(?:\\?\\s+)?\\*[^\\s,[\\]{}:]+\\s*:(?:\\s|$)`, "u");
 const plain = line => line.replace(/\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/gu, (_, x, u, U) => String.fromCodePoint(parseInt(x ?? u ?? U, 16)));
 const pinned = uses =>
   uses.startsWith("./") ||
@@ -32,6 +35,8 @@ export function problems(text) {
     const line = plain(raw), joined = carried + line.trimStart();
     carried = /\\$/u.test(raw) ? joined.slice(0, -1).slice(-32) : ""; // the end is enough to find the word across the break
     if (line.includes("pull_request_target") || joined.includes("pull_request_target")) found.push({ line: i + 1, what: "pull_request_target runs a pull request with the repository's own token and secrets: never (floor rule 2)" });
+    if (LONG_KEY.test(line)) found.push({ line: i + 1, what: "a key written the long way (`? key`) cannot be read: write it as `key: value` (floor rule 2)" });
+    if (ALIAS_KEY.test(line)) found.push({ line: i + 1, what: "a key that is an alias (`*name:`) cannot be read: write the key itself (floor rule 2)" });
     for (const m of line.matchAll(KEY)) {
       const uses = m[1] ?? m[2] ?? m[3];
       if (uses === undefined) found.push({ line: i + 1, what: "a `uses` with its value not on the same line cannot be read: write it as `uses: name@version` (floor rule 2)" });

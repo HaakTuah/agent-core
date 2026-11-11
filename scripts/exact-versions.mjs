@@ -41,21 +41,44 @@ const inside = (spec, dir) => {
 };
 const exact = (spec, dir) => EXACT.test(spec) || inside(spec, dir) || git(spec);
 
+// Whether a name fits a pattern whose only sign is *, any run of characters; in time that grows with their lengths.
+const fits = (pattern, name) => {
+  let p = 0, n = 0, star = -1, mark = 0;
+  while (n < name.length) {
+    if (pattern[p] === "*") { star = p++; mark = n; }
+    else if (pattern[p] === name[n]) { p++; n++; }
+    else if (star < 0) return false;
+    else { p = star + 1; n = ++mark; }
+  }
+  while (pattern[p] === "*") p++;
+  return p === pattern.length;
+};
+// Whether a folder is one a "workspaces" pattern names: part by part, ** standing for any number of folders.
+const names = (pattern, folder) => {
+  const want = pattern.split("/").filter(part => part && part !== "."), have = folder.split("/").filter(Boolean), dead = new Set();
+  const from = (w, h) => {
+    if (w === want.length) return h === have.length;
+    if (dead.has(`${w} ${h}`)) return false;
+    let ok = false;
+    if (want[w] === "**") for (let skip = h; skip <= have.length && !ok; skip++) ok = from(w + 1, skip);
+    else ok = h < have.length && fits(want[w], have[h]) && from(w + 1, h + 1);
+    if (!ok) dead.add(`${w} ${h}`);
+    return ok;
+  };
+  return from(0, 0);
+};
+
 // The project's workspaces: for each package list given (each { file, pkg }) that names "workspaces", and for each of
 // those workspaces, the names npm fills from the project itself when that list asks for them. A file to its names.
 export function workspaces(lists) {
   const own = new Map();
-  const quote = text => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   for (const { file, pkg } of lists) {
     const globs = Array.isArray(pkg?.workspaces) ? pkg.workspaces : Array.isArray(pkg?.workspaces?.packages) ? pkg.workspaces.packages : [];
-    const folders = glob => {
-      const inner = glob.replace(/^!/u, "").replace(/^\.\//u, "").replace(/\/+$/u, "").split("**").map(piece => piece.split("*").map(quote).join("[^/]*")).join(".*");
-      return new RegExp(`^${[quote(dirOf(file)), inner].filter(Boolean).join("/")}$`, "u");
-    };
-    const named = globs.filter(g => typeof g === "string");
-    const members = named.filter(g => !g.startsWith("!")).map(folders), left = named.filter(g => g.startsWith("!")).map(folders);
-    const member = folder => members.some(m => m.test(folder)) && !left.some(m => m.test(folder)); // a folder a "!" leaves out is none, wherever it stands
-    const mine = lists.filter(l => l.file !== file && typeof l.pkg?.name === "string" && member(dirOf(l.file)));
+    const named = globs.filter(g => typeof g === "string"), base = dirOf(file);
+    const under = folder => base === "" ? folder : folder.startsWith(`${base}/`) ? folder.slice(base.length + 1) : null;
+    // A folder a "!" leaves out is no workspace, wherever the "!" stands in the list.
+    const member = folder => folder !== null && named.some(g => !g.startsWith("!") && names(g, folder)) && !named.some(g => g.startsWith("!") && names(g.slice(1), folder));
+    const mine = lists.filter(l => l.file !== file && typeof l.pkg?.name === "string" && member(under(dirOf(l.file))));
     for (const at of mine.length ? [file, ...mine.map(l => l.file)] : []) own.set(at, new Set([...own.get(at) ?? [], ...mine.map(l => l.pkg.name)]));
   }
   return own;
