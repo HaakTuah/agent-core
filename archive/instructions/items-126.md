@@ -211,7 +211,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Yes, and make things as refined as possible!
 
-146. **11 November 2026** (both games, in the design chat, 17:41 Oslo time), after the final audit's report, behind
+146. **11 November 2026** (both games, in the design chat, 16:41 UTC), after the final audit's report, behind
      the usage brake's removal from the core and both games (floor rule 16 among it, his yes as he asked), and the
      return of "other providers first", which core archive 76 gave and the cut-down of 10 November had dropped:
 
