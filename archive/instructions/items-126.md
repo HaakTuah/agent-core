@@ -231,3 +231,12 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      offered as:
 
      > Open the core to him (Recommended)
+
+149. **11 November 2026** (the core, in the design chat, 21:37 UTC), asked whether floor rule 18 should gain an
+     exception for an owner's own computer, since as written it forbade a setup another owner already runs (one tool
+     calling another's under his own account); behind rule 18 cut down to what agents do, the setup itself left to
+     the owner and `setup/server.md`:
+
+     > Really, the setup is something the owner does, so why even have rules for what kind of set-up is allowed? Seems
+     > like overreach, all it acheives is the system refusing to work, it doesn't help it make it right, like our build
+     > rules does, right?
