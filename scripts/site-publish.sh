@@ -23,17 +23,18 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 for attempt in 1 2 3 4 5; do
-  if [ "$target" = root ] && [ -n "${GITHUB_SHA:-}" ]; then
-    git fetch -q origin "+refs/heads/main:refs/remotes/origin/main"
-    main=$(git rev-parse refs/remotes/origin/main)
-    [ "$main" = "$GITHUB_SHA" ] || { echo "gh-pages: main is now at ${main:0:7}, not this run's ${GITHUB_SHA:0:7}; root skipped"; exit 0; }
-  fi
   rm -rf "$work/tree" && mkdir "$work/tree"
   if git fetch -q origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null; then
     old=$(git rev-parse "refs/remotes/origin/$branch")
     git archive "$old" | tar -x -C "$work/tree"
   else
     old=""   # the branch does not exist yet: the lease requires that it still does not
+  fi
+  # (main fetched after gh-pages, so a root published from a newer main before this lease is seen here too)
+  if [ "$target" = root ] && [ -n "${GITHUB_SHA:-}" ]; then
+    git fetch -q origin "+refs/heads/main:refs/remotes/origin/main"
+    main=$(git rev-parse refs/remotes/origin/main)
+    [ "$main" = "$GITHUB_SHA" ] || { echo "gh-pages: main is now at ${main:0:7}, not this run's ${GITHUB_SHA:0:7}; root skipped"; exit 0; }
   fi
 
   # A preview never creates the branch, nor writes beside a root that is not there: deployed, such a branch would
