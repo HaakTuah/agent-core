@@ -12,13 +12,13 @@ too).
   `"scan"`. It reads every tracked file (but what `skip` names and, in a project, its copy of the core) and needs:
   - every lockfile, and every `package.json` with dependencies, to be one the config's `lockfiles` checks;
   - an entry for every action but the owner's own and the project's;
-  - an entry for every package npx, npm exec, npm install (by any spelling, after any options) or npm pack fetches,
-    at the exact version audited, from npm's own registry (a command naming another fails). This covers workflows,
-    scripts and tools of any kind (TypeScript components, Dockerfiles, files with no extension, read by their `#!`
-    line), the commands in JSON and TOML files (package.json's `scripts`, hooks, tasks, launches) and commands written
-    as arrays. npx `--no-install` never fetches, so a bare name passes there. Any other fetch that cannot be read
-    fails, but npm pack's and another fetcher's (curl, wget, pip, playwright install and the like). Each of those
-    passes only in a file an entry's `files` names, as its hand audit;
+  - an entry for every package npx, npm exec, npm install (by any spelling, after any options) or npm pack fetches, at
+    the exact version audited, from npm's own registry (a command naming another fails). This covers workflows, scripts
+    and tools of any kind (TypeScript components, Dockerfiles, files with no extension, read by their `#!` line), every
+    string of a JSON file but its prose (package.json's `scripts` and tools' hooks, tasks, launches), TOML files, YAML
+    folded over lines, and commands written as arrays. npx `--no-install` never fetches, so a bare name passes there.
+    Any other fetch that cannot be read fails, but npm pack's and another fetcher's (curl, wget, pip, playwright install
+    and the like). Each of those passes only in a file an entry's `files` names, as its hand audit;
   - an entry covering every script in a language it cannot read (Python and the like, by its extension or its `#!`
     line): the entries of what it uses, which ship if it does;
   - an entry covering every code file with a licence notice, and every font, image, sound, video, model, data or other
@@ -35,7 +35,7 @@ too).
   its lists and readers in its own suite. Those tests come into the first, on invented names: how a licence expression
   is read, which list allows what, a package known by its registry address, npm's settings. The second stages a small
   project in a temporary git repository for each case. The project passes as it is, passes 19 allowed forms, and fails
-  95 others, each for the reason it names: the licence lists, a lockfile's package, the owner's kind, actions, every
+  103 others, each for the reason it names: the licence lists, a lockfile's package, the owner's kind, actions, every
   form of fetch, copied code, assets and binaries, lockfiles left unchecked, an entry covering nothing, and a bad
   `"scan"`.
 - **The core's own audit:** `.github/licences.json` and `.github/licences-audit.json` hold what the core's workflows and
@@ -46,10 +46,10 @@ too).
   security reviews (floor rule 3). Neither gains a permission or an input.
 - **`README.md`,** point 5: the licence check's audit, held whole by the scan.
 
-Tested: the tests pass (8 and 115 checks), and so does the core's own audit of its 95 files. Codex's review and the
+Tested: the tests pass (8 and 123 checks), and so does the core's own audit of its 95 files. Codex's review and the
 fallback reviewer's found ways round the first two versions: `package.json` scripts, hooks, tasks and launches, other
-spellings and fetchers, an option's unknown value hiding the command, another registry, curl in a quoted command,
-comments that hid commands, folded YAML, unread file kinds and #! lines, lockfiles left out, scripts of other languages
+spellings and fetchers, an option's value hiding the command, another registry, curl in a quoted command, comments
+that hid commands, folded YAML, tools' hooks in package.json, unread file kinds and #! lines, lockfiles left out, scripts of other languages
 that ship, `own` covering too much. Each is now closed and tested. A dry run on each game with
 the new scripts:
 - Snakes passes, but for its own scan and that scan's test, which name the forms they look for; both go in its sync
@@ -65,7 +65,9 @@ suite drops the tests of the core's functions that moved here.
 
 Readings taken: a hand audit (an entry's `files` naming a file, for npm pack's or another fetcher's fetches the scan
 cannot read) covers the whole file, so a later fetch added to that file passes the scan; the review of that PR is what
-sees it, as for any edit to an audit. The scan's test file is a little past 20 KB: it is one list of cases, read only by
-whoever changes the scan. Lockfile packages need no audit entry, since the check reads each one's licence from the
-lockfile at every version; Snakes' hand list of them repeated it. The owner's own work gets a kind of its own rather
-than a list of folders the scan passes over, so every asset's origin stands in one place. Questions for the owner: none.
+sees it, as for any edit to an audit. A file with no extension is read as shell, so a prose file such as a bare
+`LICENSE` naming an npm command would fail; a project skips it if it has one (neither game does). The scan's test file
+is a little past 20 KB: it is one list of cases, read only by whoever changes the scan. Lockfile packages need no audit
+entry, since the check reads each one's licence from the lockfile at every version; Snakes' hand list of them repeated
+it. The owner's own work gets a kind of its own rather than a list of folders the scan passes over, so every asset's
+origin stands in one place. Questions for the owner: none.

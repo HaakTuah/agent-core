@@ -35,7 +35,7 @@ import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 
 const OWN = "HaakTuah/";
-const SHELL = /\.(ya?ml|sh|bash|zsh|mk|toml)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile)$/iu;
+const SHELL = /\.(ya?ml|sh|bash|zsh|fish|mk|toml|envrc)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile|\.envrc)$/iu;
 const JS = /\.([cm]?[jt]sx?)$/iu;
 const YAML = /\.ya?ml$/iu;
 const OTHER_LANGUAGE = /\.(py|pyw|rb|ps1|psm1|bat|cmd|pl|pm|php|lua|r|jl|tcl|vbs|groovy|gradle|kts)$/iu;
@@ -64,7 +64,19 @@ const NO_FETCH = new Set([
   "undeprecate", "uninstall", "unlink", "remove", "rm", "r", "un", "unpublish", "unstar", "update", "up", "upgrade",
   "udpate", "version", "verison", "v", "view", "info", "show", "whoami",
 ]);
-const VALUED = new Set(["--prefix", "-C", "--loglevel", "--registry", "--cache", "-w", "--workspace", "--userconfig", "--globalconfig", "--tag", "--omit", "--include"]);
+const VALUED = new Set([
+  "-C", "-w", "-L", "--access", "--auth-type", "--before", "--browser", "--ca", "--cache", "--cafile", "--call", "-c",
+  "--cert", "--cidr", "--color", "--cpu", "--depth", "--diff", "--diff-dst-prefix", "--diff-src-prefix", "--diff-unified",
+  "--editor", "--expect-result-count", "--fetch-retries", "--fetch-retry-factor", "--fetch-retry-maxtimeout",
+  "--fetch-retry-mintimeout", "--fetch-timeout", "--globalconfig", "--heading", "--https-proxy", "--include",
+  "--init-author-email", "--init-author-name", "--init-author-url", "--init-license", "--init-module", "--init-version",
+  "--install-strategy", "--key", "--libc", "--local-address", "--location", "--lockfile-version", "--loglevel",
+  "--logs-dir", "--logs-max", "--maxsockets", "--message", "-m", "--node-options", "--noproxy", "--omit", "--os", "--otp",
+  "--pack-destination", "--preid", "--prefix", "--provenance-file", "--proxy", "--registry", "--replace-registry-host",
+  "--save-prefix", "--sbom-format", "--sbom-type", "--scope", "--script-shell", "--searchexclude", "--searchlimit",
+  "--searchopts", "--searchstaleness", "--shell", "--tag", "--tag-version-prefix", "--umask", "--userconfig", "--viewer",
+  "--which", "--workspace",
+]);
 // Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments).
 const OTHER_FETCHER = new RegExp(
   "(?:^|[\\s;&|(`$\'\"])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
@@ -122,32 +134,49 @@ export function fetched(line) {
 }
 
 /**
+ * A YAML folded block ("key: >") as the one line it reads as: the lines after it indented deeper than its key, up to a
+ * blank line or one indented no deeper, joined with spaces (as YAML folds them).
+ */
+function folded(text) {
+  const lines = text.split(/\r?\n/u), out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(\s*(?:-\s+)?)[\w'"$.-]+\s*:\s*>[-+]?\d?\s*$/u.exec(lines[i]);
+    if (!m) { out.push(lines[i]); continue; }
+    const key = m[1].length, block = [];
+    while (i + 1 < lines.length && lines[i + 1].trim() && lines[i + 1].search(/\S/u) > key) block.push(lines[++i].trim());
+    out.push(`${lines[i - block.length]} ${block.join(" ")}`);
+  }
+  return out.join("\n");
+}
+
+/**
  * The command lines in a text: each npx or npm and what follows it on its line, and each written as an array. A line
  * continued on the next (a shell's "\\" at its end, or a YAML folded block, "key: >") is read as one.
  */
 function commands(text) {
   const out = [];
-  const joined = text.replace(/\\\r?\n/gu, " ").replace(/:[ \t]*>[-+]?[ \t]*\r?\n((?:[ \t]+\S.*(?:\r?\n|$))+)/gu, (_, block) => `: ${block.replace(/\s*\r?\n\s*/gu, " ")}\n`);
+  const joined = folded(text.replace(/\\\r?\n/gu, " "));
   for (const m of joined.matchAll(/\b(npx|npm)\b(?!['"`]\s*,)[^\n;&|>]*/gu)) out.push(m[0]); // (an array, below)
   for (const m of joined.matchAll(/['"`](npx|npm)['"`]\s*,\s*\[([^\]]*)\]/gu)) out.push([m[1], ...[...m[2].matchAll(/['"`]([^'"`]*)['"`]/gu)].map((s) => s[1])].join(" "));
   return out;
 }
 
 /**
- * The commands in a JSON value, one line each: in every object, the strings and lists under its keys that hold a command
- * (package.json's "scripts", a hook's "command", a task's "command" and "args", a launch's "runtimeExecutable" and
- * "runtimeArgs", a container's "postCreateCommand" and the like) read together, so a program meets its arguments; an
- * object under such a key gives one line for each of its strings. Prose (an "about", a "how") is left alone, since it
- * may name a command without running it.
+ * The commands in a JSON value, one line each: every string in it (package.json's "scripts" and tools' hooks, a hook's
+ * "command", a task's, a container's set-up) but those under a key of prose (an "about", a "description", a "how"),
+ * which may name a command without running it. In each object, the strings and lists under keys that hold a command
+ * (a task's "command" and "args", a launch's "runtimeExecutable" and "runtimeArgs") are read as one line, so a program
+ * meets its arguments.
  */
 const COMMAND = /command|cmd|script|exec|args|^run$/iu;
+const PROSE = /^(\$?comment|about|description|summary|how|used|why|notes?|help|message|text|title|label|keywords|author|contributors|maintainers|homepage|repository|bugs|funding|licen[cs]e|url)$/iu;
 const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
 function commandLines(v) {
-  if (!v || typeof v !== "object") return [];
+  if (!v || typeof v !== "object") return typeof v === "string" ? [v] : [];
   const line = [], out = [];
   for (const [k, x] of Object.entries(v)) {
-    if (COMMAND.test(k) && (typeof x === "string" || Array.isArray(x))) line.push(...strings(x));
-    else if (COMMAND.test(k) && x && typeof x === "object") out.push(...strings(x));
+    if (!Array.isArray(v) && PROSE.test(k)) continue;
+    if (!Array.isArray(v) && COMMAND.test(k) && (typeof x === "string" || (Array.isArray(x) && x.every((y) => typeof y === "string")))) line.push(...strings(x));
     else out.push(...commandLines(x));
   }
   return line.length ? [line.join(" "), ...out] : out;
@@ -206,7 +235,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
     const text = binary.has(f) ? "" : readFileSync(join(root, f), "utf8");
     // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
     // scan cannot read; with none, as shell)
-    const bare = !binary.has(f) && !/\.\w+$/u.test(posix.basename(f));
+    const bare = !binary.has(f) && !/.\.\w+$/u.test(posix.basename(f)); // (".envrc" and the like have none either)
     const interpreter = bare && text.startsWith("#!") ? /^#!\s*\S*?(?:env\s+(?:-\S+\s+)*)?([\w.-]+)/u.exec(text.split("\n")[0].replace(/^#!\s*\S*\//u, "#!"))?.[1] ?? "" : "";
     const other = OTHER_LANGUAGE.test(f) || (bare && interpreter && !/^(sh|bash|dash|zsh|ksh|node|deno|bun|tsx|ts-node)$/u.test(interpreter));
     const runs = !other && (SHELL.test(f) || JS.test(f) || bare);
