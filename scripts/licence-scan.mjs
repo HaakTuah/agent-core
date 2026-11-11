@@ -75,7 +75,7 @@ function attributesOf(text, at) {
 
 /**
  * The parts of a page or component that run, read so as to fail closed rather than to match HTML's parser case by
- * case: every script element's body wherever "<script" stands (in a comment, an attribute's value or a textarea too),
+ * case: every script element's tag and body wherever "<script" stands (in a comment, an attribute's value or a textarea too),
  * to the first "</script" that ends its name, or to the file's end where the body holds "<!--" (as HTML may read it on)
  * or the tag has no end, but a script of data or a template by its own type attribute (JSON-LD, an import map,
  * text/template); every event handler and bound attribute (onclick, @click, :value, v-if, x-data, quoted or not) and
@@ -93,6 +93,7 @@ function executable(text, f) {
     if (k < covered || !ends(k, 7)) continue; // (one inside a body or tag already read is part of it)
     const tag = attributesOf(text, k + 7);
     if (tag.end < 0) { parts.push(text.slice(k + 7)); break; }
+    parts.push(text.slice(k + 7, tag.end)); // (its tag too: one that is only text may span a script that runs)
     while (c < closes.length && closes[c] <= tag.end) c++;
     let stop = c < closes.length ? closes[c] : text.length;
     // (a script that runs is read, to the file's end where it holds "<!--", and covers what it read; one of data covers
