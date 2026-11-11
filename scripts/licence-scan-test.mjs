@@ -89,6 +89,7 @@ for (const [what, change] of [
   ["a lockfile the config names, a tool in it under GPL", LOCK("GPL-3.0-only")],
   ["an audited install with a comment after it", append("scripts/setup.sh", "npm install -g mossgrip-cli@1.2.3 # the one we audited\n")],
   ["npm run after an option", append("scripts/setup.sh", "npm --silent run build\n")],
+  ["an audited package written as an array", write("scripts/crop.mjs", "execFileSync('npx', ['mossgrip-cli@1.2.3']);\n")],
 ]) { const f = run(change); ok(f.length === 0, `passes ${what}`, f.join("\n")); }
 
 for (const [what, change, why] of [
@@ -153,6 +154,13 @@ for (const [what, change, why] of [
   ["npm install folded over two lines of YAML", append(".github/workflows/ci.yml", "      - run: >\n          npm install -g\n          mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
   ["npm install in a Dockerfile", write("Dockerfile", "FROM node\nRUN npm install -g mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
   ["curl in a script", append("scripts/setup.sh", "curl -sSfo moss.tgz https://mossgrip.example/moss.tgz\n"), /fetches what no entry/],
+  ["curl in a shell command a tool runs as a string", write("scripts/icon.mjs", "execSync('curl -o icon.png https://mossgrip.example/icon.png');\n"), /fetches what no entry/],
+  ["an audited package fetched from another registry", append("scripts/setup.sh", "npm install --registry https://mossgrip.example -g mossgrip-cli@1.2.3\n"), /another registry/],
+  ["npm pointed at another registry by its environment", append("scripts/setup.sh", "npm_config_registry=https://mossgrip.example npx mossgrip-cli@1.2.3\n"), /another registry/],
+  ["a package given as a task's argument", write(".vscode/tasks.json", JSON.stringify({ command: "npx", args: ["mossgrip-widgets@1.2.3"] })), /mossgrip-widgets .* is not in/],
+  ["a script with no extension whose #! line names another language", write("scripts/render", "#!/usr/bin/env python3\nimport mosspy\n"), /language the scan cannot read/],
+  ["a script in another language that reaches users, audited as a tool", (dir) => { write("site/lib.py", "import moss\n")(dir); handAudited("site/lib.py")(dir); }, /reaches users/],
+  ["a licence notice in a script of another language", write("scripts/lichen.py", "# SPDX-License-Identifier: GPL-3.0-only\n"), /language the scan cannot read|licence notice/],
   ["curl run by a tool", write("scripts/tiles.mjs", "execFileSync(\"curl\", [\"-sSf\", \"https://mossgrip.example/tile.png\"]);\n"), /fetches what no entry/],
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
   ["playwright install", append(".github/workflows/ci.yml", "      - run: npx --no-install playwright install chromium\n"), /fetches what no entry/],

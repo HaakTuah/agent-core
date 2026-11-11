@@ -67,7 +67,7 @@ const NO_FETCH = new Set([
 const VALUED = new Set(["--prefix", "-C", "--loglevel", "--registry", "--cache", "-w", "--workspace", "--userconfig", "--globalconfig", "--tag", "--omit", "--include"]);
 // Other fetchers, as a command (at a line's or command's start, or as a program named in quotes before its arguments).
 const OTHER_FETCHER = new RegExp(
-  "(?:^|[\\s;&|(`$])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
+  "(?:^|[\\s;&|(`$\'\"])(?:curl|wget)\\s+(?:-[-a-zA-Z]|https?://|[\'\"$])|['\"`](?:curl|wget|pip3?|pipx|pnpm|yarn|bunx|bun|gem|cargo|deno)['\"`]\\s*,\\s*\\[|" +
     "['\"`]git['\"`]\\s*,\\s*\\[\\s*['\"`]clone|" +
     "\\b(?:pipx?3?\\s+install|pnpm\\s+(?:dlx|add|install|i)\\s|yarn\\s+(?:dlx|add)\\s|bunx\\s|bun\\s+(?:add|x|install)\\s|playwright\\s+install|" +
     "git\\s+clone|gem\\s+install|cargo\\s+install|go\\s+install|apt(?:-get)?\\s+install|brew\\s+install|deno\\s+(?:install|run))",
@@ -81,9 +81,12 @@ const OTHER_FETCHER = new RegExp(
  * Others: { specs: [] }.
  */
 export function fetched(line) {
-  const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`(]+|['"`),;]+$/gu, "")).filter(Boolean);
+  const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`([]+|['"`),;\]]+$/gu, "")).filter(Boolean);
   const end = all.findIndex((w) => w.startsWith("#") || w.startsWith("//")); // (a comment after the command)
   const words = end < 0 ? all : all.slice(0, end);
+  // (an audited name means the npm registry's package: a command that fetches from elsewhere cannot be audited by it)
+  if (/^(npx|npm)$/u.test(words[0] ?? "") && words.some((w) => /^--?(@[^=]*:)?registry\b|^--replace-registry-host\b|^npm_config_.*registry/iu.test(w)))
+    return { specs: [], unreadable: "it fetches from another registry than npm's" };
   let i = 0;
   const options = () => { while (i < words.length && words[i].startsWith("-")) i += VALUED.has(words[i]) ? 2 : 1; };
   let runs = false, local = false, packs = false;
@@ -125,7 +128,7 @@ export function fetched(line) {
 function commands(text) {
   const out = [];
   const joined = text.replace(/\\\r?\n/gu, " ").replace(/:[ \t]*>[-+]?[ \t]*\r?\n((?:[ \t]+\S.*(?:\r?\n|$))+)/gu, (_, block) => `: ${block.replace(/\s*\r?\n\s*/gu, " ")}\n`);
-  for (const m of joined.matchAll(/\b(npx|npm)\b[^\n;&|>]*/gu)) out.push(m[0]);
+  for (const m of joined.matchAll(/\b(npx|npm)\b(?!['"`]\s*,)[^\n;&|>]*/gu)) out.push(m[0]); // (an array, below)
   for (const m of joined.matchAll(/['"`](npx|npm)['"`]\s*,\s*\[([^\]]*)\]/gu)) out.push([m[1], ...[...m[2].matchAll(/['"`]([^'"`]*)['"`]/gu)].map((s) => s[1])].join(" "));
   return out;
 }
@@ -186,6 +189,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         else if (!(packs && byHand(f))) fail(`${where}: ${spec} cannot be audited (only name@exact.version${packs ? `, unless an entry's "files" names ${f}` : ""})`);
       }
     }
+    if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b/iu.test(text)) fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there`);
     if (OTHER_FETCHER.test(text) && !byHand(f)) fail(`${f}: ${OTHER_FETCHER.exec(text)[0]} fetches what no entry's "files" says (name ${f} in the entry that audits it)`);
   };
 
@@ -200,7 +204,12 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   for (const f of files) {
     if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences`);
     const text = binary.has(f) ? "" : readFileSync(join(root, f), "utf8");
-    const runs = SHELL.test(f) || JS.test(f) || (!binary.has(f) && !/\.\w+$/u.test(posix.basename(f))); // (a file with no extension: a hook, a script, read as shell)
+    // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
+    // scan cannot read; with none, as shell)
+    const bare = !binary.has(f) && !/\.\w+$/u.test(posix.basename(f));
+    const interpreter = bare && text.startsWith("#!") ? /^#!\s*\S*?(?:env\s+(?:-\S+\s+)*)?([\w.-]+)/u.exec(text.split("\n")[0].replace(/^#!\s*\S*\//u, "#!"))?.[1] ?? "" : "";
+    const other = OTHER_LANGUAGE.test(f) || (bare && interpreter && !/^(sh|bash|dash|zsh|ksh|node|deno|bun|tsx|ts-node)$/u.test(interpreter));
+    const runs = !other && (SHELL.test(f) || JS.test(f) || bare);
     if (runs) {
       // (a line that is only a comment fetches nothing; a comment after code stays, since a # or // in a string is none)
       const comment = JS.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
@@ -225,10 +234,11 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
       const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
       if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
         fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences`);
-    } else if (OTHER_LANGUAGE.test(f)) {
+    } else if (other) {
       if (!byHand(f)) fail(`${f} is in a language the scan cannot read: name it in the "files" of the entries of what it uses`);
+      else if (served(f) && !covering(f).some((e) => e.kind !== "own" && e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so an entry covering it ships`);
     }
-    if (CODE.test(f) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });
+    if ((CODE.test(f) || runs || other) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });
     if (ASSET.test(f) || binary.has(f)) needFile(f, binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
   }
   return { failures, scanned: files.length };
