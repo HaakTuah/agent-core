@@ -70,8 +70,8 @@ cannot read) covers the whole file, so a later fetch added to that file passes t
 sees it, as for any edit to an audit. A file with no extension is read as shell, so a prose file such as a bare
 `LICENSE` naming an npm command would fail; a project skips it if it has one (neither game does). A licence notice in
 any file but prose counts, so a `# Copyright` line in a workflow, or credits quoting a licence in a JSON or HTML file,
-need an entry not the owner's (his own work carries none; credits belong in a prose file). A string that is only "npx"
-or "npm", not called with its arguments right there, fails, since the scan cannot follow it into a variable. Lockfile
-packages need no audit entry, since the check reads each one's licence from the lockfile at every version; Snakes' hand
-list of them repeated it. The owner's own work gets a kind of its own rather than a list of folders the scan passes
-over, so every asset's origin stands in one place. Questions for the owner: none.
+need an entry not the owner's (his own work carries none; credits belong in a prose file). In code, a string that is
+only "npx" or "npm", not called with its arguments right there, fails, since the scan cannot follow it into a variable.
+Lockfile packages need no audit entry, since the check reads each one's licence from the lockfile at every version;
+Snakes' hand list of them repeated it. The owner's own work gets a kind of its own rather than a list of folders the
+scan passes over, so every asset's origin stands in one place. Questions for the owner: none.
