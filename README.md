@@ -58,7 +58,7 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 
 | Slot | What the project fills in |
 | --- | --- |
-| *owner's account* | the owner's GitHub login: his word (floor rule 4) and his inbox (`modules/inbox.md`) |
+| *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): his word (floor rule 4) and his inbox (`modules/inbox.md`) |
 | *progress file* | the file that holds the queue and what is done |
 | *report* | where a task's report, with its "Readings taken", goes |
 | *settling references* | what open points are settled against, with the owner's past words |
