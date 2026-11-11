@@ -111,6 +111,10 @@ for (const [what, change, why] of [
     'git -C "vendor dir" clone https://mossgrip.example/moss.git', "pip --proxy='http://a b' install mosspy"]
     .map((line) => [`another fetcher with options before its command: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
+  ...['"curl" -sSfo moss.tgz https://mossgrip.example/moss.tgz', "'wget' https://mossgrip.example/moss.tgz", '"pip" install mosspy',
+    "'git' clone https://mossgrip.example/moss.git", '"node_modules/.bin/playwright" install chromium',
+    '"$here/tools/node_modules/.bin/playwright" install --with-deps chromium', '"/usr/bin/curl" "$URL"']
+    .map((line) => [`another fetcher named as a quoted word: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["playwright install", append(".github/workflows/ci.yml", "      - run: npx --no-install playwright install chromium\n"), /fetches what no entry/],
   ["a script in a language the scan cannot read", write("scripts/render.py", "import numpy\n"), /language the scan cannot read/],
   ["npm install named in pieces of a string joined in code", write("scripts/run.mjs", "execSync('npm ' + 'install -g mossgrip-widgets@1.2.3');\n"), /mossgrip-widgets .* is not in/],
