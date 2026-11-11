@@ -35,6 +35,11 @@ for (const [what, change] of [
   ["npm view with a variable, which fetches nothing", write("scripts/times.mjs", "execFileSync('npm', ['view', name, 'time', '--json']);\n")],
   ["npx and npm asked their version, and a check that npx is there", append("scripts/setup.sh", "npx --version\nnpm exec --help\nif ! command -v npx >/dev/null; then exit 1; fi\nwhich npm\n")],
   ["npm named in a message, not as a command", (dir) => { write("scripts/say.mjs", "console.log(`${file}: npm setting not allowed`);\n")(dir); append("scripts/setup.sh", "if npm ci; then echo \"npm packages: installed\"; fi\n")(dir); }],
+  ["a page and a component showing commands in their text", (dir) => {
+    write("site/tutorial.html", "<p>Run npx mossgrip-cli to start, or curl -o moss.tgz https://mossgrip.example/moss.tgz.</p>\n<pre>npx create-moss my-app</pre>\n<script>const moss = 1;</script>\n")(dir);
+    write("site/Guide.vue", "<template><p>Run npx mossgrip-cli to start.</p></template>\n<script setup>const moss = 1;</script>\n")(dir);
+  }],
+  ["npm diff, cache and publish of what is local or audited", append("scripts/setup.sh", "npm diff --diff=mossgrip-cli@1.2.3 --diff=.\nnpm cache clean --force\nnpm publish ./moss.tgz\n")],
   ["npm exec of an audited package after --", append("scripts/setup.sh", "npm exec --package=mossgrip-cli@1.2.3 -- moss build\n")],
 ]) { const f = run(change); ok(f.length === 0, `passes ${what}`, f.join("\n")); }
 { // (a long line naming npm many times, as a bundle may, read in time: what stands before each is read only so far back)

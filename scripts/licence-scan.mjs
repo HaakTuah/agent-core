@@ -10,7 +10,7 @@
 //     workflows among them) and the project's (./), by its name (owner/repo), at whatever version it is pinned to;
 //   - an entry for each package a command fetches (licence-commands.mjs, beside this file, reads them: npx, npm exec,
 //     npm install, npm link and npm pack, in any workflow, script or tool, a file with no extension read as a shell
-//     script, a page or component read whole, any command in a JSON or TOML file), written
+//     script, the parts of a page or component that run, any command in a JSON or TOML file), written
 //     name@exact.version and audited at that version, one entry for each version used, so an update is audited again,
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and the like): each of those passes
@@ -35,7 +35,7 @@ import { OTHER_FETCHER, commandLines, commands, fetched } from "./licence-comman
 const OWN = "HaakTuah/";
 const SHELL = /\.(ya?ml|sh|bash|zsh|fish|mk|toml|envrc)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile|\.envrc)$/iu;
 const JS = /\.([cm]?[jt]sx?)$/iu;
-const WEB = /\.(html?|vue|svelte|astro)$/iu; // (pages and components, whose scripts run too: read whole, their text too)
+const WEB = /\.(html?|vue|svelte|astro)$/iu; // (pages and components: the parts that run, executable() below)
 const YAML = /\.ya?ml$/iu;
 const OTHER_LANGUAGE = /\.(py|pyw|rb|ps1|psm1|bat|cmd|pl|pm|php|lua|r|jl|tcl|vbs|groovy|gradle|kts)$/iu;
 const CODE = /\.(html?|[cm]?[jt]sx?|css|scss|sass|less|vue|svelte|astro)$/iu;
@@ -48,6 +48,29 @@ const PROSE_FILE = /\.(md|markdown|txt|rst|adoc)$/iu;
 const NOTICE = /\/\*!|@license|SPDX-License-Identifier|Copyright\s+(\(c\)|©|\d{4})|Permission is hereby granted|Licensed under the/iu;
 const EXACT = /^((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)@(\d+\.\d+\.\d+)$/iu;
 const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
+/**
+ * The parts of a page or component that run: its script blocks (an unclosed one to the end), an Astro component's
+ * frontmatter, its event handlers and bound attributes (onclick, @click, :value, v-if, x-data), javascript: addresses
+ * and, but in a plain page, its expressions in braces (Vue's, Svelte's, Astro's), each brace read to its match. Its
+ * text and markup run nothing, so a page showing a command as an example fetches nothing.
+ */
+function executable(text, f) {
+  const parts = [];
+  for (const m of text.matchAll(/<script\b[^>]*>([\s\S]*?)(?:<\/script\s*>|$)/giu)) parts.push(m[1]);
+  if (/\.astro$/iu.test(f)) { const front = /^\s*---\r?\n([\s\S]*?)(?:\r?\n---|$)/u.exec(text); if (front) parts.push(front[1]); }
+  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/giu)) parts.push(m[1] ?? m[2]);
+  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
+  if (!/\.html?$/iu.test(f)) {
+    let depth = 0, start = 0;
+    for (let k = 0; k < text.length; k++) {
+      if (text[k] === "{" && depth++ === 0) start = k;
+      else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
+    }
+    if (depth > 0) parts.push(text.slice(start));
+  }
+  return parts.join("\n");
+}
+
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
 export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const failures = [];
@@ -110,8 +133,8 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
     const runs = !other && (SHELL.test(f) || JS.test(f) || WEB.test(f) || bare);
     if (runs) {
       // (a line that is only a comment fetches nothing; a comment after code stays, since a # or // in a string is none)
-      const comment = JS.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
-      const src = text.split("\n").map((l) => l.replace(comment, "")).join("\n");
+      const comment = JS.test(f) || WEB.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
+      const src = (WEB.test(f) ? executable(text, f) : text).split("\n").map((l) => l.replace(comment, "")).join("\n");
       if (YAML.test(f)) {
         for (const m of src.matchAll(/(?:^|[\s{,])['"]?uses['"]?\s*:\s*['"]?([^\s'",}]+)/gu)) {
           const used = m[1];

@@ -1,15 +1,15 @@
-// What the commands in a project's files fetch, for the licence scan (licence-scan.mjs, beside this file, which says what
-// it needs of each). It reads each npx, npm exec (Windows' npx.cmd and npm.cmd too), npm install (and its other
-// spellings), npm link and npm pack, past any redirection, in a file's text (commands: a line of its own for each,
-// nested ones too, as in npx -c '...', and each command written as an array, execFileSync("npx", [...]), or by a path
-// to the program), and in a JSON value (commandLines: package.json's "scripts", a hook's "command", a task's program
-// with its arguments). For each it says what it fetches (fetched): the packages it names, or why that cannot be read.
-// npx --no-install (or --no) never fetches. A word that is no command, straight after an option, is read as that
-// option's value. What cannot be read: a variable, npx naming nothing to run here ("npx -y" in a variable), npm init or
-// create, which fetch by another name, npm update or npm audit fix, which take the newest a range allows, another
-// registry or npm config, npm install without its lockfile, a word that is no npm command where npm stands as one.
-// Other fetchers (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER. Node's
-// own modules only (none).
+// What the commands in a project's files fetch, for the licence scan (licence-scan.mjs, beside this file, which says
+// what it needs of each). It reads each npx, npm exec (Windows' npx.cmd and npm.cmd too), npm install (and its other
+// spellings), npm link, npm pack, npm diff, npm cache add and npm publish, past any redirection, in a file's text
+// (commands: a line of its own for each, nested ones too, as in npx -c '...', and each command written as an array,
+// execFileSync("npx", [...]), or by a path to the program), and in a JSON value (commandLines: package.json's
+// "scripts", a hook's "command", a task's program with its arguments). For each it says what it fetches (fetched): the
+// packages it names, or why that cannot be read. npx --no-install (or --no) never fetches. A word that is no command,
+// straight after an option, is read as that option's value. What cannot be read: a variable, npx naming nothing to run
+// here ("npx -y" in a variable), npm init or create, which fetch by another name, npm update or npm audit fix, which
+// take the newest a range allows, another registry or npm config, npm install without its lockfile, a word that is no
+// npm command where npm stands as one. Other fetchers (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone
+// and the like): OTHER_FETCHER. Node's own modules only (none).
 
 // npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own,
 // or none); and options known to take a value. A word that is no command, straight after an option, is read as that
@@ -67,7 +67,7 @@ export const OTHER_FETCHER = new RegExp(
  */
 export function fetched(line, atCommand = false) {
   // (a "+" between the pieces of a string built in code joins them: npm ' + 'install x)
-  const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`([]+|['"`),;\]]+$/gu, "")).filter((w) => w && w !== "+");
+  const all = line.trim().split(/\s+/u).map((w) => w.replace(/^['"`([{]+|['"`),;\]}]+$/gu, "")).filter((w) => w && w !== "+");
   if (/^(npx|npm)\.cmd$/iu.test(all[0] ?? "")) all[0] = all[0].slice(0, 3).toLowerCase(); // (Windows' spelling)
   const end = all.findIndex((w) => w.startsWith("#") || w.startsWith("//")); // (a comment after the command)
   const kept = end < 0 ? all : all.slice(0, end);
@@ -96,6 +96,20 @@ export function fetched(line, atCommand = false) {
     if (CONFIG.has(command) && sets && words.slice(i).some((w) => /(^|:)registry\b|^replace-registry-host\b|^(user|global)config\b/iu.test(w)))
       return { specs: [], unreadable: "it points npm at another registry or config, so no audited name can be trusted after it" };
     if (command === "audit" && words.slice(i).includes("fix")) return { specs: [], unreadable: "npm audit fix installs releases the lockfile does not hold" };
+    // (npm diff --diff=<spec>, npm cache add <spec> and npm publish <spec> fetch what they name, and prepare a git
+    // package, running its scripts: each but a local folder or tarball is a package to audit)
+    if (command === "diff" || command === "cache" || command === "publish") {
+      const rest = words.slice(i), specs = [], localSpec = (w) => /^(\.|\/|~|file:)/u.test(w) || /\.(tgz|tar\.gz)$/iu.test(w);
+      let adding = command !== "cache";
+      for (let k = 0; k < rest.length; k++) {
+        const w = rest[k], diff = /^--diff(?:=(.*))?$/u.exec(w);
+        if (diff) { const v = diff[1] ?? rest[++k]; if (command === "diff" && v !== undefined && !localSpec(v)) specs.push(v); continue; }
+        if (w.startsWith("-")) { if (VALUED.has(w)) k++; continue; }
+        if (!adding) { if (w !== "add") break; adding = true; continue; }
+        if (command !== "diff" && !localSpec(w)) specs.push(w);
+      }
+      return { specs };
+    }
     // (where npm stands as a command, a word after it that is no npm command cannot be read: a variable, a string
     // built in code; elsewhere, in prose, it is only a word)
     if (atCommand && command !== undefined && !fetching(command) && !NO_FETCH.has(command))

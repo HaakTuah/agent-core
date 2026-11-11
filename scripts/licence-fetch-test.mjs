@@ -119,6 +119,13 @@ for (const [what, change, why] of [
   ...["npm install --ignore-scripts --no-package-lock", "npm i --package-lock=false", "npm i --package-lock false"]
     .map((line) => [`npm install without its lockfile: ${line}`, append("scripts/setup.sh", `${line}\n`), /without the lockfile/]),
   ["npm install with the lockfile turned off by its environment", append("scripts/setup.sh", "npm_config_package_lock=false npm install --ignore-scripts\n"), /without the lockfile/],
+  ["npm diff of a git package, which prepares it", append("scripts/setup.sh", "npm diff --diff=git+https://mossgrip.example/widgets.git --diff=.\n"), /cannot be audited/],
+  ["npm cache add of a package", append("scripts/setup.sh", "npm cache add mossgrip-widgets@1.2.3\n"), /mossgrip-widgets .* is not in/],
+  ["npm publish of a git package", append("scripts/setup.sh", "npm publish git+https://mossgrip.example/widgets.git\n"), /cannot be audited/],
+  ["npx in an Astro component's frontmatter", write("site/Moss.astro", "---\nexecSync('npx -y mossgrip-cli');\n---\n<p>moss</p>\n"), /cannot be audited/],
+  ["npm in a Svelte component's expression", write("site/Moss.svelte", "<p>{execSync('npm install -g mossgrip-widgets@1.2.3')}</p>\n"), /mossgrip-widgets .* is not in/],
+  ["npx in a page's event handler", write("site/moss.html", "<button onclick=\"execSync('npx -y mossgrip-cli')\">moss</button>\n"), /cannot be audited/],
+  ["npx in a page's script left open", write("site/moss.html", "<p>moss</p>\n<script>\nexecSync('npx -y mossgrip-cli');\n"), /cannot be audited/],
   ["npx in a config with comments", write("site/jsconfig.json", "{\n  // a comment\n  \"run\": \"npx -y mossgrip-cli\"\n}\n"), /cannot be audited/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
 
