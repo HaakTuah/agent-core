@@ -1,7 +1,8 @@
 # Game design
 
 The principles every game taking the core shares, read before a task changes a rule, a feature or how the computer
-players play; each game's own add to them. A feature is any move, rule or power a player can choose to use.
+players play, and before a polish-lane task; each game's own add to them. A feature is any move, rule or power a player
+can choose to use.
 
 - **The computer players never know who is a person** (core archive 87). Nothing in the logic of the *computer players*,
   nor in *what they are shown*, says whether another player is a person; they judge every player by behaviour alone, so

@@ -32,7 +32,7 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
   (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read
   them (anyone, the owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what
   differs is a slot, and what holds for one kind alone goes in a module of its own. `scripts/general.mjs` fails a word
-  in the floor or the modules that fits only some (`.github/general.json`); a word a project finds untrue for it joins
+  in the floor or the modules that fits only some (`scripts/general.json`); a word a project finds untrue for it joins
   that list in the PR that rewords it.
 - **Never create a repository named `agent-rules`,** the core's old name: links to it redirect here (core archive 121).
 

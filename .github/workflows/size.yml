@@ -26,4 +26,4 @@ jobs:
       - name: The floor and the modules stay under the cap
         run: node scripts/size.mjs
       - name: The floor and the modules fit any project
-        run: node scripts/general.mjs .github/general.json
+        run: node scripts/general.mjs scripts/general.json

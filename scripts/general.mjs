@@ -1,16 +1,17 @@
 // The core's rules fit any project ("Rules are written for any project" in AGENTS.md): fails the floor or a module that
 // uses a word true only for some of the projects that take the core, such as one that assumes a game, its players or a
-// live site. The words, with what to say instead, are its config's (.github/general.json), which also names the files
+// live site. The words, with what to say instead, are its config's (scripts/general.json), which also names the files
 // a word may stand in; a word a project finds untrue for it joins that list. This repository only, run by size.yml.
 // Reads only; Node's own modules.
 //
-//   node scripts/general.mjs .github/general.json
+//   node scripts/general.mjs scripts/general.json
 import fs from "node:fs";
 import path from "node:path";
 
-const config = JSON.parse(fs.readFileSync(process.argv[2] ?? ".github/general.json", "utf8"));
+const config = JSON.parse(fs.readFileSync(process.argv[2] ?? "scripts/general.json", "utf8"));
 const words = config.words.map(w => ({ re: new RegExp(w.pattern, "iu"), say: w.say }));
 const exempt = new Set(config.exempt);
+if (!words.length) { console.log("the list of words is empty: the check would pass anything"); process.exit(1); }
 const files = config.paths
   .flatMap(dir => fs.readdirSync(dir).filter(f => f.endsWith(".md")).map(f => path.posix.join(dir, f)))
   .filter(f => !exempt.has(f))
