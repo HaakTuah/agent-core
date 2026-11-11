@@ -15,6 +15,7 @@ ok(["^1.5.4", "~1.5.4", ">=1.5.4", "1.5.x", "1.5", "1", "*", "", "1.5.4 || 2.0.0
 ok(!fails("npm:barkbite@1.5.4") && !fails("npm:@log/barkbite@1.5.4") && fails("npm:barkbite@^1.5.4") && fails("npm:barkbite"), "an alias passes only at one exact version");
 ok([`git+https://example.com/log/mossgrip.git#${sha}`, `github:log/mossgrip#${sha}`, `log/mossgrip#${sha}`, `https://github.com/log/mossgrip.git#${sha}`, `https://gitlab.com/log/mossgrip#${sha}`, `git@example.com:log/mossgrip.git#${sha}`, `git+https://example.com/log/mossgrip.git#${sha}`, `git+ssh://git@example.com/log/mossgrip.git#${sha}`].every(s => !fails(s)), "a git address at a full commit SHA passes, in each form npm reads as one");
 ok(fails(`https://example.com/log/mossgrip.git#${sha}`) && fails(`https://github.com.example.com/log/mossgrip.git#${sha}`) && fails(`http://github.com/log/mossgrip.git#${sha}`), "a plain web address off the hosts npm knows is a download, whatever follows it, and fails");
+ok(fails(`https://github.com/log/..#${sha}`) && fails(`https://github.com/log/.#${sha}`) && fails(`https://github.com/../mossgrip#${sha}`) && fails(`log/..#${sha}`), "nor is a path of dots on a host npm knows");
 ok(fails(`../mossgrip#${sha}`) && fails(`./log/mossgrip#${sha}`) && fails(`.log/mossgrip#${sha}`), "a path with a SHA after it is no git address");
 ok(fails(`https://example.com/mossgrip.tgz#${sha}`) && fails(`log/mossgrip#semver:^1.0.0`) && fails(`log/mossgrip#${sha.slice(0, 7)}`), "a file on the web with a SHA after it, a range of tags and a short SHA each fail");
 ok(fails("git+https://example.com/log/mossgrip.git#main") && fails("github:log/mossgrip") && fails("log/mossgrip") && fails("https://example.com/mossgrip.tgz"), "a git address at a branch or at nothing, and a file on the web, each fail");
@@ -35,6 +36,10 @@ workspaces([{ file: "package.json", pkg: { workspaces: [`${"*a".repeat(40)}b`, `
 ok(Date.now() - slow < 2000, "a pattern of many stars is read in no time");
 ok(workspaces([{ file: "kit/package.json", pkg: { workspaces: ["*"] } }, { file: "kitten/package.json", pkg: { name: "kitten" } }, { file: "kit/a/package.json", pkg: { name: "a" } }]).get("kit/package.json").has("a")
   && !workspaces([{ file: "kit/package.json", pkg: { workspaces: ["*", "../kitten"] } }, { file: "kitten/package.json", pkg: { name: "kitten" } }]).has("kit/package.json"), "a pattern names folders under its own package list only");
+const dots = workspaces([{ file: "package.json", pkg: { workspaces: ["packages/*", "apps/**", "kit/.named"] } }, { file: "packages/.hidden/package.json", pkg: { name: "hidden" } },
+  { file: "packages/seen/package.json", pkg: { name: "seen" } }, { file: "apps/a/.b/c/package.json", pkg: { name: "under-hidden" } }, { file: "apps/a/b/package.json", pkg: { name: "deep" } },
+  { file: "kit/.named/package.json", pkg: { name: "named" } }]);
+ok([...dots.get("package.json")].sort().join() === "deep,named,seen", "a star stands for no folder whose name starts with a dot, as in npm; a pattern that names one outright does");
 const mine = workspaces(lists), names = file => [...mine.get(file) ?? []].sort().join();
 ok(names("package.json") === "barkbite,mossgrip" && names("src/engine/package.json") === "barkbite,mossgrip" && names("kit/package.json") === "kit-part" && names("kit/parts/a/b/package.json") === "kit-part",
   "a list that names \"workspaces\", and each of them, may ask for them as the project's own");

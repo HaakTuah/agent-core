@@ -28,6 +28,10 @@ ok(fails(`      - "\\x75ses": mossgrip/cache@v3\n`) && fails(`on: ["pull_request
 ok(fails(`on: ["pull_request_\\\n      target"]\n`) && fails("    steps: [uses: mossgrip/cache@v3]\n"), "a name broken over two lines by an escape, and a use in a list in brackets, are read");
 ok(fails("# ci\ron:\r  pull_request_target:\r") && fails("# ci\rjobs:\r      - uses: mossgrip/cache@v3\r"), "lines that end in a lone carriage return are lines");
 ok(!fails("      - run: |\n          node a.mjs \\\n            --target x\n"), "a script's own line that goes on to the next is no finding");
+ok(!fails("      - run: |\n          ? a\n          : b\n          **Note**: text\n          *.js: ok\n\n          - ? maybe\n      - run: >-\n          *k : v\n    body: | # the comment\n      *bold*: text\n"), "in the text of a block no key is looked for");
+ok(fails("      - run: |\n          echo\n        ? uses\n        : mossgrip/cache@v3\n") && fails("      - run: |\n          echo\n      - ? uses\n        : mossgrip/cache@v3\n") && fails("    a: |\n      text\n    *k : mossgrip/cache@v3\n"),
+  "a line no more indented than the block's key is past the block, and read again");
+ok(fails("      - run: |\n          echo\n          uses: mossgrip/cache@v3\n") && fails("      - run: |\n          pull_request_target\n"), "the two words themselves are read in a block too");
 ok(!fails(`      - "uses": actions/checkout@v7\n      - run: echo 'no uses here'\n`), "a quoted key with one of GitHub's own passes; the word alone is no key");
 ok(!fails(`      - uses: docker://alpine@sha256:${"a".repeat(64)}\n`) && fails("      - uses: docker://alpine:3.20\n"), "a container image passes only at its digest");
 ok(fails("on:\n  pull_request_target:\n"), "pull_request_target fails");

@@ -6,8 +6,9 @@
 //     pinned to a full commit SHA (a container image: to its sha256 digest);
 //   - writes a `uses` key in a form the check cannot read: with no YAML reader among Node's own modules it reads
 //     lines, so it fails a `uses` whose value is not on its line, a key written the long way (`? key`) and a key
-//     that is an alias (`*name:`), which a workflow never needs. A quoted key is read, and so is a name spelled with a
-//     YAML escape (\x, \u, \U) or broken over two lines by one.
+//     that is an alias (`*name:`), which a workflow never needs (the text of a block, after `|` or `>`, holds no key,
+//     so there neither is looked for). A quoted key is read, and so is a name spelled with a YAML escape (\x, \u, \U)
+//     or broken over two lines by one.
 // The rest of rule 2 (workflow_run, the fewest permissions, untrusted text in a script) takes judgement and stays with
 // the reviews, and with CodeQL where the repository has it. The copy of the core (core/) is checked in the core, which
 // runs this on itself. Reads only; Node's own modules. It checks the project it lies in, whatever the directory it is
@@ -21,6 +22,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const KEY = /(?:^|[\s{,[?-])(?:(?:"uses"|'uses')\s*:|uses\s*:(?=\s|$))[ \t]*(?:"([^"]*)"|'([^']*)'|([^\s#},]+))?/gu;
 const AT_KEY = "(?:^\\s*(?:-\\s+)*|[{,[]\\s*)"; // where a key may start: a line, after its dashes, or inside braces or brackets
 const LONG_KEY = new RegExp(`${AT_KEY}\\?(?:\\s|$)`, "u"), ALIAS_KEY = new RegExp(`${AT_KEY}(?:\\?\\s+)?\\*[^\\s,[\\]{}:]+\\s*:(?:\\s|$)`, "u");
+const BLOCK = /(?::|-)\s+[|>][0-9+-]{0,2}\s*(?:\s#.*)?$/u; // a line that opens a block of text
+const column = line => /^\s*(?:-\s+)*/u.exec(line)[0].length; // where its key starts, past the dashes
 const plain = line => line.replace(/\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/gu, (_, x, u, U) => String.fromCodePoint(parseInt(x ?? u ?? U, 16)));
 const pinned = uses =>
   uses.startsWith("./") ||
@@ -29,14 +32,17 @@ const pinned = uses =>
 // What is wrong in one file's text, each as { line, what }.
 export function problems(text) {
   const found = [];
-  let carried = "";
+  let carried = "", block = -1; // block: the column of the key whose block of text the line may lie in, or -1
   text.split(/\r\n|\r|\n/u).forEach((raw, i) => {
+    const inBlock = block >= 0 && (raw.trim() === "" || /^ */u.exec(raw)[0].length > block); // more indented than that key: its text
+    if (!inBlock) block = -1;
     if (/^\s*#/u.test(raw)) { carried = ""; return; }
+    if (!inBlock && BLOCK.test(raw)) block = column(raw);
     const line = plain(raw), joined = carried + line.trimStart();
     carried = /\\$/u.test(raw) ? joined.slice(0, -1).slice(-32) : ""; // the end is enough to find the word across the break
     if (line.includes("pull_request_target") || joined.includes("pull_request_target")) found.push({ line: i + 1, what: "pull_request_target runs a pull request with the repository's own token and secrets: never (floor rule 2)" });
-    if (LONG_KEY.test(line)) found.push({ line: i + 1, what: "a key written the long way (`? key`) cannot be read: write it as `key: value` (floor rule 2)" });
-    if (ALIAS_KEY.test(line)) found.push({ line: i + 1, what: "a key that is an alias (`*name:`) cannot be read: write the key itself (floor rule 2)" });
+    if (!inBlock && LONG_KEY.test(line)) found.push({ line: i + 1, what: "a key written the long way (`? key`) cannot be read: write it as `key: value` (floor rule 2)" });
+    if (!inBlock && ALIAS_KEY.test(line)) found.push({ line: i + 1, what: "a key that is an alias (`*name:`) cannot be read: write the key itself (floor rule 2)" });
     for (const m of line.matchAll(KEY)) {
       const uses = m[1] ?? m[2] ?? m[3];
       if (uses === undefined) found.push({ line: i + 1, what: "a `uses` with its value not on the same line cannot be read: write it as `uses: name@version` (floor rule 2)" });

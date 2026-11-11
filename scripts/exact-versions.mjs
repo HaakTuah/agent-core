@@ -23,7 +23,7 @@ const FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peer
 // downloads it as a file, whatever follows the #, so there a git address says so (git+https://).
 const GIT = new RegExp(`^(?:${[
   "git\\+(?:ssh|https?|file):\\/\\/\\S+", "git:\\/\\/\\S+", "(?:github|gitlab|bitbucket|gist):\\S+", "[^@\\s/]+@[^:.\\s/]+\\.[^:\\s/]+:\\S+",
-  "https:\\/\\/(?:github\\.com|gitlab\\.com|bitbucket\\.org)\\/[\\w.-]+\\/[\\w.-]+", "[A-Za-z0-9][\\w-]*\\/[\\w.-]+",
+  "https:\\/\\/(?:github\\.com|gitlab\\.com|bitbucket\\.org)\\/[\\w-][\\w.-]*\\/[\\w-][\\w.-]*", "[A-Za-z0-9][\\w-]*\\/[\\w-][\\w.-]*",
 ].join("|")})$`, "u");
 const git = spec => { const at = spec.lastIndexOf("#"); return at > 0 && /^[0-9a-f]{40}$/u.test(spec.slice(at + 1)) && GIT.test(spec.slice(0, at)); };
 const dirOf = file => file.includes("/") ? file.slice(0, file.lastIndexOf("/")) : "";
@@ -42,7 +42,9 @@ const inside = (spec, dir) => {
 const exact = (spec, dir) => EXACT.test(spec) || inside(spec, dir) || git(spec);
 
 // Whether a name fits a pattern whose only sign is *, any run of characters; in time that grows with their lengths.
+// As in npm, a star stands for no folder whose name starts with a dot: such a folder is named outright or not at all.
 const fits = (pattern, name) => {
+  if (name.startsWith(".") && !pattern.startsWith(".")) return false;
   let p = 0, n = 0, star = -1, mark = 0;
   while (n < name.length) {
     if (pattern[p] === "*") { star = p++; mark = n; }
@@ -60,7 +62,7 @@ const names = (pattern, folder) => {
     if (w === want.length) return h === have.length;
     if (dead.has(`${w} ${h}`)) return false;
     let ok = false;
-    if (want[w] === "**") for (let skip = h; skip <= have.length && !ok; skip++) ok = from(w + 1, skip);
+    if (want[w] === "**") for (let skip = h; skip <= have.length && !ok && !(skip > h && have[skip - 1].startsWith(".")); skip++) ok = from(w + 1, skip);
     else ok = h < have.length && fits(want[w], have[h]) && from(w + 1, h + 1);
     if (!ok) dead.add(`${w} ${h}`);
     return ok;
