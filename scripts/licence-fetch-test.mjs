@@ -144,7 +144,7 @@ for (const [what, change, why] of [
     "<script x=a\"b></script><button onclick=\"execSync('npx -y mossgrip-cli')\">", "<script x=a\"type=json\">execSync('npx -y mossgrip-cli')</script>",
     "<script \"type=json\">execSync('npx -y mossgrip-cli')</script>", "<script title=\"open>execSync('npx -y mossgrip-cli')",
     "<script x=a=\"b>execSync('npx -y mossgrip-cli')</script><p title=\"end\">",
-    "<div title=\"<!--\"><script>execSync('npx -y mossgrip-cli')</script><p title=\"-->\">",
+    "<div title=\"<!--\"><script>execSync('npx -y mossgrip-cli')</script><p title=\"-->\">", "<script x=a\u00a0type=application/json>execSync('npx -y mossgrip-cli')</script>",
     "<div title=\"<style>\"><script>execSync('npx -y mossgrip-cli')</script><p title=\"</style>\">",
     "<div title=\"<!--\"><button onclick=\"execSync('npx -y mossgrip-cli')\">moss</button><p title=\"-->\">"]
     .map((page) => [`npx in a page whose script tag has a quote inside a value or no end: ${page}`, write("site/moss.html", `${page}\n`), /cannot be audited/]),

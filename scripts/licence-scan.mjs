@@ -54,12 +54,13 @@ const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
  * unquoted one runs to a space or ">" whatever it holds (x=a="b>), and a name may hold quotes ("type=json is no type).
  * `end` is -1 where the tag has none.
  */
+const HTML_SPACE = /[\t\n\f\r ]/u; // (HTML's whitespace, ASCII only: a no-break space is part of a name or value)
 function attributesOf(text, at) {
   const attributes = [];
   let state = "before", name = "", value = "", quote = "";
   const done = () => { if (name) attributes.push([name, value]); name = value = ""; };
   for (let k = at; k < text.length; k++) {
-    const ch = text[k], space = /\s/u.test(ch);
+    const ch = text[k], space = HTML_SPACE.test(ch);
     if (state === "quoted") { if (ch === quote) { state = "before"; done(); } else value += ch; continue; }
     if (state === "unquoted") { if (space || ch === ">") { done(); state = "before"; if (ch === ">") return { attributes, end: k }; } else value += ch; continue; }
     if (ch === ">") { done(); return { attributes, end: k }; }
@@ -94,7 +95,7 @@ function executable(text, f) {
       continue;
     }
     // (a tag, read whole, so what its values hold, "<!--" or "<script", is only text; a "<" that opens none is text)
-    const name = /^[a-z][^\s/>]*/iu.exec(text.slice(lt + 1, lt + 65))?.[0];
+    const name = /^[a-z][^\t\n\f\r />]*/iu.exec(text.slice(lt + 1, lt + 65))?.[0];
     if (!name) { markup += "<"; at = lt + 1; continue; }
     const kind = name.toLowerCase(), tag = attributesOf(text, lt + 1 + name.length);
     if (tag.end < 0) { // (one with no end: a script's rest is read as code, any other's as markup)
@@ -106,11 +107,11 @@ function executable(text, f) {
     // (a closing tag ends it only where its name ends: "</scripts>" in a string does not)
     const body = tag.end + 1, close = `</${kind}`;
     let stop = lower.indexOf(close, body);
-    while (stop >= 0 && /[^\s/>]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
+    while (stop >= 0 && /[^\t\n\f\r />]/u.test(lower[stop + close.length] ?? ">")) stop = lower.indexOf(close, stop + 1);
     // (a script of data or a template, as JSON-LD, an import map or text/template, runs nothing; any other type may:
     // its own type attribute, the first one named so)
     const type = tag.attributes.find(([n]) => n.toLowerCase() === "type")?.[1] ?? "";
-    const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.trim());
+    const inert = /json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, ""));
     if (kind === "script" && !inert) parts.push(text.slice(body, stop < 0 ? text.length : stop));
     if (stop < 0) break;
     at = stop + close.length;
