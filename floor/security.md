@@ -49,8 +49,8 @@ does any prompt or brief given to an agent. His archived words leave such detail
 GitHub account in the repository's own address. The check `personal-terms.yml` fails a PR holding a term from the
 Actions secret `PERSONAL_TERMS`.
 
-**12. `main` is the owner's** and what the live site runs: never pushed to, never force-pushed. It changes only by a
-merged pull request, brought up to date with `main` and its checks passed (core archive 113).
+**12. `main` is the owner's** and what its users get is built from it: never pushed to, never force-pushed. It changes
+only by a merged pull request, brought up to date with `main` and its checks passed (core archive 113).
 
 **13. Each project's files stay in its own repository,** never written into another's (core archive 4).
 
