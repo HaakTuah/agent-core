@@ -188,11 +188,13 @@ function opensCommand(text, k, lineStart) {
     let start = k - 1;
     if ("'\"`".includes(q)) {
       while (start > 0 && text[start - 1] !== q && text[start - 1] !== "\n" && budget-- > 0) start--;
+      if (budget <= 0) return true; // (read no further: it counts)
       if (start === 0 || text[start - 1] !== q) return false;
       start--;
     } else {
       start = k;
       while (!lineStart(start) && !SPACE.has(text[start - 1]) && budget-- > 0) start--;
+      if (budget <= 0) return true;
       const w = text.slice(start, k).replace(/^.*[\/\\]/u, "");
       if (STRING_RUNNERS.test(w)) return true;
       if (!w.startsWith("-")) return false;
@@ -234,6 +236,7 @@ function atCommand(text, at) {
       if (end === at || !SPACE.has(text[end])) return false; // (a quote right before npm opens its string)
       let open = end - 2;
       while (open >= 0 && text[open] !== c && text[open] !== "\n" && walked++ < 4096) open--;
+      if (walked > 4096) return cut(); // (read no further: past what it reads, it counts)
       if (open < 0 || text[open] !== c) return false;
       // (the word the quoted part ends, with what stands before it: PAD="x y" npm, "$SUDO" npm)
       let start = open;
