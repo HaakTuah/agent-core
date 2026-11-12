@@ -9,7 +9,8 @@
 // here ("npx -y" in a variable), npm init or create, which fetch by another name, npm update or npm audit fix, which
 // take the newest a range allows, another registry or npm config, npm install without its lockfile, a word that is no
 // npm command where npm stands as one (atCommand), a command running on past 16 KB. Other fetchers (curl, wget, pip,
-// pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER. Node's own modules only (none).
+// pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER, and Windows' and .NET's: WINDOWS_FETCHER.
+// Node's own modules only (none).
 
 // npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own,
 // or none); and options known to take a value. A word that is no command, straight after an option, is read as that
@@ -79,6 +80,18 @@ export const OTHER_FETCHER = new RegExp(
     `${fetcher("deno", "(?:install|run)")})`,
   "mu",
 );
+// Windows' and .NET's fetchers, in any case, as PowerShell reads its commands: dotnet's installs of a tool, a workload,
+// a template or a package (dotnet restore reads the project's own package list, which the project's own check holds),
+// nuget, choco, winget and scoop, PowerShell's installs and its downloads (Invoke-WebRequest and the like, iwr and irm).
+export const WINDOWS_FETCHER = new RegExp(
+  `(?:${fetcher("dotnet", "(?:(?:tool|workload|new)[\"']?\\s+[\"']?(?:install|update)|add[\"']?\\s+(?:\\S+\\s+)?[\"']?package)[\"']?\\s")}|` +
+    `${fetcher("(?:nuget|choco|winget|scoop)(?:\\.exe)?", "(?:install|upgrade)[\"']?\\s")}|` +
+    "(?:^|[\\s;&|({`$'\"/\\\\])(?:Install-(?:Module|Package|Script|PSResource)|Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer)\\b|" +
+    "(?:^|[\\s;&|({`$'\"])(?:iwr|irm)\\s+(?:-[a-zA-Z]|https?://|['\"$]))",
+  "imu",
+);
+/** The first fetch in text by a fetcher the scan cannot read, or undefined. */
+export const otherFetch = (text) => (OTHER_FETCHER.exec(text) ?? WINDOWS_FETCHER.exec(text))?.[0];
 
 /**
  * What one command line fetches: { specs, unreadable, packs } where specs are the packages written for npx, npm exec,

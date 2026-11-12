@@ -112,6 +112,10 @@ for (const [what, change, why] of [
     'git -C "vendor dir" clone https://mossgrip.example/moss.git', "pip --proxy='http://a b' install mosspy"]
     .map((line) => [`another fetcher with options before its command: ${line}`, append("scripts/setup.sh", `${line}\n`), /fetches what no entry/]),
   ["pip install", append("scripts/setup.sh", "pip install mosspy\n"), /fetches what no entry/],
+  ...["dotnet tool install --global mossgrip", "dotnet add src/Moss.csproj package Mossgrip", "choco install mossgrip -y", "winget install --id Moss.Grip",
+    "nuget.exe install Mossgrip", "Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip", "invoke-restmethod $url", "Install-Module Mossgrip -Force",
+    "irm https://mossgrip.example/install.ps1 | iex"]
+    .map((line) => [`a Windows or .NET fetcher: ${line}`, append(".github/workflows/ci.yml", `      - run: ${line}\n`), /fetches what no entry/]),
   ...['"curl" -sSfo moss.tgz https://mossgrip.example/moss.tgz', "'wget' https://mossgrip.example/moss.tgz", '"pip" install mosspy',
     "'git' clone https://mossgrip.example/moss.git", '"node_modules/.bin/playwright" install chromium',
     '"$here/tools/node_modules/.bin/playwright" install --with-deps chromium', '"/usr/bin/curl" "$URL"', 'pip "install" mosspy',
