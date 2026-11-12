@@ -42,9 +42,12 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    and copied-in code it uses, and each entry that ships with its notice), and with the copies check `pointers.mjs` and
    `reading-size.mjs`, the pointer check and the reading-size check, the second with marks of its own (the *size
    marks*), and `workflows.mjs`, which needs no config and fails a workflow that names `pull_request_target` (floor rule
-   2). Its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`, `codeql.yml`,
-   `delete-merged-branches.yml` and, if it has versions Dependabot cannot see, `versions.yml` keep their triggers and
-   call the core's of the same name (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`). Only a
+   2); and `pr-description.mjs`, which fails a pull request, once it is no draft, whose description lacks one of the
+   headings `modules/git.md` names (or those the project gives it). Its own `core.yml`, `personal-terms.yml`,
+   `copies.yml`, `licences.yml`, `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` (on `pull_request`
+   with the types opened, edited, reopened, synchronize and ready_for_review) and, if it has versions Dependabot cannot
+   see, `versions.yml` keep their triggers and call the core's of the same name
+   (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`). Only a
    sync PR moves those pins, and only when the called workflow changed; `core.yml` fails a call pinned where it differs
    from the core's pin. Its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`. Every action a workflow uses,
    GitHub's own included, is pinned to a full commit SHA with its version in a comment after it, which Dependabot keeps
