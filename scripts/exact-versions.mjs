@@ -2,12 +2,15 @@
 // The exact-versions check (floor rule 7: "every package, tool and script at one exact version, never a range"), for a
 // project whose packages come from npm. For each lock file the licence check's config names ("lockfiles"), it takes
 // every package of the project's own that the lock file knows (the root and its workspaces) and holds each dependency
-// that package asks for (dependencies, devDependencies, optionalDependencies, peerDependencies) to one test: what the
-// package list says is, letter for letter, the version the lock file installs for it. A range, a tag, an alias, a git
-// or web address or a path is none of those, so each fails; nothing here reads npm's version grammar, and npm's own
-// reading is the lock file's. One thing passes besides: a dependency the lock file links to another of the project's
-// own packages (a workspace), whatever its list says. What it does not hold: "overrides", which pick among versions the
-// lock file still pins; and a lock file out of step with its lists, which `npm ci` refuses.
+// that package asks for (dependencies, devDependencies, optionalDependencies, peerDependencies) to two tests: what the
+// package list says is one version as SemVer writes one (three numbers, a pre-release and a build after them at most),
+// and it is, letter for letter, the version the lock file installs for it. A range, a tag, an alias, a git or web
+// address or a path fails the first, whatever a lock file is made to say; a version other than the installed one fails
+// the second. Nothing here reads npm's grammar of ranges: only what one exact version looks like, which SemVer fixes.
+// One thing passes besides: a dependency the lock file links to another of the project's own packages (a workspace),
+// whatever its list says. The root's "overrides" are held to the first test alone, each value one version or a "$name"
+// that points to a dependency of the root's. What it does not hold: a lock file out of step with its lists, which
+// `npm ci` refuses.
 //
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
@@ -16,6 +19,20 @@ import { fileURLToPath } from "node:url";
 
 const KINDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 const own = (key) => key === "" || !`/${key}/`.includes("/node_modules/");
+// One version as SemVer 2.0.0 writes it (the pattern semver.org gives), and no longer than any real one.
+const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/u;
+const exact = (text) => typeof text === "string" && text.length <= 256 && SEMVER.test(text);
+const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../"); // (a folder of the project's, by its key)
+const show = (value) => JSON.stringify(value) ?? String(value); // (a name or version printed so that it stays on its line)
+
+// The root's "overrides": every value, however deep, one exact version or a "$name" pointing to one of the root's own.
+function overrides(value, file, at, problems) {
+  if (typeof value === "string") {
+    if (!exact(value) && !value.startsWith("$")) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
+  } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    for (const [name, inner] of Object.entries(value)) overrides(inner, file, at === "" ? name : `${at} > ${name}`, problems);
+  } else problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
+}
 
 // The entry npm installs for `name` as seen from the package at `from`: the nearest node_modules going up.
 function installed(packages, from, name) {
@@ -34,23 +51,27 @@ export function check(lockfile, read) {
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
   for (const key of Object.keys(packages).filter(own)) {
+    if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's`); continue; }
     if (packages[key]?.link === true) continue; // (a link's target is listed under its own folder)
     const file = posix.join(root, key, "package.json");
     let list;
     try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${e.message})`); continue; }
+    if (key === "" && list?.overrides !== undefined) overrides(list.overrides, file, "", problems);
     for (const kind of KINDS) {
       const deps = list?.[kind];
       if (deps === undefined) continue;
       if (deps === null || typeof deps !== "object" || Array.isArray(deps)) { problems.push(`${file}: "${kind}" is no list of names and versions`); continue; }
       for (const [name, spec] of Object.entries(deps)) {
         const entry = installed(packages, key, name);
-        if (entry === undefined) {
+        const linked = entry !== null && typeof entry === "object" && entry.link === true && typeof entry.resolved === "string";
+        if (linked && own(entry.resolved) && inside(entry.resolved) && Object.hasOwn(packages, entry.resolved)) continue; // (one of the project's own)
+        if (!exact(spec)) {
+          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version`);
+        } else if (entry === undefined) {
           if (kind === "peerDependencies" || kind === "optionalDependencies") continue; // (a lock file may leave these out)
-          problems.push(`${file}: ${kind} "${name}": "${spec}" is not in ${lockfile}`);
-        } else if (entry.link === true && typeof entry.resolved === "string" && own(entry.resolved) && Object.hasOwn(packages, entry.resolved)) {
-          continue; // (one of the project's own packages)
-        } else if (typeof spec !== "string" || typeof entry.version !== "string" || spec !== entry.version) {
-          problems.push(`${file}: ${kind} "${name}": "${spec}" is not the one exact version the lock file installs (${entry.version ?? "none"})`);
+          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not in ${lockfile}`);
+        } else if (entry === null || typeof entry !== "object" || spec !== entry.version) {
+          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not the version the lock file installs (${show(entry?.version ?? null)})`);
         }
       }
     }

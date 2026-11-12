@@ -11,7 +11,7 @@
 # no secret: nothing is installed, and besides GitHub's dependency review nothing runs but the caller's own
 # core/scripts/licences.mjs and core/scripts/exact-versions.mjs, which core.yml holds to the core pin. The second holds
 # floor rule 7's "one exact version, never a range" for the same lockfiles: each dependency a package list of the
-# project's own asks for is, letter for letter, the version its lockfile installs.
+# project's own asks for is one version as SemVer writes one and, letter for letter, the version its lockfile installs.
 name: licences
 
 on:

@@ -22,27 +22,52 @@ function expect(name, problems, wanted) {
 const one = (spec, version = "1.2.3", extra = {}) => project({ "": { dependencies: { a: spec } } }, { "": { dependencies: { a: spec } }, "node_modules/a": { version, ...extra } });
 
 expect("an exact version passes", one("1.2.3"), 0);
-expect("a caret range fails", one("^1.2.3"), ['"a": "^1.2.3" is not the one exact version']);
-expect("a tilde range fails", one("~1.2.3"), ["not the one exact version"]);
-expect("a star fails", one("*"), ["not the one exact version"]);
-expect("a tag fails", one("latest"), ["not the one exact version"]);
-expect("a text shaped like a version that npm reads as a tag fails", one("1.2.3-rc..1", "2.0.0"), ["not the one exact version"]);
-expect("a version with a v before it fails", one("v1.2.3"), ["not the one exact version"]);
-expect("a version with an equals sign fails", one("=1.2.3"), ["not the one exact version"]);
-expect("a version with a space fails", one(" 1.2.3"), ["not the one exact version"]);
-expect("an alias fails", one("npm:b@1.2.3"), ["not the one exact version"]);
-expect("a git address fails", one("git+https://example.invalid/a.git#abc#def"), ["not the one exact version"]);
-expect("a web address fails", one("https://example.invalid/a-1.2.3.tgz"), ["not the one exact version"]);
-expect("a path fails", one("file:../a"), ["not the one exact version"]);
-expect("a link to a folder outside the project's own packages fails", one("*", "1.2.3", { link: true, resolved: "../elsewhere" }), ["not the one exact version"]);
-expect("another exact version than the lock file's fails", one("1.2.4"), ["(1.2.3)"]);
-expect("a version that is no text fails", project({ "": { dependencies: { a: 1 } } }, { "": {}, "node_modules/a": { version: "1" } }), ["not the one exact version"]);
+expect("a pre-release and a build after it pass", one("1.2.3-rc.1+build.5", "1.2.3-rc.1+build.5"), 0);
+expect("a caret range fails", one("^1.2.3"), ['"a": "^1.2.3" is not one exact version']);
+expect("a tilde range fails", one("~1.2.3"), ["is not one exact version"]);
+expect("a star fails", one("*"), ["is not one exact version"]);
+expect("a tag fails", one("latest"), ["is not one exact version"]);
+expect("a text shaped like a version that npm reads as a tag fails", one("1.2.3-rc..1", "2.0.0"), ["is not one exact version"]);
+expect("a version with a v before it fails", one("v1.2.3"), ["is not one exact version"]);
+expect("a version with an equals sign fails", one("=1.2.3"), ["is not one exact version"]);
+expect("a version with a space fails", one(" 1.2.3"), ["is not one exact version"]);
+expect("a version of two numbers fails", one("1.2", "1.2.0"), ["is not one exact version"]);
+expect("a number with a nought before it fails", one("1.02.3", "1.2.3"), ["is not one exact version"]);
+expect("a version longer than any real one fails", one(`1.2.3-${"a".repeat(300)}`, `1.2.3-${"a".repeat(300)}`), ["is not one exact version"]);
+expect("an alias fails", one("npm:b@1.2.3"), ["is not one exact version"]);
+expect("a git address fails", one("git+https://example.invalid/a.git#abc#def"), ["is not one exact version"]);
+expect("a web address fails", one("https://example.invalid/a-1.2.3.tgz"), ["is not one exact version"]);
+expect("a path fails", one("file:../a"), ["is not one exact version"]);
+expect("a version that is no text fails", project({ "": { dependencies: { a: 1 } } }, { "": {}, "node_modules/a": { version: "1" } }), ["is not one exact version"]);
+// A lock file edited by hand so that its entry says what the list says: the first test does not ask the lock file.
+expect("a range fails though the lock file is made to say the same", one("^1.2.3", "^1.2.3"), ["is not one exact version"]);
+expect("a tag fails though the lock file is made to say the same", one("latest", "latest"), ["is not one exact version"]);
+expect("a star fails though the lock file is made to say the same", one("*", "*"), ["is not one exact version"]);
+expect("a link to a folder outside the project's own packages fails", one("*", "1.2.3", { link: true, resolved: "../elsewhere" }), ["is not one exact version"]);
+expect("a link to a folder above the project fails though the lock file lists it", project({ "": { dependencies: { a: "*" } } }, { "": {}, "node_modules/a": { link: true, resolved: "../up" }, "../up": {} }), ["is not one exact version", "no folder of the project's"]);
+expect("a package whose folder starts at the disk's root fails", project({ "": {} }, { "": {}, "/etc": {} }), ["no folder of the project's"]);
+expect("another exact version than the lock file's fails", one("1.2.4"), ['is not the version the lock file installs ("1.2.3")']);
+expect("a lock file entry that is nothing fails", project({ "": { dependencies: { a: "1.2.3" } } }, { "": {}, "node_modules/a": null }), ["is not the version the lock file installs"]);
+expect("a lock file entry that is a text fails", project({ "": { dependencies: { a: "1.2.3" } } }, { "": {}, "node_modules/a": "1.2.3" }), ["is not the version the lock file installs"]);
 expect("a dependency the lock file lacks fails", project({ "": { devDependencies: { a: "1.2.3" } } }, { "": {} }), ['"a": "1.2.3" is not in package-lock.json']);
-expect("an optional dependency the lock file lacks passes", project({ "": { optionalDependencies: { a: "1.2.3" } } }, { "": {} }), 0);
-expect("an optional dependency at a range fails where the lock file has it", project({ "": { optionalDependencies: { a: "^1.2.3" } } }, { "": {}, "node_modules/a": { version: "1.2.3" } }), ["not the one exact version"]);
+expect("an optional dependency the lock file lacks passes at one exact version", project({ "": { optionalDependencies: { a: "1.2.3" } } }, { "": {} }), 0);
+expect("a peer dependency the lock file lacks fails at a range", project({ "": { peerDependencies: { a: "^1.2.3" } } }, { "": {} }), ["is not one exact version"]);
+expect("an optional dependency at a range fails where the lock file has it", project({ "": { optionalDependencies: { a: "^1.2.3" } } }, { "": {}, "node_modules/a": { version: "1.2.3" } }), ["is not one exact version"]);
 expect("every kind is read", project({ "": { dependencies: { a: "^1" }, devDependencies: { b: "^1" }, optionalDependencies: { c: "^1" }, peerDependencies: { d: "^1" } } },
   { "": {}, "node_modules/a": { version: "1.0.0" }, "node_modules/b": { version: "1.0.0" }, "node_modules/c": { version: "1.0.0" }, "node_modules/d": { version: "1.0.0" } }), ['"a"', '"b"', '"c"', '"d"']);
 expect("a list that is no list fails", project({ "": { dependencies: ["a"] } }, { "": {} }), ['"dependencies" is no list']);
+const printed = project({ "": { dependencies: { "a\n::error::x": "^1\n::error::y" } } }, { "": {} });
+expect("a name and a version are printed on one line", printed, ["is not one exact version"]);
+if (printed.some((line) => line.includes("\n"))) { failed++; console.error("FAIL a name with a line break in it breaks the line it is printed on"); }
+
+// The root's overrides.
+const overridden = (overrides) => project({ "": { dependencies: { a: "1.2.3" }, overrides } }, { "": {}, "node_modules/a": { version: "1.2.3" } });
+expect("an override at one exact version passes", overridden({ b: "2.0.0" }), 0);
+expect("an override that points to a dependency of the root's passes", overridden({ b: "$a" }), 0);
+expect("an override at a range fails", overridden({ b: "^2.0.0" }), ['overrides "b": "^2.0.0" is not one exact version']);
+expect("an override inside another is read", overridden({ "b@1": { ".": "2.0.0", c: "latest" } }), ['overrides "b@1 > c": "latest" is not one exact version']);
+expect("an override that is no text and no list fails", overridden({ b: 2 }), ['overrides "b": 2 is not one exact version']);
+expect("overrides in a workspace, which npm does not read, are not held", project({ "": {}, "src/web/": { overrides: { b: "^2" } } }, { "": {}, "src/web": {} }), 0);
 
 // Workspaces: the root and two of its own packages, one of which asks for the other and for its own copy of a package.
 const workspaces = (webAsks, webCopy) => project(
@@ -51,7 +76,7 @@ const workspaces = (webAsks, webCopy) => project(
     "node_modules/tool": { version: "2.0.0" }, "node_modules/lib": { version: "1.0.0" }, ...(webCopy ? { "src/web/node_modules/lib": { version: webCopy } } : {}) });
 expect("a workspace asked for by a star passes, and the hoisted version is the one compared", workspaces("1.0.0"), 0);
 expect("a workspace's own copy is the one compared", workspaces("3.0.0", "3.0.0"), 0);
-expect("the hoisted version does not pass where a workspace has its own copy", workspaces("1.0.0", "3.0.0"), ["(3.0.0)"]);
+expect("the hoisted version does not pass where a workspace has its own copy", workspaces("1.0.0", "3.0.0"), ['("3.0.0")']);
 expect("a workspace's range fails", workspaces("^1.0.0"), ['src/web/package.json: dependencies "lib"']);
 expect("a folder whose name only holds the letters node_modules is one of the project's own",
   project({ "": {}, "node_modules_tools/": { dependencies: { a: "^1" } } }, { "": {}, "node_modules_tools": {}, "node_modules/a": { version: "1.0.0" } }), ["node_modules_tools/package.json"]);
