@@ -33,6 +33,11 @@ expect("a version with an equals sign fails", one("=1.2.3"), ["is not one exact 
 expect("a version with a space fails", one(" 1.2.3"), ["is not one exact version"]);
 expect("a version of two numbers fails", one("1.2", "1.2.0"), ["is not one exact version"]);
 expect("a number with a nought before it fails", one("1.02.3", "1.2.3"), ["is not one exact version"]);
+expect("a number too large for npm to read as one fails though the lock file says the same", one("9007199254740992.0.0", "9007199254740992.0.0"), ["is not one exact version"]);
+expect("a version that ends as a packed file's name does fails, as npm reads it as a file", one("1.2.3+a.tgz", "1.2.3+a.tgz"), ["is not one exact version"]);
+expect("so does one that ends so in its pre-release, in capitals", one("1.2.3-a.TAR.GZ", "1.2.3-a.TAR.GZ"), ["is not one exact version"]);
+expect("and one with any letter between its tar and its gz", one("1.2.3+a.tar-gz", "1.2.3+a.tar-gz"), ["is not one exact version"]);
+expect("a number of fifteen digits passes", one("1.999999999999999.0", "1.999999999999999.0"), 0);
 expect("a version longer than any real one fails", one(`1.2.3-${"a".repeat(300)}`, `1.2.3-${"a".repeat(300)}`), ["is not one exact version"]);
 expect("an alias fails", one("npm:b@1.2.3"), ["is not one exact version"]);
 expect("a git address fails", one("git+https://example.invalid/a.git#abc#def"), ["is not one exact version"]);
@@ -68,6 +73,7 @@ expect("an override that points to a dependency of the root's passes", overridde
 expect("an override that points to nothing the root lists fails", overridden({ b: "$c" }), ['overrides "b": "$c" is not one exact version']);
 expect("an override that points to a workspace asked for by a star fails", project({ "": { dependencies: { "@own/w": "*" }, overrides: { b: "$@own/w" } }, "src/w/": {} },
   { "": {}, "src/w": {}, "node_modules/@own/w": { link: true, resolved: "src/w" } }), ['overrides "b": "$@own/w" is not one exact version']);
+expect("an override with a number too large for npm to read as one fails", overridden({ b: "9007199254740992.0.0" }), ['overrides "b": "9007199254740992.0.0" is not one exact version']);
 expect("an override at a range fails", overridden({ b: "^2.0.0" }), ['overrides "b": "^2.0.0" is not one exact version']);
 expect("an override inside another is read", overridden({ "b@1": { ".": "2.0.0", c: "latest" } }), ['overrides "b@1 > c": "latest" is not one exact version']);
 expect("an override that is no text and no list fails", overridden({ b: 2 }), ['overrides "b": 2 is not one exact version']);
@@ -87,6 +93,7 @@ expect("a folder whose name only holds the letters node_modules is one of the pr
 expect("a lock file in a folder reads the lists beside it", project({ "": { dependencies: { a: "^1" } } }, { "": {}, "node_modules/a": { version: "1.0.0" } }, "tools/"), ["tools/package.json"]);
 
 // What cannot be read.
+expect("a lock file with no entry for the root fails, and the root's list is not read", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/a": { version: "1.2.3" } } }), "package.json": JSON.stringify({ dependencies: { a: "file:a.tgz" } }) })), ["holds no entry for the project's own root"]);
 expect("a lock file that is no JSON fails", check("package-lock.json", reader({ "package-lock.json": "{" })), ["cannot be read as JSON"]);
 expect("a lock file that is missing fails", check("package-lock.json", reader({})), ["cannot be read as JSON"]);
 expect("an old lock file with no packages fails", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: {} }) })), ['holds no "packages"']);

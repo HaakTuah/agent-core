@@ -19,9 +19,16 @@ import { fileURLToPath } from "node:url";
 
 const KINDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 const own = (key) => key === "" || !`/${key}/`.includes("/node_modules/");
-// One version as SemVer 2.0.0 writes it (the pattern semver.org gives), and no longer than any real one.
+// One version as SemVer 2.0.0 writes it (the pattern semver.org gives), and nothing that npm reads otherwise though it
+// has that shape: no longer than npm reads a version, no number of more than 15 digits among its first three (npm reads
+// a larger one as a tag, past what a number can hold), and not ending as a packed file's name does (npm reads that as
+// a file). What is left was compared with npm's own reader on made-up texts, as the pull request that brought it says.
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/u;
-const exact = (text) => typeof text === "string" && text.length <= 256 && SEMVER.test(text);
+const exact = (text) => {
+  if (typeof text !== "string" || text.length > 256) return false;
+  const parts = SEMVER.exec(text);
+  return parts !== null && parts.slice(1, 4).every((number) => number.length <= 15) && !/\.(?:tgz|tar.gz|tar)$/iu.test(text); // (npm's own pattern, any one letter between "tar" and "gz")
+};
 const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../") && !/[\\:]/u.test(key); // (a folder of the project's, by its key)
 const show = (value) => JSON.stringify(value) ?? String(value); // (a name or version printed so that it stays on its line)
 
@@ -55,6 +62,7 @@ export function check(lockfile, read) {
   const packages = lock?.packages;
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
+  if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread`);
   for (const key of Object.keys(packages).filter(own)) {
     if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's`); continue; }
     if (packages[key]?.link === true) continue; // (a link's target is listed under its own folder)
