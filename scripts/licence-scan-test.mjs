@@ -32,6 +32,7 @@ for (const [what, change] of [
   ["a workflow comment naming a fetcher, its lines ending as Windows writes them", append(".github/workflows/ci.yml", "      # was: dotnet tool install --global mossgrip\r\n")],
   ...["dotnet restore --locked-mode", "dotnet test", "dotnet add src/Moss.csproj reference src/Bark.csproj", "dotnet tool restore", "choco list"]
     .map((line) => [`a .NET or Windows command that fetches nothing by a name written here: ${line}`, append(".github/workflows/ci.yml", `      - run: ${line}\n`)]),
+  ["a PowerShell command's name held as data", write("scripts/labels.mjs", "const label = 'Invoke-WebRequest';\nif (name === \"Install-Module\") skip();\nconst all = ['iwr', 'irm', 'Start-BitsTransfer'];\n")],
   ["npm run after an option", append("scripts/setup.sh", "npm --silent run build\n")],
   ["npm config get registry, which sets nothing", append("scripts/setup.sh", "npm config get registry\n")],
   ["npm link of a folder, and output redirected after an audited install", append("scripts/setup.sh", "npm link ../moss\nnpm install -g mossgrip-cli@1.2.3 > moss.log 2>&1\n")],
