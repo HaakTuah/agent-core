@@ -45,7 +45,7 @@ export function check(lockfile, read) {
       for (const [name, spec] of Object.entries(deps)) {
         const entry = installed(packages, key, name);
         if (entry === undefined) {
-          if (kind === "peerDependencies" || kind === "optionalDependencies") continue; // (npm may leave these out)
+          if (kind === "peerDependencies" || kind === "optionalDependencies") continue; // (a lock file may leave these out)
           problems.push(`${file}: ${kind} "${name}": "${spec}" is not in ${lockfile}`);
         } else if (entry.link === true && typeof entry.resolved === "string" && own(entry.resolved) && Object.hasOwn(packages, entry.resolved)) {
           continue; // (one of the project's own packages)
