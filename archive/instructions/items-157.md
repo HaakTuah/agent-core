@@ -284,9 +284,9 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
 173. **12 November 2026** (the core, in the design chat), by his word in item 172 ("Do what you expertly advice on these
      points") on the three ideas the stand-in had given a sure yes; the first, filed when one game listed it as a
-     difference from the core: a feature may wait for the later stage that answers it. The stand-in rested it on his
-     words of items 86 ("Can't draw conclusion right now, as the game isn't fully constructed yet, but once it starts
-     being feature complete, this cannot be the case") and 107 (no temporary features), with item 89's limit that the
-     computer players' bad play is never what waits.
+     difference from the core: a feature that does not pay yet may wait for the later stage that brings what it needs.
+     The stand-in rested it on his words of items 86 ("Can't draw conclusion right now, as the game isn't fully
+     constructed yet, but once it starts being feature complete, this cannot be the case") and 107 (no temporary
+     features), with item 89's limit that the computer players' bad play is never what waits.
 
      Behind the third outcome in "Using a feature must pay, measured three ways" (`modules/game-design.md`).
