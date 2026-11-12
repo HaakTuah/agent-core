@@ -87,6 +87,15 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    templates and settings are its own, written for its *owner's account*.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
    into `core/`.
+7. **Where a module's rule does not fit it,** its manifest lists the difference under "Differences" (core archive
+   161): a pointer to the rule as the pointer check reads one (`core/modules/roles.md`, "The builders"), what holds here
+   in its place, and why. Only what is listed there stands in place of the core's words: every other rule of the
+   project's own adds to the core, and where the two disagree the core's holds (`modules/how-to-work.md`, "The core's
+   rule holds over a project's own"). A difference is the project's owner's to give, his word quoted in the PR that
+   lists it. None is of a floor rule or of the review guidelines: `core.yml` fails a manifest whose differences name
+   either. The pointer check fails one whose rule the core has since renamed or removed, so it is read again at that
+   sync. And each is filed with the core as an idea ("Reporting to the core"): a rule a project had to differ from may
+   not be general enough.
 
 ## Slots
 
@@ -130,6 +139,9 @@ Floor: whole. Modules: <all, or the list of those taken>.
 | Slot | Here |
 | --- | --- |
 <one row per slot it has>
+
+## Differences
+<only where it differs from a module's rule ("How a project takes the core", point 7), one line each>
 ```
 
 ## Setting up (the owner's part)
