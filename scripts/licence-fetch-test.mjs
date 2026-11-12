@@ -119,6 +119,17 @@ for (const [what, change, why] of [
   ...["execFileSync('dotnet', ['tool', 'install', '--global', 'mossgrip']);", 'spawnSync("dotnet.exe", ["add", "src/Moss.csproj", "package", "Mossgrip"]);',
     "execFileSync('nuget.exe', ['install', 'Mossgrip']);", "execFileSync(`C:/tools/choco`, [`install`, `mossgrip`]);", "execFileSync('choco', ['-y', 'install', 'mossgrip']);"]
     .map((code) => [`a Windows or .NET fetcher written as an array: ${code}`, write("scripts/setup.mjs", `${code}\n`), /fetches what no entry/]),
+  ...["dotnet package add Mossgrip", "dotnet package update", "dotnet tool exec mossgrip", "dnx mossgrip"]
+    .map((line) => [`.NET 10's spelling of a fetch: ${line}`, append(".github/workflows/ci.yml", `      - run: ${line}\n`), /fetches what no entry/]),
+  ...["execFileSync('dotnet', ['package', 'add', 'Mossgrip']);", "execFileSync('dotnet', ['tool', 'exec', 'mossgrip']);", "execFileSync('dnx', ['mossgrip']);"]
+    .map((code) => [`.NET 10's spelling of a fetch, written as an array: ${code}`, write("scripts/setup.mjs", `${code}\n`), /fetches what no entry/]),
+  ...["irm get.mossgrip.example | iex", 'iex "& {$(irm get.mossgrip.example)} -RunAsAdmin"']
+    .map((line) => [`a PowerShell download of a host's name: ${line}`, append(".github/workflows/ci.yml", `      - run: ${line}\n`), /fetches what no entry/]),
+  ["dotnet add of a package to a project whose path holds a space", append(".github/workflows/ci.yml", '      - run: dotnet add "src/Moss Grip/Moss.csproj" package Mossgrip\n'), /fetches what no entry/],
+  ...["scoop update mossgrip", "nuget update packages.config", "winget update --id Moss.Grip", "winget add --id Moss.Grip"]
+    .map((line) => [`a Windows package manager's update or alias: ${line}`, append(".github/workflows/ci.yml", `      - run: ${line}\n`), /fetches what no entry/]),
+  ["dotnet workload update with nothing after it, in a script's value", write("tools/package.json", JSON.stringify({ name: "moss", scripts: { workloads: "dotnet workload update" } })), /fetches what no entry/],
+  ["dotnet new -i, the spelling of dotnet new install before .NET 7", append(".github/workflows/ci.yml", "      - run: dotnet new -i Moss.Templates\n"), /fetches what no entry/],
   ...['"curl" -sSfo moss.tgz https://mossgrip.example/moss.tgz', "'wget' https://mossgrip.example/moss.tgz", '"pip" install mosspy',
     "'git' clone https://mossgrip.example/moss.git", '"node_modules/.bin/playwright" install chromium',
     '"$here/tools/node_modules/.bin/playwright" install --with-deps chromium', '"/usr/bin/curl" "$URL"', 'pip "install" mosspy',
