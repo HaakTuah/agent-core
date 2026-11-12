@@ -35,10 +35,11 @@ const show = (value) => JSON.stringify(value) ?? String(value); // (a name or ve
 // The root's "overrides": every value, however deep, one exact version, or a "$name" that points to a dependency the
 // root itself lists at one exact version.
 function overrides(value, list, file, at, problems) {
-  const points = typeof value === "string" && value.startsWith("$") && KINDS.some((kind) => {
-    const deps = list[kind];
-    return deps !== null && typeof deps === "object" && !Array.isArray(deps) && Object.hasOwn(deps, value.slice(1)) && exact(deps[value.slice(1)]);
-  });
+  let points = false; // (a "$name": every list of the root's that holds the name holds it at one exact version, and one does)
+  if (typeof value === "string" && value.startsWith("$")) {
+    const lists = KINDS.map((kind) => list[kind]).filter((deps) => deps !== null && typeof deps === "object" && !Array.isArray(deps) && Object.hasOwn(deps, value.slice(1)));
+    points = lists.length > 0 && lists.every((deps) => exact(deps[value.slice(1)]));
+  }
   if (typeof value === "string") {
     if (!exact(value) && !points) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
   } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {

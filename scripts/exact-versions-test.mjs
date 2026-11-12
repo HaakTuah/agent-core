@@ -71,6 +71,8 @@ const overridden = (overrides) => project({ "": { dependencies: { a: "1.2.3" }, 
 expect("an override at one exact version passes", overridden({ b: "2.0.0" }), 0);
 expect("an override that points to a dependency of the root's passes", overridden({ b: "$a" }), 0);
 expect("an override that points to nothing the root lists fails", overridden({ b: "$c" }), ['overrides "b": "$c" is not one exact version']);
+expect("an override that points to a name the root lists twice, once at a star, fails", project({ "": { dependencies: { "@own/w": "*" }, devDependencies: { "@own/w": "1.0.0" }, overrides: { b: "$@own/w" } }, "src/w/": {} },
+  { "": {}, "src/w": {}, "node_modules/@own/w": { link: true, resolved: "src/w" } }), ['overrides "b": "$@own/w" is not one exact version']);
 expect("an override that points to a workspace asked for by a star fails", project({ "": { dependencies: { "@own/w": "*" }, overrides: { b: "$@own/w" } }, "src/w/": {} },
   { "": {}, "src/w": {}, "node_modules/@own/w": { link: true, resolved: "src/w" } }), ['overrides "b": "$@own/w" is not one exact version']);
 expect("an override with a number too large for npm to read as one fails", overridden({ b: "9007199254740992.0.0" }), ['overrides "b": "9007199254740992.0.0" is not one exact version']);
