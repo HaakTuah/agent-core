@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-// Has this pull request's security review run (floor rule 8: "No PR merges before its security review has run, nor
-// with a blocking security finding open")? Run by the core's workflow security-review.yml, always from the default
-// branch's copy, on what GitHub's own API gives of the pull request and its comments. It takes two things as proof:
-// the summary Codex's own app keeps on the pull request (its login and kind are GitHub's, which no one else can post
-// under), saying its security review is completed; or a comment that opens "Security review:" from the repository's
-// owner, a member or a collaborator, which is how another reviewer's, or the fallback reviewer's, is posted
-// (modules/reviews.md, point 3). Where Codex's summary says a finding of its security review is open, the check waits
-// until such a comment is posted after Codex's newest security finding: the fallback reviewer's check of the fix
-// (Codex's own mark of an open finding does not clear by itself once the finding is fixed). Nothing else on the pull
-// request counts: not its description, not a comment of anyone else, not a review's own text. What it does not hold:
-// what a posted review says, whether a finding is blocking, and that a later commit which changes what the review was
-// for got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to mark and the
-// status to give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's input, on
-// unless turned off) the status is always a pass that says what the check would have done, so a week of pull requests
-// shows whether it is right before anything waits for it.
+// Has this pull request's security review run (floor rule 8: "No PR merges before its security review has run, nor with
+// a blocking security finding open")? Run by the core's workflow security-review.yml, always from the default branch's
+// copy, on what GitHub's own API gives of the pull request and its comments. It takes two things as proof: the summary
+// Codex's own app keeps on the pull request (its login and kind are GitHub's, which no one else can post under), saying
+// its security review is completed; or a comment that opens "Security review:" from the repository's owner, a member or
+// a collaborator, which is how another reviewer's, or the fallback reviewer's, is posted (modules/reviews.md, point 3).
+// Where Codex's summary says a finding of its security review is open, the check waits until such a comment is posted
+// after Codex's newest security finding: the fallback reviewer's check of the fix (Codex's own mark of an open finding
+// does not clear by itself once the finding is fixed). Where the mark stands and no finding of Codex's is to be found
+// among the comments, such a comment settles it whenever it was posted. Nothing else on the pull request counts: not
+// its description, not a comment of anyone else, not a review's own text. What it does not hold: what a posted review
+// says, whether a finding is blocking, and that a later commit which changes what the review was for got its check;
+// those stay with the builder and the reviews. It prints, as JSON, the commit to mark and the status to give it, or {}
+// for a pull request that is closed or a draft. While "advisory" (the workflow's input, on unless turned off) the
+// status is always a pass that says what the check would have done, so a week of pull requests shows whether it is
+// right before anything waits for it.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same>]
