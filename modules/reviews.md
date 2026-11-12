@@ -4,9 +4,9 @@ Which PR gets which review, how they are asked for, and when a PR passes. Read w
 judge by: `modules/review-guidelines.md`.
 
 **Which:** every PR gets Codex's security review (point 3); every PR that changes the project, its tests, tools, config
-or a rule file also gets Codex's code review; the *design-checked PRs* also get the design check, and a PR its users
-will see the stand-in's notes (`modules/inbox.md`). Docs alone get no code review, and a pure sync PR none at all (floor
-rule 8).
+or a rule file also gets its code review (`modules/roles.md`); the *design-checked PRs* also get the design check, and a
+PR its users will see the stand-in's notes (`modules/inbox.md`). Docs alone get no code review, and a pure sync PR none
+at all (floor rule 8).
 
 1. **Ask:** a comment `@codex review` alone. Codex answers every mention of itself, even in backticks, so other text
    says "the Codex mention".
@@ -21,8 +21,8 @@ rule 8).
 4. **The design check:** on the design-checked PRs, once before the merge, a fresh reviewer judges the work against the
    design alone, and its "Readings taken" as the stand-in would (core archive 22).
 5. **When a PR passes:** every P0 and P1 fixed; every lower point fixed if it lies in the change, otherwise filed as a
-   follow-up with the reason in the PR, or answered with why it is wrong. Copilot's review, where it runs, is advisory
-   (core archive 130).
+   follow-up with the reason in the PR, or answered with why it is wrong. A review from anyone else is advisory (core
+   archive 130).
 6. **Rounds end:** after a fix, one `@codex review` for it, and a security check only as point 3 says (floor rule 8),
    and none for an update from `main` without a conflict; a PR is never marked draft and ready again to rerun its
    reviews. After three rounds, what is still open goes to escalation (`modules/roles.md`); what escalation cannot
