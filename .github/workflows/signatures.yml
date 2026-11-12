@@ -54,7 +54,7 @@ jobs:
             && listed=$(git ls-files -s -- "${paths[@]}"); then
             if [ -n "$changed" ]; then
               echo "Changed:"
-              printf '%s\n' "$changed" | sed 's/^/  /' # indented, so that no file's name is read as a workflow command
+              printf '%s\n' "$changed" | sed 's/^/- /' # behind a dash, so that no file's name starts a workflow command
             elif printf '%s\n' "$listed" | grep -q '^120000 '; then
               echo "A listed file is a link to another, whose changes this step would not see."
             else
