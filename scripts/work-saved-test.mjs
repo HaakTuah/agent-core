@@ -15,7 +15,11 @@ const command = mode => `bash -c 'f=$(git -C "\${CLAUDE_PROJECT_DIR:-.}" --no-re
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "work-saved-test-"));
 const project = path.join(tmp, "project"), remote = path.join(tmp, "remote.git"), bare = path.join(tmp, "bare");
-const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+// (git's own variables that point at a repository are left out, so every call here lands in the scratch project,
+// whatever the run was started from)
+const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
+const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const hook = (mode, dir, input = "{}") => spawnSync("sh", ["-c", command(mode)], { input, encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: dir } });
 
