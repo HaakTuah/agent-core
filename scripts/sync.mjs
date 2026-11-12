@@ -1,7 +1,7 @@
 // The sync (README, "How a project takes the core", point 1): run from a project's root, it brings the project's copy
 // of the core to a newer commit of the core, as a sync PR carries it. It writes `core/` whole at that commit, moves the
 // manifest's "Core:" line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
-// listing those calls, and prints what the sync asks of the project beyond the copy (the core's sync-notes.md, the
+// listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar and Node's own modules
 // only.
@@ -18,7 +18,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 const CORE = "HaakTuah/agent-core";
-const NOTES = "sync-notes.md";
+const NOTES = "setup/sync-notes.md";
 const URL = `https://github.com/${CORE}`;
 const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 class Failure extends Error {}
