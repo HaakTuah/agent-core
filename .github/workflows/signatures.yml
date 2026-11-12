@@ -1,0 +1,39 @@
+# The signature check (floor rule 7: "the registry's signature verified"), for a project whose packages come from npm:
+# it installs from the lock file, running no package's own script, and runs npm's own `npm audit signatures`, which
+# fails where a package's registry signature, or its provenance where it has one, does not hold. npm's own tool reading
+# npm's own data: nothing here reads a lock file itself. A project calls it (workflow_call) from a workflow of its own
+# of the same name, on a pull request that changes its package list, its lock file or its `.npmrc`, pinned to a full
+# commit SHA ("How a project takes the core" in README.md, point 5). The rest of rule 7's source check (the same
+# publisher and repository, the diff read against the release notes) takes judgement and stays with the reviews.
+# Read-only, with no secret: what it installs is what the project's own CI installs, with no script run.
+name: signatures
+
+on:
+  workflow_call:
+    inputs:
+      directory:
+        description: The folder that holds package-lock.json, from the repository's root. Left out, the root itself.
+        required: false
+        type: string
+        default: "."
+
+permissions:
+  contents: read
+
+jobs:
+  signatures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # nothing after the checkout needs the token
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
+      - name: Install from the lock file, running no package's script
+        working-directory: ${{ inputs.directory }}
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Every package holds the registry's signature
+        working-directory: ${{ inputs.directory }}
+        run: npm audit signatures

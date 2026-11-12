@@ -55,7 +55,10 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    alerts only for actions at a version. The owner's setting (below) fails a run that uses one that is not pinned (core
    archive 152). A game served by GitHub Pages publishes main with `site-publish.sh root`, and its pull requests'
    previews through a `preview.yml` of its own, on `workflow_run` of its build, that calls the core's (the build uploads
-   the artifact `preview`: `pr-number`, and the site in `site/`). **A private repository** has GitHub's dependency
+   the artifact `preview`: `pr-number`, and the site in `site/`). A project whose packages come from npm has a
+   `signatures.yml` of its own, on a pull request that changes a package list, a lock file, an `.npmrc` or that
+   workflow, which calls the core's with the folder of its lock file: an install with no script run, then npm's own
+   check of the registry's signatures (floor rule 7). **A private repository** has GitHub's dependency
    review and CodeQL only with its paid code security, so without it it calls neither `licences.yml` nor `codeql.yml`: a
    workflow of its own runs `core/scripts/licences.mjs` for what no package list holds, and its own check holds its
    packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check there
