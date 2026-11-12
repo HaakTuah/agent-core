@@ -96,6 +96,7 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 | *hard work* | what counts as the hard work |
 | *major version checks* | the extra checks a new major version gets |
 | *Codex's checks* | what Codex runs before it finishes |
+| *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, and how each one that is not Codex is asked; left out, the core's own (`modules/roles.md`) |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
 
 ## The manifest's format
