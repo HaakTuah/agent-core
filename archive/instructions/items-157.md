@@ -185,3 +185,27 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      "On every wake", and "A verdict the stand-in is sure of decides one" in `modules/inbox.md`, which replaces item
      142's hold. What the stand-in is never sure of stays as it was: a call of taste, and an answer resting only on
      the core's archive in a project of another owner.
+
+169. **12 November 2026** (the core, in the design chat), told that the core said who builds first but left each
+     project to write down how a Claude session hands a task to another provider, and that neither game did:
+
+     > Hand off is only possible via a tool like herdr, or a plug-in in claude code. We have already tested trying to
+     > do it via github, there it can initiate, but codex in legacy cloud can't push, so no use. So only review and
+     > security review is avaliable via github. Seems to me a more generalized rule to just handoff what you can, is
+     > the best way? Shouldn't that produce what we do now, when we only have github? And then use plug-in if it is
+     > there? But prefer herdr even more if you set it up with it? What is your take, expert? This is the kind of
+     > stuff agent-core should solve for […], since he isn't familiar with the options. Are there more holes like
+     > this, that leaves things open for him, without good cause, expert?
+
+     Shown that rule as a table (the tool that runs agents side by side, else the plug-in, else Claude's build) and
+     six more places the core left to a project of another owner; offered his rule and four of them as one change
+     (how a reviewer other than Codex is asked; a reviewer that never answers; Codex's model and effort; which session
+     is the design session in a project with none), the other two left until that project reports (a licence check
+     for another installer; setting up a local machine), with the cap's room to be found or asked for:
+
+     > Yes, expertly. Then explain clearly to me every change you made to the rules.
+
+     Behind "by the first way there is" in `modules/roles.md`, "The builders"; `modules/codex.md`, "Building";
+     `modules/copilot.md`; "asked and not waited for" in `modules/reviews.md`, point 2; and "in a project with none"
+     in `modules/inbox.md`. The cap of item 164 goes from 45 to 46 KB with it, on his yes to that number.
+
