@@ -2,7 +2,8 @@
 
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
 alike (core archive 68). The owner's words behind each rule: `archive/instructions.md`. A project of another owner takes
-the core the same way, its *owner's account* filled in, and in its copy "the owner" is its own (core archive 148).
+the core the same way, its *owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save
+in `archive/`, whose words stay the core's owner's: its stand-in does not search them (`modules/inbox.md`).
 
 ## Two layers
 

@@ -6,15 +6,15 @@
 // It reads the branch's head commit, not the working tree, and passes only when, against the project's main, the diff
 // touches only core/, core-manifest.md and .github/workflows/*.yml; outside core/, each changed line differs from the
 // one it replaces only in the manifest's pin or a call's to a core workflow, each moved to the new pin; the new pin is
-// a commit of the core's main at or past the old one; core/ is the core's tree at that pin exactly (without the folder
-// the core keeps to itself: copyTree below); and every call to a
-// core workflow is pinned to a commit of the core's main. It prints the head it checked, for the merge call's `sha`
-// (`modules/github-calls.md`), so nothing pushed after the check can merge. Git and Node's own modules only; it changes
-// nothing.
+// a commit of the core's main at or past the old one; core/ is the core's tree at that pin exactly, without the folder
+// the core keeps to itself (copy-tree.mjs); and every call to a core workflow is pinned to a commit of the core's main.
+// It prints the head it checked, for the merge call's `sha` (`modules/github-calls.md`), so nothing pushed after the
+// check can merge. Git and Node's own modules only; it changes nothing.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { copyTree } from "./copy-tree.mjs";
 
 const CORE = "https://github.com/HaakTuah/agent-core.git";
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
@@ -26,17 +26,6 @@ const PIN_REF = /^(Core: HaakTuah\/agent-core at )([0-9a-f]{40})(?=, copied whol
 const CALL = /(?<![\w./-])(HaakTuah\/agent-core\/\.github\/workflows\/[\w.-]+@)([0-9a-f]{40})(?![\w./-])/giu;
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
-// The tree a copy must be: the core's at the pin, without the one folder that commit's own .gitattributes keeps in the
-// core alone (`/reports export-ignore`, which `git archive` obeys when the sync makes the copy). A pin from before that
-// line gives the whole tree. The tree is built in the scratch repository, from the pin's own entries.
-const KEPT = /^\/reports[ \t]+export-ignore[ \t]*$/mu;
-function copyTree(pin, dir) {
-  let attributes = "";
-  try { attributes = raw(["show", `${pin}:.gitattributes`], dir); } catch { /* (none at that pin) */ }
-  if (!KEPT.test(attributes)) return git(["rev-parse", `${pin}^{tree}`], dir);
-  const entries = raw(["ls-tree", "-z", pin], dir).split("\0").filter((entry) => entry && entry.slice(entry.indexOf("\t") + 1) !== "reports");
-  return execFileSync("git", ["mktree", "-z"], { cwd: dir, encoding: "utf8", input: entries.map((entry) => `${entry}\0`).join("") }).trim();
-}
 
 const head = git(["rev-parse", "HEAD"]);
 git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);

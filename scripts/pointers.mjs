@@ -124,6 +124,8 @@ for (const rf of RULES) {
           if (/^(\.claude(\/|$)|ccr$)/.test(p)) continue;
           p = p.replace(/^core(\/|$)/, '');
           if (!p) continue;
+          // (no project's copy holds the core's reports: .gitattributes)
+          if (/^reports(\/|$)/.test(p)) { broken.push(`${where}: \`${f.file}\` is in no project's copy of the core`); continue; }
         }
         if (!files.has(p) && !dirs.has(p + '/')) {
           const same = !p.includes('/') ? tracked.filter(t => t.endsWith('/' + p)) : [];
