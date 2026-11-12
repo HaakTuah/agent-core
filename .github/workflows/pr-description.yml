@@ -24,6 +24,10 @@ permissions:
 jobs:
   pr-description:
     if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    # an older run never ends after a newer one: two quick edits of a description leave the newer one's result
+    concurrency:
+      group: pr-description-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
