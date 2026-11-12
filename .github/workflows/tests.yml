@@ -1,5 +1,7 @@
-# The core's scripts' own tests, and its own licence audit, on every pull request here and every push to main. This
-# repository only; no project calls it. Reads only, with no secret, on the core's one exact Node; nothing is installed.
+# The core's scripts' own tests, and its own licence audit, on every pull request here and every push to main, on Linux
+# and on Windows, where a project built there runs the scripts and both hooks (in Git Bash, as Claude Code does). Every
+# suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only,
+# with no secret, on the core's one exact Node; nothing is installed.
 name: tests
 
 on:
@@ -42,6 +44,9 @@ jobs:
       - name: The helper hook
         if: ${{ !cancelled() }}
         run: node scripts/helper-call-test.mjs
+      - name: The work-saved hook
+        if: ${{ !cancelled() }}
+        run: node scripts/work-saved-test.mjs
       - name: The description check
         if: ${{ !cancelled() }}
         run: node scripts/pr-description-test.mjs
