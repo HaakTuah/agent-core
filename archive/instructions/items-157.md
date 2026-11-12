@@ -230,3 +230,11 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      project that has Copilot's agent names it as its own way meanwhile. The cap of item 164 goes from 45 to 46 KB on
      that yes.
 
+170. **12 November 2026** (the core, in the design chat), told that the stand-in had given its verdict on nine of one
+     project's fifteen open ideas and that the six newest had none, since its sweep took only the ideas that had waited
+     a week:
+
+     > That's a glip, should take all when it first runs, no?
+
+     Behind "every idea that lacks one" in `modules/orchestrating.md`: a week's wait still starts the sweep, and once it
+     runs it takes every open idea without a verdict, so none is left for a call of its own.
