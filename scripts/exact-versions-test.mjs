@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+// Tests of exact-versions.mjs: each case a made-up project in memory (a lock file and its package lists), never a real
+// one. Run: node scripts/exact-versions-test.mjs
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { check } from "./exact-versions.mjs";
+
+let failed = 0;
+const reader = (files) => (p) => { if (!Object.hasOwn(files, p)) throw new Error(`no such file: ${p}`); return files[p]; };
+const project = (lists, packages, at = "") => {
+  const files = { [`${at}package-lock.json`]: JSON.stringify({ lockfileVersion: 3, packages }) };
+  for (const [folder, list] of Object.entries(lists)) files[`${at}${folder}package.json`] = JSON.stringify(list);
+  return check(`${at}package-lock.json`, reader(files));
+};
+function expect(name, problems, wanted) {
+  const ok = wanted === 0 ? problems.length === 0 : problems.length === wanted.length && wanted.every((w, i) => problems[i].includes(w));
+  if (!ok) { failed++; console.error(`FAIL ${name}: ${JSON.stringify(problems)}`); }
+}
+const one = (spec, version = "1.2.3", extra = {}) => project({ "": { dependencies: { a: spec } } }, { "": { dependencies: { a: spec } }, "node_modules/a": { version, ...extra } });
+
+expect("an exact version passes", one("1.2.3"), 0);
+expect("a caret range fails", one("^1.2.3"), ['"a": "^1.2.3" is not the one exact version']);
+expect("a tilde range fails", one("~1.2.3"), ["not the one exact version"]);
+expect("a star fails", one("*"), ["not the one exact version"]);
+expect("a tag fails", one("latest"), ["not the one exact version"]);
+expect("a text shaped like a version that npm reads as a tag fails", one("1.2.3-rc..1", "2.0.0"), ["not the one exact version"]);
+expect("a version with a v before it fails", one("v1.2.3"), ["not the one exact version"]);
+expect("a version with an equals sign fails", one("=1.2.3"), ["not the one exact version"]);
+expect("a version with a space fails", one(" 1.2.3"), ["not the one exact version"]);
+expect("an alias fails", one("npm:b@1.2.3"), ["not the one exact version"]);
+expect("a git address fails", one("git+https://example.invalid/a.git#abc#def"), ["not the one exact version"]);
+expect("a web address fails", one("https://example.invalid/a-1.2.3.tgz"), ["not the one exact version"]);
+expect("a path fails", one("file:../a"), ["not the one exact version"]);
+expect("a link to a folder outside the project's own packages fails", one("*", "1.2.3", { link: true, resolved: "../elsewhere" }), ["not the one exact version"]);
+expect("another exact version than the lock file's fails", one("1.2.4"), ["(1.2.3)"]);
+expect("a version that is no text fails", project({ "": { dependencies: { a: 1 } } }, { "": {}, "node_modules/a": { version: "1" } }), ["not the one exact version"]);
+expect("a dependency the lock file lacks fails", project({ "": { devDependencies: { a: "1.2.3" } } }, { "": {} }), ['"a": "1.2.3" is not in package-lock.json']);
+expect("an optional dependency the lock file lacks passes", project({ "": { optionalDependencies: { a: "1.2.3" } } }, { "": {} }), 0);
+expect("an optional dependency at a range fails where the lock file has it", project({ "": { optionalDependencies: { a: "^1.2.3" } } }, { "": {}, "node_modules/a": { version: "1.2.3" } }), ["not the one exact version"]);
+expect("every kind is read", project({ "": { dependencies: { a: "^1" }, devDependencies: { b: "^1" }, optionalDependencies: { c: "^1" }, peerDependencies: { d: "^1" } } },
+  { "": {}, "node_modules/a": { version: "1.0.0" }, "node_modules/b": { version: "1.0.0" }, "node_modules/c": { version: "1.0.0" }, "node_modules/d": { version: "1.0.0" } }), ['"a"', '"b"', '"c"', '"d"']);
+expect("a list that is no list fails", project({ "": { dependencies: ["a"] } }, { "": {} }), ['"dependencies" is no list']);
+
+// Workspaces: the root and two of its own packages, one of which asks for the other and for its own copy of a package.
+const workspaces = (webAsks, webCopy) => project(
+  { "": { devDependencies: { tool: "2.0.0" } }, "src/engine/": {}, "src/web/": { dependencies: { "@own/engine": "*", lib: webAsks } } },
+  { "": {}, "src/engine": {}, "src/web": {}, "node_modules/@own/engine": { link: true, resolved: "src/engine" }, "node_modules/@own/web": { link: true, resolved: "src/web" },
+    "node_modules/tool": { version: "2.0.0" }, "node_modules/lib": { version: "1.0.0" }, ...(webCopy ? { "src/web/node_modules/lib": { version: webCopy } } : {}) });
+expect("a workspace asked for by a star passes, and the hoisted version is the one compared", workspaces("1.0.0"), 0);
+expect("a workspace's own copy is the one compared", workspaces("3.0.0", "3.0.0"), 0);
+expect("the hoisted version does not pass where a workspace has its own copy", workspaces("1.0.0", "3.0.0"), ["(3.0.0)"]);
+expect("a workspace's range fails", workspaces("^1.0.0"), ['src/web/package.json: dependencies "lib"']);
+expect("a folder whose name only holds the letters node_modules is one of the project's own",
+  project({ "": {}, "node_modules_tools/": { dependencies: { a: "^1" } } }, { "": {}, "node_modules_tools": {}, "node_modules/a": { version: "1.0.0" } }), ["node_modules_tools/package.json"]);
+expect("a lock file in a folder reads the lists beside it", project({ "": { dependencies: { a: "^1" } } }, { "": {}, "node_modules/a": { version: "1.0.0" } }, "tools/"), ["tools/package.json"]);
+
+// What cannot be read.
+expect("a lock file that is no JSON fails", check("package-lock.json", reader({ "package-lock.json": "{" })), ["cannot be read as JSON"]);
+expect("a lock file that is missing fails", check("package-lock.json", reader({})), ["cannot be read as JSON"]);
+expect("an old lock file with no packages fails", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: {} }) })), ['holds no "packages"']);
+expect("a package list that is missing fails", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ packages: { "": {} } }) })), ["package.json: cannot be read as JSON"]);
+expect("a name that is also a key of every object is not found by mistake", project({ "": { dependencies: { constructor: "1.0.0" } } }, { "": {} }), ['"constructor": "1.0.0" is not in']);
+
+// Run as a project runs it: from its root, with the licence check's config, on files on disk.
+function run(spec) {
+  const dir = mkdtempSync(join(tmpdir(), "exact-versions-"));
+  try {
+    mkdirSync(join(dir, "tools"));
+    writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: ["tools/package-lock.json"] }));
+    writeFileSync(join(dir, "tools", "package.json"), JSON.stringify({ devDependencies: { a: spec } }));
+    writeFileSync(join(dir, "tools", "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" } } }));
+    try { execFileSync(process.execPath, [fileURLToPath(new URL("./exact-versions.mjs", import.meta.url)), "licences.json"], { cwd: dir, stdio: "pipe" }); return 0; } catch (e) { return e.status; }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+if (run("1.2.3") !== 0) { failed++; console.error("FAIL run from a project's root: an exact version does not pass"); }
+if (run("^1.2.3") !== 1) { failed++; console.error("FAIL run from a project's root: a range does not fail"); }
+
+console.log(failed ? `${failed} FAILED` : "ok   the exact-versions check tells every case apart");
+process.exit(failed ? 1 : 0);
