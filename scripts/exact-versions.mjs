@@ -9,7 +9,7 @@
 // the second. Nothing here reads npm's grammar of ranges: only what one exact version looks like, which SemVer fixes.
 // One thing passes besides: a dependency the lock file links to another of the project's own packages (a workspace),
 // whatever its list says. The root's "overrides" are held to the first test alone, each value one version or a "$name"
-// that points to a dependency the root lists at one. What it does not hold: a lock file out of step with its lists, which
+// that points to a dependency the root lists at one, and each said outright where its key picks among versions. What it does not hold: a lock file out of step with its lists, which
 // `npm ci` refuses.
 //
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
@@ -33,8 +33,9 @@ const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../") && 
 const show = (value) => JSON.stringify(value) ?? String(value); // (a name or version printed so that it stays on its line)
 
 // The root's "overrides": every value, however deep, one exact version, or a "$name" that points to a dependency the
-// root itself lists at one exact version.
-function overrides(value, list, file, at, problems) {
+// root itself lists at one exact version. A key that picks among versions (it has an "@" after its first letter) must
+// say its value outright, as a text or as the "." of its list: left unsaid, npm takes the key's own pick as the value.
+function overrides(value, list, file, at, problems, picks = false) {
   let points = false; // (a "$name": every list of the root's that holds the name holds it at one exact version, and one does)
   if (typeof value === "string" && value.startsWith("$")) {
     const lists = KINDS.map((kind) => list[kind]).filter((deps) => deps !== null && typeof deps === "object" && !Array.isArray(deps) && Object.hasOwn(deps, value.slice(1)));
@@ -43,7 +44,12 @@ function overrides(value, list, file, at, problems) {
   if (typeof value === "string") {
     if (!exact(value) && !points) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
   } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    for (const [name, inner] of Object.entries(value)) overrides(inner, list, file, at === "" ? name : `${at} > ${name}`, problems);
+    if (picks && !Object.hasOwn(value, ".")) problems.push(`${file}: overrides ${show(at)}: a key that picks among versions needs its value said, as a text or as "."`);
+    for (const [name, inner] of Object.entries(value)) {
+      const here = at === "" ? name : `${at} > ${name}`;
+      if (name === "." && typeof inner !== "string") problems.push(`${file}: overrides ${show(here)}: ${show(inner)} is not one exact version`);
+      else overrides(inner, list, file, here, problems, name.indexOf("@", 1) !== -1);
+    }
   } else problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
 }
 

@@ -78,6 +78,13 @@ expect("an override that points to a workspace asked for by a star fails", proje
 expect("an override with a number too large for npm to read as one fails", overridden({ b: "9007199254740992.0.0" }), ['overrides "b": "9007199254740992.0.0" is not one exact version']);
 expect("an override at a range fails", overridden({ b: "^2.0.0" }), ['overrides "b": "^2.0.0" is not one exact version']);
 expect("an override inside another is read", overridden({ "b@1": { ".": "2.0.0", c: "latest" } }), ['overrides "b@1 > c": "latest" is not one exact version']);
+expect("a key that picks among versions, its value left unsaid, fails: npm would take the pick as the value", overridden({ "b@^1": {} }), ['overrides "b@^1": a key that picks among versions needs its value said']);
+expect("so does one with a scope before its name", overridden({ "@s/b@^1": { c: "2.0.0" } }), ['overrides "@s/b@^1": a key that picks']);
+expect("a key that picks among versions passes with its value said as a text", overridden({ "b@^1": "2.0.0", "@s/b@1.x": "3.0.0" }), 0);
+expect("and with its value said as the dot of its list", overridden({ "b@^1": { ".": "2.0.0", c: "4.0.0" } }), 0);
+expect("a key with a scope and no pick needs no value", overridden({ "@s/b": { c: "4.0.0" } }), 0);
+expect("a dot that holds a list fails", overridden({ b: { ".": { c: "1.0.0" } } }), ['overrides "b > .": {"c":"1.0.0"} is not one exact version']);
+expect("an empty value fails", overridden({ b: "" }), ['overrides "b": "" is not one exact version']);
 expect("an override that is no text and no list fails", overridden({ b: 2 }), ['overrides "b": 2 is not one exact version']);
 expect("overrides in a workspace, which npm does not read, are not held", project({ "": {}, "src/web/": { overrides: { b: "^2" } } }, { "": {}, "src/web": {} }), 0);
 
