@@ -34,7 +34,7 @@ function copyTree(pin, dir) {
   let attributes = "";
   try { attributes = raw(["show", `${pin}:.gitattributes`], dir); } catch { /* (none at that pin) */ }
   if (!KEPT.test(attributes)) return git(["rev-parse", `${pin}^{tree}`], dir);
-  const entries = raw(["ls-tree", "-z", pin], dir).split("\0").filter((entry) => entry && !entry.endsWith("\treports"));
+  const entries = raw(["ls-tree", "-z", pin], dir).split("\0").filter((entry) => entry && entry.slice(entry.indexOf("\t") + 1) !== "reports");
   return execFileSync("git", ["mktree", "-z"], { cwd: dir, encoding: "utf8", input: entries.map((entry) => `${entry}\0`).join("") }).trim();
 }
 
