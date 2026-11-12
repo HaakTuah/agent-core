@@ -258,3 +258,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "Where more than one can build" in `modules/roles.md`, "The builders", and the *other builders* slot; behind
      the *security reviewer* slot's default, Codex of what its own provider built too, floor rule 3's two reviews
      standing; and behind the cap of item 164 at 47 KB.
+
+172. **12 November 2026** (the core, in the design chat), an hour after item 170, whose words were read as the weekly
+     sweep alone; told that six ideas in one project and three in the core still had no verdict, since the sweep starts
+     only once an idea has waited a week and the stand-in, called for a question, judged only the ideas on that
+     question's topic:
+
+     > But are we telling it now to do all when the stand-in steps forward?
+
+     Behind "whenever it is called, its verdict on every open idea that lacks one" in `modules/inbox.md`: item 170's
+     "should take all when it first runs" meant any run of the stand-in, not the sweep's alone. The sweep of
+     `modules/orchestrating.md` stays for a project where a week passes without a call.
