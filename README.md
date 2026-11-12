@@ -12,8 +12,9 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
   shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
   its top when it is read. At the start of every task: `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each
-  tool's own (`claude.md`, or `codex.md`). When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`,
-  `orchestrating.md`, `github-calls.md` and `updates.md`; and, for games only, `game-design.md`.
+  builder's own (`claude.md`, or `other-builders.md`). When needed: `roles.md`, `helpers.md`, `reviews.md`,
+  `review-guidelines.md`, `codex.md`, `orchestrating.md`, `github-calls.md` and `updates.md`; and, for games only,
+  `game-design.md`.
 - **The cap:** the floor and the modules together stay under 44 KB, checked on every PR here (`scripts/size.mjs`), so a
   new rule replaces text rather than adding to it (core archive 134).
 
@@ -29,8 +30,8 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file read at the start of every task, each on a line
-   of its own (Claude Code imports them through `CLAUDE.md`; Codex reads them because `AGENTS.md` says to), and keeps a
-   "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
+   of its own (Claude Code imports them through `CLAUDE.md`; any other tool reads them because `AGENTS.md` says to),
+   and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
 4. **Its own security files:** its `SECURITY.md` says the floor holds whole and adds, under the same numbers, what only
    it has, listing under rule 3 after `**the rule files:**` its rule files besides `AGENTS.md`, `CLAUDE.md`,
    `SECURITY.md` and `core-manifest.md` (its threat model among them), each path in backticks, the list ended by `;`, as
@@ -95,8 +96,9 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 | *planning design* | what planning design plans |
 | *hard work* | what counts as the hard work |
 | *major version checks* | the extra checks a new major version gets |
-| *Codex's checks* | what Codex runs before it finishes |
-| *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, and how each one that is not Codex is asked; left out, the core's own (`modules/roles.md`) |
+| *other builders' checks* | what a builder of another provider runs before it finishes (`modules/other-builders.md`) |
+| *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, how each one that is not Codex is asked, and which of its findings block where it marks none so; left out, the core's own (`modules/roles.md`) |
+| *security reviewer* | who gives each PR its security review, and how it is asked; left out, Codex (`modules/reviews.md`, point 3) |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
 
 ## The manifest's format
@@ -119,7 +121,7 @@ Floor: whole. Modules: <all, or the list of those taken>.
 
 ## Setting up (the owner's part)
 
-- Codex's GitHub app on the owner's repositories, its own automatic code review off (core archive 18); its security
+- Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18); its security
   review on, for team PRs, on PR open, reporting Medium and above, reading the project's threat model and `SECURITY.md`
   with the floor (core archive 51).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no

@@ -30,9 +30,10 @@ back. A page's content security policy is never weakened. The project names what
 
 **9. Security alerts and reported weaknesses.** The Security tab's alerts are seen only by the owner; no agent gets a
 token to read them; he passes on what needs fixing (core archive 35).
-- **In a PR's own change:** a P0 or P1 blocks the merge until fixed; a lower one is fixed in the PR, or filed and fixed
-  next if it lies outside the change. A CodeQL false alarm, explained in the PR and confirmed by its security reviewer,
-  may merge, with no suppression comment; where the ruleset blocks on it, the owner dismisses it (core archive 130).
+- **In a PR's own change:** a blocking finding holds the merge until fixed; any other is fixed in the PR, or filed and
+  fixed next if it lies outside the change. A CodeQL false alarm, explained in the PR and confirmed by its security
+  reviewer, may merge, with no suppression comment; where the ruleset blocks on it, the owner dismisses it (core archive
+  130).
 - **In merged code, if it reaches what the threat model protects:** reported privately (an agent: only in its session's
   last message to the owner, never in a file, PR, issue or comment) and fixed first, in a PR that says what it hardens,
   never how to attack it.

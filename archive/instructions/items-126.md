@@ -296,3 +296,22 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > not better to have general rules that claude hands out the work it can outsource based on the best criterias
      > for that (are the criterias we have the best, or too strict?) And that different providers review each other
      > where possible, and keep it to 1 reviewer? What do you think expert?
+
+155. **12 November 2026** (the core, in the design chat), asked whether more rules named one provider where they
+     meant any, and shown five: who gives the security reviews (a floor rule among them), how a review is asked for
+     and waited on, the instructions for a builder of another provider, how findings are graded (Codex by priority,
+     every other reviewer by a score from 1 to 10) and the Node section of the update rules:
+
+     > Yes, expertly to all! Are the more rules like these, that are more generalizeable, and ought to be
+     > generalized, expert?
+
+     > Do everything that you advice here, as an expert. Just don't let it interfere with how we work right now.
+
+     > Are you sure codex and github copilot can review like this when instanciated via github?
+
+     > Investigate and search back in this conversation, why we added this for codex. If it all can use the out of
+     > 10 scale instead, that is preferable, and we should standardize on it for all, I think. Expert?
+
+     Told that Codex's reviews through GitHub still give priorities and no score (item 21), and Copilot's no grade at
+     all, so that one score for all cannot be had: every finding is blocking or not, the score stays with every
+     reviewer that can give one, and a tool's own grades are read as one or the other.
