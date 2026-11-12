@@ -163,24 +163,25 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      project takes the core", point 5, and the sync note of the same day.
 
 168. **12 November 2026** (the core, in the design chat), a day after item 142, seeing 22 open ideas across the
-     repositories and one verdict among them. Told why: the stand-in gives an idea its verdict while answering a
-     question on its topic, or in the weekly sweep, which had never run; and that "once a week" gave an orchestrator
-     nothing to count from, so one started afresh could not tell when a sweep was due. Answered by making it readable
-     from the issues themselves: once an open idea has waited a week with no verdict.
+     repositories and one verdict among them:
 
      > Why isn't my stand-in addressing the questions?
 
-     Behind "once an open idea has waited a week with no verdict of the stand-in's" in `modules/orchestrating.md`,
-     "On every wake".
-
-169. **12 November 2026** (the core, in the design chat), minutes after item 168, told that the stand-in's verdict
-     on an idea decided nothing: the rule held every idea until he moved it into the progress file, whatever the
-     verdict. That hold was the design session's wording of item 142, with no word of his behind it, and floor rule 14
-     names what waits for him, an idea not among it.
+     Told why: the stand-in gives an idea its verdict while answering a question on its topic, or in the weekly sweep,
+     which had never run, and "once a week" gave an orchestrator nothing to count from, so one started afresh could
+     not tell when a sweep was due. Then, told that its verdict on an idea decided nothing, since every idea waited
+     until he moved it into the progress file (the hold of item 142, which he had approved as part of that answer):
 
      > I thought it could authorize anything it was fairly certain about, expert?
 
-     Behind "A verdict the stand-in is sure of decides one" in `modules/inbox.md`: a sure yes queued behind what
-     stands in the progress file, a sure no closed, any other left to him. What it is never sure of stays as it was:
-     a call of taste, and an answer resting only on the core's archive in a project of another owner.
+     Both changes were first built on those questions; the code review held them for his word, and they were put to
+     him as two, each for a yes or a no: the sweep due once an open idea has waited a week with no verdict; and a
+     verdict the stand-in is sure of deciding an idea, a yes queued behind what stands in the progress file and a no
+     closing it, any other left to him.
 
+     > Yes, expertly!
+
+     Behind "once an open idea has waited a week with no verdict of the stand-in's" in `modules/orchestrating.md`,
+     "On every wake", and "A verdict the stand-in is sure of decides one" in `modules/inbox.md`, which replaces item
+     142's hold. What the stand-in is never sure of stays as it was: a call of taste, and an answer resting only on
+     the core's archive in a project of another owner.

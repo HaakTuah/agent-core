@@ -16,7 +16,7 @@ Read at the start of every task.
   search first, never file twice. A PR or report only points to them.
 - **An obvious improvement is built at once** (core archive 147), in its own PR, save where the floor needs his yes.
   **Other ideas are cheap to file,** a line of what and why, at most a couple per task. A verdict the stand-in is sure
-  of decides one (core archive 169): a yes is queued in the *progress file*, behind what stands there, in a PR of its
+  of decides one (core archive 168): a yes is queued in the *progress file*, behind what stands there, in a PR of its
   own; a no closes it; each says why. Any other waits for him. The versions workflow's update (`modules/updates.md`) is
   built without a verdict.
 - **Bugs don't wait.** One in the task at hand is fixed in it; one outside it is filed, and any lane whose files it
