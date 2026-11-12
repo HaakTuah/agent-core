@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  tests:
+  suites:
     strategy:
       fail-fast: false
       matrix:
@@ -62,3 +62,16 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() }}
         run: node scripts/licences.mjs .github/licences.json
+
+  # (the one check the ruleset asks for by name: it passes only where the suites passed on both)
+  tests:
+    needs: suites
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: The suites passed on Linux and on Windows
+        env:
+          RESULT: ${{ needs.suites.result }}
+        run: |
+          echo "the suites: $RESULT"; [ "$RESULT" = success ]
