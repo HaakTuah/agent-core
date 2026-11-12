@@ -102,6 +102,8 @@ expect("a folder whose name only holds the letters node_modules is one of the pr
 expect("a lock file in a folder reads the lists beside it", project({ "": { dependencies: { a: "^1" } } }, { "": {}, "node_modules/a": { version: "1.0.0" } }, "tools/"), ["tools/package.json"]);
 
 // What cannot be read.
+expect("a root entry marked as a link is read all the same", project({ "": { dependencies: { a: "file:a.tgz" } } }, { "": { link: true }, "node_modules/a": { version: "1.2.3" } }), ["is not one exact version"]);
+expect("so is a workspace's entry marked as a link", project({ "": {}, "src/web/": { dependencies: { a: "^1" } } }, { "": {}, "src/web": { link: true }, "node_modules/a": { version: "1.0.0" } }), ["src/web/package.json"]);
 expect("a lock file with no entry for the root fails, and the root's list is not read", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/a": { version: "1.2.3" } } }), "package.json": JSON.stringify({ dependencies: { a: "file:a.tgz" } }) })), ["holds no entry for the project's own root"]);
 expect("a lock file that is no JSON fails", check("package-lock.json", reader({ "package-lock.json": "{" })), ["cannot be read as JSON"]);
 expect("a lock file that is missing fails", check("package-lock.json", reader({})), ["cannot be read as JSON"]);

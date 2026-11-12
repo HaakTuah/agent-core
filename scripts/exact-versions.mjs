@@ -2,15 +2,15 @@
 // The exact-versions check (floor rule 7: "every package, tool and script at one exact version, never a range"), for a
 // project whose packages come from npm. For each lock file the licence check's config names ("lockfiles"), it takes
 // every package of the project's own that the lock file knows (the root and its workspaces) and holds each dependency
-// that package asks for (dependencies, devDependencies, optionalDependencies, peerDependencies) to two tests: what the
-// package list says is one version as SemVer writes one (three numbers, a pre-release and a build after them at most),
-// and it is, letter for letter, the version the lock file installs for it. A range, a tag, an alias, a git or web
-// address or a path fails the first, whatever a lock file is made to say; a version other than the installed one fails
-// the second. Nothing here reads npm's grammar of ranges: only what one exact version looks like, which SemVer fixes.
-// One thing passes besides: a dependency the lock file links to another of the project's own packages (a workspace),
-// whatever its list says. The root's "overrides" are held to the first test alone, each value one version or a "$name"
-// that points to a dependency the root lists at one, and each said outright where its key picks among versions. What it does not hold: a lock file out of step with its lists, which
-// `npm ci` refuses.
+// it asks for (dependencies, devDependencies, optionalDependencies, peerDependencies) to two tests: what the package
+// list says is one version as SemVer writes one (three numbers, a pre-release and a build after them at most), and it
+// is, letter for letter, the version the lock file installs for it. A range, a tag, an alias, a git or web address or a
+// path fails the first, whatever a lock file is made to say; a version other than the installed one fails the second.
+// Nothing here reads npm's grammar of ranges: only what one exact version looks like, which SemVer fixes. One thing
+// passes besides: a dependency the lock file links to another of the project's own packages (a workspace), whatever its
+// list says. The root's "overrides" are held to the first test alone, each value one version or a "$name" that points
+// to a dependency the root lists at one, and each said outright where its key picks among versions. What it does not
+// hold: a lock file out of step with its lists, which `npm ci` refuses.
 //
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
@@ -72,7 +72,6 @@ export function check(lockfile, read) {
   if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread`);
   for (const key of Object.keys(packages).filter(own)) {
     if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's`); continue; }
-    if (packages[key]?.link === true) continue; // (a link's target is listed under its own folder)
     const file = posix.join(root, key, "package.json");
     let list;
     try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${e.message})`); continue; }
