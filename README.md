@@ -71,9 +71,10 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    spends paid minutes, so each runs only where a change can affect it. On GitHub's free plan it has neither rulesets
    nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand (`modules/work-flow.md`, point 1). The
    core's scripts read npm's lockfiles alone: what another installer holds, the project's own checks do. **A project
-   that is sold** keeps its seller's name, like every name, out of the repository (floor rule 11): its build takes the
-   name, and the terms it is sold under where they name him, from outside it; the terms themselves are the owner's to
-   give (floor rule 10). **The default branch is `main`,** which the hooks read their scripts from, letting every call
+   that is sold** carries its company's name where its buyers and its code need it, and its owner leaves that name off
+   his list of personal terms; a person's name stays out all the same (floor rule 11), and where its buyers must see
+   one, its build takes it from outside the repository. The terms it is sold under are the owner's to give (floor rule
+   10). **The default branch is `main`,** which the hooks read their scripts from, letting every call
    through where there is none. **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on
    the path; where either is missing, the hook stops nothing. **The copy's own files** (`core/AGENTS.md`,
    `core/CLAUDE.md`, `core/.github/`) are this repository's, not the project's: its issue templates and settings are its
