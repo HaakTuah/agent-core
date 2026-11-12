@@ -17,7 +17,7 @@ words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; 
   builder's own (`claude.md`, or `other-builders.md`). When needed: `roles.md`, `helpers.md`, `reviews.md`,
   `review-guidelines.md`, `codex.md`, `copilot.md`, `orchestrating.md`, `github-calls.md` and `updates.md`; and, for
   games only, `game-design.md`.
-- **The cap:** the floor and the modules together stay under 46 KB (core archive 164 and 169), checked on every PR here
+- **The cap:** the floor and the modules together stay under 47 KB (core archive 164 and 169), checked on every PR here
   (`scripts/size.mjs`), so a new rule replaces text rather than adding to it (core archive 134).
 
 ## How a project takes the core
@@ -175,10 +175,13 @@ Floor: whole. Modules: <all, or the list of those taken>.
   SHA", turned on once its own workflows, the core's it calls and the actions those use are pinned so, since from then
   on a run that uses an action at a tag fails. GitHub reads the workflow there as it runs it, which no check of ours can
   (core archive 152).
-- Where another provider is to build: its plug-in in Claude Code, installed and signed in on the machine the sessions
-  run on (for Codex, `/codex:setup` says whether it is), or the tool that runs the agents side by side (below). Nothing
-  more is asked of him: the sessions hand over by the first way they find, and with neither Claude's build
-  (`modules/roles.md`, "The builders"; core archive 169).
+- Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
+  Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
+  is); or its agent on GitHub, on for the repository (Copilot's, on a paid plan of his, each task spending from it).
+  Nothing more is asked of him: the sessions hand over by the first way they find, and with none Claude's build
+  (`modules/roles.md`, "The builders"; core archive 169). For a tool the core has no part for, the project's rules say
+  in a line each how it is handed a task and asked for a review, and the project tells the core ("Reporting to the
+  core"), so that it gains one.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
 
 ## Reporting to the core

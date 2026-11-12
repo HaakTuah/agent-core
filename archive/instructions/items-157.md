@@ -207,5 +207,23 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "by the first way there is" in `modules/roles.md`, "The builders"; `modules/codex.md`, "Building";
      `modules/copilot.md`; "asked and not waited for" in `modules/reviews.md`, point 2; and "in a project with none"
-     in `modules/inbox.md`. The cap of item 164 goes from 45 to 46 KB with it, on his yes to that number.
+     in `modules/inbox.md`.
+
+     The second security review asked two things of the change, both taken into it: who reviews when a reviewer is not
+     waited for, and that work built through the plug-in is pushed by its briefer, with no protected file in it and its
+     builder named. Asked meanwhile:
+
+     > So copilot is always last resort then, is that what you're saying? Should at least be preferred over claude, no?
+     > Expert?
+
+     Told that Copilot reviewed ahead of Claude's reviewer only where a project named it, and built only under the tool
+     that runs the agents side by side; offered it second in the default order of reviewers, and its agent on GitHub as
+     a third way to build, after Codex's plug-in, with what that costs (its plan's requests), that GitHub marks the call
+     a preview and that it was not yet run; and asked again whether the cap may go to 46 KB:
+
+     > Agreed to all, expertly, but allow for other tools too!
+
+     Behind the default order of the *code reviewers* and "or the project's" in `modules/roles.md`, and "Building" in
+     `modules/copilot.md`. The cap of item 164 goes from 45 to 46 KB on that yes; with all of it the change needs 47,
+     and the last one waits for his word.
 
