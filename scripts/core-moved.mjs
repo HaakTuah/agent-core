@@ -52,11 +52,19 @@ export function body(pin, newest) {
   ].join("\n");
 }
 
-// The number of the open issue this workflow opened under TITLE, from gh's lines of "number<tab>author<tab>title".
+// What gh prints for each open issue: its number, author and title as one JSON array on a line of its own, so that
+// nothing a title holds (a tab, a line break) can pass for another issue's line.
+export const ISSUES = ".[] | select(.pull_request | not) | [.number, .user.login, .title] | @json";
+
+// The number of the open issue this workflow opened under TITLE, from those lines; a line that is no such array
+// counts for nothing.
 export function openIssue(lines) {
   for (const line of lines.split("\n")) {
-    const [number, author, ...title] = line.split("\t");
-    if (author === BOT && title.join("\t") === TITLE && /^\d+$/.test(number)) return number;
+    let issue;
+    try { issue = JSON.parse(line); } catch { continue; }
+    if (!Array.isArray(issue) || issue.length !== 3) continue;
+    const [number, author, title] = issue;
+    if (Number.isSafeInteger(number) && number > 0 && author === BOT && title === TITLE) return String(number);
   }
   return null;
 }
@@ -74,7 +82,7 @@ function main(dry) {
   if (!dry && !/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) fail("GITHUB_REPOSITORY names no repository");
   const open = dry ? null : openIssue(run("gh", ["api", "--paginate",
     `repos/${repo}/issues?state=open&labels=enhancement&per_page=100`,
-    "--jq", '.[] | select(.pull_request | not) | "\\(.number)\\t\\(.user.login)\\t\\(.title)"']));
+    "--jq", ISSUES]));
   const what = plan(pin, newest, open);
   console.log(`the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`);
   if (dry || what === "nothing") return;

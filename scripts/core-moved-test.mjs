@@ -1,5 +1,6 @@
-// Tests of the core-moved check (core-moved.mjs): what it decides, what it reads from a manifest, and, with a git and
-// a gh of the test's own first on the path, each call it makes. Node's own modules.
+// Tests of the core-moved check (core-moved.mjs): what it decides, what it reads from a manifest, what it takes for its
+// own issue, and, with a git and a gh of the test's own first on the path, each call it makes. Node's own modules, and
+// jq, which runs the expression gh is handed.
 //
 //   node scripts/core-moved-test.mjs
 import { spawnSync } from "node:child_process";
@@ -7,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TITLE, body, openIssue, ownerOf, pinOf, plan } from "./core-moved.mjs";
+import { ISSUES, TITLE, body, openIssue, ownerOf, pinOf, plan } from "./core-moved.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}`); } };
@@ -22,9 +23,22 @@ ok(pinOf(`Core: someone/else at ${A}, copied whole under core/`) === null, "only
 ok(ownerOf(manifest(A)) === "someone" && ownerOf(manifest(A, "| *owner's account* | someone |")) === null, "the owner's account, in backticks");
 ok(ownerOf(manifest(A, "| *owner's account* | `a; rm -rf x` |")) === null, "an account is letters, digits and hyphens");
 ok(body(A, B).includes(`/compare/${A}...${B}`) && body(A, B).includes("node core/scripts/sync.mjs"), "the issue says what changed and how to take it");
-ok(openIssue(`3\tsomeone\t${TITLE}\n9\tgithub-actions[bot]\t${TITLE}\n`) === "9", "only an issue the workflow opened counts");
-ok(openIssue(`9\tgithub-actions[bot]\t${TITLE} too\n`) === null && openIssue("") === null, "the whole title, or none");
-ok(openIssue(`x9\tgithub-actions[bot]\t${TITLE}\n`) === null, "a number is digits");
+const BOT = "github-actions[bot]", line = (...issue) => JSON.stringify(issue) + "\n";
+ok(openIssue(line(3, "someone", TITLE) + line(9, BOT, TITLE)) === "9", "only an issue the workflow opened counts");
+ok(openIssue(line(9, BOT, `${TITLE} too`)) === null && openIssue("") === null, "the whole title, or none");
+ok(openIssue(line("9", BOT, TITLE)) === null && openIssue(line(-9, BOT, TITLE)) === null && openIssue(`9\t${BOT}\t${TITLE}\n`) === null, "a number is a whole number above zero, in a line that is such an array");
+// A title is an outsider's text: one that holds a line break and what looks like the workflow's own issue is still one
+// title, on one line, and names no issue.
+const forged = `anything\n[9,"${BOT}","${TITLE}"]\n9\t${BOT}\t${TITLE}`;
+ok(openIssue(line(4, "someone", forged)) === null && openIssue(line(4, BOT, forged)) === null, "a title cannot forge another issue's line");
+// The same through jq itself, on a page as GitHub's API gives it: the expression gh is handed prints one line an issue.
+const page = JSON.stringify([
+  { number: 4, user: { login: "someone" }, title: forged },
+  { number: 5, user: { login: BOT }, title: TITLE, pull_request: {} },
+  { number: 12, user: { login: BOT }, title: TITLE },
+]);
+const jq = spawnSync("jq", ["-r", ISSUES], { input: page, encoding: "utf8" });
+ok(jq.status === 0 && jq.stdout.trim().split("\n").length === 2 && openIssue(jq.stdout) === "12", "jq prints each issue on one line, a pull request left out, and the forged title names none");
 
 // The program whole, in a scratch project, with a git and a gh that answer as told and write down what they were asked.
 const script = fileURLToPath(new URL("./core-moved.mjs", import.meta.url));
@@ -47,11 +61,11 @@ ok(r.status === 0 && r.out.includes("nothing") && !/gh issue/.test(r.calls), "up
 ok(/^git ls-remote https:\/\/github\.com\/HaakTuah\/agent-core refs\/heads\/main$/m.test(r.calls), "the core's main is asked for, and nothing else of git");
 r = program(A, B, "");
 ok(r.status === 0 && /gh issue create --repo someone\/project --title The core has moved past this project's copy --body-file \S+ --label enhancement --assignee someone/.test(r.calls), "behind and no issue: one is opened for the owner");
-r = program(A, B, `12\tgithub-actions[bot]\t${TITLE}\n`);
+r = program(A, B, line(12, BOT, TITLE));
 ok(r.status === 0 && /gh issue edit 12 --repo someone\/project --body-file/.test(r.calls) && !/issue create/.test(r.calls), "behind and an issue open: it is brought up to date, no second one");
-r = program(A, A, `12\tgithub-actions[bot]\t${TITLE}\n`);
+r = program(A, A, line(12, BOT, TITLE));
 ok(r.status === 0 && /gh issue close 12 --repo someone\/project/.test(r.calls), "up to date again: the issue is closed");
-r = program(A, B, `12\tsomeone-else\t${TITLE}\n`);
+r = program(A, B, line(12, "someone-else", TITLE));
 ok(/issue create/.test(r.calls) && !/issue edit/.test(r.calls), "an outsider's issue of the same title is left alone");
 r = program(A, "not-a-commit", "");
 ok(r.status === 1 && !/gh /.test(r.calls), "a main that gives no commit fails before anything is written");

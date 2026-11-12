@@ -23,4 +23,4 @@ Each in a line.
 The work does not wait for the answer.
 
 **The kind of project**
-Public or private; what it is built on; where it is built.
+No closer than this: public or private; the platform it is built on; the cloud or the owner's own computer.

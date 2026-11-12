@@ -23,4 +23,4 @@ What went wrong or cost time without it, and how often.
 The file and section, if there is one. The commit of the core your project holds.
 
 **The kind of project**
-Public or private; what it is built on; where it is built.
+No closer than this: public or private; the platform it is built on; the cloud or the owner's own computer.

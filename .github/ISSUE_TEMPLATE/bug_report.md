@@ -23,7 +23,7 @@ What the rule, hook, check or script did, in plain words. An error it printed, i
 What you expected instead, and the rule or section that says so, if there is one.
 
 **The kind of project**
-Public or private; what it is built on; where it is built (the cloud, the owner's own computer).
+No closer than this: public or private; the platform it is built on; the cloud or the owner's own computer.
 
 **What you did meanwhile**
 Whether the work went on, and by which reading.

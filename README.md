@@ -82,9 +82,8 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    through where there is none. **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on
    the path; where either is missing, the hook stops nothing. **Another tool's session** has neither hook, which are
    Claude Code's: what holds its work is its reading of `AGENTS.md` and the checks on every pull request. **The copy's
-   own files** (`core/AGENTS.md`,
-   `core/CLAUDE.md`, `core/.github/`) are this repository's, not the project's: its issue templates and settings are its
-   own, written for its *owner's account*.
+   own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`) are this repository's, not the project's: its issue
+   templates and settings are its own, written for its *owner's account*.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
    into `core/`.
 
@@ -154,9 +153,9 @@ an issue on one of this repository's three forms (`.github/ISSUE_TEMPLATE/`, whi
 `core/.github/ISSUE_TEMPLATE/`): a bug, an idea or a question (`modules/inbox.md`, "The core itself"). This repository
 is public, and so is every word of an issue, so a report holds only what the light of day can take.
 
-- **It says:** which rule, hook, check or script of the core (its file, and its section or line); the commit of the
-  core the project holds; what happened; what was expected; and the kind of project (public or private, what it is
-  built on, where it is built).
+- **It says:** which rule, hook, check or script of the core (its file, and its section or line); the commit of the core
+  the project holds; what happened; what was expected; and the kind of project, no closer than this: public or private,
+  the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer.
 - **It never says:** anything of the project itself (its code, file names, logs, paths, what it does, who uses it, its
   company or its people; its name only if the project is public), anything secret, any person's name, or how to get
   past a check, a hook or a rule.
