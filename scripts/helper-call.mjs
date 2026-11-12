@@ -49,8 +49,9 @@ export function defines(project, type) {
   catch (error) { return error?.code !== "ENOENT"; }
 }
 
-// Whether the type is a plug-in's own: its name holds a colon, which Claude Code allows in no other type's name.
-const plugged = type => typeof type === "string" && type.includes(":");
+// Whether the type is a plug-in's own: its name holds a colon, which Claude Code allows in no other type's name (read
+// as Claude Code reads a name, so a colon written in another width counts too).
+const plugged = type => typeof type === "string" && type.normalize("NFKC").includes(":");
 
 const whyMax = `This helper's call asks for the effort max: never max, and above high only for escalation ` +
   `(the core's modules/claude.md, "Pass both model and effort"). Ask for less.`;
