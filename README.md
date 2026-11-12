@@ -36,7 +36,8 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    `SECURITY.md` and `core-manifest.md` (its threat model among them), each path in backticks, the list ended by `;`, as
    `core/scripts/rule-files.mjs` reads them, and among the checks on the work the configs of its copies, licence and
    reading-size checks. Its threat model adds to the floor's.
-5. **The shared scripts and workflows,** run from its `core/` copy: `work-saved.sh` as its work-saved hook, `copies.mjs`
+5. **The shared scripts and workflows,** run from its `core/` copy: `work-saved.sh` as its work-saved hook and
+   `helper-call.mjs` as its hook before a helper starts (it refuses a call without a model and an effort), `copies.mjs`
    and `licences.mjs` as its copies and licence checks with configs of its own (the *copies check*; the licence check's
    with its audit of what no lockfile holds, which `licence-scan.mjs` holds whole, every action, fetched package, asset
    and copied-in code it uses, and each entry that ships with its notice), and with the copies check `pointers.mjs` and
