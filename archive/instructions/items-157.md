@@ -173,3 +173,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "once an open idea has waited a week with no verdict of the stand-in's" in `modules/orchestrating.md`,
      "On every wake".
 
+169. **12 November 2026** (the core, in the design chat), minutes after item 168, told that the stand-in's verdict
+     on an idea decided nothing: the rule held every idea until he moved it into the progress file, whatever the
+     verdict. That hold was the design session's wording of item 142, with no word of his behind it, and floor rule 14
+     names what waits for him, an idea not among it.
+
+     > I thought it could authorize anything it was fairly certain about, expert?
+
+     Behind "A verdict the stand-in is sure of decides one" in `modules/inbox.md`: a sure yes queued behind what
+     stands in the progress file, a sure no closed, any other left to him. What it is never sure of stays as it was:
+     a call of taste, and an answer resting only on the core's archive in a project of another owner.
+
