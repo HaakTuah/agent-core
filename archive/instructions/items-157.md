@@ -69,7 +69,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > agreed on everything else, expertly!
 
-     Behind "The core's rule holds over a project's own" in `modules/how-to-work.md`, point 7 of "How a project takes
+     Behind "A project's own rules add to the core's" in `modules/how-to-work.md`, point 7 of "How a project takes
      the core" in `README.md`, and the step of `core.yml` that fails a difference from the floor or the review
      guidelines.
 

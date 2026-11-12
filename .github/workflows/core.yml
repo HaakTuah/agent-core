@@ -35,12 +35,21 @@ jobs:
           fi
       - name: The manifest's differences name no floor rule and not the review guidelines
         run: |
-          # (README, "How a project takes the core", point 7: a project differs from a module's rule alone)
-          bad=$(awk '/^#+[[:space:]]/ { d = (tolower($0) ~ /^#+[[:space:]]+differences[[:space:]]*$/); next }
-                     d && tolower($0) ~ /floor|review[- ]guidelines/' core-manifest.md)
+          set -euo pipefail
+          # (README, "How a project takes the core", point 7: a project differs from a module's rule alone. A tripwire
+          # for the plain case: the section runs from a heading whose letters spell "differences", through any deeper
+          # heading, to the next heading of its level or above, and a line counts by its letters alone.)
+          bad=$(awk '
+            function letters(s) { s = tolower(s); gsub(/[^a-z]/, "", s); return s }
+            /^[ \t]*#+/ {
+              line = $0; sub(/^[ \t]*/, "", line); match(line, /^#+/); level = RLENGTH
+              if (letters($0) == "differences") { depth = level; next }
+              if (depth && level <= depth) depth = 0
+            }
+            depth && letters($0) ~ /floor|reviewguidelines/' core-manifest.md)
           if [ -n "$bad" ]; then
-            echo "core-manifest.md lists a difference from the floor or the review guidelines, which no project differs from:"
-            printf '%s\n' "$bad"; exit 1
+            echo "core-manifest.md lists a difference that names the floor or the review guidelines, which no project differs from:"
+            printf '%s\n' "$bad" | sed 's/^/> /'; exit 1
           fi
       - name: The core pin
         id: pin
