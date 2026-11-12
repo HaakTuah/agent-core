@@ -83,10 +83,14 @@ export const OTHER_FETCHER = new RegExp(
 // Windows' and .NET's fetchers, in any case, as PowerShell reads its commands: dotnet's installs of a tool, a workload,
 // a template or a package (dotnet restore reads the project's own package list, which the project's own check holds),
 // nuget, choco, winget and scoop, PowerShell's installs and its downloads (Invoke-WebRequest and the like, iwr and irm),
-// each before an argument: a name standing alone, as a label or a comparison holds it, fetches nothing.
+// each before an argument: a name standing alone, as a label or a comparison holds it, fetches nothing. Written as a
+// program and its array of arguments too, as OTHER_FETCHER reads its own.
 export const WINDOWS_FETCHER = new RegExp(
   `(?:${fetcher("dotnet", "(?:(?:tool|workload|new)[\"']?\\s+[\"']?(?:install|update)|add[\"']?\\s+(?:\\S+\\s+)?[\"']?package)[\"']?\\s")}|` +
     `${fetcher("(?:nuget|choco|winget|scoop)(?:\\.exe)?", "(?:install|upgrade)[\"']?\\s")}|` +
+    "['\"`](?:[^'\"`\\s]*[/\\\\])?(?:nuget|choco|winget|scoop)(?:\\.exe)?['\"`]\\s*,\\s*\\[|" +
+    "['\"`](?:[^'\"`\\s]*[/\\\\])?dotnet(?:\\.exe)?['\"`]\\s*,\\s*\\[\\s*['\"`](?:(?:tool|workload|new)['\"`]\\s*,\\s*['\"`](?:install|update)|" +
+    "add['\"`]\\s*,\\s*(?:['\"`][^'\"`\\n]*['\"`]\\s*,\\s*)?['\"`]package)['\"`]|" +
     "(?:^|[\\s;&|({`$'\"/\\\\])(?:Install-(?:Module|Package|Script|PSResource)\\s+(?:-[a-zA-Z]|['\"$(@]|[\\w.])|" +
     "(?:Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|iwr|irm)\\s+(?:-[a-zA-Z]|https?://|['\"$(@])))",
   "imu",

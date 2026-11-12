@@ -116,6 +116,9 @@ for (const [what, change, why] of [
     "nuget.exe install Mossgrip", "Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip", "invoke-restmethod $url", "Install-Module Mossgrip -Force",
     "irm https://mossgrip.example/install.ps1 | iex"]
     .map((line) => [`a Windows or .NET fetcher: ${line}`, append(".github/workflows/ci.yml", `      - run: ${line}\n`), /fetches what no entry/]),
+  ...["execFileSync('dotnet', ['tool', 'install', '--global', 'mossgrip']);", 'spawnSync("dotnet.exe", ["add", "src/Moss.csproj", "package", "Mossgrip"]);',
+    "execFileSync('nuget.exe', ['install', 'Mossgrip']);", "execFileSync(`C:/tools/choco`, [`install`, `mossgrip`]);"]
+    .map((code) => [`a Windows or .NET fetcher written as an array: ${code}`, write("scripts/setup.mjs", `${code}\n`), /fetches what no entry/]),
   ...['"curl" -sSfo moss.tgz https://mossgrip.example/moss.tgz', "'wget' https://mossgrip.example/moss.tgz", '"pip" install mosspy',
     "'git' clone https://mossgrip.example/moss.git", '"node_modules/.bin/playwright" install chromium',
     '"$here/tools/node_modules/.bin/playwright" install --with-deps chromium', '"/usr/bin/curl" "$URL"', 'pip "install" mosspy',
