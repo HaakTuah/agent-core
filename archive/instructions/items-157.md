@@ -131,3 +131,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      without that folder, the trims of the same pull request, "or leaves to him" in floor rule 14, and
      `scripts/pointers.mjs --core` in the tests workflow.
 
+
+166. **12 November 2026** (the core, in the design chat), on the stand-in in a project of another owner, whose copy
+     carries the core's archive: the first wording (the same day) kept its stand-in from the core's archive
+     altogether. Answered: not opt-in, which would need that project's owner to say so, but searched by default, his
+     own words first, and an answer that rests on the core's archive alone marked unsure, so he sees it first and
+     can overrule it.
+
+     > Don't I answer fairly logically though? […] Should it be opt-in instead whether it also looks to core's archive
+     > for past decisions, or will they not make sense anyhow for his project? I think some general principles in
+     > engineering and software design stands regardless, expert?
+
+     Behind "and one resting only on the core's archive where the core's owner is another" in `modules/inbox.md`,
+     "The stand-in".
