@@ -68,7 +68,8 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    review and CodeQL only with its paid code security, so without it it calls neither `licences.yml` nor `codeql.yml`: a
    workflow of its own runs `core/scripts/licences.mjs` for what no package list holds, and its own check holds its
    packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check there
-   spends paid minutes, so each runs only where a change can affect it. On GitHub's free plan it has neither rulesets
+   spends paid minutes, so each runs only where a change can affect it, and its orchestrator syncs the core once a day
+   at most, not on every wake (`modules/orchestrating.md`). On GitHub's free plan it has neither rulesets
    nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand (`modules/work-flow.md`, point 1). The
    core's scripts read npm's lockfiles alone: what another installer holds, the project's own checks do. **A project
    that is sold** carries its company's name where its buyers and its code need it, and its owner leaves that name off
