@@ -266,6 +266,18 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > But are we telling it now to do all when the stand-in steps forward?
 
+     That change was written on those words and held when its review found them a question and no instruction. Asked
+     then outright whether the stand-in, every time it is called, should give every open idea that lacks one its
+     verdict, and whether the three ideas it had just given a sure yes in the core should be built (a feature that may
+     wait for a later stage, the checks still unbuilt, a real run of Copilot's agent):
+
+     > Do you agree, expertly?
+
+     Told yes to each, in that order, the check that holds a merge for its security review advisory for a week first,
+     and the run likely to need his own approval of the agent's workflows once:
+
+     > Do what you expertly advice on these points.
+
      Behind "whenever it is called, its verdict on every open idea that lacks one" in `modules/inbox.md`: item 170's
      "should take all when it first runs" meant any run of the stand-in, not the sweep's alone. The sweep of
      `modules/orchestrating.md` stays for a project where a week passes without a call.
