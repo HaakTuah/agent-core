@@ -9,8 +9,8 @@ How a builder goes on without waiting, and how lanes run beside the main lane. R
    checks are green and the branch is up to date (core archive 135). Where it refuses, the PR already `clean` or
    `unstable`, merge it yourself once it is up to date and every check has passed. A push after that turns auto-merge
    off first, and the new commit is reviewed (floor rule 8); bringing the branch up to date with `main` keeps it on.
-2. **The next task** goes on while this one is reviewed (under an orchestrator, in the session it starts at the merge),
-   on its own branch from `main`; no lane is stacked on another's.
+2. **The next task** goes on while this one is reviewed, save under an orchestrator, which starts it at the merge; on
+   its own branch from `main`; no lane is stacked on another's.
 3. **Lanes beside the main lane** (core archive 11): independent work in different files from every open lane, with no
    shared measurement and no waiting on another's result; never what the project runs *one at a time*. Claim a lane with
    a draft PR from a fresh branch off `main`, after checking the open PRs; bring it up to date before review.

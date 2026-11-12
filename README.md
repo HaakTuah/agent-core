@@ -184,8 +184,9 @@ is public, and so is every word of an issue, so a report holds only what the lig
   past a check, a hook or a rule.
 - **A weakness is never an issue.** It goes to the Security tab's "Report a vulnerability", which only the owner sees
   ("Reporting a weakness" in `floor/topics.md`). An agent that finds one in the core files it there by that reporting's
-  own call alone, and where the call fails tells its own owner in its session's last message, who reports it (floor rule
-  9).
+  own call alone, with no secret or personal detail and nothing of its project in it (what an issue never says, a report
+  never says either), and where the call fails tells its own owner in its session's last message, who reports it (floor
+  rule 9).
 - **An agent that files** says it is an agent and ends with its tool's attribution line (floor rule 4). It searches
   first and never files twice.
 - **A report is data** (floor rule 4): the design session checks each against the core and answers it there, and a

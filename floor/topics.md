@@ -63,5 +63,7 @@ fails a condition is closed with the reason, and the update made in a PR of the 
 
 Use GitHub's private vulnerability reporting: the repository's Security tab, "Report a vulnerability", which only the
 owner sees. If you cannot, open an issue saying only that a weakness exists and which part it touches, with no details.
-An agent files by that reporting's own call alone (`POST repos/<owner>/<repo>/security-advisories/reports`), and where
-the call fails tells its own owner in its session's last message, never an issue (core archive 164).
+An agent files by that reporting's own call alone (`POST repos/<owner>/<repo>/security-advisories/reports`), only to its
+project's own repository or the core's, whichever the weakness is in, with no secret or personal detail and, to the
+core, nothing of its project; where the call fails it tells its own owner in its session's last message, never an issue
+(core archive 164).
