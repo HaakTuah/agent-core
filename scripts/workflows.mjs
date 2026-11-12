@@ -4,8 +4,9 @@
 // whole text for the word and reads no YAML, so no way of writing a key, a comment or a line break hides it; the two
 // ways YAML has of spelling a word otherwise are undone first: an escape (\x, \u, \U) is read as what it spells, and
 // a word broken over lines by an escaped line break is joined. A file the check cannot read as the project's own
-// UTF-8 text fails too: a link, and one in another encoding, in which the word would stand unseen. A comment or a
-// script that needs to speak of the trigger calls it something else.
+// UTF-8 text fails too: a link (and any link in .github, where a linked folder would hold workflows the check never
+// sees), and a file in another encoding, in which the word would stand unseen. A comment or a script that needs to
+// speak of the trigger calls it something else.
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
@@ -59,15 +60,19 @@ export const readable = text => !/[\0\ufffd]/u.test(text);
 // The files the check reads, of those git tracks.
 export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") &&
   (/^\.github\/(workflows\/[^/]+|actions\/.+)\.ya?ml$/iu.test(f) || /(^|\/)action\.ya?ml$/iu.test(f)));
+// What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
+export const unlinked = files => { const read = new Set(reads(files)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
   process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
-  const files = reads(git(["ls-files", "-z"]).split("\0").filter(Boolean));
-  let failed = 0;
+  const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
+  const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
+  let failed = links.size;
+  for (const file of links) console.log(`FAIL ${file}: a link, not a file: the check reads the project's own text only`);
   for (const file of files) {
-    if (fs.lstatSync(file).isSymbolicLink()) { failed++; console.log(`FAIL ${file}: a link, not a file: the check reads the project's own text only`); continue; }
+    if (links.has(file)) continue;
     const text = fs.readFileSync(file, "utf8"), found = lines(text);
     if (!readable(text)) { failed++; console.log(`FAIL ${file}: not UTF-8 text, so it cannot be searched: save it as UTF-8`); }
     failed += found.length;
