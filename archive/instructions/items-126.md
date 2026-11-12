@@ -315,3 +315,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Told that Codex's reviews through GitHub still give priorities and no score (item 21), and Copilot's no grade at
      all, so that one score for all cannot be had: every finding is blocking or not, the score stays with every
      reviewer that can give one, and a tool's own grades are read as one or the other.
+
+156. **12 November 2026** (the core, in the design chat), once the project of another owner had taken the core: a
+     product he means to sell, in a private repository, not built on Node, reviewed by Copilot and Codex, built on his
+     own computer:
+
+     > Investigate: make sure not hook, check, or rule, will interfere in a negative way with […] setup and work, now
+     > that he has agent-core. Rules which enforces compliance with best practices are good, and makes his agents work
+     > as they should. But anything that stops stuff, because his setup is different: planning to commercialize his
+     > product, private repo, .net stack, uses both github copilot and codex like he likes, runs locally on his own
+     > machine, etc, etc. Must absolutely be addressed, expertly!
+
+     Behind the end of floor rule 10 (the owner's own work carries the terms he gives it, where it said no licence
+     file ever), and the README's lines on a project that is sold, GitHub's free plan, the default branch and Windows.

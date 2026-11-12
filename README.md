@@ -68,8 +68,14 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
    review and CodeQL only with its paid code security, so without it it calls neither `licences.yml` nor `codeql.yml`: a
    workflow of its own runs `core/scripts/licences.mjs` for what no package list holds, and its own check holds its
    packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check there
-   spends paid minutes, so each runs only where a change can affect it. The core's scripts read npm's lockfiles alone:
-   what another installer holds, the project's own checks do. **The copy's own files** (`core/AGENTS.md`,
+   spends paid minutes, so each runs only where a change can affect it. On GitHub's free plan it has neither rulesets
+   nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand (`modules/work-flow.md`, point 1). The
+   core's scripts read npm's lockfiles alone: what another installer holds, the project's own checks do. **A project
+   that is sold** keeps its seller's name, like every name, out of the repository (floor rule 11): its build takes the
+   name, and the terms it is sold under where they name him, from outside it; the terms themselves are the owner's to
+   give (floor rule 10). **The default branch is `main`,** which the hooks read their scripts from, letting every call
+   through where there is none. **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on
+   the path; where either is missing, the hook stops nothing. **The copy's own files** (`core/AGENTS.md`,
    `core/CLAUDE.md`, `core/.github/`) are this repository's, not the project's: its issue templates and settings are its
    own, written for its *owner's account*.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
@@ -96,7 +102,7 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 | *planning design* | what planning design plans |
 | *hard work* | what counts as the hard work |
 | *major version checks* | the extra checks a new major version gets |
-| *other builders' checks* | what a builder of another provider runs before it finishes (`modules/other-builders.md`) |
+| *other builders' checks* | what a builder of another provider runs before it finishes (`modules/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
 | *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, how each one that is not Codex is asked, and which of its findings block where it marks none so; left out, the core's own (`modules/roles.md`) |
 | *security reviewer* | who gives each PR its security review, and how it is asked; left out, Codex (`modules/reviews.md`, point 3) |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
@@ -121,9 +127,9 @@ Floor: whole. Modules: <all, or the list of those taken>.
 
 ## Setting up (the owner's part)
 
-- Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18); its security
-  review on, for team PRs, on PR open, reporting Medium and above, reading the project's threat model and `SECURITY.md`
-  with the floor (core archive 51).
+- Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive
+  18); its security review on, for team PRs, on PR open, reporting Medium and above, reading the project's threat model
+  and `SECURITY.md` with the floor (core archive 51).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
   approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code

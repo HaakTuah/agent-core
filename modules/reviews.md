@@ -12,12 +12,11 @@ rule 8).
 2. **No sign within about 5 minutes, or no finished review within about 20, or an answer that is not a review:** the
    next reviewer, last the fallback reviewer (`modules/claude.md`), takes the PR at once (core archive 19 and 20). A
    late review is still read, but nothing waits for it.
-3. **Security:** the *security reviewer* (unless the project names one, Codex) reviews a PR once, when it is marked
-   ready. A later commit that fixes a security finding, or changes what the review is for (input, a workflow, the
-   network, saved files, a dependency), gets the fallback reviewer's check of that change; a security review not
-   finished within about 30 minutes of the ready mark is done by the fallback reviewer over the whole diff (core archive
-   47 to 51). A PR that changes what runs by itself or with credentials gets both reviewers', each over the whole diff
-   (floor rule 3).
+3. **Security:** the *security reviewer* (Codex, or the project's) reviews a PR once, when it is marked ready. A later
+   commit that fixes a security finding, or changes what the review is for (input, a workflow, the network, saved files,
+   a dependency), gets the fallback reviewer's check of that change; a security review not finished within about 30
+   minutes of the ready mark is done by the fallback reviewer over the whole diff (core archive 47 to 51). A PR that
+   changes what runs by itself or with credentials gets both reviewers', each over the whole diff (floor rule 3).
 4. **The design check:** on the design-checked PRs, once before the merge, a fresh reviewer judges the work against the
    design alone, and its "Readings taken" as the stand-in would (core archive 22).
 5. **When a PR passes:** every blocking point fixed; every other fixed if it lies in the change, otherwise filed as a

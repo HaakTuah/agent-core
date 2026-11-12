@@ -9,7 +9,7 @@ the floor. Changes only on the owner's word (core archive 56).
   section) and marked **blocking** or not, and scores the work from 1 to 10 (core archive 155). A 10 is a list with
   nothing blocking open: the work does all of the task's text, keeps every standing rule, leaves nothing behind, its
   tests prove it, and a demanding expert would hand it over as it stands. Where a reviewer's tool gives priorities and
-  no score, its P0 and P1 block, and what blocks here is P1 at least.
+  no score, its P0 and P1 block, and what blocks here is P1 or P0.
 - **A later round** checks that the earlier points were fixed and reviews what changed since. Something new about work
   it already saw is raised only if it blocks.
 
