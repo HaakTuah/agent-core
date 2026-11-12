@@ -45,6 +45,7 @@ expect("a tag fails though the lock file is made to say the same", one("latest",
 expect("a star fails though the lock file is made to say the same", one("*", "*"), ["is not one exact version"]);
 expect("a link to a folder outside the project's own packages fails", one("*", "1.2.3", { link: true, resolved: "../elsewhere" }), ["is not one exact version"]);
 expect("a link to a folder above the project fails though the lock file lists it", project({ "": { dependencies: { a: "*" } } }, { "": {}, "node_modules/a": { link: true, resolved: "../up" }, "../up": {} }), ["is not one exact version", "no folder of the project's"]);
+expect("a package whose folder is written the way another system writes one fails", project({ "": {} }, { "": {}, "..\\up": {}, "C:/up": {} }), ["no folder of the project's", "no folder of the project's"]);
 expect("a package whose folder starts at the disk's root fails", project({ "": {} }, { "": {}, "/etc": {} }), ["no folder of the project's"]);
 expect("another exact version than the lock file's fails", one("1.2.4"), ['is not the version the lock file installs ("1.2.3")']);
 expect("a lock file entry that is nothing fails", project({ "": { dependencies: { a: "1.2.3" } } }, { "": {}, "node_modules/a": null }), ["is not the version the lock file installs"]);
@@ -64,6 +65,9 @@ if (printed.some((line) => line.includes("\n"))) { failed++; console.error("FAIL
 const overridden = (overrides) => project({ "": { dependencies: { a: "1.2.3" }, overrides } }, { "": {}, "node_modules/a": { version: "1.2.3" } });
 expect("an override at one exact version passes", overridden({ b: "2.0.0" }), 0);
 expect("an override that points to a dependency of the root's passes", overridden({ b: "$a" }), 0);
+expect("an override that points to nothing the root lists fails", overridden({ b: "$c" }), ['overrides "b": "$c" is not one exact version']);
+expect("an override that points to a workspace asked for by a star fails", project({ "": { dependencies: { "@own/w": "*" }, overrides: { b: "$@own/w" } }, "src/w/": {} },
+  { "": {}, "src/w": {}, "node_modules/@own/w": { link: true, resolved: "src/w" } }), ['overrides "b": "$@own/w" is not one exact version']);
 expect("an override at a range fails", overridden({ b: "^2.0.0" }), ['overrides "b": "^2.0.0" is not one exact version']);
 expect("an override inside another is read", overridden({ "b@1": { ".": "2.0.0", c: "latest" } }), ['overrides "b@1 > c": "latest" is not one exact version']);
 expect("an override that is no text and no list fails", overridden({ b: 2 }), ['overrides "b": 2 is not one exact version']);

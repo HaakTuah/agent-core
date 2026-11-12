@@ -9,7 +9,7 @@
 // the second. Nothing here reads npm's grammar of ranges: only what one exact version looks like, which SemVer fixes.
 // One thing passes besides: a dependency the lock file links to another of the project's own packages (a workspace),
 // whatever its list says. The root's "overrides" are held to the first test alone, each value one version or a "$name"
-// that points to a dependency of the root's. What it does not hold: a lock file out of step with its lists, which
+// that points to a dependency the root lists at one. What it does not hold: a lock file out of step with its lists, which
 // `npm ci` refuses.
 //
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
@@ -22,15 +22,20 @@ const own = (key) => key === "" || !`/${key}/`.includes("/node_modules/");
 // One version as SemVer 2.0.0 writes it (the pattern semver.org gives), and no longer than any real one.
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/u;
 const exact = (text) => typeof text === "string" && text.length <= 256 && SEMVER.test(text);
-const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../"); // (a folder of the project's, by its key)
+const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../") && !/[\\:]/u.test(key); // (a folder of the project's, by its key)
 const show = (value) => JSON.stringify(value) ?? String(value); // (a name or version printed so that it stays on its line)
 
-// The root's "overrides": every value, however deep, one exact version or a "$name" pointing to one of the root's own.
-function overrides(value, file, at, problems) {
+// The root's "overrides": every value, however deep, one exact version, or a "$name" that points to a dependency the
+// root itself lists at one exact version.
+function overrides(value, list, file, at, problems) {
+  const points = typeof value === "string" && value.startsWith("$") && KINDS.some((kind) => {
+    const deps = list[kind];
+    return deps !== null && typeof deps === "object" && !Array.isArray(deps) && Object.hasOwn(deps, value.slice(1)) && exact(deps[value.slice(1)]);
+  });
   if (typeof value === "string") {
-    if (!exact(value) && !value.startsWith("$")) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
+    if (!exact(value) && !points) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
   } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    for (const [name, inner] of Object.entries(value)) overrides(inner, file, at === "" ? name : `${at} > ${name}`, problems);
+    for (const [name, inner] of Object.entries(value)) overrides(inner, list, file, at === "" ? name : `${at} > ${name}`, problems);
   } else problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
 }
 
@@ -56,7 +61,7 @@ export function check(lockfile, read) {
     const file = posix.join(root, key, "package.json");
     let list;
     try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${e.message})`); continue; }
-    if (key === "" && list?.overrides !== undefined) overrides(list.overrides, file, "", problems);
+    if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
     for (const kind of KINDS) {
       const deps = list?.[kind];
       if (deps === undefined) continue;
