@@ -9,9 +9,11 @@
 # What it does not hold: that a lock entry which names one registry package resolves to that package and not another
 # of the registry's, and the rest of rule 7's source check (the same publisher and repository, a provenance kept where
 # the old version had one, the diff read against the release notes): those stay with the reviews, which read the lock
-# file's diff. A project calls it (workflow_call) from a workflow of its own of the same name, on a pull request that
-# changes a package list, a lock file, an `.npmrc` or that workflow, pinned to a full commit SHA ("How a project takes
-# the core" in README.md, point 5). Read-only, with no secret.
+# file's diff. A project calls it (workflow_call) from a workflow of its own of the same name, on every pull request,
+# pinned to a full commit SHA ("How a project takes the core" in README.md, point 5). It looks itself whether the pull
+# request changes a package list, a lock file, an `.npmrc`, the Node version or the calling workflow (git's own diff
+# against the base), installs and checks only then, and passes otherwise: so it reports on every pull request and a
+# ruleset can require it. Where it cannot tell what changed, it checks. Read-only, with no secret.
 name: signatures
 
 on:
@@ -34,12 +36,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # nothing after the checkout needs the token
+      - name: Does the pull request change what this check reads?
+        id: what
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
+        run: |
+          # The checkout is the pull request merged into its base, so the diff from the base is what it changes. Any
+          # doubt (no base, a fetch that fails, a diff that fails) means the check runs.
+          run=true
+          if [ -n "$BASE" ] && git fetch --quiet --no-tags --depth=1 origin "$BASE" \
+            && changed=$(git diff --no-renames --name-only "$BASE" HEAD -- \
+              ':(glob)**/package.json' ':(glob)**/package-lock.json' ':(glob)**/.npmrc' \
+              core/.node-version .github/workflows/signatures.yml); then
+            if [ -z "$changed" ]; then run=false; else printf 'Changed:\n%s\n' "$changed"; fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          [ "$run" = true ] || echo "No package list, lock file, .npmrc, Node version or signatures workflow changed: nothing to verify."
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.what.outputs.run == 'true'
         with:
           node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
       - name: Install from the lock file, from the registry alone, running no package's install script
+        if: steps.what.outputs.run == 'true'
         working-directory: ${{ inputs.directory }}
         run: npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none
       - name: The registry's signature on each installed name and version
+        if: steps.what.outputs.run == 'true'
         working-directory: ${{ inputs.directory }}
         run: npm audit signatures
