@@ -85,16 +85,19 @@ export const OTHER_FETCHER = new RegExp(
 // nuget, choco, winget and scoop, PowerShell's installs and its downloads (Invoke-WebRequest and the like, iwr and irm),
 // each before an argument: a name standing alone, as a label or a comparison holds it, fetches nothing. Written as a
 // program and its array of arguments too, as OTHER_FETCHER reads its own.
-export const WINDOWS_FETCHER = new RegExp(
-  `(?:${fetcher("dotnet", "(?:(?:tool|workload|new)[\"']?\\s+[\"']?(?:install|update)|add[\"']?\\s+(?:\\S+\\s+)?[\"']?package)[\"']?\\s")}|` +
-    `${fetcher("(?:nuget|choco|winget|scoop)(?:\\.exe)?", "(?:install|upgrade)[\"']?\\s")}|` +
-    "['\"`](?:[^'\"`\\s]*[/\\\\])?(?:nuget|choco|winget|scoop)(?:\\.exe)?['\"`]\\s*,\\s*\\[|" +
-    "['\"`](?:[^'\"`\\s]*[/\\\\])?dotnet(?:\\.exe)?['\"`]\\s*,\\s*\\[\\s*['\"`](?:(?:tool|workload|new)['\"`]\\s*,\\s*['\"`](?:install|update)|" +
-    "add['\"`]\\s*,\\s*(?:['\"`][^'\"`\\n]*['\"`]\\s*,\\s*)?['\"`]package)['\"`]|" +
-    "(?:^|[\\s;&|({`$'\"/\\\\])(?:Install-(?:Module|Package|Script|PSResource)\\s+(?:-[a-zA-Z]|['\"$(@]|[\\w.])|" +
-    "(?:Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|iwr|irm)\\s+(?:-[a-zA-Z]|https?://|['\"$(@])))",
-  "imu",
-);
+export const WINDOWS_FETCHER = (() => {
+  const Q = "['\"`]", FIRST = String.raw`\s*,\s*\[\s*(?:${Q}-[^'"` + "`" + String.raw`\n]*${Q}\s*,\s*){0,8}${Q}`; // (a program, then its array, past options)
+  const named = (name) => String.raw`${Q}(?:[^'"` + "`" + String.raw`\s]*[/\\])?${name}(?:\.exe)?${Q}${FIRST}`;
+  return new RegExp(
+    `(?:${fetcher(String.raw`dotnet(?:\.exe)?`, String.raw`(?:(?:tool|workload|new)["']?\s+["']?(?:install|update)|add["']?\s+(?:\S+\s+)?["']?package)["']?\s`)}|` +
+      `${fetcher(String.raw`(?:nuget|choco|winget|scoop)(?:\.exe)?`, String.raw`(?:install|upgrade)["']?\s`)}|` +
+      String.raw`${named("(?:nuget|choco|winget|scoop)")}(?:install|upgrade)${Q}|` +
+      String.raw`${named("dotnet")}(?:(?:tool|workload|new)${Q}\s*,\s*${Q}(?:install|update)|add${Q}\s*,\s*(?:${Q}[^'"` + "`" + String.raw`\n]*${Q}\s*,\s*)?${Q}package)${Q}|` +
+      String.raw`(?:^|[\s;&|({` + "`" + String.raw`$'"/\\])(?:Install-(?:Module|Package|Script|PSResource)\s+(?:-[a-zA-Z]|['"$(@]|[\w.])|` +
+      String.raw`(?:Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|iwr|irm)\s+(?:-[a-zA-Z]|https?://|['"$(@])))`,
+    "imu",
+  );
+})();
 /** The first fetch in text by a fetcher the scan cannot read, or undefined. */
 export const otherFetch = (text) => (OTHER_FETCHER.exec(text) ?? WINDOWS_FETCHER.exec(text))?.[0];
 
