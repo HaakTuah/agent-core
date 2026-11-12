@@ -68,11 +68,17 @@ function sync(tmp) {
     ? `Workflow calls moved:\n  ${moved.join("\n  ")}`
     : "No workflow call moved: the PR changes no workflow.");
   // What this sync asks of the project beyond the copy: the entries the core's sync notes gained between the two pins.
-  let asks = [];
-  try { asks = git(["diff", "--unified=0", "--no-color", old, pin, "--", NOTES], tmp).split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1)); } catch { /* (a pin from before the notes) */ }
-  console.log(asks.length
-    ? `This sync asks more of the project than the copy (core/${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or queue it in the progress file where it is large.\n${asks.join("\n")}`
-    : `This sync asks nothing of the project beyond the copy (core/${NOTES}).`);
+  // (A pin from before the notes gives every entry. Where the entries cannot be read, it says so: never an all-clear.)
+  let asks = null;
+  try {
+    asks = git(["diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", old, pin, "--", NOTES], tmp)
+      .split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
+  } catch { /* said below */ }
+  console.log(asks === null
+    ? `What this sync asks of the project beyond the copy could not be read: read core/${NOTES} for the entries newer than the old pin.`
+    : asks.length
+      ? `This sync asks more of the project than the copy (core/${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or queue it in the progress file where it is large.\n${asks.join("\n")}`
+      : `This sync asks nothing of the project beyond the copy (core/${NOTES}).`);
 }
 
 // The clone lives in a temporary folder, removed however the sync ends.

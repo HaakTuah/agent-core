@@ -4,8 +4,9 @@ Most changes to the core reach a project by the copy alone. An entry stands here
 of its own for a change to hold: a row of its manifest, a line of a rule file, a workflow, an audit.
 `core/scripts/sync.mjs` prints the entries a sync brings, and an orchestrator gives them a lane when this file gains
 any (`core/modules/orchestrating.md`). Each is done in a PR of its own once the sync PR is merged (a pure sync holds the
-copy alone: floor rule 8), or queued in the *progress file* where it is large; none waits for the owner unless it says
-so. Each entry says how to tell it is done, so a project unsure
+copy alone: floor rule 8), or queued in the *progress file* where it is large; none waits for the owner beyond what
+the floor names. One that changes a protected file (`AGENTS.md`, the manifest, a workflow) is the trusted builder's,
+never a task given to another provider's (floor rule 3). Each entry says how to tell it is done, so a project unsure
 where it stands checks them all, and one already done asks nothing. Newest last, each on one line.
 
 - **12 November 2026, builders named by role.** Done when `AGENTS.md` tells a builder of another provider to read `core/modules/other-builders.md` at the start of every task and gives `core/modules/codex.md` to no builder; the manifest's row for what such a builder runs before it finishes is named *other builders' checks* (a row *Codex's checks* is renamed); and the *size marks* and any other config name those files so.
