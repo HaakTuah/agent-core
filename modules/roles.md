@@ -9,9 +9,10 @@ Read when a task needs one.
   else an agent on GitHub that pushes its own branch, each as its part says (`modules/codex.md`, `modules/copilot.md`,
   or the project's); with none, Claude's build. It takes every task or part whose brief can say all it needs and whose
   result a check or its review can judge, each in its own working tree and PR, whose first line names its builder; its
-  briefer sees that its diff holds no protected file before it is pushed or its checks run. Claude's keep what no brief
-  carries (a design reading, the owner's past words) and what the other cannot take or failed at twice. This bars no
-  tool from work the owner gives it or Claude's cannot take.
+  briefer sees that its diff holds no protected file before pushing it or, where its builder pushed, before its checks
+  run; work that holds one is dropped. Claude's keep what no brief carries (a design reading, the owner's past words)
+  and what the other cannot take or failed at twice. This bars no tool from work the owner gives it or Claude's cannot
+  take.
 - **One code review, by another provider than the builder's where one answers** (the *code reviewers*; core archive 18
   and 154): unless the project names its order, Codex's, then Copilot's where the repository has it, last the fallback
   reviewer's, Claude's.
