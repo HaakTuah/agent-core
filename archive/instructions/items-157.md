@@ -223,7 +223,10 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Agreed to all, expertly, but allow for other tools too!
 
-     Behind the default order of the *code reviewers* and "or the project's" in `modules/roles.md`, and "Building" in
-     `modules/copilot.md`. The cap of item 164 goes from 45 to 46 KB on that yes; with all of it the change needs 47,
-     and the last one waits for his word.
+     Behind the default order of the *code reviewers* and "a way the project names" in `modules/roles.md`. Copilot's
+     building is not in the change: three rounds of review each found a step of it that only a real run can settle (its
+     own push before any check of its diff, and the approval its workflows wait for, which asks a permission the
+     sessions' sign-ins are set up without), so it is filed as an idea (issue 124) with what a run must show, and a
+     project that has Copilot's agent names it as its own way meanwhile. The cap of item 164 goes from 45 to 46 KB on
+     that yes.
 

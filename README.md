@@ -17,7 +17,7 @@ words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; 
   builder's own (`claude.md`, or `other-builders.md`). When needed: `roles.md`, `helpers.md`, `reviews.md`,
   `review-guidelines.md`, `codex.md`, `copilot.md`, `orchestrating.md`, `github-calls.md` and `updates.md`; and, for
   games only, `game-design.md`.
-- **The cap:** the floor and the modules together stay under 47 KB (core archive 164 and 169), checked on every PR here
+- **The cap:** the floor and the modules together stay under 46 KB (core archive 164 and 169), checked on every PR here
   (`scripts/size.mjs`), so a new rule replaces text rather than adding to it (core archive 134).
 
 ## How a project takes the core
@@ -177,11 +177,11 @@ Floor: whole. Modules: <all, or the list of those taken>.
   (core archive 152).
 - Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
   Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
-  is); or its agent on GitHub, on for the repository (Copilot's, on a paid plan of his, each task spending from it; the
-  setting that lets its workflows run without an approval stays off). Nothing more is asked of him: the sessions hand
-  over by the first way they find, and with none Claude's build (`modules/roles.md`, "The builders"; core archive 169).
-  For a tool the core has no part for, the project's rules say in a line each how it is handed a task and asked for a
-  review, and the project tells the core ("Reporting to the core"), so that it gains one.
+  is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is
+  asked for a review) and the project tells the core ("Reporting to the core"), so that the tool gains a part here.
+  Nothing more is asked of him: the sessions hand over by the first way they find, and with none Claude's build
+  (`modules/roles.md`, "The builders"; core archive 169). A tool that pushes its own branch gets a sign-in that cannot
+  change a workflow (as `setup/server.md`, point 5), or its workflows wait for an approval before they run.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
 
 ## Reporting to the core

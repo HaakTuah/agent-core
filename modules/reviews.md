@@ -10,9 +10,9 @@ stand-in's notes (`modules/inbox.md`). Docs alone get no code review, and a pure
    says.
 2. **No sign within about 5 minutes, or no finished review within about 20, or an answer that is not a review:** the
    next reviewer, last the fallback reviewer (`modules/claude.md`), takes the PR at once (core archive 19 and 20). A
-   late review is still read. A reviewer, the security reviewer too, that left the last three PRs it was asked on
-   without a review is asked and not waited for, which the PR says: the next takes the PR at once, a security review
-   being the fallback reviewer's, over the whole diff.
+   late review is still read. A reviewer, the security reviewer too, that gave the last three PRs it was asked on no
+   review is asked and not waited for, which the PR says: the next takes it at once, and the fallback reviewer its
+   security review, over the whole diff.
 3. **Security:** the *security reviewer* (Codex, or the project's) reviews a PR once, when it is opened for review or
    marked ready. A later commit that fixes a security finding, or changes what the review is for (input, a workflow, the
    network, saved files, a dependency), gets the fallback reviewer's check of that change; a security review not
