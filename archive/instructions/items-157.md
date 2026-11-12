@@ -162,3 +162,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "the project's own suites run on one only for what they take from the copy" in `README.md`, "How a
      project takes the core", point 5, and the sync note of the same day.
 
+168. **12 November 2026** (the core, in the design chat), a day after item 142, seeing 22 open ideas across the
+     repositories and one verdict among them. Told why: the stand-in gives an idea its verdict while answering a
+     question on its topic, or in the weekly sweep, which had never run; and that "once a week" gave an orchestrator
+     nothing to count from, so one started afresh could not tell when a sweep was due. Answered by making it readable
+     from the issues themselves: once an open idea has waited a week with no verdict.
+
+     > Why isn't my stand-in addressing the questions?
+
+     Behind "once an open idea has waited a week with no verdict of the stand-in's" in `modules/orchestrating.md`,
+     "On every wake".
+
