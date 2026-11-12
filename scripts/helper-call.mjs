@@ -6,9 +6,9 @@
 // project defines itself (a file .claude/agents/<type>.md), whose definition holds its model and effort, which a model
 // named in the call would overrule. It judges nothing else: which model and effort fit which role stays with the table
 // in modules/claude.md, and what a definition holds with the review of the PR that changes it.
-// It reads Claude Code's own JSON for a hook on stdin and nothing else; whatever it cannot read it lets through, since
-// it holds a habit, not a floor rule, and a hook that stops every helper on a format it does not know costs more than
-// the habit. Exit 0 lets the call go on; exit 2 refuses it, the reason on stderr, which Claude Code shows the caller.
+// It reads Claude Code's own JSON for a hook on stdin, looks whether that one file is there, and nothing else;
+// whatever it cannot read it lets through, since it holds a habit, not a floor rule, and a hook that stops every
+// helper on a format it does not know costs more than the habit. Exit 0 lets the call go on; exit 2 refuses it, the reason on stderr, which Claude Code shows the caller.
 // Claude Code passes an effort on a helper's call from 2.1.292 on. Run by a PreToolUse hook in .claude/settings.json,
 // from the copy merged into main (README.md, "How a project takes the core", point 5). Node's own modules.
 //
