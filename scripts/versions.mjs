@@ -76,14 +76,15 @@ async function times(e) {
     if (!res.ok) throw new Error(`${e.name}: PyPI answered ${res.status}`);
     return pypiTimes(await res.json());
   }
-  return JSON.parse(npm(["view", e.name, "time", "--json"]));
+  return JSON.parse(npmView(e.name));
 }
-// npm's answer. On Windows npm is a command script, which only the command shell starts, so there its arguments reach
-// a shell: each must be a plain word (a package's name as its registry takes it, a flag), or nothing is started.
-export function npm(args, platform = process.platform) {
-  if (!args.every(a => typeof a === "string" && /^[\w@./-]+$/.test(a))) throw new Error(`npm ${args.join(" ")}: not plain words`);
-  const [cmd, all] = platform === "win32" ? ["cmd.exe", ["/d", "/s", "/c", "npm", ...args]] : ["npm", args];
-  return execFileSync(cmd, all, { encoding: "utf8" });
+// npm's answer to what it knows of a package's releases. On Windows npm is a command script, which only the command
+// shell starts, so there the name reaches a shell: it must be a plain word, or nothing is started.
+export function npmView(name, platform = process.platform) {
+  if (typeof name !== "string" || !/^[\w@./-]+$/.test(name)) throw new Error(`${name}: no plain word, so it is given to no shell`);
+  return platform === "win32"
+    ? execFileSync("cmd.exe", ["/d", "/s", "/c", `npm view ${name} time --json`], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+    : execFileSync("npm", ["view", name, "time", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 // What an issue says for an entry behind: the Feature request template's headings (.github/ISSUE_TEMPLATE/).
 export const issue = (e, to, config) => ({
