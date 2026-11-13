@@ -43,9 +43,11 @@ words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; 
    and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
 4. **Its own security files:** its `SECURITY.md` says the floor holds whole and adds, under the same numbers, what only
    it has, listing under rule 3 after `**the rule files:**` its rule files besides `AGENTS.md`, `CLAUDE.md`,
-   `SECURITY.md` and `core-manifest.md` (its threat model among them), each path in backticks, the list ended by `;`, as
-   `core/scripts/rule-files.mjs` reads them, and among the checks on the work the configs of its copies, licence and
-   reading-size checks. Its threat model adds to the floor's.
+   `SECURITY.md` and `core-manifest.md` (its threat model among them), each path in backticks, the list ended by `;` (a
+   file a tool takes its instructions from, such as an `AGENTS.md` in a subfolder, is a rule file without being listed,
+   and a project keeps none it does not mean to have: floor rule 3), as `core/scripts/rule-files.mjs` reads them, and
+   among the checks on the work the configs of its copies, licence and reading-size checks. Its threat model adds to the
+   floor's.
 5. **The shared scripts and workflows,** run from its `core/` copy: `work-saved.sh` as its work-saved hook and
    `helper-call.mjs` as its hook on the Agent tool (it refuses a call that names no model or no effort, until the call
    is made again with the same prompt, and the effort max on every call but a fork's; a helper of a type the project
