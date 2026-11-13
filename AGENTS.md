@@ -29,9 +29,12 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
   owner's yes in it.
 - **The size cap keeps the rules lean and decides nothing else** (`scripts/size.mjs`; core archive 179 and 181): no rule
   is moved from where it belongs, cut short or left out to fit, nor is another rule's reason, name or example cut to
-  make room. It rises, one step, only as "A mark on what every session reads" in `modules/review-guidelines.md` says of
-  any such mark (core archive 182): here those files are the floor and the modules.
-- **The design session writes and merges changes here,** each carried into every project by that project's sync PR.
+  make room. It rises, one step of a whole KB, only as "A mark on what every session reads" in
+  `modules/review-guidelines.md` says of any such mark (core archive 182): here those files are the floor and the
+  modules.
+- **The design session writes and merges changes here,** each carried into every project by that project's sync PR. It
+  also does here what "Sessions" in `modules/work-flow.md` asks of a session that ends: it reads what reviews left after
+  a merge (`modules/reviews.md`, point 2) and cleans up what it made.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
