@@ -120,7 +120,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      fails a run that uses one that is not pinned (core archive 152).
    - **A game served by GitHub Pages** publishes main with `bash core/scripts/site-publish.sh root`, and its pull
      requests' previews through a `preview.yml` of its own, on `workflow_run` of its build, that calls the core's (the
-     build uploads the artifact `preview`: `pr-number`, and the site in `site/`).
+     build uploads the artifact `preview`: `pr-number`, and the site in `site/`). A preview and the live site share one
+     browser origin, with every other Pages site of the account, so a preview's code, which no review has passed yet,
+     reads whatever the live game keeps in the browser: a game keeps nothing there that matters beyond its own saves,
+     and its threat model says so (core archive 201).
    - **A project whose packages come from npm** has a `signatures.yml` of its own, on every pull request, which calls
      the core's with the folder of its lock file: where the pull request changes a package list, a lock file, an
      `.npmrc`, the Node version or that workflow, an install from the registry alone, running no package's install
