@@ -1,7 +1,8 @@
 // Checks the licence check (licences.mjs, beside this file) on a whole project, with its scan (licence-scan.mjs): the
 // staged project (licence-scan-stage.mjs) passes as it is, passes each allowed form, and fails each form of something
-// off its list or left out of its audit but a fetch (licence-fetch-test.mjs has those), for the reason it names. Run by
-// the core's tests workflow (.github/workflows/tests.yml).
+// off its list or left out of its audit but a fetch (licence-fetch-test.mjs has those), for the reason it names; and
+// the owner's yes (licence-yes.mjs), on a package and on an audit entry. Run by the core's tests workflow
+// (.github/workflows/tests.yml).
 //
 //   node scripts/licence-scan-test.mjs
 import { LOCK, append, done, entry, handAudited, json, ok, run, write } from "./licence-scan-stage.mjs";
@@ -117,5 +118,49 @@ for (const [what, change, why] of [
   ["notices naming no file", json("licences.json", (j) => { j.notices = "site/NOTICES.txt"; }), /"notices", site\/NOTICES\.txt, names no file/],
   ["notices naming a folder", json("licences.json", (j) => { j.notices = "site/audio"; }), /"notices", site\/audio, names no file/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
+
+// The owner's yes (licence-yes.mjs): a package or an audit entry off its list passes only by it, and never further.
+{
+  const said = "the owner, 13 November 2026: take it";
+  const yes = (more = {}) => ({ package: "mossgrip-lib@1.0.0", licence: "LGPL-3.0-only", ships: true, yes: said, notice: "Mossgrip, LGPL 3.0.", ...more });
+  const shipped = (license, accepted) => (dir) => { LOCK(license)(dir); json("licences.json", (j) => { j.ships = ["package.json"]; if (accepted) j.accepted = accepted; })(dir); };
+  const paid = { name: "Bark pack", kind: "asset", licence: "LicenseRef-Vendor-EULA", ships: true, files: ["site/audio/"], notice: "Bark pack, bought." };
+  const bought = (accepted, e = paid) => (dir) => { json("audit.json", (j) => { j.entries = j.entries.filter((x) => x.name !== "Bark sounds").concat(e); })(dir); json("licences.json", (j) => { j.accepted = accepted; })(dir); };
+  const bare = shipped("LGPL-3.0-only");
+  for (const [what, change] of [
+    ["a shipped package under LGPL, with the owner's yes for that version and its notice", shipped("LGPL-3.0-only", [yes()])],
+    ["a shipped package whose lockfile names no licence, read by hand and bought", shipped(undefined, [yes({ licence: "LicenseRef-Vendor-EULA" })])],
+    ["a tool that only runs under terms off the tools' list, accepted as a tool, with no notice", (dir) => { LOCK("LicenseRef-Vendor-EULA")(dir); json("licences.json", (j) => { j.accepted = [yes({ licence: "LicenseRef-Vendor-EULA", ships: false, notice: undefined })]; })(dir); }],
+    ["an audit entry that was bought, with the owner's yes", bought([{ entry: "Bark pack", yes: said }])],
+  ]) { const f = run(change); ok(f.length === 0, `passes ${what}`, f.join("\n")); }
+  for (const [what, change, why] of [
+    ["a shipped package under LGPL with no yes, and says where one goes", bare, /off the list for what ships: mossgrip-lib@1\.0\.0 \(LGPL-3\.0-only\).*named in the config's "accepted"/],
+    ["a yes for another version", shipped("LGPL-3.0-only", [yes({ package: "mossgrip-lib@1.0.1" })]), /off the list for what ships: mossgrip-lib@1\.0\.0/],
+    ["a yes that nothing installs", shipped("LGPL-3.0-only", [yes(), yes({ package: "mossgrip-old@2.0.0" })]), /"accepted" names mossgrip-old@2\.0\.0, which nothing installs: remove it/],
+    ["a yes for what is on its list", shipped("MIT", [yes({ licence: "MIT" })]), /which is on its list and needs no yes: remove it/],
+    ["a yes for a tool, where it ships", shipped("LGPL-3.0-only", [yes({ ships: false })]), /a yes for a tool is no yes for what ships/],
+    ["a yes for what ships with no notice", shipped("LGPL-3.0-only", [yes({ notice: " " })]), /its notice ships too.*its "notice" in "accepted"/],
+    ["a yes under non-commercial terms, by the yes", shipped(undefined, [yes({ licence: "CC-BY-NC-4.0" })]), /accepted, and under CC-BY-NC-4\.0, terms floor rule 10 never allows/],
+    ["a yes under source-available terms, by the lockfile", shipped("BUSL-1.1", [yes()]), /accepted, and under BUSL-1\.1, terms floor rule 10 never allows/],
+    ["a package under terms the floor never allows, with no word of a yes", shipped("SSPL-1.0"), /^off the list for what ships: mossgrip-lib@1\.0\.0 \(SSPL-1\.0\), in package-lock\.json$/],
+    ["a yes whose licence no machine can read", shipped(undefined, [yes({ licence: "see the vendor's page" })]), /which no machine can read/],
+    ["a yes with no words of the owner's", shipped("LGPL-3.0-only", [yes({ yes: " " })]), /"accepted" is not a list of/],
+    ["a yes with a key it does not know", shipped("LGPL-3.0-only", [yes({ why: "needed" })]), /"accepted" is not a list of/],
+    ["a yes naming a package with no version", shipped("LGPL-3.0-only", [yes({ package: "mossgrip-lib" })]), /"accepted" is not a list of/],
+    ["a yes given twice", shipped("LGPL-3.0-only", [yes(), yes()]), /names one twice: package mossgrip-lib@1\.0\.0/],
+    ["a yes for a package that comes from elsewhere than the registry", (dir) => { shipped("LGPL-3.0-only", [yes()])(dir); json("package-lock.json", (j) => { j.packages["node_modules/mossgrip-lib"].resolved = "https://mossgrip.example/mossgrip-lib/-/mossgrip-lib-1.0.0.tgz"; })(dir); }, /off the list for what ships: mossgrip-lib@1\.0\.0/],
+    ["a bought audit entry with no yes", bought(undefined), /Bark pack: LicenseRef-Vendor-EULA is not on the list for what ships/],
+    ["a yes for an audit entry the audit does not hold", bought([{ entry: "Bark pack", yes: said }, { entry: "Moss pack", yes: said }]), /names the audit entry Moss pack, which the audit does not hold: remove it/],
+    ["a yes for an audit entry on its list", (dir) => json("licences.json", (j) => { j.accepted = [{ entry: "Bark sounds", yes: said }]; })(dir), /the audit entry Bark sounds, which is on its list and needs no yes/],
+    ["a yes for an audit entry under no-derivatives terms", bought([{ entry: "Bark pack", yes: said }], { ...paid, licence: "CC-BY-ND-4.0" }), /accepted, and under CC-BY-ND-4\.0, terms floor rule 10 never allows/],
+    ["a yes for an audit entry whose licence no machine can read", bought([{ entry: "Bark pack", yes: said }], { ...paid, licence: "bought from the vendor" }), /which no machine can read/],
+    ["an accepted audit entry that ships without its notice", bought([{ entry: "Bark pack", yes: said }], { ...paid, notice: "" }), /Bark pack: it ships, so its notice ships too/],
+    ["a yes in \"accepted\" for a NuGet package's audit entry", (dir) => { entry({ name: "Odd.Pkg@1.0.0", kind: "nuget", licence: "LGPL-3.0-only", ships: true, notice: "Odd, LGPL 3.0." })(dir); json("licences.json", (j) => { j.accepted = [{ entry: "Odd.Pkg@1.0.0", yes: said }]; })(dir); }, /a NuGet package's yes stands in "nuget\.accepted", never in "accepted"/],
+    ["a yes for an audit entry with a licence of its own", bought([{ entry: "Bark pack", licence: "MIT", yes: said }]), /"accepted" is not a list of/],
+    ["a yes for an audit entry in a config with no audit", (dir) => { LOCK("MIT")(dir); json("licences.json", (j) => { delete j.audit; delete j.scan; j.accepted = [{ entry: "Bark pack", yes: said }]; })(dir); }, /names an audit entry, and the config names no "audit"/],
+  ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
+  const twice = run((dir) => { shipped("LGPL-3.0-only", [yes({ ships: false })])(dir); json("package-lock.json", (j) => { j.packages["node_modules/bark-x/node_modules/mossgrip-lib"] = { ...j.packages["node_modules/mossgrip-lib"] }; j.packages["node_modules/bark-x"] = { version: "1.0.0", resolved: "https://registry.npmjs.org/bark-x/-/bark-x-1.0.0.tgz", license: "MIT", dependencies: { "mossgrip-lib": "1.0.0" } }; j.packages[""].dependencies["bark-x"] = "1.0.0"; })(dir); write("package.json", JSON.stringify({ name: "bark", dependencies: { "mossgrip-lib": "1.0.0", "bark-x": "1.0.0" } }))(dir); });
+  ok(twice.length === 1, "a package a lockfile holds twice fails once", twice.join("\n"));
+}
 
 done();

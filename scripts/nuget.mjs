@@ -19,12 +19,10 @@
 //     then holds to its list like any entry. A new version needs a new entry, so a licence that changes with a version
 //     is read again, and an entry no package needs any more fails;
 //   - "one the owner wants anyway waits for the owner's yes" (floor rule 10): a package off its list passes only where
-//     the config's "accepted" names that exact version with what it is under (an SPDX id this check knows, or
-//     LicenseRef-<a name for it>, so that a machine can read it), whether it ships, the owner's words for it and,
-//     where it ships, its notice; a yes for a tool is no yes for what ships, and no yes takes in terms the
-//     floor never allows, by what the manifest, the audit or the entry itself says. It is named there alone: an audit
-//     entry for it too would be held to the list by the licence check, so the two together fail here. An accepted
-//     version nothing installs any more fails, so the list only shrinks by itself;
+//     the config's "nuget.accepted" names that exact version with the owner's yes (licence-yes.mjs, beside this file,
+//     says how one is written and what none takes in, by what the manifest, the audit or the yes itself says). It is
+//     named there alone: an audit entry for it too would be held to the list by the licence check, so the two
+//     together fail here. An accepted version nothing installs any more fails, so the list only shrinks by itself;
 //   - what the restore brought and no lock file read here names (a targeting pack, a PackageDownload, an SDK a project
 //     file names): its licence is held to the list for what ships all the same, by its manifest, the audit or a yes.
 // What it does not hold: that the lock files are what a restore gives today (the workflow that runs this,
@@ -52,14 +50,15 @@
 //   node core/scripts/nuget.mjs --projects     the project files git knows, a line each: what the workflow restores
 //
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
-// packages ship, "tools": those of projects that only run (tests, tools), "accepted": [{ "package": "<Id>@<version>",
-// "licence": what it is under, as an SPDX expression or LicenseRef-<name>, "ships": true or false, "yes": the owner's
-// words and their date, "notice": its notice, where it ships }] }. With --advisory it says what it would fail and passes, for a project's first weeks with it.
+// packages ship, "tools": those of projects that only run (tests, tools), "accepted": the owner's yeses, as
+// licence-yes.mjs writes one for a package, named "<Id>@<version>" }. With --advisory it says what it would fail and
+// passes, for a project's first weeks with it.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { NEVER, licenceOk, loadConfig, policy } from "./licences.mjs";
+import { acceptedList, yesFaults } from "./licence-yes.mjs";
+import { licenceOk, loadConfig, policy } from "./licences.mjs";
 import { started } from "./started.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
@@ -89,13 +88,7 @@ export function nugetConfig(config) {
   const ships = paths("ships"), tools = paths("tools");
   const twice = ships.filter((p) => tools.includes(p)).concat(ships.filter((p, i) => ships.indexOf(p) !== i), tools.filter((p, i) => tools.indexOf(p) !== i));
   if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}`);
-  const accepted = nuget.accepted ?? [];
-  const whole = (a) => a && typeof a === "object" && !Array.isArray(a) && Object.keys(a).every((k) => ["package", "licence", "ships", "yes", "notice"].includes(k))
-    && [a.package, a.licence, a.yes].every((s) => typeof s === "string" && s.trim()) && /^[^@\s]+@[^@\s]+$/u.test(a.package)
-    && typeof a.ships === "boolean" && (a.notice === undefined || typeof a.notice === "string");
-  if (!Array.isArray(accepted) || !accepted.every(whole)) throw new Error('the config\'s "nuget.accepted" is not a list of { "package": "<Id>@<version>", "licence": ..., "ships": true or false, "yes": ..., and "notice" where it ships }');
-  const again = accepted.map((a) => a.package.toLowerCase()).filter((p, i, all) => all.indexOf(p) !== i);
-  if (again.length) throw new Error(`the config's "nuget.accepted" names a package twice: ${again.join(", ")}`);
+  const accepted = acceptedList(nuget.accepted, "nuget.accepted", /^[^@\s]+@[^@\s]+$/u, "<Id>@<version>", { same: (name) => name.toLowerCase() });
   return { ships, tools, accepted };
 }
 
@@ -206,10 +199,7 @@ function restoredPackages(packagesDir) {
  */
 export function check(config, root, packagesDir, tracked) {
   const { ships, tools, accepted } = nugetConfig(config);
-  const { allowedFor, tools: known } = policy(config);
-  // (an accepted licence is named so that a machine can read it: ids this check knows, or LicenseRef-<name>)
-  const ids = new Set([...known, ...allowedFor("", true, "data"), ...allowedFor("", true, "font")]);
-  const readable = (licence) => { const words = licence.match(/\(|\)|[^\s()]+/gu) ?? []; return words.length > 0 && words.every((w, i) => ["(", ")", "AND", "OR", "WITH"].includes(w) || ids.has(w) || /^LicenseRef-[A-Za-z0-9.-]+$/u.test(w) || (words[i - 1] === "WITH" && /^[A-Za-z0-9.-]+$/u.test(w))); };
+  const lists = policy(config), { allowedFor } = lists;
   const failures = [];
   const own = tracked.filter((f) => !f.startsWith("core/"));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
@@ -279,12 +269,8 @@ export function check(config, root, packagesDir, tracked) {
     }
     if (a) {
       used.add(k);
-      const never = [a.licence, licence.expression, entry?.licence].filter((l) => typeof l === "string" && NEVER.test(l));
-      if (never.length) failures.push(`${name}: accepted, and under ${never[0]}, terms floor rule 10 never allows`);
-      if (!readable(a.licence)) failures.push(`${name}: accepted under "${a.licence}", which no machine can read: name it by an SPDX id this check knows, or as LicenseRef-<a name for it>, as LicenseRef-Vendor-EULA for one that was bought`);
+      failures.push(...yesFaults(name, a, p.shipped, [licence.expression, entry?.licence], lists, '"nuget.accepted"'));
       if (entry) failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both: an accepted package stands in "nuget.accepted" alone, since the licence check holds every audit entry to its list`);
-      if (p.shipped && a.ships !== true) failures.push(`${name}: accepted as a tool that only runs ("ships": false), and it is held as what ships: a yes for a tool is no yes for what ships (floor rule 10)`);
-      if (p.shipped && !a.notice?.trim()) failures.push(`${name}: it ships, so its notice ships too (floor rule 10): its "notice" in "nuget.accepted"`);
       continue;
     }
     failures.push(`${name} (${where}): ${why}${byHand ? "" : `; one the owner wants anyway is named in the config's "nuget.accepted", with the owner's words (floor rule 10)`}`);

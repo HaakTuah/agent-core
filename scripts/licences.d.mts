@@ -8,11 +8,13 @@ export interface LicenceConfig {
   notices?: string;
   ignoreScriptsIn?: string[];
   scan?: { served?: string[]; tools?: string[]; skip?: string[] };
+  accepted?: ({ package: string; licence: string; ships: boolean; yes: string; notice?: string } | { entry: string; yes: string })[];
 }
 export function floorList(file?: string | URL): { any: string[]; data: string[]; fonts: string[]; publicDomain: boolean };
 export function policy(config?: Partial<LicenceConfig>): {
   allowedFor(name: string, shipped?: boolean, kind?: string | null): Set<string>;
   tools: string[];
+  never: RegExp;
 };
 export function licenceOk(expression: unknown, allow: Set<string>): boolean;
 export function registryName(resolved: string | undefined): string | undefined;
