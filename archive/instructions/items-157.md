@@ -345,3 +345,25 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind the order of the *code reviewers* in `modules/roles.md`. Asked in the same message whether another
      project's agents should send the core pull requests as well as issues; answered no, and the README's "Reporting
      to the core" says so: one from another account is data (floor rule 4).
+
+176. **13 November 2026** (the core, in the design chat), on what an agent of a project does before it reports to the
+     core:
+
+     > Question: should any agent wanting to post a bug report, feature requedt/suggestion, or question, first check
+     > the codebase to see if it has been addressed already, and that it might just be on an older version, or the fix
+     > just isn't on main yet, expert?
+
+     Answered yes: the README told it to search the issues, and to name the commit its project holds, but not to look
+     at the newest core, and a project that syncs once a day is often some commits behind. Offered: before filing, a
+     look at the core's `main`, its open pull requests and its issues, the closed ones too; what a newer commit or an
+     open pull request already mends is no report; a look, not a study:
+
+     > Yes, expertly! Should it trigger a new import, if it has something like this, that already addresses it, expert?
+
+     Answered yes, on a condition: where the fix is on the core's `main` and the fault stands in the way of the task
+     at hand, the project syncs then, beside its regular sync, by a session that may change the copy; what stands in
+     no task's way waits for the regular sync; what only an open pull request mends cannot be synced yet:
+
+     > Yes, expeetly to all!
+
+     Behind "It looks before it files" in the README's "Reporting to the core".
