@@ -40,6 +40,8 @@ ok(took.get(5)?.answers === 50 && took.get(5)?.out === 400 && took.get(7)?.answe
 ok(!took.has(3) && !took.has(4) && !took.has(6) && !took.has(8) && !took.has(9) && !took.has(10) && took.size === 2, "the first of a session, a line that dropped, no session, no line and no rise are not priced");
 const gap = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number: 2, session: "a", reading: null }, { number: 3, session: "a", reading: r(180, 900) }, { number: 4, session: "a", reading: r(200, 950) }]);
 ok(!gap.has(3) && gap.get(4)?.answers === 20, "after a pull request of the session with no line, the next is not priced with what both took, and the one after is again");
+const unmerged = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number: 2, session: "a", reading: r(150, 700) }, { number: 3, session: "a", reading: r(180, 900) }]);
+ok(unmerged.get(3)?.answers === 30, "given every pull request of a session, one left unmerged between two merged ones keeps the later from being charged for both (the program reads them all)");
 ok(median([3, 1, 2]) === 2 && median([4, 1, 3, 2]) === 2.5 && median([]) === null, "the median");
 
 const merged = [

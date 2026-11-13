@@ -142,13 +142,15 @@ function main(argv) {
     let repo = process.env.GITHUB_REPOSITORY;
     if (!repo) try { repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(git(["remote", "get-url", "origin"]).trim())?.[1]; } catch { /* said below */ }
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
-    const wanted = new Set(merged.map(m => m.number)), pulls = [], oldest = Math.min(...wanted);
-    // (page by page, newest first, until the oldest merge here is passed: a cloud session's gh cannot follow pages by itself)
+    const pulls = [], oldest = Math.min(...merged.map(m => m.number));
+    // (page by page, newest first, until the oldest merge here is passed: a cloud session's gh cannot follow pages by
+    // itself. Every pull request from that one on is read, merged or not, open or closed: one a session left unmerged
+    // between two merged ones holds a reading of its own, and without it the later one would be charged for both)
     for (let page = 1; page <= 200; page++) {
-      const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=closed&sort=created&direction=desc&per_page=100&page=${page}`,
+      const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
         "--jq", ".[] | [.number, (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
       const rows = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
-      for (const [number, body] of rows) if (wanted.has(number)) pulls.push({ number, session: sessionOf(body), reading: reading(body) });
+      for (const [number, body] of rows) if (number >= oldest) pulls.push({ number, session: sessionOf(body), reading: reading(body) });
       if (rows.length < 100 || rows.some(([number]) => number < oldest)) break;
     }
     const took = priced(pulls);
