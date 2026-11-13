@@ -83,6 +83,9 @@ jobs:
       - name: The starter kit, and the core's own checks on a project it writes
         if: ${{ !cancelled() }}
         run: node scripts/init-test.mjs
+      - name: The cap's own check
+        if: ${{ !cancelled() }}
+        run: node scripts/size-test.mjs
       - name: The pointer check
         if: ${{ !cancelled() }}
         run: node scripts/pointers-test.mjs
