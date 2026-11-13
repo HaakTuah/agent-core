@@ -596,7 +596,9 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      else could be meant), the floor's among them on these words, and the words added to the check that fails what
      fits only some projects; this archive stays as written, a dated record. And told that a project tells whose words
      the core's archive holds by two accounts in its manifest, the one in the core's address and its *owner's account*,
-     which the rule would now say.
+     which the rule would now say:
+
+     > Approved! Do all of this, expertly! […]
 
      Behind the wording of the owner throughout the floor, the modules, `README.md` and `setup/`; the last pattern in
      `scripts/general.json`; and "the account in the core's address in the manifest not being the *owner's account*"
