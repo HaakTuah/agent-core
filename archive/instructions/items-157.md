@@ -659,3 +659,15 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      account's login from there, the list no longer holding it; and `scripts/core-address-test.mjs`, which holds each
      place GitHub needs it written out to the one, and fails in the core's own repository where that is not the one
      named: the nearest to "dynamically" that GitHub allows.
+
+193. **13 November 2026** (the core, in the design chat; of what the second audit left for the owner):
+
+     > Why is this nessecary if it is proven that they hold to the criterias, expert?
+
+     Told: the trim of the floor holds to the test and waits only for the yes the floor asks of any change to itself;
+     that three of the five wordings change nothing a rule asks and were the design session's to mend, which it does;
+     and that two are decisions the test cannot settle.
+
+     Behind "save a helper whose definition gives them" in `modules/claude.md`, and a reviewer's login in
+     `modules/codex.md` and `modules/copilot.md`.
+
