@@ -92,3 +92,21 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `scripts/stand-in-record.mjs --open` lists them; a reading departing from an owner's answer given by the stand-in
      and listed with that answer's date; and "Its record", which the same script counts at each review of the core
      (`AGENTS.md`, "The core is measured as a feature is").
+
+200. **13 November 2026** (the core, the same chat as item 199). Shown an orchestrator's own account of a lane it
+     called alive at one check, from a status line, while its branch had had no push for two hours, which then sat idle
+     for nine; told that the orchestrator's model, set as "Sonnet is enough", was the one seat nothing reviews, and
+     offered Opus there, a script for the stall check, a wake set once rather than each turn, and an end to a false
+     alarm of unpushed commits, the owner had said that Sonnet, at high, had "stopped fully up at least twice for the
+     couple of days we have given it this position". Then:
+
+     > Agreed, expertly! But would a script spam whenever I run out of usage, or tell my orchestrators to stop up to
+     > save usage, expert? What should our recommendation be? Opus on high? Or should we keep sonnet on high/extra, with
+     > the script to keep it in line, expert?
+
+     Answered: Opus at high, with the script; nothing stops to save usage; and a lane handed over once, then to
+     another provider, or else waiting and tried once a day, named to the owner once, so that no wake repeats it.
+     Behind the orchestrator's row in `modules/claude.md` and its line in `setup/server.md`; and, in
+     `modules/orchestrating.md`, the hourly wake set once as a repeat, its clone on `main`, and "A stalled lane" found by
+     `scripts/stalled.mjs` and handed over once. Read as a yes to Opus at high, the session's recommendation when he
+     asked which.
