@@ -117,15 +117,16 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      script, then npm's own check of the registry's signature on each installed name and version (floor rule 7); where
      it changes none, the check passes, so a ruleset can require it.
    - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
-     core's with the licence check's config and what to restore: a restore from its lock files alone (`dotnet restore
-     --locked-mode`, floor rule 15), then `nuget.mjs`, which holds every package in those lock files to one exact
-     version (floor rule 7) and to its licence list (floor rule 10), each licence read from the manifest of the
-     package the restore brought. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each
-     named in the config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest
-     names no licence a machine can read is recorded by hand in the audit as `<Id>@<version>`; one off its list that
-     the owner wants anyway is named in "nuget.accepted" with the owner's words. It starts advisory, saying what it
-     would fail and passing, and a private repository calls it like any other: it needs nothing of GitHub's paid code
-     security.
+     core's with the licence check's config: a restore of each project file git knows from its lock file alone
+     (`dotnet restore --locked-mode`, floor rule 15), then `nuget.mjs`, which holds every package in those lock files
+     to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the manifest
+     of the package the restore brought; what the restore brought that no lock file names is held to the list for what
+     ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
+     config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
+     licence a machine can read is recorded by hand in the audit as `<Id>@<version>`, of "kind": "nuget"; one off its
+     list that the owner wants anyway is named in "nuget.accepted" with the owner's words, and there alone. It starts
+     advisory, saying what it would fail and passing, and a private repository calls it like any other: it needs
+     nothing of GitHub's paid code security.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
