@@ -414,9 +414,9 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Yes, expertly to all of this!
 
-     Behind floor rule 8's "A security review that starts by itself when a PR opens or is marked ready is waited for
-     and read on every PR, a pure sync's too"; the cap at 48 KB and "The size cap keeps the rules lean and decides nothing else" in
-     `AGENTS.md`; and, put back or anchored: the fallback reviewer named in the *code reviewers*' order and "its
-     closed PRs and the *progress file* say" in `modules/roles.md`, a posted security review "naming the tool and the
-     commit it read" and "the project's newest PRs that asked it show" in `modules/reviews.md`, and the hints the
+     Behind floor rule 8's "A security review that starts by itself when a PR opens or is marked ready is waited for and
+     read on every PR, a pure sync's too"; the cap at 48 KB and "The size cap keeps the rules lean and decides nothing
+     else" in `AGENTS.md`; and, put back or anchored: the fallback reviewer named in the *code reviewers*' order and
+     "its closed PRs and the *progress file* say" in `modules/roles.md`, a posted security review "naming the tool and
+     the commit it read" and "the project's newest PRs that asked it show" in `modules/reviews.md`, and the hints the
      orchestrator's rule had lost.
