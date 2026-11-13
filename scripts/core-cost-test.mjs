@@ -17,7 +17,7 @@ ok(classify("x", ["core/a.md", "src/game.js"], rules) === "own" && classify("x",
 ok(classify("dependabot/npm_and_yarn/tools/x-1.2.3", ["tools/package-lock.json"], rules) === "update" && classify("x/dependabot/y", ["tools/package-lock.json"], rules) === "own", "a branch of Dependabot's own is an update");
 ok(classify("x", [], rules) === "own", "a merge that changed nothing is not counted as the core's");
 ok(classify("dependabot/npm_and_yarn/x-1.2.3", ["tools/package-lock.json"], rules, false) === "own" && classify("dependabot/x", ["core/a.md", "core-manifest.md"], rules, false) === "sync", "a fork's branch of that name is no update of Dependabot's: it counts by what it changed");
-ok(REPO.test("some-one/a.project_x") && !REPO.test("../..") && !REPO.test("./x") && !REPO.test("some-one/..") && !REPO.test("some.one/x") && !REPO.test("a/b/c") && !REPO.test("a/b?x=1") && !REPO.test("a /b"), "a repository's name is an account and a name, never a path out of its route");
+ok(REPO.test("some-one/a.project_x") && REPO.test("some_managed/x") && REPO.test("some-org/.github") && !REPO.test("../..") && !REPO.test("./x") && !REPO.test("some-one/..") && !REPO.test("some.one/x") && !REPO.test("a/b/c") && !REPO.test("a/b?x=1") && !REPO.test("a /b"), "a repository's name is an account and a name, never a path out of its route");
 
 ok(weekOf("2026-11-09T00:00:00Z") === "2026-11-09" && weekOf("2026-11-15T23:59:59Z") === "2026-11-09" && weekOf("2026-11-16T00:00:00+00:00") === "2026-11-16" && weekOf("2026-11-13T01:30:00+02:00") === "2026-11-09", "a week runs from Monday to Sunday, in UTC");
 

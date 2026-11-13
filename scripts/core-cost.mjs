@@ -24,9 +24,9 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
 const within = (file, dir) => file === dir || file.startsWith(`${dir}/`);
 
-// A repository's name as GitHub has it: an account (letters, digits and hyphens) and a name that is not dots alone, so
-// it is one repository's route and never a path out of it.
-export const REPO = /^[A-Za-z0-9-]+\/(?!\.+$)[\w.-]+$/;
+// A repository's name as GitHub has it: an account (letters, digits, hyphens, and the underscore a managed account
+// holds) and a name that is not dots alone, so it is one repository's route and never a path out of it.
+export const REPO = /^[A-Za-z0-9_-]+\/(?!\.+$)[\w.-]+$/;
 
 // What a merged pull request was, by its branch and the files it changed (`rules`: the project's rule files). A branch
 // counts as Dependabot's only where it is the repository's own (`ours`): a fork may name a branch anything.
@@ -138,6 +138,8 @@ function main(argv) {
   let repo = process.env.GITHUB_REPOSITORY;
   if (!repo) try { repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(git(["remote", "get-url", "origin"]).trim())?.[1]; } catch { /* (no origin) */ }
   if (!REPO.test(repo ?? "")) repo = null;
+  // (said, never passed over: without it no branch counts as Dependabot's, and its merges count by what they changed)
+  if (!repo) console.error("note: the repository is not known (GITHUB_REPOSITORY, or origin's address), so no merge is counted as an update of Dependabot's");
   const owner = repo?.split("/")[0].toLowerCase();
   const merged = [];
   for (const line of log.split("\n").filter(Boolean)) {
