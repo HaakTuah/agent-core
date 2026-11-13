@@ -17,9 +17,10 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 let n = 0;
 // A project: `locked` is the lock file's packages by path; `installed`, each package's own package.json by path (a
 // path left out is a package no install brought; a string is written as it stands).
-const project = (locked, installed, lockName = "package-lock.json") => {
+const project = (locked, installed, lockName = "package-lock.json", workspaces) => {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(dir);
+  if (workspaces) fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "bark", workspaces }));
   fs.writeFileSync(path.join(dir, lockName), JSON.stringify({ name: "bark", lockfileVersion: 3, packages: { "": { name: "bark" }, ...locked } }));
   for (const [at, own] of Object.entries(installed)) { fs.mkdirSync(path.join(dir, at), { recursive: true }); fs.writeFileSync(path.join(dir, at, "package.json"), typeof own === "string" ? own : JSON.stringify(own)); }
   return dir;
@@ -35,7 +36,8 @@ const good = said(project(
   { [A]: { version: "1.0.0", license: "MIT" }, [B]: { version: "2.1.0", license: "Apache-2.0" }, [C]: { version: "0.9.0" }, "node_modules/bark-x": { version: "3.0.0", license: "ISC" },
     "packages/own": { name: "own", version: "0.0.1", license: "LicenseRef-Owner" }, "node_modules/own": { resolved: "packages/own", link: true },
     "node_modules/@moss/grip-win32": { version: "2.1.0", license: "Apache-2.0", optional: true, os: ["win32"] } },
-  { [A]: { name: "mossgrip-lib", version: "1.0.0", license: "MIT" }, [B]: { version: "2.1.0", license: { type: "Apache-2.0", url: "x" } }, [C]: { version: "0.9.0" }, "node_modules/bark-x": { version: "3.0.0", license: "ISC" } }));
+  { [A]: { name: "mossgrip-lib", version: "1.0.0", license: "MIT" }, [B]: { version: "2.1.0", license: { type: "Apache-2.0", url: "x" } }, [C]: { version: "0.9.0" }, "node_modules/bark-x": { version: "3.0.0", license: "ISC" } },
+  "package-lock.json", ["packages/own"]));
 ok(/^4 packages of package-lock\.json read back from the packages themselves, their licence and their version; 1 of another system, not installed here, not read; 0 failing/.test(good),
   "a lock file whose every entry says what its package says passes: a scope, a package inside another's folder, one with no licence on either side, the old object form; the project's own packages and a link to one are not its to read, and an optional package of another system is counted as not read", good);
 ok(/^"node_modules\/mossgrip-lib": package-lock\.json says its licence is "MIT", and its own package\.json says "GPL-3\.0-only"/.test(one({ license: "MIT" }, { version: "1.0.0", license: "GPL-3.0-only" })), "a licence written into the lock file that the package does not say fails, by name, with both");
@@ -76,6 +78,28 @@ ok(/threw: no npm-shrinkwrap\.json or package-lock\.json/.test(said(none)) && /t
 const long = one({ license: "MIT" }, { version: "1.0.0", license: `MIT\n::error::${"x".repeat(500)}` });
 const key = said(project({ "node_modules/x\n::error title=Licences::all read\n": { version: "1.0.0" } }, {}));
 ok(long.split("\n").length === 2 && long.split("\n")[0].length < 500 && key.split("\n").length === 2 && !/^::error/m.test(key), "what a lock file or a package says is shown on one line, and no longer than a line: a path too, which could else start a line of its own in a log", `${long.slice(0, 300)}\n${key}`);
+
+// a link to a folder that is no workspace (a dependency written "file:"): the install puts the folder in place as it
+// stands, and its own package.json is what the lock file's entry for it is held to
+const linked = (licence, more = {}) => said(project({ "node_modules/vend": { resolved: "vendor/vend", link: true }, "vendor/vend": { version: "1.0.0", license: "MIT" }, ...more }, { "vendor/vend": { version: "1.0.0", license: licence } }));
+ok(/"node_modules\/vend": package-lock\.json says its licence is "MIT", and its own package\.json says "GPL-3\.0-only"/.test(linked("GPL-3.0-only")) && /^1 packages of package-lock\.json read back.*; 0 failing/.test(linked("MIT"))
+  && /"node_modules\/vend": a link to a folder package-lock\.json holds no entry for/.test(said(project({ "node_modules/vend": { resolved: "vendor/gone", link: true } }, {})))
+  && /a link to a folder package-lock\.json holds no entry for/.test(said(project({ "node_modules/vend": { resolved: "../outside", link: true } }, {}))),
+  "a link to a folder that is no workspace is read back from that folder's own package.json; one to a folder the lock file does not hold fails");
+// what the install put in place and the lock file does not name: a package bundled in another's, its entries taken out
+const bundled = (more) => { const dir = project({ [A]: { version: "1.0.0", license: "MIT" }, "packages/own": { version: "0.0.1" } }, { [A]: { version: "1.0.0", license: "MIT" }, ...more }, "package-lock.json", ["packages/own"]); return said(dir); };
+ok(/"node_modules\/mossgrip-lib\/node_modules\/abbrev": installed, and package-lock\.json holds no entry for it/.test(bundled({ [`${A}/node_modules/abbrev`]: { version: "1.0.0", license: "GPL-3.0-only" } }))
+  && /"node_modules\/@moss\/hidden": installed, and package-lock\.json holds no entry for it/.test(bundled({ "node_modules/@moss/hidden": { version: "1.0.0" } }))
+  && /"packages\/own\/node_modules\/x": installed, and package-lock\.json holds no entry for it/.test(bundled({ "packages/own/node_modules/x": { version: "1.0.0" } }))
+  && / 0 failing/.test(bundled({ "node_modules/.bin/tool": {}, "node_modules/.cache/x": {} })),
+  "a package the install put in place that the lock file does not name fails, however deep, scoped or in a workspace's own folder; the install's own hidden folders are no packages");
+// (a long chain of optional entries, each asking for the next two, under one of another system: decided in time)
+const chain = { "": { name: "bark", optionalDependencies: { "moss-win32": "1.0.0" } }, "node_modules/moss-win32": { version: "1.0.0", optional: true, os: ["win32"], dependencies: { c0: "1.0.0", c1: "1.0.0" } } };
+for (let i = 0; i < 400; i++) chain[`node_modules/c${i}`] = { version: "1.0.0", optional: true, dependencies: { [`c${i + 1}`]: "1.0.0", [`c${i + 2}`]: "1.0.0" } };
+const leafFirst = Object.fromEntries(Object.entries(chain).reverse()), start = Date.now(), chained = leftOut(leafFirst, LINUX);
+ok(chained.size === 401 && Date.now() - start < 2000, "a long chain of optional entries under one of another system is all left out, decided in time", `${chained.size} in ${Date.now() - start} ms`);
+chain[""].dependencies = { c200: "1.0.0" };
+ok(leftOut(chain, LINUX).has("node_modules/c199") && !leftOut(chain, LINUX).has("node_modules/c200") && !leftOut(chain, LINUX).has("node_modules/c201"), "and what the project itself asks for is not, nor what that asks for in turn");
 
 const script = fileURLToPath(new URL("./licence-installed.mjs", import.meta.url));
 const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8", cwd: tmp });
