@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { check, lockForm, plainVersion } from "./licence-installed.mjs";
+import { check, leftOut, lockForm, plainVersion } from "./licence-installed.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -24,7 +24,8 @@ const project = (locked, installed, lockName = "package-lock.json") => {
   for (const [at, own] of Object.entries(installed)) { fs.mkdirSync(path.join(dir, at), { recursive: true }); fs.writeFileSync(path.join(dir, at, "package.json"), typeof own === "string" ? own : JSON.stringify(own)); }
   return dir;
 };
-const said = (dir) => { try { const r = check(dir); return [...r.failures, r.summary].join("\n"); } catch (e) { return `threw: ${e.message}`; } };
+const LINUX = { os: "linux", cpu: "x64", libc: "glibc" }; // (the system every test here installs on, whatever runs it)
+const said = (dir) => { try { const r = check(dir, LINUX); return [...r.failures, r.summary].join("\n"); } catch (e) { return `threw: ${e.message}`; } };
 const A = "node_modules/mossgrip-lib", B = "node_modules/@moss/grip", C = "node_modules/bark-x/node_modules/mossgrip-lib";
 const one = (lock, own) => said(project({ [A]: { version: "1.0.0", ...lock } }, own === undefined ? {} : { [A]: own }));
 
@@ -35,15 +36,23 @@ const good = said(project(
     "packages/own": { name: "own", version: "0.0.1", license: "LicenseRef-Owner" }, "node_modules/own": { resolved: "packages/own", link: true },
     "node_modules/@moss/grip-win32": { version: "2.1.0", license: "Apache-2.0", optional: true, os: ["win32"] } },
   { [A]: { name: "mossgrip-lib", version: "1.0.0", license: "MIT" }, [B]: { version: "2.1.0", license: { type: "Apache-2.0", url: "x" } }, [C]: { version: "0.9.0" }, "node_modules/bark-x": { version: "3.0.0", license: "ISC" } }));
-ok(/^4 packages of package-lock\.json read back from the packages themselves, their licence and their version; 1 optional ones not installed here \(another system's\), not read; 0 failing/.test(good),
+ok(/^4 packages of package-lock\.json read back from the packages themselves, their licence and their version; 1 of another system, not installed here, not read; 0 failing/.test(good),
   "a lock file whose every entry says what its package says passes: a scope, a package inside another's folder, one with no licence on either side, the old object form; the project's own packages and a link to one are not its to read, and an optional package of another system is counted as not read", good);
 ok(/^"node_modules\/mossgrip-lib": package-lock\.json says its licence is "MIT", and its own package\.json says "GPL-3\.0-only"/.test(one({ license: "MIT" }, { version: "1.0.0", license: "GPL-3.0-only" })), "a licence written into the lock file that the package does not say fails, by name, with both");
 ok(/says its licence is "MIT", and its own package\.json says none/.test(one({ license: "MIT" }, { version: "1.0.0" })) && /says its licence is none, and its own package\.json says "BUSL-1\.1"/.test(one({}, { version: "1.0.0", license: "BUSL-1.1" }))
   && /says its licence is "MIT", and its own package\.json says \{"type":"SSPL-1\.0"\}/.test(one({ license: "MIT" }, { version: "1.0.0", license: { type: "SSPL-1.0" } })), "so does one the lock file adds, one it leaves out, and one the package writes the old way");
 ok(/says its version is "1\.0\.0", and its own package\.json says "2\.0\.0"/.test(one({ license: "MIT" }, { version: "2.0.0", license: "MIT" })), "a version the lock file claims and the package does not say fails");
-ok(/mossgrip-lib": not installed, and not one npm marks optional/.test(one({ license: "MIT" })) && /not installed, and not one npm marks optional/.test(one({ license: "MIT", os: ["win32"] }))
-  && /1 optional ones not installed here \(another system's\), not read; 0 failing/.test(one({ license: "MIT", devOptional: true, cpu: ["arm64"] })) && /1 optional ones not installed here/.test(one({ license: "MIT", optional: true })),
-  "a package that is not installed fails, unless npm marks it optional: one for another system, or one that only such a package asks for and that names no system itself; to name a system is not enough alone");
+const lacks = /not installed, and no optional package of another system or of one alone/, unread = (n) => new RegExp(`; ${n} of another system, not installed here, not read; 0 failing`);
+ok(lacks.test(one({ license: "MIT" })) && lacks.test(one({ license: "MIT", os: ["win32"] })) && lacks.test(one({ license: "MIT", optional: true })) && lacks.test(one({ license: "MIT", optional: true, os: ["linux"], cpu: ["x64"], libc: ["glibc"] }))
+  && lacks.test(one({ license: "MIT", optional: true, engines: { node: "<1" } })), "a package that is not installed fails: to name another system is not enough, nor to be marked optional, nor to be optional for this very system, nor to name a Node version the machine does not run");
+ok([{ os: ["win32"] }, { os: ["darwin", "win32"] }, { os: ["!linux"] }, { cpu: ["arm64"] }, { libc: ["musl"] }, { os: "win32" }, { os: ["linux"], cpu: ["!x64"] }].every(more => unread(1).test(one({ license: "MIT", optional: true, ...more })))
+  && unread(1).test(one({ license: "MIT", devOptional: true, cpu: ["arm64"], engines: { node: ">=18" } })) && leftOut({ [A]: { optional: true, libc: ["glibc"] } }, { os: "darwin", cpu: "arm64", libc: null }).has(A),
+  "an optional package that names systems which leave this one out is one an install leaves out, and is counted as not read: by its system, its processor or its C library, in any form npm reads");
+const sub = "node_modules/moss-win32", child = "node_modules/moss-win32/node_modules/moss-part", shared = "node_modules/moss-util";
+const tree = (root, more = {}) => said(project({ "": { name: "bark", ...root }, [sub]: { version: "1.0.0", optional: true, os: ["win32"], dependencies: { "moss-part": "1.0.0", "moss-util": "1.0.0" } },
+  [child]: { version: "1.0.0", license: "MIT", optional: true }, [shared]: { version: "1.0.0", license: "MIT", optional: true, ...more } }, {}));
+ok(unread(3).test(tree({ optionalDependencies: { "moss-win32": "1.0.0" } })) && /moss-util": not installed/.test(tree({ optionalDependencies: { "moss-win32": "1.0.0" }, dependencies: { "moss-util": "1.0.0" } }))
+  && /moss-util": not installed/.test(tree({ optionalDependencies: { "moss-win32": "1.0.0" } }, { optional: false })), "an optional package that only packages of another system ask for is left out with them; one the project itself also asks for, or one not marked optional, is not");
 ok(plainVersion("v1.0.0") === "1.0.0" && plainVersion(" =1.0.0 ") === "1.0.0" && plainVersion("1.0.0-v2") === "1.0.0-v2" && plainVersion(undefined) === undefined
   && / 0 failing/.test(one({ license: "MIT" }, { version: "v1.0.0", license: "MIT" })) && / 0 failing/.test(one({ license: "MIT" }, "\ufeff" + JSON.stringify({ version: "1.0.0", license: "MIT" }))),
   "a version spelt with a v or an equals sign in the package is the version npm wrote, and a package.json that starts with a byte-order mark is read as npm reads it");
