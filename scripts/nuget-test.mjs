@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { check, lockPackages, manifestLicence, nugetConfig, projectFiles } from "./nuget.mjs";
+import { REGISTRY, check, lockPackages, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -24,6 +24,13 @@ ok(throws(() => nugetConfig({ nuget: { ships: [L], tools: [L] } })) && throws(()
 const yes = { package: "Odd.Pkg@1.0.0", licence: "LGPL-3.0-only", ships: false, yes: "the owner, 13 November 2026: take it" };
 ok(nugetConfig({ nuget: { accepted: [yes, { ...yes, package: "Other.Pkg@2.0.0", ships: true, notice: "its notice" }] } }).accepted.length === 2 && [[{ ...yes, yes: "" }], [{ ...yes, package: "Odd.Pkg" }], [{ ...yes, more: 1 }], [{ ...yes, notice: 5 }], [{ ...yes, ships: "no" }], [{ package: "A@1", licence: "x", ships: true }], ["A@1"], {}].every(a => throws(() => nugetConfig({ nuget: { accepted: a } }))),
   "an accepted package names its exact version, what it is under, whether it ships and the owner's words, with its notice or without, and nothing else");
+
+// where packages come from
+ok(sourcesOf({ nuget: {} }, "/project").join() === REGISTRY && sourcesOf({ nuget: { sources: ["https://pkgs.example.com/feed/v3/index.json", "vendor/packages/"] } }, path.resolve("/project")).join() === `${REGISTRY},https://pkgs.example.com/feed/v3/index.json,${path.resolve("/project", "vendor/packages")}`,
+  "a restore takes packages from NuGet's own registry, and from what the config names beside it: an address, a folder of the project's by its whole path");
+ok(["http://pkgs.example.com/", "https://user:word@pkgs.example.com/", "https://pkgs.example.com/v3?key=1", "https://pkgs.example.com/a b", "https://-pkgs.example.com/", "https://169.254.169.254/", "https://localhost/", "https://pkgs..example.com/", "https://pkgs.example.com/a/../b", "../out/", "/abs/", "vendor", "./", "./vendor/", "vendor//x/", "vendor/../x/", ".git/", ".../", "core/", "Core/scripts/", "-x/", "--source/", REGISTRY, REGISTRY.toUpperCase(), 5, "vendor/\n--source\nhttps://pkgs.example.com/"]
+  .every(s => throws(() => nugetConfig({ nuget: { sources: [s] } }))) && throws(() => nugetConfig({ nuget: { sources: "vendor/" } })) && throws(() => nugetConfig({ nuget: { sources: ["vendor/", "vendor/"] } })),
+  "a source is an https address of a named host, with no sign-in or question in it, or a folder inside the project that is not the core's copy or git's own; never the registry again, never one twice, never a word a restore could read as an option");
 
 // a lock file
 const entry = (type, resolved, requested) => ({ type, ...(requested ? { requested } : {}), resolved, contentHash: "h==" });
@@ -86,10 +93,16 @@ const MANIFESTS = {
   "Some.Pack@8.0.0": `<license type="expression">MIT</license>`,
 };
 let folders = 0;
+// (each package as a restore leaves it: its manifest, and beside it NuGet's record of the source it took it from; a
+// name is "<Id>@<version>", or [that, the source] for one taken from elsewhere than the registry)
 const restore = (...names) => {
   const dir = `restored-${++folders}`;
   fs.mkdirSync(path.join(tmp, dir));
-  for (const name of names.filter(n => MANIFESTS[n])) { const [id, version] = name.toLowerCase().split("@"); put(`${dir}/${id}/${version}/${id}.nuspec`, nuspec(MANIFESTS[name])); }
+  for (const [name, source = REGISTRY] of names.map(n => (Array.isArray(n) ? n : [n])).filter(([n]) => MANIFESTS[n])) {
+    const [id, version] = name.toLowerCase().split("@");
+    put(`${dir}/${id}/${version}/${id}.nuspec`, nuspec(MANIFESTS[name]));
+    put(`${dir}/${id}/${version}/.nupkg.metadata`, JSON.stringify({ version: 2, contentHash: "h==", source }));
+  }
   return path.join(tmp, dir);
 };
 const direct = (...pairs) => Object.fromEntries(pairs.map(([id, v]) => [id, entry("Direct", v, `[${v}, )`)]));
@@ -186,6 +199,47 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 fs.mkdirSync(path.join(repo, "core"), { recursive: true });
 fs.cpSync(here, path.join(repo, "core", "scripts"), { recursive: true });
 fs.cpSync(path.join(here, "..", "floor"), path.join(repo, "core", "floor"), { recursive: true });
+// where each package was taken from, as NuGet records it beside the package
+const APP = "src/App/App.csproj", only = [APP, L];
+const takenFrom = (source, nuget = {}, tracked = only, { meta, env } = {}) => {
+  put(L, lock(direct(["Newtonsoft.Json", "13.0.3"])));
+  const dir = restore(["Newtonsoft.Json@13.0.3", source]), record = path.join(dir, "newtonsoft.json", "13.0.3", ".nupkg.metadata");
+  if (meta === null) fs.rmSync(record); else if (meta !== undefined) fs.writeFileSync(record, meta);
+  return check({ ships: [], nuget: { ships: [L], ...nuget } }, tmp, dir, tracked, env).failures.join("\n");
+};
+const named = { sources: ["https://pkgs.example.com/v3/index.json", "vendor/packages/"] }, vendored = [...only, "vendor/packages/Bought.1.0.0.nupkg"];
+ok(takenFrom(REGISTRY) === "" && takenFrom("https://pkgs.example.com/v3/index.json", named, vendored) === ""
+  && takenFrom(path.join(tmp, "vendor", "packages") + path.sep, named, vendored) === "" && takenFrom(path.join(tmp, "vendor", "packages"), named, vendored) === "",
+  "a package taken from the registry, or from a source the config names, an address or a folder however its path ends, passes");
+ok(/Newtonsoft\.Json@13\.0\.3 \(src\/App\/packages\.lock\.json\): the restore took it from https:\/\/pkgs\.example\.com\/v3\/index\.json, which is neither NuGet's own registry nor a source the config's "nuget\.sources" names/.test(takenFrom("https://pkgs.example.com/v3/index.json"))
+  && /the restore took it from .*vendored/.test(takenFrom(path.join(tmp, "vendored"))) && /the restore took it from http:\/\/pkgs\.example\.com/.test(takenFrom("http://pkgs.example.com/v3/index.json", { sources: ["https://pkgs.example.com/v3/index.json"] }))
+  && /the restore took it from https:\/\/API\.nuget\.org/.test(takenFrom("https://API.nuget.org/v3/index.json")), "one taken from anywhere else fails, whatever added the source: an address, a folder, the plain form of a named address, another spelling of the registry's");
+ok([null, "", "not json", "{}", JSON.stringify({ version: 2, source: "" }), JSON.stringify({ source: 7 })].every(meta => /the restore left no record of where it took it from \(\.nupkg\.metadata\)/.test(takenFrom(REGISTRY, {}, only, { meta }))),
+  "a package with no record of where it was taken from, or one that names no source, fails: its source cannot be read");
+const elsewhere = check({ ships: [], nuget: { ships: [L] } }, tmp, restore("Newtonsoft.Json@13.0.3", ["Some.Pack@8.0.0", "https://pkgs.example.com/v3/index.json"]), only).failures.join("\n");
+ok(/some\.pack@8\.0\.0 \(brought by the restore, and named in no lock file read here\): the restore took it from https:\/\/pkgs\.example\.com/.test(elsewhere), "a package the restore brought that no lock file names, for a project of another kind say, is held to the same sources", elsewhere);
+// (the runner's own SDK stands outside the project, as on a runner)
+const sdk = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-sdk-")); process.on("exit", () => fs.rmSync(sdk, { recursive: true, force: true }));
+for (const name of ["dotnet", "dotnet.exe"]) fs.writeFileSync(path.join(sdk, name), "");
+const onPath = { env: { PATH: [path.join(tmp, "nowhere"), sdk].join(path.delimiter) } };
+ok(takenFrom(path.join(sdk, "library-packs"), {}, only, onPath) === "" && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "elsewhere", "library-packs"), {}, only, onPath)) && /the restore took it from .*library-packs/.test(takenFrom(path.join(sdk, "library-packs"))),
+  "the SDK's own folder of packages, beside the dotnet the PATH names, is a source every restore has; a folder of that name anywhere else is not, nor that one where no dotnet stands beside it on the PATH");
+put("tools/dotnet", "");
+const relative = path.relative(process.cwd(), path.join(tmp, "tools")), local = (dir) => takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: dir } });
+ok(/the restore took it from .*library-packs/.test(local(relative)) && /the restore took it from .*library-packs/.test(local(path.join(tmp, "tools"))) && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { DOTNET_ROOT: path.join(tmp, "tools") } })),
+  "a dotnet the PATH or DOTNET_ROOT names by a path that is not whole, or one inside the project, brings no folder of packages: it would be one the pull request brought");
+const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-path-")); process.on("exit", () => fs.rmSync(outside, { recursive: true, force: true }));
+fs.symlinkSync(path.join(tmp, "tools", "dotnet"), path.join(outside, "dotnet"));
+ok(/the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: outside } })), "nor one whose link, outside the project, leads into it", takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: outside } }));
+put("vendor/packages/Bought.1.0.0.nupkg", "");
+const shown = names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] });
+fs.symlinkSync(os.tmpdir(), path.join(tmp, "vendor/packages/elsewhere"));
+ok(/"nuget\.sources" names vendor\/packages\/, a folder that holds no file git knows/.test(names(["vendor/readme.md"], { sources: ["vendor/packages/"] })) && shown === ""
+  && /vendor\/packages\/elsewhere: a link, in a folder the config names as a source/.test(names(["vendor/packages/Bought.1.0.0.nupkg", "vendor/packages/elsewhere"], { sources: ["vendor/packages/"] })),
+  "a folder named as a source holds files git knows, so what it gives stands in the pull request, and no link that leads out of it");
+fs.rmSync(path.join(tmp, "vendor/packages/elsewhere")); put("vendor/packages/deep/Slipped.2.0.0.nupkg", "");
+ok(/vendor\/packages\/deep\/Slipped\.2\.0\.0\.nupkg: a file git does not know, in a folder the config names as a source/.test(names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/"] }))
+  && names(["vendor/packages/Bought.1.0.0.nupkg", "vendor/packages/deep/Slipped.2.0.0.nupkg"], { sources: ["vendor/packages/"] }) === "", "and nothing git does not know, however deep: a restore takes what the pull request shows and nothing beside it");
 const inRepo = (to, text) => { fs.mkdirSync(path.dirname(path.join(repo, to)), { recursive: true }); fs.writeFileSync(path.join(repo, to), text); };
 inRepo("src/App/App.csproj", "<Project />"); inRepo(L, lock(direct(["Copy.Left", "4.0.0"])));
 inRepo("checks/audit.json", JSON.stringify({ entries: [] }));
@@ -199,6 +253,8 @@ ok(strict.status === 1 && /^FAIL: Copy\.Left@4\.0\.0/m.test(strict.out) && /1 fa
 ok(advisory.status === 0 && /^WOULD FAIL: Copy\.Left@4\.0\.0/m.test(advisory.out) && /Advisory: nothing fails for it yet/.test(advisory.out), "advisory, it says what it would fail, and passes", advisory.out);
 ok(run("checks/licences.json").status === 1 && run("--packages", left).status === 1 && run().status === 1 && run("checks/missing.json", "--packages", left, "--advisory").status === 1, "without its config or the restore's folder it fails, advisory or not");
 ok(run("--projects").status === 0 && run("--projects").stdout === "src/App/App.csproj\n", "asked for the project files, it lists what git knows, a line each, for the restore");
+ok(run("checks/licences.json", "--sources").status === 0 && run("checks/licences.json", "--sources").stdout === `${REGISTRY}\n` && run("--sources").status === 1 && run("checks/missing.json", "--sources").status === 1,
+  "asked for the sources, it lists the registry and what the config names, a line each, and fails without a config it can read");
 inRepo(L, lock(direct(["Newtonsoft.Json", "13.0.3"])));
 const fine = run("checks/licences.json", "--packages", path.relative(repo, json));
 ok(fine.status === 0 && /^1 NuGet packages in 1 lock files checked/m.test(fine.out), "a lock file edited and not yet committed is read as it stands, and the folder may be named from where it is started", fine.out);

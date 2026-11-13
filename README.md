@@ -125,11 +125,13 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
    - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
      core's with the licence check's config: a restore of each project file git knows from its lock file alone
-     (`dotnet restore --locked-mode`, floor rule 15), then `nuget.mjs`, which holds every package in those lock files
-     to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the manifest
-     of the package the restore brought; what the restore brought that no lock file names is held to the list for what
-     ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
-     config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
+     (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
+     config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads from
+     NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
+     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from
+     the manifest of the package the restore brought; what the restore brought that no lock file names is held to the
+     list for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named
+     in the config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
      licence a machine can read is read by hand: a tool that only runs is then recorded in the audit as
      `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
      off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
