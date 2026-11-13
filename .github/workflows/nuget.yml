@@ -15,11 +15,10 @@
 # included: so this runs with contents: read and no secret, nothing after the checkout holds the token, and what a pull
 # request does to its project files is the reviews' to read, as with every check that builds. Where the packages come
 # from is this restore's to say (floor rule 7): NuGet's own registry and the sources the config names, given to every
-# restore, which overrules what a NuGet.Config names, and the script then reads from what each restore wrote
-# (project.assets.json) that it took packages from nowhere else; a source that asks for a sign-in has none here. A
-# project for
-# Windows alone restores here all the same (EnableWindowsTargeting); one whose SDK the runner lacks
-# restores in a workflow of its own, and runs the script there.
+# restore, which overrules what a NuGet.Config names, and the script then reads, by NuGet's own record beside each
+# package it brought (.nupkg.metadata), that it took none from elsewhere; a source that asks for a sign-in has none
+# here. A project for Windows alone restores here all the same (EnableWindowsTargeting); one whose SDK the runner
+# lacks restores in a workflow of its own, and runs the script there.
 name: nuget
 
 on:

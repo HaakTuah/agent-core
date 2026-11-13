@@ -8,8 +8,10 @@
 // solution builds with the kit in it, and what the build leaves behind disturbs no check; and the NuGet check
 // (nuget.mjs) on real packages: the SDK's project takes two from nuget.org with lock files on, a restore from the lock
 // files alone fills a folder, and the check reads the real lock files and the real packages' manifests there, passes
-// them, fails a package under the GPL that is then added, and the restore refuses a lock file gone stale. On Linux
-// and on Windows.
+// them, fails a package under the GPL that is then added, and the restore refuses a lock file gone stale; and where
+// packages come from: the restore takes them from the sources the workflow gives it, whatever a NuGet.Config names,
+// and the check fails a package that a source a build file added gave, by NuGet's own record of where it took it
+// from. On Linux and on Windows.
 // Git, tar, Node's own modules, and the .NET SDK where there is one, which writes its own settings and caches into the
 // test's scratch folder.
 //
@@ -153,15 +155,21 @@ if (kit.status === 0) {
     const itsOwn = fresh("from-its-config"), given = fresh("from-the-registry", ...from);
     ok(itsOwn.status !== 0 && !itsOwn.brought && given.status === 0 && given.brought, "a NuGet.Config that names another source alone would restore from there and finds nothing; given its sources as the workflow gives them, the same restore takes every package from the registry", `${itsOwn.status} ${itsOwn.out.slice(-500)}\n     ${given.status} ${given.out.slice(-800)}`);
     fs.rmSync(path.join(plain, "NuGet.Config"));
-    // a file the build reads beside the project file adds a source to what the restore was given: what the restore
-    // wrote says so, and the check reads it there
+    // a file the build reads beside the project file adds a source to what the restore was given, and the project takes
+    // a package only that source holds: NuGet's own record beside the package says where it was taken from, and the
+    // check reads it there
     const checked = name => check(plain, ["core/scripts/nuget.mjs", "checks/licences.json", "--packages", kept(name)]);
-    const clean = checked("from-the-registry");
-    fs.writeFileSync(path.join(plain, "src/App/App.csproj.user"), "<Project><PropertyGroup><RestoreAdditionalProjectSources>$(MSBuildThisFileDirectory)../../empty-feed</RestoreAdditionalProjectSources></PropertyGroup></Project>\n");
+    const clean = checked("from-the-registry"), only = "AgentCoreTrial.OnlyHere";
+    const made = [["new", "classlib", "--output", kept("only-here")], ["pack", kept("only-here"), "--output", path.join(plain, "extra-feed"), `-p:PackageId=${only}`, "-p:PackageVersion=1.0.0"]]
+      .map(args => [args[0], dotnet(tmp, ...args)]).filter(([, r]) => r.status !== 0);
+    fs.writeFileSync(path.join(plain, "src/App/App.csproj.user"), "<Project><PropertyGroup><RestoreAdditionalProjectSources>$(MSBuildThisFileDirectory)../../extra-feed</RestoreAdditionalProjectSources></PropertyGroup></Project>\n");
+    const taken = dotnet(plain, "add", "src/App", "package", only, "--version", "1.0.0");
     const added = fresh("with-a-source-added", ...from), caught = checked("with-a-source-added");
-    ok(clean.status === 0 && added.status === 0 && caught.status === 1 && /^FAIL: src\/App\/App\.csproj: its restore took packages from .*empty-feed/m.test(caught.out),
-      "restored from the registry alone the check passes; with a file beside the project file adding a source, the restore still passes and the check fails it, naming the source", `${clean.status} ${clean.out.slice(0, 600)}\n     ${added.status} ${added.out.slice(-400)}\n     ${caught.status} ${caught.out.slice(0, 900)}`);
-    fs.rmSync(path.join(plain, "src/App/App.csproj.user")); fs.rmSync(path.join(plain, "empty-feed"), { recursive: true });
+    ok(clean.status === 0 && made.length === 0 && taken.status === 0 && added.status === 0 && caught.status === 1 && new RegExp(`^FAIL: ${only.replace(".", "\\.")}@1\\.0\\.0 \\(src/App/packages\\.lock\\.json\\): the restore took it from .*extra-feed`, "m").test(caught.out),
+      "restored from the registry alone the check passes; with a file beside the project file adding a source and a package only it holds, the restore passes and the check fails that package, naming where it was taken from",
+      `${clean.status} ${clean.out.slice(0, 600)}\n     ${made.map(([what, r]) => `dotnet ${what}: ${r.out.slice(-400)}`).join("\n     ")}\n     ${taken.status} ${taken.out.slice(-400)}\n     ${added.status} ${added.out.slice(-400)}\n     ${caught.status} ${caught.out.slice(0, 900)}`);
+    fs.rmSync(path.join(plain, "src/App/App.csproj.user")); fs.rmSync(path.join(plain, "extra-feed"), { recursive: true });
+    git(plain, "checkout", "-q", "--", ".");
     // a folder of the project's own as a source: named in the config, given to the restore by its whole path
     fs.mkdirSync(path.join(plain, "vendor/packages"), { recursive: true });
     fs.copyFileSync(path.join(kept("from-the-registry"), "newtonsoft.json", "13.0.3", "newtonsoft.json.13.0.3.nupkg"), path.join(plain, "vendor/packages/newtonsoft.json.13.0.3.nupkg"));
