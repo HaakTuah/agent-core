@@ -67,8 +67,8 @@ words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; 
    project whose orchestrator does not wake every day also has a `core-moved.yml` of its own, on a daily schedule, in a
    job that grants `contents: read` and `issues: write`: it keeps one issue open for the owner while this repository's
    `main` is past the project's pin (`core/scripts/core-moved.mjs`), and opens no pull request, since one a workflow
-   opens gets no checks. A session started with no orchestrator asks the same at its start
-   (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
+   opens gets no checks. A session of the trusted builder's (floor rule 3) started with no orchestrator asks the same at
+   its start (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
    `modules/work-flow.md`), so that issue is the backstop for the days no session starts. Only a sync PR moves those
    pins, and only when the called workflow changed; `core.yml` fails a call pinned where it differs from the core's pin.
    A sync changes nothing of the project's own, and the core tested its scripts before the sync brings them: so the
