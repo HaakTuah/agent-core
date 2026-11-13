@@ -3,7 +3,7 @@
 // to git and gh are the program's own and are not made here.
 //
 //   node scripts/core-cost-test.mjs
-import { classify, dayOf, defaultRef, median, priced, print, reading, sessionOf, table, weekOf } from "./core-cost.mjs";
+import { REPO, classify, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "./core-cost.mjs";
 import { line } from "./session-cost.mjs";
 
 let failed = 0, count = 0;
@@ -16,6 +16,8 @@ ok(classify("x", ["core/a.md", "AGENTS.md"], rules) === "upkeep" && classify("x"
 ok(classify("x", ["core/a.md", "src/game.js"], rules) === "own" && classify("x", ["docs/design.md"], rules) === "own" && classify("x", ["corerules.md"], rules) === "own" && classify("x", [".github-notes.md"], rules) === "own", "anything of the project's own makes it the project's own work, and a name that only begins like a folder's is not in it");
 ok(classify("dependabot/npm_and_yarn/tools/x-1.2.3", ["tools/package-lock.json"], rules) === "update" && classify("x/dependabot/y", ["tools/package-lock.json"], rules) === "own", "a branch of Dependabot's own is an update");
 ok(classify("x", [], rules) === "own", "a merge that changed nothing is not counted as the core's");
+ok(classify("dependabot/npm_and_yarn/x-1.2.3", ["tools/package-lock.json"], rules, false) === "own" && classify("dependabot/x", ["core/a.md", "core-manifest.md"], rules, false) === "sync", "a fork's branch of that name is no update of Dependabot's: it counts by what it changed");
+ok(REPO.test("some-one/a.project_x") && !REPO.test("../..") && !REPO.test("./x") && !REPO.test("some-one/..") && !REPO.test("some.one/x") && !REPO.test("a/b/c") && !REPO.test("a/b?x=1") && !REPO.test("a /b"), "a repository's name is an account and a name, never a path out of its route");
 
 ok(weekOf("2026-11-09T00:00:00Z") === "2026-11-09" && weekOf("2026-11-15T23:59:59Z") === "2026-11-09" && weekOf("2026-11-16T00:00:00+00:00") === "2026-11-16" && weekOf("2026-11-13T01:30:00+02:00") === "2026-11-09", "a week runs from Monday to Sunday, in UTC");
 
@@ -42,6 +44,16 @@ const gap = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number:
 ok(!gap.has(3) && gap.get(4)?.answers === 20, "after a pull request of the session with no line, the next is not priced with what both took, and the one after is again");
 const unmerged = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number: 2, session: "a", reading: r(150, 700) }, { number: 3, session: "a", reading: r(180, 900) }]);
 ok(unmerged.get(3)?.answers === 30, "given every pull request of a session, one left unmerged between two merged ones keeps the later from being charged for both (the program reads them all)");
+// what gh gives of each pull request: only the repository's own count, a fork's is as if it were not there
+const link = "https://claude.ai/code/session_a", body = n => `x\n\nSession so far: ${n} answers (Opus); tokens in 1, cache written ${n * 10}, cache read ${n * 100}, out ${n * 5}.\n\n${link}`;
+const own = [[1, "Some/Project", body(100)], [3, "some/project", body(150)]];
+const honest = priced(readings(own, "some/project", 1)).get(3)?.answers;
+ok(honest === 50, "a session's two pull requests, read from their descriptions, price the second by what rose", String(honest));
+for (const [what, forged] of [["a lower line", body(1)], ["a line just below the next", body(149)], ["the session's link and no line", `x\n${link}`]]) {
+  const got = priced(readings([...own, [2, "outsider/project", forged]], "some/project", 1)).get(3)?.answers;
+  ok(got === 50, `a fork's pull request between them that names the session, with ${what}, changes nothing`, String(got));
+}
+ok(priced(readings([...own, [2, null, body(1)]], "some/project", 1)).get(3)?.answers === 50 && readings([[2, "", body(1)], [0, "some/project", body(1)]], "some/project", 1).length === 0, "nor does one whose fork is gone, and one from before the oldest merge is not read");
 ok(median([3, 1, 2]) === 2 && median([4, 1, 3, 2]) === 2.5 && median([]) === null, "the median");
 
 const merged = [

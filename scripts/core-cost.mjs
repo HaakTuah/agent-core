@@ -24,9 +24,14 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
 const within = (file, dir) => file === dir || file.startsWith(`${dir}/`);
 
-// What a merged pull request was, by its branch and the files it changed (`rules`: the project's rule files).
-export function classify(branch, files, rules) {
-  if (/^dependabot\//.test(branch)) return "update";
+// A repository's name as GitHub has it: an account (letters, digits and hyphens) and a name that is not dots alone, so
+// it is one repository's route and never a path out of it.
+export const REPO = /^[A-Za-z0-9-]+\/(?!\.+$)[\w.-]+$/;
+
+// What a merged pull request was, by its branch and the files it changed (`rules`: the project's rule files). A branch
+// counts as Dependabot's only where it is the repository's own (`ours`): a fork may name a branch anything.
+export function classify(branch, files, rules, ours = true) {
+  if (ours && /^dependabot\//.test(branch)) return "update";
   const copy = f => within(f, "core") || f === "core-manifest.md";
   if (files.length && files.some(f => within(f, "core")) && files.every(f => copy(f) || /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f))) return "sync";
   if (files.length && files.every(f => copy(f) || within(f, ".github") || within(f, ".claude") || rules.includes(f))) return "upkeep";
@@ -58,6 +63,15 @@ export function reading(body) {
 
 // The session a description names (the link a cloud session ends it with), or "" where it names none.
 export const sessionOf = body => /claude\.ai\/code\/(session_[A-Za-z0-9]+)/.exec(String(body ?? ""))?.[1] ?? "";
+
+// The pull requests whose descriptions count, from what gh gave of each ([number, the repository its branch is in, its
+// description]): only those from a branch of the repository itself, at or past the oldest merge read. A fork's is left
+// out whole, as if it were not there: anyone can open one, name a session in it and write a line of any size, and
+// counted even as "no line" it would wipe that session's reading.
+export function readings(rows, repo, oldest) {
+  return rows.filter(([number, from]) => number >= oldest && String(from ?? "").toLowerCase() === repo.toLowerCase())
+    .map(([number, , body]) => ({ number, session: sessionOf(body), reading: reading(body) }));
+}
 
 // What each pull request took: `pulls` are { number, session, reading } in any order. A pull request is priced by how
 // far its session's line rose since that session's pull request before it, and only where every part of the line rose
@@ -120,13 +134,18 @@ function main(argv) {
   const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
   if (!ref) fail("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
   const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
+  // (the repository, from GitHub's own variable or origin's address: whose branches are its own, and where --cost asks)
+  let repo = process.env.GITHUB_REPOSITORY;
+  if (!repo) try { repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(git(["remote", "get-url", "origin"]).trim())?.[1]; } catch { /* (no origin) */ }
+  if (!REPO.test(repo ?? "")) repo = null;
+  const owner = repo?.split("/")[0].toLowerCase();
   const merged = [];
   for (const line of log.split("\n").filter(Boolean)) {
     const [sha, when, subject] = line.split("\t");
-    const m = /^Merge pull request #(\d+) from [^/\s]+\/(\S+)/.exec(subject ?? "");
+    const m = /^Merge pull request #(\d+) from ([^/\s]+)\/(\S+)/.exec(subject ?? "");
     if (!m) continue;
     const files = git(["diff", "--name-only", "-z", "--no-renames", `${sha}^1`, sha]).split("\0").filter(Boolean);
-    const kind = classify(m[2], files, rules);
+    const kind = classify(m[3], files, rules, m[2].toLowerCase() === owner);
     let lines = 0;
     if (kind === "own") {
       for (const row of git(["diff", "--numstat", "--no-renames", `${sha}^1`, sha]).split("\n").filter(Boolean)) {
@@ -139,18 +158,17 @@ function main(argv) {
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
 
   if (cost) {
-    let repo = process.env.GITHUB_REPOSITORY;
-    if (!repo) try { repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(git(["remote", "get-url", "origin"]).trim())?.[1]; } catch { /* said below */ }
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
+    if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
     const pulls = [], oldest = Math.min(...merged.map(m => m.number));
     // (page by page, newest first, until the oldest merge here is passed: a cloud session's gh cannot follow pages by
-    // itself. Every pull request from that one on is read, merged or not, open or closed: one a session left unmerged
-    // between two merged ones holds a reading of its own, and without it the later one would be charged for both)
+    // itself. Every pull request of the repository's own from that one on is read, merged or not, open or closed: one
+    // a session left unmerged between two merged ones holds a reading of its own, and without it the later one would
+    // be charged for both)
     for (let page = 1; page <= 200; page++) {
       const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
-        "--jq", ".[] | [.number, (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
+        "--jq", ".[] | [.number, (.head.repo.full_name // \"\"), (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
       const rows = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
-      for (const [number, body] of rows) if (number >= oldest) pulls.push({ number, session: sessionOf(body), reading: reading(body) });
+      pulls.push(...readings(rows, repo, oldest));
       if (rows.length < 100 || rows.some(([number]) => number < oldest)) break;
     }
     const took = priced(pulls);
