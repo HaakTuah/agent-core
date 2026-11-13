@@ -34,7 +34,7 @@ ok(same(t.answers, { matched: { unsure: 1, "no verdict seen": 1 }, missed: { sur
 ok(print(t, "some-one/x") === "The stand-in's record in some-one/x, from 8 comments:\n  verdicts on ideas: 3 (sure yes 1, unsure later 1, unsure yes 1)\n  the owner's answers marked: 3, matched 2 (no verdict seen: 1 of 1; sure: 0 of 1; unsure: 1 of 1)", "the printed record", print(t, "some-one/x"));
 ok(print(tally([]), "some-one/x") === "The stand-in's record in some-one/x, from 0 comments:\n  verdicts on ideas: 0\n  the owner's answers marked: 0, matched 0", "an empty record prints its zeros");
 
-const i = (issue, writer = true) => ({ issue, title: issue, writer });
+const i = (issue, owner = true) => ({ issue, title: issue, owner });
 const l = lacking([i("7"), i("8"), i("9"), i("11"), i("12", false)], [
   c("8", "2026-11-12T16:30:00Z", "**The stand-in's verdict, updated: yes (sure)**"),
   c("8", "2026-11-12T16:00:00Z", "**The stand-in's verdict: later, unsure.**"), // (given out of order)
@@ -42,7 +42,7 @@ const l = lacking([i("7"), i("8"), i("9"), i("11"), i("12", false)], [
   c("11", "2026-11-12T16:00:00Z", "Stand-in's verdict: later (unsure)."),
 ]);
 ok(same(l.none.map(i => i.issue), ["7", "9"]) && same(l.later.map(i => i.issue), ["11"]), "an idea lacks a verdict where none came from a writer; a later is its last", JSON.stringify(l));
-ok(l.others === 1 && !l.none.some(x => x.issue === "12"), "an idea another account filed is left out and counted (floor rule 4)");
+ok(l.others === 1 && !l.none.some(x => x.issue === "12"), "an idea another account filed, a member's or a collaborator's too, is left out and counted (floor rule 4)");
 ok(plain("a\u001b[31mb\nc\u0085d") === "a [31mb c d" && plain(null) === "", "a title loses its control characters");
 
 console.log(`\n${count - failed} of ${count} passed`);
