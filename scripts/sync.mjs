@@ -12,7 +12,8 @@
 //
 // The first copy: a project with its manifest written and no core/ yet runs this file from a clone of the core's main
 // (`node <the clone>/scripts/sync.mjs`, a full SHA after it for another commit), and core/ is written at the commit its
-// manifest's "Core:" line names, that line moved if a SHA was given.
+// manifest's "Core:" line names, that line moved if a SHA was given. A project that follows the core's releases runs
+// it from a clone at a release, so that nothing newer than one runs in its sessions (README.md, point 1).
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
