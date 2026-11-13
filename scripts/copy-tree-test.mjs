@@ -1,5 +1,5 @@
-// Tests of copy-tree.mjs, the tree a project's copy of the core must be (the purity check of a sync PR rests on it:
-// pure-sync.mjs). In a scratch repository, against what `git archive` itself makes, as sync.mjs makes a copy; on Linux
+// Tests of copy-tree.mjs, the tree a project's copy of the core must be, and how two copies are compared (the purity
+// check of a sync PR rests on it: pure-sync.mjs; core.yml compares the same way). In a scratch repository, against what `git archive` itself makes, as sync.mjs makes a copy; on Linux
 // and on Windows. Git, tar and Node's own modules only.
 //
 //   node scripts/copy-tree-test.mjs
@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { copyTree } from "./copy-tree.mjs";
+import { copyTree, entries } from "./copy-tree.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -87,6 +87,16 @@ const modes = git(core, "rev-parse", "HEAD");
 const listed = (rev) => git(core, "ls-tree", "-r", rev).split("\n");
 ok(JSON.stringify(listed(copyTree(modes, core))) === JSON.stringify(listed(modes).filter((line) => !line.split("\t")[1].startsWith("reports/"))),
   "an executable file and a link keep their modes; every entry but the folder's is the pin's own");
+
+// how two copies are compared (core.yml compares the same way): by git's object ids and types, the executable bit aside
+const blob = git(core, "hash-object", "-w", "floor/rules.md");
+const treeOf = (...lines) => execFileSync("git", ["mktree", "--missing"], { cwd: core, input: lines.map((l) => `${l}\n`).join(""), encoding: "utf8" }).trim();
+const plain = treeOf(`100644 blob ${blob}\trun.sh`);
+ok(entries(treeOf(`100755 blob ${blob}\trun.sh`), core) === entries(plain, core), "a file the copy records 100644 where the core's is 100755 is the same file: the executable bit is no difference");
+ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), core) !== entries(plain, core), "a link in its place is not");
+ok(entries(treeOf(`160000 commit ${modes}\trun.sh`), core) !== entries(plain, core), "nor a submodule");
+ok(entries(treeOf(`100644 blob ${git(core, "hash-object", "-w", "reports/one.md")}\trun.sh`), core) !== entries(plain, core), "nor a file of other content");
+ok(entries(treeOf(`100644 blob ${blob}\trun.sh`, `100644 blob ${blob}\textra.md`), core) !== entries(plain, core), "nor a copy with a file more");
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

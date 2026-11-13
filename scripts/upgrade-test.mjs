@@ -10,7 +10,7 @@
 // only its docs, one that touches its package files, and the daily core-moved run; then its hooks, from main's copy as
 // Claude Code runs them. GitHub's own services (CodeQL, the dependency review) are not run here, and GitHub's API is a
 // stand-in that gives the security-review check one completed review. The sync's pull request is pure, as
-// pure-sync.mjs reads it from the release it moves to, where git keeps the copy's modes as the core's. It needs the
+// pure-sync.mjs reads it from the release it moves to, in both projects. It needs the
 // core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the .NET SDK too, which takes
 // nothing from the network for a project with no package, while npm takes one small package from the registry.
 // On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own modules.
@@ -223,9 +223,7 @@ function upgrade(p, ownChanges, expect) {
   const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}` });
   ok(!failures(onSync), `${p.name}: every check passes on the sync's pull request (${started(onSync).length} jobs)`, failures(onSync));
   const pure = node(p.dir, path.join(theCore, "scripts", "pure-sync.mjs"));
-  const keepsModes = git(p.dir, "config", "--bool", "core.fileMode") !== "false";
-  if (keepsModes) ok(pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${p.name}: the sync is pure, as pure-sync.mjs reads it from the release it moves to`, pure.out);
-  else console.log(`note ${p.name}: git here records no file's mode, and pure-sync.mjs says: ${pure.out.trim().split("\n").pop()}`);
+  ok(pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${p.name}: the sync is pure, as pure-sync.mjs reads it from the release it moves to, whatever modes git here records`, pure.out);
 
   // merged, as its merger merges it, and pushed to main
   git(p.dir, "checkout", "-q", "main");

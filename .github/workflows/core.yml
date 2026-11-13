@@ -1,5 +1,6 @@
 # The copy of the core ("How a project takes the core" in README.md, points 1 and 5), for every project that takes it:
-# fails a change whose core/ is not this repository, whole and unchanged, at the commit its core-manifest.md pins, whose
+# fails a change whose core/ is not this repository, whole and unchanged, at the commit its core-manifest.md pins (by
+# git's object ids, entry by entry, the executable bit aside: core archive 201), whose
 # pin, or the pin of a call to one of its workflows, is not a commit of this repository's main (so what a project takes
 # passed the core's reviews; floor rule 8; the call to this workflow itself: scripts/pure-sync.mjs), or
 # whose calls to the core's workflows are pinned to a commit where the called workflow differs from the one at that pin,
@@ -85,8 +86,17 @@ jobs:
           set -euo pipefail
           bad=0 core=${CORE//./\\.} # (in a pattern, a dot of the address is a dot)
           # (what the core keeps to itself is no part of a copy: its own .gitattributes says which folder)
-          if grep -q -s -x '/reports export-ignore' .core-at-pin/.gitattributes; then rm -rf .core-at-pin/reports; fi
-          if ! diff -r -q --exclude=.git .core-at-pin core; then echo "core/ differs from the core at its pin (above)"; bad=1; fi
+          # (entry by entry, by git's own object ids and types, as scripts/pure-sync.mjs compares through
+          # copy-tree.mjs: a file's content, a link or a submodule each count, and the executable bit does not, since a
+          # copy made on Windows records every file 100644 and nothing runs a file of the copy by its mode)
+          entries() { git -C "$1" ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
+          want=$(entries .core-at-pin "$PIN") have=$(entries . HEAD:core) || { echo "core/ is no folder of this commit"; have=""; }
+          if grep -q -s -x '/reports export-ignore' .core-at-pin/.gitattributes; then want=$(printf '%s\n' "$want" | awk -F '\t' '$2 !~ /^reports\//'); fi
+          if [ "$want" != "$have" ]; then
+            echo "core/ differs from the core at its pin, by git's object ids (< the core's, > core/'s):"
+            diff <(printf '%s\n' "$want") <(printf '%s\n' "$have") | grep '^[<>]' | head -n 20 || true
+            bad=1
+          fi
           if ! git -C .core-at-pin fetch -q --no-tags origin refs/heads/main \
             || ! git -C .core-at-pin merge-base --is-ancestor "$PIN" FETCH_HEAD; then
             echo "the pin $PIN is not a commit of the core's main"; bad=1
