@@ -3,7 +3,7 @@
 // to git and gh are the program's own and are not made here.
 //
 //   node scripts/core-cost-test.mjs
-import { classify, median, priced, print, reading, sessionOf, table, weekOf } from "./core-cost.mjs";
+import { classify, dayOf, defaultRef, median, priced, print, reading, sessionOf, table, weekOf } from "./core-cost.mjs";
 import { line } from "./session-cost.mjs";
 
 let failed = 0, count = 0;
@@ -18,6 +18,9 @@ ok(classify("dependabot/npm_and_yarn/tools/x-1.2.3", ["tools/package-lock.json"]
 ok(classify("x", [], rules) === "own", "a merge that changed nothing is not counted as the core's");
 
 ok(weekOf("2026-11-09T00:00:00Z") === "2026-11-09" && weekOf("2026-11-15T23:59:59Z") === "2026-11-09" && weekOf("2026-11-16T00:00:00+00:00") === "2026-11-16" && weekOf("2026-11-13T01:30:00+02:00") === "2026-11-09", "a week runs from Monday to Sunday, in UTC");
+
+ok(dayOf("2026-11-09T00:30:00+02:00") === "2026-11-08" && dayOf("2026-11-08T23:30:00-02:00") === "2026-11-09" && dayOf("2026-11-09T12:00:00Z") === "2026-11-09", "a day is UTC's too, whatever offset the moment was written with, so the split and the weeks agree");
+ok(defaultRef(() => true) === "refs/remotes/origin/HEAD" && defaultRef(n => n !== "refs/remotes/origin/HEAD") === "refs/remotes/origin/main" && defaultRef(n => n === "refs/heads/main") === "refs/heads/main" && defaultRef(() => false) === null, "the merges read are the default branch's, origin's first, and never the branch checked out");
 
 const sample = line({ answers: 1234, sum: { input_tokens: 7, cache_creation_input_tokens: 2000000, cache_read_input_tokens: 30000000, output_tokens: 456789 }, families: ["Opus"] });
 ok(JSON.stringify(reading(`The change.\n\n${sample}\n\nmore`)) === JSON.stringify({ answers: 1234, input: 7, written: 2000000, read: 30000000, out: 456789 }), "the line session-cost.mjs prints is read back, count for count", sample);
@@ -35,6 +38,8 @@ const took = priced([
 ]);
 ok(took.get(5)?.answers === 50 && took.get(5)?.out === 400 && took.get(7)?.answers === 10 && took.get(7)?.out === 60, "a pull request took what its session's line rose by since that session's one before");
 ok(!took.has(3) && !took.has(4) && !took.has(6) && !took.has(8) && !took.has(9) && !took.has(10) && took.size === 2, "the first of a session, a line that dropped, no session, no line and no rise are not priced");
+const gap = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number: 2, session: "a", reading: null }, { number: 3, session: "a", reading: r(180, 900) }, { number: 4, session: "a", reading: r(200, 950) }]);
+ok(!gap.has(3) && gap.get(4)?.answers === 20, "after a pull request of the session with no line, the next is not priced with what both took, and the one after is again");
 ok(median([3, 1, 2]) === 2 && median([4, 1, 3, 2]) === 2.5 && median([]) === null, "the median");
 
 const merged = [

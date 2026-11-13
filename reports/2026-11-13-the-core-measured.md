@@ -11,8 +11,8 @@ upkeep (rule files, `.github/`, `.claude/`) together, of all that merged.
 
 | Game | When | Merged | Own work | Sync | Other upkeep | Updates | The core's share |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Barkstreet Snakes | before 9 November | 115 | 115 | 0 | 0 | 0 | 0% |
-| Barkstreet Snakes | from 9 November on | 109 | 48 | 52 | 9 | 0 | 56% |
+| Barkstreet Snakes | before 9 November | 116 | 116 | 0 | 0 | 0 | 0% |
+| Barkstreet Snakes | from 9 November on | 108 | 47 | 52 | 9 | 0 | 56% |
 | Amarna Letters | before 9 November | 157 | 155 | 0 | 1 | 1 | 1% |
 | Amarna Letters | from 9 November on | 120 | 61 | 48 | 10 | 1 | 48% |
 
@@ -36,7 +36,7 @@ merged PRs, 39 could be priced: 17 in one game and 22 in the other.
 
 ## What the numbers say, and what they do not
 
-- **About half of what merged since 9 November was the core's upkeep,** in both games: 61 of 109 PRs and 58 of 120.
+- **About half of what merged since 9 November was the core's upkeep,** in both games: 61 of 108 PRs and 58 of 120.
   Before the core there were none, since the rules then lived in each game and changed with its own work.
 - **The games' own work kept its pace in PRs and shrank in size.** As many own-work PRs merged in these four and a
   half days as in a whole week before, but they changed a fifth of the lines or less. Two things beside the core
@@ -57,5 +57,5 @@ merged PRs, 39 could be priced: 17 in one game and 22 in the other.
   floor. Why the record shrinks was not looked into here; until it is, the line at the end of a description is best
   read as "at least".
 
-Readings taken: the split is by what a PR changed, with the rule files as each game lists them today, so an older PR
+Readings taken: days and weeks are UTC's; the split is by what a PR changed, with the rule files as each game lists them today, so an older PR
 that changed a file since renamed counts as own work. Questions for the owner: none.

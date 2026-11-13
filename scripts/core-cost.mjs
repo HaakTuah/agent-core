@@ -8,7 +8,7 @@
 //   own      anything else: the project's own work, its docs included
 // and prints, week by week, how many of each merged, the share that was the core's upkeep (sync and upkeep together)
 // and the lines of its own work that changed. With --split it prints the same for all before a day and all from it
-// on, as for the day the project took the core. With --cost it also reads each pull request's description (gh, page by
+// on, as for the day the project took the core. Weeks and days are UTC's. With --cost it also reads each pull request's description (gh, page by
 // page) for the line session-cost.mjs prints, and says what a pull request took: the answers and output tokens a
 // session's line rose by since that session's pull request before it. That line is no steady count (a session's
 // record can lose answers, and the line then drops), so a pull request is priced only where its session's line rose in
@@ -33,6 +33,14 @@ export function classify(branch, files, rules) {
   return "own";
 }
 
+// The day (UTC) a moment falls on, as YYYY-MM-DD, whatever offset it was written with.
+export const dayOf = iso => new Date(iso).toISOString().slice(0, 10);
+
+// The branch whose merges are read: the default branch as the clone knows its origin's, else origin's main, else its
+// own main (the core's projects all name it so: core.yml), by the first of them `has`; never the branch checked out,
+// which may be a task's. Null where there is none of them.
+export const defaultRef = has => ["refs/remotes/origin/HEAD", "refs/remotes/origin/main", "refs/heads/main"].find(has) ?? null;
+
 // The Monday (UTC) of the week a moment falls in, as YYYY-MM-DD.
 export function weekOf(iso) {
   const d = new Date(iso);
@@ -53,11 +61,13 @@ export const sessionOf = body => /claude\.ai\/code\/(session_[A-Za-z0-9]+)/.exec
 
 // What each pull request took: `pulls` are { number, session, reading } in any order. A pull request is priced by how
 // far its session's line rose since that session's pull request before it, and only where every part of the line rose
-// or stood: the first of a session, one with no session or no line, and one whose line dropped are not priced.
+// or stood: the first of a session, one with no session or no line, and one whose line dropped are not priced. Nor is
+// the one after a pull request of that session with no line, since what rose since the reading before belongs to both.
 export function priced(pulls) {
   const last = new Map(), took = new Map();
   for (const p of [...pulls].sort((a, b) => a.number - b.number)) {
-    if (!p.session || !p.reading) continue;
+    if (!p.session) continue;
+    if (!p.reading) { last.delete(p.session); continue; }
     const before = last.get(p.session);
     last.set(p.session, p.reading);
     if (!before) continue;
@@ -107,8 +117,8 @@ function main(argv) {
   for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
   let rules;
   try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = ruleFiles(); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
-  let ref = "HEAD";
-  try { ref = git(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD"]).trim(); } catch { /* (no such ref: the branch checked out) */ }
+  const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
+  if (!ref) fail("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
   const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
   const merged = [];
   for (const line of log.split("\n").filter(Boolean)) {
@@ -145,7 +155,7 @@ function main(argv) {
     for (const m of merged) m.took = took.get(m.number) ?? null;
   }
 
-  const groupOf = split ? m => (m.when.slice(0, 10) < split ? `before ${split}` : `from ${split} on`) : m => `week of ${weekOf(m.when)}`;
+  const groupOf = split ? m => (dayOf(m.when) < split ? `before ${split}` : `from ${split} on`) : m => `week of ${weekOf(m.when)}`;
   const rows = table(merged, groupOf);
   if (split) rows.sort((a, b) => a.key.startsWith("before") ? -1 : 1);
   console.log(print(rows, cost));
