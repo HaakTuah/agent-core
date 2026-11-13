@@ -30,8 +30,9 @@ export function next(dir) {
 
 // Whether this file lies in the core's own repository (its scripts/ at the repository's root), not in a project's copy.
 export function inTheCore(file = fileURLToPath(import.meta.url)) {
-  const root = path.resolve(path.dirname(file), "..");
-  try { return fs.realpathSync(git(["rev-parse", "--show-toplevel"], root)) === fs.realpathSync(root); } catch { return false; }
+  // (asked of git as a path from the repository's root, empty at the root itself: no two spellings of one folder,
+  // such as Windows' short names, are ever compared)
+  try { return git(["rev-parse", "--show-prefix"], path.resolve(path.dirname(file), "..")) === ""; } catch { return false; }
 }
 
 function main(cut) {
