@@ -6,7 +6,7 @@
 // these; a term only in a file git reads as binary (not read); only in a commit from before the rule; a file named with
 // a term before it, deleted or renamed away; only in the
 // author of a merge GitHub itself made (floor rule 11's exception), committed as GitHub and signed by its key, while
-// one written to look so (unsigned, or signed by another key) fails, and so does every merge's author where the key
+// one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
 // runs, so no file holds them. On Linux and on Windows. Git, bash and Node's own modules.
@@ -117,6 +117,35 @@ if (gpg) {
   passes("a merge GitHub itself made into the branch, its author the merging account's profile (floor rule 11's exception)", update(GITHUB));
   fails("a merge written to look like GitHub's, committed as GitHub but not signed", update(AS_GITHUB));
   fails("a merge committed as GitHub but signed by another key", update({ ...AS_GITHUB, ...signedBy(stranger, "someone@example.invalid") }));
+  // a certificate made to look like GitHub's: an X.509 signature, which carries its own certificate and which gpgsm
+  // reads as good where it is not told to trust none (made only where openssl and gpgsm can make one here)
+  const forger = path.join(tmp, "x509");
+  const x509 = (() => {
+    try {
+      fs.mkdirSync(forger, { mode: 0o700 });
+      const run = (cmd, args, input) => execFileSync(cmd, args, { cwd: forger, env: { ...env, GNUPGHOME: forger }, input, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], timeout: 30000 });
+      run("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "key.pem", "-out", "cert.pem", "-days", "30", "-subj", "/CN=GitHub/emailAddress=noreply@github.com"]);
+      run("openssl", ["pkcs12", "-export", "-legacy", "-inkey", "key.pem", "-in", "cert.pem", "-out", "id.p12", "-passout", "pass:"]);
+      run("gpgsm", ["--batch", "--pinentry-mode", "loopback", "--passphrase-fd", "0", "--import", "id.p12"], "\n");
+      const fpr = run("gpgsm", ["--with-colons", "--list-secret-keys"]).split("\n").find(l => l.startsWith("fpr:"))?.split(":")[9];
+      if (!fpr) return null;
+      fs.writeFileSync(path.join(forger, "trustlist.txt"), `${fpr.match(/../g).join(":")} S relax\n`);
+      fs.writeFileSync(path.join(forger, "gpgsm.conf"), "disable-crl-checks\ninclude-certs -1\n");
+      const signing = { GNUPGHOME: forger, GIT_CONFIG_COUNT: "4", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.format", GIT_CONFIG_VALUE_1: "x509", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: fpr, GIT_CONFIG_KEY_3: "gpg.x509.program", GIT_CONFIG_VALUE_3: "gpgsm" };
+      // (tried first: a commit it signs reads as good to a gpgsm that trusts nothing of its own, as the check's runner would)
+      const probe = path.join(tmp, "x509-probe"), empty = path.join(tmp, "x509-empty");
+      fs.mkdirSync(probe);
+      fs.mkdirSync(empty, { mode: 0o700 });
+      git(probe, ["init", "-q"]);
+      git(probe, ["commit", "-q", "--allow-empty", "-m", "signed"], { ...AS_GITHUB, ...signing });
+      return /^[GU]$/.test(git(probe, ["-c", "gpg.x509.program=gpgsm", "log", "-1", "--format=%G?"], { GNUPGHOME: empty })) ? signing : null;
+    } catch {
+      return null;
+    }
+  })();
+  process.on("exit", () => { for (const home of [forger, path.join(tmp, "x509-empty")]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
+  if (x509) fails("a merge committed as GitHub but signed with a certificate made to look like GitHub's (X.509)", update({ ...AS_GITHUB, ...x509 }));
+  else console.log("note openssl or gpgsm cannot make a certificate here, so a merge signed with one is not tried");
   const unfetched = check(update(GITHUB), { key: path.join(tmp, "no-such-key") });
   ok(!unfetched.passed && unfetched.out.includes("could not be fetched") && !unfetched.out.includes(term), "where GitHub's key cannot be fetched, no merge is taken for GitHub's, and the run says so", unfetched.out);
 } else {
