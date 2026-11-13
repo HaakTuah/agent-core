@@ -46,7 +46,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    project's pin and nothing in between, and wherever this README or a script says the core has moved, it has moved
    only when such a release is cut; a full SHA still takes any commit of `main`. Why: a pure sync brings scripts, hooks
    and workflows that no review in the project reads (floor rule 8), so what another owner's project runs was reviewed
-   in the core alone, and its owner takes only what the core's owner chose to hand on.
+   in the core alone, and its owner takes only what the core's owner chose to hand on. So that nothing of the core's
+   newer than a release runs in such a project's sessions either, its merger runs `scripts/pure-sync.mjs` from a
+   checkout of the release the sync moves to, itself a commit of `main` (floor rule 8), and its first copy is made
+   from a clone at a release.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and the list is read against

@@ -18,10 +18,11 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
-import { NOTES, asksBetween, followsOf, newestRelease } from "./releases.mjs";
+import { NOTES, asksBetween, followsOf, newestRelease, past, plainEnv } from "./releases.mjs";
 
 const URL = `https://github.com/${CORE}`;
-const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+// (git's own variables that point elsewhere are left out, so every call lands in the folder it names: releases.mjs)
+const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
 
@@ -47,13 +48,13 @@ function sync(tmp) {
       pin = newest.sha; release = ` (${newest.name})`;
     }
   }
-  try { git(["cat-file", "-e", `${pin}^{commit}`], tmp); } catch { fail(`${pin} is not a commit of the core`); }
+  if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
   if (pin === old && !first) { console.log(`core/ is already at ${pin}: nothing to sync`); return; }
 
   fs.rmSync("core", { recursive: true, force: true });
   fs.mkdirSync("core");
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { input: execFileSync("git", ["archive", pin], { cwd: tmp, maxBuffer: 1 << 28 }) });
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { input: execFileSync("git", ["archive", pin], { cwd: tmp, env: plainEnv(), maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
 
   const moved = [];

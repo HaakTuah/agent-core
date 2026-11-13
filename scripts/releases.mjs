@@ -13,7 +13,12 @@ const SHA = /^[0-9a-f]{40}$/;
 export const RELEASE = /^release-([1-9][0-9]{0,8})$/;
 // the core's sync notes: what a sync asks of a project beyond the copy
 export const NOTES = "setup/sync-notes.md";
-const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+// Git's own variables that point a command at another repository than the folder it is run in (a hook, or a shell
+// that set them, hands them on): left out of every call here and in release.mjs, so each lands in the folder it names
+// and nowhere else.
+export const elsewhere = /^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|COMMON_DIR|NAMESPACE)$/i;
+export const plainEnv = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !elsewhere.test(name)));
+const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const holds = (args, cwd) => { try { git(args, cwd); return true; } catch { return false; } };
 
 // The manifest's *owner's account* (core.yml checks the row's form), or null where it has no one such row.
@@ -37,21 +42,33 @@ export function followsOf(manifest) {
 // The core's main and its release tags, with their history, fetched into the empty folder `dir`, so that which commit
 // is past which can be told there. (`url` is the tests' own: every other caller takes the core's address.)
 export function fetchCore(dir, url = `https://github.com/${CORE}`) {
-  git(["init", "-q", "--bare"], dir);
+  git(["init", "-q", "--bare", dir], dir); // (the folder named outright: never a repository git was pointed at)
   git(["fetch", "-q", "--no-tags", url, "+refs/heads/main:refs/heads/main", "+refs/tags/release-*:refs/tags/release-*"], dir);
 }
 
 // Whether the commit `older` is `newer` or one it came from; false too where either is no commit there.
 export const past = (older, newer, dir) => SHA.test(older) && holds(["merge-base", "--is-ancestor", older, newer], dir);
 
+// Every tag there with a release's name, by its number, lowest first, with the commit it stands on: followed through
+// to a commit however the tag was made (a tag of a tag too), so a release is never anything but a commit; null where
+// it leads to none.
+export function namedReleases(dir) {
+  return git(["for-each-ref", "--format=%(refname:strip=2)", "refs/tags/"], dir).split("\n")
+    .map(name => ({ name, n: Number(RELEASE.exec(name)?.[1]) })).filter(r => Number.isSafeInteger(r.n))
+    .map(r => { let sha = null; try { sha = git(["rev-parse", "--verify", "--quiet", `refs/tags/${r.name}^{commit}`], dir); } catch { /* (no commit) */ } return { ...r, sha: SHA.test(sha ?? "") ? sha : null }; })
+    .sort((a, b) => a.n - b.n);
+}
+
 // The releases in a repository that holds the core's main and its tags, the newest (the highest number) first. A tag
-// counts only where its name is a release's and its commit is one of main: a tag on anything else is no release.
+// counts only where its name is a release's, its commit is one of main, and it is at or past the release numbered
+// before it: a tag on anything else, or one numbered high on an older commit by mistake, is no release, so the newest
+// by number is always the newest in main's history too.
 export function releasesIn(dir) {
-  return git(["for-each-ref", "--format=%(refname:strip=2) %(objectname) %(*objectname)", "refs/tags/"], dir)
-    .split("\n").filter(Boolean)
-    .map(line => { const [name, sha, commit] = line.split(" "); return { name, n: Number(RELEASE.exec(name)?.[1]), sha: commit || sha }; })
-    .filter(r => Number.isSafeInteger(r.n) && past(r.sha, "refs/heads/main", dir))
-    .sort((a, b) => b.n - a.n);
+  const kept = [];
+  for (const r of namedReleases(dir)) {
+    if (r.sha && past(r.sha, "refs/heads/main", dir) && (!kept.length || past(kept.at(-1).sha, r.sha, dir))) kept.push(r);
+  }
+  return kept.reverse();
 }
 
 // The newest release there, with whether it is past the pin (`moved`: the project's copy is behind it), or null where

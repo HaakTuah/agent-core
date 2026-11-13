@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { CORE, OWNER } from "./core-address.mjs";
 import { inTheCore, next } from "./release.mjs";
-import { NOTES, RELEASE, asksBetween, fetchCore, followsOf, newestRelease, ownerOf, past, releasesIn } from "./releases.mjs";
+import { NOTES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, namedReleases, newestRelease, ownerOf, past, releasesIn } from "./releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -32,9 +32,10 @@ ok(RELEASE.test("release-1") && RELEASE.test("release-120") && !RELEASE.test("re
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "releases-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 // (git's own variables that point at a repository are left out, so every call lands in the scratch one)
-for (const name of Object.keys(process.env)) if (/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)) delete process.env[name];
+for (const name of Object.keys(process.env)) if (elsewhere.test(name)) delete process.env[name];
 Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
-const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+// (the test's own calls never take a variable that points elsewhere, even while one is set to try the scripts)
+const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([name]) => !elsewhere.test(name))), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const core = path.join(tmp, "core");
 fs.mkdirSync(path.join(core, path.dirname(NOTES)), { recursive: true });
 git(core, "init", "-q", "-b", "main");
@@ -72,9 +73,44 @@ ok(!newestRelease(side, dir).moved && !newestRelease("f".repeat(40), dir).moved,
 ok(asksBetween(c1, c3, dir).join("|") === "- **First.** Done when one.|- **Second.** Done when two." && asksBetween(c3, c4, dir).length === 0, "a sync asks what the notes gained between the two commits");
 ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read give no all-clear");
 const coming = next(dir);
-ok(coming.name === "release-3" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release is numbered after the newest, on main's newest commit");
-git(core, "tag", "release-3", "-f", c4);
-ok(next(fetched()) === null, "with the newest release on main's newest commit there is nothing to release");
+ok(coming.name === "release-4" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release stands on main's newest commit, numbered after every tag with a release's name, the one that is no release too, so its name is never taken");
+
+// a tag of a tag, and a number out of main's order
+git(core, "tag", "-a", "-m", "inner", "inner", c4);
+git(core, "tag", "-a", "-m", "a tag of a tag", "release-5", "inner");
+git(core, "tag", "release-6", c1); // (numbered newest, on main's oldest commit: a mistake)
+dir = fetched();
+const five = releasesIn(dir)[0];
+ok(five.name === "release-5" && five.sha === c4 && git(dir, "cat-file", "-t", five.sha) === "commit", "a release made as a tag of a tag is the commit it leads to, never a tag", JSON.stringify(five));
+ok(!releasesIn(dir).some(r => r.name === "release-6") && namedReleases(dir).at(-1).name === "release-6" && newestRelease(c1, dir).name === "release-5", "a tag numbered newest on an older commit is no release: the newest by number is the newest in main's history");
+ok(next(dir) === null, "with the newest release on main's newest commit there is nothing to release");
+commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n- **Third.** Done when three.\n`);
+dir = fetched();
+ok(next(dir).name === "release-7" && next(dir).before.name === "release-5" && next(dir).asks.join() === "- **Third.** Done when three.", "the next one is numbered past the mistaken tag, and carries what the notes gained since the newest release");
+git(core, "tag", "release-999999999", c1);
+let refused = false;
+try { next(fetched()); } catch { refused = true; }
+ok(refused, "a tag numbered so high that the next would be no release's name stops the cut, and says so");
+git(core, "tag", "-d", "release-999999999");
+
+// git's own variables that point elsewhere: a project's repository is never touched, and the guard is not fooled
+const victim = path.join(tmp, "victim");
+fs.mkdirSync(path.join(victim, "core", "scripts"), { recursive: true });
+git(victim, "init", "-q", "-b", "main");
+fs.writeFileSync(path.join(victim, "f"), "x");
+git(victim, "add", "-A");
+git(victim, "commit", "-q", "-m", "its own");
+const own = git(victim, "rev-parse", "HEAD");
+process.env.GIT_DIR = path.join(victim, ".git");
+process.env.GIT_WORK_TREE = victim;
+let pointed, fooled;
+try {
+  pointed = fs.mkdtempSync(path.join(tmp, "pointed-"));
+  fetchCore(pointed, core);
+  fooled = inTheCore(path.join(victim, "core", "scripts", "release.mjs"));
+} finally { delete process.env.GIT_DIR; delete process.env.GIT_WORK_TREE; }
+ok(releasesIn(pointed)[0]?.name === "release-5" && git(victim, "rev-parse", "HEAD") === own && git(victim, "config", "--get", "core.bare") === "false" && git(victim, "tag").trim() === "", "with git pointed at a project's repository, the core is still fetched into its own folder and the project's is left as it was");
+ok(fooled === false, "and a project's copy is still no place to cut a release from");
 
 // where a release may be cut
 ok(inTheCore(), "this file lies in the core's own repository");
@@ -83,6 +119,12 @@ fs.mkdirSync(path.join(project, "core", "scripts"), { recursive: true });
 git(project, "init", "-q");
 ok(!inTheCore(path.join(project, "core", "scripts", "release.mjs")), "a copy under a project's core/ is not the core: a project cuts no release");
 ok(!inTheCore(path.join(tmp, "nowhere", "scripts", "release.mjs")), "nor is a folder that is no repository");
+// a copy kept as a repository of its own under a project's core/, the project's manifest beside it
+const nested = path.join(tmp, "nested");
+fs.mkdirSync(path.join(nested, "core", "scripts"), { recursive: true });
+fs.writeFileSync(path.join(nested, "core-manifest.md"), "# Core manifest\n");
+git(path.join(nested, "core"), "init", "-q");
+ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a clone or submodule of the core under a project's core/");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;

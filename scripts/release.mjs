@@ -13,26 +13,34 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { NOTES, asksBetween, fetchCore, releasesIn } from "./releases.mjs";
+import { NOTES, RELEASE, asksBetween, fetchCore, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
 
-const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
 // The next release in a repository that holds the core's main and its tags: its name, the commit it would stand on,
 // the release before it (null: the first), and what a sync from that one to it asks of a project. Null where the
-// newest release already stands on main's newest commit: there is nothing to hand on.
+// newest release already stands on main's newest commit: there is nothing to hand on. It is numbered after every tag
+// with a release's name, one that is no release included, so its name is never taken; and it throws where that number
+// would be no release's name any more.
 export function next(dir) {
   const tip = git(["rev-parse", "refs/heads/main"], dir);
   const [before] = releasesIn(dir);
   if (before?.sha === tip) return null;
-  return { name: `release-${(before?.n ?? 0) + 1}`, sha: tip, before: before ?? null, asks: before ? asksBetween(before.sha, tip, dir) : [] };
+  const name = `release-${(namedReleases(dir).at(-1)?.n ?? 0) + 1}`;
+  if (!RELEASE.test(name)) throw new Error(`${name} is no release's name: a tag numbered too high stands in the way, and is the owner's to remove`);
+  return { name, sha: tip, before: before ?? null, asks: before ? asksBetween(before.sha, tip, dir) : [] };
 }
 
-// Whether this file lies in the core's own repository (its scripts/ at the repository's root), not in a project's copy.
+// Whether this file lies in the core's own repository: its scripts/ at the root of a repository that is no project's
+// copy, even a copy kept as a repository of its own (a clone or a submodule under a project's core/, with the
+// project's manifest beside it).
 export function inTheCore(file = fileURLToPath(import.meta.url)) {
+  const root = path.resolve(path.dirname(file), "..");
   // (asked of git as a path from the repository's root, empty at the root itself: no two spellings of one folder,
   // such as Windows' short names, are ever compared)
-  try { return git(["rev-parse", "--show-prefix"], path.resolve(path.dirname(file), "..")) === ""; } catch { return false; }
+  try { if (git(["rev-parse", "--show-prefix"], root) !== "") return false; } catch { return false; }
+  return !(path.basename(root) === "core" && fs.existsSync(path.join(root, "..", "core-manifest.md")));
 }
 
 function main(cut) {
