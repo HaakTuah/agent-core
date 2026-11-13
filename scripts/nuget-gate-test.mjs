@@ -96,6 +96,8 @@ else {
   restores("one that adds it in the second of two imports on a line", { "build/two.xml": ADDS }, { start: { "src/App/App.csproj": project('  <Import Project="..\\..\\build\\deps.xml" /><Import Project="..\\..\\build\\two.xml" />\n'), "build/two.xml": EMPTY } });
   restores("one that adds it in a file a property imports", { "build/two.xml": ADDS }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY } });
   restores("one that adds it in an imported file whose name is not plain ASCII", { "build/Ünï.xml": ADDS }, { start: { "build/deps.xml": '<Project>\n  <Import Project="Ünï.xml" />\n</Project>\n', "build/Ünï.xml": EMPTY } });
+  restores("one that adds a package in an import, where the project's record of its restore lies outside the checkout", { "build/deps.xml": '<Project>\n  <ItemGroup>\n    <PackageDownload Include="Newtonsoft.Json" Version="[12.0.1]" />\n  </ItemGroup>\n</Project>\n' },
+    { start: { "Directory.Build.props": `<Project>\n  <PropertyGroup>\n    <BaseIntermediateOutputPath>${path.join(tmp, "elsewhere", String(n + 1)).replace(/\\/g, "/")}/</BaseIntermediateOutputPath>\n  </PropertyGroup>\n</Project>\n` } });
   restores("one that downloads a package beside the lock file, of a name it locks at another version", { "build/deps.xml": '<Project>\n  <ItemGroup>\n    <PackageDownload Include="Newtonsoft.Json" Version="[12.0.1]" />\n  </ItemGroup>\n</Project>\n' });
   let canLink = true;
   try { fs.symlinkSync(path.join(tmp, "nowhere"), path.join(tmp, "probe")); } catch { canLink = false; }

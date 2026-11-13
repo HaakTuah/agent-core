@@ -86,8 +86,8 @@ jobs:
           # package of the project's, and the same for every project on the runner's SDK)
           PACKS='Microsoft\.(NETCore|WindowsDesktop|AspNetCore)\.App\.Ref'
           holds() {
-            local empty project out codes id projects locks
-            empty=$(mktemp -d)
+            local empty stamp project out codes id projects locks records
+            empty=$(mktemp -d) stamp=$(mktemp)
             mapfile -d '' -t projects < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/*.csproj' \
               ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(exclude)core/**')
             mapfile -d '' -t locks < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/packages.lock.json' \
@@ -95,17 +95,22 @@ jobs:
             for project in "${projects[@]}"; do
               out=$(dotnet restore --locked-mode --source "$empty" "-p:RestorePackagesPath=$NUGET_PACKAGES" \
                 -p:NuGetLockFilePath= "./$project" < /dev/null 2>&1) && continue
-              codes=$(printf '%s\n' "$out" | grep -oE 'error [A-Z]+[0-9]+' | sort -u) || { echo "$project: the restore failed with no error NuGet names"; return 1; }
+              codes=$(printf '%s\n' "$out" | grep -oE 'error [A-Z]+[0-9]+' | sort -u)
+              [ -n "$codes" ] || { echo "$project: the restore failed with no error NuGet names"; return 1; }
               if printf '%s\n' "$codes" | grep -qvE '^error NU110[123]$'; then echo "$project:" $codes; return 1; fi
               while IFS= read -r id; do
                 printf '%s\n' "$id" | grep -qxE "$PACKS" && continue
                 [ "${#locks[@]}" -gt 0 ] && grep -qiF -- "\"$id\": {" "${locks[@]}" || { echo "$project: a package no lock file names is asked for ($id)"; return 1; }
-              done < <(printf '%s\n' "$out" | grep -oE 'NU110[123]: Unable to find package [^ ]+' | sed -E 's/.* package //; s/\.$//' | sort -u)
+              done < <(printf '%s\n' "$out" | grep -oE 'NU110[123]: Unable to find (a stable )?package [^ ]+' | sed -E 's/.* package //; s/\.$//' | sort -u)
             done
+            # (each project's own record of its restore, written just now inside the checkout: one that lies elsewhere
+            # is a doubt)
+            records=$(find . -path ./core -prune -o -name project.assets.json -newer "$stamp" -print | grep -c .)
+            [ "$records" -ge "${#projects[@]}" ] || { echo "a project's own record of its restore lies outside the checkout"; return 1; }
             while IFS= read -r -d '' assets; do
               jq -e --arg packs "$PACKS" '[.project.frameworks[]? | .downloadDependencies // [] | .[] | select(.name | test("^(" + $packs + ")$") | not)] | length == 0' "$assets" > /dev/null \
                 || { echo "a project downloads a package beside its lock file"; return 1; }
-            done < <(find . -path ./core -prune -o -name project.assets.json -print0)
+            done < <(find . -path ./core -prune -o -name project.assets.json -newer "$stamp" -print0)
           }
           run=true
           # (the config, its audit and each folder it names as a source, each by its exact name, and the caller)

@@ -2,8 +2,9 @@
 // project, job by job and step by step, so that the test runs each check's own shell and not a copy of it. It reads
 // the YAML the core's workflows are written in (block mappings and sequences, block scalars, plain and quoted scalars,
 // flow sequences, comments), evaluates GitHub's expressions (`${{ }}`: contexts, literals, ! == != && || and the
-// functions the core's workflows use), and runs each job whose `if` holds: each `run` step in bash with -e and
-// pipefail as GitHub runs it, its env and its expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses`
+// functions the core's workflows use), and runs each job whose `if` holds, a job for each combination of its matrix:
+// each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell is named bash), its env and its
+// expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses`
 // step by a handler the caller gives for that action, or not at all, said so. A context, function or form it does not
 // know throws, so a workflow the core changes in a way this cannot read fails the test, and is taught here, rather than
 // running other than GitHub would. Tests only: no project and no workflow of the core's runs it. Node's own modules.
@@ -245,6 +246,7 @@ const outputsOf = file => {
  */
 export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
+  const defaults = wf.defaults?.run?.shell;
   const declared = wf.on?.workflow_call?.inputs ?? {};
   const given = Object.fromEntries(Object.entries(declared).map(([name, d]) => [name, name in inputs ? inputs[name] : d?.default ?? (d?.type === "boolean" ? false : "")]));
   for (const name of Object.keys(inputs)) if (!(name in declared)) throw new Error(`an input the workflow does not take: ${name}`);
@@ -286,7 +288,11 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
       const script = path.join(tmp, `step-${result.steps.length}.sh`);
       fs.writeFileSync(script, fill(step.run, ctx, state));
       const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
-      const r = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", script], { cwd, encoding: "utf8", env: {
+      // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
+      // the defaults', with --noprofile --norc -e -o pipefail)
+      const shell = step.shell ?? job.defaults?.run?.shell ?? defaults;
+      if (shell !== undefined && shell !== "bash") throw new Error(`a shell this runner does not know: ${shell} (in ${id})`);
+      const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
         ...base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
         GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(github.repository), GITHUB_EVENT_NAME: str(github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
       const passed = r.status === 0;
