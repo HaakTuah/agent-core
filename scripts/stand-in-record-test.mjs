@@ -1,9 +1,10 @@
 // Tests of the stand-in's record (stand-in-record.mjs): what reads as a verdict, its kind and sureness, how the owner's
-// marked answers are set against the verdict before them, the printed lines, and the open ideas that lack a verdict. Node's own modules only; the calls to
+// marked answers are set against the verdict before them, the printed lines, the open ideas that lack a verdict, and
+// a title's control characters. Node's own modules only; the calls to
 // git and gh are the program's own and are not made here.
 //
 //   node scripts/stand-in-record-test.mjs
-import { lacking, print, tally, verdict } from "./stand-in-record.mjs";
+import { lacking, plain, print, tally, verdict } from "./stand-in-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -33,13 +34,16 @@ ok(same(t.answers, { matched: { unsure: 1, "no verdict seen": 1 }, missed: { sur
 ok(print(t, "some-one/x") === "The stand-in's record in some-one/x, from 8 comments:\n  verdicts on ideas: 3 (sure yes 1, unsure later 1, unsure yes 1)\n  the owner's answers marked: 3, matched 2 (no verdict seen: 1 of 1; sure: 0 of 1; unsure: 1 of 1)", "the printed record", print(t, "some-one/x"));
 ok(print(tally([]), "some-one/x") === "The stand-in's record in some-one/x, from 0 comments:\n  verdicts on ideas: 0\n  the owner's answers marked: 0, matched 0", "an empty record prints its zeros");
 
-const l = lacking([{ issue: "7", title: "a" }, { issue: "8", title: "b" }, { issue: "9", title: "c" }, { issue: "11", title: "d" }], [
+const i = (issue, writer = true) => ({ issue, title: issue, writer });
+const l = lacking([i("7"), i("8"), i("9"), i("11"), i("12", false)], [
   c("8", "2026-11-12T16:30:00Z", "**The stand-in's verdict, updated: yes (sure)**"),
   c("8", "2026-11-12T16:00:00Z", "**The stand-in's verdict: later, unsure.**"), // (given out of order)
   c("9", "2026-11-12T16:00:00Z", "**The stand-in's verdict: yes, sure.**", false),
   c("11", "2026-11-12T16:00:00Z", "Stand-in's verdict: later (unsure)."),
 ]);
 ok(same(l.none.map(i => i.issue), ["7", "9"]) && same(l.later.map(i => i.issue), ["11"]), "an idea lacks a verdict where none came from a writer; a later is its last", JSON.stringify(l));
+ok(l.others === 1 && !l.none.some(x => x.issue === "12"), "an idea another account filed is left out and counted (floor rule 4)");
+ok(plain("a\u001b[31mb\nc\u0085d") === "a [31mb c d" && plain(null) === "", "a title loses its control characters");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
