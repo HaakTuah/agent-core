@@ -60,6 +60,6 @@ let said = "";
 try { npmView("mossgrip-that-is-in-no-cache"); } catch (e) { said = String(e.stderr ?? ""); }
 ok(/^npm (error|ERR!)/mi.test(said), "the package manager starts and answers, on Linux and on Windows");
 ok(throws(() => npmView("mossgrip & echo x")) && throws(() => npmView("moss%PATH%")) && throws(() => npmView("moss\"grip"))
-  && throws(() => npmView("moss^grip", "win32")) && throws(() => npmView(7)), "a name that is no plain word reaches neither it nor a shell");
+  && throws(() => npmView("moss^grip", "win32")) && throws(() => npmView(7)) && throws(() => npmView("--registry")) && throws(() => npmView("/c")), "a name that is no plain word, or reads as an option, reaches neither it nor a shell");
 for (const d of [root, outside]) fs.rmSync(d, { recursive: true, force: true });
 if (failed) process.exit(1);
