@@ -12,7 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
-import { FILES, TEMPLATES, files, fill, licences, linked, modules, named, options, sizes } from "./init.mjs";
+import { FILES, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -27,7 +27,9 @@ ok(throws(() => options(["--owner", "x", "--force"])) && throws(() => options(["
 ok(options(["--owner", "x", "--at", A]).at === A && throws(() => options(["--owner", "x", "--at", "main"])) && throws(() => options(["--owner", "x", "--at", A.slice(1)])), "a commit is 40 hex characters");
 ok(options(["--owner", "x", "--npm", "tools/"]).packages === "tools" && options(["--owner", "x", "--npm", "."]).packages === "." && options(["--owner", "x", "--npm", "a\\b"]).packages === "a/b", "the npm folder is read from the project's root, either slash");
 ok(throws(() => options(["--owner", "x", "--npm", "../out"])) && throws(() => options(["--owner", "x", "--npm", "/abs"])) && throws(() => options(["--owner", "x", "--npm", "a b"])) && throws(() => options(["--owner", "x", "--npm", "a/../../b"])) && throws(() => options(["--owner", "x", "--npm", "$(x)"])), "a folder outside the project, or one that is more than a path, stops it");
-ok(options(["--owner", "x", "--name", "A fine project"]).name === "A fine project" && named("Bark & Bite (2nd), v1.0!") && named("Tr\u00e6na's tool") && named("x"), "a name is letters, digits and blanks, with the few marks a name uses");
+ok(options(["--owner", "x", "--name", "A fine project"]).name === "A fine project" && named("Bark & Bite (2nd), v1.0!") && named("Tr\u00e6na's tool") && named("x") && named("Snake: the game") && named("C# tools"), "a name is letters, digits and blanks, with the few marks a name uses");
+ok(named("\u0939\u093f\u0928\u094d\u0926\u0940") && named("Cafe\u0301") && options(["--owner", "x", "--name", "Cafe\u0301"]).name === "Caf\u00e9" && !named("\u0301x"), "a script written with marks on its letters is a name too, a letter and its accent are read as the one letter, and a mark alone begins no name");
+ok(filtered("filter.x.clean sh -c evil\nfilter.lfs.required true\nFILTER.Y.process run\nfilter.x.clean again\n").join() === "filter.x.clean,FILTER.Y.process" && filtered("").length === 0, "a project's own filters that run a command are found by name, and one that runs none is not");
 for (const [what, bad] of [["a line break", "two\nlines"], ["a template's word", "{{pin}}"], ["a bar", "a | b"], ["blanks around it", " padded "], ["a blank at its end", "padded "], ["an @, which Claude Code reads as a file to take in", "Try @~/.ssh/id_rsa"], ["an @ at its start", "@AGENTS.md"], ["a tab", "a\tb"], ["a line separator", "a\u2028b"], ["a control character", "a\u0007b"], ["a backtick", "a`b"], ["an angle bracket", "a<b"], ["a dash at its start", "-x"], ["81 characters", "x".repeat(81)], ["nothing", ""]]) {
   ok(!named(bad) && throws(() => options(["--owner", "x", "--name", bad])), `a name with ${what} is refused`);
 }
@@ -156,6 +158,15 @@ fs.mkdirSync(pointedDir);
 git(pointedDir, "init", "-q", "-b", "main");
 const pe = spawnSync(process.execPath, [script, "--owner", "x"], { cwd: pointedDir, env: { ...env, GIT_DIR: path.join(p.dir, ".git"), GIT_WORK_TREE: p.dir }, encoding: "utf8" });
 ok(pe.status === 0 && fs.existsSync(path.join(pointedDir, "core-manifest.md")) && git(p.dir, "status", "--porcelain") === "" && git(pointedDir, "status", "--porcelain").includes("A  core-manifest.md"), "with git pointed at another project's repository, the kit writes and stages in the project it is run in, and leaves the other as it was", (pe.stdout + pe.stderr).slice(0, 300));
+// a filter in the project's own git settings would run a command on `git add`: the kit refuses before it adds
+const fdir = path.join(tmp, "with-a-filter");
+fs.mkdirSync(fdir);
+git(fdir, "init", "-q", "-b", "main");
+const ran = path.join(tmp, "the-filter-ran");
+git(fdir, "config", "--local", "filter.kit.clean", `${JSON.stringify(process.execPath)} -e "require('fs').writeFileSync(process.argv[1], '')" ${JSON.stringify(ran)}`);
+fs.writeFileSync(path.join(fdir, ".gitattributes"), "* filter=kit\n");
+const rf = run(fdir, script, "--owner", "x");
+ok(rf.status === 1 && rf.out.includes("filter.kit.clean") && !fs.existsSync(ran) && !fs.existsSync(path.join(fdir, "core-manifest.md")), "a project whose own git settings hold a filter is refused before anything is written or added, and the filter never runs", rf.out.slice(0, 300));
 const r = project("no-owner");
 ok(r.status === 1 && fs.readdirSync(r.dir).join() === ".git", "without an owner it writes nothing");
 fs.mkdirSync(path.join(p.dir, "sub"));

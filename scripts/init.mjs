@@ -33,7 +33,9 @@ export const TEMPLATES = "setup/template";
 const raw = (args, cwd, env = plainEnv()) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
 const git = (args, cwd, env) => raw(args, cwd, env).trim();
 // For every call made in the project itself, whose own git settings are not the kit's to trust (a folder may come
-// whole from someone else): the two settings that run a command are turned off, as work-saved.sh turns them off.
+// whole from someone else): the two settings that run a command by themselves are turned off, as work-saved.sh turns
+// them off. A filter of the project's own, which would run on `git add`, cannot be turned off so: the kit refuses a
+// project whose own settings hold one, before it adds anything (`filtered`, below).
 const guarded = () => ({ ...plainEnv(), GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "core.fsmonitor", GIT_CONFIG_VALUE_0: "false", GIT_CONFIG_KEY_1: "core.hooksPath", GIT_CONFIG_VALUE_1: "/dev/null" });
 class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
@@ -75,8 +77,16 @@ const KB = 1024;
 // uses, beginning with a letter or digit and ending with no blank. Nothing a tool reads as more than a name gets in:
 // no @ (Claude Code takes "@path" in a rule file for a file to read in), no line break of any kind, no control
 // character, no bracket, brace, backtick or bar. The folder's name, where it serves as the project's, is held to it too.
-export const NAME = "at most 80 letters, digits and blanks, with . _ ' & , ( ) + ! - where a name needs them, beginning with a letter or digit";
-export const named = text => /^[\p{L}\p{N}][\p{L}\p{N} ._'&,()+!-]{0,79}$/u.test(text) && !text.endsWith(" ");
+// Read in its composed form, so a letter written as a letter and its accent (as a folder's name can be) is one letter;
+// marks that belong to a letter are let in after the first, for the scripts that are written with them.
+export const NAME = "at most 80 letters, digits and blanks, with . _ ' & , ( ) + ! - : # where a name needs them, beginning with a letter or digit";
+export const named = text => /^[\p{L}\p{N}][\p{L}\p{M}\p{N} ._'&,()+!:#-]{0,79}$/u.test(text.normalize("NFC")) && !text.endsWith(" ");
+
+// The commands the project's own git settings would run on `git add`: its filters, read with what its settings
+// include, as names only. None is the usual case; the user's own settings, outside the project, are the user's.
+export function filtered(lines) {
+  return [...new Set(lines.split("\n").map(l => /^(filter\.[^\s]*\.(?:clean|smudge|process))(?:\s|$)/i.exec(l)?.[1]).filter(Boolean))];
+}
 
 // The part of a path inside the project that is a link, if any, or null: nothing is written through one, since it may
 // lead outside the project. A path that does not exist yet has none from there on.
@@ -106,6 +116,7 @@ export function options(argv) {
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(o.owner ?? "")) fail("--owner <login>: the owner's GitHub login (letters, digits and hyphens)");
   if (o.at !== undefined && !/^[0-9a-f]{40}$/.test(o.at)) fail("--at <full SHA>: the core's commit as 40 hex characters");
   if (o.name !== undefined && !named(o.name)) fail(`--name: ${NAME}`);
+  o.name = o.name?.normalize("NFC");
   if (o.packages !== undefined) {
     o.packages = o.packages.replace(/\\/g, "/").replace(/\/+$/, "") || ".";
     if (!/^(\.|[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*)$/.test(o.packages)) fail("--npm <folder>: a folder inside the project, from its root (. for the root itself)");
@@ -163,8 +174,11 @@ function init(argv) {
   try { below = git(["rev-parse", "--show-prefix"], here, guarded()); } catch { fail("run it in the root of the project's git repository (git init first)"); }
   if (below !== "") fail("run it in the root of the project's git repository");
   if (fs.realpathSync.native(here) === fs.realpathSync.native(ROOT)) fail("run it in the project, not in the core itself");
-  o.name ??= path.basename(here);
+  o.name ??= path.basename(here).normalize("NFC");
   if (!named(o.name)) fail(`the folder's name does not serve as the project's (${NAME}): give --name`);
+  let filters = "";
+  try { filters = raw(["config", "--local", "--includes", "--get-regexp", "^filter\\."], here, guarded()); } catch { /* (none: git ends with 1) */ }
+  if (filtered(filters).length) fail(`the project's own git settings hold ${filtered(filters).join(", ")}, which would run a command when the kit adds its files: take it out of .git/config first, or start from a fresh git init`);
 
   let pin;
   try { pin = git(["rev-parse", `${o.at ?? "HEAD"}^{commit}`], ROOT); } catch { fail(o.at ? `${o.at} is no commit of this clone of the core` : "run it from a clone of the core (the script's own folder is no git repository)"); }
