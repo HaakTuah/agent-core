@@ -38,8 +38,13 @@ const kept = name => path.join(tmp, "sdk", name);
 const sdkEnv = { ...env, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0", UseSharedCompilation: "false",
   RestorePackagesWithLockFile: "true", DOTNET_CLI_HOME: kept("home"), NUGET_PACKAGES: kept("packages"), NUGET_HTTP_CACHE_PATH: kept("http-cache"), NUGET_PLUGINS_CACHE_PATH: kept("plugins-cache"), ImportDirectoryBuildProps: "false", ImportDirectoryBuildTargets: "false" };
 const dotnet = (dir, ...args) => { const r = spawnSync("dotnet", args, { cwd: dir, env: sdkEnv, encoding: "utf8" }); return { status: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` }; };
-const sdk = dotnet(tmp, "--version").status === 0;
-ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so the project there is one the SDK wrote, and is built");
+const hasSdk = dotnet(tmp, "--version").status === 0;
+// (the SDK's project takes two packages from nuget.org: where that cannot be reached, what needs it is skipped, said in a
+// line, as where there is no SDK; asked of NuGet's own index, through the proxy the machine names, if any)
+const reach = hasSdk ? spawnSync(process.execPath, ["-e", "fetch(process.argv[1], { method: 'HEAD', signal: AbortSignal.timeout(15000) }).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))", "https://api.nuget.org/v3/index.json"], { env: { ...env, NODE_USE_ENV_PROXY: "1" }, encoding: "utf8" }).status === 0 : false;
+if (hasSdk && !reach) console.log("skip what needs nuget.org: it cannot be reached from here, so the project is written by hand and not built, as where there is no .NET SDK");
+const sdk = hasSdk && reach;
+ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK and nuget.org can be reached, so the project there is one the SDK wrote, and is built");
 
 // a .NET project, in a repository that converts line endings as git for Windows does by default
 const dir = fresh("a-dotnet-project");
@@ -183,5 +188,5 @@ if (kit.status === 0) {
   }
 }
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the starter kit in a .NET project, cloned as Windows clones it${sdk ? "" : " (no .NET SDK here: the project was written by hand and not built)"}`);
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the starter kit in a .NET project, cloned as Windows clones it${sdk ? "" : ` (${hasSdk ? "nuget.org cannot be reached" : "no .NET SDK"} here: the project was written by hand and not built)`}`);
 process.exit(failed ? 1 : 0);

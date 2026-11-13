@@ -1,0 +1,127 @@
+// Tests of the fetch before the NuGet check's restore (nuget-fetch.mjs) and of the check that reads what it fetched
+// (nuget.mjs --fetched): a package file's manifest read out of it, a tool held to one exact version, a package held to
+// its lock file's content hash, and each licence held to its list before any build runs, a licence the floor moved off
+// the list for what ships reported where the base held the package. Package files are made here, in a folder the
+// config names as a source; where nuget.org can be reached, one real package is fetched from it too. On Linux and on
+// Windows. Git and Node's own modules.
+//
+//   node scripts/nuget-fetch-test.mjs
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
+import { fetchAll, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
+import { REGISTRY, check } from "./nuget.mjs";
+
+let failed = 0, count = 0;
+const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } };
+const throws = fn => { try { fn(); return false; } catch { return true; } };
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-fetch-test-"));
+process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+
+// a zip, as a package file is one: each [name, text, deflated]
+function zip(files) {
+  const locals = [], centrals = [];
+  let at = 0;
+  for (const [name, text, deflate = true] of files) {
+    const raw = Buffer.from(text), data = deflate ? deflateRawSync(raw) : raw, n = Buffer.from(name);
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(deflate ? 8 : 0, 8);
+    head.writeUInt32LE(crc32(raw), 14); head.writeUInt32LE(data.length, 18); head.writeUInt32LE(raw.length, 22); head.writeUInt16LE(n.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(deflate ? 8 : 0, 10);
+    central.writeUInt32LE(crc32(raw), 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(raw.length, 24); central.writeUInt16LE(n.length, 28); central.writeUInt32LE(at, 42);
+    locals.push(head, n, data); centrals.push(central, n);
+    at += 30 + n.length + data.length;
+  }
+  const dir = Buffer.concat(centrals), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(at, 16);
+  return Buffer.concat([...locals, dir, end]);
+}
+const nuspec = (id, version, licence) => `<?xml version="1.0" encoding="utf-8"?>\n<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">\n  <metadata>\n    <id>${id}</id>\n    <version>${version}</version>\n    <license type="expression">${licence}</license>\n  </metadata>\n</package>\n`;
+const pkg = (id, version, licence) => zip([[`${id}.nuspec`, nuspec(id, version, licence)], ["lib/net9.0/x.dll", "not a real assembly", false]]);
+const hash = bytes => createHash("sha512").update(bytes).digest("base64");
+
+// the manifest, out of a package file
+ok(nuspecOf(pkg("A", "1.0.0", "MIT")).includes("<license type=\"expression\">MIT</license>") && nuspecOf(zip([["A.nuspec", nuspec("A", "1.0.0", "MIT"), false]])).includes("MIT"), "a package file's manifest is read out of it, deflated or stored");
+ok(throws(() => nuspecOf(zip([["a.nuspec", "x"], ["b.nuspec", "y"]]))) && throws(() => nuspecOf(zip([["lib/a.nuspec", "x"]]))) && throws(() => nuspecOf(Buffer.from("not a zip"))), "two manifests at its root, one in a folder alone, or no zip at all: none is read");
+// a tool, at one exact version
+const t = toolsOf(JSON.stringify({ version: 1, isRoot: true, tools: { "dotnet-ef": { version: "9.0.1", commands: ["dotnet-ef"] }, "range-tool": { version: "[1.0,2.0)" }, "star-tool": { version: "1.*" }, "no-version": {} } }), "x/.config/dotnet-tools.json");
+ok(t.tools.length === 1 && t.tools[0].id === "dotnet-ef" && t.failures.length === 3 && t.failures.every(f => f.includes("one exact version")), "a tool is held to one exact version: a range, a wildcard or none fails", JSON.stringify(t));
+
+// a project: its lock file, a tools manifest, and a folder of package files the config names as a source
+const root = path.join(tmp, "project"), source = path.join(root, "local-packages");
+fs.mkdirSync(path.join(root, "src/App"), { recursive: true });
+fs.mkdirSync(path.join(root, ".config"), { recursive: true });
+fs.mkdirSync(source);
+const files = { "Good.Pkg": ["1.0.0", "MIT"], "Plpkg": ["2.0.0", "MS-PL"], "Bad.Hash": ["1.0.0", "MIT"], "Tool.A": ["3.0.0", "Apache-2.0"], "Tool.B": ["1.0.0", "LicenseRef-Other"] };
+const bytes = {};
+for (const [id, [version, licence]] of Object.entries(files)) { bytes[id] = pkg(id, version, licence); fs.writeFileSync(path.join(source, `${id.toLowerCase()}.${version}.nupkg`), bytes[id]); }
+const entry = (id, h = hash(bytes[id])) => ({ type: "Direct", requested: `[${files[id][0]}, )`, resolved: files[id][0], contentHash: h });
+const lock = deps => `${JSON.stringify({ version: 1, dependencies: { "net9.0": deps } }, null, 2)}\n`;
+const config = { ships: [], audit: "audit.json", nuget: { ships: ["src/App/packages.lock.json"], tools: [], sources: ["local-packages/"] } };
+fs.writeFileSync(path.join(root, "audit.json"), '{ "entries": [] }\n');
+const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+const git = (...args) => execFileSync("git", args, { cwd: root, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+git("init", "-q", "-b", "main");
+const commit = (deps, tools) => {
+  fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), lock(deps));
+  fs.writeFileSync(path.join(root, ".config/dotnet-tools.json"), JSON.stringify({ version: 1, isRoot: true, tools }));
+  git("add", "-A"); git("commit", "-q", "-m", "x");
+  return git("ls-files").split("\n");
+};
+let into = 0;
+const run = async (tracked, base = null) => {
+  const dir = path.join(tmp, `fetched-${++into}`);
+  const fetched = await fetchAll(config, root, tracked, dir, [path.resolve(source)]);
+  const checked = check(config, root, dir, tracked, process.env, { base, fetched: true });
+  return { fetched, checked, dir };
+};
+
+// what a base held: Plpkg under MS-PL, before the floor moved it off the list for what ships
+commit({ "Plpkg": entry("Plpkg") }, {});
+let tracked = commit({ "Good.Pkg": entry("Good.Pkg"), "Plpkg": entry("Plpkg") }, { "tool.a": { version: "3.0.0" } });
+let r = await run(tracked, "HEAD^1");
+ok(r.fetched.failures.length === 0 && fs.existsSync(path.join(r.dir, "good.pkg", "1.0.0", "good.pkg.nuspec")) && JSON.parse(fs.readFileSync(path.join(r.dir, "good.pkg", "1.0.0", ".nupkg.metadata"), "utf8")).source === path.resolve(source),
+  "each locked package and tool is fetched from a source the config names, held to its content hash, and its manifest laid out as a restore lays out its own", JSON.stringify(r.fetched));
+ok(r.checked.failures.length === 0 && r.checked.reports.length === 1 && r.checked.reports[0].includes("Plpkg@2.0.0") && r.checked.summary.includes("read before the restore"), "the check reads them before the restore: a package under MIT and a tool under Apache-2.0 pass, and one the base already held under MS-PL is reported and passes", JSON.stringify(r.checked));
+tracked = commit({ "Good.Pkg": entry("Good.Pkg"), "Plpkg": entry("Plpkg") }, {});
+fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), lock({ "Plpkg": entry("Plpkg") })); git("commit", "-q", "-am", "only plpkg");
+fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), lock({})); git("commit", "-q", "-am", "none");
+tracked = commit({ "Plpkg": entry("Plpkg") }, {});
+r = await run(tracked, "HEAD^1");
+ok(r.checked.failures.length === 1 && r.checked.failures[0].includes("Plpkg@2.0.0") && r.checked.failures[0].includes("MS-PL is off the list for what ships"), "one a pull request adds under MS-PL fails, it alone: the owner's yes is asked", JSON.stringify(r.checked));
+tracked = commit({ "Bad.Hash": entry("Bad.Hash", hash(Buffer.from("another file"))) }, {});
+r = await run(tracked);
+ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("content hash"), "a package file that is not the one its lock file names by its content hash fails", JSON.stringify(r.fetched));
+tracked = commit({ "Not.There": { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "x" } }, {});
+r = await run(tracked);
+ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("in neither NuGet's registry nor a source"), "a package no source holds fails", JSON.stringify(r.fetched));
+tracked = commit({}, { "tool.b": { version: "1.0.0" } });
+r = await run(tracked, "HEAD^1");
+ok(r.fetched.failures.length === 0 && r.checked.failures.length === 1 && r.checked.failures[0].toLowerCase().includes("tool.b@1.0.0") && r.checked.failures[0].includes("tools' list"), "a tool is held to the tools' list: one a pull request adds under a licence off it fails", JSON.stringify(r.checked));
+tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "tool.b": { version: "1.0.0" } });
+r = await run(tracked, "HEAD^1");
+ok(r.checked.failures.length === 0 && r.checked.reports.some(x => x.toLowerCase().includes("tool.b@1.0.0") && x.includes("held before this check read tools")), "one the base already held, never checked before, is reported and passes: no sync fails a project over it", JSON.stringify(r.checked));
+tracked = commit({}, { "tool.c": { version: "1.*" } });
+r = await run(tracked);
+ok(r.fetched.failures.some(f => f.includes("one exact version")), "a tool at no one exact version fails", JSON.stringify(r.fetched));
+
+// a real package from nuget.org, where it can be reached (through the proxy the machine names, if any)
+const reach = spawnSync(process.execPath, ["-e", "fetch(process.argv[1], { method: 'HEAD', signal: AbortSignal.timeout(15000) }).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))", REGISTRY], { env: { ...process.env, NODE_USE_ENV_PROXY: "1" } }).status === 0;
+ok(reach || !process.env.GITHUB_ACTIONS, "on GitHub's runners nuget.org can be reached");
+if (!reach) console.log("skip the real package: nuget.org cannot be reached from here");
+else {
+  const real = path.join(tmp, "real");
+  fs.mkdirSync(path.join(real, "src/App"), { recursive: true });
+  fs.writeFileSync(path.join(real, "src/App/packages.lock.json"), lock({ "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==" } }));
+  const out = spawnSync(process.execPath, ["-e", `import(${JSON.stringify(new URL("./nuget-fetch.mjs", import.meta.url).href)}).then(m => m.fetchAll(${JSON.stringify({ nuget: { ships: ["src/App/packages.lock.json"], tools: [] } })}, ${JSON.stringify(real)}, ["src/App/packages.lock.json"], ${JSON.stringify(path.join(real, "fetched"))}, [${JSON.stringify(REGISTRY)}])).then(r => console.log(JSON.stringify(r)))`], { env: { ...process.env, NODE_USE_ENV_PROXY: "1" }, encoding: "utf8" });
+  const got = JSON.parse(out.stdout || "{}");
+  const manifest = path.join(real, "fetched", "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec");
+  ok(got.failures?.length === 0 && fs.existsSync(manifest) && fs.readFileSync(manifest, "utf8").includes("MIT"), "a real package is fetched from nuget.org and held to the content hash a real lock file names", `${out.stdout}${out.stderr}`);
+}
+
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the fetch before the NuGet check's restore`);
+process.exitCode = failed ? 1 : 0;

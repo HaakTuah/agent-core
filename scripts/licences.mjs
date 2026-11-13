@@ -74,7 +74,24 @@ const NEVER = new RegExp([
   "(^|[^a-z])BSL(?![-_ ]?1\\.0)", // (the floor's "BSL", as the Business Source License is also written; BSL-1.0 is Boost's, on the list)
   "elastic", "commons[-_ ]?clause", "polyform", "functional[-_ ]?source", "source[-_ ]?available",
 ].join("|"), "iu");
-const COPYLEFT = /GPL|MPL|EPL|CDDL|-SA(-|$)/iu;
+const COPYLEFT = /GPL|MPL|EPL|CDDL|-SA(-|$)|MS-PL/iu;
+// Licences the floor moved off the list for what ships, each with the day it moved (core archive 201): from then on
+// what ships under one waits for the owner's yes, save what a project's lock files or audit already held at the pull
+// request's base, which is reported and passes, so that no sync fails a project over what it holds (the core's
+// AGENTS.md, "Nothing locks another owner's project"); one a pull request adds or updates waits, that pull request alone.
+export const MOVED_OFF = new Map([["MS-PL", "13 November 2026"]]);
+/** Whether an expression off a list would pass but for a licence the floor moved off it. */
+export function movedOff(expression, allow) {
+  try { return !licenceOk(expression, allow) && licenceOk(expression, new Set([...allow, ...MOVED_OFF.keys()])); } catch { return false; }
+}
+/** A file's text at a commit of the repository at `root`, or null where git cannot give it. */
+export function textAt(root, rev, file) {
+  try { return execFileSync("git", ["show", `${rev}:${file}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { return null; }
+}
+/** The base a pull request's checkout is read against: the first parent of GitHub's merge of it, or null. */
+export function baseOf(root) {
+  try { execFileSync("git", ["rev-parse", "-q", "--verify", "HEAD^2"], { cwd: root, stdio: "ignore" }); return "HEAD^1"; } catch { return null; }
+}
 
 /** Floor rule 10's list for what ships, read from its own words: { any, data, fonts, publicDomain }. */
 export function floorList(file = new URL("../floor/topics.md", import.meta.url)) {
@@ -342,11 +359,25 @@ function lockfilePackages(root, lockPath, ships) {
     });
 }
 
-/** The check, on the project at `root`: { failures, summary }. */
-export function check(config, root) {
+/** The check, on the project at `root`, read against `base` (a commit, or null): { failures, reports, summary }. */
+export function check(config, root, base = null) {
   config = normalised(config);
   const lists = policy(config), { allowedFor } = lists;
-  const failures = [];
+  const failures = [], reports = [];
+  // (what each lock file held at the base, by name@version, read once each)
+  const heldIn = new Map();
+  // (with no base to read it against, as in a checkout of one commit, what ships under a licence moved off is reported
+  // and passes, as it passed before: held or not cannot be told, and no sync fails a project over it)
+  const held = (lockPath, name, version) => {
+    if (!base) return true;
+    if (!heldIn.has(lockPath)) {
+      const names = new Set();
+      try { for (const [path, e] of Object.entries(JSON.parse(textAt(root, base, lockPath)).packages ?? {})) if (lockInstalled(path) && e) names.add(`${path.slice(path.lastIndexOf("node_modules/") + 13)}@${e.version}`); } catch { /* (none held) */ }
+      heldIn.set(lockPath, names);
+    }
+    return heldIn.get(lockPath).has(`${name}@${version}`);
+  };
+  const report = (what, licence) => `${what} ships under ${licence}, which since ${[...MOVED_OFF].filter(([id]) => licence.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "held before then" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "accepted" or has it replaced`;
   // (the owner's yeses, by what each names; `needed`: those something off its list stood on, `onList`: those nothing did)
   const accepted = config.accepted ?? [], needed = new Set(), onList = new Set();
   const yesFor = (kind, name) => accepted.find((a) => a[kind] === name);
@@ -362,6 +393,7 @@ export function check(config, root) {
     const a = p.registryName === undefined || p.registryVersion !== p.version ? undefined : yesFor("package", `${p.registryName}@${p.version}`);
     if (licenceOk(p.license, allowedFor(p.registryName ?? "", p.shipped))) { if (a) onList.add(a); continue; }
     if (a) { needed.add(a); failures.push(...yesFaults(a.package, a, p.shipped, [p.license], lists, '"accepted"')); continue; }
+    if (p.shipped && movedOff(p.license, allowedFor(p.registryName ?? "", true)) && held(p.lockPath, p.name, p.version)) { reports.push(report(`${p.name}@${p.version}, in ${p.lockPath},`, p.license)); continue; }
     const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
     failures.push(`off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? "" : `; one the owner wants anyway is named in the config's "accepted", with the owner's words (floor rule 10)`}`);
   }
@@ -369,6 +401,10 @@ export function check(config, root) {
   if (config.audit) {
     entries = JSON.parse(readFileSync(join(root, config.audit), "utf8")).entries;
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list`);
+    // (an entry held at the base as it stands: the same name, version and licence)
+    let before = [];
+    try { before = base ? JSON.parse(textAt(root, base, config.audit)).entries ?? [] : []; } catch { /* (none held) */ }
+    const auditHeld = (e) => !base || (Array.isArray(before) && before.some((b) => b && b.name === e.name && b.version === e.version && b.licence === e.licence && b.ships === true));
     // (the notices file the config names; null when it names none there, which fails once, not for every entry)
     const noticesFile = config.notices === undefined ? undefined : join(root, config.notices);
     const notices = noticesFile === undefined ? undefined : existsSync(noticesFile) && statSync(noticesFile).isFile() ? readFileSync(noticesFile, "utf8") : null;
@@ -393,6 +429,7 @@ export function check(config, root) {
         if (a.licence !== e.licence) failures.push(`${config.audit}: ${e.name}: accepted under ${a.licence}, and recorded as under ${e.licence}: another licence is another yes`);
         failures.push(...yesFaults(`${config.audit}: ${e.name}`, a, e.ships === true, [e.licence], lists, null));
       }
+      else if (e.ships === true && movedOff(e.licence, allowedFor(e.name, true, e.kind ?? null)) && auditHeld(e)) reports.push(report(`${config.audit}: ${e.name}`, e.licence));
       else failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}`);
       if (e.ships === true && notices !== null && !(notices === undefined ? typeof e.notice === "string" && e.notice.trim() : notices.includes(e.name))) {
         failures.push(`${config.audit}: ${e.name}: it ships, so its notice ships too (floor rule 10): ${notices === undefined ? 'its "notice", for the notices the project builds' : `its name in ${config.notices}`}`);
@@ -414,8 +451,8 @@ export function check(config, root) {
   const shippedCount = packages.filter((p) => p.shipped).length;
   const summary = `${packages.length} packages checked (${shippedCount} shipped or may be, ${packages.length - shippedCount} tools that only run)` +
     `${config.audit ? `, ${entries.length} audit entries` : ""}${scanned ? `, ${scanned.scanned} files scanned for what the audit must hold` : ""}; ` +
-    `${needed.size ? `${needed.size} accepted on the owner's yes; ` : ""}${all.length} failing (floor rule 10)`;
-  return { failures: all, summary };
+    `${needed.size ? `${needed.size} accepted on the owner's yes; ` : ""}${reports.length ? `${reports.length} held before a licence moved off the list, reported; ` : ""}${all.length} failing (floor rule 10)`;
+  return { failures: all, reports, summary };
 }
 
 /**
@@ -444,7 +481,8 @@ if (started(import.meta.url)) {
     for (const line of actionLists(config)) console.log(line);
   } else {
     let result;
-    try { result = check(config, root); } catch (e) { fail(e.message); }
+    try { result = check(config, root, baseOf(root)); } catch (e) { fail(e.message); }
+    for (const r of result.reports) console.log(`REPORT: ${r}`);
     for (const f of result.failures) console.error(`FAIL: ${f}`);
     console.log(result.summary);
     process.exit(result.failures.length ? 1 : 0);

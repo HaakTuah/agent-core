@@ -52,6 +52,9 @@ jobs:
       - name: The NuGet check
         if: ${{ !cancelled() }}
         run: node scripts/nuget-test.mjs
+      - name: The NuGet check's fetch before the restore, against each package's content hash
+        if: ${{ !cancelled() }}
+        run: node scripts/nuget-fetch-test.mjs
       - name: The exact-versions check
         if: ${{ !cancelled() }}
         run: node scripts/exact-versions-test.mjs

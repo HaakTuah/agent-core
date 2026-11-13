@@ -58,6 +58,10 @@
 // (core/scripts/ there), whatever the directory it is started from; the config's own path is read from that directory.
 //
 //   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--advisory]
+//   node core/scripts/nuget.mjs <config> --packages <the folder nuget-fetch.mjs filled> --fetched [--advisory]
+//                                               the same, before the restore: the licences of what the lock files name,
+//                                               and of the tools a manifest of dotnet's names, read from files no pull
+//                                               request's build has run beside (core archive 201)
 //   node core/scripts/nuget.mjs --projects     the project files git knows, a line each: what the workflow restores
 //   node core/scripts/nuget.mjs <config> --sources   where the workflow's restore takes packages from, a line each,
 //                                                    a folder by its whole path
@@ -73,7 +77,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
-import { licenceOk, loadConfig, policy } from "./licences.mjs";
+import { MOVED_OFF, baseOf, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
@@ -176,7 +180,7 @@ export function lockPackages(text, lockPath) {
       if (entry.type !== "Transitive" && ![`[${resolved}, )`, `[${resolved}]`, `[${resolved}, ${resolved}]`].includes(requested)) {
         failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}: ask for one exact version, the one installed (floor rule 7)`);
       }
-      packages.set(key(id, resolved), { id, version: resolved });
+      packages.set(key(id, resolved), { id, version: resolved, contentHash });
     }
   }
   return { packages: [...packages.values()], failures: failures.map(shown) };
@@ -258,10 +262,18 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked, env = process.env) {
+export function check(config, root, packagesDir, tracked, env = process.env, { base = null, fetched = false } = {}) {
   const { ships, tools, accepted, sources } = nugetConfig(config);
   const lists = policy(config), { allowedFor } = lists;
-  const failures = [];
+  const failures = [], reports = [];
+  // (what a lock file held at the base, by id@version: a package under a licence the floor moved off the list that it
+  // held is reported and passes; with no base to read, as licences.mjs reads it, it is reported and passes too)
+  const heldIn = new Map();
+  const held = (lock, k) => {
+    if (!base) return true;
+    if (!heldIn.has(lock)) heldIn.set(lock, new Set(lockPackages(textAt(root, base, lock) ?? "", lock).packages.map((q) => key(q.id, q.version))));
+    return heldIn.get(lock).has(k);
+  };
   const own = tracked.filter((f) => !f.startsWith("core/"));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   for (const f of projectFiles(tracked)) {
@@ -310,9 +322,25 @@ export function check(config, root, packagesDir, tracked, env = process.env) {
       if (!packages.has(k) || (shipped && !packages.get(k).shipped)) packages.set(k, { ...p, shipped, lock: f });
     }
   }
+  // the tools a manifest of dotnet's names, read before the restore alone (no restore brings them), each held to the
+  // tools' list, one exact version each (nuget-fetch.mjs fetched them)
+  if (fetched) {
+    for (const f of own.filter((t) => posix.basename(t) === "dotnet-tools.json")) {
+      let manifest = {};
+      try { manifest = JSON.parse(readFileSync(join(root, f), "utf8")); } catch { failures.push(`${f} is not JSON`); }
+      // (a tool the base's manifest already held at that version was never checked before this release: what is wrong
+      // with it is reported and passes, so that no sync fails a project over it; one a pull request adds or updates is
+      // held to the list)
+      let before = new Set();
+      try { before = base ? new Set(Object.entries(JSON.parse(textAt(root, base, f) ?? "{}")?.tools ?? {}).map(([id, e]) => key(id, String(e?.version)))) : null; } catch { before = new Set(); }
+      for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
+        if (ID.test(id) && typeof entry?.version === "string" && VERSION.test(entry.version) && !packages.has(key(id, entry.version))) packages.set(key(id, entry.version), { id, version: entry.version, shipped: false, lock: f, tool: true, heldTool: before === null || before.has(key(id, entry.version)) });
+      }
+    }
+  }
   // what the restore brought that no lock file read here names: held like what ships, with no lock to say otherwise
   let unnamed = 0;
-  for (const r of packagesDir ? restoredPackages(packagesDir) : []) {
+  for (const r of packagesDir && !fetched ? restoredPackages(packagesDir) : []) {
     if (!packages.has(key(r.id, r.version))) { unnamed++; packages.set(key(r.id, r.version), { id: r.id, version: r.version, shipped: true, lock: null }); }
   }
   let entries = [];
@@ -325,10 +353,18 @@ export function check(config, root, packagesDir, tracked, env = process.env) {
   const yes = new Map(accepted.map((a) => [a.package.toLowerCase(), a]));
   const used = new Set(), read = new Set();
   for (const [k, p] of packages) {
+    const before = failures.length;
+    try { judge(k, p); } finally {
+      if (p.heldTool) reports.push(...failures.splice(before).map((f) => `${f} (a tool held before this check read tools: reported, and passes)`));
+    }
+  }
+  function judge(k, p) {
     const name = `${p.id}@${p.version}`, list = p.shipped ? "the list for what ships" : "the tools' list";
     const where = p.lock ?? "brought by the restore, and named in no lock file read here";
     const manifest = join(packagesDir ?? "", p.id.toLowerCase(), p.version.toLowerCase(), `${p.id.toLowerCase()}.nuspec`);
-    if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read: restore from the lock files first (dotnet restore --locked-mode)`); continue; }
+    // (before the restore, one the fetch could not reach is read after it: the fetch said so)
+    if (fetched && (!packagesDir || !existsSync(manifest))) { used.add(k); read.add(k); return; }
+    if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read: restore from the lock files first (dotnet restore --locked-mode)`); return; }
     // (where NuGet took it from, by NuGet's own record of this restore: nothing a project file says is read for it)
     let taken;
     try { taken = JSON.parse(readFileSync(join(dirname(manifest), TAKEN), "utf8"))?.source; } catch { /* (no record) */ }
@@ -341,7 +377,11 @@ export function check(config, root, packagesDir, tracked, env = process.env) {
     let why, byHand = false;
     if (licence.expression !== undefined) {
       if (entry) { read.add(k); failures.push(`${name}: ${config.audit} holds an entry for it, and its manifest names its licence itself (${licence.expression}): remove the entry`); }
-      if (licenceOk(licence.expression, allowed)) { if (a) { used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes: remove it`); } continue; }
+      if (licenceOk(licence.expression, allowed)) { if (a) { used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes: remove it`); } return; }
+      if (!a && p.shipped && p.lock && movedOff(licence.expression, allowed) && held(p.lock, k)) {
+        reports.push(`${name} (${where}) ships under ${licence.expression}, which since ${[...MOVED_OFF].filter(([id]) => licence.expression.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "held before then" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "nuget.accepted" or has it replaced`);
+        return;
+      }
       why = `${licence.expression} is off ${list}`;
     } else if (p.shipped) {
       // (what ships under a licence only a reading by hand gives waits for the owner's yes, whatever was read)
@@ -354,23 +394,24 @@ export function check(config, root, packagesDir, tracked, env = process.env) {
     } else {
       read.add(k);
       if (typeof entry.licence !== "string") why = `its entry in ${config.audit} names no licence`;
-      else if (licenceOk(entry.licence, allowed)) { if (a) { used.add(k); failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both, and the entry is on its list: remove the yes`); } continue; }
+      else if (licenceOk(entry.licence, allowed)) { if (a) { used.add(k); failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both, and the entry is on its list: remove the yes`); } return; }
       else why = `${entry.licence}, as ${config.audit} records it, is off ${list}`;
     }
     if (a) {
       used.add(k);
       failures.push(...yesFaults(name, a, p.shipped, [licence.expression, entry?.licence], lists, '"nuget.accepted"'));
       if (entry) failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both: an accepted package stands in "nuget.accepted" alone, since the licence check holds every audit entry to its list`);
-      continue;
+      return;
     }
     failures.push(`${name} (${where}): ${why}${byHand ? "" : `; one the owner wants anyway is named in the config's "nuget.accepted", with the owner's words (floor rule 10)`}`);
   }
-  for (const a of accepted) if (!used.has(a.package.toLowerCase())) failures.push(`"nuget.accepted" names ${a.package}, which nothing installs: remove it`);
-  for (const [k, e] of audited) if (!read.has(k)) failures.push(`${config.audit}: the entry ${e.name}, of "kind": "nuget", is for no package whose licence had to be read by hand: remove it`);
+  // (before the restore, a yes or an entry may be for what only the restore brings: the check after it holds those)
+  if (!fetched) for (const a of accepted) if (!used.has(a.package.toLowerCase())) failures.push(`"nuget.accepted" names ${a.package}, which nothing installs: remove it`);
+  if (!fetched) for (const [k, e] of audited) if (!read.has(k)) failures.push(`${config.audit}: the entry ${e.name}, of "kind": "nuget", is for no package whose licence had to be read by hand: remove it`);
   const all = [...packages.values()], named = all.filter((p) => p.lock), shipped = named.filter((p) => p.shipped).length;
   const summary = `${named.length} NuGet packages in ${listed.length} lock files checked (${shipped} in what ships, ${named.length - shipped} tools that only run)` +
-    `${unnamed ? `, and ${unnamed} more that the restore brought and no lock file names` : ""}, ${[...used].filter((k) => packages.has(k)).length} accepted on the owner's yes; ${failures.length} failing (floor rules 7 and 10)`;
-  return { failures: failures.map(shown), summary };
+    `${unnamed ? `, and ${unnamed} more that the restore brought and no lock file names` : ""}${fetched ? ", read before the restore" : ""}, ${[...used].filter((k) => packages.has(k) && yes.has(k)).length} accepted on the owner's yes;${reports.length ? ` ${reports.length} held before a licence moved off the list, reported;` : ""} ${failures.length} failing (floor rules 7 and 10)`;
+  return { failures: failures.map(shown), reports: reports.map(shown), summary };
 }
 
 if (started(import.meta.url)) {
@@ -403,8 +444,9 @@ if (started(import.meta.url)) {
   let result;
   try {
     const config = loadConfig(configPath), { root, tracked } = project();
-    result = check(config, root, packagesDir, tracked);
+    result = check(config, root, packagesDir, tracked, process.env, { base: baseOf(root), fetched: args.includes("--fetched") });
   } catch (e) { fail(e.message); }
+  for (const r of result.reports) console.log(`REPORT: ${r}`);
   for (const f of result.failures) console.error(`${advisory ? "WOULD FAIL" : "FAIL"}: ${f}`);
   console.log(result.summary + (advisory && result.failures.length ? ". Advisory: nothing fails for it yet." : ""));
   process.exit(result.failures.length && !advisory ? 1 : 0);

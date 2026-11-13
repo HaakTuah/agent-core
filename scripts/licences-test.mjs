@@ -5,7 +5,11 @@
 //
 //   node scripts/licences-test.mjs
 import { readable } from "./licence-yes.mjs";
-import { actionLists, licenceOk, policy, registryName, registryOverrides, registryVersion, scriptsOff } from "./licences.mjs";
+import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, scriptsOff } from "./licences.mjs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 let failed = 0;
 const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
@@ -45,5 +49,30 @@ ok(JSON.stringify(registryOverrides(npmrc.join("\n"))) === JSON.stringify(npmrc)
   && JSON.stringify(registryOverrides("ignore-scripts=false\nIGNORE-SCRIPTS=true\nignore-scripts=\n")) === JSON.stringify(["ignore-scripts=false", "IGNORE-SCRIPTS=true", "ignore-scripts="]),
   "refuses every npm setting but a few harmless ones, however its key is spelt");
 ok(scriptsOff("# no install scripts\nignore-scripts=true\n") && !scriptsOff("ignore-scripts=false\n"), "knows when install scripts are off");
+
+// a licence the floor moved off the list for what ships (MS-PL, 13 November 2026): held at the base, reported and passing;
+// added or updated, failing, that pull request alone
+const ships = policy().allowedFor("x", true);
+ok(!ships.has("MS-PL") && policy().allowedFor("x", false).has("MS-PL") && movedOff("MS-PL", ships) && !movedOff("MIT OR MS-PL", ships) && !movedOff("GPL-3.0-only", ships), "MS-PL is off the list for what ships and on the tools', and only it is a licence moved off");
+{
+  const dir = mkdtempSync(join(tmpdir(), "licences-test-moved-"));
+  const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env: gitEnv, stdio: ["ignore", "pipe", "pipe"] });
+  const lock = (deps) => JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: Object.fromEntries(deps.map(([n, v]) => [n, v])) }, ...Object.fromEntries(deps.map(([n, v, l]) => [`node_modules/${n}`, { version: v, license: l, resolved: `https://registry.npmjs.org/${n}/-/${n}-${v}.tgz` }])) } });
+  const commit = (deps) => { writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", dependencies: Object.fromEntries(deps.map(([n, v]) => [n, v])) })); writeFileSync(join(dir, "package-lock.json"), lock(deps)); git("add", "-A"); git("commit", "-q", "-m", "x"); };
+  try {
+    git("init", "-q");
+    commit([["held", "1.0.0", "MS-PL"], ["fine", "1.0.0", "MIT"]]);
+    commit([["held", "1.0.0", "MS-PL"], ["fine", "1.0.0", "MIT"], ["added", "2.0.0", "MS-PL"]]);
+    const config = { ships: ["package.json"], lockfiles: ["package-lock.json"] };
+    const r = check(config, dir, "HEAD^1");
+    ok(r.reports.length === 1 && r.reports[0].includes("held@1.0.0") && r.reports[0].includes("13 November 2026") && r.failures.length === 1 && r.failures[0].includes("added@2.0.0"), "held at the base, a package under MS-PL is reported and passes; one the pull request adds fails, it alone", JSON.stringify(r));
+    commit([["held", "1.1.0", "MS-PL"], ["fine", "1.0.0", "MIT"]]);
+    const u = check(config, dir, "HEAD^1");
+    ok(u.reports.length === 0 && u.failures.length === 1 && u.failures[0].includes("held@1.1.0"), "one the pull request updates fails too: the yes is for that version", JSON.stringify(u));
+    const none = check(config, dir, null);
+    ok(none.reports.length === 1 && none.reports[0].includes("no base to read") && none.failures.length === 0, "with no base to read (a checkout of one commit), it is reported and passes, as it passed before: no sync fails a project over it", JSON.stringify(none));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
 
 process.exit(failed ? 1 : 0);
