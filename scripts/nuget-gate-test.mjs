@@ -1,11 +1,14 @@
 // Checks the first step of the NuGet check (.github/workflows/nuget.yml, "Does the pull request change what NuGet
-// reads?"), run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull requests of a .NET project:
-// it says to restore wherever the pull request changes anything NuGet reads, a file a project file imports under a name
-// of its own included, followed through what that file imports, and wherever it is in doubt; and not to where only
-// other files change. On Linux and on Windows. Git, bash, jq and Node's own modules.
+// reads?"), run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull requests of a .NET project that
+// holds one real package in its lock file: it says to restore wherever a pull request changes a file it names, and,
+// where none changed, wherever NuGet finds a lock file that no longer holds what its project asks for, however the
+// project asks (in an import, two imports on a line, through a property, a link, a name outside plain ASCII), or a
+// package downloaded beside it; and not to where only other files change. No package is downloaded: the step restores
+// against an empty source. Where there is no .NET SDK (never on GitHub's runners) only the first look is tried. On
+// Linux and on Windows. Git, bash, jq, the .NET SDK and Node's own modules.
 //
 //   node scripts/nuget-gate-test.mjs
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -18,17 +21,28 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/nuget.yml"), "utf8");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-gate-test-"));
 process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
-const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)/i.test(name)));
-Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" });
+const home = path.join(tmp, "home");
+fs.mkdirSync(path.join(home, "AppData", "Roaming"), { recursive: true });
+const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|NUGET_|DOTNET_CLI_HOME$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
+Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
+  HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), LOCALAPPDATA: path.join(home, "AppData", "Local"), DOTNET_CLI_HOME: home, NUGET_HTTP_CACHE_PATH: path.join(tmp, "http-cache"),
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const version = spawnSync("dotnet", ["--version"], { env, encoding: "utf8" });
+const sdk = version.status === 0;
+ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so NuGet's own word is asked here as there");
+const tfm = `net${sdk ? version.stdout.trim().split(".")[0] : "9"}.0`;
 
-const PROJECT = '<Project Sdk="Microsoft.NET.Sdk">\n  <Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>\n    <TargetFramework>net9.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n';
+const project = (imports = '  <Import Project="..\\..\\build\\deps.xml" />\n') => `<Project Sdk="Microsoft.NET.Sdk">\n${imports}  <PropertyGroup>\n    <OutputType>Exe</OutputType>\n    <TargetFramework>${tfm}</TargetFramework>\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\n  </PropertyGroup>\n  <ItemGroup>\n    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />\n  </ItemGroup>\n</Project>\n`;
+const LOCK = `${JSON.stringify({ version: 1, dependencies: { [tfm]: { "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==" } } } }, null, 2)}\n`;
+const EMPTY = "<Project>\n</Project>\n";
+const ADDS = '<Project>\n  <ItemGroup>\n    <PackageReference Include="Serilog" Version="4.0.0" />\n  </ItemGroup>\n</Project>\n';
 const START = {
   "README.md": "# A project\n",
-  "src/App/App.csproj": PROJECT,
-  "src/App/packages.lock.json": '{ "version": 1, "dependencies": { "net9.0": {} } }\n',
-  "build/deps.xml": '<Project>\n  <Import Project="more.xml" Condition="true" />\n</Project>\n',
-  "build/more.xml": "<Project>\n</Project>\n",
+  "src/App/App.csproj": project(),
+  "src/App/Program.cs": "System.Console.WriteLine(1);\n",
+  "src/App/packages.lock.json": LOCK,
+  "build/deps.xml": EMPTY,
   "checks/licences.json": '{ "audit": "checks/audit.json", "nuget": { "ships": ["src/App/packages.lock.json"], "tools": [], "sources": ["https://example.invalid/v3/index.json", "local-packages/"] } }\n',
   "checks/audit.json": '{ "entries": [] }\n',
   "local-packages/readme.txt": "packages\n",
@@ -47,39 +61,48 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "base");
   const baseSha = git(dir, "rev-parse", "HEAD");
-  put(files);
+  if (typeof files === "function") files(dir); else put(files);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "--allow-empty", "-m", "a change");
   const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: `someone/project/.github/workflows/${caller}@refs/pull/1/merge`,
     event: { pull_request: { base: { sha: base ? baseSha : "" } } } };
-  const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {} }, until: "what", temp: tmp });
+  const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, until: "what", temp: tmp });
   const step = job.steps.find(s => s.name === "Does the pull request change what NuGet reads?");
   return { run: job.outputs.what?.outputs.run, out: step?.out ?? JSON.stringify(job.steps) };
 }
-const restores = (what, ...args) => { const r = gate(...args); ok(r.run === "true", `${what}: it restores`, r.out); };
+const restores = (what, ...args) => { const r = gate(...args); ok(r.run === "true", `${what}: it restores`, r.out); return r; };
 const skips = (what, ...args) => { const r = gate(...args); ok(r.run === "false", `${what}: no restore`, r.out); };
 
-skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
-restores("one that changes a project file", { "src/App/App.csproj": PROJECT.replace("</Project>", "  <!-- a note -->\n</Project>") });
-restores("one that changes a lock file", { "src/App/packages.lock.json": '{ "version": 1, "dependencies": { "net9.0": { } } }\n' });
-restores("one that changes only a file a project file imports, under a name of its own", { "build/deps.xml": '<Project>\n  <Import Project="more.xml" />\n  <ItemGroup><PackageReference Include="A" Version="1.0.0" /></ItemGroup>\n</Project>\n' });
-restores("one that changes only a file that an imported file imports", { "build/more.xml": '<Project>\n  <ItemGroup><PackageReference Include="A" Version="1.0.0" /></ItemGroup>\n</Project>\n' });
-restores("one that changes a shared project's items", { "src/Shared/Shared.projitems": "<Project>\n</Project>\n" }, { start: { "src/Shared/Shared.projitems": "<Project/>\n" } });
-restores("one that changes a NuGet.Config, spelt in any case", { "NuGet.Config": "<configuration/>\n" });
-restores("one that adds a response file beside a project file, spelt in any case", { "src/App/msbuild.RSP": "-p:RestoreSources=x\n" });
-restores("one that changes the licence config", { "checks/licences.json": START["checks/licences.json"].replace("[]", "[ ]") });
-restores("one that changes the audit the config names", { "checks/audit.json": '{ "entries": [ ] }\n' });
-restores("one that changes a folder the config names as a source", { "local-packages/a.nupkg": "x" });
-restores("one that changes the calling workflow, under its own name", { ".github/workflows/restore.yml": "name: restore again\n" }, { caller: "restore.yml" });
-skips("one that changes another workflow", { ".github/workflows/other.yml": "name: other\n" });
-restores("a doc's change where an import is made of a property", { "README.md": "# More\n" }, { start: { "build/more.xml": '<Project>\n  <Import Project="$(MSBuildThisFileDirectory)x.props" />\n</Project>\n' } });
-restores("a doc's change where an import leads outside the repository", { "README.md": "# More\n" }, { start: { "build/more.xml": '<Project>\n  <Import Project="..\\..\\..\\outside.props" />\n</Project>\n' } });
-restores("a doc's change where an import's path stands on another line", { "README.md": "# More\n" }, { start: { "build/more.xml": '<Project>\n  <Import\n    Project="x.props" />\n</Project>\n' } });
-restores("a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false });
-let canLink = true;
-try { fs.symlinkSync(path.join(tmp, "nowhere"), path.join(tmp, "probe")); } catch { canLink = false; }
-if (canLink) restores("a doc's change where a listed file is a link", { "README.md": "# More\n" }, { link: ["Directory.Build.props", "README.md"] });
-else console.log("skip the link: this machine lets the test make none");
+// the first look, by name
+for (const [what, files, opts] of [
+  ["one that changes a project file", { "src/App/App.csproj": project().replace("</Project>", "  <!-- a note -->\n</Project>") }],
+  ["one that changes a lock file", { "src/App/packages.lock.json": LOCK.replace("\n}\n", "\n}\n\n") }],
+  ["one that adds a response file beside a project file, spelt in any case", { "src/App/msbuild.RSP": "-p:RestoreSources=x\n" }],
+  ["one that changes a NuGet.Config, spelt in any case", { "NuGet.Config": "<configuration/>\n" }],
+  ["one that changes the licence config", { "checks/licences.json": START["checks/licences.json"].replace("[]", "[ ]") }],
+  ["one that changes the audit the config names", { "checks/audit.json": '{ "entries": [ ] }\n' }],
+  ["one that changes a folder the config names as a source", { "local-packages/a.nupkg": "x" }],
+  ["one that changes the calling workflow, under its own name", { ".github/workflows/restore.yml": "name: restore again\n" }, { caller: "restore.yml" }],
+  ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
+]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
+
+// the second look, NuGet's own word, where no file the first names changed
+if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
+else {
+  skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
+  skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
+  skips("one that changes an imported file in a way that asks for nothing new", { "build/deps.xml": "<Project>\n  <PropertyGroup>\n    <Nothing>x</Nothing>\n  </PropertyGroup>\n</Project>\n" });
+  restores("one that adds a package only in a file a project file imports", { "build/deps.xml": ADDS });
+  restores("one that adds it in the second of two imports on a line", { "build/two.xml": ADDS }, { start: { "src/App/App.csproj": project('  <Import Project="..\\..\\build\\deps.xml" /><Import Project="..\\..\\build\\two.xml" />\n'), "build/two.xml": EMPTY } });
+  restores("one that adds it in a file a property imports", { "build/two.xml": ADDS }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY } });
+  restores("one that adds it in an imported file whose name is not plain ASCII", { "build/Ünï.xml": ADDS }, { start: { "build/deps.xml": '<Project>\n  <Import Project="Ünï.xml" />\n</Project>\n', "build/Ünï.xml": EMPTY } });
+  restores("one that downloads a package beside the lock file, of a name it locks at another version", { "build/deps.xml": '<Project>\n  <ItemGroup>\n    <PackageDownload Include="Newtonsoft.Json" Version="[12.0.1]" />\n  </ItemGroup>\n</Project>\n' });
+  let canLink = true;
+  try { fs.symlinkSync(path.join(tmp, "nowhere"), path.join(tmp, "probe")); } catch { canLink = false; }
+  if (!canLink) console.log("skip the links: this machine lets the test make none");
+  else restores("one that points an imported link at a file that adds a package", dir => { fs.rmSync(path.join(dir, "build/link.xml")); fs.symlinkSync("adds.xml", path.join(dir, "build/link.xml")); },
+    { start: { "build/deps.xml": '<Project>\n  <Import Project="link.xml" />\n</Project>\n', "build/empty.xml": EMPTY, "build/adds.xml": ADDS }, link: ["build/link.xml", "empty.xml"] });
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check's first step`);
 process.exitCode = failed ? 1 : 0;

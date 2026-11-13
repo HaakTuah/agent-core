@@ -18,16 +18,20 @@
 # package it brought (.nupkg.metadata), that it took none from elsewhere; a source that asks for a sign-in has none
 # here. A project for Windows alone restores here all the same (EnableWindowsTargeting); one whose SDK the runner lacks
 # restores in a workflow of its own, and runs the script there.
-# It first looks whether the pull request changes anything NuGet reads (git's own diff against the base, as the
-# signature check looks; core archive 201): a project file (a shared project's too), a lock file, a .props or .targets
-# file, a Directory.Build or Directory.Packages file, a response file (MSBuild.rsp), a .user file beside a project
-# file, every file any of these imports (followed through what that file imports in turn), a NuGet.Config, a
+# It first looks whether the pull request changes anything NuGet reads, so that a private repository pays for no
+# restore a pull request cannot have changed, while the check still reports on every pull request (core archive 201).
+# Two looks: git's own diff against the base, as the signature check looks, for a project file, a lock file, a .props,
+# .targets, Directory.Build or response file, a .user file beside a project file, packages.config, a NuGet.Config, a
 # global.json, .NET's tools manifest, a package file, the licence check's config and its audit, a folder the config
-# names as a source, the core's Node version or the calling workflow. Where it changes none, it passes without a restore, so that a private repository
-# pays for no restore a pull request cannot have changed, and the check still reports on every pull request. Any doubt
-# runs it: no base, a base that cannot be fetched, a config that cannot be read, a listed file that is a link, or an
-# import it cannot follow to one file of the repository (a path made of a property, an item or a wildcard, or one
-# that leads outside), so a project whose imports are written so runs the check on every pull request, as before.
+# names as a source, the core's Node version and the calling workflow; and, where none changed, NuGet's own word that
+# every lock file still holds what its project asks for, however it asks (an import, a property, any file a build
+# reads), from a restore against an empty source that downloads nothing. It passes without a restore only where both
+# say so. Any doubt runs it: no base, a base that cannot be fetched, a config that cannot be read, a listed file that
+# is a link, an error of the restore's other than a locked package not found, or a package downloaded beside a lock
+# file, save the SDK's own reference packs (Microsoft.NETCore.App.Ref, Microsoft.WindowsDesktop.App.Ref and
+# Microsoft.AspNetCore.App.Ref), which it adds by itself. What the second look leaves to the next change of a lock
+# file: a source that a build file adds, from which a package of the same content hash would come, since every
+# package's bytes are its lock file's.
 name: nuget
 
 on:
@@ -61,45 +65,53 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
           CONFIG: ${{ inputs.config }}
           CALLER: ${{ github.workflow_ref }} # the calling workflow, by its own path, whatever it is named
+          NUGET_PACKAGES: ${{ runner.temp }}/nuget-look # a folder of its own, which an empty source leaves empty
+          DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+          DOTNET_NOLOGO: "1"
+          EnableWindowsTargeting: "true"
         run: |
           # The checkout is the pull request merged into its base, with both parents, so the diff from the base is what
           # it changes. Any doubt means the check runs.
-          build=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(glob,icase)**/*.proj'
-            ':(glob,icase)**/*.projitems' ':(glob,icase)**/*.shproj' ':(glob,icase)**/*.props' ':(glob,icase)**/*.targets'
-            ':(glob,icase)**/*.user' ':(glob,icase)**/*.rsp' ':(glob,icase)**/Directory.Build.*')
-          paths=("${build[@]}" ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json'
-            ':(glob,icase)**/packages.config' ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json'
-            ':(glob,icase)**/.config/dotnet-tools.json' ':(glob,icase)**/*.nupkg' core/.node-version .github/workflows/nuget.yml)
-          # Every file a project or build file imports, and what those import, by its path from the root: an import
-          # whose path holds a property, an item, a wildcard or an entity, leads outside the repository, or stands on
-          # a line without its Project, is a doubt.
-          imports() {
-            local f dir line value to
-            local -A seen=()
-            local queue=()
-            mapfile -t queue < <(git ls-files -- "${build[@]}")
-            while [ "${#queue[@]}" -gt 0 ]; do
-              f=${queue[0]}; queue=("${queue[@]:1}")
-              [ -z "${seen[$f]+x}" ] && [ -f "$f" ] || continue
-              seen[$f]=1
-              dir=$(dirname -- "$f")
-              while IFS= read -r line; do
-                value=$(printf '%s\n' "$line" | grep -o -i -E "project[[:space:]]*=[[:space:]]*(\"[^\"]*\"|'[^']*')" | head -n 1 | sed -E "s/^[^=]*=[[:space:]]*.//; s/.$//") || return 1
-                case "$value" in ''|*'$('*|*'@('*|*'%'*|*'*'*|*'?'*|*'&'*) return 1 ;; esac
-                to=$(realpath -m --relative-to=. -- "$dir/${value//\\//}") || return 1
-                case "$to" in ..|../*|/*) return 1 ;; esac
-                printf ':(literal)%s\n' "$to"
-                queue+=("$to")
-              done < <(grep -i -E '<import([[:space:]]|/|>|$)' -- "$f" || true)
+          paths=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(glob,icase)**/*.props'
+            ':(glob,icase)**/*.targets' ':(glob,icase)**/Directory.Build.*' ':(glob,icase)**/*.rsp' ':(glob,icase)**/*.user'
+            ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json' ':(glob,icase)**/packages.config'
+            ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json' ':(glob,icase)**/.config/dotnet-tools.json'
+            ':(glob,icase)**/*.nupkg' core/.node-version .github/workflows/nuget.yml)
+          # NuGet's own word on whether every lock file still holds what its project asks for, however the project asks
+          # (in an import, through a property, from any file a build reads): a restore of each project file from its
+          # lock file alone against an empty source, which downloads nothing. It holds only where each restore passed
+          # or failed only for packages not found that a lock file names, and no project downloads a package beside its
+          # lock file (a PackageDownload, a targeting pack), as each restore's own record of the project says.
+          # (the SDK's own reference packs, which it adds by itself, a Windows project's with EnableWindowsTargeting: no
+          # package of the project's, and the same for every project on the runner's SDK)
+          PACKS='Microsoft\.(NETCore|WindowsDesktop|AspNetCore)\.App\.Ref'
+          holds() {
+            local empty project out codes id projects locks
+            empty=$(mktemp -d)
+            mapfile -d '' -t projects < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/*.csproj' \
+              ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(exclude)core/**')
+            mapfile -d '' -t locks < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/packages.lock.json' \
+              ':(glob,icase)**/packages.*.lock.json' ':(exclude)core/**')
+            for project in "${projects[@]}"; do
+              out=$(dotnet restore --locked-mode --source "$empty" "-p:RestorePackagesPath=$NUGET_PACKAGES" \
+                -p:NuGetLockFilePath= "./$project" < /dev/null 2>&1) && continue
+              codes=$(printf '%s\n' "$out" | grep -oE 'error [A-Z]+[0-9]+' | sort -u) || { echo "$project: the restore failed with no error NuGet names"; return 1; }
+              if printf '%s\n' "$codes" | grep -qvE '^error NU110[123]$'; then echo "$project:" $codes; return 1; fi
+              while IFS= read -r id; do
+                printf '%s\n' "$id" | grep -qxE "$PACKS" && continue
+                [ "${#locks[@]}" -gt 0 ] && grep -qiF -- "\"$id\": {" "${locks[@]}" || { echo "$project: a package no lock file names is asked for ($id)"; return 1; }
+              done < <(printf '%s\n' "$out" | grep -oE 'NU110[123]: Unable to find package [^ ]+' | sed -E 's/.* package //; s/\.$//' | sort -u)
             done
+            while IFS= read -r -d '' assets; do
+              jq -e --arg packs "$PACKS" '[.project.frameworks[]? | .downloadDependencies // [] | .[] | select(.name | test("^(" + $packs + ")$") | not)] | length == 0' "$assets" > /dev/null \
+                || { echo "a project downloads a package beside its lock file"; return 1; }
+            done < <(find . -path ./core -prune -o -name project.assets.json -print0)
           }
           run=true
           # (the config, its audit and each folder it names as a source, each by its exact name, and the caller)
-          if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | strings | select(startswith("https://") | not)' "$CONFIG") \
-            && imported=$(imports); then
+          if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | strings | select(startswith("https://") | not)' "$CONFIG"); then
             paths+=(":(literal)$CONFIG")
             while IFS= read -r p; do [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$extra"
-            while IFS= read -r p; do [ -n "$p" ] && paths+=("$p"); done <<< "$imported"
             caller=${CALLER#"$GITHUB_REPOSITORY"/}; caller=${caller%%@*}
             [ -n "$caller" ] && [ "$caller" != "$CALLER" ] && paths+=(":(literal)$caller")
             if { git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$BASE"; } \
@@ -110,13 +122,13 @@ jobs:
                 printf '%s\n' "$changed" | sed 's/^/- /' # behind a dash, so that no file's name starts a workflow command
               elif printf '%s\n' "$listed" | grep -q '^120000 '; then
                 echo "A listed file is a link to another, whose changes this step would not see."
-              else
+              elif holds; then
                 run=false
-                echo "Nothing NuGet reads changed (project, lock, build or config files, what they import, the licence config, the Node version or this workflow): nothing to restore."
+                echo "Nothing NuGet reads changed, and every lock file still holds what its project asks for: nothing to restore."
+              else
+                echo "A lock file no longer holds what its project asks for, or a project downloads a package beside it, or NuGet could not say: the check runs."
               fi
             fi
-          else
-            [ -z "$BASE" ] || echo "An import this step cannot follow, or a config it cannot read: the check runs."
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
