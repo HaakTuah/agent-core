@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { current, newest, issue, pypiTimes } from "./versions.mjs";
+import { current, newest, issue, npm, pypiTimes } from "./versions.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -53,5 +53,9 @@ ok(newest({ "1.5.4": ago(300), "2.0": ago(30) }, { days: 7, version: "1.5.4" }, 
 ok(newest({ "1.5.4": ago(300), "1234567890.0.0": ago(30) }, { days: 7, version: "1.5.4" }, now) === "1.5.4", "a number too long to compare exactly is no release");
 ok(newest(pt, { days: 10, version: "1.5.4" }, now) === "2.0.1", "and the newest old enough taken from them as from npm's");
 ok(/pypi\.org\/project\/mossgrip\/2\.0\.1\//.test(issue({ ...py, version: "1.5.4" }, "2.0.1", "x.json").body), "a PyPI release's issue links its PyPI page");
+// npm itself, asked only for its own version (no registry): it starts on this machine, Windows too
+ok(/^\d+\.\d+\.\d+/.test(npm(["--version"]).trim()), "npm starts and answers, on Linux and on Windows");
+ok(throws(() => npm(["view", "mossgrip & echo x", "time"])) && throws(() => npm(["view", "moss%PATH%"])) && throws(() => npm(["view", "moss\"grip"]))
+  && throws(() => npm(["view", "moss^grip"], "win32")) && throws(() => npm(["view", 7])), "what is no plain word never reaches npm or a shell");
 for (const d of [root, outside]) fs.rmSync(d, { recursive: true, force: true });
 if (failed) process.exit(1);

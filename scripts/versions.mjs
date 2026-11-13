@@ -76,7 +76,14 @@ async function times(e) {
     if (!res.ok) throw new Error(`${e.name}: PyPI answered ${res.status}`);
     return pypiTimes(await res.json());
   }
-  return JSON.parse(execFileSync("npm", ["view", e.name, "time", "--json"], { encoding: "utf8" }));
+  return JSON.parse(npm(["view", e.name, "time", "--json"]));
+}
+// npm's answer. On Windows npm is a command script, which only the command shell starts, so there its arguments reach
+// a shell: each must be a plain word (a package's name as its registry takes it, a flag), or nothing is started.
+export function npm(args, platform = process.platform) {
+  if (!args.every(a => typeof a === "string" && /^[\w@./-]+$/.test(a))) throw new Error(`npm ${args.join(" ")}: not plain words`);
+  const [cmd, all] = platform === "win32" ? ["cmd.exe", ["/d", "/s", "/c", "npm", ...args]] : ["npm", args];
+  return execFileSync(cmd, all, { encoding: "utf8" });
 }
 // What an issue says for an entry behind: the Feature request template's headings (.github/ISSUE_TEMPLATE/).
 export const issue = (e, to, config) => ({
