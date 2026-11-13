@@ -35,8 +35,17 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
 - **The design session writes and merges changes here,** each carried into every project by that project's sync PR. It
   also does here what "Sessions" in `modules/work-flow.md` asks of a session that ends: it reads what reviews left after
   a merge (`modules/reviews.md`, point 2) and cleans up what it made.
+- **A release is cut on the owner's word** (core archive 195): another owner's project takes the core only from a
+  release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as it
+  stands may be handed on, about once a week, and never by a session's own choice. `node scripts/release.mjs` says what
+  the next one would carry, and with `--cut` cuts it: the tag `release-N` on `main`'s newest commit, never moved or
+  deleted afterwards.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
+- **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
+  `node core/scripts/core-cost.mjs --cost`, run in each project of the owner's, says what share of its merged PRs were
+  the core's upkeep and what a PR took, and the numbers go into that review's report, beside the last ones'. Where the
+  core's share grew and the project's own work did not, the review says why, or what of the core goes for it.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
 - **A new rule says what holds it** (core archive 195). A PR that changes the floor or the modules has the heading
