@@ -109,6 +109,9 @@ jobs:
       - name: The NuGet check's first step, which says whether a pull request needs a restore
         if: ${{ !cancelled() }}
         run: node scripts/nuget-gate-test.mjs
+      - name: The personal-terms check, its own job on scratch pull requests
+        if: ${{ !cancelled() }}
+        run: node scripts/personal-terms-test.mjs
       - name: The cap's own check
         if: ${{ !cancelled() }}
         run: node scripts/size-test.mjs
