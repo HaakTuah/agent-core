@@ -128,10 +128,11 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      of the package the restore brought; what the restore brought that no lock file names is held to the list for what
      ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
      config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
-     licence a machine can read is recorded by hand in the audit as `<Id>@<version>`, of "kind": "nuget"; one off its
-     list that the owner wants anyway is named in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It starts
-     advisory, saying what it would fail and passing, and a private repository calls it like any other: it needs
-     nothing of GitHub's paid code security.
+     licence a machine can read is read by hand: a tool that only runs is then recorded in the audit as
+     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
+     off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
+     It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
+     private repository calls it like any other: it needs nothing of GitHub's paid code security.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull

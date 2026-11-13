@@ -14,10 +14,12 @@
 //     its lock installs (NuGet writes a plain Version="1.2.3" as "[1.2.3, )", which with a lock file is that version);
 //   - floor rule 10: a package whose manifest names its licence as an SPDX expression is held to its list by that
 //     (what ships to the floor's, a tool that only runs to the tools': policy, in licences.mjs). One whose manifest
-//     names a licence file, an address or nothing has no licence a machine can read: it passes only with an entry in
-//     the project's audit named <Id>@<version>, of "kind": "nuget", the licence read by hand, which the licence check
-//     then holds to its list like any entry. A new version needs a new entry, so a licence that changes with a version
-//     is read again, and an entry no package needs any more fails;
+//     names a licence file, an address or nothing has no licence a machine can read, and is read by hand. A tool
+//     that only runs then passes with an entry in the project's audit named <Id>@<version>, of "kind": "nuget", which
+//     the licence check holds to its list like any entry. One that ships passes only by the owner's yes, in
+//     "nuget.accepted" with the licence as it was read and its notice, and has no audit entry: no session's reading
+//     alone puts into what ships a package no machine could read (floor rule 10). A new version needs a new entry or
+//     a new yes, so a licence that changes with a version is read again, and one no package needs any more fails;
 //   - "one the owner wants anyway waits for the owner's yes" (floor rule 10): a package off its list passes only where
 //     the config's "nuget.accepted" names that exact version with the owner's yes (licence-yes.mjs, beside this file,
 //     says how one is written and what none takes in, by what the manifest, the audit or the yes itself says). It is
@@ -52,7 +54,7 @@
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
 // packages ship, "tools": those of projects that only run (tests, tools), "accepted": the owner's yeses, as
 // licence-yes.mjs writes one for a package, named "<Id>@<version>" }. With --advisory it says what it would fail and
-// passes, for a project's first weeks with it.
+// passes, for a project where the check itself is at fault, while that is mended.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
@@ -257,13 +259,17 @@ export function check(config, root, packagesDir, tracked) {
       if (entry) { read.add(k); failures.push(`${name}: ${config.audit} holds an entry for it, and its manifest names its licence itself (${licence.expression}): remove the entry`); }
       if (licenceOk(licence.expression, allowed)) { if (a) { used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes: remove it`); } continue; }
       why = `${licence.expression} is off ${list}`;
+    } else if (p.shipped) {
+      // (what ships under a licence only a reading by hand gives waits for the owner's yes, whatever was read)
+      byHand = true;
+      why = `it ships, and its manifest names ${licence.other}, no licence a machine can read: what ships under a licence read by hand waits for the owner's yes (floor rule 10), in the config's "nuget.accepted", with the licence as it was read`;
+      if (entry) { read.add(k); if (!a) failures.push(`${name}: it ships, so ${config.audit} holds no entry for it: its licence, read by hand, stands in "nuget.accepted" with the owner's yes`); }
     } else if (!entry) {
       byHand = true;
       why = `its manifest names ${licence.other}, no licence a machine can read: read it by hand and record it in ${config.audit ?? "the audit"} as "${name}", of "kind": "nuget"`;
     } else {
       read.add(k);
       if (typeof entry.licence !== "string") why = `its entry in ${config.audit} names no licence`;
-      else if (p.shipped && entry.ships !== true) why = `its entry in ${config.audit} does not say it ships ("ships": true), and it is held as what ships`;
       else if (licenceOk(entry.licence, allowed)) { if (a) { used.add(k); failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both, and the entry is on its list: remove the yes`); } continue; }
       else why = `${entry.licence}, as ${config.audit} records it, is off ${list}`;
     }

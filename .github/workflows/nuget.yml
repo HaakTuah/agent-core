@@ -6,9 +6,10 @@
 # restore brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
 # manifest of the package the restore brought. What that script holds and does not, it says itself. A project calls
 # this (workflow_call) from a workflow of its own of the same name, on every pull request, pinned to a full commit SHA
-# ("How a project takes the core" in README.md, point 5), passing the licence check's config. While "advisory" (on
-# unless turned off) it says what it would fail and passes, a restore that fails included, so a project's first weeks
-# with it show whether it is right before anything waits for it. A restore runs the pull request's own project files,
+# ("How a project takes the core" in README.md, point 5), passing the licence check's config. It fails from a
+# project's first day (core archive 198). With "advisory" (off unless a project turns it on) it says what it would
+# fail and passes, a restore that fails included: for a project where the check itself is at fault, while that is
+# reported to the core and mended, and never to let a package through. A restore runs the pull request's own project files,
 # as its build would, and what they run could change anything in this job, the script and the manifests it reads
 # included: so this runs with contents: read and no secret, nothing after the checkout holds the token, and what a pull
 # request does to its project files is the reviews' to read, as with every check that builds. Where the packages come
@@ -25,10 +26,10 @@ on:
         required: true
         type: string
       advisory:
-        description: Whether it only says what it would fail (true, as it starts) or fails the pull request (false).
+        description: Whether it only says what it would fail (true, while a fault of the check's own is mended) or fails the pull request (false).
         required: false
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
