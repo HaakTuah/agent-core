@@ -458,7 +458,8 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Yes to all, expertly!
 
-     Behind "a finding of the last week made after its PR merged, with no reply, is answered as point 5 says" in
-     `modules/reviews.md` and "then both read what reviews left after a merge" in `modules/work-flow.md`; "Codex's
-     before Copilot's, where neither builds" in `modules/roles.md`; "Never a pull request" in `README.md`; and "It rises
-     only when it has to" and "a raise of the size cap in a PR with no "Leanness check:" comment" in `AGENTS.md`.
+     Behind "a finding of the last week by a reviewer the project asks, made after its PR merged, with no reply, is
+     answered as point 5 says" in `modules/reviews.md` and "then both read what reviews left after a merge" in
+     `modules/work-flow.md`; "Codex's before Copilot's, where neither builds" in `modules/roles.md`; "Never a pull
+     request" in `README.md`; and "It rises only when it has to" and "a raise of the size cap in a PR with no "Leanness
+     check:" comment" in `AGENTS.md`.
