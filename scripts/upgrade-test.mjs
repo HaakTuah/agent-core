@@ -35,6 +35,8 @@ ok(yaml.name === "x" && yaml.on.workflow_call.inputs.a.default === true && yaml.
 const c = { github: { event_name: "pull_request", event: { pull_request: { draft: false, user: { login: "Dependabot[bot]" } }, issue: null } }, inputs: { private: false, advisory: true } };
 ok(evaluate("github.event_name == 'PULL_REQUEST' && !github.event.pull_request.draft", c) === true && evaluate("github.event.issue.pull_request || 'x'", c) === "x" && evaluate("github.event.pull_request.user.login != 'dependabot[bot]'", c) === false
   && evaluate("contains(fromJSON('[\"OWNER\",\"MEMBER\"]'), 'member') && startsWith('abc', 'A')", c) === true && evaluate("!inputs.private || !inputs.advisory", c) === true, "and evaluates GitHub's expressions as GitHub does: case-blind strings, || giving a value, a missing property null");
+const matrixed = runWorkflow("on:\n  workflow_call:\n    inputs:\n      languages:\n        type: string\n        default: '[\"a\", \"b\"]'\njobs:\n  analyze:\n    strategy:\n      matrix:\n        language: ${{ fromJSON(inputs.languages) }}\n        os: [x, y]\n    steps: []\n", { github: {}, dry: true });
+ok(matrixed.map(r => r.job).join() === "analyze (a, x),analyze (a, y),analyze (b, x),analyze (b, y)", "a job's matrix is a job for each combination, named by its values, so a matrix that grows starts more jobs", matrixed.map(r => r.job).join());
 let threw = 0;
 for (const bad of ["vars.X == 1", "hashFiles('x')", "a ~ b"]) { try { evaluate(bad, c); } catch { threw++; } }
 ok(threw === 3, "a context, function or sign it does not know stops the test, to be taught, rather than read other than GitHub would");
@@ -182,7 +184,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     if (trigger.branches && !trigger.branches.includes("main")) continue;
     if (event === "pull_request" && trigger.types && !trigger.types.includes("synchronize") && !trigger.types.includes("opened")) continue;
     for (const [id, job] of Object.entries(wf.jobs ?? {})) {
-      const call = new RegExp(`^${CORE.replace(/[.]/g, "\\.")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
+      const call = new RegExp(`^${CORE.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
       if (!call) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [], own: true }]); continue; }
       if (call[1] === "nuget.yml" && !sdk) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [] }]); console.log(`note ${p.name}: no .NET SDK here, so the NuGet check is not run`); continue; }
       const text = git(theCore, "show", `${call[2]}:.github/workflows/${call[1]}`);

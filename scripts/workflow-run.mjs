@@ -201,6 +201,26 @@ export function holds(cond, contexts, state) {
 
 // ---- running a called workflow ----
 
+// A value as written: a whole `${{ }}` gives the expression's own value (a list, say), anything else is text.
+const valueOf = (v, contexts) => {
+  const whole = typeof v === "string" && /^\s*\$\{\{([\s\S]*)\}\}\s*$/.exec(v);
+  return whole ? evaluate(whole[1], contexts) : v;
+};
+// A job's matrix as its combinations ([null] for a job with none): each key's list, in GitHub's order. An include or an
+// exclude, which this has no need of yet, stops the test, to be taught.
+function combinations(matrix, contexts) {
+  if (matrix === undefined || matrix === null) return [null];
+  const m = valueOf(matrix, contexts);
+  if (!m || typeof m !== "object" || Array.isArray(m) || "include" in m || "exclude" in m) throw new Error(`a matrix this runner does not know: ${JSON.stringify(matrix)}`);
+  let list = [{}];
+  for (const [key, raw] of Object.entries(m)) {
+    const values = valueOf(raw, contexts);
+    if (!Array.isArray(values)) throw new Error(`a matrix this runner does not know: ${key}`);
+    list = list.flatMap(c => values.map(v => ({ ...c, [key]: v })));
+  }
+  return list;
+}
+
 const outputsOf = file => {
   const out = {};
   const lines = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n") : [];
@@ -232,12 +252,17 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
   for (const [name, d] of Object.entries(wf.on?.workflow_call?.secrets ?? {})) if (d?.required && !(name in secrets)) throw new Error(`the call leaves out a required secret: ${name}`);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
-    const tmp = fs.mkdtempSync(path.join(temp, "runner-temp-"));
-    const ctx = { github, inputs: given, secrets, runner: { temp: tmp, os: "Linux", ...runner }, env: {}, steps: {}, matrix: {}, vars: {} };
-    const state = { failed: false };
-    const result = { job: id, ran: holds(job.if, ctx, state), passed: true, steps: [], outputs: ctx.steps };
-    results.push(result);
-    try { if (result.ran && !dry) runJob(job, id, ctx, state, result, tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+    const top = { github, inputs: given, secrets, vars: {} };
+    if (!holds(job.if, top, { failed: false })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); continue; }
+    // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
+    for (const matrix of combinations(job.strategy?.matrix, top)) {
+      const tmp = fs.mkdtempSync(path.join(temp, "runner-temp-"));
+      const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...runner }, env: {}, steps: {}, matrix: matrix ?? {} };
+      const state = { failed: false };
+      const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
+      results.push(result);
+      try { if (!dry) runJob(job, id, ctx, state, result, tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+    }
   }
   return results;
 

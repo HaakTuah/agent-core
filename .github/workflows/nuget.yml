@@ -20,10 +20,10 @@
 # restores in a workflow of its own, and runs the script there.
 # It first looks whether the pull request changes anything NuGet reads (git's own diff against the base, as the
 # signature check looks; core archive 201): a project file (a shared project's too), a lock file, a .props or .targets
-# file, a Directory.Build or Directory.Packages file, a .user file beside a project file, every file any of these
-# imports (followed through what that file imports in turn), a NuGet.Config, a global.json, .NET's tools manifest, a
-# package file, the licence check's config and its audit, a folder the config names as a source, the core's Node
-# version or the calling workflow. Where it changes none, it passes without a restore, so that a private repository
+# file, a Directory.Build or Directory.Packages file, a response file (MSBuild.rsp), a .user file beside a project
+# file, every file any of these imports (followed through what that file imports in turn), a NuGet.Config, a
+# global.json, .NET's tools manifest, a package file, the licence check's config and its audit, a folder the config
+# names as a source, the core's Node version or the calling workflow. Where it changes none, it passes without a restore, so that a private repository
 # pays for no restore a pull request cannot have changed, and the check still reports on every pull request. Any doubt
 # runs it: no base, a base that cannot be fetched, a config that cannot be read, a listed file that is a link, or an
 # import it cannot follow to one file of the repository (a path made of a property, an item or a wildcard, or one
@@ -66,7 +66,7 @@ jobs:
           # it changes. Any doubt means the check runs.
           build=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(glob,icase)**/*.proj'
             ':(glob,icase)**/*.projitems' ':(glob,icase)**/*.shproj' ':(glob,icase)**/*.props' ':(glob,icase)**/*.targets'
-            ':(glob,icase)**/*.user' ':(glob,icase)**/Directory.Build.*')
+            ':(glob,icase)**/*.user' ':(glob,icase)**/*.rsp' ':(glob,icase)**/Directory.Build.*')
           paths=("${build[@]}" ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json'
             ':(glob,icase)**/packages.config' ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json'
             ':(glob,icase)**/.config/dotnet-tools.json' ':(glob,icase)**/*.nupkg' core/.node-version .github/workflows/nuget.yml)

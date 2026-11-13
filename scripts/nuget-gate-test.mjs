@@ -66,6 +66,7 @@ restores("one that changes only a file a project file imports, under a name of i
 restores("one that changes only a file that an imported file imports", { "build/more.xml": '<Project>\n  <ItemGroup><PackageReference Include="A" Version="1.0.0" /></ItemGroup>\n</Project>\n' });
 restores("one that changes a shared project's items", { "src/Shared/Shared.projitems": "<Project>\n</Project>\n" }, { start: { "src/Shared/Shared.projitems": "<Project/>\n" } });
 restores("one that changes a NuGet.Config, spelt in any case", { "NuGet.Config": "<configuration/>\n" });
+restores("one that adds a response file beside a project file, spelt in any case", { "src/App/msbuild.RSP": "-p:RestoreSources=x\n" });
 restores("one that changes the licence config", { "checks/licences.json": START["checks/licences.json"].replace("[]", "[ ]") });
 restores("one that changes the audit the config names", { "checks/audit.json": '{ "entries": [ ] }\n' });
 restores("one that changes a folder the config names as a source", { "local-packages/a.nupkg": "x" });
