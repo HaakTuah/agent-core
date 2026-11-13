@@ -1,9 +1,9 @@
 // Tests that the core's address stands in one place (core-address.mjs): no other script holds it, the one workflow that
 // must (core.yml, which may not read it from the copy it checks) holds the same, and each place where GitHub needs it
-// written out follows it: the *owner's account* in AGENTS.md, the issue templates' assignee, and each link or call to
-// this repository in the README and the templates. Run by GitHub in the core's own repository, it also fails where
-// that repository is not the one named: after the account or the repository is renamed, the address is changed once,
-// and this test names what else must follow. Reads only; Node's own modules.
+// written out follows it: the *owner's account* in AGENTS.md, the issue templates' assignee, and each link, call or
+// manifest line in the README and the templates, found by its form and held to the whole address. Run by GitHub in the
+// core's own repository, it also fails where that repository is not the one named: after the account or the repository
+// is renamed, the address is changed once, and this test names what else must follow. Reads only; Node's own modules.
 //
 //   node scripts/core-address-test.mjs
 import fs from "node:fs";
@@ -16,7 +16,7 @@ const read = f => fs.readFileSync(path.join(root, f), "utf8");
 const list = dir => fs.readdirSync(path.join(root, dir)).sort().map(f => `${dir}/${f}`);
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}`); } };
-const account = OWNER.toLowerCase(), repo = CORE.slice(OWNER.length + 1);
+const account = OWNER.toLowerCase();
 
 ok(/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/u.test(CORE), "the address is one account and one repository");
 ok(new RegExp(`^${CORE_SOURCE}$`, "u").test(CORE) && new RegExp(`^${CORE_SOURCE}$`).test(CORE), "its pattern's source matches it, with the u flag and without");
@@ -39,12 +39,18 @@ for (const f of templates.filter(f => f.endsWith(".md"))) {
   const assignee = read(f).match(/^assignees: (.+?)\r?$/mu)?.[1];
   ok(assignee === OWNER, `${f} assigns to ${assignee}, core-address.mjs says ${OWNER}`);
 }
-const named = new RegExp(`([A-Za-z0-9-]+)/${repo.replace(/[.]/gu, "\\.")}(?![A-Za-z0-9_-])`, "gu");
-for (const f of ["README.md", ...templates]) {
-  const others = [...read(f).matchAll(named)].map(m => m[1]).filter(o => o !== OWNER && o !== "com");
-  ok(!others.length, `${f} writes this repository's address under ${[...new Set(others)].join(", ")}, core-address.mjs says ${CORE}`);
+// (each written address is found by its form, whatever it names, so one a rename left behind is found too, and each
+// is the whole address)
+const written = [
+  ["README.md", /uses: ([^\s/`]+\/[^\s/`]+)\/\.github\/workflows\//gu, "a call to one of the core's workflows"],
+  ["README.md", /^Core: (\S+) at </gmu, "the manifest's line"],
+  ["README.md", /`([\w.-]+\/[\w.-]+)\*`/gu, "what a project's Actions settings allow"],
+  ...templates.map(f => [f, /github\.com\/([^\s/()#]+\/[^\s/()#]+)/gu, "a link to this repository"]),
+];
+for (const [f, form, what] of written) {
+  const found = [...read(f).matchAll(form)].map(m => m[1]);
+  ok(found.length > 0 && found.every(a => a === CORE), `${f}: ${what} names ${[...new Set(found)].join(", ") || "nothing"}, core-address.mjs says ${CORE}`);
 }
-ok([...read("README.md").matchAll(named)].length > 0, "the README writes the address a project's manifest and calls take");
 
 // in the core's own repository on GitHub: the address is this repository's
 const here = process.env.GITHUB_REPOSITORY;
