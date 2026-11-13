@@ -71,6 +71,7 @@ const OWNER = "LicenseRef-Owner";
 // terms, by the ids and the words they go by), and copyleft, never in what ships: a guard on the lists themselves.
 const NEVER = new RegExp([
   "(^|[^a-z])(NC|ND|FSL)([^a-z]|$)", "non[-_ ]?commercial", "no[-_ ]?deriv", "BUSL", "business[-_ ]?source", "SSPL", "server[-_ ]?side",
+  "(^|[^a-z])BSL(?![-_ ]?1\\.0)", // (the floor's "BSL", as the Business Source License is also written; BSL-1.0 is Boost's, on the list)
   "elastic", "commons[-_ ]?clause", "polyform", "functional[-_ ]?source", "source[-_ ]?available",
 ].join("|"), "iu");
 const COPYLEFT = /GPL|MPL|EPL|CDDL|-SA(-|$)/iu;

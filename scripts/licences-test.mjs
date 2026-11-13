@@ -29,8 +29,8 @@ ok(registryVersion("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0
   && registryVersion("https://registry.npmjs.org/mossgrip-data/-/lichen-1.0.0.tgz") === undefined && registryVersion("file:vendor/mossgrip-data-1.0.0.tgz") === undefined && registryVersion(undefined) === undefined,
   "and its version by the same address");
 ok(["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "CC-BY-NC-4.0", "CC-BY-ND-4.0", "PolyForm-Noncommercial-1.0.0", "PolyForm-Small-Business-1.0.0", "FSL-1.1-MIT", "MIT + Commons Clause", "LicenseRef-NonCommercial",
-  "LicenseRef-Business-Source", "LicenseRef-NoDerivatives", "LicenseRef-Source-Available", "Server Side Public License", '{"type":"BUSL-1.1"}', "non_commercial use only"].every((l) => lists.never.test(l))
-  && ["MIT", "NCSA", "LicenseRef-Vendor-EULA", "LGPL-3.0-only", "UNLICENSED", "CNRI-Python", "Unicode-DFS-2016", "BSL-1.0", "PostgreSQL", "MS-PL"].every((l) => !lists.never.test(l)),
+  "LicenseRef-Business-Source", "LicenseRef-NoDerivatives", "LicenseRef-Source-Available", "Server Side Public License", '{"type":"BUSL-1.1"}', "non_commercial use only", "BSL-1.1", "BSL 1.1", "BSL", "MIT AND BSL-1.1"].every((l) => lists.never.test(l))
+  && ["MIT", "NCSA", "LicenseRef-Vendor-EULA", "LGPL-3.0-only", "UNLICENSED", "CNRI-Python", "Unicode-DFS-2016", "BSL-1.0", "BSL 1.0", "PostgreSQL", "MS-PL", "Apache-2.0 WITH LLVM-exception"].every((l) => !lists.never.test(l)),
   "knows the terms no list and no yes takes in by their ids and by the words they go by, and no allowed licence among them");
 const ids = new Set(lists.tools);
 ok(["MIT", "(MIT OR GPL-2.0-only)", "GPL-2.0-only WITH Classpath-exception-2.0", "LicenseRef-A AND (MIT OR LGPL-3.0-only)", "LicenseRef-Vendor-EULA"].every((l) => readable(l, ids))
