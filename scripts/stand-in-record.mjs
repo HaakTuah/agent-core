@@ -105,9 +105,10 @@ function main(args) {
     ".[] | [(.issue_url | split(\"/\") | last), .created_at, .author_association, .body] | @json")
     .map(([issue, at, who, body]) => ({ issue, at, body, writer: WRITERS.includes(who) }));
   if (!open) return console.log(print(tally(comments), repo));
+  // (pull requests are taken out after paging, so that a page's length is still GitHub's own)
   const ideas = pages(`repos/${repo}/issues?state=open&labels=enhancement`,
-    ".[] | select(.pull_request | not) | [(.number | tostring), .title, .author_association] | @json")
-    .map(([issue, title, who]) => ({ issue, title, writer: WRITERS.includes(who) }));
+    ".[] | [(.number | tostring), .title, .author_association, (.pull_request != null)] | @json")
+    .filter(([, , , pull]) => !pull).map(([issue, title, who]) => ({ issue, title, writer: WRITERS.includes(who) }));
   const { none, later, others } = lacking(ideas, comments);
   console.log([`Open ideas in ${repo} with no verdict of the stand-in's: ${none.length}`, ...none.map(i => `  #${i.issue} ${plain(i.title)}`),
     `Open ideas whose last verdict is a "later": ${later.length}`, ...later.map(i => `  #${i.issue} ${plain(i.title)}`),
