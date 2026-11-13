@@ -1,0 +1,85 @@
+// Tests of the copy of the core's check (.github/workflows/core.yml), its own job run as GitHub runs it for a project
+// (workflow-run.mjs, beside this file), so that its shell is tested here before it runs in any project: on a scratch
+// project whose copy and calls are as they should be, and on each fault the check names (a default branch of another
+// name, a difference from the floor or the review guidelines, a manifest without its one pin or one owner's account, a
+// pin off the core's main, a call pinned where its workflow differs or written in another form). The copy's own faults
+// (an edit, a file added, a link, a submodule, one whose id is the copy's own tree; the executable bit no difference)
+// are pure-sync-test.mjs's, which runs this job on each. A scratch core of two commits on its main and one off it,
+// reached through the core's address by a git rewrite, so no call reaches the network. On Linux and on Windows. Git,
+// tar, bash and Node's own modules.
+//
+//   node scripts/core-yml-test.mjs
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { CORE, OWNER } from "./core-address.mjs";
+import { runWorkflow } from "./workflow-run.mjs";
+
+let failed = 0, count = 0;
+const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200).replace(/\n/g, "\n     ")}`}`); } };
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-yml-test-"));
+process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const slash = p => p.replace(/\\/g, "/");
+const theCore = path.join(tmp, "the-core");
+const url = `https://github.com/${CORE}`;
+const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
+Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git`, GIT_ALLOW_PROTOCOL: "file" });
+const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
+const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
+
+// the core: A, then B (the core as it stands, its personal-terms workflow changed since A), and a commit off main
+fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_modules"].some(x => slash(src).endsWith(x)) });
+git(theCore, "init", "-q", "-b", "main");
+const terms = fs.readFileSync(path.join(theCore, ".github/workflows/personal-terms.yml"), "utf8");
+write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
+git(theCore, "add", "-A");
+git(theCore, "commit", "-q", "-m", "A");
+const A = git(theCore, "rev-parse", "HEAD");
+write(theCore, ".github/workflows/personal-terms.yml", terms);
+git(theCore, "commit", "-q", "-am", "B");
+const B = git(theCore, "rev-parse", "HEAD");
+const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
+const workflow = git(theCore, "show", `${B}:.github/workflows/core.yml`);
+
+const MANIFEST = (pin = B, more = "") => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${OWNER}\` |\n${more}`;
+const CALLS = (terms = B, core = A) => `name: core\non:\n  pull_request:\njobs:\n  core:\n    uses: ${CORE}/.github/workflows/core.yml@${core}\n  terms:\n    uses: ${CORE}/.github/workflows/personal-terms.yml@${terms}\n    secrets: inherit\n`;
+let n = 0;
+// The check's verdict on a project whose copy is the core at B, with the files given in place of the usual ones.
+function check(files = {}, { branch = "main" } = {}) {
+  const dir = path.join(tmp, `project-${++n}`);
+  fs.mkdirSync(path.join(dir, "core"), { recursive: true });
+  git(dir, "init", "-q", "-b", "main");
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", B], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  for (const [f, text] of Object.entries({ "core-manifest.md": MANIFEST(), ".github/workflows/core.yml": CALLS(), ...files })) write(dir, f, text);
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "a project");
+  const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: branch, private: false }, pull_request: { base: { sha: "" } } } };
+  const [job] = runWorkflow(workflow, { github, base: env, temp: tmp, workspace: () => dir,
+    uses: { "actions/checkout": (w, ws) => { if (!w.repository) return; const to = path.join(ws, w.path); git(tmp, "clone", "-q", "--no-checkout", theCore, to); git(to, "checkout", "-q", "--detach", w.ref); } } });
+  return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
+}
+const passes = (what, ...args) => { const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
+const fails = (what, words, ...args) => { const r = check(...args); ok(!r.passed && r.out.includes(words), `${what}: fails, saying so`, r.out); };
+
+passes("a project whose copy is the core at its pin, each call pinned where its workflow is the same");
+fails("a default branch of another name", "The default branch here is trunk", {}, { branch: "trunk" });
+fails("a difference from the floor", "names the floor or the review guidelines", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/floor/security.md`, rule 12: main is pushed to here.\n") });
+fails("a difference from the review guidelines, under a heading spelt otherwise", "names the floor or the review guidelines", { "core-manifest.md": MANIFEST(B, "\n### DIFFERENCES\n- the Review Guidelines: none here.\n") });
+passes("a difference from a module", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/modules/roles.md`, \"The builders\": Codex alone builds here, since no other tool is set up.\n") });
+passes("a heading inside a fenced block, and the floor named outside the section", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/modules/roles.md`, \"The builders\": none.\n\n## Notes\nThe floor holds whole.\n\n```\n# Differences\nthe floor\n```\n") });
+fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
+fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
+fails("a manifest without the owner's account", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });
+fails("an owner's account that is no login", "owner's account", { "core-manifest.md": MANIFEST().replace(`\`${OWNER}\``, "`two words`") });
+fails("a pin off the core's main", `the pin ${SIDE} is not a commit of the core's main`, { "core-manifest.md": MANIFEST(SIDE) });
+fails("a call pinned where its workflow differs from the core's at the pin", "personal-terms.yml at", { ".github/workflows/core.yml": CALLS(A) });
+fails("a call pinned off the core's main", "is not a commit of the core's main", { ".github/workflows/core.yml": CALLS(SIDE) });
+fails("a call written in another form", "a call to the core not written", { ".github/workflows/core.yml": CALLS().replace(`core.yml@${A}`, "core.yml@main") });
+passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
+
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check`);
+process.exitCode = failed ? 1 : 0;

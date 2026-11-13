@@ -1,10 +1,11 @@
-// Checks the first step of the NuGet check (.github/workflows/nuget.yml, "Does the pull request change what NuGet
-// reads?"), run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull requests of a .NET project that
+// Checks the NuGet check's own steps (.github/workflows/nuget.yml): first "Does the pull request change what NuGet
+// reads?", then the whole job, each run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull requests of a .NET project that
 // holds one real package in its lock file: it says to restore wherever a pull request changes a file it names, and,
 // where none changed, wherever NuGet finds a lock file that no longer holds what its project asks for, however the
 // project asks (in an import, two imports on a line, through a property, a link, a name outside plain ASCII), or a
 // package downloaded beside it; and not to where only other files change. No package is downloaded: the step restores
-// against an empty source. Where there is no .NET SDK (never on GitHub's runners) only the first look is tried. On
+// against an empty source. The whole job, on a project with no package: its restore and its check pass, and a lock file
+// that no longer holds what its project asks for fails the restore. Where there is no .NET SDK (never on GitHub's runners) only the first look is tried. On
 // Linux and on Windows. Git, bash, jq, the .NET SDK and Node's own modules.
 //
 //   node scripts/nuget-gate-test.mjs
@@ -106,5 +107,33 @@ else {
     { start: { "build/deps.xml": '<Project>\n  <Import Project="link.xml" />\n</Project>\n', "build/empty.xml": EMPTY, "build/adds.xml": ADDS }, link: ["build/link.xml", "empty.xml"] });
 }
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check's first step`);
+// the whole job, its restore and its check run as GitHub runs them, on a project that holds the core as core/
+if (sdk) {
+  const whole = (files) => {
+    const dir = path.join(tmp, `whole-${++n}`);
+    fs.mkdirSync(dir);
+    git(dir, "init", "-q", "-b", "main");
+    fs.cpSync(root, path.join(dir, "core"), { recursive: true, filter: src => !["/.git", "/node_modules", "/reports"].some(x => src.replace(/\\/g, "/").endsWith(x)) });
+    const put = set => { for (const [f, text] of Object.entries(set)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };
+    put({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, ""), "src/App/Program.cs": "System.Console.WriteLine(1);\n",
+      "src/App/packages.lock.json": `${JSON.stringify({ version: 1, dependencies: { [tfm]: {} } }, null, 2)}\n`,
+      "checks/licences.json": '{ "ships": [], "audit": "checks/licences-audit.json", "scan": { "served": [], "skip": [] }, "nuget": { "ships": ["src/App/packages.lock.json"], "tools": [] } }\n',
+      "checks/licences-audit.json": '{ "entries": [] }\n' });
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "base");
+    const baseSha = git(dir, "rev-parse", "HEAD");
+    put(files);
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "a change");
+    const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: "someone/project/.github/workflows/nuget.yml@refs/pull/1/merge", event: { pull_request: { base: { sha: baseSha } } } };
+    const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, temp: tmp });
+    return { passed: job.passed, ran: job.steps.filter(x => x.ran).map(x => x.name), out: job.steps.map(x => x.out).join("") };
+  };
+  const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });
+  ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out);
+  const stale = whole({ "src/App/App.csproj": project("") });
+  ok(!stale.passed && /lock file failed|NU1004/.test(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
+}
+
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check's own steps`);
 process.exitCode = failed ? 1 : 0;
