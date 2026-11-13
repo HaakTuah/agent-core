@@ -445,8 +445,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Maybe a reviewer has to concur that condensing isn't possible without losing meaning or enforcement, so that
      > the cap has to be expanded? What is your expert take?
 
-     Told that it should, and that it would stand among this repository's review guidelines on these words. Behind "a
-     finding of the last week made after its PR merged, with no reply, is answered as point 5 says" in
-     `modules/reviews.md` and "then both read what reviews left after a merge" in `modules/work-flow.md`; "Codex's
-     before Copilot's, where neither builds" in `modules/roles.md`; "Never a pull request" in `README.md`; and "It rises
-     only when it has to" and "a raise of the size cap, unless the reviewer concurs" in `AGENTS.md`.
+     Told that it should, and that a code reviewer reads the change before it and not every rule each time:
+
+     > Yes, because condensing would primarily be condensing of what is already there, so if a reviewer cannot check
+     > whether room cannot be made with what was there before and what is added, and kept under the cap, then it
+     > cannot fully evaluate, no, expert? Is an independent verifier subsession better then, expert?
+
+     Told that it is: a fresh session that wrote none of the change reads all the rules for room, what it finds is
+     trimmed, and the cap rises only if that is not enough, the reviewer blocking a raise without that check; and that
+     this would stand among this repository's review guidelines on these words. Behind "a finding of the last week made
+     after its PR merged, with no reply, is answered as point 5 says" in `modules/reviews.md` and "then both read what
+     reviews left after a merge" in `modules/work-flow.md`; "Codex's before Copilot's, where neither builds" in
+     `modules/roles.md`; "Never a pull request" in `README.md`; and "It rises only when it has to" and "a raise of the
+     size cap in a PR with no "Leanness check:" comment" in `AGENTS.md`.

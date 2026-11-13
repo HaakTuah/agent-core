@@ -20,7 +20,8 @@ words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; 
 - **The cap:** the floor and the modules together stay within 49 KB (core archive 164, 169, 171, 179 and 181), checked
   on every PR here (`scripts/size.mjs`), so a new rule replaces text rather than adding to it (core archive 134). It
   keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a change that
-  honest trimming gives no room for raises the cap, saying why, where its code reviewer concurs (`AGENTS.md`).
+  honest trimming gives no room for raises the cap, saying why, once a fresh session has read all the rules for room and
+  found too little (`AGENTS.md`).
 
 ## How a project takes the core
 
