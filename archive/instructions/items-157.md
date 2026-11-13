@@ -493,3 +493,23 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Apply all your recommendations, expertly!
 
      Behind those three wordings in `floor/topics.md` and `floor/threat-model.md`; no rule's meaning changes.
+
+184. **13 November 2026** (the core, in the design chat), after a fresh session's read of all the rules had found
+     trims and some had been taken and some left by the design session's own judgement:
+
+     > Maybe we need to have clear criterias what must remain in place, for a condensing to be valid, expert? What is
+     > your expert take on this? Otherwise it just becomes a question of taste? Then we could run a full audit on all
+     > rules files of agent-core, condense them as much as possible, and set the cap there? What is your expert take
+     > on this, expert?
+
+     Told: yes to criteria, written into the rule as the test for every trim (a reader with the trimmed text and what
+     that reader has already read acts the same in every case; who a rule binds and when, what it asks, every limit
+     and exception, what enforces it, its reason and each name and example stay; only a second statement of what that
+     reader has already read, or words carrying none of these, may go; in doubt the words stay); yes to one audit
+     pass under them over all the core's rule files, any trim in the floor listed for his yes; and the cap set at the
+     next whole KB above the result, not at it, since a cap with no room makes every one-line mend pay for a read of
+     all the rules:
+
+     > Agreed expertly with all your takes! You can commence now. […]
+
+     Behind "A trim is valid" in `modules/review-guidelines.md`.
