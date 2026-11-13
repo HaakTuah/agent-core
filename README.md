@@ -35,8 +35,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, the sync
    script prints the entries a sync brings, and each is done in a PR of its own once the sync is merged. The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
-   its pin. The first copy is the sync script's too, run from a clone of this repository once the manifest is written
-   (the script's header says how); the copy's own `.gitattributes` keeps every line ending as it is.
+   its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
+   submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The
+   first copy is the sync script's too, run from a clone of this repository once the manifest is written (the script's
+   header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 
    **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N`
    on a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's
@@ -114,9 +116,9 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
      update, with no alert of its own, since GitHub alerts only for actions at a version. The owner's setting (below)
      fails a run that uses one that is not pinned (core archive 152).
-   - **A game served by GitHub Pages** publishes main with `site-publish.sh root`, and its pull requests' previews
-     through a `preview.yml` of its own, on `workflow_run` of its build, that calls the core's (the build uploads the
-     artifact `preview`: `pr-number`, and the site in `site/`).
+   - **A game served by GitHub Pages** publishes main with `bash core/scripts/site-publish.sh root`, and its pull
+     requests' previews through a `preview.yml` of its own, on `workflow_run` of its build, that calls the core's (the
+     build uploads the artifact `preview`: `pr-number`, and the site in `site/`).
    - **A project whose packages come from npm** has a `signatures.yml` of its own, on every pull request, which calls
      the core's with the folder of its lock file: where the pull request changes a package list, a lock file, an
      `.npmrc`, the Node version or that workflow, an install from the registry alone, running no package's install

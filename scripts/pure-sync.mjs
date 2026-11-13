@@ -8,15 +8,16 @@
 // It reads the branch's head commit, not the working tree, and passes only when, against the project's main, the diff
 // touches only core/, core-manifest.md and .github/workflows/*.yml; outside core/, each changed line differs from the
 // one it replaces only in the manifest's pin or a call's to a core workflow, each moved to the new pin; the new pin is
-// a commit of the core's main at or past the old one; core/ is the core's tree at that pin exactly, without the folder
-// the core keeps to itself (copy-tree.mjs); and every call to a core workflow is pinned to a commit of the core's main.
+// a commit of the core's main at or past the old one; core/ is a folder, and the core's tree at that pin, compared as
+// copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every call to a core
+// workflow is pinned to a commit of the core's main.
 // It prints the head it checked, for the merge call's `sha` (`modules/github-calls.md`), so nothing pushed after the
 // check can merge. Git and Node's own modules only; it changes nothing.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyTree } from "./copy-tree.mjs";
+import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
@@ -78,8 +79,8 @@ try {
   git(["fetch", "-q", "--no-tags", CORE, "refs/heads/main"], dir);
   for (const sha of pins) if (!ok(["merge-base", "--is-ancestor", sha, "FETCH_HEAD"], dir)) fail.push(`${sha} is not a commit of the core's main`);
   if (oldPin && pin && !ok(["merge-base", "--is-ancestor", oldPin, pin], dir)) fail.push(`the pin goes back: ${pin} is not past ${oldPin}`);
-  if (pin && ok(["cat-file", "-e", `${pin}^{commit}`], dir) && copyTree(pin, dir) !== git(["rev-parse", `${head}:core`])) {
-    fail.push(`core/ is not the core's tree at ${pin}`);
+  if (pin && ok(["cat-file", "-e", `${pin}^{commit}`], dir) && (!coreIsFolder(head, process.cwd()) || entries(copyTree(pin, dir), dir) !== entries(`${head}:core`, process.cwd()))) {
+    fail.push(`core/ is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
   }
 } finally {
   rmSync(dir, { recursive: true, force: true });
