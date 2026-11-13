@@ -158,7 +158,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
      request or by a comment that opens "Security review:" from the owner, a member or a collaborator
      (`modules/reviews.md`, point 3), the second alone where Codex marks a finding of its review open, posted after
-     it. It is advisory until the core says otherwise: the status always passes and says what the check would have
+     it. Where a summary of Codex's is there but its state cannot be read, a form nobody documents having changed, the
+     status says so, the run warns, and the check waits or passes as it would with no summary (a summary whose first
+     line itself changed is not known as one, and counts as none); its tests keep real summaries as GitHub's API gives
+     them. It is advisory until the core says otherwise: the status always passes and says what the check would have
      done. Dependabot's own pull request passes it (floor rule 17); one that needs no security review and gets none by
      itself (floor rule 8) says so in such a comment. It runs a short job at each push and each such comment, a dozen
      or so a pull request, which a private repository pays for: there the job is skipped, and so not billed, unless

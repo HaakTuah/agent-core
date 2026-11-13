@@ -110,4 +110,6 @@ jobs:
             exit 0
           fi
           jq -r '.status | "\(.state): \(.description)"' "$d/out.json"
+          # (a summary of Codex's it cannot read: the check's own fixed words, never the comment's)
+          if jq -e '.warning' "$d/out.json" > /dev/null; then echo "::warning::$(jq -r '.warning' "$d/out.json")"; fi
           jq '.status' "$d/out.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null
