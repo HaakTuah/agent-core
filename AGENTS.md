@@ -45,6 +45,10 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
   differs is a slot, and what holds for one kind alone goes in a module of its own. `scripts/general.mjs` fails a word
   in the floor or the modules that fits only some (`scripts/general.json`); a word a project finds untrue for it joins
   that list in the PR that rewords it.
+- **The core's address stands in one place** (`scripts/core-address.mjs`; core archive 192). Should the account or the
+  repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
+  `scripts/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
+  manifest's line and its calls.
 - **Never create a repository named `agent-rules`,** the core's old name: links to it redirect here (core archive 121).
 
 ## Review guidelines

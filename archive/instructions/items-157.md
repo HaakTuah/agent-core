@@ -638,3 +638,24 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "a weakness: floor rule 9" in `modules/reviews.md`; "those not on a line" in `modules/github-calls.md`;
      "worktree or clone" in `modules/work-flow.md`; "It also does here what "Sessions" in `modules/work-flow.md` asks"
      and "one step of a whole KB" in `AGENTS.md`; and the cap in `scripts/size.mjs`.
+
+192. **13 November 2026** (the core, in the design chat; of `scripts/general.json`):
+
+     > Okay, last thing, really! […] But I found this file with my username hardcoded. Is that so wise? I could
+     > change it at any time, and why hard anchor stuff to my name in such a way? Does it not suffice to state repo
+     > owner or something, if something should be anchored to me, expert?
+
+     Told: in that file the name is a banned word, which keeps it out of the rules; that the account stands in about
+     ten places outside the archive, each an address or the one anchor of whose word counts, which is stated on
+     purpose and never inferred; that GitHub needs it written out in a workflow's call to another repository and in
+     an issue template's assignee; and that the scripts could share one place for it, a change for the daytime.
+
+     > Fully agreed! It must be one place at least, so it only needs changing once, if there is no better way to
+     > attach it to the account name so it changes dynamically? You have a go on everything expertly. Want all we have
+     > agreed on finished tonight. […]
+
+     Behind `scripts/core-address.mjs`, which every script that names the core reads; the one `CORE` of
+     `.github/workflows/core.yml`, which may not read it from the copy it checks; the words check banning the
+     account's login from there, the list no longer holding it; and `scripts/core-address-test.mjs`, which holds each
+     place GitHub needs it written out to the one, and fails in the core's own repository where that is not the one
+     named: the nearest to "dynamically" that GitHub allows.
