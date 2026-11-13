@@ -16,7 +16,7 @@ stand-in's notes (`modules/inbox.md`). Docs alone get no code review unless anot
    (core archive 181). A reviewer, the security reviewer too, that gave the last three PRs it was asked on no review
    (the project's newest PRs that asked it show) is asked and not waited for, which the PR says: the next takes it at
    once, and the fallback reviewer its security review, over the whole diff. A security review that starts by itself is
-   still waited for, as long as point 3 says (floor rule 8).
+   still waited for (floor rule 8).
 3. **Security** (core archive 47 to 51, 174, 177). A *security reviewer* the session calls reviews the finished work
    once, aimed at the ways in it touches, and again only if a later commit touches one. Where one starts by itself
    (Codex's app; floor rule 8), such a later commit, or a security finding's fix, gets the fallback reviewer's check.

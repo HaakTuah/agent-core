@@ -18,15 +18,15 @@ sessions does it say so and stop.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can
   (core archive 185): once its task merged, or it stopped with its work pushed and its note in the *progress file* (for
   usage too: a fresh builder picks up from the branch), its last message read and nothing scheduled bound to it. It
-  first checks that the session cleaned up ("Sessions" in `modules/work-flow.md`) and does so for one that could not.
-  Never deleted; never one the owner works in or that waits only on the owner's yes.
+  first checks that the session cleaned up and does so for one that could not. Never deleted; never one the owner works
+  in or that waits only on the owner's yes.
 - **A lane for every independent entry** (core archive 11), by `modules/work-flow.md`.
 - **A stalled lane** (core archive 133), looked for on every wake: an open PR with no push to its branch for a few
   hours, whose session has ended, cannot be reached (started elsewhere, such as on another account) or sits idle, goes
   to a fresh builder from its branch, the old session told to stop; not one that waits only on the owner's yes.
 - **It asks the owner nothing** but floor rule 14's yeses (core archive 133 and 134): it does it and reports it in a
-  line. Before it reports anything as waiting on the owner (floor rule 14), it checks GitHub: a yes already in the PR
-  (the owner's or the design session's relay), a branch already deleted or a setting already made is never reported
-  again (core archive 137).
+  line. Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or
+  the design session's relay), a branch already deleted or a setting already made is never reported again (core archive
+  137).
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each
   in a clone of its own, and wakes when one's state changes.
