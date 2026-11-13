@@ -367,3 +367,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Yes, expeetly to all!
 
      Behind "It looks before it files" in the README's "Reporting to the core".
+
+177. **13 November 2026** (the core, in the design chat), told what a look through the core before another project's
+     first import had found, among it that a pull request was merged 24 minutes after it opened, on the fallback
+     reviewer's security review, because Codex's own security review had never begun on it, though point 3 of
+     `modules/reviews.md` knew only a wait of about 30 minutes:
+
+     > Address everything that ought to be addressed from this, in your expert opinion.
+
+     Behind "One not begun in about 5 minutes" in point 3 of `modules/reviews.md`: a security review that starts by
+     itself and shows no sign is not waited out, as point 2 already had it for the code review.
