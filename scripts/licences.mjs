@@ -64,7 +64,7 @@ const OSI = [
 // for data, the Open Data Commons dedication; GitHub's own services an audit may name, under GitHub's terms.
 const SAME_TERMS = ["PSF-2.0"];
 const PUBLIC_DOMAIN = { any: ["Public Domain"], data: ["PDDL-1.0"] };
-const GITHUB_SERVICES = new Set(["CodeQL CLI"]);
+const GITHUB_SERVICES = new Set(["CodeQL CLI", "GitHub's commit signing key"]);
 const GITHUB_TERMS = "LicenseRef-GitHub-Terms";
 const OWNER = "LicenseRef-Owner";
 // What the floor never allows on either list or by any yes (non-commercial, no-derivatives and source-available
