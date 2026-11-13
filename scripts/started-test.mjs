@@ -24,10 +24,11 @@ try {
   ok(says(path.join(real, "probe.mjs")) === "started", "a script started by its own path knows it");
   ok(says(path.join("real", "probe.mjs")) === "started", "and by a path from the folder it is run in");
   ok(says(path.join(link, "probe.mjs")) === "started", "and where its folder is reached through a link");
+  ok(says("--preserve-symlinks-main", path.join(link, "probe.mjs")) === "started", "and where Node is told to keep the link's path");
   ok(says(path.join(real, "other.mjs")) === "imported" && says(path.join(link, "other.mjs")) === "imported", "a script another file imports knows that too");
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // (helper-call.mjs asks in its own line: the hook runs it as text, which imports nothing beside it)
 const own = fs.readdirSync(here).filter(f => f.endsWith(".mjs") && !f.endsWith("-test.mjs") && !["started.mjs", "helper-call.mjs"].includes(f))
-  .filter(f => /process\.argv\[1\]/.test(fs.readFileSync(path.join(here, f), "utf8")));
+  .filter(f => /process\s*\.\s*argv\s*(\[\s*1\s*\]|\.\s*at\s*\(\s*1\s*\))|\bargv\s*\[\s*1\s*\]/.test(fs.readFileSync(path.join(here, f), "utf8")));
 ok(own.length === 0, `no script beside it reads the path it was started by: ${own.join(", ") || "none"}`);
 process.exit(failed ? 1 : 0);
