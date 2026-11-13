@@ -463,3 +463,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `modules/work-flow.md`; "Codex's before Copilot's, where neither builds" in `modules/roles.md`; "Never a pull
      request" in `README.md`; and "It rises only when it has to" and "a raise of the size cap in a PR with no "Leanness
      check:" comment" in `AGENTS.md`.
+
+183. **13 November 2026** (the core, in the design chat), told what a fresh session's read of all the rules for room
+     had found in the floor: six wordings another floor sentence already says. Recommended: yes to three (the opening
+     of `floor/topics.md` drops "read before a task touches one", which `floor/security.md` says; the opening of
+     `floor/threat-model.md` drops "The part every project shares", which its title says; rule 17 drops "the one
+     exception to rule 4", which rule 4 says), and the other three left alone (rule 3's list of files, "he himself" in
+     rule 14, "key or secret" in rule 1):
+
+     > Apply all your recommendations, expertly!
+
+     Behind those three wordings in `floor/topics.md` and `floor/threat-model.md`; no rule's meaning changes.
