@@ -10,9 +10,8 @@
 # project's first day (core archive 198). With "advisory" (off unless a project turns it on) it says what it would
 # fail and passes, a restore that fails included: for a project where the check itself is at fault, while that is
 # reported to the core and mended, and never to let a package through. A restore runs the pull request's own project
-# files,
-# as its build would, and what they run could change anything in this job, the script and the manifests it reads
-# included: so this runs with contents: read and no secret, nothing after the checkout holds the token, and what a pull
+# files, as its build would, and what they run could change anything in this job, the script and the manifests it
+# reads included: so this runs with contents: read and no secret, nothing after the checkout holds the token, and what a pull
 # request does to its project files is the reviews' to read, as with every check that builds. Where the packages come
 # from is this restore's to say (floor rule 7): NuGet's own registry and the sources the config names, given to every
 # restore, which overrules what a NuGet.Config names, and the script then reads, by NuGet's own record beside each

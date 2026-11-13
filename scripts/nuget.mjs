@@ -65,11 +65,12 @@
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
 // packages ship, "tools": those of projects that only run (tests, tools), "accepted": the owner's yeses, as
 // licence-yes.mjs writes one for a package, named "<Id>@<version>", "sources": where packages may come from beside
-// NuGet's own registry, each an https address or a folder of the project's own that holds the package files }. With --advisory it says what it would fail and
-// passes, for a project where the check itself is at fault, while that is mended.
+// NuGet's own registry, each an https address or a folder of the project's own that holds the package files }. With
+// --advisory it says what it would fail and passes, for a project where the check itself is at fault, while that is
+// mended.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { delimiter, dirname, join, posix, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { licenceOk, loadConfig, policy } from "./licences.mjs";
@@ -80,7 +81,8 @@ const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
 const BUILD_FILE = /\.(?:cs|fs|vb)proj$|\.props$|\.targets$/iu; // where a project can name another lock file
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
-// an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git lists it
+// an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
+// lists it
 export const REGISTRY = "https://api.nuget.org/v3/index.json";
 const SOURCE_ADDRESS = /^https:\/\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}(?::[0-9]{1,5})?(?:\/[A-Za-z0-9_~-][A-Za-z0-9._~-]*)*\/?$/u;
 const SOURCE_FOLDER = /^[A-Za-z0-9_][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\/$/u;
@@ -130,9 +132,12 @@ function place(p) {
 }
 
 /** The folders of packages the .NET SDK itself brings and gives every restore as a source (`library-packs`, beside
- *  each `dotnet` the PATH or DOTNET_ROOT names): the runner's own, which no pull request writes. */
-export function sdkPacks(env = process.env) {
-  const homes = [env.DOTNET_ROOT, ...(env.PATH ?? env.Path ?? "").split(delimiter)].filter(Boolean).flatMap((dir) => ["dotnet", "dotnet.exe"].map((name) => join(dir, name)).filter((file) => existsSync(file)));
+ *  each `dotnet` the PATH or DOTNET_ROOT names): the runner's own, which no pull request writes. Only a whole path
+ *  counts, and none inside the project at `root`: a dotnet there would be one the pull request brought. */
+export function sdkPacks(env = process.env, root = null) {
+  const inside = (dir) => root !== null && (place(dir) === place(root) || place(dir).startsWith(place(root) + sep));
+  const homes = [env.DOTNET_ROOT, ...(env.PATH ?? env.Path ?? "").split(delimiter)].filter((dir) => dir && isAbsolute(dir) && !inside(dir))
+    .flatMap((dir) => ["dotnet", "dotnet.exe"].map((name) => join(dir, name)).filter((file) => existsSync(file)));
   return [...new Set(homes.map((file) => { try { return join(dirname(realpathSync(file)), "library-packs"); } catch { return null; } }).filter(Boolean).map(place))];
 }
 
@@ -278,8 +283,8 @@ export function check(config, root, packagesDir, tracked, env = process.env) {
   }
   // Where each package was taken from, as NuGet itself records it beside the package (.nupkg.metadata, read below):
   // NuGet's own registry, a source the config names, or the SDK's own folder of packages.
-  const allowed = sourcesOf(config, root), folders = [...allowed.filter((a) => !a.startsWith("https://")).map(place), ...sdkPacks(env)];
-  const from = (source) => (/^https?:/iu.test(source) ? allowed.includes(source) : folders.includes(place(source)));
+  const givenSources = sourcesOf(config, root), folders = [...givenSources.filter((a) => !a.startsWith("https://")).map(place), ...sdkPacks(env, root)];
+  const from = (source) => (/^https?:/iu.test(source) ? givenSources.includes(source) : folders.includes(place(source)));
   const listed = [...ships, ...tools];
   for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config: say whether its packages ship`);
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);

@@ -218,10 +218,16 @@ ok([null, "", "not json", "{}", JSON.stringify({ version: 2, source: "" }), JSON
   "a package with no record of where it was taken from, or one that names no source, fails: its source cannot be read");
 const elsewhere = check({ ships: [], nuget: { ships: [L] } }, tmp, restore("Newtonsoft.Json@13.0.3", ["Some.Pack@8.0.0", "https://pkgs.example.com/v3/index.json"]), only).failures.join("\n");
 ok(/some\.pack@8\.0\.0 \(brought by the restore, and named in no lock file read here\): the restore took it from https:\/\/pkgs\.example\.com/.test(elsewhere), "a package the restore brought that no lock file names, for a project of another kind say, is held to the same sources", elsewhere);
-const sdk = path.join(tmp, "sdk"); put("sdk/dotnet", ""); put("sdk/dotnet.exe", "");
+// (the runner's own SDK stands outside the project, as on a runner)
+const sdk = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-sdk-")); process.on("exit", () => fs.rmSync(sdk, { recursive: true, force: true }));
+for (const name of ["dotnet", "dotnet.exe"]) fs.writeFileSync(path.join(sdk, name), "");
 const onPath = { env: { PATH: [path.join(tmp, "nowhere"), sdk].join(path.delimiter) } };
 ok(takenFrom(path.join(sdk, "library-packs"), {}, only, onPath) === "" && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "elsewhere", "library-packs"), {}, only, onPath)) && /the restore took it from .*library-packs/.test(takenFrom(path.join(sdk, "library-packs"))),
   "the SDK's own folder of packages, beside the dotnet the PATH names, is a source every restore has; a folder of that name anywhere else is not, nor that one where no dotnet stands beside it on the PATH");
+put("tools/dotnet", "");
+const relative = path.relative(process.cwd(), path.join(tmp, "tools")), local = (dir) => takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: dir } });
+ok(/the restore took it from .*library-packs/.test(local(relative)) && /the restore took it from .*library-packs/.test(local(path.join(tmp, "tools"))) && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { DOTNET_ROOT: path.join(tmp, "tools") } })),
+  "a dotnet the PATH or DOTNET_ROOT names by a path that is not whole, or one inside the project, brings no folder of packages: it would be one the pull request brought");
 put("vendor/packages/Bought.1.0.0.nupkg", "");
 const shown = names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] });
 fs.symlinkSync(os.tmpdir(), path.join(tmp, "vendor/packages/elsewhere"));
