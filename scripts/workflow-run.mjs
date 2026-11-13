@@ -220,8 +220,10 @@ const outputsOf = file => {
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
  * With `dry`, it only says which jobs would start: each one that starts is a job the repository's owner pays for.
+ * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). Each job's own
+ * temporary folder is made under `temp` and removed when the job ends.
  */
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false }) {
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
   const declared = wf.on?.workflow_call?.inputs ?? {};
   const given = Object.fromEntries(Object.entries(declared).map(([name, d]) => [name, name in inputs ? inputs[name] : d?.default ?? (d?.type === "boolean" ? false : "")]));
@@ -230,12 +232,16 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
   for (const [name, d] of Object.entries(wf.on?.workflow_call?.secrets ?? {})) if (d?.required && !(name in secrets)) throw new Error(`the call leaves out a required secret: ${name}`);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "runner-temp-"));
+    const tmp = fs.mkdtempSync(path.join(temp, "runner-temp-"));
     const ctx = { github, inputs: given, secrets, runner: { temp: tmp, os: "Linux", ...runner }, env: {}, steps: {}, matrix: {}, vars: {} };
     const state = { failed: false };
-    const result = { job: id, ran: holds(job.if, ctx, state), passed: true, steps: [] };
+    const result = { job: id, ran: holds(job.if, ctx, state), passed: true, steps: [], outputs: ctx.steps };
     results.push(result);
-    if (!result.ran || dry) continue;
+    try { if (result.ran && !dry) runJob(job, id, ctx, state, result, tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  }
+  return results;
+
+  function runJob(job, id, ctx, state, result, tmp) {
     const dir = workspace(id);
     ctx.env = Object.fromEntries(Object.entries(job.env ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
     for (const step of job.steps ?? []) {
@@ -262,7 +268,7 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
       result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
       if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
       if (!passed) { state.failed = true; result.passed = false; }
+      if (until && step.id === until) return;
     }
   }
-  return results;
 }

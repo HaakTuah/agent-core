@@ -13,14 +13,15 @@
 #
 # Advisory, unless the caller turns that off: the status always passes and says what the check would have done ("would
 # wait, ..."), so nothing waits for it until a week of pull requests has shown it right. Turned off, the status stays
-# pending until the review has run, and a ruleset can require it.
-#
-# In a private repository each run is a job its owner pays for, a dozen or so a pull request, for a status that only
-# advises: there the job is skipped, which GitHub does not bill (core archive 201), unless the caller turns it on with
-# the input "private", or has turned advisory off, since a ruleset may then wait for the status. Dependabot's own pull request, every commit of it
+# pending until the review has run, and a ruleset can require it. Dependabot's own pull request, every commit of it
 # Dependabot's and signed by GitHub, passes it where no review of Codex's has begun on it (floor rule 17), and one that
 # needs no security review and gets none by itself (floor rule 8: it touches no way in, or is a pure sync, where no
 # reviewer starts by itself) says so in a comment that opens "Security review:".
+#
+# In a private repository each run is a job its owner pays for, a dozen or so a pull request, for a status that only
+# advises: there the job is skipped, which GitHub does not bill (core archive 201), unless the caller turns it on with
+# the input "private", or has turned advisory off, since a ruleset may then wait for the status. A ruleset that
+# requires the status while it advises waits for good in a private repository: such a project passes "private".
 #
 # What keeps it safe, since a comment starts it and it may write a status (floor rule 2): it checks out the default
 # branch, never the pull request, and runs only that branch's copy of the script; a comment's text is read only in the

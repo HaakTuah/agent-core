@@ -106,6 +106,9 @@ jobs:
       - name: A project of the previous release, synced to this commit, passes every check unchanged
         if: ${{ !cancelled() }}
         run: node scripts/upgrade-test.mjs
+      - name: The NuGet check's first step, which says whether a pull request needs a restore
+        if: ${{ !cancelled() }}
+        run: node scripts/nuget-gate-test.mjs
       - name: The cap's own check
         if: ${{ !cancelled() }}
         run: node scripts/size-test.mjs
