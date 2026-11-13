@@ -56,6 +56,8 @@ r = words({}, { "archive/items.md": "One.\n++ Asked, he said yes.\nThen she did.
 ok(r.status === 1 && r.out.includes("archive/items.md:2:") && r.out.includes("archive/items.md:3:"), "an added line that starts as a diff's file header does is read as the line it is, and the lines after it keep their numbers", r.out);
 r = words({ "archive/old.md": `${OLD}\n2. **2 November**. Then he asked again.\n` }, { "archive/old.md": null, "archive/moved.md": `${OLD}\n2. **2 November**. Then he asked again.\n` });
 ok(r.status === 0, "a record moved to another file, its lines taken away and added word for word, is not new text", r.out);
+r = words({ "archive/old.md": `${OLD}\n2. **2 November**. Then he asked again.\n` }, { "archive/old.md": null, "archive/moved.md": `${OLD}\n2. **2 November**. Then he asked again.\n`, "reports/new.md": "Then he asked again.\n2. **2 November**. Then he asked again.\n" });
+ok(r.status === 1 && /reports\/new\.md:2: "he"/.test(r.out), "a moved line added a second time is new text: each line taken away excuses one", r.out);
 const bad = spawnSync(process.execPath, [script, "general.json", "--base", "--ext-diff"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 const none = spawnSync(process.execPath, [script, "general.json", "--base", "no-such-commit"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 ok(bad.status === 1 && none.status === 1 && /--base needs a commit/.test(bad.stdout + none.stdout), "a --base that is an option, or no commit, is refused", `${bad.stdout}${bad.stderr}${none.stdout}`);

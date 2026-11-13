@@ -45,16 +45,17 @@ console.log(`${files.length} files of the floor and the modules read for ${words
 // the lines a change adds to the dated records, for the words that name them: each line a hunk of git's own diff adds,
 // counted by the hunk's own header (so no added line is taken for a file's), by its file and line number; a quoted
 // line left out, and so is one the same diff takes away elsewhere word for word, a record moved and not written anew
+// (each line taken away excuses one line added, so a second copy of a moved line is read as new)
 for (const w of config.words.filter(w => w.added?.length)) {
   if (!baseRev) { console.log(`no --base given: the lines added under ${w.added.join(", ")} were not read`); continue; }
   const re = new RegExp(w.pattern, "iu");
   const diff = execFileSync("git", ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", "-U0", "--end-of-options", baseRev, "HEAD", "--", ...w.added], { encoding: "utf8", maxBuffer: 1 << 28 });
-  const added = [], removed = new Set();
+  const added = [], removed = new Map();
   let file = "", line = 0, plus = 0, minus = 0;
   for (const l of diff.split("\n")) {
     if (plus || minus) {
       if (l.startsWith("+") && plus) { added.push({ file, line: line++, text: l.slice(1) }); plus--; }
-      else if (l.startsWith("-") && minus) { removed.add(l.slice(1)); minus--; }
+      else if (l.startsWith("-") && minus) { removed.set(l.slice(1), (removed.get(l.slice(1)) ?? 0) + 1); minus--; }
       continue;
     }
     const hunk = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(l);
@@ -63,7 +64,7 @@ for (const w of config.words.filter(w => w.added?.length)) {
   }
   let read = 0;
   for (const a of added) {
-    if (removed.has(a.text)) continue;
+    if (removed.get(a.text)) { removed.set(a.text, removed.get(a.text) - 1); continue; }
     read++;
     const hit = /^\s*>/.test(a.text) ? null : a.text.match(re);
     if (hit) { found++; console.log(`${a.file}:${a.line}: "${hit[0]}" in a line this change adds; say ${w.say}`); }
