@@ -110,3 +110,57 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `modules/orchestrating.md`, the hourly wake set once as a repeat, its clone on `main`, and "A stalled lane" found by
      `scripts/stalled.mjs` and handed over once. Read as a yes to Opus at high, the session's recommendation when he
      asked which.
+
+201. **13 November 2026** (the core, handed to its design session in a message of the owner's: the brief of an outside
+     session that had audited the core at release-2 that day, which the owner had gone through point by point, the
+     owner's word quoted under each section). On section 0, that nothing may lock the project of another owner, which
+     is private, built on .NET on Windows, follows the releases and is on GitHub's free plan, where every check job
+     costs at least one whole minute of the account's 2,000 a month and Actions stop once they are spent:
+
+     > Guarantee me nothing of this will stun lock […]
+
+     On section 1, three ideas (an account of the agents' own, GitHub enforcing the owner's yes, only the owner cutting
+     a release):
+
+     > File as 3 ideas in issues. Might do it, but not right now.
+
+     On section 2, that the personal-terms check reads every commit, the owner asking whether a private repository pays
+     for it:
+
+     > Agreed, if the test is quick. Don't want to add too much overhead. […] private repo, so […] spends action points
+     > on such checks, no, expert? If so, make it an opt-in, so […] doesn't go broke over it, when [the] repo is private
+     > anyways.
+
+     Answered that the scan adds seconds inside the job that already runs and no billed minute, so it is on for every
+     project; and on failing where the secret `PERSONAL_TERMS` is missing:
+
+     > No, must be optional.
+
+     On sections 3 to 7 (no "he" or "his" for the owner in new text; the owner's own projects follow the releases; the
+     copy compared by git's object ids; tests for the sync scripts; the workflows' shell in tested scripts), each:
+
+     > Agreed.
+
+     On sections 8, 9, 10, 11 and 12 (the core's own repository; reading and size; .NET; games served by GitHub Pages;
+     extra checks and a stop switch):
+
+     > Agreed to all in 'agent-core itself'.
+
+     > Agreed to all in 'Reading and size'.
+
+     > Agreed to all in '.NET and […] project', but 'Branch protection and secret scanning for […] private repo' I
+     > don't want this to stun lock […] work if this isn't set-up on […] end
+
+     > Agreed on 'Games'.
+
+     > Agreed to all in 'Extra'.
+
+     And, handing it over, on the two the brief had only explained (the security-review check warning where it cannot
+     read Codex's summary; a project that follows the releases taking a commit that is no release only through a
+     review):
+
+     > Yes to A and B.
+
+     With it: section 0 first, every later PR keeping its test green; never a release cut by a session, the owner
+     told when one is ready. Behind, in `AGENTS.md`: "Nothing locks another owner's project", held by
+     `scripts/upgrade-test.mjs`; and each section's own change, in the PR that cites this item.

@@ -103,7 +103,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      `modules/work-flow.md`), so that issue is the backstop for the days no session starts.
    - **Only a sync PR moves those pins,** and only when the called workflow changed; `core.yml` fails a call pinned
      where it differs from the core's pin.
-   - **A sync changes nothing of the project's own,** and the core tested its scripts before the sync brings them: so
+   - **A sync changes nothing of the project's own,** and the core tested its scripts before the sync brings them, on a
+     project of the previous release synced to the change (`AGENTS.md`, "Nothing locks another owner's project"): so
      the project's own suites run on one only for what they take from the copy (all of them where they run on its Node
      version and `core/.node-version` changed; those that read its scripts for a change under `core/scripts/`), never
      for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a pin moved
@@ -136,7 +137,9 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
      off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
      It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
-     private repository calls it like any other: it needs nothing of GitHub's paid code security.
+     private repository calls it like any other: it needs nothing of GitHub's paid code security. Like the signature
+     check, it first looks whether the pull request changes anything NuGet reads (its workflow's header lists what),
+     and passes without a restore where it changes none; any doubt runs it.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
@@ -145,8 +148,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      it. It is advisory until the core says otherwise: the status always passes and says what the check would have
      done. Dependabot's own pull request passes it (floor rule 17); one that needs no security review and gets none by
      itself (floor rule 8) says so in such a comment. It runs a short job at each push and each such comment, a dozen
-     or so a pull request, which a private repository pays for like its other checks, so it has the check unless its
-     owner says otherwise.
+     or so a pull request, which a private repository pays for: there the job is skipped, and so not billed, unless
+     the project turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds and `core/scripts/exact-versions.mjs` for its lockfiles, and its own check holds its
