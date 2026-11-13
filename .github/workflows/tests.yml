@@ -68,6 +68,9 @@ jobs:
       - name: The core-moved check
         if: ${{ !cancelled() }}
         run: node scripts/core-moved-test.mjs
+      - name: The core's releases, what a project follows, and cutting one
+        if: ${{ !cancelled() }}
+        run: node scripts/releases-test.mjs
       - name: The core's address stands in one place, and is this repository's
         if: ${{ !cancelled() }}
         run: node scripts/core-address-test.mjs
