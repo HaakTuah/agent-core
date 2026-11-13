@@ -1,5 +1,5 @@
-// Tests of the cap's own check (size.mjs): the cap a version of the file sets, whose comment answers for a raise, and
-// what is said of a pull request that raises the cap. Node's own modules only.
+// Tests of the cap's own check (size.mjs): what it counts, the cap a version of the file sets, whose comment answers for
+// a raise, and what is said of a pull request that raises the cap. Node's own modules only.
 //
 //   node scripts/size-test.mjs
 import { spawnSync } from "node:child_process";
@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CAP, answered, capOf, raised } from "./size.mjs";
+import { CAP, COUNTED, answered, capOf, raised } from "./size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -45,12 +45,13 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const put = (name, text) => { const to = path.join(tmp, name); fs.writeFileSync(to, text); return to; };
 const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: path.dirname(path.dirname(file)), encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
 const same = put("same.mjs", own), lower = put("lower.mjs", at(CAP / 1024 - 1)), none = put("none.json", "[[]]"), one = put("one.json", JSON.stringify([yes]));
-ok(run().status === 0 && /bytes of \d+ \(\d+ files\)/.test(run().out), "with no argument it holds the floor and the modules to the cap, as before");
+ok(COUNTED.includes("floor/security.md") && ["how-to-work", "inbox", "work-flow", "git", "claude", "other-builders"].every(m => COUNTED.includes(`modules/${m}.md`)) && !COUNTED.includes("floor/topics.md") && !COUNTED.includes("modules/reviews.md") && COUNTED.every(f => !f.startsWith("core/")),
+  "it counts what every session reads at its start, as the starter kit lists it (the floor's security.md, the modules read then, each builder's own), and no file read only when needed");
+ok(run().status === 0 && /what every session reads at its start \(floor\/security\.md, .*\): \d+ bytes of \d+$/m.test(run().out), "with no argument it holds those files to the cap", run().out);
 ok(run("--raise", same, none).status === 0 && run("--raise", same, none).out.includes("the cap is not raised"), "against a base with the same cap it passes with no comment");
 ok(run("--raise", lower, none).status === 1 && run("--raise", lower, none).out.includes("Leanness check:") && run("--raise", lower, one).status === 0 && run("--raise", lower, one).out.includes("holds a leanness check's answer"), "against a base with a lower cap it fails without the answer and passes with it");
 // (a copy of the script whose real cap is not the one its readable line says, run as itself)
-fs.mkdirSync(path.join(tmp, "scripts"));
-fs.copyFileSync(path.join(path.dirname(file), "started.mjs"), path.join(tmp, "scripts", "started.mjs"));
+fs.cpSync(path.dirname(file), path.join(tmp, "scripts"), { recursive: true });
 fs.writeFileSync(path.join(tmp, "scripts", "size.mjs"), own.replace(/^export const CAP = (\d+) \* 1024;$/m, (line, kb) => `/*\n${line}\n*/\nexport const CAP = ${Number(kb) + 8}*1024;`));
 const hidden = spawnSync(process.execPath, [path.join(tmp, "scripts", "size.mjs"), "--raise", same, one], { cwd: tmp, encoding: "utf8" });
 ok(hidden.status === 1 && hidden.stderr.includes("does not set the cap the script runs with") && !hidden.stdout.includes("ok"), "run as itself, a script whose real cap hides behind a look-alike line fails the raise check, answer or no answer", hidden.stdout + hidden.stderr);
