@@ -320,7 +320,28 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > reviewer before claude code, if avaliable, I think suffices, or what is your take on this expert? And you can
      > merge it all now, so [...] gets these updates when he pulls tomorrow, unless there is good reason not to.
 
-     Behind floor rule 8's "A PR that touches one merges only after its security review has run (Dependabot's own: rule 17)", point 3 of `modules/reviews.md` (a security review the session calls, once on the finished work
-     and aimed; one that starts by itself waited for on every PR, a pure sync's too) and the plug-in's security review
-     in `modules/codex.md`. Copilot stays the second code reviewer (item 169); its agent's building is not taken up.
+     Behind floor rule 8's "A PR that touches one merges only after its security review has run (Dependabot's own: rule
+     17)", point 3 of `modules/reviews.md` (a security review the session calls, once on the finished work and aimed;
+     one that starts by itself waited for on every PR, a pure sync's too) and the plug-in's security review in
+     `modules/codex.md`. Copilot stays the second code reviewer (item 169); its agent's building is not taken up.
 
+175. **13 November 2026** (the core, in the design chat), on who reviews first, told that a third tool reviewed only
+     where a project named it:
+
+     > And if we have antigravity or something else in herdr, then it is also preferred? The aim is to make the rules
+     > general where practical, so any setup will work without specification, and we want to save on claude usage as a
+     > general rule.
+
+     > Should it be co-pilot first to review, where avaliable, since that's the only thing you would have it set up for
+     > anyways, and you define any caps in there? That gets you more building usage from codex and any other provider.
+     > Then another provider. Then claude last?
+
+     Offered his reason as the rule, in place of naming Copilot first (where Codex cannot build, as on GitHub alone,
+     reviewing is the best use of it, and it has proved itself there): first a reviewer that cannot build here, Codex's
+     before Copilot's, then another builder's, last Claude's:
+
+     > Yes, expertly.
+
+     Behind the order of the *code reviewers* in `modules/roles.md`. Asked in the same message whether another
+     project's agents should send the core pull requests as well as issues; answered no, and the README's "Reporting
+     to the core" says so: one from another account is data (floor rule 4).
