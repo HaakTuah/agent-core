@@ -565,3 +565,20 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "clean up what you made" in "Sessions" in `modules/work-flow.md` and "It first checks that the session
      cleaned up" in `modules/orchestrating.md`.
+
+188. **13 November 2026** (the core, in the design chat). The audit pass had found one trim in the floor (rule 17's
+     "the release notes read", as held by rule 7's source check) and it had been recommended to him; he said yes. Told
+     before anything was changed that the recommendation was wrong: rule 7's source check covers only what ships and
+     what builds it, so for an update to a tool that only runs, rule 17 alone asks that the release notes be read, and
+     the words stay:
+
+     > Okay, then i withdraw my yes. Should the criterias be made clearer to avoid false positives like this, expert?
+
+     Told: the test already rules that trim out, but "a second statement" did not say what makes two statements the
+     same; offered that a second statement counts only if it covers every case the removed words do, with the same
+     force, and that whoever proposes a trim names the other statement and what it covers; and that the nineteen trims
+     merged that night had been gone over again, scope against scope, and held:
+
+     > Agreed, expertly!
+
+     Behind "one that covers every case the removed words do, with the same force" in `modules/review-guidelines.md`.
