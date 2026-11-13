@@ -13,15 +13,15 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
   task can break, read at the start of every task; `topics.md` the rules for particular work; `threat-model.md` the
   shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
-  its top when it is read. At the start of every task: `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each
-  builder's own (`claude.md`, or `other-builders.md`). When needed: `roles.md`, `helpers.md`, `reviews.md`,
-  `review-guidelines.md`, `codex.md`, `copilot.md`, `orchestrating.md`, `github-calls.md` and `updates.md`; and, for
-  games only, `game-design.md`.
+  its top when it is read (a provider's part: when that provider is asked). At the start of every task:
+  `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
+  When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
+  `orchestrating.md`, `github-calls.md` and `updates.md`; and, for games only, `game-design.md`.
 - **The cap:** the floor and the modules together stay within 51 KB (core archive 164, 169, 171, 179, 181, 182 and 187),
   checked on every PR here (`scripts/size.mjs`), so a new rule replaces text rather than adding to it (core archive
   134). It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a
-  change that honest trimming gives no room for raises the cap one step, once a fresh session has read all the rules for
-  room and found too little (`AGENTS.md`).
+  change that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all
+  the rules for room and found too little (`AGENTS.md`).
 
 ## How a project takes the core
 
@@ -107,8 +107,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    and its own check holds its packages to floor rule 10's list. Its Actions settings must allow this repository's
    workflows, and each check there spends paid minutes, which its owner set aside by making it private (so no step waits
    for the owner's yes over them: floor rule 14), so each runs only where a change can affect it, and the core is synced
-   once a day at most, a sync PR opened that day being the day's (`modules/orchestrating.md`). On GitHub's free plan it
-   has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
+   once a day at most, a sync PR opened that day being the day's ("Sessions" in `modules/work-flow.md`). On GitHub's
+   free plan it has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
    (`modules/work-flow.md`, point 1). The core's scripts read npm's lockfiles alone: what another installer holds, the
    project's own checks do. **A project that is sold** carries its company's name where its buyers and its code need it,
    and its owner leaves that name off the list of personal terms; a person's name stays out all the same (floor rule
@@ -207,7 +207,7 @@ Floor: whole. Modules: <all, or the list of those taken>.
   change a workflow (as `setup/server.md`, point 5), or its workflows wait for an approval before they run.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
 - Any other machine the sessions run on is the owner's to set up (floor rule 18), who chooses knowing what a setup like
-  `setup/server.md`'s buys: an account of their own for the agents and a throwaway box for the project's code mean that
+  `setup/server.md`'s buys: an account of the agents' own and a throwaway box for the project's code mean that
   an agent fooled by planted text (in a dependency, a web page, an issue) reaches only what that account holds and runs
   code only inside the box. Without them it reaches all the owner's own account can: its files, its other sign-ins, its
   keys. What agents keep on every machine are promises (floor rule 18); only the setup limits one that breaks them.

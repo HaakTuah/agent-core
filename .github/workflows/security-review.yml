@@ -1,5 +1,5 @@
-# The security-review check (floor rule 8: "No PR merges before its security review has run, nor with a blocking
-# security finding open"), for every project that takes the core: it gives the head commit of each open pull request
+# The security-review check (floor rule 8: a PR that touches a way in merges only after its security review has
+# run, and none with a blocking security finding open), for every project that takes the core: it gives the head commit of each open pull request
 # that is no draft a commit status, "security-review", that says whether its security review has run. Proof is the
 # summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment that opens
 # "Security review:" from the repository's owner, a member or a collaborator, which is how the fallback reviewer's or
