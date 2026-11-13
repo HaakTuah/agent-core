@@ -70,7 +70,7 @@
 // mended.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { licenceOk, loadConfig, policy } from "./licences.mjs";
@@ -123,11 +123,19 @@ export function nugetConfig(config) {
  *  by its whole path under `root`, so that a restore reads it from wherever it is started. */
 export const sourcesOf = (config, root) => [REGISTRY, ...nugetConfig(config).sources.map((s) => (s.startsWith("https://") ? s : resolve(root, s)))];
 
-/** A path as one spelling of the place it names: whole, with links and Windows' short names resolved where it is
- *  there, and in one case where the system reads paths so. */
+/** A path as one spelling of the place it names: whole, with links and Windows' short names resolved, as the system
+ *  spells them, up to the nearest folder of it that is there (the rest as it is written), and in one case where the
+ *  system reads paths so: two spellings of one place, there or not yet, are one. */
 function place(p) {
-  let whole = resolve(p);
-  try { whole = realpathSync.native(whole); } catch { /* (not there: as it is written) */ }
+  let at = resolve(p), whole;
+  const rest = [];
+  for (;;) {
+    try { whole = join(realpathSync.native(at), ...rest); break; } catch { /* (not there: try the folder above) */ }
+    const up = dirname(at);
+    if (up === at) { whole = join(at, ...rest); break; }
+    rest.unshift(basename(at));
+    at = up;
+  }
   return process.platform === "win32" ? whole.toLowerCase() : whole;
 }
 
