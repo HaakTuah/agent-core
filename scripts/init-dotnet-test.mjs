@@ -6,7 +6,8 @@
 // copy of the core is byte for byte the same in both, since its own .gitattributes travels with it; the reading-size
 // check counts the same in both, a file that stands exactly at its mark included; and where the SDK is there, the
 // solution builds with the kit in it, and what the build leaves behind disturbs no check. On Linux and on Windows.
-// Git, tar, Node's own modules, and the .NET SDK where there is one.
+// Git, tar, Node's own modules, and the .NET SDK where there is one, which writes its own settings and caches into the
+// test's scratch folder.
 //
 //   node scripts/init-dotnet-test.mjs
 import { spawnSync } from "node:child_process";
@@ -24,8 +25,12 @@ ok(bytes("a\nb\n") === 4 && bytes("a\r\nb\r\n") === 4 && bytes("") === 0, "a fil
 ok(bytes("a\rb\r") === 4 && bytes("\r\r\n") === 2 && bytes("\n\r") === 2 && bytes("\r") === 1, "a carriage return that stands before no line feed is counted like any byte");
 
 const { tmp, env, git, run, script, fresh } = scratch("init-dotnet-test-");
-// (the SDK is kept quiet, and leaves no build server behind to hold a file of the scratch folder)
-const sdkEnv = { ...env, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0", UseSharedCompilation: "false" };
+// (the SDK is kept quiet, and leaves no build server behind to hold a file of the scratch folder; what it keeps for
+// itself, its own settings and its packages' caches, lies in the scratch folder too, and a build reads no
+// Directory.Build file from a folder above the project, where on a shared machine anyone could have left one)
+const kept = name => path.join(tmp, "sdk", name);
+const sdkEnv = { ...env, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0", UseSharedCompilation: "false",
+  DOTNET_CLI_HOME: kept("home"), NUGET_PACKAGES: kept("packages"), NUGET_HTTP_CACHE_PATH: kept("http-cache"), NUGET_PLUGINS_CACHE_PATH: kept("plugins-cache"), ImportDirectoryBuildProps: "false", ImportDirectoryBuildTargets: "false" };
 const dotnet = (dir, ...args) => { const r = spawnSync("dotnet", args, { cwd: dir, env: sdkEnv, encoding: "utf8" }); return { status: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` }; };
 const sdk = dotnet(tmp, "--version").status === 0;
 ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so the project there is one the SDK wrote, and is built");
