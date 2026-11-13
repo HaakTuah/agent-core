@@ -17,7 +17,7 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
   `orchestrating.md`, `github-calls.md` and `updates.md`; and, for games only, `game-design.md`.
-- **The cap:** the floor and the modules together stay within 51 KB (core archive 164, 169, 171, 179, 181, 182 and 187),
+- **The cap:** the floor and the modules together stay within 52 KB (core archive 164, 169, 171, 179, 181, 182, 187 and 191),
   checked on every PR here (`scripts/size.mjs`), so a new rule replaces text rather than adding to it (core archive
   134). It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a
   change that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all
