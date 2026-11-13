@@ -46,10 +46,10 @@ export function raised(base, head, comments) {
   return `the cap rises from ${from} to ${to} bytes, and the pull request has no comment that opens "Leanness check:": a fresh session reads all the rules for room first, its answer is posted so, and this check is run again (modules/review-guidelines.md, "A mark on what every session reads")`;
 }
 
-function main(argv) {
-  if (argv[0] === "--raise") {
+function main([flag, baseFile, commentsFile]) {
+  if (flag === "--raise") {
     let base = null, comments = null;
-    try { base = fs.readFileSync(argv[1], "utf8"); comments = JSON.parse(fs.readFileSync(argv[2], "utf8")); } catch { /* (said below) */ }
+    try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
     if (comments === null) { console.error("FAIL: name the base's size.mjs and the pull request's comments: node scripts/size.mjs --raise <base> <comments>"); return 1; }
     const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments);
     if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
