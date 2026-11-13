@@ -7,6 +7,16 @@ review the core, not the design session.
 
 ## The answer
 
+**Corrected the same day: no rule is a candidate to go.** This report first named "Match effort to the task" as one,
+on two grounds, and both were wrong. It said no archive item stands behind the rule: the owner's own standing line
+does, word for word, in core archive 25 ("Match effort to the task. Docs, READMEs, small fixes and config: one pass,
+no subagents."); the rule only lacked its pointer, which it now has. And it said the rule repeats the file's first
+line: its first half does, its second is said nowhere else, and `modules/helpers.md` leans on it ("Not for one-pass
+work" names no kinds of work since a lean pass of 10 November left that to this rule). The count below is unchanged:
+the rule was never cited in either project's pull requests. That zero was a reason to read the rule again, as "How it
+was counted" says, and the reading stopped at the rule's own line where it should have gone on to the archive and to
+what points at the rule. The paragraph below stands as first written, with this said above it.
+
 **One rule is a candidate to go: "Match effort to the task" (`modules/how-to-work.md`).** The other 42 stay. The count
 does not show a set of dead rules: 33 of the 43 show in at least one pull request's "Readings taken" or comments, and
 each of the 10 that never do was read again, below, for what it does. Most of those are one line that sends a session
@@ -54,7 +64,7 @@ project's own rule files before 9 November, and the count covers those weeks too
 | `modules/helpers.md`: Fresh eyes | 0 / 5 | 0 / 4 | As above. |
 | `modules/helpers.md`: At most five at a time, a brief that stands alone, every result checked | 20 / 164 | 33 / 188 | As above; helpers are named in every fifth pull request. |
 | `modules/how-to-work.md`: A question from the owner is a question | 2 / 3 | 2 / 3 | Stays: the owner's own words (core archive 25), and cited when it mattered. |
-| `modules/how-to-work.md`: Match effort to the task | 0 / 0 | 0 / 2 | **The one candidate to go.** Never cited in either game, no archive item behind it, and it says again what the file's first line says ("the cheapest approach that does it well" against "at the lowest cost now and later"). |
+| `modules/how-to-work.md`: Match effort to the task | 0 / 0 | 0 / 2 | Stays (corrected: see "The answer"). The owner's own line, core archive 25; its second half is said nowhere else, and `modules/helpers.md` leans on it. |
 | `modules/how-to-work.md`: Edit in place, and don't loop | 5 / 13 | 3 / 7 | Stays: cited where a builder changed approach or marked a task blocked. |
 | `modules/inbox.md`: Nothing goes to the owner to be answered | 2 / 4 | 2 / 3 | Stays. Its first clause repeats floor rule 14; the rest (the stand-in gives the reading, the unsure first) is said nowhere else. A trim would save under 100 bytes. |
 | `modules/inbox.md`: The stand-in | 14 / 37 | 5 / 28 | Stays: in steady use. |
