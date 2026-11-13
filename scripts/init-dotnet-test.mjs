@@ -5,7 +5,11 @@
 // own checks run in both. What it holds: the kit and every check pass in the converted clone as in the plain one; the
 // copy of the core is byte for byte the same in both, since its own .gitattributes travels with it; the reading-size
 // check counts the same in both, a file that stands exactly at its mark included; and where the SDK is there, the
-// solution builds with the kit in it, and what the build leaves behind disturbs no check. On Linux and on Windows.
+// solution builds with the kit in it, and what the build leaves behind disturbs no check; and the NuGet check
+// (nuget.mjs) on real packages: the SDK's project takes two from nuget.org with lock files on, a restore from the lock
+// files alone fills a folder, and the check reads the real lock files and the real packages' manifests there, passes
+// them, fails a package under the GPL that is then added, and the restore refuses a lock file gone stale. On Linux
+// and on Windows.
 // Git, tar, Node's own modules, and the .NET SDK where there is one, which writes its own settings and caches into the
 // test's scratch folder.
 //
@@ -30,7 +34,7 @@ const { tmp, env, git, run, script, fresh } = scratch("init-dotnet-test-");
 // Directory.Build file from a folder above the project, where on a shared machine anyone could have left one)
 const kept = name => path.join(tmp, "sdk", name);
 const sdkEnv = { ...env, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1", MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0", UseSharedCompilation: "false",
-  DOTNET_CLI_HOME: kept("home"), NUGET_PACKAGES: kept("packages"), NUGET_HTTP_CACHE_PATH: kept("http-cache"), NUGET_PLUGINS_CACHE_PATH: kept("plugins-cache"), ImportDirectoryBuildProps: "false", ImportDirectoryBuildTargets: "false" };
+  RestorePackagesWithLockFile: "true", DOTNET_CLI_HOME: kept("home"), NUGET_PACKAGES: kept("packages"), NUGET_HTTP_CACHE_PATH: kept("http-cache"), NUGET_PLUGINS_CACHE_PATH: kept("plugins-cache"), ImportDirectoryBuildProps: "false", ImportDirectoryBuildTargets: "false" };
 const dotnet = (dir, ...args) => { const r = spawnSync("dotnet", args, { cwd: dir, env: sdkEnv, encoding: "utf8" }); return { status: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` }; };
 const sdk = dotnet(tmp, "--version").status === 0;
 ok(sdk || !process.env.GITHUB_ACTIONS, "on GitHub's runners there is a .NET SDK, so the project there is one the SDK wrote, and is built");
@@ -40,9 +44,13 @@ const dir = fresh("a-dotnet-project");
 git(dir, "config", "core.autocrlf", "true");
 if (sdk) {
   const steps = [["new", "sln", "--name", "Trial"], ["new", "console", "--output", "src/App"], ["new", "classlib", "--output", "src/Lib"],
-    ["sln", "add", "src/App", "src/Lib"], ["add", "src/App", "reference", "src/Lib"], ["new", "gitignore"]];
+    ["sln", "add", "src/App", "src/Lib"], ["add", "src/App", "reference", "src/Lib"], ["new", "gitignore"],
+    // (two real packages, each at one version, with lock files on: the SDK's settings above turn them on)
+    ["add", "src/App", "package", "Newtonsoft.Json", "--version", "13.0.3"], ["add", "src/Lib", "package", "Serilog", "--version", "4.0.0"],
+    // (once more for the whole solution: the program's lock file takes in what its library now pulls in)
+    ["restore"]];
   const wrote = steps.map(args => [args.join(" "), dotnet(dir, ...args)]).filter(([, r]) => r.status !== 0);
-  ok(wrote.length === 0, "the .NET SDK writes a solution with a program and a library", wrote.map(([what, r]) => `dotnet ${what}: ${r.out.slice(0, 400)}`).join("\n     "));
+  ok(wrote.length === 0, "the .NET SDK writes a solution with a program and a library, and adds two packages from nuget.org", wrote.map(([what, r]) => `dotnet ${what}: ${r.out.slice(0, 400)}`).join("\n     "));
 } else {
   // (as an editor on Windows writes them: every line ending a carriage return and a line feed)
   const write = (to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true }); fs.writeFileSync(path.join(dir, to), text.replace(/\n/g, "\r\n")); };
@@ -56,9 +64,14 @@ git(dir, "add", "-A");
 git(dir, "commit", "-q", "-m", "a .NET project");
 
 const kit = run(dir, script, "--owner", "someone-else", "--name", "A .NET project", "--nuget", ".");
-ok(kit.status === 0 && kit.out.includes("The starter kit is written") && kit.out.includes("its NuGet packages: a check of the project's own"), "the kit writes into a .NET project, and says that its NuGet packages need a check of the project's own", kit.out.slice(0, 800));
+ok(kit.status === 0 && kit.out.includes("The starter kit is written") && kit.out.includes("its NuGet packages: lock files turned on"), "the kit writes into a .NET project, and says what its NuGet packages still need", kit.out.slice(0, 800));
 if (kit.status === 0) {
-  ok(fs.readFileSync(path.join(dir, ".github/dependabot.yml"), "utf8").includes('package-ecosystem: "nuget"\n    directory: "/"\n') && !fs.existsSync(path.join(dir, ".github/workflows/signatures.yml")), "Dependabot is told of its NuGet packages, and npm's signature check is not called");
+  ok(fs.readFileSync(path.join(dir, ".github/dependabot.yml"), "utf8").includes('package-ecosystem: "nuget"\n    directory: "/"\n') && !fs.existsSync(path.join(dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(dir, ".github/workflows/nuget.yml")), "Dependabot is told of its NuGet packages, the NuGet check is called, and npm's signature check is not");
+  // (what the kit leaves to the project: its lock files, named as those of what ships)
+  const lockFiles = git(dir, "ls-files", "--", "*packages.lock.json").split("\n").filter(Boolean);
+  const licencesConfig = JSON.parse(fs.readFileSync(path.join(dir, "checks/licences.json"), "utf8"));
+  fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify({ ...licencesConfig, nuget: { ships: lockFiles, tools: [] } }, null, 2)}\n`);
+  git(dir, "add", "checks/licences.json");
   git(dir, "commit", "-q", "-m", "the starter kit");
 
   // two clones: as it is stored, and as git for Windows clones it by default
@@ -107,6 +120,25 @@ if (kit.status === 0) {
     ok(fs.existsSync(path.join(converted, "src/App/bin")) && git(converted, "status", "--porcelain") === "", "what the build leaves behind is ignored by git, and nothing of the kit's was touched");
     const after = failing(converted, "after the build");
     ok(after.length === 0, "every check of the core still passes after the build", after.join("\n     "));
+
+    // the NuGet check, on the real lock files and the manifests of the real packages a restore brings
+    const restored = kept("restored"), restoring = { ...sdkEnv, NUGET_PACKAGES: restored };
+    const sdkIn = (root, ...args) => { const r = spawnSync("dotnet", args, { cwd: root, env: restoring, encoding: "utf8" }); return { status: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}` }; };
+    const nuget = (root, ...more) => check(root, ["core/scripts/nuget.mjs", "checks/licences.json", "--packages", restored, ...more]);
+    ok(lockFiles.length === 2, "with lock files on, the SDK wrote one beside each project, and git knows both", lockFiles.join());
+    // (as the workflow does it: each project file the script lists, from its own lock file)
+    const listedProjects = check(converted, ["core/scripts/nuget.mjs", "--projects"]).out.split("\n").filter(Boolean);
+    const locked = listedProjects.map(project => sdkIn(converted, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", `./${project}`));
+    ok(listedProjects.length === 2 && locked.every(r => r.status === 0) && fs.existsSync(path.join(restored, "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec")), "the script lists both project files, a restore of each from its lock file alone passes in the converted clone, and brings each package's manifest", `${listedProjects.join()}\n     ${locked.map(r => r.out.slice(-400)).join("\n     ")}`);
+    const real = nuget(converted), counted = Number(/^(\d+) NuGet packages in 2 lock files checked/m.exec(real.out)?.[1]);
+    ok(real.status === 0 && counted >= 2, "the NuGet check reads the real lock files and the real manifests, and passes two packages under MIT and Apache-2.0", real.out.slice(0, 1200));
+    const gpl = sdkIn(plain, "add", "src/App", "package", "MySql.Data", "--version", "8.0.33");
+    const refused = nuget(plain), advised = nuget(plain, "--advisory");
+    ok(gpl.status === 0 && refused.status === 1 && /^FAIL: MySql\.Data@8\.0\.33 \(src\/App\/packages\.lock\.json\): (.* is off the list for what ships|its manifest names (a licence file|an address|nothing))/m.test(refused.out), "a package under the GPL, added to what ships, fails it by name, for its licence as its real manifest gives it", `${gpl.out.slice(-400)}\n     ${refused.out.slice(0, 1500)}`);
+    ok(advised.status === 0 && /^WOULD FAIL: MySql\.Data@8\.0\.33 /m.test(advised.out), "advisory, the same run says so and passes");
+    git(plain, "checkout", "-q", "--", ...lockFiles);
+    const stale = sdkIn(plain, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", "./src/App");
+    ok(stale.status !== 0, "with the project asking for a package its lock file does not hold, the restore from the lock files refuses", stale.out.slice(-600));
   }
 }
 
