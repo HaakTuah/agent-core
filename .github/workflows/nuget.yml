@@ -18,6 +18,15 @@
 # package it brought (.nupkg.metadata), that it took none from elsewhere; a source that asks for a sign-in has none
 # here. A project for Windows alone restores here all the same (EnableWindowsTargeting); one whose SDK the runner lacks
 # restores in a workflow of its own, and runs the script there.
+# It first looks whether the pull request changes anything NuGet reads (git's own diff against the base, as the
+# signature check looks; core archive 201): a project file, a lock file, a .props or .targets file, a Directory.Build
+# or Directory.Packages file, a NuGet.Config, a global.json, .NET's tools manifest, a .user file beside a project file,
+# a package file, the licence check's config and its audit, a folder the config names as a source, the core's Node
+# version or the calling workflow. Where it changes none, it passes without a restore, so that a private repository
+# pays for no restore a pull request cannot have changed, and the check still reports on every pull request; any doubt
+# (no base, a base that cannot be fetched, a config that cannot be read, a listed file that is a link) runs it. What
+# that look does not see is a file a project file imports under another name; a package's version, licence or source
+# cannot change while its lock file does not, and a change to the lock file runs the check.
 name: nuget
 
 on:
@@ -44,10 +53,46 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # nothing after the checkout needs the token
+          fetch-depth: 2 # the merge commit and its parents: the base the next step diffs from
+      - name: Does the pull request change what NuGet reads?
+        id: what
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
+          CONFIG: ${{ inputs.config }}
+        run: |
+          # The checkout is the pull request merged into its base, with both parents, so the diff from the base is what
+          # it changes. Any doubt means the check runs.
+          paths=(':(glob,icase)**/*.csproj' ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(glob,icase)**/*.user'
+            ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json' ':(glob,icase)**/packages.config'
+            ':(glob,icase)**/*.props' ':(glob,icase)**/*.targets' ':(glob,icase)**/Directory.Build.*'
+            ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json' ':(glob,icase)**/.config/dotnet-tools.json'
+            ':(glob,icase)**/*.nupkg' core/.node-version .github/workflows/nuget.yml)
+          run=true
+          # (the config, its audit and each folder it names as a source, each by its exact name)
+          if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | strings | select(startswith("https://") | not)' "$CONFIG"); then
+            paths+=(":(literal)$CONFIG")
+            while IFS= read -r p; do [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$extra"
+            if { git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$BASE"; } \
+              && changed=$(git diff --no-renames --name-only "$BASE" HEAD -- "${paths[@]}") \
+              && listed=$(git ls-files -s -- "${paths[@]}"); then
+              if [ -n "$changed" ]; then
+                echo "Changed:"
+                printf '%s\n' "$changed" | sed 's/^/- /' # behind a dash, so that no file's name starts a workflow command
+              elif printf '%s\n' "$listed" | grep -q '^120000 '; then
+                echo "A listed file is a link to another, whose changes this step would not see."
+              else
+                run=false
+                echo "Nothing NuGet reads changed (project, lock, build or config files, the licence config, the Node version or this workflow): nothing to restore."
+              fi
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.what.outputs.run != 'false' # anything but a plain no checks
         with:
           node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
       - name: Restore each project file from its lock file alone
+        if: steps.what.outputs.run != 'false' # anything but a plain no checks
         env:
           CONFIG: ${{ inputs.config }}
           ADVISORY: ${{ inputs.advisory }}
@@ -79,6 +124,7 @@ jobs:
             echo "Advisory: nothing fails for it yet."
           fi
       - name: Every package one exact version, and under a licence on its list
+        if: steps.what.outputs.run != 'false' # anything but a plain no checks
         env:
           CONFIG: ${{ inputs.config }}
           ADVISORY: ${{ inputs.advisory }}

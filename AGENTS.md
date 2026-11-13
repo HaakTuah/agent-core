@@ -43,6 +43,13 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
   page under Actions has the button; `.github/workflows/release.yml`; core archive 197), and the workflow cuts it only
   where every check on `main`'s newest commit has passed: the tag `release-N` on that commit, never moved or deleted
   afterwards. `node scripts/release.mjs` says what the next one would carry.
+- **Nothing locks another owner's project** (core archive 201): in a project that changes nothing of its own, a sync to
+  the release that carries a change makes no check fail, block, wait or start where it did not before, and adds no
+  billed job, since a private repository on GitHub's free plan pays a whole minute for each job and its Actions stop
+  once the month's are spent. Anything new is inside a job that already runs, advisory, or off until the project turns
+  it on. `scripts/upgrade-test.mjs`, in `.github/workflows/tests.yml`, holds it: a project written by the previous
+  release's starter kit (npm and .NET, the .NET one as Windows holds it), synced to the commit under test, passes every
+  check of the core unchanged and starts no job it did not start before.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
