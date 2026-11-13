@@ -452,9 +452,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > cannot fully evaluate, no, expert? Is an independent verifier subsession better then, expert?
 
      Told that it is: a fresh session that wrote none of the change reads all the rules for room, what it finds is
-     trimmed, and the cap rises only if that is not enough, the reviewer blocking a raise without that check; and that
-     this would stand among this repository's review guidelines on these words. Behind "a finding of the last week made
-     after its PR merged, with no reply, is answered as point 5 says" in `modules/reviews.md` and "then both read what
-     reviews left after a merge" in `modules/work-flow.md`; "Codex's before Copilot's, where neither builds" in
-     `modules/roles.md`; "Never a pull request" in `README.md`; and "It rises only when it has to" and "a raise of the
-     size cap in a PR with no "Leanness check:" comment" in `AGENTS.md`.
+     trimmed, and the cap rises only if that is not enough, the reviewer blocking a raise without that check. The code
+     review of the change held that a question of his is no yes (`modules/how-to-work.md`), so he was asked outright
+     whether this repository's review guidelines should gain that blocking point:
+
+     > Yes to all, expertly!
+
+     Behind "a finding of the last week made after its PR merged, with no reply, is answered as point 5 says" in
+     `modules/reviews.md` and "then both read what reviews left after a merge" in `modules/work-flow.md`; "Codex's
+     before Copilot's, where neither builds" in `modules/roles.md`; "Never a pull request" in `README.md`; and "It rises
+     only when it has to" and "a raise of the size cap in a PR with no "Leanness check:" comment" in `AGENTS.md`.
