@@ -255,31 +255,31 @@ function upgrade(p, ownChanges, expect) {
 }
 
 // the npm project, public
-const npm = project("an-npm-project", { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
+const npmProject = project("an-npm-project", { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
   write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
   write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
     "node_modules/ms": { version: "2.1.3", resolved: "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz", integrity: "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==", license: "MIT" } } }, null, 2)}\n`);
   write(dir, "README.md", "# An npm project\n");
   write(dir, ".gitignore", "node_modules/\n");
 } });
-upgrade(npm, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
+upgrade(npmProject, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
   ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
 (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
   [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
 
 // the .NET project, private, held as Windows holds it
-const dotnet = project("a-dotnet-project", { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, files: dir => {
+const dotnetProject = project("a-dotnet-project", { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, files: dir => {
   write(dir, "src/App/App.csproj", `<Project Sdk="Microsoft.NET.Sdk">\r\n  <PropertyGroup>\r\n    <OutputType>Exe</OutputType>\r\n    <TargetFramework>${tfm}</TargetFramework>\r\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\r\n  </PropertyGroup>\r\n</Project>\r\n`);
   write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
   write(dir, "src/App/packages.lock.json", `{\r\n  "version": 1,\r\n  "dependencies": {\r\n    "${tfm}": {}\r\n  }\r\n}\r\n`);
   write(dir, "README.md", "# A .NET project\r\n");
   write(dir, ".gitignore", "bin/\r\nobj/\r\n");
 } });
-const config = path.join(dotnet.dir, "checks/licences.json");
+const config = path.join(dotnetProject.dir, "checks/licences.json");
 fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);
-git(dotnet.dir, "add", "-A");
-ok(git(dotnet.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), "a-dotnet-project: every file it holds is 100644, as on Windows, the copy of the core's scripts too");
-upgrade(dotnet, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
+git(dotnetProject.dir, "add", "-A");
+ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), "a-dotnet-project: every file it holds is 100644, as on Windows, the copy of the core's scripts too");
+upgrade(dotnetProject, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
   ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
 (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
   ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
