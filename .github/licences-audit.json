@@ -6,6 +6,7 @@
     { "name": "actions/download-artifact", "kind": "action", "licence": "MIT", "used": "preview.yml, the site a pull request's build uploaded" },
     { "name": "actions/dependency-review-action", "kind": "action", "licence": "MIT", "used": "licences.yml, the licence gate on new and updated packages" },
     { "name": "github/codeql-action", "kind": "action", "licence": "MIT", "used": "codeql.yml, code scanning" },
+    { "name": "GitHub's commit signing key", "kind": "github-service", "licence": "LicenseRef-GitHub-Terms", "files": [".github/workflows/personal-terms.yml"], "used": "personal-terms.yml fetches GitHub's public key (https://github.com/web-flow.gpg) to check that a merge was signed by GitHub, which floor rule 11's exception asks: a GitHub service, nothing of which ships" },
     { "name": "CodeQL CLI", "kind": "github-service", "licence": "LicenseRef-GitHub-Terms", "used": "code scanning, run by github/codeql-action: a GitHub service, free while a repository is public" },
     { "name": "GitHub CLI", "kind": "tool", "licence": "MIT", "used": "gh in versions.yml, core-moved.yml (through scripts/core-moved.mjs), delete-merged-branches.yml and preview.yml, the runner's own" },
     { "name": "jq", "kind": "tool", "licence": "MIT", "used": "versions.yml, the runner's own: it reads the issues the versions check would open; and scripts/core-moved-test.mjs, which runs through it the expression gh is handed" },
