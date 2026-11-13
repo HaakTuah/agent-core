@@ -32,9 +32,9 @@ wrote none of it reads the project's own such files whole, with the change, for 
 what is still over moves the mark. **A trim is valid** only if a reader who has the trimmed text, and what that reader
 has read by then, acts the same in every case. It keeps who a rule binds and when, what it asks or forbids, every limit
 and exception, what checks or enforces it, its reason, and each name and example; it removes only a second statement of
-what that reader has already read, or words that carry none of these. In doubt the words stay. Blocking: a trim that
-fails this; and a raise with no "Leanness check:" comment in the PR giving that session's answer, save for growth a sync
-of the core brought.
+what that reader has already read, or words that carry none of these. In doubt the words stay. It holds for every trim
+of a rule file, whatever its purpose. Blocking: a trim that fails this; and a raise with no "Leanness check:" comment in
+the PR giving that session's answer, save for growth a sync of the core brought.
 
 **A rule file changed:** blocking for a rule that departs from the owner's archived words it cites; and a finding for a
 rule that adds text without replacing any, or makes anyone wait for the owner beyond floor rules 3 and 14 (core archive

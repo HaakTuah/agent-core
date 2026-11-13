@@ -513,3 +513,37 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Agreed expertly with all your takes! You can commence now. […]
 
      Behind "A trim is valid" in `modules/review-guidelines.md`.
+
+185. **13 November 2026** (the core, in the design chat):
+
+     > Can we add a rule that makes any session/subsession that is finished, archive? At least have the orchestrator
+     > archive all its subsessions once they are finished? Probably also if you tell them to stop due to usage and push
+     > up all, because then it is better to just have another builder season pick up again, no? Expert? Can they
+     > archive themselves also, and should they? What is your expert take on all of this?
+
+     Told: yes, by the orchestrator and not by the session itself, which is the worst judge of whether it is finished
+     and whose last message must be read first; once its task merged or it stopped with its work pushed and its note
+     left, a stop for usage too, a fresh builder picking up from the branch; its last message read and nothing
+     scheduled bound to it; archived, never deleted; never a session he works in or one waiting only on his yes; a
+     session nobody orchestrates says in its last message that it can be archived; and that whether an agent can
+     archive a session depends on the tool that runs them, which the design session could not confirm for every one:
+
+     > Agreed expertly to all!
+
+     Behind "A finished session is archived" in `modules/orchestrating.md` and "that it can be archived" in "Sessions"
+     in `modules/work-flow.md`.
+
+186. **13 November 2026** (the core, in the design chat):
+
+     > Do we have anything in agent-core about running occasional clean-ups and condensing runs? Agent-core maybe
+     > isn't the place for that? But any job that is scheduled for that in a work queue file, like in our repos, will
+     > it also do the rules files, and use our new criterias, checks, and verifications, etc, expert?
+
+     Told: the core schedules none, rightly, since when to clean up is a project's own queue entry and a file reaching
+     its mark is what forces a condensing; but the test for a valid trim stood inside the rule on raising a mark, so a
+     clean-up that trims a rule file for another reason was not plainly bound by it. Offered: the test holds for every
+     trim of a rule file, whatever it is made for, with no fresh session's read where nothing rises:
+
+     > Agreed, expertly! Do it!
+
+     Behind "It holds for every trim of a rule file, whatever its purpose" in `modules/review-guidelines.md`.
