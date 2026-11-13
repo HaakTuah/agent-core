@@ -9,15 +9,18 @@
 // waits until such a comment is posted after Codex's newest security finding: the fallback reviewer's check of the fix
 // (Codex's own mark of an open finding does not clear by itself once the finding is fixed). Where the mark stands and
 // no finding of Codex's is to be found among the comments, such a comment settles it whenever it was posted.
-// Dependabot's own pull request, opened by it from a branch of the repository, passes where no review of Codex's is
-// running on it: floor rule 17 holds it. A pull request that needs no security review and gets none by itself says so
-// in a comment of that kind. Nothing else on the pull request counts: not its description, not a comment of anyone
-// else, not a review's own text. What it does not hold: what a posted review says, whether a finding is blocking,
-// whether a pull request of Dependabot's still changes only what rule 17 allows, and that a later commit which changes
-// what the review was for got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to
-// mark and the status to give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's
-// input, on unless turned off) the status is always a pass that says what the check would have done, so a week of pull
-// requests shows whether it is right before anything waits for it.
+// Dependabot's own pull request, opened by it from a branch of the repository, passes where no review of Codex's has
+// begun on it: floor rule 17 holds it (with a branch of the repository, its status is written when the first comment
+// that counts arrives, which is Codex's summary once the code review rule 17 asks for is asked). A pull request that
+// needs no security review and gets none by itself says so in a comment of that kind, which its code reviewer checks
+// (modules/reviews.md, point 3); the status then says a review is posted, and cannot tell that note from a review.
+// Nothing else on the pull request counts: not its description, not a comment of anyone else, not a review's own text.
+// What it does not hold: what a posted review says, whether a finding is blocking, whether a pull request of
+// Dependabot's still changes only what rule 17 allows, and that a later commit which changes what the review was for
+// got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to mark and the status to
+// give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's input, on unless turned
+// off) the status is always a pass that says what the check would have done, so a week of pull requests shows whether
+// it is right before anything waits for it.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same>]
@@ -66,9 +69,9 @@ export function judge(pull, comments, reviewComments) {
     return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
   }
   if (posted.length > 0) return { sha, done: true, why: "a security review is posted on the pull request" };
-  // Dependabot's own, with no review of Codex's running on it: the floor holds it another way (rule 17)
+  // Dependabot's own, with no review of Codex's begun on it: the floor holds it another way (rule 17)
   const dependabots = pull.user?.login === "dependabot[bot]" && pull.user.type === "Bot" && typeof pull.head.repo?.full_name === "string" && pull.head.repo.full_name === pull.base?.repo?.full_name;
-  if (dependabots && !(review !== null && typeof review === "object" && review.status === "running")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
+  if (dependabots && !(review !== null && typeof review === "object" && typeof review.status === "string")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
   return { sha, done: false, why: "no security review has run yet" };
 }
 

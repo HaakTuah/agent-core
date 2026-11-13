@@ -13,17 +13,19 @@
 #
 # Advisory, unless the caller turns that off: the status always passes and says what the check would have done ("would
 # wait, ..."), so nothing waits for it until a week of pull requests has shown it right. Turned off, the status stays
-# pending until the review has run, and a ruleset can require it. Dependabot's own pull request passes it (floor rule
-# 17), and one that needs no security review and gets none by itself (floor rule 8: it touches no way in, or is a pure
-# sync, where no reviewer starts by itself) says so in a comment that opens "Security review:".
+# pending until the review has run, and a ruleset can require it. Dependabot's own pull request passes it where no
+# review of Codex's has begun on it (floor rule 17), and one that needs no security review and gets none by itself
+# (floor rule 8: it touches no way in, or is a pure sync, where no reviewer starts by itself) says so in a comment that
+# opens "Security review:".
 #
 # What keeps it safe, since a comment starts it and it may write a status (floor rule 2): it checks out the default
 # branch, never the pull request, and runs only that branch's copy of the script; a comment's text is read only in the
-# job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where that
-# is the summary of Codex's app or opens "Security review:" from the owner, a member or a collaborator; on
-# pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token could not write
-# the status (theirs is written when a review's comment arrives); and the token can read, and write a commit status,
-# nothing more. A posted review that is later edited away or deleted is seen at the next push, not at once.
+# job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where that is
+# the summary of Codex's app or opens "Security review:" from the owner, a member or a collaborator; on pull_request it
+# runs only for a branch of the repository itself and not for Dependabot, whose token could not write the status (theirs
+# is written when the first comment that counts arrives: on Dependabot's own, Codex's summary, once the code review that
+# floor rule 17 asks for is asked); and the token can read, and write a commit status, nothing more. A posted review
+# that is later edited away or deleted is seen at the next push, not at once.
 name: security-review
 
 on:

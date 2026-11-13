@@ -291,7 +291,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind the third outcome in "Using a feature must pay, measured three ways" (`modules/game-design.md`).
 
-174. **13 November 2026** (the core, in the design chat, 01:33 to 01:51 his time), shown that the core's "every PR gets
+174. **13 November 2026** (the core, in the design chat), shown that the core's "every PR gets
      its security review, once, when it opens" was what GitHub's trigger can do, written as if it were the rule; that a
      security review of a sync had found what the core's own had passed; and that one of Dependabot's updates had merged
      with none:
@@ -320,8 +320,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > reviewer before claude code, if avaliable, I think suffices, or what is your take on this expert? And you can
      > merge it all now, so [...] gets these updates when he pulls tomorrow, unless there is good reason not to.
 
-     Behind floor rule 8's "A PR that adds or changes one merges only after its security review has run (Dependabot's
-     own: rule 17)", point 3 of `modules/reviews.md` (a security review the session calls, once on the finished work
+     Behind floor rule 8's "A PR that touches one merges only after its security review has run (Dependabot's own: rule 17)", point 3 of `modules/reviews.md` (a security review the session calls, once on the finished work
      and aimed; one that starts by itself waited for on every PR, a pure sync's too) and the plug-in's security review
      in `modules/codex.md`. Copilot stays the second code reviewer (item 169); its agent's building is not taken up.
 
