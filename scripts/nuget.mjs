@@ -138,7 +138,8 @@ export function sdkPacks(env = process.env, root = null) {
   const inside = (dir) => root !== null && (place(dir) === place(root) || place(dir).startsWith(place(root) + sep));
   const homes = [env.DOTNET_ROOT, ...(env.PATH ?? env.Path ?? "").split(delimiter)].filter((dir) => dir && isAbsolute(dir) && !inside(dir))
     .flatMap((dir) => ["dotnet", "dotnet.exe"].map((name) => join(dir, name)).filter((file) => existsSync(file)));
-  return [...new Set(homes.map((file) => { try { return join(dirname(realpathSync(file)), "library-packs"); } catch { return null; } }).filter(Boolean).map(place))];
+  // (and the dotnet itself, where a link leads: one inside the project is the pull request's, wherever its link stands)
+  return [...new Set(homes.map((file) => { try { return join(dirname(realpathSync(file)), "library-packs"); } catch { return null; } }).filter((dir) => dir && !inside(dir)).map(place))];
 }
 
 /**

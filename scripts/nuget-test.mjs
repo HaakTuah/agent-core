@@ -228,6 +228,9 @@ put("tools/dotnet", "");
 const relative = path.relative(process.cwd(), path.join(tmp, "tools")), local = (dir) => takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: dir } });
 ok(/the restore took it from .*library-packs/.test(local(relative)) && /the restore took it from .*library-packs/.test(local(path.join(tmp, "tools"))) && /the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { DOTNET_ROOT: path.join(tmp, "tools") } })),
   "a dotnet the PATH or DOTNET_ROOT names by a path that is not whole, or one inside the project, brings no folder of packages: it would be one the pull request brought");
+const outside = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-test-path-")); process.on("exit", () => fs.rmSync(outside, { recursive: true, force: true }));
+fs.symlinkSync(path.join(tmp, "tools", "dotnet"), path.join(outside, "dotnet"));
+ok(/the restore took it from .*library-packs/.test(takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: outside } })), "nor one whose link, outside the project, leads into it", takenFrom(path.join(tmp, "tools", "library-packs"), {}, only, { env: { PATH: outside } }));
 put("vendor/packages/Bought.1.0.0.nupkg", "");
 const shown = names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] });
 fs.symlinkSync(os.tmpdir(), path.join(tmp, "vendor/packages/elsewhere"));
