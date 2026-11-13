@@ -65,6 +65,9 @@ jobs:
       - name: The core-moved check
         if: ${{ !cancelled() }}
         run: node scripts/core-moved-test.mjs
+      - name: The starter kit, and the core's own checks on a project it writes
+        if: ${{ !cancelled() }}
+        run: node scripts/init-test.mjs
       - name: The core's address stands in one place, and is this repository's
         if: ${{ !cancelled() }}
         run: node scripts/core-address-test.mjs
