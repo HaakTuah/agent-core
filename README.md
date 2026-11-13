@@ -37,6 +37,16 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin. The first copy is the sync script's too, run from a clone of this repository once the manifest is written
    (the script's header says how); the copy's own `.gitattributes` keeps every line ending as it is.
+
+   **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N` on
+   a commit of `main`, cut on the owner's word (`AGENTS.md`, "A release is cut on the owner's word";
+   `scripts/release.mjs`). A project whose *owner's account* is not the account the core is under follows the releases,
+   unless its manifest's *follows* row says `main`; the projects of the core's own owner follow `main`, unless theirs
+   says `releases` (`scripts/releases.mjs`). Following the releases, the sync script takes the newest release past the
+   project's pin and nothing in between, and wherever this README or a script says the core has moved, it has moved
+   only when such a release is cut; a full SHA still takes any commit of `main`. Why: a pure sync brings scripts, hooks
+   and workflows that no review in the project reads (floor rule 8), so what another owner's project runs was reviewed
+   in the core alone, and its owner takes only what the core's owner chose to hand on.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and the list is read against
@@ -145,6 +155,7 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 | Slot | What the project fills in |
 | --- | --- |
 | *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`) |
+| *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
 | *progress file* | the file that holds the queue and what is done |
 | *report* | where a task's report, with its "Readings taken", goes |
 | *settling references* | what open points are settled against, with the owner's past words |
@@ -190,6 +201,8 @@ Floor: whole. Modules: <all, or the list of those taken>.
 - Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18);
   its security review on, for team PRs (Dependabot's own need none: floor rule 8), on PR open, reporting Medium and
   above, reading the project's threat model and `SECURITY.md` with the floor (core archive 51).
+- This repository's tags: a ruleset on `release-*` that blocks a tag's update and its deletion, so a release stays on
+  the commit it was cut on (core archive 195).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
   approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code

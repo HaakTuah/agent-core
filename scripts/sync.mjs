@@ -6,8 +6,9 @@
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar and Node's own modules
 // only; the core's address: core-address.mjs, beside this file.
 //
-//   node core/scripts/sync.mjs              to the core's newest main
-//   node core/scripts/sync.mjs <full SHA>   to that commit of the core
+//   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main, or its newest
+//                                           release where it follows the releases (releases.mjs, beside this file)
+//   node core/scripts/sync.mjs <full SHA>   to that commit of the core's main, whatever the project follows
 //
 // The first copy: a project with its manifest written and no core/ yet runs this file from a clone of the core's main
 // (`node <the clone>/scripts/sync.mjs`, a full SHA after it for another commit), and core/ is written at the commit its
@@ -17,8 +18,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
+import { NOTES, asksBetween, followsOf, newestRelease } from "./releases.mjs";
 
-const NOTES = "setup/sync-notes.md";
 const URL = `https://github.com/${CORE}`;
 const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 class Failure extends Error {}
@@ -35,7 +36,17 @@ function sync(tmp) {
   git(["clone", "--quiet", "--bare", URL, tmp]);
   const arg = process.argv[2];
   if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
-  const pin = arg ?? (first ? old : git(["rev-parse", "refs/heads/main"], tmp));
+  let pin = arg ?? (first ? old : null), release = "";
+  if (!pin) {
+    const follows = followsOf(text) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out beside one *owner's account* row`);
+    if (follows === "main") pin = git(["rev-parse", "refs/heads/main"], tmp);
+    else {
+      const newest = newestRelease(old, tmp);
+      if (!newest) { console.log("the core has cut no release yet: nothing to sync (a full SHA takes a commit of its main)"); return; }
+      if (!newest.moved) { console.log(`core/ is at or past the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}): nothing to sync`); return; }
+      pin = newest.sha; release = ` (${newest.name})`;
+    }
+  }
   try { git(["cat-file", "-e", `${pin}^{commit}`], tmp); } catch { fail(`${pin} is not a commit of the core`); }
   if (pin === old && !first) { console.log(`core/ is already at ${pin}: nothing to sync`); return; }
 
@@ -63,17 +74,13 @@ function sync(tmp) {
 
   if (first) { console.log(`core/ written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
   const changed = git(["diff", "--stat", "--format=", old, pin], tmp).split("\n").pop() || "no files";
-  console.log(`core/ ${old.slice(0, 7)} -> ${pin.slice(0, 7)} (${changed.trim()}); ${manifest} moved.`);
+  console.log(`core/ ${old.slice(0, 7)} -> ${pin.slice(0, 7)}${release} (${changed.trim()}); ${manifest} moved.`);
   console.log(moved.length
     ? `Workflow calls moved:\n  ${moved.join("\n  ")}`
     : "No workflow call moved: the PR changes no workflow.");
   // What this sync asks of the project beyond the copy: the entries the core's sync notes gained between the two pins.
   // (A pin from before the notes gives every entry. Where the entries cannot be read, it says so: never an all-clear.)
-  let asks = null;
-  try {
-    asks = git(["diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", old, pin, "--", NOTES], tmp)
-      .split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
-  } catch { /* said below */ }
+  const asks = asksBetween(old, pin, tmp);
   console.log(asks === null
     ? `What this sync asks of the project beyond the copy could not be read: read core/${NOTES} for the entries newer than the old pin.`
     : asks.length
