@@ -671,3 +671,17 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "save a helper whose definition gives them" in `modules/claude.md`, and a reviewer's login in
      `modules/codex.md` and `modules/copilot.md`.
 
+194. **13 November 2026** (the core, in the design chat). Asked outright for two answers: yes or no to the trim of the
+     floor the leanness check had found valid ("; the rest are in `floor/security.md`" in the opening of
+     `floor/topics.md`, which `floor/security.md` says of it in its own opening), advised as a yes since a valid trim
+     goes whether or not there is room; and yes or no to the floor winning where two rules pulled against each other:
+     floor rule 8 has a security review that starts by itself waited for on every PR, and point 2 of
+     `modules/reviews.md` had a reviewer that failed three times running asked and not waited for, "the security
+     reviewer too". Advised: the floor stays as it is and the module says so, since waiting on a broken reviewer costs
+     minutes and skipping the review that starts by itself costs more.
+
+     > Yes, expertly, to all that you advice as an expert here.
+
+     Behind the opening of `floor/topics.md`, and "A security review that starts by itself is still waited for" in
+     `modules/reviews.md`. The owner with two accounts was filed as an idea.
+
