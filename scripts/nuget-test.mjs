@@ -207,6 +207,22 @@ const unnamed = names(only, { ships: [L] });
 fs.rmSync(path.join(tmp, "src/App/obj"), { recursive: true });
 ok(/names no sources, so where src\/App\/App\.csproj took its packages from cannot be read/.test(unnamed) && /src\/App\/App\.csproj: no project\.assets\.json in the project says what its restore used/.test(names(only, { ships: [L] })),
   "a project whose restore left nothing that names its sources, or nothing at all, fails: it was not restored here");
+restoredFrom(APP);
+put("fetch/obj/project.assets.json", JSON.stringify({ project: { restore: { projectPath: path.join(tmp, "fetch/Fetch.proj"), sources: { [REGISTRY]: {}, "https://pkgs.example.com/v3/index.json": {} } } } }));
+const unlisted = names(only, { ships: [L] });
+put("fetch/obj/project.assets.json", JSON.stringify({ project: { restore: { sources: { [REGISTRY]: {} } } } }));
+const nameless = names(only, { ships: [L] });
+fs.rmSync(path.join(tmp, "fetch"), { recursive: true });
+const builtOn = (to) => { put("src/App/obj/project.assets.json", JSON.stringify({ project: { restore: { projectPath: path.join(tmp, APP), sources: { [REGISTRY]: {} }, frameworks: { "net10.0": { projectReferences: { [path.join(tmp, to)]: { projectPath: path.join(tmp, to) } } } } } } })); return names([...only, "tests/App.Tests/App.Tests.csproj", T], { ships: [L], tools: [T] }); };
+ok(/Fetch\.proj: its restore took packages from https:\/\/pkgs\.example\.com\/v3\/index\.json/.test(unlisted) && /fetch\/obj\/project\.assets\.json: it does not say which project it was written for/.test(nameless)
+  && builtOn("tests/App.Tests/App.Tests.csproj") === "" && /src\/App\/App\.csproj: it builds on .*Fetch\.proj, which is no project file this check reads/.test(builtOn("fetch/Fetch.proj")),
+  "every restore's sources count, whatever project it was for, a file of another kind too; and a project built on one that is no project file read here fails, since its packages would go unread");
+restoredFrom(APP);
+const sdk = path.join(tmp, "sdk"); put("sdk/dotnet", ""); put("sdk/dotnet.exe", "");
+const withSdk = (source) => { restoredFrom(APP, [REGISTRY, source]); return check({ ships: [], nuget: { ships: [L] } }, tmp, restore(), only, { PATH: [path.join(tmp, "nowhere"), sdk].join(path.delimiter) }).failures.join("\n"); };
+ok(withSdk(path.join(sdk, "library-packs")) === "" && /its restore took packages from .*library-packs/.test(withSdk(path.join(tmp, "elsewhere", "library-packs"))) && /its restore took packages from /.test(from([REGISTRY, path.join(sdk, "library-packs")])),
+  "the SDK's own folder of packages, beside the dotnet the PATH names, is a source every restore has; a folder of that name anywhere else is not, nor that one where no dotnet stands beside it on the PATH");
+restoredFrom(APP);
 ok(from([REGISTRY], {}, only, "artifacts/obj/App/project.assets.json") === "" && /artifacts\/obj\/App\/project\.assets\.json: git knows it, and it is what a restore writes/.test(names([...only, "artifacts/obj/App/project.assets.json"], { ships: [L] })),
   "what a restore wrote is found wherever in the project its obj folder lies, and one that git knows is no restore's: it fails");
 fs.rmSync(path.join(tmp, "artifacts"), { recursive: true }); restoredFrom(APP);

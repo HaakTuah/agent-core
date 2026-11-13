@@ -14,9 +14,12 @@
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
 //     byte for byte, what one of those sources gives. A project or any file its build reads can still add a source
-//     to what the restore was given, so this reads what each restore used from what it wrote (project.assets.json,
-//     which names its sources) and fails one that took packages from anywhere else: no reading of build files, which
-//     can name a source in more ways than a scan knows. A folder named as a source holds files git knows, no links;
+//     to what the restore was given, so this reads what every restore wrote (each project.assets.json under the
+//     project, which names its sources and the projects it builds on) and fails one that took packages from anywhere
+//     else, whatever project it was for, and a project built on that is no project file read here: no reading of
+//     build files, which can name a source in more ways than a scan knows. The SDK's own folder of packages, which
+//     it gives every restore itself, is known by the dotnet the runner holds. A folder named as a source holds files
+//     git knows, no links;
 //   - floor rule 7's "one exact version, never a range": what a project asks for is, letter for letter, the version
 //     its lock installs (NuGet writes a plain Version="1.2.3" as "[1.2.3, )", which with a lock file is that version);
 //   - floor rule 10: a package whose manifest names its licence as an SPDX expression is held to its list by that
@@ -66,8 +69,8 @@
 // NuGet's own registry, each an https address or a folder of the project's own that holds the package files }. With --advisory it says what it would fail and
 // passes, for a project where the check itself is at fault, while that is mended.
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
-import { join, posix, resolve } from "node:path";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { delimiter, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { licenceOk, loadConfig, policy } from "./licences.mjs";
@@ -118,6 +121,21 @@ export function nugetConfig(config) {
 /** Where a restore takes packages from, in order: NuGet's own registry, then the sources the config names, a folder
  *  by its whole path under `root`, so that a restore reads it from wherever it is started. */
 export const sourcesOf = (config, root) => [REGISTRY, ...nugetConfig(config).sources.map((s) => (s.startsWith("https://") ? s : resolve(root, s)))];
+
+/** A path as one spelling of the place it names: whole, with links and Windows' short names resolved where it is
+ *  there, and in one case where the system reads paths so. */
+function place(p) {
+  let whole = resolve(p);
+  try { whole = realpathSync.native(whole); } catch { /* (not there: as it is written) */ }
+  return process.platform === "win32" ? whole.toLowerCase() : whole;
+}
+
+/** The folders of packages the .NET SDK itself brings and gives every restore as a source (`library-packs`, beside
+ *  each `dotnet` the PATH or DOTNET_ROOT names): the runner's own, which no pull request writes. */
+export function sdkPacks(env = process.env) {
+  const homes = [env.DOTNET_ROOT, ...(env.PATH ?? env.Path ?? "").split(delimiter)].filter(Boolean).flatMap((dir) => ["dotnet", "dotnet.exe"].map((name) => join(dir, name)).filter((file) => existsSync(file)));
+  return [...new Set(homes.map((file) => { try { return join(dirname(realpathSync(file)), "library-packs"); } catch { return null; } }).filter(Boolean).map(place))];
+}
 
 /** Every project.assets.json under `root`, as paths from it: what restores left there. Not in .git or node_modules. */
 function assetsFiles(root, dir = "") {
@@ -235,7 +253,7 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked) {
+export function check(config, root, packagesDir, tracked, env = process.env) {
   const { ships, tools, accepted, sources } = nugetConfig(config);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [];
@@ -264,23 +282,30 @@ export function check(config, root, packagesDir, tracked) {
   // What each restore used, read from what it wrote (project.assets.json, wherever in the project its obj folder
   // lies): its sources are NuGet's own registry and what the config names, whatever a NuGet.Config, a project file or
   // any file a build reads says. One that git knows is no restore's, and none for a project means it was not restored.
-  const allowed = sourcesOf(config, root), fold = (p) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
-  const from = (source) => allowed.some((a) => (a.startsWith("https://") ? a === source : !/^https?:/iu.test(source) && fold(a) === fold(source)));
-  const written = [];
+  const allowed = sourcesOf(config, root), folders = [...allowed.filter((a) => !a.startsWith("https://")).map(place), ...sdkPacks(env)];
+  const from = (source) => (/^https?:/iu.test(source) ? allowed.includes(source) : folders.includes(place(source)));
+  const projects = new Map(projectFiles(tracked).map((f) => [place(join(root, f)), f]));
+  const restored = new Set();
   for (const f of assetsFiles(root)) {
     if (tracked.includes(f)) { failures.push(`${f}: git knows it, and it is what a restore writes: this check reads there what the restore used, so it is never committed`); continue; }
     let restore;
     try { restore = JSON.parse(readFileSync(join(root, f), "utf8"))?.project?.restore; } catch { /* (read as holding nothing) */ }
-    if (restore && typeof restore.projectPath === "string") written.push({ at: f, project: fold(restore.projectPath), sources: restore.sources });
-  }
-  for (const f of projectFiles(tracked)) {
-    const mine = written.filter((w) => w.project === fold(join(root, f)));
-    if (!mine.length) failures.push(`${f}: no ${ASSETS} in the project says what its restore used: restore it first (dotnet restore --locked-mode), its obj folder inside the project`);
-    for (const w of mine) {
-      if (!w.sources || typeof w.sources !== "object" || Array.isArray(w.sources)) { failures.push(`${w.at}: it names no sources, so where ${f} took its packages from cannot be read`); continue; }
-      for (const source of Object.keys(w.sources)) if (!from(source)) failures.push(`${f}: its restore took packages from ${source}, which is neither NuGet's own registry nor a source the config's "nuget.sources" names (floor rule 7): something the build reads added it`);
+    if (!restore || typeof restore !== "object" || typeof restore.projectPath !== "string") { failures.push(`${f}: it does not say which project it was written for, so what that restore used cannot be read`); continue; }
+    // (whatever project it was written for, one git knows as a project file or any other: every restore's sources count)
+    const project = projects.get(place(restore.projectPath)) ?? restore.projectPath;
+    restored.add(project);
+    if (!restore.sources || typeof restore.sources !== "object" || Array.isArray(restore.sources)) failures.push(`${f}: it names no sources, so where ${project} took its packages from cannot be read`);
+    else for (const source of Object.keys(restore.sources)) if (!from(source)) failures.push(`${project}: its restore took packages from ${source}, which is neither NuGet's own registry nor a source the config's "nuget.sources" names (floor rule 7): something the build reads added it`);
+    // (a project it builds on was restored with it: each is a project file this check reads, or its packages go unread)
+    const frameworks = restore.frameworks && typeof restore.frameworks === "object" ? Object.values(restore.frameworks) : [];
+    for (const refs of frameworks.map((x) => x?.projectReferences).filter((x) => x && typeof x === "object")) {
+      for (const [key, ref] of Object.entries(refs)) {
+        const other = typeof ref?.projectPath === "string" ? ref.projectPath : key;
+        if (!projects.has(place(other))) failures.push(`${project}: it builds on ${other}, which is no project file this check reads (a .csproj, .fsproj or .vbproj that git knows): its packages would go unread`);
+      }
     }
   }
+  for (const f of projects.values()) if (!restored.has(f)) failures.push(`${f}: no ${ASSETS} in the project says what its restore used: restore it first (dotnet restore --locked-mode), its obj folder inside the project`);
   const listed = [...ships, ...tools];
   for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config: say whether its packages ship`);
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
