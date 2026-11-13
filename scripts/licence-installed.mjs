@@ -30,7 +30,8 @@ const shown = (value) => (value === undefined ? "none" : JSON.stringify(value).r
 /** The check, on the folder `dir`, which holds the lock file and the node_modules an install from it filled:
  *  { failures, summary }. */
 export function check(dir) {
-  const name = ["npm-shrinkwrap.json", "package-lock.json"].find((f) => existsSync(join(dir, f))); // (npm takes the first)
+  // (where both stand, the shrinkwrap file is the one an install reads)
+  const name = ["npm-shrinkwrap.json", "package-lock.json"].find((f) => existsSync(join(dir, f)));
   if (!name) throw new Error("no npm-shrinkwrap.json or package-lock.json in the folder");
   let lock;
   try { lock = JSON.parse(readFileSync(join(dir, name), "utf8")); } catch { throw new Error(`cannot read ${name} as JSON`); }
