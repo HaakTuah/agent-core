@@ -82,7 +82,9 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
-     spent so far, where Claude Code's own record of it can be read, and nothing where it cannot.
+     spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
+     its own beside that record (ids, counts and the models' families), so the line does not drop where the record
+     loses answers.
    - **Its calls to the core's workflows:** its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`,
      `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` and, if it has versions Dependabot cannot see,
      `versions.yml` keep their triggers and call the core's of the same name
