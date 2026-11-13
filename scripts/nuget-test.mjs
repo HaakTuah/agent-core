@@ -195,7 +195,7 @@ fs.cpSync(here, path.join(repo, "core", "scripts"), { recursive: true });
 fs.cpSync(path.join(here, "..", "floor"), path.join(repo, "core", "floor"), { recursive: true });
 put("build/Feed.props", "<Project><PropertyGroup><RestoreAdditionalProjectSources>https://pkgs.example.com/v3/index.json</RestoreAdditionalProjectSources></PropertyGroup></Project>");
 put("build/Sources.targets", "<Project><PropertyGroup><restoresources>vendored</restoresources></PropertyGroup></Project>"); put("build/Config.props", "<Project><PropertyGroup><RestoreConfigFile>other.config</RestoreConfigFile></PropertyGroup></Project>");
-ok(["build/Feed.props", "build/Sources.targets", "build/Config.props"].every(f => new RegExp(`${f.replace(/[./]/g, "\\$&")} names RestoreSources, RestoreAdditionalProjectSources or RestoreConfigFile`).test(names([f], {}))),
+ok(["build/Feed.props", "build/Sources.targets", "build/Config.props"].every(f => names([f], {}).includes(`${f} names RestoreSources, RestoreAdditionalProjectSources or RestoreConfigFile`)),
   "a build file that names a source of its own, or another config, fails: it would add to the sources the restore was given");
 ok(/"nuget\.sources" names vendor\/packages\/, a folder that holds no file git knows/.test(names(["vendor/readme.md"], { sources: ["vendor/packages/"] })) && names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] }) === "",
   "a folder named as a source holds files git knows, so what it gives stands in the pull request");
