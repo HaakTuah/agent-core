@@ -21,4 +21,5 @@ Read at the start of every task.
 
 **Sessions:** started task by task, stop when your task is merged, saying in your last message what merged and what is
 next; otherwise carry on with the next task. A long task may end a session at a passed gate, with a commit and a note in
-the *progress file* saying where to pick up (core archive 143).
+the *progress file* saying where to pick up (core archive 143). With no orchestrator, a session first syncs the core as
+one would (`modules/orchestrating.md`).

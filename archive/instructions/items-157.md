@@ -367,3 +367,18 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Yes, expeetly to all!
 
      Behind "It looks before it files" in the README's "Reporting to the core".
+
+178. **13 November 2026** (the core, in the design chat), on when a project takes the core's newer commits:
+
+     > Also, is the core clear enough about when to import it for other repo's orchestrator, or are there gaps that
+     > could make it so it is never updated, or at a different schedule than intended, expert?
+
+     Answered that there were three gaps: only the orchestrator was told to look, so a session started with none never
+     did, and the daily issue was then the one signal; the rule did not name how to tell that the core had moved; and
+     "once a day" had nothing to count from. Offered one sentence where every session reads it at the start of a task:
+
+     > Do it expertly!
+
+     Behind "With no orchestrator, a session first syncs the core as one would" in `modules/work-flow.md`,
+     `core-moved.mjs --dry` in `modules/orchestrating.md`, and the README's "a sync PR opened that day being the
+     day's" (item 177 is in the pull request that was open beside this one).
