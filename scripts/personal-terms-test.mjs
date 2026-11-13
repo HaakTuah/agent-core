@@ -5,12 +5,14 @@
 // in a commit's message, author or committer (name or address), and in the title or description. What passes: none of
 // these; a term only in a file git reads as binary (not read); only in a commit from before the rule; a file named with
 // a term before it, deleted or renamed away; only in the
-// author of a merge GitHub itself made (floor rule 11's exception); only in a commit of the base's, though the event
+// author of a merge GitHub itself made (floor rule 11's exception), committed as GitHub and signed by its key, while
+// one written to look so (unsigned, or signed by another key) fails, and so does every merge's author where the key
+// cannot be fetched; only in a commit of the base's, though the event
 // names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
 // runs, so no file holds them. On Linux and on Windows. Git, bash and Node's own modules.
 //
 //   node scripts/personal-terms-test.mjs
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -28,8 +30,39 @@ const TERMS = `${term}\n${other}\n${wide}\n`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)/i.test(name)));
 Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_DATE: "2026-11-13T12:00:00Z", GIT_COMMITTER_DATE: "2026-11-13T12:00:00Z" });
 const ME = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
-const GITHUB = { GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" };
 const git = (dir, args, extra = {}) => execFileSync("git", args, { cwd: dir, env: { ...env, ...ME, ...extra }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const AS_GITHUB = { GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" };
+// GitHub's own signing key, stood in for by one made here, which a stand-in for curl serves as the check fetches it;
+// where gpg cannot run (a Windows runner without it), the cases that need a signature are left out, said below. The
+// check itself runs only on GitHub's Linux runners.
+const bash = (script, extra = {}) => spawnSync("bash", ["-c", script], { env: { ...env, ...extra }, encoding: "utf8" });
+const signer = path.join(tmp, "signer"), stranger = path.join(tmp, "other-signer"), stubs = path.join(tmp, "stubs");
+const keyFile = path.join(tmp, "web-flow.gpg");
+fs.mkdirSync(stubs);
+fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\n[ -f "$STAND_IN_KEY" ] || exit 22\ncat "$STAND_IN_KEY"\n`, { mode: 0o755 });
+const makeKey = (home, who) => { fs.mkdirSync(home, { mode: 0o700 }); return bash(`gpg -q --batch --pinentry-mode loopback --passphrase '' --quick-gen-key '${who}' ed25519 sign never`, { GNUPGHOME: home }).status === 0; };
+const signedBy = (home, key) => ({ GNUPGHOME: home, GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.program", GIT_CONFIG_VALUE_1: "gpg", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: key });
+process.on("exit", () => { for (const home of [signer, stranger]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
+// (gpg is tried whole first: both keys made, GitHub's exported, a commit signed with it and read back as good)
+const gpg = (() => {
+  try {
+    if (!makeKey(signer, "GitHub <noreply@github.com>") || !makeKey(stranger, "Someone <someone@example.invalid>")) return false;
+    fs.writeFileSync(keyFile, execFileSync("gpg", ["-q", "--batch", "--armor", "--export"], { env: { ...env, GNUPGHOME: signer } }));
+    const probe = path.join(tmp, "gpg-probe"), keys = path.join(tmp, "gpg-probe-keys");
+    fs.mkdirSync(probe);
+    fs.mkdirSync(keys, { mode: 0o700 });
+    git(probe, ["init", "-q"]);
+    git(probe, ["commit", "-q", "--allow-empty", "-m", "signed"], { ...AS_GITHUB, ...signedBy(signer, "noreply@github.com") });
+    execFileSync("gpg", ["-q", "--batch", "--import", keyFile], { env: { ...env, GNUPGHOME: keys }, stdio: "ignore" });
+    return /^[GU]$/.test(git(probe, ["-c", "gpg.program=gpg", "log", "-1", "--format=%G?"], { GNUPGHOME: keys }));
+  } catch {
+    return false;
+  } finally {
+    bash("gpgconf --kill all", { GNUPGHOME: path.join(tmp, "gpg-probe-keys") });
+  }
+})();
+// a commit as GitHub makes one: committed by GitHub and signed with its key
+const GITHUB = gpg ? { ...AS_GITHUB, ...signedBy(signer, "noreply@github.com") } : AS_GITHUB;
 
 let n = 0;
 const put = (dir, files) => { for (const [name, text] of Object.entries(files)) { const at = path.join(dir, name); if (text === null) fs.rmSync(at); else { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.writeFileSync(at, text); } } };
@@ -49,12 +82,13 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], GITHUB);
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } } } };
-  const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base: { ...env, ...ME }, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
+  const base = { ...env, ...ME, STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
+  const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && ![term, other, wide].some(t => r.out.includes(t)), `${what} fails, and the term is never printed`, r.out); };
@@ -79,7 +113,15 @@ fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COM
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
 const onMain = [[{ "c.md": "y\n" }, {}, "on main"]];
 const update = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], onMain);
-passes("a merge GitHub itself made into the branch, its author the merging account's profile (floor rule 11's exception)", update(GITHUB));
+if (gpg) {
+  passes("a merge GitHub itself made into the branch, its author the merging account's profile (floor rule 11's exception)", update(GITHUB));
+  fails("a merge written to look like GitHub's, committed as GitHub but not signed", update(AS_GITHUB));
+  fails("a merge committed as GitHub but signed by another key", update({ ...AS_GITHUB, ...signedBy(stranger, "someone@example.invalid") }));
+  const unfetched = check(update(GITHUB), { key: path.join(tmp, "no-such-key") });
+  ok(!unfetched.passed && unfetched.out.includes("could not be fetched") && !unfetched.out.includes(term), "where GitHub's key cannot be fetched, no merge is taken for GitHub's, and the run says so", unfetched.out);
+} else {
+  console.log("note gpg cannot run here, so the merges GitHub signs are not tried (the check runs on GitHub's Linux runners alone)");
+}
 fails("a merge anyone else made, with a term in its author", update({}));
 fails("a commit that is no merge, with a term in its author, whoever committed it", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
 // a merge resolved by hand: the lines its resolution adds are read

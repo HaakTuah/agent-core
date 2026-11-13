@@ -2,8 +2,8 @@
 # from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
 # written into the repository, since the list itself would be personal. Of each commit since the rule it reads the
 # message, the author's and the committer's name and address (save those of a merge GitHub itself made, which floor
-# rule 11 excepts, told by its committer; one written by hand to look so passes too, which the check, made against
-# slips, does not hold), the lines it adds (a merge's, those its own resolution adds) and the names of the files it
+# rule 11 excepts: one GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where
+# it cannot, no merge is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and the names of the files it
 # writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit (core
 # archive 201). The commits read are the pull request's own, its base's left out. A file whose older name holds a
 # term is deleted or renamed away freely; a commit that only edits it fails, since the diff names it. It reads
@@ -63,14 +63,21 @@ jobs:
             mine=(); if git rev-parse -q --verify 'HEAD^2' > /dev/null; then mine=('^HEAD^1'); fi
             commits=$(git rev-list --since-as-filter='2026-11-02T17:30:00Z' "$BASE..HEAD" "${mine[@]}")
             bad="" people="" added="" names=""
+            # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
+            # only where its committer is GitHub and that key signed it, so one written by hand to look so does not)
+            keys="$RUNNER_TEMP/github-keys"; mkdir -p -m 700 "$keys"
+            if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
+              echo "::notice::GitHub's signing key could not be fetched, so no merge is taken for one GitHub made: re-run the check"
+            fi
             # (no step here names a shell, so GitHub runs it without pipefail: a grep -q that stops early never makes a
             # hit read as a miss)
             for c in $commits; do
               short=$(git rev-parse --short "$c")
               if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
               # (save a merge GitHub itself made, "update branch" too, whose author is the merging account's profile:
-              # floor rule 11 excepts it)
-              if [ "$(git log -1 --format='%P|%cn <%ce>' "$c" | sed 's/^[^ |]* [^|]*|/merge|/')" != "merge|GitHub <noreply@github.com>" ] \
+              # floor rule 11 excepts it; its signature good by GitHub's key alone, the only one this keyring holds)
+              if { [ "$(git log -1 --format='%P|%cn <%ce>' "$c" | sed 's/^[^ |]* [^|]*|/merge|/')" != "merge|GitHub <noreply@github.com>" ] \
+                  || ! GNUPGHOME="$keys" git -c gpg.program=gpg log -1 --format=%G? "$c" 2> /dev/null | grep -q -x '[GU]'; } \
                 && git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list"; then people="$people $short"; fi
               # (the lines it adds, a merge's those its own resolution adds; git that cannot show them, older than 2.36,
               # fails the check rather than read nothing)
@@ -88,5 +95,5 @@ jobs:
             if [ -n "$names" ]; then echo "A personal term is in the name of a file that these commits write:"; echo "$names"; found=1; fi
           fi
           if grep -q -i -F -f "$list" <<< "$TITLE"$'\n'"$BODY"; then echo "A personal term is in the PR's title or description."; found=1; fi
-          rm -f "$list"
+          rm -rf "$list" "$RUNNER_TEMP/github-keys"
           exit "$found"
