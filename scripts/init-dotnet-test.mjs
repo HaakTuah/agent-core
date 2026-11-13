@@ -46,7 +46,9 @@ if (sdk) {
   const steps = [["new", "sln", "--name", "Trial"], ["new", "console", "--output", "src/App"], ["new", "classlib", "--output", "src/Lib"],
     ["sln", "add", "src/App", "src/Lib"], ["add", "src/App", "reference", "src/Lib"], ["new", "gitignore"],
     // (two real packages, each at one version, with lock files on: the SDK's settings above turn them on)
-    ["add", "src/App", "package", "Newtonsoft.Json", "--version", "13.0.3"], ["add", "src/Lib", "package", "Serilog", "--version", "4.0.0"]];
+    ["add", "src/App", "package", "Newtonsoft.Json", "--version", "13.0.3"], ["add", "src/Lib", "package", "Serilog", "--version", "4.0.0"],
+    // (once more for the whole solution: the program's lock file takes in what its library now pulls in)
+    ["restore"]];
   const wrote = steps.map(args => [args.join(" "), dotnet(dir, ...args)]).filter(([, r]) => r.status !== 0);
   ok(wrote.length === 0, "the .NET SDK writes a solution with a program and a library, and adds two packages from nuget.org", wrote.map(([what, r]) => `dotnet ${what}: ${r.out.slice(0, 400)}`).join("\n     "));
 } else {
