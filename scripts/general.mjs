@@ -18,7 +18,8 @@ import { OWNER } from "./core-address.mjs";
 const args = process.argv.slice(2);
 const at = args.indexOf("--base");
 const baseRev = at >= 0 ? args[at + 1] : null;
-if (at >= 0 && !/^[\w^~./-]+$/.test(baseRev ?? "")) { console.log("--base needs a commit"); process.exit(1); }
+// (a commit, never an option: git is asked whether it is one, and it stands after --end-of-options)
+if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/.test(baseRev ?? "") || (() => { try { execFileSync("git", ["rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })())) { console.log("--base needs a commit"); process.exit(1); }
 const config = JSON.parse(fs.readFileSync(args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json", "utf8"));
 const account = { pattern: OWNER.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"), say: "the *owner's account*, or the repository's own address" };
 const words = [...config.words, account].map(w => ({ re: new RegExp(w.pattern, "iu"), say: w.say }));
@@ -41,22 +42,31 @@ for (const file of files) {
 }
 console.log(`${files.length} files of the floor and the modules read for ${words.length} words: ${found} found`);
 
-// the lines a change adds to the dated records, for the words that name them: each "+" line of git's own diff, by its
-// file and line number, a quoted line left out
+// the lines a change adds to the dated records, for the words that name them: each line a hunk of git's own diff adds,
+// counted by the hunk's own header (so no added line is taken for a file's), by its file and line number; a quoted
+// line left out, and so is one the same diff takes away elsewhere word for word, a record moved and not written anew
 for (const w of config.words.filter(w => w.added?.length)) {
   if (!baseRev) { console.log(`no --base given: the lines added under ${w.added.join(", ")} were not read`); continue; }
   const re = new RegExp(w.pattern, "iu");
-  const diff = execFileSync("git", ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", "-U0", baseRev, "HEAD", "--", ...w.added], { encoding: "utf8", maxBuffer: 1 << 28 });
-  let file = "", line = 0, read = 0;
+  const diff = execFileSync("git", ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", "-U0", "--end-of-options", baseRev, "HEAD", "--", ...w.added], { encoding: "utf8", maxBuffer: 1 << 28 });
+  const added = [], removed = new Set();
+  let file = "", line = 0, plus = 0, minus = 0;
   for (const l of diff.split("\n")) {
-    if (l.startsWith("+++ ")) { file = l.slice(4).replace(/^b\//, ""); continue; }
-    const hunk = /^@@ -\S+ \+(\d+)/.exec(l);
-    if (hunk) { line = Number(hunk[1]); continue; }
-    if (!l.startsWith("+")) continue;
+    if (plus || minus) {
+      if (l.startsWith("+") && plus) { added.push({ file, line: line++, text: l.slice(1) }); plus--; }
+      else if (l.startsWith("-") && minus) { removed.add(l.slice(1)); minus--; }
+      continue;
+    }
+    const hunk = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(l);
+    if (hunk) { minus = hunk[1] === undefined ? 1 : Number(hunk[1]); line = Number(hunk[2]); plus = hunk[3] === undefined ? 1 : Number(hunk[3]); continue; }
+    if (l.startsWith("+++ ")) file = l.slice(4).replace(/^b\//, "");
+  }
+  let read = 0;
+  for (const a of added) {
+    if (removed.has(a.text)) continue;
     read++;
-    const text = l.slice(1), hit = /^\s*>/.test(text) ? null : text.match(re);
-    if (hit) { found++; console.log(`${file}:${line}: "${hit[0]}" in a line this change adds; say ${w.say}`); }
-    line++;
+    const hit = /^\s*>/.test(a.text) ? null : a.text.match(re);
+    if (hit) { found++; console.log(`${a.file}:${a.line}: "${hit[0]}" in a line this change adds; say ${w.say}`); }
   }
   console.log(`${read} lines added under ${w.added.join(", ")} since ${baseRev} read for "${w.pattern}"`);
 }
