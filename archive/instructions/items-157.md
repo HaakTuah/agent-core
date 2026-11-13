@@ -547,3 +547,21 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Agreed, expertly! Do it!
 
      Behind "It holds for every trim of a rule file, whatever its purpose" in `modules/review-guidelines.md`.
+
+187. **13 November 2026** (the core, in the design chat), on the rule that a finished session is archived:
+
+     > […] What i would however add is that they should also clean up, no? In the cloud, I don't think it matters. The
+     > container is finished when the session is. But locally/server, they have a tendency to leave work trees behind,
+     > scratches, branches, etc, etc. Shouldn't everything important for future work be pushed, and everything not, be
+     > cleaned up? When you archive a sessions seems like a good time to do it? Your expert take?
+
+     Told: yes; the session cleans up what it made before its last message, since it knows what that is, and the
+     orchestrator checks before it archives and does it for a session that could not; only what the session itself
+     made; a worktree, clone or local branch goes only where nothing in it is uncommitted or unpushed, the rest pushed
+     or left and named; what it started is stopped; no other session's folders and no branch on GitHub; nothing to do
+     where the machine ends with the session:
+
+     > Agreed with everything, expert! […]
+
+     Behind "it cleans up what it made" in "Sessions" in `modules/work-flow.md` and "It first checks that the session
+     cleaned up" in `modules/orchestrating.md`.
