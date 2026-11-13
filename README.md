@@ -178,10 +178,9 @@ Floor: whole. Modules: <all, or the list of those taken>.
 ## Setting up (the owner's part)
 
 - Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18);
-  its security review on, for team PRs, on PR open, reporting Medium and above, reading the project's threat model and
-  `SECURITY.md` with the floor (core archive 51). Team PRs leave out Dependabot's, where the builder asks for it by
-  comment (`modules/codex.md`); "All PRs" would let anyone who opens a pull request in a public repository spend the
-  owner's reviews.
+  its security review on, for all PRs (team PRs would leave out Dependabot's, which need it too: floor rule 8), on PR
+  open, reporting Medium and above, reading the project's threat model and `SECURITY.md` with the floor (core archive
+  51).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
   approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
