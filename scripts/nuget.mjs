@@ -138,8 +138,11 @@ export function sdkPacks(env = process.env, root = null) {
   const inside = (dir) => root !== null && (place(dir) === place(root) || place(dir).startsWith(place(root) + sep));
   const homes = [env.DOTNET_ROOT, ...(env.PATH ?? env.Path ?? "").split(delimiter)].filter((dir) => dir && isAbsolute(dir) && !inside(dir))
     .flatMap((dir) => ["dotnet", "dotnet.exe"].map((name) => join(dir, name)).filter((file) => existsSync(file)));
-  // (and the dotnet itself, where a link leads: one inside the project is the pull request's, wherever its link stands)
-  return [...new Set(homes.map((file) => { try { return join(dirname(realpathSync(file)), "library-packs"); } catch { return null; } }).filter((dir) => dir && !inside(dir)).map(place))];
+  // (and the folder the dotnet itself stands in, where a link leads, as the system spells it: one inside the project
+  // is the pull request's, wherever its link stands; that folder is there, so no spelling of a place not yet made,
+  // which Windows may write in its short form, is compared)
+  return [...new Set(homes.map((file) => { try { return dirname(realpathSync.native(file)); } catch { return null; } })
+    .filter((home) => home && !inside(home)).map((home) => place(join(home, "library-packs"))))];
 }
 
 /**
