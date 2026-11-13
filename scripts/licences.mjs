@@ -188,7 +188,9 @@ export function registryVersion(resolved) {
  * the package.json files (`manifest(dir)`, dir "" for its own), not the lockfile's `dev` flags; each name resolved as
  * Node resolves it, from the nearest node_modules folder up. Peer and optional dependencies count, since they may be
  * bundled. Each package's own `dependencies` and `license` are the lockfile's, as npm wrote them: npm checks a
- * package's bytes against the lockfile, never those fields, so a hand edit to them is a review finding.
+ * package's bytes against the lockfile, never those fields. Where the signatures workflow installs from a lockfile,
+ * licence-installed.mjs, beside this file, reads each `license` back from the installed package; a hand edit to the
+ * `dependencies` is a review finding.
  */
 export function shippedPaths(packages, workspaces, manifest) {
   const deps = (m) => Object.keys({ ...m.dependencies, ...m.optionalDependencies, ...m.peerDependencies });
@@ -290,20 +292,51 @@ export function loadConfig(path) {
   return config;
 }
 
+/** Whether a lock file names an entry as npm writes one: "" for the project itself, else folders joined by "/", none
+ *  of them empty, "." or "..", and no backslash. A key of any other form is read one way here and perhaps another by
+ *  an install, so a lock file that holds one is refused whole. */
+export const lockPathOk = (path) => path === "" || (!path.includes("\\") && path.split("/").every((part) => part !== "" && part !== "." && part !== ".."));
+
+/** Whether a lock entry is a package an install puts into a folder: the one test for every reader of a lock file. */
+export const lockInstalled = (path) => path.includes("node_modules/");
+
+/** A project's workspaces, by the paths its package.json (`pkg`, read; `where`, its name in a message) names: each by
+ *  its path, never a pattern, so every reader of the lock file takes the same ones as the project's own. */
+export function workspacesIn(pkg, where) {
+  const named = pkg?.workspaces ?? [];
+  if (!Array.isArray(named) || named.some((w) => typeof w !== "string" || /[*?[{]/u.test(w))) throw new Error(`${where}: name each workspace by its path`);
+  return named.map((w) => posix.normalize(w));
+}
+
+/**
+ * The packages of a lock file that every reader holds to a licence, as { path, at, entry }: each entry an install puts
+ * into a folder, but a link to a workspace, which is the project's own. A link to any other folder (a dependency
+ * written "file:"), the install puts in place as that folder stands: its `entry` is that folder's, and `at` the folder
+ * its own files stand in, null where the link names no folder the lock file holds.
+ */
+export function lockRead(packages, workspaces) {
+  return Object.entries(packages)
+    .filter(([path, entry]) => lockInstalled(path) && !(entry.link && workspaces.includes(entry.resolved)))
+    .map(([path, entry]) => {
+      if (!entry.link) return { path, at: path, entry };
+      const at = typeof entry.resolved === "string" && entry.resolved !== "" && lockPathOk(entry.resolved) && Object.hasOwn(packages, entry.resolved) ? entry.resolved : null;
+      return { path, at, entry: at === null ? {} : packages[at] };
+    });
+}
+
 /** Every package each lockfile installs, with its licence, whether it ships, and the name its registry address gives. */
 function lockfilePackages(root, lockPath, ships) {
   const base = posix.dirname(lockPath) === "." ? "" : posix.dirname(lockPath);
   const read = (p) => JSON.parse(readFileSync(join(root, base, p), "utf8"));
   const lock = read(posix.basename(lockPath));
-  if (!lock.packages || typeof lock.packages !== "object") throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3)`);
-  const named = read("package.json").workspaces ?? [];
-  if (!Array.isArray(named) || named.some((w) => typeof w !== "string" || /[*?[{]/u.test(w))) throw new Error(`${posix.join(base, "package.json")}: name each workspace by its path`);
-  const workspaces = named.map((w) => posix.normalize(w));
+  if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3)`);
+  const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
+  if (odd) throw new Error(`${lockPath} holds an entry at ${JSON.stringify(odd[0]).slice(0, 200)} that is not written as npm writes one`);
+  const workspaces = workspacesIn(read("package.json"), posix.join(base, "package.json"));
   const shipped = ships ? shippedPaths(lock.packages, workspaces, (dir) => read(posix.join(dir, "package.json"))) : new Set();
-  return Object.entries(lock.packages)
-    .filter(([path, entry]) => path.includes("node_modules/") && !(entry.link && workspaces.includes(entry.resolved)))
-    .map(([path, entry]) => {
-      const target = entry.link ? lock.packages[entry.resolved] ?? {} : entry;
+  return lockRead(lock.packages, workspaces)
+    .map(({ path, entry: target }) => {
+      const entry = lock.packages[path];
       const name = path.slice(path.lastIndexOf("node_modules/") + 13);
       return { name, version: target.version, license: target.license, registryName: entry.link ? undefined : registryName(entry.resolved), registryVersion: entry.link ? undefined : registryVersion(entry.resolved), shipped: shipped.has(path), lockPath };
     });
@@ -318,6 +351,11 @@ export function check(config, root) {
   const accepted = config.accepted ?? [], needed = new Set(), onList = new Set();
   const yesFor = (kind, name) => accepted.find((a) => a[kind] === name);
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
+  // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
+  for (const f of config.lockfiles ?? []) {
+    const other = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
+    if (existsSync(join(root, other))) failures.push(`${f}: ${other} stands beside it, and an install reads the shrinkwrap file of the two: keep one`);
+  }
   for (const p of packages) {
     // (a yes names a package and its version as the registry's address does, like "data" and "fonts": never by a
     // name or a version a lockfile could be given beside it)

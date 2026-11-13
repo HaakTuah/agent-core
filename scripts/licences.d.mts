@@ -17,6 +17,8 @@ export function policy(config?: Partial<LicenceConfig>): {
   never: RegExp;
 };
 export function licenceOk(expression: unknown, allow: Set<string>): boolean;
+export function lockPathOk(path: string): boolean;
+export function lockInstalled(path: string): boolean;
 export function registryName(resolved: string | undefined): string | undefined;
 export function registryVersion(resolved: string | undefined): string | undefined;
 export function shippedPaths(

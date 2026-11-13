@@ -119,8 +119,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    - **A project whose packages come from npm** has a `signatures.yml` of its own, on every pull request, which calls
      the core's with the folder of its lock file: where the pull request changes a package list, a lock file, an
      `.npmrc`, the Node version or that workflow, an install from the registry alone, running no package's install
-     script, then npm's own check of the registry's signature on each installed name and version (floor rule 7); where
-     it changes none, the check passes, so a ruleset can require it.
+     script, then npm's own check of the registry's signature on each installed name and version (floor rule 7), and
+     `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
+     itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
+     than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
    - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
      core's with the licence check's config: a restore of each project file git knows from its lock file alone
      (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
