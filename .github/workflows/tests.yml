@@ -94,6 +94,9 @@ jobs:
       - name: The tree a copy must be
         if: ${{ !cancelled() }}
         run: node scripts/copy-tree-test.mjs
+      - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
+        if: ${{ !cancelled() }}
+        run: node scripts/pure-sync-test.mjs
       - name: Whether a script was started by itself
         if: ${{ !cancelled() }}
         run: node scripts/started-test.mjs
