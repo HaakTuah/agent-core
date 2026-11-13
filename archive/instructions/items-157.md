@@ -429,3 +429,24 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Approved expertly!
 
      Behind "and any other file a tool takes its instructions from, wherever it lies" in floor rule 3.
+
+181. **13 November 2026** (the core, in the design chat), asked for a take on everything he had said yes to on 12 and 13
+     November. Told: keep all of it; add a reader for a review that comes in after its PR merged, since "a late review
+     is still read" named none and a session stops at the merge; reword the *code reviewers*' order, whose "(Codex's,
+     then Copilot's)" could be read as if Codex never builds; and give "Never a pull request" in the README, written on
+     a question of his, its yes:
+
+     > Agreed with all of your takes here, expertly! Do it! My only slight concern is that cap can blow up. But the
+     > hard cap was worse. The best is if we manage to keep it so it is only ever expanded when it has to, not due to
+     > inefficient phrasing, duplication, or anything else, expertly.
+
+     And two minutes later:
+
+     > Maybe a reviewer has to concur that condensing isn't possible without losing meaning or enforcement, so that
+     > the cap has to be expanded? What is your expert take?
+
+     Told that it should, and that it would stand among this repository's review guidelines on these words. Behind "a
+     finding of the last week made after its PR merged, with no reply, is answered as point 5 says" in
+     `modules/reviews.md` and "then both read what reviews left after a merge" in `modules/work-flow.md`; "Codex's
+     before Copilot's, where neither builds" in `modules/roles.md`; "Never a pull request" in `README.md`; and "It rises
+     only when it has to" and "a raise of the size cap, unless the reviewer concurs" in `AGENTS.md`.
