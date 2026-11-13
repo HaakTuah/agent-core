@@ -136,7 +136,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > No, must be optional.
 
-     On sections 3 to 7 (no "he" or "his" for the owner in new text; the owner's own projects follow the releases; the
+     On sections 3 to 7 (no gendered pronoun for the owner in new text; the owner's own projects follow the releases; the
      copy compared by git's object ids; tests for the sync scripts; the workflows' shell in tested scripts), each:
 
      > Agreed.
