@@ -47,6 +47,12 @@ const pathKey = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH"
 const bare2 = spawnSync("sh", ["-c", command("start")], { input: "{}", encoding: "utf8", env: { ...env, [pathKey]: noNode, CLAUDE_PROJECT_DIR: project } });
 ok(bare2.status === 0 && /The helper hook is off here: Node is not on the path/.test(bare2.stdout) && /not committed/.test(bare2.stdout), "with no Node on the path, the start says in a line that the helper hook is off, beside what it reports, and stops nothing", `${bare2.status} ${bare2.stdout}${bare2.stderr}`);
 ok(!/helper hook is off/.test(r.stdout), "with Node on the path it says nothing of it", r.stdout);
+// the owner's stop switch: the branch agents-stop on origin, said at the start where it stands, and not where it is gone
+git(project, "push", "-q", "origin", "main:agents-stop");
+const stopped = hook("start", project);
+ok(stopped.status === 0 && /The owner's stop switch is set/.test(stopped.stdout), "with the branch agents-stop on origin, the start says the owner's stop switch is set, and stops nothing itself", `${stopped.status} ${stopped.stdout}`);
+git(project, "push", "-q", "origin", "--delete", "agents-stop");
+ok(!/stop switch/.test(hook("start", project).stdout), "deleted, it says nothing of it");
 git(project, "add", "-A");
 git(project, "commit", "-q", "-m", "a note");
 r = hook("stop", project);

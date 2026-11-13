@@ -8,7 +8,8 @@ starting and handing over sessions, passing on the owner's word. Only if it cann
 and stop.
 
 - **On every wake,** the hourly one set once to repeat, never anew each turn (core archive 200), on the owner's computer
-  only one the owner set up (floor rule 8; core archive 42, 44 and 124): pull `main`, its clone on `main`; if a rule
+  only one the owner set up (floor rule 8; core archive 42, 44 and 124): read the stop switch first (`modules/work-flow.md`),
+  and where it stands, start nothing and tell the running builders to stop; pull `main`, its clone on `main`; if a rule
   file changed, re-read it and pass what touches them to the running builders in one message; if `setup/sync-notes.md`
   gained entries, a lane does what they ask; sync the core in a routine lane, as "Sessions" in `modules/work-flow.md`
   says; turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`); act on what

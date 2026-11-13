@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Nothing is lost ("Push after every commit" in the core's modules/git.md): Claude Code runs this when a session starts
 # ("start") and whenever a reply is about to end ("stop"). start reports work left uncommitted, unpushed or stashed,
-# and says in a line where Node is not on the path, so the helper hook is off (core archive 201);
+# and says in a line where Node is not on the path, so the helper hook is off, and where the owner's stop switch is set
+# (core archive 201);
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
 # made never traps a session. It only reads the repository, with the git settings that run commands (fsmonitor, hooks)
 # turned off. Claude Code runs the copy merged into main (the project's
@@ -11,6 +12,11 @@ input=$(cat 2>/dev/null || true)
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 g() { git --no-optional-locks -c core.fsmonitor=false -c core.hooksPath=/dev/null "$@"; }
 g rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+# The owner's stop switch (the core's modules/work-flow.md): the branch agents-stop on origin, asked of origin itself,
+# never by a prompt for a sign-in; where it cannot be asked, nothing is said.
+if [ "$mode" = start ] && GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never g -c credential.interactive=never ls-remote --exit-code --heads origin agents-stop >/dev/null 2>&1; then
+  echo "The owner's stop switch is set (the branch agents-stop on origin): start no task; commit and push what you have, and stop, saying so."
+fi
 # (a note, never a block: the helper hook is started by node, so without it there the hook stops nothing)
 if [ "$mode" = start ] && ! command -v node >/dev/null 2>&1; then
   echo "The helper hook is off here: Node is not on the path, and Claude Code starts that hook with node (the core's README.md, \"On Windows\")."

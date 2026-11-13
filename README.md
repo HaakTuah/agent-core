@@ -294,6 +294,8 @@ Floor: whole. Modules: <all, or the list of those taken>.
   more is asked of the owner: the sessions hand over by the first way they find, and with none Claude's build
   (`modules/roles.md`, "The builders"; core archive 169). A tool that pushes its own branch gets a sign-in that cannot
   change a workflow (as `setup/server.md`, point 5), or its workflows wait for an approval before they run.
+- The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
+  and delete it to let them go on (`modules/work-flow.md`). It stops only that repository's agents.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
 - Any other machine the sessions run on is the owner's to set up (floor rule 18), who chooses knowing what a setup like
   `setup/server.md`'s buys: an account of the agents' own and a throwaway box for the project's code mean that

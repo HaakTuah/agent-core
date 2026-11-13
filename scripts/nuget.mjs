@@ -98,7 +98,15 @@ const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writ
 const key = (id, version) => `${id}@${version}`.toLowerCase();
 /** A JSON file's text without the byte-order mark dotnet reads past. */
 export const unmarked = (text) => (text.startsWith("\uFEFF") ? text.slice(1) : text);
-const CUT = "\u0000"; // stands where a comment, CDATA or a processing instruction was cut from a manifest: no XML holds it
+// what stands where a comment or a processing instruction was cut from a manifest, and where CDATA was: no XML holds either
+const CUT = "\u0000", CDATA = "\u0001";
+// XML's own declaration, as XML writes it: only at a manifest's start, after a byte-order mark if one stands there
+const XB = "[ \\t\\r\\n]"; // XML's own blanks
+const DECLARATION = new RegExp(`^<\\?xml${XB}+version${XB}*=${XB}*(?:"1\\.[0-9]+"|'1\\.[0-9]+')(?:${XB}+encoding${XB}*=${XB}*(?:"[A-Za-z][A-Za-z0-9._-]*"|'[A-Za-z][A-Za-z0-9._-]*'))?(?:${XB}+standalone${XB}*=${XB}*(?:"(?:yes|no)"|'(?:yes|no)'))?${XB}*\\?>`, "u");
+// a tag's attributes, each parted from the last by a blank, with no "<" in a value (nor a part cut out, which began with
+// one), and a reference to a character as XML writes one
+const ATTRIBUTES = /^(?:[ \t\r\n]+[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?[ \t\r\n]*=[ \t\r\n]*(?:"[^"<\u0000\u0001]*"|'[^'<\u0000\u0001]*'))*[ \t\r\n]*$/u;
+const AMPERSAND = /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/u;
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
 const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
 
@@ -202,9 +210,10 @@ export function lockPackages(text, lockPath) {
  */
 export function manifestLicence(text) {
   const unread = { other: "a manifest it will not read" }, malformed = { other: "a manifest that is not well formed" };
-  if (typeof text !== "string" || /<!DOCTYPE|<!ENTITY/iu.test(text) || text.includes(CUT)) return unread;
+  if (typeof text !== "string" || /<!DOCTYPE|<!ENTITY/iu.test(text) || text.includes(CUT) || text.includes(CDATA)) return unread;
+  text = text.replace(/^\ufeff/u, "").replace(DECLARATION, "");
   // (what is no element is cut out first, each from its opening to its own end, in the order they stand, and a mark
-  // no manifest can hold is left where each stood)
+  // no manifest can hold is left where each stood: a comment holds no "--", and an instruction is named, never "xml")
   let plain = "", at = 0;
   const ends = { "<!--": "-->", "<![CDATA[": "]]>", "<?": "?>" };
   for (;;) {
@@ -212,13 +221,18 @@ export function manifestLicence(text) {
     if (!found) { plain += text.slice(at); break; }
     const end = text.indexOf(ends[found[1]], found[0] + found[1].length);
     if (end < 0) return malformed;
-    plain += `${text.slice(at, found[0])}${CUT}`;
+    const body = text.slice(found[0] + found[1].length, end);
+    if (found[1] === "<!--" && (body.includes("--") || body.endsWith("-"))) return malformed;
+    if (found[1] === "<?" && !/^(?!xml(?:[ \t\r\n]|$))[A-Za-z_][A-Za-z0-9_.-]*(?:[ \t\r\n]|$)/iu.test(body)) return malformed;
+    plain += `${text.slice(at, found[0])}${found[1] === "<![CDATA[" ? CDATA : CUT}`;
     at = end + ends[found[1]].length;
   }
-  const stack = [], licences = [];
+  // (each "&" a reference XML knows, and no "]]>" but the end of CDATA)
+  if (AMPERSAND.test(plain) || plain.includes("]]>")) return malformed;
+  const stack = [], licences = [], prefixes = new Set(["xml"]);
   let url = false, last = 0, open = null, roots = 0, metadatas = 0;
-  // (between two tags stands text, never a "<"; outside the root, nothing but blanks, a cut-out part or a byte-order mark)
-  const gapOk = (to) => { const gap = plain.slice(last, to); return !gap.includes("<") && (stack.length > 0 || /^[ \t\r\n\u0000\ufeff]*$/u.test(gap)); };
+  // (between two tags stands text, never a "<"; outside the root, nothing but blanks, a comment or an instruction)
+  const gapOk = (to) => { const gap = plain.slice(last, to); return !gap.includes("<") && (stack.length > 0 || /^[ \t\r\n\u0000]*$/u.test(gap)); };
   // (a name ends at XML's own blanks, a slash or the tag's end, and at nothing else)
   const tags = /<(\/?)([^ \t\r\n/<>]+)((?:"[^"]*"|'[^']*'|[^'"<>])*?)(\/?)>/gu;
   for (const tag of plain.matchAll(tags)) {
@@ -226,6 +240,15 @@ export function manifestLicence(text) {
     const [, closing, name, attributes, empty] = tag;
     // (a plain name, with no prefix; and no namespace declared below the root, so every element is in the root's)
     if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/u.test(name) || (attributes && !/^[ \t\r\n]/u.test(attributes))) return unread;
+    // (no attribute twice, by its local name; a prefix only one the root declares, to a namespace, or xml)
+    const pairs = [...attributes.matchAll(/([^ \t\r\n=]+)[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)')/gu)].map((m) => [m[1], m[2] ?? m[3]]);
+    if (!ATTRIBUTES.test(attributes)) return malformed;
+    if (!closing && !stack.length) {
+      for (const [n, v] of pairs) if (n.startsWith("xmlns:") && (["xml", "xmlns"].includes(n.slice(6)) || !v)) return unread; else if (n.startsWith("xmlns:")) prefixes.add(n.slice(6));
+    }
+    const named = pairs.map(([n]) => n).filter((n) => n !== "xmlns" && !n.startsWith("xmlns:"));
+    if (new Set(named.map((n) => n.split(":").at(-1))).size !== named.length || named.some((n) => n.includes(":") && !prefixes.has(n.split(":")[0]))) return malformed;
+    if (new Set(pairs.map(([n]) => n)).size !== pairs.length) return malformed;
     if (!closing && stack.length && /(?:^|[ \t\r\n])xmlns[ \t\r\n]*[:=]/u.test(attributes.replace(/"[^"]*"|'[^']*'/gu, '""'))) return unread;
     if (closing) {
       if (empty || attributes.trim() || stack.pop() !== name) return malformed;
@@ -247,8 +270,9 @@ export function manifestLicence(text) {
   const kind = type?.[1] ?? type?.[2];
   if (kind === "file") return { other: "a licence file" };
   const expression = licences[0].body.replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, "");
-  // (plain printable ASCII and XML's blanks alone: another blank would part words here that it parts for no other reader)
-  if (kind !== "expression" || !expression || /[<&]/u.test(expression) || !/^[\x20-\x7e\t\r\n]+$/u.test(expression)) return { other: "a licence it cannot read" };
+  // (plain printable ASCII alone, its words parted by spaces: XML reads a line's end otherwise than it stands, and SPDX
+  // parts words by spaces alone)
+  if (kind !== "expression" || !expression || /[<&]/u.test(expression) || !/^[\x20-\x7e]+$/u.test(expression)) return { other: "a licence it cannot read" };
   return { expression };
 }
 

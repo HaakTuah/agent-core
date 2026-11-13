@@ -55,6 +55,9 @@ jobs:
       - name: The NuGet check's fetch before the restore, against each package's content hash
         if: ${{ !cancelled() }}
         run: node scripts/nuget-fetch-test.mjs
+      - name: The hand-written readers, against SPDX's own parser and an XML parser (once, on Linux, where tar unpacks them)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: node scripts/readers-test.mjs
       - name: The exact-versions check
         if: ${{ !cancelled() }}
         run: node scripts/exact-versions-test.mjs

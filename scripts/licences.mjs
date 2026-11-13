@@ -156,12 +156,14 @@ export function policy(config = {}) {
 /**
  * Whether an SPDX expression is allowed: read with its brackets, one side of an OR enough and every part of an AND
  * needed. AND and OR mixed without brackets (which SPDX reads with AND first, a reader perhaps not), an exception
- * (WITH) or anything unreadable is refused.
+ * (WITH) or anything unreadable is refused: a blank but a space, a character beyond printable ASCII, or a WITH with no
+ * exception's name after it. scripts/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser.
  */
 export function licenceOk(expression, allow) {
   if (typeof expression !== "string" || !expression.trim()) return false;
+  if (/[^\x20-\x7e]/u.test(expression)) return false;
   if (allow.has(expression.trim())) return true;
-  const tokens = expression.match(/\(|\)|[^\s()]+/gu) ?? [];
+  const tokens = expression.match(/\(|\)|[^ ()]+/gu) ?? [];
   let at = 0;
   const level = () => {
     const oks = [term()];
@@ -181,7 +183,12 @@ export function licenceOk(expression, allow) {
       return ok;
     }
     if (token === undefined || [")", "AND", "OR", "WITH"].includes(token)) throw new Error("unexpected token");
-    if (tokens[at] === "WITH") { at += 2; return false; }
+    if (tokens[at] === "WITH") {
+      const exception = tokens[at + 1] ?? "";
+      at += 2;
+      if (!/^[A-Za-z0-9][A-Za-z0-9.-]*$/u.test(exception) || /^(?:AND|OR|WITH)$/iu.test(exception)) throw new Error("no exception's name");
+      return false;
+    }
     return allow.has(token);
   };
   try {
