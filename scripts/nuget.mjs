@@ -30,7 +30,10 @@
 // What it does not hold: that the lock files are what a restore gives today (the workflow that runs this,
 // .github/workflows/nuget.yml, restores each project file this script lists with --locked-mode first, which fails
 // where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
-// project file fixes and no lock file holds; whether the owner said what "accepted"
+// project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
+// restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
+// names goes unseen, and such a folder stands in the pull request for the reviews to see); whether the owner said
+// what "accepted"
 // quotes, which the reviews hold, the config being a protected file; a project of another kind than the three above,
 // and a tool a manifest of dotnet's names (.config/dotnet-tools.json), which no restore here brings; and what no lock
 // file names at all (a tool a script installs, a font, an image), which the licence check's audit and scan hold. A
@@ -183,7 +186,8 @@ export function manifestLicence(text) {
   const kind = type?.[1] ?? type?.[2];
   if (kind === "file") return { other: "a licence file" };
   const expression = licences[0].body.replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, "");
-  if (kind !== "expression" || !expression || /[<&]/u.test(expression) || expression.includes(CUT)) return { other: "a licence it cannot read" };
+  // (plain printable ASCII and XML's blanks alone: another blank would part words here that it parts for no other reader)
+  if (kind !== "expression" || !expression || /[<&]/u.test(expression) || !/^[\x20-\x7e\t\r\n]+$/u.test(expression)) return { other: "a licence it cannot read" };
   return { expression };
 }
 
@@ -218,7 +222,8 @@ export function check(config, root, packagesDir, tracked) {
     let text = "";
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
     if (/NuGetLockFilePath/iu.test(text)) failures.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read`);
-    if (/RestorePackagesPath/iu.test(text)) failures.push(`${f} names RestorePackagesPath: packages restored to another folder are ones this check does not read`);
+    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) failures.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read`);
+    if (/TreatAsLocalProperty/iu.test(text)) failures.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them`);
   }
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   const listed = [...ships, ...tools];
