@@ -563,5 +563,5 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Agreed with everything, expert! […]
 
-     Behind "it cleans up what it made" in "Sessions" in `modules/work-flow.md` and "It first checks that the session
+     Behind "clean up what you made" in "Sessions" in `modules/work-flow.md` and "It first checks that the session
      cleaned up" in `modules/orchestrating.md`.
