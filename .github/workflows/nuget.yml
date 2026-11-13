@@ -103,10 +103,14 @@ jobs:
                 [ "${#locks[@]}" -gt 0 ] && grep -qiF -- "\"$id\": {" "${locks[@]}" || { echo "$project: a package no lock file names is asked for ($id)"; return 1; }
               done < <(printf '%s\n' "$out" | grep -oE 'NU110[123]: Unable to find (a stable )?package [^ ]+' | sed -E 's/.* package //; s/\.$//' | sort -u)
             done
-            # (each project's own record of its restore, written just now inside the checkout: one that lies elsewhere
-            # is a doubt)
-            records=$(find . -path ./core -prune -o -name project.assets.json -newer "$stamp" -print | grep -c .)
-            [ "$records" -ge "${#projects[@]}" ] || { echo "a project's own record of its restore lies outside the checkout"; return 1; }
+            # (each project's own record of its restore, written just now inside the checkout and naming that project:
+            # one that lies elsewhere, or is not there, is a doubt)
+            records=$(find . -path ./core -prune -o -name project.assets.json -newer "$stamp" -print0 \
+              | xargs -0 -r jq -r '.project.restore.projectPath // empty' | tr '\\' '/' | tr -d '\r')
+            for project in "${projects[@]}"; do
+              printf '%s\n' "$records" | while IFS= read -r r; do [[ "${r,,}" == *"/${project,,}" ]] && echo yes; done | grep -q yes \
+                || { echo "$project: its own record of its restore lies outside the checkout"; return 1; }
+            done
             while IFS= read -r -d '' assets; do
               jq -e --arg packs "$PACKS" '[.project.frameworks[]? | .downloadDependencies // [] | .[] | select(.name | test("^(" + $packs + ")$") | not)] | length == 0' "$assets" > /dev/null \
                 || { echo "a project downloads a package beside its lock file"; return 1; }
