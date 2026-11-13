@@ -152,7 +152,26 @@ if (kit.status === 0) {
     };
     const itsOwn = fresh("from-its-config"), given = fresh("from-the-registry", ...from);
     ok(itsOwn.status !== 0 && !itsOwn.brought && given.status === 0 && given.brought, "a NuGet.Config that names another source alone would restore from there and finds nothing; given its sources as the workflow gives them, the same restore takes every package from the registry", `${itsOwn.status} ${itsOwn.out.slice(-500)}\n     ${given.status} ${given.out.slice(-800)}`);
-    fs.rmSync(path.join(plain, "NuGet.Config")); fs.rmSync(path.join(plain, "empty-feed"), { recursive: true });
+    fs.rmSync(path.join(plain, "NuGet.Config"));
+    // a file the build reads beside the project file adds a source to what the restore was given: what the restore
+    // wrote says so, and the check reads it there
+    const checked = name => check(plain, ["core/scripts/nuget.mjs", "checks/licences.json", "--packages", kept(name)]);
+    const clean = checked("from-the-registry");
+    fs.writeFileSync(path.join(plain, "src/App/App.csproj.user"), "<Project><PropertyGroup><RestoreAdditionalProjectSources>$(MSBuildThisFileDirectory)../../empty-feed</RestoreAdditionalProjectSources></PropertyGroup></Project>\n");
+    const added = fresh("with-a-source-added", ...from), caught = checked("with-a-source-added");
+    ok(clean.status === 0 && added.status === 0 && caught.status === 1 && /^FAIL: src\/App\/App\.csproj: its restore took packages from .*empty-feed/m.test(caught.out),
+      "restored from the registry alone the check passes; with a file beside the project file adding a source, the restore still passes and the check fails it, naming the source", `${clean.status} ${clean.out.slice(0, 600)}\n     ${added.status} ${added.out.slice(-400)}\n     ${caught.status} ${caught.out.slice(0, 900)}`);
+    fs.rmSync(path.join(plain, "src/App/App.csproj.user")); fs.rmSync(path.join(plain, "empty-feed"), { recursive: true });
+    // a folder of the project's own as a source: named in the config, given to the restore by its whole path
+    fs.mkdirSync(path.join(plain, "vendor/packages"), { recursive: true });
+    fs.copyFileSync(path.join(kept("from-the-registry"), "newtonsoft.json", "13.0.3", "newtonsoft.json.13.0.3.nupkg"), path.join(plain, "vendor/packages/newtonsoft.json.13.0.3.nupkg"));
+    git(plain, "add", "-f", "vendor/packages/newtonsoft.json.13.0.3.nupkg");
+    const configFile = path.join(plain, "checks/licences.json"), config = JSON.parse(fs.readFileSync(configFile, "utf8"));
+    fs.writeFileSync(configFile, JSON.stringify({ ...config, nuget: { ...config.nuget, sources: ["vendor/packages/"] } }));
+    const both = check(plain, ["core/scripts/nuget.mjs", "checks/licences.json", "--sources"]).out.split("\n").filter(Boolean);
+    const withFolder = fresh("with-a-folder", ...both.flatMap(source => ["--source", source])), folderChecked = checked("with-a-folder");
+    ok(both.length === 2 && path.isAbsolute(both[1]) && withFolder.status === 0 && folderChecked.status === 0, "a folder the config names is given to the restore by its whole path, the restore takes it beside the registry, and the check knows it as the source it named",
+      `${both.join()}\n     ${withFolder.status} ${withFolder.out.slice(-500)}\n     ${folderChecked.status} ${folderChecked.out.slice(0, 900)}`);
   }
 }
 

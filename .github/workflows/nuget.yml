@@ -9,12 +9,15 @@
 # ("How a project takes the core" in README.md, point 5), passing the licence check's config. It fails from a
 # project's first day (core archive 198). With "advisory" (off unless a project turns it on) it says what it would
 # fail and passes, a restore that fails included: for a project where the check itself is at fault, while that is
-# reported to the core and mended, and never to let a package through. A restore runs the pull request's own project files,
+# reported to the core and mended, and never to let a package through. A restore runs the pull request's own project
+# files,
 # as its build would, and what they run could change anything in this job, the script and the manifests it reads
 # included: so this runs with contents: read and no secret, nothing after the checkout holds the token, and what a pull
 # request does to its project files is the reviews' to read, as with every check that builds. Where the packages come
 # from is this restore's to say (floor rule 7): NuGet's own registry and the sources the config names, given to every
-# restore, which overrules what a NuGet.Config names; a source that asks for a sign-in has none here. A project for
+# restore, which overrules what a NuGet.Config names, and the script then reads from what each restore wrote
+# (project.assets.json) that it took packages from nowhere else; a source that asks for a sign-in has none here. A
+# project for
 # Windows alone restores here all the same (EnableWindowsTargeting); one whose SDK the runner lacks
 # restores in a workflow of its own, and runs the script there.
 name: nuget
@@ -68,7 +71,7 @@ jobs:
               # (the two properties given here overrule a project's own: its packages go to the folder the check
               # reads, and its lock file is the one beside it; dotnet reads nothing of the list. A fallback folder
               # cannot be turned off so: the SDK takes the word for a folder's name. The check fails a build file
-              # that names one, or a source of its own.)
+              # that names one, and reads from what each restore wrote where it took its packages from.)
               dotnet restore --locked-mode "${sources[@]}" "-p:RestorePackagesPath=$NUGET_PACKAGES" -p:NuGetLockFilePath= "./$project" < /dev/null || failed=1
             done < "$RUNNER_TEMP/nuget-projects"
           else failed=1; fi

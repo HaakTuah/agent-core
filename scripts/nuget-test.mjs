@@ -26,11 +26,11 @@ ok(nugetConfig({ nuget: { accepted: [yes, { ...yes, package: "Other.Pkg@2.0.0", 
   "an accepted package names its exact version, what it is under, whether it ships and the owner's words, with its notice or without, and nothing else");
 
 // where packages come from
-ok(sourcesOf({ nuget: {} }).join() === REGISTRY && sourcesOf({ nuget: { sources: ["https://pkgs.example.com/feed/v3/index.json", "vendor/packages/"] } }).join() === `${REGISTRY},https://pkgs.example.com/feed/v3/index.json,vendor/packages/`,
-  "a restore takes packages from NuGet's own registry, and from what the config names beside it: an address, a folder of the project's");
-ok(["http://pkgs.example.com/", "https://user:word@pkgs.example.com/", "https://pkgs.example.com/v3?key=1", "https://pkgs.example.com/a b", "https://-pkgs.example.com/", "../out/", "/abs/", "vendor", "./vendor/", "vendor//x/", "-x/", "--source/", REGISTRY, REGISTRY.toUpperCase(), 5, "vendor/\n--source\nhttps://pkgs.example.com/"]
+ok(sourcesOf({ nuget: {} }, "/project").join() === REGISTRY && sourcesOf({ nuget: { sources: ["https://pkgs.example.com/feed/v3/index.json", "vendor/packages/"] } }, path.resolve("/project")).join() === `${REGISTRY},https://pkgs.example.com/feed/v3/index.json,${path.resolve("/project", "vendor/packages")}`,
+  "a restore takes packages from NuGet's own registry, and from what the config names beside it: an address, a folder of the project's by its whole path");
+ok(["http://pkgs.example.com/", "https://user:word@pkgs.example.com/", "https://pkgs.example.com/v3?key=1", "https://pkgs.example.com/a b", "https://-pkgs.example.com/", "https://169.254.169.254/", "https://localhost/", "https://pkgs..example.com/", "https://pkgs.example.com/a/../b", "../out/", "/abs/", "vendor", "./", "./vendor/", "vendor//x/", "vendor/../x/", ".git/", ".../", "core/", "Core/scripts/", "-x/", "--source/", REGISTRY, REGISTRY.toUpperCase(), 5, "vendor/\n--source\nhttps://pkgs.example.com/"]
   .every(s => throws(() => nugetConfig({ nuget: { sources: [s] } }))) && throws(() => nugetConfig({ nuget: { sources: "vendor/" } })) && throws(() => nugetConfig({ nuget: { sources: ["vendor/", "vendor/"] } })),
-  "a source is an https address with no sign-in or question in it, or a folder inside the project; never the registry again, never one twice, never a word a restore could read as an option");
+  "a source is an https address of a named host, with no sign-in or question in it, or a folder inside the project that is not the core's copy or git's own; never the registry again, never one twice, never a word a restore could read as an option");
 
 // a lock file
 const entry = (type, resolved, requested) => ({ type, ...(requested ? { requested } : {}), resolved, contentHash: "h==" });
@@ -99,11 +99,13 @@ const restore = (...names) => {
   for (const name of names.filter(n => MANIFESTS[n])) { const [id, version] = name.toLowerCase().split("@"); put(`${dir}/${id}/${version}/${id}.nuspec`, nuspec(MANIFESTS[name])); }
   return path.join(tmp, dir);
 };
+// (what a restore of a project file writes into its obj folder: where it took packages from, among much else)
+const restoredFrom = (project, sources = [REGISTRY], at = `${path.posix.dirname(project)}/obj/project.assets.json`) => put(at, JSON.stringify({ version: 3, project: { restore: { projectPath: path.join(tmp, project), sources: Object.fromEntries(sources.map(source => [source, {}])) } } }));
 const direct = (...pairs) => Object.fromEntries(pairs.map(([id, v]) => [id, entry("Direct", v, `[${v}, )`)]));
 const installed = deps => Object.entries(deps).filter(([, e]) => e.type !== "Project").map(([id, e]) => `${id}@${e.resolved}`);
 const TRACKED = ["src/App/App.csproj", L, "tests/App.Tests/App.Tests.csproj", T, "core/scripts/x.mjs"];
 const project = (shipsDeps, toolsDeps, { nuget = {}, entries = [], extra = [], config = {} } = {}) => {
-  put(L, lock(shipsDeps)); put(T, lock(toolsDeps));
+  put(L, lock(shipsDeps)); put(T, lock(toolsDeps)); restoredFrom("src/App/App.csproj"); restoredFrom("tests/App.Tests/App.Tests.csproj");
   put("checks/audit.json", JSON.stringify({ entries }));
   return check({ ships: [], audit: "checks/audit.json", ...config, nuget: { ships: [L], tools: [T], ...nuget } }, tmp, restore(...installed(shipsDeps), ...installed(toolsDeps), ...extra), TRACKED);
 };
@@ -193,18 +195,32 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 fs.mkdirSync(path.join(repo, "core"), { recursive: true });
 fs.cpSync(here, path.join(repo, "core", "scripts"), { recursive: true });
 fs.cpSync(path.join(here, "..", "floor"), path.join(repo, "core", "floor"), { recursive: true });
-put("build/Feed.props", "<Project><PropertyGroup><RestoreAdditionalProjectSources>https://pkgs.example.com/v3/index.json</RestoreAdditionalProjectSources></PropertyGroup></Project>");
-put("build/Sources.targets", "<Project><PropertyGroup><restoresources>vendored</restoresources></PropertyGroup></Project>"); put("build/Config.props", "<Project><PropertyGroup><RestoreConfigFile>other.config</RestoreConfigFile></PropertyGroup></Project>");
-ok(["build/Feed.props", "build/Sources.targets", "build/Config.props"].every(f => names([f], {}).includes(`${f} names RestoreSources, RestoreAdditionalProjectSources or RestoreConfigFile`)),
-  "a build file that names a source of its own, or another config, fails: it would add to the sources the restore was given");
-ok(/"nuget\.sources" names vendor\/packages\/, a folder that holds no file git knows/.test(names(["vendor/readme.md"], { sources: ["vendor/packages/"] })) && names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] }) === "",
-  "a folder named as a source holds files git knows, so what it gives stands in the pull request");
+// where each restore took its packages from, read from what it wrote
+const APP = "src/App/App.csproj", only = [APP, L], from = (sources, nuget = {}, tracked = only, at) => { restoredFrom(APP, sources, at); return names(tracked, { ships: [L], ...nuget }); };
+ok(from([REGISTRY]) === "" && from([REGISTRY, "https://pkgs.example.com/v3/index.json", path.join(tmp, "vendor", "packages") + path.sep], { sources: ["https://pkgs.example.com/v3/index.json", "vendor/packages/"] }, [...only, "vendor/packages/Bought.1.0.0.nupkg"]) === "",
+  "a restore that took its packages from the registry, and from the sources the config names, an address or a folder however its path ends, passes");
+ok(/src\/App\/App\.csproj: its restore took packages from https:\/\/pkgs\.example\.com\/v3\/index\.json, which is neither NuGet's own registry nor a source the config's "nuget\.sources" names/.test(from([REGISTRY, "https://pkgs.example.com/v3/index.json"]))
+  && /its restore took packages from /.test(from([REGISTRY, path.join(tmp, "vendored")])) && /its restore took packages from http:\/\/pkgs\.example\.com/.test(from(["http://pkgs.example.com/v3/index.json"], { sources: ["https://pkgs.example.com/v3/index.json"] }))
+  && /its restore took packages from https:\/\/API\.nuget\.org/.test(from(["https://API.nuget.org/v3/index.json"])), "one that took them from anywhere else fails, whatever added the source: an address, a folder, the plain form of a named address, another spelling of the registry's");
+put("src/App/obj/project.assets.json", JSON.stringify({ project: { restore: { projectPath: path.join(tmp, APP) } } }));
+const unnamed = names(only, { ships: [L] });
+fs.rmSync(path.join(tmp, "src/App/obj"), { recursive: true });
+ok(/names no sources, so where src\/App\/App\.csproj took its packages from cannot be read/.test(unnamed) && /src\/App\/App\.csproj: no project\.assets\.json in the project says what its restore used/.test(names(only, { ships: [L] })),
+  "a project whose restore left nothing that names its sources, or nothing at all, fails: it was not restored here");
+ok(from([REGISTRY], {}, only, "artifacts/obj/App/project.assets.json") === "" && /artifacts\/obj\/App\/project\.assets\.json: git knows it, and it is what a restore writes/.test(names([...only, "artifacts/obj/App/project.assets.json"], { ships: [L] })),
+  "what a restore wrote is found wherever in the project its obj folder lies, and one that git knows is no restore's: it fails");
+fs.rmSync(path.join(tmp, "artifacts"), { recursive: true }); restoredFrom(APP);
+put("vendor/packages/Bought.1.0.0.nupkg", ""); fs.symlinkSync(os.tmpdir(), path.join(tmp, "vendor/packages/elsewhere"));
+ok(/"nuget\.sources" names vendor\/packages\/, a folder that holds no file git knows/.test(names(["vendor/readme.md"], { sources: ["vendor/packages/"] })) && names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] }) === ""
+  && /vendor\/packages\/elsewhere: a link, in a folder the config names as a source/.test(names(["vendor/packages/Bought.1.0.0.nupkg", "vendor/packages/elsewhere"], { sources: ["vendor/packages/"] })),
+  "a folder named as a source holds files git knows, so what it gives stands in the pull request, and no link that leads out of it");
 const inRepo = (to, text) => { fs.mkdirSync(path.dirname(path.join(repo, to)), { recursive: true }); fs.writeFileSync(path.join(repo, to), text); };
 inRepo("src/App/App.csproj", "<Project />"); inRepo(L, lock(direct(["Copy.Left", "4.0.0"])));
 inRepo("checks/audit.json", JSON.stringify({ entries: [] }));
 inRepo("checks/licences.json", JSON.stringify({ ships: [], audit: "checks/audit.json", nuget: { ships: [L] } }));
 const git = (...args) => spawnSync("git", args, { cwd: repo, env, encoding: "utf8" });
 git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "a project");
+inRepo("src/App/obj/project.assets.json", JSON.stringify({ project: { restore: { projectPath: path.join(repo, "src/App/App.csproj"), sources: { [REGISTRY]: {} } } } }));
 const run = (...args) => { const r = spawnSync(process.execPath, [path.join(repo, "core/scripts/nuget.mjs"), ...args], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr, stdout: r.stdout }; };
 const left = restore("Copy.Left@4.0.0"), json = restore("Newtonsoft.Json@13.0.3");
 const strict = run("checks/licences.json", "--packages", left), advisory = run("checks/licences.json", "--packages", left, "--advisory");
