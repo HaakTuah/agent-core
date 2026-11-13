@@ -5,11 +5,11 @@
 // file (`npm ci`, as the signatures workflow runs it, .github/workflows/signatures.yml, which runs this next), it
 // holds every entry of the lock file to the package.json of the package installed for it, in its licence, read as npm
 // writes one, and in its version. With it, the licence check's reading of the lock file is a reading of the packages.
-// What it does not hold: a package of another system, which no install here brings (an optional one that names the
-// systems it is for, whose folder is not there: counted, and said; a project that builds what ships on such a system
-// installs it there, unread); a lock file the workflow does not install from, where a project has more than one and
-// calls the workflow for one; the project's own packages (the root, a workspace, a link to one); and that a package's
-// own package.json tells the truth about its terms, which nothing but a reading of them can. It runs none of what it
+// What it does not hold: a package npm marks optional that no install here brings (one for another system, or one
+// only such a package asks for: counted, and said; a project that builds what ships on such a system installs it
+// there, unread); a lock file the workflow does not install from, where a project has more than one and calls the
+// workflow for one; the project's own packages (the root, a workspace, a link to one); and that a package's own
+// package.json tells the truth about its terms, which nothing but a reading of them can. It runs none of what it
 // reads: each package.json is read as JSON. Node's own modules only.
 //
 //   node core/scripts/licence-installed.mjs [the folder that holds the lock file, the current one if left out]
@@ -26,6 +26,9 @@ export function lockForm(licence) {
   if (!Array.isArray(licence) && licence.type) return lockForm(licence.type);
   return Object.keys(licence).length ? licence : null;
 }
+
+/** A version as npm writes one into a lock file from a package.json's: without the space, "v" or "=" some are spelt with. */
+export const plainVersion = (version) => (typeof version === "string" ? version.trim().replace(/^[=v\s]+/u, "") : version);
 
 // (what a lock file or a package holds, on one line of a log, and no longer than a line)
 const shown = (value) => (value === undefined ? "none" : JSON.stringify(value).replace(/[\u007f-\u009f\u2028\u2029]/gu, "?").slice(0, 200));
@@ -50,20 +53,22 @@ export function check(dir) {
     if (!lockInstalled(path) || entry.link) continue;
     const file = join(dir, path, "package.json");
     if (!existsSync(file)) {
-      // (only what npm itself leaves out: an optional package that names the systems it is for, on another)
-      if ((entry.optional || entry.devOptional) && (entry.os || entry.cpu || entry.libc)) absent++;
-      else failures.push(`${shown(path)}: not installed, and no optional package of another system, so what it says of itself cannot be read: install from the lock file first (npm ci)`);
+      // (only what npm itself may leave out: a package it marks optional, which is one for another system or one
+      // that only such a package asks for)
+      if (entry.optional || entry.devOptional) absent++;
+      else failures.push(`${shown(path)}: not installed, and not one npm marks optional, so what it says of itself cannot be read: install from the lock file first (npm ci)`);
       continue;
     }
     let own;
-    try { own = JSON.parse(readFileSync(file, "utf8")); } catch { own = null; }
+    // (read as npm reads one: a byte-order mark before it is no part of it)
+    try { const text = readFileSync(file, "utf8"); own = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text); } catch { own = null; }
     if (!own || typeof own !== "object" || Array.isArray(own)) { failures.push(`${shown(path)}: its package.json cannot be read as JSON`); continue; }
     read++;
     if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${shown(path)}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}`);
-    if (own.version !== entry.version) failures.push(`${shown(path)}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}`);
+    if (plainVersion(own.version) !== plainVersion(entry.version)) failures.push(`${shown(path)}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}`);
   }
   const summary = `${read} packages of ${name} read back from the packages themselves, their licence and their version` +
-    `${absent ? `; ${absent} of another system, not installed here, not read` : ""}; ${failures.length} failing (floor rule 10)`;
+    `${absent ? `; ${absent} optional ones not installed here (another system's), not read` : ""}; ${failures.length} failing (floor rule 10)`;
   return { failures, summary };
 }
 

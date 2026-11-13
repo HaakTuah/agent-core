@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { check, lockForm } from "./licence-installed.mjs";
+import { check, lockForm, plainVersion } from "./licence-installed.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -35,14 +35,18 @@ const good = said(project(
     "packages/own": { name: "own", version: "0.0.1", license: "LicenseRef-Owner" }, "node_modules/own": { resolved: "packages/own", link: true },
     "node_modules/@moss/grip-win32": { version: "2.1.0", license: "Apache-2.0", optional: true, os: ["win32"] } },
   { [A]: { name: "mossgrip-lib", version: "1.0.0", license: "MIT" }, [B]: { version: "2.1.0", license: { type: "Apache-2.0", url: "x" } }, [C]: { version: "0.9.0" }, "node_modules/bark-x": { version: "3.0.0", license: "ISC" } }));
-ok(/^4 packages of package-lock\.json read back from the packages themselves, their licence and their version; 1 of another system, not installed here, not read; 0 failing/.test(good),
+ok(/^4 packages of package-lock\.json read back from the packages themselves, their licence and their version; 1 optional ones not installed here \(another system's\), not read; 0 failing/.test(good),
   "a lock file whose every entry says what its package says passes: a scope, a package inside another's folder, one with no licence on either side, the old object form; the project's own packages and a link to one are not its to read, and an optional package of another system is counted as not read", good);
 ok(/^"node_modules\/mossgrip-lib": package-lock\.json says its licence is "MIT", and its own package\.json says "GPL-3\.0-only"/.test(one({ license: "MIT" }, { version: "1.0.0", license: "GPL-3.0-only" })), "a licence written into the lock file that the package does not say fails, by name, with both");
 ok(/says its licence is "MIT", and its own package\.json says none/.test(one({ license: "MIT" }, { version: "1.0.0" })) && /says its licence is none, and its own package\.json says "BUSL-1\.1"/.test(one({}, { version: "1.0.0", license: "BUSL-1.1" }))
   && /says its licence is "MIT", and its own package\.json says \{"type":"SSPL-1\.0"\}/.test(one({ license: "MIT" }, { version: "1.0.0", license: { type: "SSPL-1.0" } })), "so does one the lock file adds, one it leaves out, and one the package writes the old way");
 ok(/says its version is "1\.0\.0", and its own package\.json says "2\.0\.0"/.test(one({ license: "MIT" }, { version: "2.0.0", license: "MIT" })), "a version the lock file claims and the package does not say fails");
-ok(/mossgrip-lib": not installed, and no optional package of another system/.test(one({ license: "MIT" })) && /not installed, and no optional package of another system/.test(one({ license: "MIT", optional: true })) && /not installed/.test(one({ license: "MIT", os: ["win32"] }))
-  && /1 of another system, not installed here, not read; 0 failing/.test(one({ license: "MIT", devOptional: true, cpu: ["arm64"] })), "a package that is not installed fails, unless it is an optional one that names the systems it is for: to be called optional, or to name a system, is not enough alone");
+ok(/mossgrip-lib": not installed, and not one npm marks optional/.test(one({ license: "MIT" })) && /not installed, and not one npm marks optional/.test(one({ license: "MIT", os: ["win32"] }))
+  && /1 optional ones not installed here \(another system's\), not read; 0 failing/.test(one({ license: "MIT", devOptional: true, cpu: ["arm64"] })) && /1 optional ones not installed here/.test(one({ license: "MIT", optional: true })),
+  "a package that is not installed fails, unless npm marks it optional: one for another system, or one that only such a package asks for and that names no system itself; to name a system is not enough alone");
+ok(plainVersion("v1.0.0") === "1.0.0" && plainVersion(" =1.0.0 ") === "1.0.0" && plainVersion("1.0.0-v2") === "1.0.0-v2" && plainVersion(undefined) === undefined
+  && / 0 failing/.test(one({ license: "MIT" }, { version: "v1.0.0", license: "MIT" })) && / 0 failing/.test(one({ license: "MIT" }, "\ufeff" + JSON.stringify({ version: "1.0.0", license: "MIT" }))),
+  "a version spelt with a v or an equals sign in the package is the version npm wrote, and a package.json that starts with a byte-order mark is read as npm reads it");
 ok(/its package\.json cannot be read as JSON/.test(one({ license: "MIT" }, "{ not json")) && /its package\.json cannot be read as JSON/.test(one({ license: "MIT" }, "[]")), "a package whose own package.json cannot be read fails");
 const oddly = (key, entry = { version: "1.0.0", license: "MIT" }) => said(project({ [key]: entry }, { [A]: { version: "1.0.0", license: "GPL-3.0-only" } }));
 ok(["node_modules//mossgrip-lib", "node_modules///mossgrip-lib", "node_modules/./mossgrip-lib", "node_modules/x/../mossgrip-lib", "node_modules/../../elsewhere", "/abs/node_modules/x", "node_modules/mossgrip-lib/", "node_modules\\mossgrip-lib", "packages//own"]
