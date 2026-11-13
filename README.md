@@ -124,16 +124,16 @@ words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; 
    a pointer to the rule as the pointer check reads one (`core/modules/roles.md`, "The builders"), what holds here in
    its place, and why. Only what is listed there stands in place of the core's words. Every other rule of the project's
    own adds to the core: one that asks for more than a module does (a stricter check, a further review, its safety
-   rules) is no difference and needs no line, and one that would replace a module's rule unlisted yields to it
-   (`modules/how-to-work.md`, "A project's own rules add to the core's"). A difference is the project's owner's to give,
-   his word quoted in the PR that lists it; until he gives it the module's rule holds, and the work goes on by it (or,
-   where its letter would defeat its purpose, by "Principles over rules"). None is against the floor, against what a
-   floor rule rests on (who reviews a change and who may merge it, in `modules/reviews.md`, `modules/roles.md` and
-   `modules/git.md`: no session reviews its own work), or against the review guidelines. `core.yml` fails a manifest
-   whose differences name the floor or the review guidelines: a tripwire for the plain case, while what holds the rule
-   is the reviews every change to the manifest gets, as a protected file. The pointer check fails a difference whose
-   rule the core has since renamed or removed, so it is read again at that sync. And each is filed with the core as an
-   idea ("Reporting to the core"): a rule a project had to differ from may not be general enough.
+   rules) is no difference and needs no line (`modules/how-to-work.md`, "A project's own rules add to the core's"). A
+   difference is the project's owner's to give, his word quoted in the PR that lists it; until he gives it the module's
+   rule holds, and the work goes on by it (or, where its letter would defeat its purpose, by "Principles over rules").
+   None is against the floor, against what a floor rule rests on (who reviews a change and who may merge it, in
+   `modules/reviews.md`, `modules/roles.md` and `modules/git.md`: no session reviews its own work), or against the
+   review guidelines. `core.yml` fails a manifest whose differences name the floor or the review guidelines: a tripwire
+   for the plain case, while what holds the rule is the reviews every change to the manifest gets, as a protected file.
+   The pointer check fails a difference whose rule the core has since renamed or removed, so it is read again at that
+   sync. And each is filed with the core as an idea ("Reporting to the core"): a rule a project had to differ from may
+   not be general enough.
 
 ## Slots
 
