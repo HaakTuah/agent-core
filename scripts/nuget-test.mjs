@@ -226,10 +226,15 @@ restoredFrom(APP);
 ok(from([REGISTRY], {}, only, "artifacts/obj/App/project.assets.json") === "" && /artifacts\/obj\/App\/project\.assets\.json: git knows it, and it is what a restore writes/.test(names([...only, "artifacts/obj/App/project.assets.json"], { ships: [L] })),
   "what a restore wrote is found wherever in the project its obj folder lies, and one that git knows is no restore's: it fails");
 fs.rmSync(path.join(tmp, "artifacts"), { recursive: true }); restoredFrom(APP);
-put("vendor/packages/Bought.1.0.0.nupkg", ""); fs.symlinkSync(os.tmpdir(), path.join(tmp, "vendor/packages/elsewhere"));
-ok(/"nuget\.sources" names vendor\/packages\/, a folder that holds no file git knows/.test(names(["vendor/readme.md"], { sources: ["vendor/packages/"] })) && names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] }) === ""
+put("vendor/packages/Bought.1.0.0.nupkg", "");
+const shown = names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/", "https://pkgs.example.com/v3/index.json"] });
+fs.symlinkSync(os.tmpdir(), path.join(tmp, "vendor/packages/elsewhere"));
+ok(/"nuget\.sources" names vendor\/packages\/, a folder that holds no file git knows/.test(names(["vendor/readme.md"], { sources: ["vendor/packages/"] })) && shown === ""
   && /vendor\/packages\/elsewhere: a link, in a folder the config names as a source/.test(names(["vendor/packages/Bought.1.0.0.nupkg", "vendor/packages/elsewhere"], { sources: ["vendor/packages/"] })),
   "a folder named as a source holds files git knows, so what it gives stands in the pull request, and no link that leads out of it");
+fs.rmSync(path.join(tmp, "vendor/packages/elsewhere")); put("vendor/packages/deep/Slipped.2.0.0.nupkg", "");
+ok(/vendor\/packages\/deep\/Slipped\.2\.0\.0\.nupkg: a file git does not know, in a folder the config names as a source/.test(names(["vendor/packages/Bought.1.0.0.nupkg"], { sources: ["vendor/packages/"] }))
+  && names(["vendor/packages/Bought.1.0.0.nupkg", "vendor/packages/deep/Slipped.2.0.0.nupkg"], { sources: ["vendor/packages/"] }) === "", "and nothing git does not know, however deep: a restore takes what the pull request shows and nothing beside it");
 const inRepo = (to, text) => { fs.mkdirSync(path.dirname(path.join(repo, to)), { recursive: true }); fs.writeFileSync(path.join(repo, to), text); };
 inRepo("src/App/App.csproj", "<Project />"); inRepo(L, lock(direct(["Copy.Left", "4.0.0"])));
 inRepo("checks/audit.json", JSON.stringify({ entries: [] }));

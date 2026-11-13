@@ -18,8 +18,8 @@
 //     project, which names its sources and the projects it builds on) and fails one that took packages from anywhere
 //     else, whatever project it was for, and a project built on that is no project file read here: no reading of
 //     build files, which can name a source in more ways than a scan knows. The SDK's own folder of packages, which
-//     it gives every restore itself, is known by the dotnet the runner holds. A folder named as a source holds files
-//     git knows, no links;
+//     it gives every restore itself, is known by the dotnet the runner holds. A folder named as a source holds
+//     only files git knows, and no link;
 //   - floor rule 7's "one exact version, never a range": what a project asks for is, letter for letter, the version
 //     its lock installs (NuGet writes a plain Version="1.2.3" as "[1.2.3, )", which with a lock file is that version);
 //   - floor rule 10: a package whose manifest names its licence as an SPDX expression is held to its list by that
@@ -69,7 +69,7 @@
 // NuGet's own registry, each an https address or a folder of the project's own that holds the package files }. With --advisory it says what it would fail and
 // passes, for a project where the check itself is at fault, while that is mended.
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { delimiter, dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
@@ -272,12 +272,21 @@ export function check(config, root, packagesDir, tracked, env = process.env) {
     if (/TreatAsLocalProperty/iu.test(text)) failures.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them`);
   }
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
-  // (a folder named as a source is the project's own, in the pull request for the reviews to read: packages in files,
-  // none of them a link that leads elsewhere)
+  // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
+  // one git knows, and none is a link that leads elsewhere)
   for (const s of sources.filter((x) => !x.startsWith("https://"))) {
-    const held = own.filter((f) => f.startsWith(s));
-    if (!held.length) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows`);
-    for (const f of held) { let link = false; try { link = lstatSync(join(root, f)).isSymbolicLink(); } catch { /* (gone from the folder: no link) */ } if (link) failures.push(`${f}: a link, in a folder the config names as a source: what it leads to is not what the pull request shows`); }
+    if (!own.some((f) => f.startsWith(s))) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows`);
+    const held = (dir) => {
+      let entries = [];
+      try { entries = readdirSync(join(root, dir), { withFileTypes: true }); } catch { /* (a folder that is not there holds nothing) */ }
+      for (const e of entries) {
+        const at = `${dir}${e.name}`;
+        if (e.isSymbolicLink()) failures.push(`${at}: a link, in a folder the config names as a source: what it leads to is not what the pull request shows`);
+        else if (e.isDirectory()) held(`${at}/`);
+        else if (!tracked.includes(at)) failures.push(`${at}: a file git does not know, in a folder the config names as a source: a restore would take packages the pull request does not show`);
+      }
+    };
+    held(s);
   }
   // What each restore used, read from what it wrote (project.assets.json, wherever in the project its obj folder
   // lies): its sources are NuGet's own registry and what the config names, whatever a NuGet.Config, a project file or
