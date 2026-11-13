@@ -112,6 +112,9 @@ jobs:
       - name: The personal-terms check, its own job on scratch pull requests
         if: ${{ !cancelled() }}
         run: node scripts/personal-terms-test.mjs
+      - name: The words check, the dated records' added lines too
+        if: ${{ !cancelled() }}
+        run: node scripts/general-test.mjs
       - name: The cap's own check
         if: ${{ !cancelled() }}
         run: node scripts/size-test.mjs
