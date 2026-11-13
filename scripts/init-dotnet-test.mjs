@@ -128,7 +128,7 @@ if (kit.status === 0) {
     ok(lockFiles.length === 2, "with lock files on, the SDK wrote one beside each project, and git knows both", lockFiles.join());
     // (as the workflow does it: each project file the script lists, from its own lock file)
     const listedProjects = check(converted, ["core/scripts/nuget.mjs", "--projects"]).out.split("\n").filter(Boolean);
-    const locked = listedProjects.map(project => sdkIn(converted, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", "-p:RestoreFallbackFolders=clear", "-p:RestoreAdditionalProjectFallbackFolders=", `./${project}`));
+    const locked = listedProjects.map(project => sdkIn(converted, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", `./${project}`));
     ok(listedProjects.length === 2 && locked.every(r => r.status === 0) && fs.existsSync(path.join(restored, "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec")), "the script lists both project files, a restore of each from its lock file alone passes in the converted clone, and brings each package's manifest", `${listedProjects.join()}\n     ${locked.map(r => r.out.slice(-400)).join("\n     ")}`);
     const real = nuget(converted), counted = Number(/^(\d+) NuGet packages in 2 lock files checked/m.exec(real.out)?.[1]);
     ok(real.status === 0 && counted >= 2, "the NuGet check reads the real lock files and the real manifests, and passes two packages under MIT and Apache-2.0", real.out.slice(0, 1200));
@@ -137,7 +137,7 @@ if (kit.status === 0) {
     ok(gpl.status === 0 && refused.status === 1 && /^FAIL: MySql\.Data@8\.0\.33 \(src\/App\/packages\.lock\.json\): (.* is off the list for what ships|its manifest names (a licence file|an address|nothing))/m.test(refused.out), "a package under the GPL, added to what ships, fails it by name, for its licence as its real manifest gives it", `${gpl.out.slice(-400)}\n     ${refused.out.slice(0, 1500)}`);
     ok(advised.status === 0 && /^WOULD FAIL: MySql\.Data@8\.0\.33 /m.test(advised.out), "advisory, the same run says so and passes");
     git(plain, "checkout", "-q", "--", ...lockFiles);
-    const stale = sdkIn(plain, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", "-p:RestoreFallbackFolders=clear", "-p:RestoreAdditionalProjectFallbackFolders=", "./src/App");
+    const stale = sdkIn(plain, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", "./src/App");
     ok(stale.status !== 0, "with the project asking for a package its lock file does not hold, the restore from the lock files refuses", stale.out.slice(-600));
   }
 }
