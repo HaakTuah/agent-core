@@ -23,3 +23,15 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "A new rule says what holds it" in `AGENTS.md` and the heading its check asks for
      (`.github/workflows/own-description.yml`); and behind the other three, each in a PR of its own.
+
+196. **13 November 2026** (the core, the same chat as item 195). Told that the four improvements were merged, that both
+     games now followed the releases, and that one step was left to the owner, cutting the first release, since the
+     session could push no tag:
+
+     > I need you to do everything, I won't be tagging commits. Also, couldn't you try it on windows with a .net
+     > project? Is there anything else we should do? Are all rules grounded now, or is there anything more we can do?
+     > […]
+
+     Behind "The owner tags nothing by hand" in `AGENTS.md` and the workflow that cuts a release
+     (`.github/workflows/release.yml`); and behind the starter kit's trial on Windows with a .NET project and the
+     further checks for rules only discipline held, each in a PR of its own.
