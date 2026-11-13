@@ -128,10 +128,12 @@ export function licences(o, has) {
 function init(argv) {
   const o = options(argv);
   const here = process.cwd();
-  let top;
-  try { top = git(["rev-parse", "--show-toplevel"], here); } catch { fail("run it in the root of the project's git repository (git init first)"); }
-  if (fs.realpathSync(top) !== fs.realpathSync(here)) fail("run it in the root of the project's git repository");
-  if (fs.realpathSync(here) === fs.realpathSync(ROOT)) fail("run it in the project, not in the core itself");
+  // (asked of git as a path from the repository's root, empty at the root itself: no two spellings of one folder,
+  // such as Windows' short names, are ever compared)
+  let below;
+  try { below = git(["rev-parse", "--show-prefix"], here); } catch { fail("run it in the root of the project's git repository (git init first)"); }
+  if (below !== "") fail("run it in the root of the project's git repository");
+  if (fs.realpathSync.native(here) === fs.realpathSync.native(ROOT)) fail("run it in the project, not in the core itself");
   o.name ??= path.basename(here);
   if (!/^[^\r\n{}`|<>]{1,80}$/u.test(o.name)) fail("the folder's name does not serve as the project's: give --name");
 
