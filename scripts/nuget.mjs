@@ -15,15 +15,17 @@
 //     the project's audit named <Id>@<version>, the licence read by hand, which the licence check then holds to its
 //     list like any entry. A new version needs a new entry, so a licence that changes with a version is read again.
 //   - "one the owner wants anyway waits for the owner's yes" (floor rule 10): a package off its list passes only where
-//     the config's "accepted" names that exact version with what it is under and the owner's words for it; never one
-//     under terms the floor never allows. An accepted version no lock installs any more fails, so the list only
-//     shrinks by itself.
+//     the config's "accepted" names that exact version with what it is under and the owner's words for it, and, where
+//     it ships, its notice; never one under terms the floor never allows. It is named there alone: an audit entry for
+//     it too would be held to the list by the licence check, so the two together fail here. An accepted version no
+//     lock installs any more fails, so the list only shrinks by itself.
 // What it does not hold: that the lock files are what a restore gives today (the workflow that runs this,
 // .github/workflows/nuget.yml, restores with --locked-mode first, which fails where they are not: floor rule 15);
 // whether the owner said what "accepted" quotes, which the reviews hold, the config being a protected file; and what
 // no lock file names (a tool a script installs, a font, an image), which the licence check's audit and scan hold.
 // A manifest is read as the XML it is, by its one licence element under its metadata; anything it cannot read so
-// (a document type, a manifest that is not well formed, two such elements) counts as no readable licence. Node's own
+// (a document type, a manifest that is not well formed, two such elements, an expression with a comment, CDATA or an
+// entity inside it) counts as no readable licence. Node's own
 // modules only, and no network: the restore brought the manifests. It checks the project it lies in (core/scripts/
 // there), whatever the directory it is started from; the config's own path is read from that directory.
 //
@@ -31,7 +33,7 @@
 //
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
 // packages ship, "tools": those of projects that only run (tests, tools), "accepted": [{ "package": "<Id>@<version>",
-// "licence": what it is under, "yes": the owner's words and their date }] }. With --advisory it says what it would
+// "licence": what it is under, "yes": the owner's words and their date, "notice": its notice, where it ships }] }. With --advisory it says what it would
 // fail and passes, for a project's first weeks with it.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -45,6 +47,7 @@ const LOCK = "packages.lock.json";
 const ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/u; // a package's id, as NuGet takes one
 const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writes one
 const key = (id, version) => `${id}@${version}`.toLowerCase();
+const CUT = "\u0000"; // stands where a comment, CDATA or a processing instruction was cut from a manifest: no XML holds it
 
 /** The config's "nuget", checked: { ships, tools, accepted }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {
@@ -62,9 +65,9 @@ export function nugetConfig(config) {
   const twice = ships.filter((p) => tools.includes(p)).concat(ships.filter((p, i) => ships.indexOf(p) !== i), tools.filter((p, i) => tools.indexOf(p) !== i));
   if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}`);
   const accepted = nuget.accepted ?? [];
-  const whole = (a) => a && typeof a === "object" && !Array.isArray(a) && Object.keys(a).every((k) => ["package", "licence", "yes"].includes(k))
-    && [a.package, a.licence, a.yes].every((s) => typeof s === "string" && s.trim()) && /^[^@\s]+@[^@\s]+$/u.test(a.package);
-  if (!Array.isArray(accepted) || !accepted.every(whole)) throw new Error('the config\'s "nuget.accepted" is not a list of { "package": "<Id>@<version>", "licence": ..., "yes": ... }');
+  const whole = (a) => a && typeof a === "object" && !Array.isArray(a) && Object.keys(a).every((k) => ["package", "licence", "yes", "notice"].includes(k))
+    && [a.package, a.licence, a.yes].every((s) => typeof s === "string" && s.trim()) && /^[^@\s]+@[^@\s]+$/u.test(a.package) && (a.notice === undefined || typeof a.notice === "string");
+  if (!Array.isArray(accepted) || !accepted.every(whole)) throw new Error('the config\'s "nuget.accepted" is not a list of { "package": "<Id>@<version>", "licence": ..., "yes": ..., and "notice" where it ships }');
   return { ships, tools, accepted };
 }
 
@@ -102,11 +105,14 @@ export function lockPackages(text, lockPath) {
  * (a word for what it has instead: "a licence file", "an address", "nothing") where a machine cannot read one.
  * Read as XML: comments, CDATA and processing instructions are no elements, and the licence is the one `license`
  * element directly under `metadata` under `package`. A document type, a manifest that is not well formed, or two such
- * elements give no licence it will trust.
+ * elements give no licence it will trust; nor does an expression with any of those cut-out parts inside it, since
+ * CDATA there is part of the expression a reader of XML sees, and this one would see less.
  */
 export function manifestLicence(text) {
   if (typeof text !== "string" || /<!DOCTYPE|<!ENTITY/iu.test(text)) return { other: "a manifest it will not read" };
-  // (what is no element is cut out first, each from its opening to its own end, in the order they stand)
+  // (what is no element is cut out first, each from its opening to its own end, in the order they stand, and a mark
+  // no manifest can hold is left where each stood)
+  if (text.includes(CUT)) return { other: "a manifest it will not read" };
   let plain = "", at = 0;
   const ends = { "<!--": "-->", "<![CDATA[": "]]>", "<?": "?>" };
   for (;;) {
@@ -114,7 +120,7 @@ export function manifestLicence(text) {
     if (!found) { plain += text.slice(at); break; }
     const end = text.indexOf(ends[found[1]], found[0] + found[1].length);
     if (end < 0) return { other: "a manifest that is not well formed" };
-    plain += `${text.slice(at, found[0])} `;
+    plain += `${text.slice(at, found[0])}${CUT}`;
     at = end + ends[found[1]].length;
   }
   const stack = [], licences = [];
@@ -141,7 +147,7 @@ export function manifestLicence(text) {
   const kind = type?.[1] ?? type?.[2];
   if (kind === "file") return { other: "a licence file" };
   const expression = licences[0].body.trim();
-  if (kind !== "expression" || !expression || /[<&]/u.test(expression)) return { other: "a licence it cannot read" };
+  if (kind !== "expression" || !expression || /[<&]/u.test(expression) || expression.includes(CUT)) return { other: "a licence it cannot read" };
   return { expression };
 }
 
@@ -198,6 +204,8 @@ export function check(config, root, packagesDir, tracked) {
     if (a) {
       used.add(k);
       if (NEVER.test(a.licence)) failures.push(`${name}: accepted under ${a.licence}, terms floor rule 10 never allows`);
+      if (audited.has(k)) failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both: an accepted package stands in "nuget.accepted" alone, since the licence check holds every audit entry to its list`);
+      if (p.shipped && !a.notice?.trim()) failures.push(`${name}: it ships, so its notice ships too (floor rule 10): its "notice" in "nuget.accepted"`);
       continue;
     }
     failures.push(`${name} (${p.lock}): ${why}${byHand ? "" : `; one the owner wants anyway is named in the config's "nuget.accepted", with the owner's words (floor rule 10)`}`);
