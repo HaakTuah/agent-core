@@ -128,8 +128,9 @@ if (kit.status === 0) {
     ok(lockFiles.length === 2, "with lock files on, the SDK wrote one beside each project, and git knows both", lockFiles.join());
     // (as the workflow does it: each project file the script lists, from its own lock file)
     const listedProjects = check(converted, ["core/scripts/nuget.mjs", "--projects"]).out.split("\n").filter(Boolean);
-    const locked = listedProjects.map(project => sdkIn(converted, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", `./${project}`));
-    ok(listedProjects.length === 2 && locked.every(r => r.status === 0) && fs.existsSync(path.join(restored, "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec")), "the script lists both project files, a restore of each from its lock file alone passes in the converted clone, and brings each package's manifest", `${listedProjects.join()}\n     ${locked.map(r => r.out.slice(-400)).join("\n     ")}`);
+    const from = check(converted, ["core/scripts/nuget.mjs", "checks/licences.json", "--sources"]).out.split("\n").filter(Boolean).flatMap(source => ["--source", source]);
+    const locked = listedProjects.map(project => sdkIn(converted, "restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", `./${project}`));
+    ok(listedProjects.length === 2 && from.join() === "--source,https://api.nuget.org/v3/index.json" && locked.every(r => r.status === 0) && fs.existsSync(path.join(restored, "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec")), "the script lists both project files and the registry as their one source, a restore of each from its lock file alone passes in the converted clone, and brings each package's manifest", `${listedProjects.join()}\n     ${locked.map(r => r.out.slice(-400)).join("\n     ")}`);
     const real = nuget(converted), counted = Number(/^(\d+) NuGet packages in 2 lock files checked/m.exec(real.out)?.[1]);
     ok(real.status === 0 && counted >= 2, "the NuGet check reads the real lock files and the real manifests, and passes two packages under MIT and Apache-2.0", real.out.slice(0, 1200));
     const gpl = sdkIn(plain, "add", "src/App", "package", "MySql.Data", "--version", "8.0.33");
@@ -139,6 +140,19 @@ if (kit.status === 0) {
     git(plain, "checkout", "-q", "--", ...lockFiles);
     const stale = sdkIn(plain, "restore", "--locked-mode", `-p:RestorePackagesPath=${restored}`, "-p:NuGetLockFilePath=", "./src/App");
     ok(stale.status !== 0, "with the project asking for a package its lock file does not hold, the restore from the lock files refuses", stale.out.slice(-600));
+
+    // where packages come from: what the restore is given, whatever a NuGet.Config names
+    git(plain, "checkout", "-q", "--", ".");
+    fs.mkdirSync(path.join(plain, "empty-feed"));
+    fs.writeFileSync(path.join(plain, "NuGet.Config"), `<?xml version="1.0" encoding="utf-8"?>\n<configuration><packageSources><clear /><add key="elsewhere" value="./empty-feed" /></packageSources></configuration>\n`);
+    const fresh = (name, ...sources) => {
+      for (const project of ["src/App", "src/Lib"]) fs.rmSync(path.join(plain, project, "obj"), { recursive: true, force: true });
+      const r = spawnSync("dotnet", ["restore", "--locked-mode", ...sources, `-p:RestorePackagesPath=${kept(name)}`, "-p:NuGetLockFilePath=", "./src/App"], { cwd: plain, env: { ...sdkEnv, NUGET_PACKAGES: kept(name), NUGET_HTTP_CACHE_PATH: kept(`${name}-cache`) }, encoding: "utf8" });
+      return { status: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}`, brought: fs.existsSync(path.join(kept(name), "newtonsoft.json", "13.0.3", "newtonsoft.json.nuspec")) };
+    };
+    const itsOwn = fresh("from-its-config"), given = fresh("from-the-registry", ...from);
+    ok(itsOwn.status !== 0 && !itsOwn.brought && given.status === 0 && given.brought, "a NuGet.Config that names another source alone would restore from there and finds nothing; given its sources as the workflow gives them, the same restore takes every package from the registry", `${itsOwn.status} ${itsOwn.out.slice(-500)}\n     ${given.status} ${given.out.slice(-800)}`);
+    fs.rmSync(path.join(plain, "NuGet.Config")); fs.rmSync(path.join(plain, "empty-feed"), { recursive: true });
   }
 }
 

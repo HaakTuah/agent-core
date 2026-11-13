@@ -10,6 +10,12 @@
 //     plain one, or a NuGetLockFilePath a project or build file names; the workflow's restore also sets that
 //     property empty for every project, wherever it was set) fails, and so do the older packages.config, which has
 //     none, and a response file that gives every build options this check cannot read (Directory.Build.rsp);
+//   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
+//     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
+//     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
+//     byte for byte, what one of those sources gives. A build file that names a source of its own, or another
+//     config, fails here (RestoreSources, RestoreAdditionalProjectSources, RestoreConfigFile), since those add to
+//     what the restore was given; a folder named as a source holds files git knows;
 //   - floor rule 7's "one exact version, never a range": what a project asks for is, letter for letter, the version
 //     its lock installs (NuGet writes a plain Version="1.2.3" as "[1.2.3, )", which with a lock file is that version);
 //   - floor rule 10: a package whose manifest names its licence as an SPDX expression is held to its list by that
@@ -50,10 +56,12 @@
 //
 //   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--advisory]
 //   node core/scripts/nuget.mjs --projects     the project files git knows, a line each: what the workflow restores
+//   node core/scripts/nuget.mjs <config> --sources   where the workflow's restore takes packages from, a line each
 //
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
 // packages ship, "tools": those of projects that only run (tests, tools), "accepted": the owner's yeses, as
-// licence-yes.mjs writes one for a package, named "<Id>@<version>" }. With --advisory it says what it would fail and
+// licence-yes.mjs writes one for a package, named "<Id>@<version>", "sources": where packages may come from beside
+// NuGet's own registry, each an https address or a folder of the project's own that holds the package files }. With --advisory it says what it would fail and
 // passes, for a project where the check itself is at fault, while that is mended.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -67,6 +75,11 @@ const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
 const BUILD_FILE = /\.(?:cs|fs|vb)proj$|\.props$|\.targets$/iu; // where a project can name another lock file
+// NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
+// an https address with no sign-in in it, or a folder of the project's own, as git lists it
+export const REGISTRY = "https://api.nuget.org/v3/index.json";
+const SOURCE_ADDRESS = /^https:\/\/[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:\/[A-Za-z0-9._~-]+)*\/?$/u;
+const SOURCE_FOLDER = /^[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_.][A-Za-z0-9_.-]*)*\/$/u;
 const RESPONSE_FILE = /^(?:Directory\.Build|MSBuild)\.rsp$/iu; // options MSBuild gives every build of the folder
 const ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/u; // a package's id, as NuGet takes one
 const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writes one
@@ -75,11 +88,11 @@ const CUT = "\u0000"; // stands where a comment, CDATA or a processing instructi
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
 const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
 
-/** The config's "nuget", checked: { ships, tools, accepted }. A key or a shape it does not know would check less. */
+/** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {
   const nuget = config?.nuget;
   if (!nuget || typeof nuget !== "object" || Array.isArray(nuget)) throw new Error('the config has no "nuget": { "ships": [...], "tools": [...] }');
-  const odd = Object.keys(nuget).filter((k) => !["ships", "tools", "accepted"].includes(k));
+  const odd = Object.keys(nuget).filter((k) => !["ships", "tools", "accepted", "sources"].includes(k));
   if (odd.length) throw new Error(`the config's "nuget" holds keys it does not know: ${odd.join(", ")}`);
   const paths = (name) => {
     const v = nuget[name] ?? [];
@@ -91,8 +104,16 @@ export function nugetConfig(config) {
   const twice = ships.filter((p) => tools.includes(p)).concat(ships.filter((p, i) => ships.indexOf(p) !== i), tools.filter((p, i) => tools.indexOf(p) !== i));
   if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}`);
   const accepted = acceptedList(nuget.accepted, "nuget.accepted", /^[^@\s]+@[^@\s]+$/u, "<Id>@<version>", { same: (name) => name.toLowerCase() });
-  return { ships, tools, accepted };
+  const sources = nuget.sources ?? [];
+  const source = (s) => typeof s === "string" && s.length <= 300 && (SOURCE_ADDRESS.test(s) || (SOURCE_FOLDER.test(s) && posix.normalize(s) === s && !s.startsWith("../")));
+  if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address with no sign-in or question in it, or a folder of the project\'s, as git lists it, ending in "/"');
+  const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
+  if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already`);
+  return { ships, tools, accepted, sources };
 }
+
+/** Where a restore takes packages from, in order: NuGet's own registry, then the sources the config names. */
+export const sourcesOf = (config) => [REGISTRY, ...nugetConfig(config).sources];
 
 /**
  * The packages one lock file installs, as { id, version }, and what is wrong with it as lines. A project's own
@@ -200,7 +221,7 @@ function restoredPackages(packagesDir) {
  * { failures, summary }.
  */
 export function check(config, root, packagesDir, tracked) {
-  const { ships, tools, accepted } = nugetConfig(config);
+  const { ships, tools, accepted, sources } = nugetConfig(config);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [];
   const own = tracked.filter((f) => !f.startsWith("core/"));
@@ -215,9 +236,12 @@ export function check(config, root, packagesDir, tracked) {
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
     if (/NuGetLockFilePath/iu.test(text)) failures.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read`);
     if (/RestorePackagesPath|FallbackFolders/iu.test(text)) failures.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read`);
+    if (/RestoreSources|RestoreAdditionalProjectSources|RestoreConfigFile/iu.test(text)) failures.push(`${f} names RestoreSources, RestoreAdditionalProjectSources or RestoreConfigFile: where packages come from is NuGet's own registry and what the config's "nuget.sources" names, and no build file adds to that`);
     if (/TreatAsLocalProperty/iu.test(text)) failures.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them`);
   }
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
+  // (a folder named as a source is the project's own, in the pull request for the reviews to read: packages in files)
+  for (const s of sources.filter((x) => !x.startsWith("https://"))) if (!own.some((f) => f.startsWith(s))) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows`);
   const listed = [...ships, ...tools];
   for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config: say whether its packages ship`);
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
@@ -308,6 +332,13 @@ if (started(import.meta.url)) {
   }
   const at = args.indexOf("--packages"), packagesDir = at >= 0 ? args[at + 1] : undefined;
   const configPath = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1));
+  if (args.includes("--sources")) {
+    if (!configPath) fail("name the config: node core/scripts/nuget.mjs <config> --sources");
+    let from;
+    try { from = sourcesOf(loadConfig(configPath)); } catch (e) { fail(e.message); }
+    for (const s of from) console.log(s);
+    process.exit(0);
+  }
   if (!configPath || !packagesDir) fail("name the config and the restore's folder: node core/scripts/nuget.mjs <config> --packages <folder> [--advisory]");
   let result;
   try {
