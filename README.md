@@ -233,9 +233,11 @@ Floor: whole. Modules: <all, or the list of those taken>.
 - Each repository's secret scanning with push protection (Settings, Advanced Security), where the repository has it:
   GitHub then refuses a push that holds a key of a kind it knows, before the key reaches the history, which no check
   on a pull request can (floor rule 1).
-- The owner's GitHub profile, its name left empty: GitHub writes that name as the author of every merge it makes, into
-  the history of every repository the account merges in, and with none it writes the login, which the floor allows
-  (floor rule 11). No check of ours sees a merge before it is made.
+- The owner's GitHub profile, its name left empty, and "Keep my email addresses private" turned on (Settings, Emails):
+  GitHub writes the profile's name and the account's address as the author of every merge it makes, into the history
+  of every repository the account merges in. With no name it writes the login, and with the address kept private one
+  of GitHub's own that holds only the login, both of which the floor allows (floor rules 1 and 11). No check of ours
+  sees a merge before it is made.
 - Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
   Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
   is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is asked
