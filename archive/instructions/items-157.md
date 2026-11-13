@@ -420,3 +420,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      "its closed PRs and the *progress file* say" in `modules/roles.md`, a posted security review "naming the tool and
      the commit it read" and "the project's newest PRs that asked it show" in `modules/reviews.md`, and the hints the
      orchestrator's rule had lost.
+
+180. **13 November 2026** (the core, in the design chat), after a night in which the core changed more than twenty times
+     in a day, with another project about to take it for the first time. Offered: from now the core's rule changes
+     are gathered and go in once a day, the fixes of faults excepted, so that a project is not chasing it; that
+     project's first sessions are asked for what they meet; and a licence check for .NET's packages is built in that
+     project first and moves here once proven:
+
+     > Agreed with all your takes, address anything if there is anything to address, expert!
+
+     Behind "Rule changes go in once a day" in `AGENTS.md`.

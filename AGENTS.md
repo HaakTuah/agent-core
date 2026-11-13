@@ -30,6 +30,10 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
 - **The size cap keeps the rules lean and decides nothing else** (`scripts/size.mjs`; core archive 179): no rule is
   moved from where it belongs, cut short or left out to fit, nor is another rule's reason, name or example cut to make
   room. A change that trimming what is said twice gives no room for raises the cap in the same PR and says why.
+- **Rule changes go in once a day** (core archive 180): the day's changes to the floor, the modules and the README are
+  gathered and merged together, in one PR where they can share one, so that a project takes a day's rules in one sync.
+  The fix of a fault (a check, script or workflow that fails where it should pass, or passes where it should fail; a
+  rule that contradicts another) goes at once.
 - **The design session writes and merges changes here,** each carried into every project by that project's sync PR.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
