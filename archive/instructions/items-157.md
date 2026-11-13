@@ -603,3 +603,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind the wording of the owner throughout the floor, the modules, `README.md` and `setup/`; the last pattern in
      `scripts/general.json`; and "the account in the core's address in the manifest not being the *owner's account*"
      in `modules/inbox.md`.
+
+190. **13 November 2026** (the core, in the design chat):
+
+     > Will […] repo implement all modules? Did it do it o[n] the initial implementation with the brief, and will it
+     > implement new ones during daily syncs?
+
+     Told: a project's copy of the core always holds every module, and each sync brings its newest text; which modules
+     apply is the manifest's line, "all" or a list; changes inside a module a project takes arrive by themselves, but a
+     list does not gain a new module by itself and nothing told a project so. Built at once as an obvious improvement,
+     to reach the next import: a note for every project, and a sentence in the README.
+
+     Behind "A list of modules does not grow by itself" in `README.md` and the note "the modules a project takes" in
+     `setup/sync-notes.md`.

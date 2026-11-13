@@ -38,7 +38,9 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    its pin. The first copy is the sync script's too, run from a clone of this repository once the manifest is written
    (the script's header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
-   core's words, and what fills each slot. Every session reads it at the start.
+   core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
+   itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and the list is read against
+   `core/modules/` then.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file read at the start of every task, each on a line
    of its own (Claude Code imports them through `CLAUDE.md`; any other tool reads them because `AGENTS.md` says to),
    and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
