@@ -5,7 +5,8 @@
 # rule 11 excepts, told by its committer; one written by hand to look so passes too, which the check, made against
 # slips, does not hold), the lines it adds (a merge's, those its own resolution adds) and the names of the files it
 # writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit (core
-# archive 201). The commits read are the pull request's own, its base's left out. It reads
+# archive 201). The commits read are the pull request's own, its base's left out. A file whose older name holds a
+# term is deleted or renamed away freely; a commit that only edits it fails, since the diff names it. It reads
 # no file git takes for binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where
 # a term was found (file and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project
 # that has not set it) it passes with a note: the check is optional.
@@ -71,11 +72,15 @@ jobs:
               # floor rule 11 excepts it)
               if [ "$(git log -1 --format='%P|%cn <%ce>' "$c" | sed 's/^[^ |]* [^|]*|/merge|/')" != "merge|GitHub <noreply@github.com>" ] \
                 && git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list"; then people="$people $short"; fi
-              # (the lines it adds, a merge's those its own resolution adds)
-              if git show --format= --patch --remerge-diff --no-ext-diff --no-textconv --no-color "$c" | grep '^+' | grep -q -i -F -f "$list"; then added="$added $short"; fi
-              # (the names of every file it writes, as git holds them: empty, renamed or binary ones too, none quoted; a merge's,
+              # (the lines it adds, a merge's those its own resolution adds; git that cannot show them, older than 2.36,
+              # fails the check rather than read nothing)
+              if ! patch=$(git show --format= --patch --remerge-diff --no-ext-diff --no-textconv --no-color "$c"); then
+                echo "git could not show what $short adds (it needs git 2.36 or later)"; found=1
+              elif printf '%s\n' "$patch" | grep '^+' | grep -q -i -F -f "$list"; then added="$added $short"; fi
+              # (the names of every file it writes, not of one it deletes, so that an older name is taken out freely, as
+              # git holds them: empty, renamed or binary ones too, none quoted; a merge's,
               # those its own resolution writes)
-              if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
+              if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames --diff-filter=d -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
             done
             if [ -n "$bad" ]; then echo "A personal term is in these commits' messages:"; echo "$bad"; found=1; fi
             if [ -n "$people" ]; then echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1; fi

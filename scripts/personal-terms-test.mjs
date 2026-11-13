@@ -3,7 +3,8 @@
 // merge into its base. What fails: a term in a file, in a line a commit adds and a later one takes away, in a line a
 // merge's own resolution adds, in a file's name (an empty file, a rename, a binary file, a name outside plain ASCII),
 // in a commit's message, author or committer (name or address), and in the title or description. What passes: none of
-// these; a term only in a file git reads as binary (not read); only in a commit from before the rule; only in the
+// these; a term only in a file git reads as binary (not read); only in a commit from before the rule; a file named with
+// a term before it, deleted or renamed away; only in the
 // author of a merge GitHub itself made (floor rule 11's exception); only in a commit of the base's, though the event
 // names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
 // runs, so no file holds them. On Linux and on Windows. Git, bash and Node's own modules.
@@ -66,6 +67,11 @@ fails("a term in an empty file's name, the file removed again", pull([[{ [`notes
 fails("a term in a file's new name, renamed and nothing else", pull([[dir => { git(dir, ["mv", "a.md", `${term}.md`]); }]]));
 fails("a term in a binary file's name, the file removed again", pull([[{ [`${other}.bin`]: "\u0000x\u0000" }], [{ [`${other}.bin`]: null }]]));
 fails("a term outside plain ASCII in a file's name", pull([[{ [`a-${wide}.md`]: "x\n" }]]));
+// a file named with a term before the rule, already on main: taking it out passes, by deletion or by renaming it away
+const leaked = [[{ [`old-${term}.md`]: "kept\n" }, { GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }, "before the rule"]];
+const cleanup = change => { const repo = pull([], leaked); git(repo.dir, ["checkout", "-q", "-B", "change", "main"]); commitAll(repo.dir, [change]); return repo; };
+passes("deleting a file named with a term before the rule", cleanup(dir => git(dir, ["rm", "-q", `old-${term}.md`])));
+passes("renaming such a file to a clean name", cleanup(dir => git(dir, ["mv", `old-${term}.md`, "old.md"])));
 fails("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]));
 fails("a term in a commit's author name", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]));
 fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@example.invalid` }]]));
