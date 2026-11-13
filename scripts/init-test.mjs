@@ -77,6 +77,7 @@ ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    director
 const both = dependabot({ packages: "web", nuget: "." });
 ok(ecosystems(both) === 3 && both.indexOf('directory: "/web"') > 0 && both.indexOf('directory: "/web"') < both.indexOf('"nuget"') && (both.match(/^version: 2$/gm) ?? []).length === 1, "a project with both installers gets both, in one config");
 ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");
+ok(fs.readFileSync(path.join(root, ".claude/settings.json"), "utf8") === fromFolder("claude-settings.json.tmpl").replaceAll(":core/scripts/", ":scripts/"), "the core's own settings are the kit's, its hooks reading main's scripts/ where a project's read core/scripts/ (floor rule 3)");
 ok(!/\{\{[a-z]+\}\}/.test(whole) && whole.includes("${{ secrets.PERSONAL_TERMS }}") && whole.includes(`uses: ${CORE}/.github/workflows/core.yml@${A}`) && whole.includes(`dependency-name: "${CORE}*"`), "filled in, no template word is left and GitHub's own expressions stand as written, each call is to the core's own address at the pin, and Dependabot leaves those calls alone");
 
 // the program whole: a scratch copy of the core as it stands here, and a scratch project

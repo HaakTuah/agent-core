@@ -10,8 +10,13 @@
 //   `path`, rule 3             a numbered point in that file (point, points 4 and 9, rules 1 to 4)
 //   "Section", point 6         a numbered point in that section (point 6 of "Section" too)
 //   ("Section"), point 6       with no file: the file the pointer is in; a lone point: its own section's list
+//   floor rule 3               a rule of the floor, by its bold number in any of the floor's files (floor rules 3 and 10
+//                              too); in the floor's own files, a lone rule is the floor's
+//   core archive 134           an item of the core's archive, by its number in its item files (134 and 138, 118 to 120)
 // A run of these joined only by a comma, "and", "in", "of" or an opening bracket is one pointer: one file, its sections
-// and its points.
+// and its points; a floor rule and an archive item stand alone. One of those two that leads nowhere fails the core's
+// own run, and is listed in a project's, so that a sync never fails a project's check over a citation of its own
+// (AGENTS.md of the core, "Nothing locks another owner's project").
 //
 //   node core/scripts/pointers.mjs
 //
@@ -35,6 +40,10 @@ for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL:
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+// the floor's files and the archive's item files, the core's own here or a project's copy of them
+const HOME = CORE ? "" : "core/";
+const FLOOR = tracked.filter(f => f.startsWith(`${HOME}floor/`) && f.endsWith(".md"));
+const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items-\\d+\\.md$`).test(f));
 
 // A file's anchors: its headings and bold lead-ins, each with the lines it spans (to the next heading of its level or
 // above), and its numbered points by line (a list item, or a paragraph led by its bold number, as the core's floor
@@ -58,19 +67,22 @@ const section = (file, title) => parse(file).anchors.find(a => a.title === title
 const hasPoint = (file, from, to, n) => parse(file).lines.slice(from, to).some(l => new RegExp(`^\\s*(\\*\\*)?${n}\\.\\s`).test(l));
 
 // The atoms of a block (a paragraph or a list item, its lines joined): files, quoted titles and numbered points.
+const numbers = text => text.split(/, | and | or /).flatMap(s => s.includes(' to ') ? (([a, b]) => Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
 function atoms(text) {
   const out = [];
-  const re = /`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
-  for (const m of text.matchAll(re)) {
-    const at = { start: m.index, end: m.index + m[0].length };
+  const re = /\bfloor (rules?) (\d+(?:(?:, | and | to | or )\d+)*)\b|\bcore archive (\d+(?:(?:, | and | to | or )\d+)*)\b|`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
+  for (const m0 of text.matchAll(re)) {
+    const at = { start: m0.index, end: m0.index + m0[0].length };
+    if (m0[2] !== undefined) { out.push({ ...at, floor: numbers(m0[2]), word: `floor ${m0[1]}` }); continue; }
+    if (m0[3] !== undefined) { out.push({ ...at, archive: numbers(m0[3]) }); continue; }
+    const m = [m0[0], m0[4], m0[5], m0[6], m0[7], m0[8]];
     if (m[1] !== undefined) {
       // a package's name, such as `@types/node`, is no path
       if (!/^[\w.@-]*[\w-]\/|^[\w./-]+\.(md|js|json|sh|css|html|yml|txt)$|\/$/.test(m[1]) || /[<>*]/.test(m[1]) || m[1].startsWith('@')) continue;
       out.push({ ...at, file: m[1] });
     } else if (m[2] || m[3]) out.push({ ...at, title: plain(m[2] || m[3]) });
     else {
-      const ns = m[5].split(/, | and | or /).flatMap(s => s.includes(' to ') ? (([a, b]) => Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
-      out.push({ ...at, points: ns, word: m[4] });
+      out.push({ ...at, points: numbers(m[5]), word: m[4] });
     }
   }
   return out;
@@ -102,7 +114,23 @@ for (const rf of RULES) {
       const p = posix.normalize(posix.join(posix.dirname(rf), m[1].split('#')[0])).replace(/\/$/, '');
       if (!files.has(p) && !dirs.has(p + '/')) broken.push(`${rf}:${b.i + 1}: the link to ${m[1]} leads to no tracked file or folder`);
     }
-    const list = atoms(b.text);
+    const all = atoms(b.text);
+    // a floor rule and an archive item stand alone: each is looked for in its own files
+    for (const a of all.filter(x => x.floor || x.archive)) {
+      const where = `${rf}:${b.i + 1}`;
+      if (a.floor) {
+        const missing = a.floor.filter(n => !FLOOR.some(f => hasPoint(f, 0, Infinity, n)));
+        count += a.floor.length - missing.length;
+        if (!FLOOR.length) unread.push(`${where}: ${a.word} ${a.floor.join(', ')} (no floor here to read it in)`);
+        else if (missing.length) { count += missing.length; (CORE ? broken : unread).push(`${where}: ${a.word} ${missing.join(', ')}: no such rule in the floor`); }
+      } else {
+        const missing = a.archive.filter(n => !ITEMS.some(f => parse(f).lines.some(l => l.startsWith(`${n}. `))));
+        count += a.archive.length - missing.length;
+        if (!ITEMS.length) unread.push(`${where}: core archive ${a.archive.join(', ')} (no archive here to read it in)`);
+        else if (missing.length) { count += missing.length; (CORE ? broken : unread).push(`${where}: core archive ${missing.join(', ')}: no such item in the archive`); }
+      }
+    }
+    const list = all.filter(x => !x.floor && !x.archive);
     // join atoms into pointers
     const groups = [];
     list.forEach((a, k) => {
@@ -153,6 +181,12 @@ for (const rf of RULES) {
         let from, to, what;
         if (t) { const s = section(file, t.title); if (!s) continue; ({ from, to } = s); what = `"${t.title}" in ${file}`; }
         else if (f) { from = 0; to = Infinity; what = file; }
+        else if (FLOOR.includes(rf) && /^rules?$/.test(n.word)) {
+          const missing = n.points.filter(x => !FLOOR.some(fl => hasPoint(fl, 0, Infinity, x)));
+          count += n.points.length;
+          if (missing.length) broken.push(`${where}: ${n.word} ${missing.join(', ')}: no such rule in the floor`);
+          continue;
+        }
         else if (own) { from = own.i; to = (parse(rf).heads.find(h => h.i > own.i && h.level <= own.level) || { i: Infinity }).i; what = `its own section of ${rf}`; }
         else { unread.push(`${where}: ${n.word} ${n.points.join(', ')} (no file or section named)`); continue; }
         const missing = n.points.filter(x => !hasPoint(file, from, to, x));

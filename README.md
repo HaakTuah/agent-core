@@ -175,8 +175,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      (`.github/workflows/tests.yml`).
    - **Another tool's session** has neither hook, which are Claude Code's: what holds its work is its reading of
      `AGENTS.md` and the checks on every pull request.
-   - **The copy's own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`) are this repository's, not the
-     project's: its issue templates and settings are its own, written for its *owner's account*.
+   - **The copy's own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`, `core/.claude/`) are this
+     repository's, not the project's: its issue templates and settings are its own, written for its *owner's account*.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
    into `core/`.
 7. **Where a module's rule does not fit it,** its manifest lists the difference under "Differences" (core archive 161):
@@ -250,6 +250,9 @@ Floor: whole. Modules: <all, or the list of those taken>.
   above, reading the project's threat model and `SECURITY.md` with the floor (core archive 51).
 - This repository's tags: a ruleset on `release-*` that blocks a tag's update and its deletion, so a release stays on
   the commit it was cut on (core archive 195).
+- This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
+  request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check` required
+  (core archive 201).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
   approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
