@@ -9,10 +9,11 @@
 // moved on from that commit, or where a check on it has not passed. Git and Node's own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
-//   node scripts/release.mjs --cut    cuts it: the tag is pushed to the core's repository, and nothing else is
-//     --at <sha>                      only where main's newest commit is this one
-//     --runs <file>                   only where the checks listed in this file, GitHub's answer to
-//                                     repos/<core>/actions/runs?head_sha=<sha>&event=push, have all passed
+//   node scripts/release.mjs --cut --at <sha> --runs <file>
+//                                     cuts it: the tag is pushed to the core's repository, and nothing else is. Only
+//                                     where main's newest commit is <sha>, and the checks listed in <file>, GitHub's
+//                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push, have
+//                                     all passed: without the two it cuts nothing
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -44,7 +45,7 @@ export function next(dir, at = null) {
 export const OWN = ".github/workflows/release.yml";
 
 // Why a release may not stand on a commit yet, each reason a line, from GitHub's list of the workflow runs that the
-// push of that commit to main started (what repos/<core>/actions/runs?head_sha=<sha>&event=push answers); none where
+// push of that commit to main started (repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push); none where
 // it may. It may where every such run has finished and passed, and at least one did more than skip: a run still going,
 // one that failed or was cancelled, a list read only in part, and a commit no check has run on yet each hold it, so a
 // release never stands on a commit whose checks the core's own main has not passed. Nothing is guessed: a list in any
@@ -85,6 +86,8 @@ function main(argv) {
   const cut = argv.includes("--cut");
   let at, runs;
   try { at = after("--at", argv); runs = after("--runs", argv); } catch (e) { return fail(e.message); }
+  // (asked before anything is fetched: a cut is never tried without the commit it is for and the checks on it)
+  if (cut && (at === null || runs === null)) return fail("--cut needs --at <sha> and --runs <file>: the release workflow gives both (.github/workflows/release.yml)");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-release-"));
   try {
     fetchCore(dir);
@@ -98,12 +101,10 @@ function main(argv) {
         ? `It asks more of a project than the copy (${NOTES}):\n${asks.join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    if (runs !== null) {
-      let list = null;
-      try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
-      const reasons = held(list);
-      if (reasons.length) return fail(`${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}`);
-    }
+    let list = null;
+    try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
+    const reasons = held(list);
+    if (reasons.length) return fail(`${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}`);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     git(["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`], dir);
     console.log(`${name} is cut.`);

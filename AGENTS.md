@@ -38,10 +38,9 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
 - **A release is cut on the owner's word** (core archive 195 and 196): another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, about once a week, and never by a session's own choice. The owner tags nothing by hand:
-  the session the owner tells starts the `release` workflow on `main` (`.github/workflows/release.yml`), with the
-  owner's word as its input, and the workflow cuts it only where every check on `main`'s newest commit has passed: the
-  tag `release-N` on that commit, never moved or deleted afterwards. `node scripts/release.mjs` says what the next one
-  would carry.
+  the session the owner tells starts the `release` workflow on `main` (`.github/workflows/release.yml`), and the
+  workflow cuts it only where every check on `main`'s newest commit has passed: the tag `release-N` on that commit,
+  never moved or deleted afterwards. `node scripts/release.mjs` says what the next one would carry.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
