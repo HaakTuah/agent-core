@@ -86,7 +86,7 @@ const p = project("a-project", "--owner", "someone-else", "--npm", "tools");
 const has = f => fs.existsSync(path.join(p.dir, f)), read = f => fs.readFileSync(path.join(p.dir, f), "utf8");
 ok(p.status === 0 && p.out.includes("The starter kit is written") && p.out.includes("FILL IN"), "it writes a project and says what is left", p.out.slice(0, 600));
 if (p.status === 0) {
-  ok(FILES.every(([, to]) => has(to)) && has("checks/sizes.json") && has("checks/licences.json") && has("checks/copies-baseline.json") && has("core/floor/security.md") && !has("core/reports"), "every file is there, with the copy of the core, without what the core keeps to itself");
+  ok(FILES.every(([, to, when]) => has(to) === (!when || !!when({ packages: "tools" }))) && has("checks/sizes.json") && has("checks/licences.json") && has("checks/copies-baseline.json") && has("core/floor/security.md") && !has("core/reports"), "every file its options ask for is there and no other of the kit's, with the copy of the core, without what the core keeps to itself");
   const manifest = read("core-manifest.md");
   ok(new RegExp(`^Core: ${CORE_SOURCE} at ${pin}, copied whole under core/`, "m").test(manifest) && /^\| \*owner's account\* \| `someone-else` \|$/m.test(manifest), "the manifest pins the commit and names the owner's account, as core.yml reads them");
   ok(read("AGENTS.md").startsWith("# a-project\n") && read(".github/workflows/signatures.yml").includes('directory: "tools"') && read(".github/dependabot.yml").includes('directory: "/tools"') && read(".github/ISSUE_TEMPLATE/bug_report.md").includes("assignees: someone-else"), "the project's name is its folder's, and the npm folder and the owner are where they belong");
@@ -111,6 +111,11 @@ ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.y
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
+const n = project("a-dotnet-project", "--owner", "x", "--nuget", "src", "--private");
+const nRead = f => fs.readFileSync(path.join(n.dir, f), "utf8");
+ok(n.status === 0 && nRead(".github/workflows/nuget.yml").includes('restore: "src"') && nRead(".github/workflows/nuget.yml").includes("advisory: true") && JSON.stringify(JSON.parse(nRead("checks/licences.json")).nuget) === '{"ships":[],"tools":[]}' && nRead(".github/dependabot.yml").includes('directory: "/src"') && !fs.existsSync(path.join(n.dir, ".github/workflows/signatures.yml")) && n.out.includes("RestorePackagesWithLockFile"),
+  "a project whose packages come from NuGet gets the call to the NuGet check, advisory, the config's part for its lock files, and is told to turn lock files on; a private one too, since that check needs nothing GitHub sells", n.out.slice(0, 400));
+ok(!fs.existsSync(path.join(t.dir, ".github/workflows/nuget.yml")) && JSON.parse(fs.readFileSync(path.join(t.dir, "checks/licences.json"), "utf8")).nuget === undefined, "and one that named no NuGet folder gets neither");
 ok(p.status !== 0 || /\*\*the trusted builder:\*\*\n\s+FILL IN:/.test(read("SECURITY.md")) && p.out.includes("who may change the protected files"), "who may change the protected files is left for the project to say, and listed with what is left");
 // the kit is read from the commit, never from the clone's working folder: an edit not yet committed reaches no project
 const edited = path.join(core, TEMPLATES, "workflows", "core.yml.tmpl");

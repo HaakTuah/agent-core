@@ -1,0 +1,19 @@
+# The NuGet check (floor rules 7, 10 and 15), on every pull request, Dependabot's included: the core's, for the
+# projects under {{nuget}}/. It restores the packages from the lock files alone and holds each to one exact version and
+# to its licence list, reading the licence check's config and its "nuget". Read-only, and no secrets. It starts
+# advisory: it says what it would fail and passes.
+name: nuget
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  nuget:
+    uses: {{core}}/.github/workflows/nuget.yml@{{pin}}
+    with:
+      config: checks/licences.json
+      restore: "{{nuget}}" # (in quotes: a folder named true or null is still a folder's name)
+      advisory: true # FILL IN: false, once the check has been right for a week of the project's pull requests

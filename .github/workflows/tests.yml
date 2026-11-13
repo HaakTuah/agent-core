@@ -2,7 +2,8 @@
 # and on Windows, where a project built there runs the scripts and both hooks (in Git Bash, as Claude Code does). Every
 # suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only,
 # with no secret, on the core's one exact Node; nothing is installed. One suite writes and builds a .NET project with
-# the .NET SDK the runner holds, in a scratch folder (scripts/init-dotnet-test.mjs).
+# the .NET SDK the runner holds, in a scratch folder, and takes a few packages from nuget.org for it
+# (scripts/init-dotnet-test.mjs).
 name: tests
 
 on:
@@ -42,6 +43,9 @@ jobs:
       - name: The licence scan on every form of a fetch
         if: ${{ !cancelled() }}
         run: node scripts/licence-fetch-test.mjs
+      - name: The NuGet check
+        if: ${{ !cancelled() }}
+        run: node scripts/nuget-test.mjs
       - name: The exact-versions check
         if: ${{ !cancelled() }}
         run: node scripts/exact-versions-test.mjs

@@ -1,14 +1,14 @@
 # Cuts a release of the core (AGENTS.md, "A release is cut on the owner's word"; README.md, "How a project takes the
 # core", point 1): the tag `release-N` on main's newest commit, which the owner never pushes by hand. It runs only when
-# started by hand, which takes write access to this repository: a session the owner told to cut one starts it on
-# main. On any other branch it fails before anything is read. It cuts only where every check the push of that commit
-# to main started has finished and passed, and where main has not moved on since the run began (scripts/release.mjs,
-# which also numbers the release and never moves a tag that exists); otherwise it fails, says which check holds it,
-# and is started again later. This repository only; no project calls it.
-# It may write this repository's contents, which the tag needs, and read its Actions runs; the token reaches the one
-# step that cuts, through git's own credential helper, and is never written into a command or a file. It takes no
-# input: a run's inputs are shown to anyone who can read the repository before any step could check them, so the
-# owner's word for a release is not written here (floor rule 11), and no text of anyone's reaches a step.
+# started by hand, which takes write access to this repository: the owner, or a session the owner told to and whose own
+# limits let it, starts it on main (its page under Actions has the button). On any other branch it fails before
+# anything is read. It cuts only where every check the push of that commit to main started has finished and passed, and
+# where main has not moved on since the run began (scripts/release.mjs, which also numbers the release and never moves
+# a tag that exists); otherwise it fails, says which check holds it, and is started again later. This repository only;
+# no project calls it. It may write this repository's contents, which the tag needs, and read its Actions runs; the
+# token reaches the one step that cuts, through git's own credential helper, and is never written into a command or a
+# file. It takes no input: a run's inputs are shown to anyone who can read the repository before any step could check
+# them, so the owner's word for a release is not written here (floor rule 11), and no text of anyone's reaches a step.
 name: release
 
 on:

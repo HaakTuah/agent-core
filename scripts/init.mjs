@@ -16,8 +16,8 @@
 //   --name     the project's name in its rule files; left out, its folder's
 //   --at       the commit of the core's main the project starts from; left out, the clone's own HEAD
 //   --npm      its packages come from npm: the signature check and Dependabot's npm updates, for that folder
-//   --nuget    its packages come from NuGet (.NET): Dependabot's NuGet updates, for the folder that holds its solution
-//              or project files (. for the root); what holds those packages' licences and versions is the project's own
+//   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
+//              that holds its solution or project files (. for the root)
 //   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
 //              workflows, which need it (README.md, point 5, "A private repository")
 //   --game     a game: the module game-design.md with the others
@@ -69,6 +69,7 @@ export const FILES = [
   ["workflows/codeql.yml.tmpl", ".github/workflows/codeql.yml", o => !o.private],
   ["workflows/licences.yml.tmpl", ".github/workflows/licences.yml", o => !o.private],
   ["workflows/signatures.yml.tmpl", ".github/workflows/signatures.yml", o => o.packages !== undefined],
+  ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined],
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "core"];
@@ -146,7 +147,7 @@ export function fill(text, words) {
 // Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
 // `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
-  const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, modules: modules(moduleNames, o.game) };
+  const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game) };
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     // (Dependabot's own part for each installer the project named, after the part every project has)
@@ -167,9 +168,10 @@ export function sizes(bytes) {
 }
 
 // The licence check's first config: nothing ships yet, and of npm's files only those that stand today are named,
-// since the check fails on one it cannot read. `has`: whether a path of the project exists.
+// since the check fails on one it cannot read. A project whose packages come from NuGet gets the NuGet check's part,
+// its lock files still to be named. `has`: whether a path of the project exists.
 export function licences(o, has) {
-  const config = { ships: [], audit: "checks/licences-audit.json", scan: { served: [], skip: [] } };
+  const config = { ships: [], audit: "checks/licences-audit.json", scan: { served: [], skip: [] }, ...(o.nuget === undefined ? {} : { nuget: { ships: [], tools: [] } }) };
   if (o.packages === undefined) return config;
   const at = name => o.packages === "." ? name : `${o.packages}/${name}`;
   return { lockfiles: [at("package-lock.json")].filter(has), ...config, ignoreScriptsIn: [at(".npmrc")].filter(has) };
@@ -229,7 +231,7 @@ function init(argv) {
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");
   console.log("  where it has versions Dependabot cannot see, its versions check: the core's README, point 5");
-  if (o.nuget !== undefined) console.log("  its NuGet packages: a check of the project's own that holds each to floor rule 10's licences and to one exact version (floor rules 7 and 10), since the core's licence and exact-version checks read npm's lists alone");
+  if (o.nuget !== undefined) console.log("  its NuGet packages: lock files turned on (RestorePackagesWithLockFile in its project files or Directory.Build.props) and committed, and each packages.lock.json named in checks/licences.json under \"nuget\", as one whose packages ship or one of tools that only run");
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
   console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);
   console.log("  the Actions setting that every action is pinned to a full commit SHA; the Actions secret PERSONAL_TERMS; and the security reviewer's app.");
