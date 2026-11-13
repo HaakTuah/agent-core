@@ -1,7 +1,12 @@
-# Nothing personal, ever (floor rule 11). Fails a pull request whose files, commit messages, title or description hold
-# a term from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and
-# never written into the repository, since the list itself would be personal. It prints only where a term was found
-# (file and line), never the term. Without the secret (a fork, Dependabot) it passes with a note.
+# Nothing personal, ever (floor rule 11). Fails a pull request whose files, commits, title or description hold a term
+# from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
+# written into the repository, since the list itself would be personal. Of each commit since the rule it reads the
+# message, the author's and the committer's name and address (save those of a merge GitHub itself made, which floor
+# rule 11 excepts), and the lines it adds (with the files' names), so a term that one commit adds and a later one
+# takes out still fails: merging keeps every commit (core archive 201). It reads
+# no file git takes for binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where
+# a term was found (file and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project
+# that has not set it) it passes with a note: the check is optional.
 # It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full commit SHA
 # (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
@@ -48,14 +53,23 @@ jobs:
           if [ -n "$hits" ]; then echo "A personal term is in these files (file:line):"; echo "$hits"; found=1; fi
           if [ -n "$BASE" ]; then
             # Only commits made since the rule (2 November 2026): older ones cannot be changed without rewriting history.
-            # One commit at a time, so every new commit's message is checked, not only the newest.
+            # One commit at a time, so every new commit is checked, not only the newest.
             # --since-as-filter skips older commits without stopping the walk; a failing rev-list fails the job.
             commits=$(git rev-list --since-as-filter='2026-11-02T17:30:00Z' "$BASE..HEAD")
-            bad=""
+            bad="" people="" added=""
             for c in $commits; do
-              if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $(git rev-parse --short "$c")"; fi
+              short=$(git rev-parse --short "$c")
+              if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
+              # (save a merge GitHub itself made, "update branch" too, whose author is the merging account's profile:
+              # floor rule 11 excepts it)
+              if [ "$(git log -1 --format='%P|%cn <%ce>' "$c" | sed 's/^[^ |]* [^|]*|/merge|/')" != "merge|GitHub <noreply@github.com>" ] \
+                && git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list"; then people="$people $short"; fi
+              # (the lines it adds, and the names of the files it writes: a merge's own diff is none)
+              if git show --format= --patch --diff-merges=off --no-ext-diff --no-textconv --no-color "$c" | grep '^+' | grep -q -i -F -f "$list"; then added="$added $short"; fi
             done
             if [ -n "$bad" ]; then echo "A personal term is in these commits' messages:"; echo "$bad"; found=1; fi
+            if [ -n "$people" ]; then echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1; fi
+            if [ -n "$added" ]; then echo "A personal term is in a line, or a file's name, that these commits add:"; echo "$added"; found=1; fi
           fi
           if grep -q -i -F -f "$list" <<< "$TITLE"$'\n'"$BODY"; then echo "A personal term is in the PR's title or description."; found=1; fi
           rm -f "$list"
