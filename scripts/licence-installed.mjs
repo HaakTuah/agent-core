@@ -6,13 +6,16 @@
 // holds every entry of the lock file to the package.json of the package installed for it, in its licence, read as npm
 // writes one, and in its version. With it, the licence check's reading of the lock file is a reading of the packages.
 // What it does not hold: a package of another system, which no install here brings (an optional one that names the
-// systems it is for, whose folder is not there: counted, and said); the project's own packages (the root, a workspace, a link to one); and that a
-// package's own package.json tells the truth about its terms, which nothing but a reading of them can. It runs none
-// of what it reads: each package.json is read as JSON. Node's own modules only.
+// systems it is for, whose folder is not there: counted, and said; a project that builds what ships on such a system
+// installs it there, unread); a lock file the workflow does not install from, where a project has more than one and
+// calls the workflow for one; the project's own packages (the root, a workspace, a link to one); and that a package's
+// own package.json tells the truth about its terms, which nothing but a reading of them can. It runs none of what it
+// reads: each package.json is read as JSON. Node's own modules only.
 //
 //   node core/scripts/licence-installed.mjs [the folder that holds the lock file, the current one if left out]
 import { existsSync, readFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { join } from "node:path";
+import { lockInstalled, lockPathOk } from "./licences.mjs";
 import { started } from "./started.mjs";
 
 /** A licence as npm writes one into a lock file from a package.json's "license": the type of one written the old way,
@@ -30,31 +33,34 @@ const shown = (value) => (value === undefined ? "none" : JSON.stringify(value).r
 /** The check, on the folder `dir`, which holds the lock file and the node_modules an install from it filled:
  *  { failures, summary }. */
 export function check(dir) {
-  // (where both stand, the shrinkwrap file is the one an install reads)
-  const name = ["npm-shrinkwrap.json", "package-lock.json"].find((f) => existsSync(join(dir, f)));
+  const [name, second] = ["npm-shrinkwrap.json", "package-lock.json"].filter((f) => existsSync(join(dir, f)));
   if (!name) throw new Error("no npm-shrinkwrap.json or package-lock.json in the folder");
+  // (an install reads the shrinkwrap file of the two, and the licence check the one its config names: only one may stand)
+  if (second) throw new Error("both npm-shrinkwrap.json and package-lock.json stand in the folder: keep one");
   let lock;
   try { lock = JSON.parse(readFileSync(join(dir, name), "utf8")); } catch { throw new Error(`cannot read ${name} as JSON`); }
   if (!lock || typeof lock.packages !== "object" || !lock.packages || Array.isArray(lock.packages)) throw new Error(`${name} has no "packages" (npm's lockfile version 2 or 3)`);
   const failures = [];
   let read = 0, absent = 0;
   for (const [path, entry] of Object.entries(lock.packages)) {
-    // (an installed package lies under a node_modules folder; anything else is the project's own: its root, a workspace)
-    if (!/(?:^|\/)node_modules\/[^/]/u.test(path) || !entry || typeof entry !== "object" || entry.link) continue;
-    if (posix.normalize(path) !== path || path.startsWith("/") || path.split("/").includes("..")) { failures.push(`${name}: an entry at ${shown(path)}, which is no folder inside the project`); continue; }
+    // (every entry is written as npm writes one, or it fails before anything is left out: lockPathOk, in licences.mjs)
+    if (!lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry)) { failures.push(`${name}: an entry at ${shown(path)} that is not written as npm writes one`); continue; }
+    // (an installed package, by the licence check's own test; anything else is the project's own: its root, a
+    // workspace, a link to one)
+    if (!lockInstalled(path) || entry.link) continue;
     const file = join(dir, path, "package.json");
     if (!existsSync(file)) {
       // (only what npm itself leaves out: an optional package that names the systems it is for, on another)
       if ((entry.optional || entry.devOptional) && (entry.os || entry.cpu || entry.libc)) absent++;
-      else failures.push(`${path}: not installed, and no optional package of another system, so what it says of itself cannot be read: install from the lock file first (npm ci)`);
+      else failures.push(`${shown(path)}: not installed, and no optional package of another system, so what it says of itself cannot be read: install from the lock file first (npm ci)`);
       continue;
     }
     let own;
     try { own = JSON.parse(readFileSync(file, "utf8")); } catch { own = null; }
-    if (!own || typeof own !== "object" || Array.isArray(own)) { failures.push(`${path}: its package.json cannot be read as JSON`); continue; }
+    if (!own || typeof own !== "object" || Array.isArray(own)) { failures.push(`${shown(path)}: its package.json cannot be read as JSON`); continue; }
     read++;
-    if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${path}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}`);
-    if (own.version !== entry.version) failures.push(`${path}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}`);
+    if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${shown(path)}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}`);
+    if (own.version !== entry.version) failures.push(`${shown(path)}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}`);
   }
   const summary = `${read} packages of ${name} read back from the packages themselves, their licence and their version` +
     `${absent ? `; ${absent} of another system, not installed here, not read` : ""}; ${failures.length} failing (floor rule 10)`;

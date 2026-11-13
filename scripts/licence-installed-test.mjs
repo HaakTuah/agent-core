@@ -37,29 +37,33 @@ const good = said(project(
   { [A]: { name: "mossgrip-lib", version: "1.0.0", license: "MIT" }, [B]: { version: "2.1.0", license: { type: "Apache-2.0", url: "x" } }, [C]: { version: "0.9.0" }, "node_modules/bark-x": { version: "3.0.0", license: "ISC" } }));
 ok(/^4 packages of package-lock\.json read back from the packages themselves, their licence and their version; 1 of another system, not installed here, not read; 0 failing/.test(good),
   "a lock file whose every entry says what its package says passes: a scope, a package inside another's folder, one with no licence on either side, the old object form; the project's own packages and a link to one are not its to read, and an optional package of another system is counted as not read", good);
-ok(/mossgrip-lib: package-lock\.json says its licence is "MIT", and its own package\.json says "GPL-3\.0-only"/.test(one({ license: "MIT" }, { version: "1.0.0", license: "GPL-3.0-only" })), "a licence written into the lock file that the package does not say fails, by name, with both");
+ok(/^"node_modules\/mossgrip-lib": package-lock\.json says its licence is "MIT", and its own package\.json says "GPL-3\.0-only"/.test(one({ license: "MIT" }, { version: "1.0.0", license: "GPL-3.0-only" })), "a licence written into the lock file that the package does not say fails, by name, with both");
 ok(/says its licence is "MIT", and its own package\.json says none/.test(one({ license: "MIT" }, { version: "1.0.0" })) && /says its licence is none, and its own package\.json says "BUSL-1\.1"/.test(one({}, { version: "1.0.0", license: "BUSL-1.1" }))
   && /says its licence is "MIT", and its own package\.json says \{"type":"SSPL-1\.0"\}/.test(one({ license: "MIT" }, { version: "1.0.0", license: { type: "SSPL-1.0" } })), "so does one the lock file adds, one it leaves out, and one the package writes the old way");
 ok(/says its version is "1\.0\.0", and its own package\.json says "2\.0\.0"/.test(one({ license: "MIT" }, { version: "2.0.0", license: "MIT" })), "a version the lock file claims and the package does not say fails");
-ok(/mossgrip-lib: not installed, and no optional package of another system/.test(one({ license: "MIT" })) && /not installed, and no optional package of another system/.test(one({ license: "MIT", optional: true })) && /not installed/.test(one({ license: "MIT", os: ["win32"] }))
+ok(/mossgrip-lib": not installed, and no optional package of another system/.test(one({ license: "MIT" })) && /not installed, and no optional package of another system/.test(one({ license: "MIT", optional: true })) && /not installed/.test(one({ license: "MIT", os: ["win32"] }))
   && /1 of another system, not installed here, not read; 0 failing/.test(one({ license: "MIT", devOptional: true, cpu: ["arm64"] })), "a package that is not installed fails, unless it is an optional one that names the systems it is for: to be called optional, or to name a system, is not enough alone");
 ok(/its package\.json cannot be read as JSON/.test(one({ license: "MIT" }, "{ not json")) && /its package\.json cannot be read as JSON/.test(one({ license: "MIT" }, "[]")), "a package whose own package.json cannot be read fails");
-ok(/an entry at "node_modules\/\.\.\/\.\.\/elsewhere", which is no folder inside the project/.test(said(project({ "node_modules/../../elsewhere": { version: "1.0.0" } }, {}))) && /no folder inside the project/.test(said(project({ "/abs/node_modules/x": { version: "1.0.0" } }, {}))),
-  "an entry that points out of the project is read nowhere, and fails");
+const oddly = (key, entry = { version: "1.0.0", license: "MIT" }) => said(project({ [key]: entry }, { [A]: { version: "1.0.0", license: "GPL-3.0-only" } }));
+ok(["node_modules//mossgrip-lib", "node_modules///mossgrip-lib", "node_modules/./mossgrip-lib", "node_modules/x/../mossgrip-lib", "node_modules/../../elsewhere", "/abs/node_modules/x", "node_modules/mossgrip-lib/", "node_modules\\mossgrip-lib", "packages//own"]
+  .every(key => /an entry at ".*" that is not written as npm writes one/.test(oddly(key)) && !/ 0 failing/.test(oddly(key))) && /an entry at "node_modules\/mossgrip-lib" that is not written as npm writes one/.test(oddly(A, "MIT")) && /not written as npm writes one/.test(oddly(A, [])),
+  "an entry whose path is not written as npm writes one fails before anything is left out, whatever folder an install would read it as; so does one that is no entry");
 const shrink = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { version: "1.0.0", license: "ISC" } }, "npm-shrinkwrap.json");
+ok(/npm-shrinkwrap\.json says its licence is "MIT"/.test(said(shrink)), "a shrinkwrap file alone is the lock file read");
 fs.writeFileSync(path.join(shrink, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { [A]: { version: "1.0.0", license: "ISC" } } }));
-ok(/npm-shrinkwrap\.json says its licence is "MIT"/.test(said(shrink)), "where both lock files stand, the one npm takes is the one read");
+ok(/threw: both npm-shrinkwrap\.json and package-lock\.json stand in the folder: keep one/.test(said(shrink)), "where both lock files stand, an install reads one and the licence check may read the other: it stops");
 const none = path.join(tmp, "none"); fs.mkdirSync(none);
 const old = project({}, {}); fs.writeFileSync(path.join(old, "package-lock.json"), JSON.stringify({ lockfileVersion: 1, dependencies: {} }));
 const broken = project({}, {}); fs.writeFileSync(path.join(broken, "package-lock.json"), "{");
 ok(/threw: no npm-shrinkwrap\.json or package-lock\.json/.test(said(none)) && /threw: package-lock\.json has no "packages"/.test(said(old)) && /threw: cannot read package-lock\.json as JSON/.test(said(broken)), "no lock file, one of the old form, or one that is no JSON stops the check");
 const long = one({ license: "MIT" }, { version: "1.0.0", license: `MIT\n::error::${"x".repeat(500)}` });
-ok(long.split("\n").length === 2 && long.split("\n")[0].length < 400, "what a package says of itself is shown on one line, and no longer than a line", long.slice(0, 300));
+const key = said(project({ "node_modules/x\n::error title=Licences::all read\n": { version: "1.0.0" } }, {}));
+ok(long.split("\n").length === 2 && long.split("\n")[0].length < 500 && key.split("\n").length === 2 && !/^::error/m.test(key), "what a lock file or a package says is shown on one line, and no longer than a line: a path too, which could else start a line of its own in a log", `${long.slice(0, 300)}\n${key}`);
 
 const script = fileURLToPath(new URL("./licence-installed.mjs", import.meta.url));
 const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8", cwd: tmp });
 const fine = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { version: "1.0.0", license: "MIT" } }), forged = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { version: "1.0.0", license: "GPL-3.0-only" } });
-ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(run(fine).stdout) && run(forged).status === 1 && /^FAIL: node_modules\/mossgrip-lib: /.test(run(forged).stderr) && run(none).status === 1 && run().status === 1,
+ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(run(fine).stdout) && run(forged).status === 1 && /^FAIL: "node_modules\/mossgrip-lib": /.test(run(forged).stderr) && run(none).status === 1 && run().status === 1,
   "as a program: it passes and says what it read, fails with each failure on a line, and fails where there is no lock file, the folder named or the current one");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the licences read back from the packages`);
