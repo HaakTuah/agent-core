@@ -53,6 +53,10 @@ const tree = (root, more = {}) => said(project({ "": { name: "bark", ...root }, 
   [child]: { version: "1.0.0", license: "MIT", optional: true }, [shared]: { version: "1.0.0", license: "MIT", optional: true, ...more } }, {}));
 ok(unread(3).test(tree({ optionalDependencies: { "moss-win32": "1.0.0" } })) && /moss-util": not installed/.test(tree({ optionalDependencies: { "moss-win32": "1.0.0" }, dependencies: { "moss-util": "1.0.0" } }))
   && /moss-util": not installed/.test(tree({ optionalDependencies: { "moss-win32": "1.0.0" } }, { optional: false })), "an optional package that only packages of another system ask for is left out with them; one the project itself also asks for, or one not marked optional, is not");
+ok(unread(3).test(tree({ optionalDependencies: { "moss-win32": "1.0.0" }, peerDependencies: { "moss-util": "1.0.0" }, peerDependenciesMeta: { "moss-util": { optional: true } } }))
+  && /moss-util": not installed/.test(tree({ optionalDependencies: { "moss-win32": "1.0.0" }, peerDependencies: { "moss-util": "1.0.0" } }))
+  && /moss-util": not installed/.test(tree({ optionalDependencies: { "moss-win32": "1.0.0" }, peerDependencies: { "moss-util": "1.0.0" }, peerDependenciesMeta: { "moss-util": { optional: "yes" } } })),
+  "a peer the project marks optional asks for nothing, since npm never installs one for it; a peer it does not mark so, or marks so in no form npm reads, asks for its package");
 ok(plainVersion("v1.0.0") === "1.0.0" && plainVersion(" =1.0.0 ") === "1.0.0" && plainVersion("1.0.0-v2") === "1.0.0-v2" && plainVersion(undefined) === undefined
   && / 0 failing/.test(one({ license: "MIT" }, { version: "v1.0.0", license: "MIT" })) && / 0 failing/.test(one({ license: "MIT" }, "\ufeff" + JSON.stringify({ version: "1.0.0", license: "MIT" }))),
   "a version spelt with a v or an equals sign in the package is the version npm wrote, and a package.json that starts with a byte-order mark is read as npm reads it");

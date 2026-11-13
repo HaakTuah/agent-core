@@ -49,11 +49,18 @@ export function thisSystem() {
 /**
  * The entries of a lock file's `packages` that an install on `system` leaves out for the system's sake alone, by
  * path: an optional one that names systems which leave this one out, and an optional one that only such entries ask
- * for. Nothing else explains a package that is not there: not a Node version an entry names, which the lock file's
+ * for (a peer an entry marks optional asks for nothing, since npm never installs one for it). Nothing else explains a
+ * package that is not there: not a Node version an entry names, which the lock file's
  * writer could set to fit one machine.
  */
 export function leftOut(packages, system = thisSystem()) {
-  const asks = (entry) => Object.keys({ ...entry.dependencies, ...entry.optionalDependencies, ...entry.peerDependencies });
+  // (what an entry asks npm to install: its dependencies, its optional ones, and its peers but those it marks optional,
+  // which npm never installs for it: peerDependenciesMeta)
+  const asks = (entry) => {
+    const meta = entry.peerDependenciesMeta && typeof entry.peerDependenciesMeta === "object" ? entry.peerDependenciesMeta : {};
+    const peers = Object.keys({ ...entry.peerDependencies }).filter((name) => !(Object.hasOwn(meta, name) && meta[name]?.optional === true));
+    return [...new Set([...Object.keys({ ...entry.dependencies, ...entry.optionalDependencies }), ...peers])];
+  };
   // (a name is found as Node finds one: in the nearest node_modules folder, from the asking package's own upward)
   const found = (from, name) => {
     for (let dir = from; ; dir = dir.includes("/node_modules/") ? dir.slice(0, dir.lastIndexOf("/node_modules/")) : "") {
