@@ -1,0 +1,54 @@
+// Tests of the core's own measurement (core-cost.mjs): what a merged pull request counts as, the week it falls in, what
+// a session-cost line reads as, which pull requests can be priced, and the table. Node's own modules only; the calls
+// to git and gh are the program's own and are not made here.
+//
+//   node scripts/core-cost-test.mjs
+import { classify, median, priced, print, reading, sessionOf, table, weekOf } from "./core-cost.mjs";
+import { line } from "./session-cost.mjs";
+
+let failed = 0, count = 0;
+const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
+const rules = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md", "docs/threat-model.md"];
+
+ok(classify("sync/core", ["core/floor/security.md", "core-manifest.md", ".github/workflows/core.yml"], rules) === "sync", "the copy, the manifest and a workflow: a sync");
+ok(classify("x", ["core-manifest.md", ".github/workflows/core.yml"], rules) === "upkeep", "with nothing of the copy changed it is no sync, but upkeep");
+ok(classify("x", ["core/a.md", "AGENTS.md"], rules) === "upkeep" && classify("x", [".claude/settings.json", ".github/dependabot.yml", "docs/threat-model.md"], rules) === "upkeep", "the copy with a rule file, or settings, Dependabot's config and a rule file: upkeep");
+ok(classify("x", ["core/a.md", "src/game.js"], rules) === "own" && classify("x", ["docs/design.md"], rules) === "own" && classify("x", ["corerules.md"], rules) === "own" && classify("x", [".github-notes.md"], rules) === "own", "anything of the project's own makes it the project's own work, and a name that only begins like a folder's is not in it");
+ok(classify("dependabot/npm_and_yarn/tools/x-1.2.3", ["tools/package-lock.json"], rules) === "update" && classify("x/dependabot/y", ["tools/package-lock.json"], rules) === "own", "a branch of Dependabot's own is an update");
+ok(classify("x", [], rules) === "own", "a merge that changed nothing is not counted as the core's");
+
+ok(weekOf("2026-11-09T00:00:00Z") === "2026-11-09" && weekOf("2026-11-15T23:59:59Z") === "2026-11-09" && weekOf("2026-11-16T00:00:00+00:00") === "2026-11-16" && weekOf("2026-11-13T01:30:00+02:00") === "2026-11-09", "a week runs from Monday to Sunday, in UTC");
+
+const sample = line({ answers: 1234, sum: { input_tokens: 7, cache_creation_input_tokens: 2000000, cache_read_input_tokens: 30000000, output_tokens: 456789 }, families: ["Opus"] });
+ok(JSON.stringify(reading(`The change.\n\n${sample}\n\nmore`)) === JSON.stringify({ answers: 1234, input: 7, written: 2000000, read: 30000000, out: 456789 }), "the line session-cost.mjs prints is read back, count for count", sample);
+ok(reading("no line here") === null && reading(`> ${sample}`) === null && reading(null) === null, "a description without the line at a line's start gives none");
+ok(sessionOf("x\nhttps://claude.ai/code/session_01AbC\n") === "session_01AbC" && sessionOf("nothing") === "", "the session is the one the description's link names");
+
+const r = (answers, out) => ({ answers, input: 1, written: answers * 10, read: answers * 100, out });
+const took = priced([
+  { number: 5, session: "a", reading: r(150, 900) }, { number: 3, session: "a", reading: r(100, 500) }, // (given out of order)
+  { number: 4, session: "b", reading: r(40, 80) },
+  { number: 6, session: "a", reading: r(120, 700) }, // (the line dropped: the record lost answers)
+  { number: 7, session: "a", reading: r(130, 760) },
+  { number: 8, session: "", reading: r(999, 999) }, { number: 9, session: "a", reading: null },
+  { number: 10, session: "a", reading: r(130, 760) }, // (nothing spent since)
+]);
+ok(took.get(5)?.answers === 50 && took.get(5)?.out === 400 && took.get(7)?.answers === 10 && took.get(7)?.out === 60, "a pull request took what its session's line rose by since that session's one before");
+ok(!took.has(3) && !took.has(4) && !took.has(6) && !took.has(8) && !took.has(9) && !took.has(10) && took.size === 2, "the first of a session, a line that dropped, no session, no line and no rise are not priced");
+ok(median([3, 1, 2]) === 2 && median([4, 1, 3, 2]) === 2.5 && median([]) === null, "the median");
+
+const merged = [
+  { number: 1, when: "2026-11-03T10:00:00Z", kind: "own", lines: 100, took: null },
+  { number: 2, when: "2026-11-10T10:00:00Z", kind: "own", lines: 40, took: { answers: 30, out: 3000 } },
+  { number: 3, when: "2026-11-10T11:00:00Z", kind: "sync", lines: 0, took: { answers: 80, out: 9000 } },
+  { number: 4, when: "2026-11-11T11:00:00Z", kind: "upkeep", lines: 0, took: null },
+  { number: 5, when: "2026-11-12T11:00:00Z", kind: "update", lines: 0, took: { answers: 5, out: 50 } },
+];
+const rows = table(merged, m => `week of ${weekOf(m.when)}`);
+ok(rows.length === 2 && rows[0].key === "week of 2026-11-02" && rows[1].all === 4 && rows[1].own === 1 && rows[1].sync === 1 && rows[1].upkeep === 1 && rows[1].update === 1 && rows[1].lines === 40 && rows[1].unpriced === 1, "the weeks in order, each with its counts");
+const text = print(rows, true).split("\n");
+ok(text.length === 3 && /\b50%/.test(text[2]) && /\b0%/.test(text[1]) && text[2].includes("30 (of 1)") && text[2].includes("80 (of 1)") && text[2].includes("3 of 4"), "the table: the core's share is its syncs and upkeep of all merged, and each median says of how many", text.join("\n     "));
+ok(!print(rows, false).includes("answers"), "without --cost the table says nothing of cost");
+
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's measurement`);
+process.exitCode = failed ? 1 : 0;
