@@ -16,4 +16,4 @@ jobs:
   signatures:
     uses: {{core}}/.github/workflows/signatures.yml@{{pin}}
     with:
-      directory: {{npm}}
+      directory: "{{npm}}" # (in quotes: a folder named true or null is still a folder's name)
