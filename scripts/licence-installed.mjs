@@ -13,7 +13,8 @@
 // packages ask for: counted, and said; a project that builds what ships on such a system installs it there, unread);
 // a lock file the workflow does not install from, where a project has more than one and calls the workflow for one;
 // the project's own packages (the root, a workspace, a link to one); and that a package's own package.json tells the
-// truth about its terms, which nothing but a reading of them can. It runs none of what it reads: each package.json is read as JSON. Node's own modules only.
+// truth about its terms, which nothing but a reading of them can. It runs none of what it reads: each package.json is
+// read as JSON. Node's own modules only.
 //
 //   node core/scripts/licence-installed.mjs [the folder that holds the lock file, the current one if left out]
 import { existsSync, readFileSync, readdirSync } from "node:fs";
