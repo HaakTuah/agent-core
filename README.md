@@ -75,7 +75,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      of its own (the *copies check*; the licence check's with its audit of what no lockfile holds, which
      `licence-scan.mjs` holds whole, every action, fetched package, asset and copied-in code it uses, and each entry
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
-     dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7).
+     dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7). A package or
+     an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
+     words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
+     tool or what ships.
    - **With the copies check,** `pointers.mjs` and `reading-size.mjs`, the pointer check and the reading-size check,
      the second with marks of its own (the *size marks*), and `workflows.mjs`, which needs no config and fails a
      workflow that names `pull_request_target` (floor rule 2).
@@ -126,7 +129,7 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
      config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
      licence a machine can read is recorded by hand in the audit as `<Id>@<version>`, of "kind": "nuget"; one off its
-     list that the owner wants anyway is named in "nuget.accepted" with the owner's words, and there alone. It starts
+     list that the owner wants anyway is named in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It starts
      advisory, saying what it would fail and passing, and a private repository calls it like any other: it needs
      nothing of GitHub's paid code security.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
