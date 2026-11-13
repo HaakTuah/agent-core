@@ -7,8 +7,9 @@
 //   - that every project file git knows (.csproj, .fsproj, .vbproj) has its lock file beside it, and that every lock
 //     file is named in the config as one whose packages ship or as one of tools that only run, so no project's
 //     packages go unread. A lock file under another name (packages.<project>.lock.json, which NuGet takes before the
-//     plain one, or a NuGetLockFilePath a project file sets) fails, and so does the older packages.config, which has
-//     none;
+//     plain one, or a NuGetLockFilePath a project or build file names; the workflow's restore also sets that
+//     property empty for every project, wherever it was set) fails, and so do the older packages.config, which has
+//     none, and a response file that gives every build options this check cannot read (Directory.Build.rsp);
 //   - floor rule 7's "one exact version, never a range": what a project asks for is, letter for letter, the version
 //     its lock installs (NuGet writes a plain Version="1.2.3" as "[1.2.3, )", which with a lock file is that version);
 //   - floor rule 10: a package whose manifest names its licence as an SPDX expression is held to its list by that
@@ -18,8 +19,9 @@
 //     then holds to its list like any entry. A new version needs a new entry, so a licence that changes with a version
 //     is read again, and an entry no package needs any more fails;
 //   - "one the owner wants anyway waits for the owner's yes" (floor rule 10): a package off its list passes only where
-//     the config's "accepted" names that exact version with what it is under, whether it ships, the owner's words for
-//     it and, where it ships, its notice; a yes for a tool is no yes for what ships, and no yes takes in terms the
+//     the config's "accepted" names that exact version with what it is under (an SPDX id this check knows, or
+//     LicenseRef-<a name for it>, so that a machine can read it), whether it ships, the owner's words for it and,
+//     where it ships, its notice; a yes for a tool is no yes for what ships, and no yes takes in terms the
 //     floor never allows, by what the manifest, the audit or the entry itself says. It is named there alone: an audit
 //     entry for it too would be held to the list by the licence check, so the two together fail here. An accepted
 //     version nothing installs any more fails, so the list only shrinks by itself;
@@ -27,16 +29,19 @@
 //     file names): its licence is held to the list for what ships all the same, by its manifest, the audit or a yes.
 // What it does not hold: that the lock files are what a restore gives today (the workflow that runs this,
 // .github/workflows/nuget.yml, restores each project file this script lists with --locked-mode first, which fails
-// where they are not: floor rule 15); the version of what no lock file names; whether the owner said what "accepted"
+// where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
+// project file fixes and no lock file holds; whether the owner said what "accepted"
 // quotes, which the reviews hold, the config being a protected file; a project of another kind than the three above,
 // and a tool a manifest of dotnet's names (.config/dotnet-tools.json), which no restore here brings; and what no lock
 // file names at all (a tool a script installs, a font, an image), which the licence check's audit and scan hold. A
 // restore runs the project's own build files, a pull request's too, which could change anything in the job this
 // runs in, this script and the manifests included: what a pull request does to its project files is the reviews' to
 // read, as with every check that builds.
-// A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it;
-// anything it cannot read so (a document type, a manifest that is not well formed, two such parts or elements, a name
-// that is not plain ASCII, an expression with a comment, CDATA or an entity inside it) counts as no readable licence.
+// A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
+// and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
+// formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
+// but on the root, an expression with a comment, CDATA or an entity inside it) counts as no readable licence, since a
+// reader of XML may find another element there than this one does.
 // Node's own modules only, and no network: the restore brought the manifests. It checks the project it lies in
 // (core/scripts/ there), whatever the directory it is started from; the config's own path is read from that directory.
 //
@@ -45,8 +50,8 @@
 //
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
 // packages ship, "tools": those of projects that only run (tests, tools), "accepted": [{ "package": "<Id>@<version>",
-// "licence": what it is under, "ships": true or false, "yes": the owner's words and their date, "notice": its notice,
-// where it ships }] }. With --advisory it says what it would fail and passes, for a project's first weeks with it.
+// "licence": what it is under, as an SPDX expression or LicenseRef-<name>, "ships": true or false, "yes": the owner's
+// words and their date, "notice": its notice, where it ships }] }. With --advisory it says what it would fail and passes, for a project's first weeks with it.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, posix } from "node:path";
@@ -58,6 +63,7 @@ const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
 const BUILD_FILE = /\.(?:cs|fs|vb)proj$|\.props$|\.targets$/iu; // where a project can name another lock file
+const RESPONSE_FILE = /^(?:Directory\.Build|MSBuild)\.rsp$/iu; // options MSBuild gives every build of the folder
 const ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/u; // a package's id, as NuGet takes one
 const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writes one
 const key = (id, version) => `${id}@${version}`.toLowerCase();
@@ -124,9 +130,11 @@ export function lockPackages(text, lockPath) {
  * (a word for what it has instead: "a licence file", "an address", "nothing") where a machine cannot read one.
  * Read as XML, the way NuGet finds it: comments, CDATA and processing instructions are no elements, and the licence
  * is the one `license` element directly under the one `metadata` under the one root, `package`. A document type, a
- * manifest that is not well formed, a second root, metadata or licence, or an element whose name is not plain ASCII
- * (which a reader of XML may take for another name than this one does) give no licence it will trust; nor does an
- * expression with a cut-out part inside it, since CDATA there is part of the expression a reader of XML sees.
+ * manifest that is not well formed, a second root, metadata or licence, an element whose name is not plain ASCII or
+ * has a prefix, or a namespace declared on any element but the root (each of which a reader of XML may take for
+ * another element than this one does: NuGet goes by an element's local name and its namespace) give no licence it
+ * will trust; nor does an expression with a cut-out part inside it, since CDATA there is part of the expression a
+ * reader of XML sees.
  */
 export function manifestLicence(text) {
   const unread = { other: "a manifest it will not read" }, malformed = { other: "a manifest that is not well formed" };
@@ -152,7 +160,9 @@ export function manifestLicence(text) {
   for (const tag of plain.matchAll(tags)) {
     if (!gapOk(tag.index)) return malformed;
     const [, closing, name, attributes, empty] = tag;
-    if (!/^[A-Za-z_][A-Za-z0-9_.:-]*$/u.test(name) || (attributes && !/^[ \t\r\n]/u.test(attributes))) return unread;
+    // (a plain name, with no prefix; and no namespace declared below the root, so every element is in the root's)
+    if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/u.test(name) || (attributes && !/^[ \t\r\n]/u.test(attributes))) return unread;
+    if (!closing && stack.length && /(?:^|[ \t\r\n])xmlns[ \t\r\n]*[:=]/u.test(attributes.replace(/"[^"]*"|'[^']*'/gu, '""'))) return unread;
     if (closing) {
       if (empty || attributes.trim() || stack.pop() !== name) return malformed;
       if (open && stack.length === 2) { licences.push({ attributes: open.attributes, body: plain.slice(open.from, tag.index) }); open = null; }
@@ -192,7 +202,10 @@ function restoredPackages(packagesDir) {
  */
 export function check(config, root, packagesDir, tracked) {
   const { ships, tools, accepted } = nugetConfig(config);
-  const { allowedFor } = policy(config);
+  const { allowedFor, tools: known } = policy(config);
+  // (an accepted licence is named so that a machine can read it: ids this check knows, or LicenseRef-<name>)
+  const ids = new Set([...known, ...allowedFor("", true, "data"), ...allowedFor("", true, "font")]);
+  const readable = (licence) => { const words = licence.match(/\(|\)|[^\s()]+/gu) ?? []; return words.length > 0 && words.every((w, i) => ["(", ")", "AND", "OR", "WITH"].includes(w) || ids.has(w) || /^LicenseRef-[A-Za-z0-9.-]+$/u.test(w) || (words[i - 1] === "WITH" && /^[A-Za-z0-9.-]+$/u.test(w))); };
   const failures = [];
   const own = tracked.filter((f) => !f.startsWith("core/"));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
@@ -205,7 +218,9 @@ export function check(config, root, packagesDir, tracked) {
     let text = "";
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
     if (/NuGetLockFilePath/iu.test(text)) failures.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read`);
+    if (/RestorePackagesPath/iu.test(text)) failures.push(`${f} names RestorePackagesPath: packages restored to another folder are ones this check does not read`);
   }
+  for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   const listed = [...ships, ...tools];
   for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config: say whether its packages ship`);
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
@@ -261,6 +276,7 @@ export function check(config, root, packagesDir, tracked) {
       used.add(k);
       const never = [a.licence, licence.expression, entry?.licence].filter((l) => typeof l === "string" && NEVER.test(l));
       if (never.length) failures.push(`${name}: accepted, and under ${never[0]}, terms floor rule 10 never allows`);
+      if (!readable(a.licence)) failures.push(`${name}: accepted under "${a.licence}", which no machine can read: name it by an SPDX id this check knows, or as LicenseRef-<a name for it>, as LicenseRef-Vendor-EULA for one that was bought`);
       if (entry) failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both: an accepted package stands in "nuget.accepted" alone, since the licence check holds every audit entry to its list`);
       if (p.shipped && a.ships !== true) failures.push(`${name}: accepted as a tool that only runs ("ships": false), and it is held as what ships: a yes for a tool is no yes for what ships (floor rule 10)`);
       if (p.shipped && !a.notice?.trim()) failures.push(`${name}: it ships, so its notice ships too (floor rule 10): its "notice" in "nuget.accepted"`);

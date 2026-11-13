@@ -57,7 +57,9 @@ jobs:
           node core/scripts/nuget.mjs --projects > "$RUNNER_TEMP/nuget-projects"
           failed=0
           while IFS= read -r project; do
-            dotnet restore --locked-mode "./$project" < /dev/null || failed=1 # (it reads nothing of the list)
+            # (the two properties given here overrule a project's own: its packages go to the folder the check reads,
+            # and its lock file is the one beside it; dotnet reads nothing of the list)
+            dotnet restore --locked-mode "-p:RestorePackagesPath=$NUGET_PACKAGES" -p:NuGetLockFilePath= "./$project" < /dev/null || failed=1
           done < "$RUNNER_TEMP/nuget-projects"
           if [ "$failed" = 1 ]; then
             echo "A restore from a lock file failed: the lock file is not what the project file asks for, or a package is not what its lock file names (floor rule 15)."
