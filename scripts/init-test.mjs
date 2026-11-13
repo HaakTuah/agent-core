@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
-import { FILES, files, fill, licences, modules, options, sizes } from "./init.mjs";
+import { COMMAND } from "./helper-call.mjs";
+import { FILES, TEMPLATES, files, fill, licences, linked, modules, named, options, sizes } from "./init.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -26,7 +27,10 @@ ok(throws(() => options(["--owner", "x", "--force"])) && throws(() => options(["
 ok(options(["--owner", "x", "--at", A]).at === A && throws(() => options(["--owner", "x", "--at", "main"])) && throws(() => options(["--owner", "x", "--at", A.slice(1)])), "a commit is 40 hex characters");
 ok(options(["--owner", "x", "--npm", "tools/"]).packages === "tools" && options(["--owner", "x", "--npm", "."]).packages === "." && options(["--owner", "x", "--npm", "a\\b"]).packages === "a/b", "the npm folder is read from the project's root, either slash");
 ok(throws(() => options(["--owner", "x", "--npm", "../out"])) && throws(() => options(["--owner", "x", "--npm", "/abs"])) && throws(() => options(["--owner", "x", "--npm", "a b"])) && throws(() => options(["--owner", "x", "--npm", "a/../../b"])) && throws(() => options(["--owner", "x", "--npm", "$(x)"])), "a folder outside the project, or one that is more than a path, stops it");
-ok(options(["--owner", "x", "--name", "A fine project"]).name === "A fine project" && throws(() => options(["--owner", "x", "--name", "two\nlines"])) && throws(() => options(["--owner", "x", "--name", "{{pin}}"])) && throws(() => options(["--owner", "x", "--name", "a | b"])) && throws(() => options(["--owner", "x", "--name", " padded "])), "a name is one line that can break no table, template or code span");
+ok(options(["--owner", "x", "--name", "A fine project"]).name === "A fine project" && named("Bark & Bite (2nd), v1.0!") && named("Tr\u00e6na's tool") && named("x"), "a name is letters, digits and blanks, with the few marks a name uses");
+for (const [what, bad] of [["a line break", "two\nlines"], ["a template's word", "{{pin}}"], ["a bar", "a | b"], ["blanks around it", " padded "], ["a blank at its end", "padded "], ["an @, which Claude Code reads as a file to take in", "Try @~/.ssh/id_rsa"], ["an @ at its start", "@AGENTS.md"], ["a tab", "a\tb"], ["a line separator", "a\u2028b"], ["a control character", "a\u0007b"], ["a backtick", "a`b"], ["an angle bracket", "a<b"], ["a dash at its start", "-x"], ["81 characters", "x".repeat(81)], ["nothing", ""]]) {
+  ok(!named(bad) && throws(() => options(["--owner", "x", "--name", bad])), `a name with ${what} is refused`);
+}
 
 // what the templates become
 ok(modules(["b.md", "game-design.md", "a.md"], false) === "`a.md`, `b.md`" && modules(["b.md", "game-design.md"], true) === "all", "a game takes every module, any other project each but the games' own, by name");
@@ -37,7 +41,7 @@ ok(JSON.stringify(licences({}, () => true)) === JSON.stringify({ ships: [], audi
 ok(licences({ packages: "tools" }, f => f === "tools/package-lock.json").lockfiles.join() === "tools/package-lock.json" && licences({ packages: "tools" }, () => false).lockfiles.length === 0 && licences({ packages: "." }, () => true).ignoreScriptsIn.join() === ".npmrc", "of npm's files only those that stand are named, from the project's root");
 
 const templates = [];
-const walk = dir => { for (const e of fs.readdirSync(path.join(root, "setup/template", dir), { withFileTypes: true })) e.isDirectory() ? walk(path.posix.join(dir, e.name)) : templates.push(path.posix.join(dir, e.name)); };
+const walk = dir => { for (const e of fs.readdirSync(path.join(root, TEMPLATES, dir), { withFileTypes: true })) e.isDirectory() ? walk(path.posix.join(dir, e.name)) : templates.push(path.posix.join(dir, e.name)); };
 walk("");
 ok(templates.every(t => t.endsWith(".tmpl")), "every file of the kit ends in .tmpl, so no tool or check takes one for the real thing", templates.filter(t => !t.endsWith(".tmpl")).join());
 const listed = new Set([...FILES.map(([t]) => t), "dependabot-npm.yml.tmpl"]);
@@ -47,7 +51,7 @@ ok(new Set(FILES.map(([, to]) => to)).size === FILES.length, "no two templates b
 // every call a template makes: to a workflow the core has, that can be called, with each input it requires
 const names = fs.readdirSync(path.join(root, ".github/workflows"));
 for (const [template] of FILES.filter(([t]) => t.startsWith("workflows/"))) {
-  const text = fs.readFileSync(path.join(root, "setup/template", template), "utf8");
+  const text = fs.readFileSync(path.join(root, TEMPLATES, template), "utf8");
   const calls = [...text.matchAll(/^\s+uses: (\S+)$/gm)].map(m => m[1]);
   const name = /^\{\{core\}\}\/\.github\/workflows\/([\w.-]+\.yml)@\{\{pin\}\}$/.exec(calls[0] ?? "")?.[1];
   ok(calls.length === 1 && name && names.includes(name), `${template} makes one call, to a workflow of the core's, at the pin`, calls.join());
@@ -55,14 +59,16 @@ for (const [template] of FILES.filter(([t]) => t.startsWith("workflows/"))) {
   const called = fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
   const required = [...called.matchAll(/^ {6}(\w+):\r?\n(?: {8}.*\r?\n)*? {8}required: true/gm)].map(m => m[1]);
   ok(/^ {2}workflow_call:/m.test(called) && required.every(input => new RegExp(`^ {6}${input}: \\S`, "m").test(text)), `${template} calls a workflow that can be called, and gives it ${required.join(", ") || "nothing, as it requires nothing"}`);
-  ok(!/pull_request_target/.test(text) && /^permissions:\r?\n {2}contents: read$/m.test(text) || name === "delete-merged-branches.yml", `${template} starts from contents: read`);
+  ok(!/pull_request_target/.test(text) && /^permissions:\r?\n {2}contents: read\r?\n\r?\njobs:/m.test(text), `${template} gives the whole workflow contents: read and nothing more; what a job needs beyond it, the job asks for`);
 }
 // what the README leaves to the templates to say (its point 5 points here for them): each workflow's triggers and permissions
-const template = name => fs.readFileSync(path.join(root, "setup/template/workflows", name), "utf8").replace(/\r\n/g, "\n");
+const template = name => fs.readFileSync(path.join(root, TEMPLATES, "workflows", name), "utf8").replace(/\r\n/g, "\n");
 ok(template("pr-description.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, edited, reopened, synchronize, ready_for_review]\n"), "the description check runs when a pull request opens, is edited, reopened, pushed to or marked ready");
-ok(template("security-review.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\n") && template("security-review.yml.tmpl").includes("permissions:\n  contents: read\n  pull-requests: read\n  statuses: write\n"), "the security-review check has its two triggers and its three permissions");
+ok(template("security-review.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\n") && template("security-review.yml.tmpl").includes("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n"), "the security-review check has its two triggers, and its job its three permissions");
 ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \* \* \*'.*\n  workflow_dispatch:\n/m.test(template("core-moved.yml.tmpl")) && template("core-moved.yml.tmpl").includes("    permissions:\n      contents: read\n      issues: write\n"), "the core-moved check runs daily or by hand, in a job that may read the repository and write issues");
-const whole = files({ owner: "someone", name: "P", packages: "tools" }, A, ["git.md"]).map(([, text]) => text).join("\n");
+const fromFolder = name => fs.readFileSync(path.join(root, TEMPLATES, name), "utf8");
+const whole = files({ owner: "someone", name: "P", packages: "tools" }, A, ["git.md"], fromFolder).map(([, text]) => text).join("\n");
+ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");
 ok(!/\{\{[a-z]+\}\}/.test(whole) && whole.includes("${{ secrets.PERSONAL_TERMS }}") && whole.includes(`uses: ${CORE}/.github/workflows/core.yml@${A}`) && whole.includes(`dependency-name: "${CORE}*"`), "filled in, no template word is left and GitHub's own expressions stand as written, each call is to the core's own address at the pin, and Dependabot leaves those calls alone");
 
 // the program whole: a scratch copy of the core as it stands here, and a scratch project
@@ -116,6 +122,40 @@ if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(p
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
 ok(p.status !== 0 || /\*\*the trusted builder:\*\*\n\s+FILL IN:/.test(read("SECURITY.md")) && p.out.includes("who may change the protected files"), "who may change the protected files is left for the project to say, and listed with what is left");
+// the kit is read from the commit, never from the clone's working folder: an edit not yet committed reaches no project
+const edited = path.join(core, TEMPLATES, "workflows", "core.yml.tmpl");
+const before = fs.readFileSync(edited, "utf8");
+fs.writeFileSync(edited, before.replace("contents: read", "contents: write"));
+const u = project("from-the-commit", "--owner", "x");
+fs.writeFileSync(edited, before);
+ok(u.status === 0 && fs.readFileSync(path.join(u.dir, ".github/workflows/core.yml"), "utf8").includes("contents: read") && !fs.readFileSync(path.join(u.dir, ".github/workflows/core.yml"), "utf8").includes("contents: write"), "a template edited in the clone and not committed is not what a project gets: it gets the commit's", u.out.slice(0, 300));
+
+// links: nothing is written through one, wherever it leads, and nothing at all once one is found
+ok(linked(tmp, "no/such/path") === null, "a path that is not there yet holds no link");
+const outside = path.join(tmp, "outside");
+fs.mkdirSync(outside);
+const link = (name, to, dir) => { const at = path.join(tmp, name); fs.mkdirSync(at); git(at, "init", "-q", "-b", "main"); dir(at, to); return at; };
+let canLink = true;
+try { fs.symlinkSync(outside, path.join(tmp, "probe"), "dir"); } catch { canLink = false; }
+if (!canLink) console.log("skip the links: this machine lets the test make none");
+else {
+  const a = link("linked-folder", outside, (at, to) => fs.symlinkSync(to, path.join(at, ".claude"), "dir"));
+  ok(linked(a, ".claude/settings.json") === ".claude", "a link is found at the part of the path where it stands");
+  const ra = run(a, script, "--owner", "x");
+  ok(ra.status === 1 && ra.out.includes("writes through no link") && fs.readdirSync(outside).length === 0 && fs.readdirSync(a).sort().join() === ".claude,.git", "a folder of the project that is a link to elsewhere stops the kit before it writes anything, there or here", ra.out.slice(0, 300));
+  const b = link("linked-file", path.join(outside, "missing.md"), (at, to) => fs.symlinkSync(to, path.join(at, "AGENTS.md"), "file"));
+  const rb = run(b, script, "--owner", "x");
+  ok(rb.status === 1 && fs.readdirSync(outside).length === 0 && fs.readdirSync(b).sort().join() === ".git,AGENTS.md", "so does a file that is a link to one not yet there: the file it names is never made", rb.out.slice(0, 300));
+  const c = link("linked-core", outside, (at, to) => fs.symlinkSync(to, path.join(at, "core"), "dir"));
+  const rc = run(c, script, "--owner", "x");
+  ok(rc.status === 1 && fs.readdirSync(outside).length === 0, "and a core/ that is a link: the copy is written into no other folder", rc.out.slice(0, 300));
+}
+// git's own variables that point elsewhere: the kit still writes into the project it is run in, from the clone it lies in
+const pointedDir = path.join(tmp, "pointed-elsewhere");
+fs.mkdirSync(pointedDir);
+git(pointedDir, "init", "-q", "-b", "main");
+const pe = spawnSync(process.execPath, [script, "--owner", "x"], { cwd: pointedDir, env: { ...env, GIT_DIR: path.join(p.dir, ".git"), GIT_WORK_TREE: p.dir }, encoding: "utf8" });
+ok(pe.status === 0 && fs.existsSync(path.join(pointedDir, "core-manifest.md")) && git(p.dir, "status", "--porcelain") === "" && git(pointedDir, "status", "--porcelain").includes("A  core-manifest.md"), "with git pointed at another project's repository, the kit writes and stages in the project it is run in, and leaves the other as it was", (pe.stdout + pe.stderr).slice(0, 300));
 const r = project("no-owner");
 ok(r.status === 1 && fs.readdirSync(r.dir).join() === ".git", "without an owner it writes nothing");
 fs.mkdirSync(path.join(p.dir, "sub"));

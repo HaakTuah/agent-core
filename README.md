@@ -89,12 +89,12 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
    - **A project whose orchestrator does not wake every day** also has a `core-moved.yml` of its own, as its template
-     has it (a daily schedule, and a job that may read the repository and write issues): it keeps one issue open for
-     the owner while this repository's `main` is past the project's pin (`core/scripts/core-moved.mjs`), and opens no
-     pull request, since one a workflow opens gets no checks. A session of the trusted builder's (floor rule 3)
-     started with no orchestrator asks the same at its start (`core/scripts/core-moved.mjs`, with `--dry`) and syncs
-     first where the core has moved ("Sessions" in `modules/work-flow.md`), so that issue is the backstop for the days
-     no session starts.
+     has it (a daily schedule or a start by hand, and a job that may read the repository and write issues): it keeps
+     one issue open for the owner while this repository's `main` is past the project's pin
+     (`core/scripts/core-moved.mjs`), and opens no pull request, since one a workflow opens gets no checks. A session
+     of the trusted builder's (floor rule 3) started with no orchestrator asks the same at its start
+     (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
+     `modules/work-flow.md`), so that issue is the backstop for the days no session starts.
    - **Only a sync PR moves those pins,** and only when the called workflow changed; `core.yml` fails a call pinned
      where it differs from the core's pin.
    - **A sync changes nothing of the project's own,** and the core tested its scripts before the sync brings them: so

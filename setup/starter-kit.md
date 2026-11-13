@@ -13,7 +13,12 @@ node <the clone>/scripts/init.mjs --owner <the owner's GitHub login>
 ```
 
 It never overwrites: where the project already has one of its files, it names them and writes nothing. What it wrote
-is staged and not committed, so the first PR shows it whole.
+is staged and not committed, so the first PR shows it whole. The templates and the copy are both read from the commit
+the clone stands on, never from an edit not yet committed there.
+
+**A project of another owner** follows the core's releases (`README.md`, "How a project takes the core", point 1), so
+it starts from one: its clone is made at the newest release (`git clone --branch release-N`), and the script, the
+templates and the copy are then all that release's.
 
 Every template ends in `.tmpl`, so that no tool takes one for a rule file, a workflow or a config of this repository
 or of a project that holds the copy (floor rule 3), and no check reads one as the real thing. `scripts/init-test.mjs`

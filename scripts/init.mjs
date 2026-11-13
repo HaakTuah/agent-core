@@ -2,9 +2,11 @@
 // the root of a project that has none of these files yet, it writes what the project needs before its first task (the
 // manifest, the rule files, the hooks' settings, the configs of the copies, reading-size and licence checks, the issue
 // forms, Dependabot's config and its calls to the core's workflows, each pinned to the commit the manifest pins) and
-// makes the first copy of the core under core/. It never overwrites: where one of its files exists, it names them and
-// writes nothing. It ends by listing what is left: the lines the project fills in itself, and the owner's settings.
-// It commits and pushes nothing. Git, tar and Node's own modules only.
+// makes the first copy of the core under core/. The templates and the copy are both read from the commit the manifest
+// pins, never from the clone's working folder, so what it writes is what was reviewed. It never overwrites: where one
+// of its files exists, it names them and writes nothing; nor does it write through a link, which could lead outside
+// the project (floor rule 13). It ends by listing what is left: the lines the project fills in itself, and the owner's
+// settings. It commits and pushes nothing. Git, tar and Node's own modules only.
 //
 //   node <the clone>/scripts/init.mjs --owner <login> [--name <the project's name>] [--at <full SHA>]
 //                                     [--npm <the folder of package-lock.json>] [--private] [--game]
@@ -21,11 +23,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const TEMPLATES = path.join(ROOT, "setup", "template");
-const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+export const TEMPLATES = "setup/template";
+// (every call without git's own variables that point at another repository, so each lands in the folder it names:
+// releases.mjs)
+const raw = (args, cwd, env = plainEnv()) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
+const git = (args, cwd, env) => raw(args, cwd, env).trim();
+// For every call made in the project itself, whose own git settings are not the kit's to trust (a folder may come
+// whole from someone else): the two settings that run a command are turned off, as work-saved.sh turns them off.
+const guarded = () => ({ ...plainEnv(), GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "core.fsmonitor", GIT_CONFIG_VALUE_0: "false", GIT_CONFIG_KEY_1: "core.hooksPath", GIT_CONFIG_VALUE_1: "/dev/null" });
 class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
 
@@ -62,6 +71,26 @@ const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", 
   "core/modules/inbox.md", "core/modules/work-flow.md", "core/modules/git.md", "core/modules/claude.md", "core/modules/other-builders.md"];
 const KB = 1024;
 
+// A project's name as it may stand in a rule file's heading: letters, digits and blanks, and the few marks a name
+// uses, beginning with a letter or digit and ending with no blank. Nothing a tool reads as more than a name gets in:
+// no @ (Claude Code takes "@path" in a rule file for a file to read in), no line break of any kind, no control
+// character, no bracket, brace, backtick or bar. The folder's name, where it serves as the project's, is held to it too.
+export const NAME = "at most 80 letters, digits and blanks, with . _ ' & , ( ) + ! - where a name needs them, beginning with a letter or digit";
+export const named = text => /^[\p{L}\p{N}][\p{L}\p{N} ._'&,()+!-]{0,79}$/u.test(text) && !text.endsWith(" ");
+
+// The part of a path inside the project that is a link, if any, or null: nothing is written through one, since it may
+// lead outside the project. A path that does not exist yet has none from there on.
+export function linked(root, to) {
+  let at = root;
+  for (const part of to.split("/")) {
+    at = path.join(at, part);
+    let found;
+    try { found = fs.lstatSync(at); } catch { return null; }
+    if (found.isSymbolicLink()) return path.relative(root, at).split(path.sep).join("/");
+  }
+  return null;
+}
+
 // The options of a command line, or a Failure that says what is wrong with it. Each value is held to its own form
 // before it reaches a file: a login, a commit, a folder inside the project, a name on one line.
 export function options(argv) {
@@ -76,7 +105,7 @@ export function options(argv) {
   }
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(o.owner ?? "")) fail("--owner <login>: the owner's GitHub login (letters, digits and hyphens)");
   if (o.at !== undefined && !/^[0-9a-f]{40}$/.test(o.at)) fail("--at <full SHA>: the core's commit as 40 hex characters");
-  if (o.name !== undefined && (!/^[^\r\n{}`|<>]{1,80}$/u.test(o.name) || o.name.trim() !== o.name)) fail("--name: one line of 80 characters at most, without braces, backticks, bars or angle brackets");
+  if (o.name !== undefined && !named(o.name)) fail(`--name: ${NAME}`);
   if (o.packages !== undefined) {
     o.packages = o.packages.replace(/\\/g, "/").replace(/\/+$/, "") || ".";
     if (!/^(\.|[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*)$/.test(o.packages)) fail("--npm <folder>: a folder inside the project, from its root (. for the root itself)");
@@ -99,9 +128,9 @@ export function fill(text, words) {
 }
 
 // Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
-export function files(o, pin, moduleNames) {
+// `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
+export function files(o, pin, moduleNames, read) {
   const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, modules: modules(moduleNames, o.game) };
-  const read = name => fs.readFileSync(path.join(TEMPLATES, name), "utf8");
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     if (to === ".github/dependabot.yml" && o.packages !== undefined) text += fill(read("dependabot-npm.yml.tmpl"), { ...words, npm: o.packages === "." ? "" : o.packages });
@@ -131,11 +160,11 @@ function init(argv) {
   // (asked of git as a path from the repository's root, empty at the root itself: no two spellings of one folder,
   // such as Windows' short names, are ever compared)
   let below;
-  try { below = git(["rev-parse", "--show-prefix"], here); } catch { fail("run it in the root of the project's git repository (git init first)"); }
+  try { below = git(["rev-parse", "--show-prefix"], here, guarded()); } catch { fail("run it in the root of the project's git repository (git init first)"); }
   if (below !== "") fail("run it in the root of the project's git repository");
   if (fs.realpathSync.native(here) === fs.realpathSync.native(ROOT)) fail("run it in the project, not in the core itself");
   o.name ??= path.basename(here);
-  if (!/^[^\r\n{}`|<>]{1,80}$/u.test(o.name)) fail("the folder's name does not serve as the project's: give --name");
+  if (!named(o.name)) fail(`the folder's name does not serve as the project's (${NAME}): give --name`);
 
   let pin;
   try { pin = git(["rev-parse", `${o.at ?? "HEAD"}^{commit}`], ROOT); } catch { fail(o.at ? `${o.at} is no commit of this clone of the core` : "run it from a clone of the core (the script's own folder is no git repository)"); }
@@ -145,27 +174,30 @@ function init(argv) {
   if (main) { try { git(["merge-base", "--is-ancestor", pin, main], ROOT); } catch { fail(`${pin} is not a commit of the core's main, as this clone knows it`); } }
   const moduleNames = git(["ls-tree", "--name-only", `${pin}:modules`], ROOT).split("\n").filter(n => n.endsWith(".md"));
 
-  const out = files(o, pin, moduleNames);
-  const taken = [...out.map(([to]) => to), ...MADE].filter(to => fs.existsSync(path.join(here, to)));
+  const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
+  const out = files(o, pin, moduleNames, read);
+  const targets = [...out.map(([to]) => to), ...MADE];
+  const links = [...new Set(targets.map(to => linked(here, to)).filter(Boolean))];
+  if (links.length) fail(`the project holds a link at ${links.join(", ")}: the starter kit writes through no link, and wrote nothing`);
+  // (a link whose target is missing is there all the same: asked without following it)
+  const taken = targets.filter(to => { try { fs.lstatSync(path.join(here, to)); return true; } catch { return false; } });
   if (taken.length) fail(`the project already has ${taken.join(", ")}: the starter kit never overwrites, and wrote nothing`);
 
-  for (const [to, text] of out) {
-    fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true });
-    fs.writeFileSync(path.join(here, to), text);
-  }
+  // ("wx": a file that has appeared since, a link too, is refused and never written over)
+  const write = (to, text) => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag: "wx" }); };
+  for (const [to, text] of out) write(to, text);
   // the first copy, as the sync makes every copy: the core's tree at the pin, without what it keeps to itself
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, maxBuffer: 1 << 28 }) });
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
   const marks = sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(here, f)).size])));
-  fs.writeFileSync(path.join(here, "checks/sizes.json"), `${JSON.stringify(marks, null, 2)}\n`);
-  const licence = licences(o, f => fs.existsSync(path.join(here, f)));
-  fs.writeFileSync(path.join(here, "checks/licences.json"), `${JSON.stringify(licence, null, 2)}\n`);
+  write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
+  write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
   // the copies check's first baseline: the copies that stand today (it reads the files git knows of)
   const made = [...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"];
-  git(["add", "--", ...made], here);
-  execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: here, stdio: ["ignore", "ignore", "inherit"] });
-  git(["add", "--", "checks/copies-baseline.json"], here);
+  git(["add", "--", ...made], here, guarded());
+  execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
+  git(["add", "--", "checks/copies-baseline.json"], here, guarded());
 
   console.log(`The starter kit is written: ${out.length + 3} files (the last three checks/sizes.json, checks/licences.json and checks/copies-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).trim()}` : null).filter(Boolean));
