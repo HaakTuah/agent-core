@@ -116,7 +116,7 @@ jobs:
           # (the config, its audit and each folder it names as a source, each by its exact name, and the caller)
           if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | strings | select(startswith("https://") | not)' "$CONFIG"); then
             paths+=(":(literal)$CONFIG")
-            while IFS= read -r p; do [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$extra"
+            while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$extra" # (jq on Windows ends lines with CR)
             caller=${CALLER#"$GITHUB_REPOSITORY"/}; caller=${caller%%@*}
             [ -n "$caller" ] && [ "$caller" != "$CALLER" ] && paths+=(":(literal)$caller")
             if { git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$BASE"; } \
