@@ -330,11 +330,17 @@ export function check(config, root) {
         if (e.kind !== "own" || e.licence !== OWNER) failures.push(`${config.audit}: ${e.name}: the owner's own work is "kind": "own" with ${OWNER}, and only it`);
         continue;
       }
-      const a = yesFor("entry", e.name);
+      // (a yes names an entry with its version, where it has one: a new version is a new entry to it)
+      const a = accepted.find((y) => y.entry === e.name && y.version === e.version);
       if (licenceOk(e.licence, allowedFor(e.name, e.ships === true, e.kind ?? null))) { if (a) onList.add(a); }
       // (a NuGet package's yes stands in "nuget.accepted" alone, where the NuGet check holds it to its exact version)
       else if (a && e.kind === "nuget") { needed.add(a); failures.push(`${config.audit}: ${e.name}: a NuGet package's yes stands in "nuget.accepted", never in "accepted"`); }
-      else if (a) { needed.add(a); failures.push(...yesFaults(`${config.audit}: ${e.name}`, { licence: e.licence, ships: e.ships === true }, e.ships === true, [], lists, null)); }
+      else if (a) {
+        needed.add(a);
+        // (the audit's own words for the licence are the yes's, letter for letter, readable or not)
+        if (a.licence !== e.licence) failures.push(`${config.audit}: ${e.name}: accepted under ${a.licence}, and recorded as under ${e.licence}: another licence is another yes`);
+        failures.push(...yesFaults(`${config.audit}: ${e.name}`, a, e.ships === true, [e.licence], lists, null));
+      }
       else failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}`);
       if (e.ships === true && notices !== null && !(notices === undefined ? typeof e.notice === "string" && e.notice.trim() : notices.includes(e.name))) {
         failures.push(`${config.audit}: ${e.name}: it ships, so its notice ships too (floor rule 10): ${notices === undefined ? 'its "notice", for the notices the project builds' : `its name in ${config.notices}`}`);
@@ -342,7 +348,7 @@ export function check(config, root) {
     }
   }
   for (const a of accepted) {
-    if (!needed.has(a)) failures.push(`"accepted" names ${a.package ?? `the audit entry ${a.entry}`}, which ${onList.has(a) ? "is on its list and needs no yes" : a.package ? "nothing installs" : "the audit does not hold"}: remove it`);
+    if (!needed.has(a)) failures.push(`"accepted" names ${a.package ?? `the audit entry ${a.entry}${a.version === undefined ? "" : ` at version ${a.version}`}`}, which ${onList.has(a) ? "is on its list and needs no yes" : a.package ? "nothing installs" : "the audit does not hold"}: remove it`);
   }
   const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? []) : undefined;
   if (scanned) failures.push(...scanned.failures);

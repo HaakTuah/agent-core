@@ -77,7 +77,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
-     words (`licence-yes.mjs`; floor rule 10), and passes for that one version alone.
+     words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
+     tool or what ships.
    - **With the copies check,** `pointers.mjs` and `reading-size.mjs`, the pointer check and the reading-size check,
      the second with marks of its own (the *size marks*), and `workflows.mjs`, which needs no config and fails a
      workflow that names `pull_request_target` (floor rule 2).

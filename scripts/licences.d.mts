@@ -8,7 +8,7 @@ export interface LicenceConfig {
   notices?: string;
   ignoreScriptsIn?: string[];
   scan?: { served?: string[]; tools?: string[]; skip?: string[] };
-  accepted?: ({ package: string; licence: string; ships: boolean; yes: string; notice?: string } | { entry: string; yes: string })[];
+  accepted?: ({ package: string; licence: string; ships: boolean; yes: string; notice?: string } | { entry: string; version?: string; licence: string; ships: boolean; yes: string })[];
 }
 export function floorList(file?: string | URL): { any: string[]; data: string[]; fonts: string[]; publicDomain: boolean };
 export function policy(config?: Partial<LicenceConfig>): {
