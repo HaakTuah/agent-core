@@ -385,10 +385,38 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Answered that there were three gaps: only the orchestrator was told to look, so a session started with none never
      did, and the daily issue was then the one signal; the rule did not name how to tell that the core had moved; and
-     "once a day" had nothing to count from. Offered one sentence where every session reads it at the start of a task:
+     "once a day" had nothing to count from. Offered one sentence where every session reads it at the start of a task,
+     "A session no orchestrator started, and the orchestrator on every wake, first checks whether the core has moved
+     (the script named) and imports if so; where checks cost money, not while an import pull request from the same day
+     exists.":
 
      > Do it expertly!
 
-     Behind "With no orchestrator, a session first syncs the core as one would" in `modules/work-flow.md`,
-     `core-moved.mjs --dry` in `modules/orchestrating.md`, and the README's "a sync PR opened that day being the
-     day's" (item 177 is in the pull request that was open beside this one).
+     First written shorter than offered, to fit the rules' size; asked whether it stood as offered (item 179):
+
+     > I agree, keep it.
+
+     Behind the last sentence of "Sessions" in `modules/work-flow.md`.
+
+179. **13 November 2026** (the core, in the design chat), told that the wait for a security review that starts by itself
+     had been written in the review rules and not in the floor, where he had been told it would stand, because the
+     floor had no room under the rules' size cap:
+
+     > That seems bad, if something ought to be somewhere, like the floor, but is cut or moved due to size
+     > constraints? That is abiding by the rules rather than by the principles that put them there in place in the
+     > first place. If there are more instances like this, remedy it, expert!
+
+     > Are there more rules lacking anchors? Investigate and remedy!
+
+     Told what would follow: the cap raised one step and its principle written down (it keeps the rules lean and
+     decides nothing else), every rule moved or cut for size put back, and each limit a session cannot check given
+     what it counts from:
+
+     > Yes, expertly to all of this!
+
+     Behind floor rule 8's "A security review that starts by itself when a PR opens is waited for and read on every
+     PR, a pure sync's too"; the cap at 48 KB and "The size cap keeps the rules lean and decides nothing else" in
+     `AGENTS.md`; and, put back or anchored: the fallback reviewer named in the *code reviewers*' order and "its
+     closed PRs and the *progress file* say" in `modules/roles.md`, a posted security review "naming the tool and the
+     commit it read" and "the project's newest PRs that asked it show" in `modules/reviews.md`, and the hints the
+     orchestrator's rule had lost.
