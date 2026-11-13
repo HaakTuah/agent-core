@@ -30,7 +30,7 @@ const t = tally([
   c("10", "2026-11-13T09:00:00Z", "The stand-in's verdict matched."),
 ]);
 ok(same(t.verdicts, { "unsure yes": 1, "unsure later": 1, "sure yes": 1 }), "every verdict counts, an updated one too", JSON.stringify(t.verdicts));
-ok(same(t.answers, { matched: { unsure: 1, "no verdict seen": 1 }, missed: { sure: 1 } }), "an answer is set against the issue's last verdict before it; none from an outsider counts", JSON.stringify(t.answers));
+ok(same(t.answers, { matched: { unsure: 1, "no verdict seen": 1 }, missed: { sure: 1 } }), "an answer is set against the issue's last verdict before it; none from another account counts", JSON.stringify(t.answers));
 ok(print(t, "some-one/x") === "The stand-in's record in some-one/x, from 8 comments:\n  verdicts on ideas: 3 (sure yes 1, unsure later 1, unsure yes 1)\n  the owner's answers marked: 3, matched 2 (no verdict seen: 1 of 1; sure: 0 of 1; unsure: 1 of 1)", "the printed record", print(t, "some-one/x"));
 ok(print(tally([]), "some-one/x") === "The stand-in's record in some-one/x, from 0 comments:\n  verdicts on ideas: 0\n  the owner's answers marked: 0, matched 0", "an empty record prints its zeros");
 
