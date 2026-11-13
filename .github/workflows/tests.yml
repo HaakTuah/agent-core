@@ -77,6 +77,9 @@ jobs:
       - name: Whether a script was started by itself
         if: ${{ !cancelled() }}
         run: node scripts/started-test.mjs
+      - name: The starter kit, and the core's own checks on a project it writes
+        if: ${{ !cancelled() }}
+        run: node scripts/init-test.mjs
       - name: The pointer check
         if: ${{ !cancelled() }}
         run: node scripts/pointers-test.mjs
