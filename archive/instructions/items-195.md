@@ -65,7 +65,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      read, by a session reading the licence by hand and recording it in the audit, with nobody asked where what it
      read was on the list, so that a misreading would put a package into what ships unless a review caught it. And
      that the NuGet check started advisory in a project, saying what it would fail and passing, until the project
-     turned that off. Put to him: whether a licence read by hand for a package that ships should need the owner's
+     turned that off. Put to the owner: whether a licence read by hand for a package that ships should need the owner's
      yes too, which closes that gap and stops a session more often; and whether the NuGet check should enforce from
      the first day and not after an advisory week, which this session would have kept.
 
