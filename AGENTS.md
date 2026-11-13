@@ -31,7 +31,8 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
   is moved from where it belongs, cut short or left out to fit, nor is another rule's reason, name or example cut to
   make room. It rises, one step of a whole KB, only as "A mark on what every session reads" in
   `modules/review-guidelines.md` says of any such mark (core archive 182): here those files are the floor and the
-  modules.
+  modules, and `.github/workflows/size.yml` fails a raise of more than one step, and one in a PR with no
+  "Leanness check:" comment.
 - **The design session writes and merges changes here,** each carried into every project by that project's sync PR. It
   also does here what "Sessions" in `modules/work-flow.md` asks of a session that ends: it reads what reviews left after
   a merge (`modules/reviews.md`, point 2) and cleans up what it made.

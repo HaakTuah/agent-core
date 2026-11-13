@@ -87,6 +87,9 @@ jobs:
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
         if: ${{ !cancelled() }}
         run: node scripts/init-dotnet-test.mjs
+      - name: The cap's own check
+        if: ${{ !cancelled() }}
+        run: node scripts/size-test.mjs
       - name: The pointer check
         if: ${{ !cancelled() }}
         run: node scripts/pointers-test.mjs
