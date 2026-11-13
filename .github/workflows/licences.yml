@@ -1,7 +1,8 @@
 # The licence check (floor rule 10), for every project that takes the core: on every pull request, Dependabot's
 # included, it fails one that adds or updates a package under a licence off its list. GitHub's dependency review holds
 # what the PR changes to the tools' list (it cannot tell what ships), letting the data and font packages the project
-# names through; core/scripts/licences.mjs then holds every package of the project's lockfiles, and its audit's entries
+# names through, and those the owner accepted under a licence off that list (core/scripts/licence-yes.mjs);
+# core/scripts/licences.mjs then holds every package of the project's lockfiles, and its audit's entries
 # (which its scan, core/scripts/licence-scan.mjs, holds whole, where the config asks), each to its own list: what ships
 # to floor rule 10's, tools that only run to the tools'. Both lists come from that script, so they stand in one place.
 # The script reads each package's licence and dependencies from the lockfile as npm wrote it (npm checks a package's

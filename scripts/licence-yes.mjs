@@ -9,9 +9,11 @@
 // its notice being the entry's own. A yes holds for what the owner saw and no further: for one version and not the
 // next, for the licence it names and not another the lockfile, the manifest or the audit comes to record, for a
 // tool and not for what ships; and none takes in terms the floor never allows (non-commercial, no-derivatives,
-// source-available). Each check fails a yes that nothing needs any more, so a list only shrinks by itself. Whether
-// the owner said what a "yes" quotes, the reviews hold, the config being a protected file. Node's own modules only;
-// it reads no file.
+// source-available), by any id or word for them the licence check knows, in the yes or in what else names the
+// licence. Each check fails a yes that nothing needs any more, so a list only shrinks by itself. What no machine
+// holds: that a name the owner gave (LicenseRef-<name>) is true to the terms it stands for, a package whose own
+// fields say "UNLICENSED" or point to a file being read by hand like any other; and whether the owner said what a
+// "yes" quotes. The reviews hold both, the config being a protected file. Node's own modules only; it reads no file.
 
 /**
  * A list of what the owner accepted off a list (this config's "accepted", the NuGet check's "nuget.accepted"),
@@ -39,15 +41,16 @@ export function acceptedList(list = [], key, named, shape, { entries = false, sa
 export function readable(licence, ids) {
   const words = typeof licence === "string" ? licence.match(/\(|\)|[^\s()]+/gu) ?? [] : [];
   const joins = ["AND", "OR", "WITH"];
+  if (words.length > 100) return false; // (no licence anyone wrote is that long, and each bracket is a call deeper)
   let at = 0;
   const term = () => {
     if (words[at] === "(") { at++; return level() && words[at++] === ")"; }
     const name = words[at++];
-    if (name === undefined || !(ids.has(name) || /^LicenseRef-[A-Za-z0-9.-]+$/u.test(name))) return false;
+    if (name === undefined || !(ids.has(name) || /^LicenseRef-[A-Za-z0-9][A-Za-z0-9.-]*$/u.test(name))) return false;
     if (words[at] !== "WITH") return true;
     const exception = words[at + 1];
     at += 2;
-    return exception !== undefined && !joins.includes(exception) && /^[A-Za-z0-9.-]+$/u.test(exception);
+    return exception !== undefined && !joins.includes(exception) && /^[A-Za-z0-9][A-Za-z0-9.-]*$/u.test(exception);
   };
   const level = () => {
     if (!term()) return false;
@@ -66,10 +69,12 @@ export function readable(licence, ids) {
  */
 export function yesFaults(name, a, shipped, others, lists, where) {
   const ids = new Set([...lists.tools, ...lists.allowedFor("", true, "data"), ...lists.allowedFor("", true, "font")]);
-  const never = [a.licence, ...others].filter((l) => typeof l === "string" && lists.never.test(l));
+  // (what a lockfile or an audit holds for a licence may be no text at all: read as the JSON it is, so nothing hides in it)
+  const said = others.filter((l) => l !== undefined && l !== null).map((l) => (typeof l === "string" ? l : JSON.stringify(l)));
+  const never = [a.licence, ...said].filter((l) => lists.never.test(l));
   const faults = [];
   if (never.length) faults.push(`${name}: accepted, and under ${never[0]}, terms floor rule 10 never allows`);
-  const other = others.find((l) => typeof l === "string" && l.trim() !== String(a.licence).trim() && readable(l, ids));
+  const other = said.find((l) => l.trim() !== String(a.licence).trim() && readable(l, ids));
   if (other !== undefined) faults.push(`${name}: accepted under ${a.licence}, and recorded as under ${other}: another licence is another yes`);
   if (!readable(a.licence, ids)) faults.push(`${name}: accepted under "${a.licence}", which no machine can read: name it by an SPDX id this check knows, or as LicenseRef-<a name for it>, as LicenseRef-Vendor-EULA for one that was bought`);
   if (shipped && a.ships !== true) faults.push(`${name}: accepted as a tool that only runs ("ships": false), and it is held as what ships: a yes for a tool is no yes for what ships (floor rule 10)`);

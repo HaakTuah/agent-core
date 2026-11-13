@@ -67,8 +67,12 @@ const PUBLIC_DOMAIN = { any: ["Public Domain"], data: ["PDDL-1.0"] };
 const GITHUB_SERVICES = new Set(["CodeQL CLI"]);
 const GITHUB_TERMS = "LicenseRef-GitHub-Terms";
 const OWNER = "LicenseRef-Owner";
-// What the floor never allows on either list, and copyleft, never in what ships: a guard on the lists themselves.
-const NEVER = /(^|-)(NC|ND)(-|$)|BUSL|SSPL|Elastic|Commons-Clause/iu;
+// What the floor never allows on either list or by any yes (non-commercial, no-derivatives and source-available
+// terms, by the ids and the words they go by), and copyleft, never in what ships: a guard on the lists themselves.
+const NEVER = new RegExp([
+  "(^|[^a-z])(NC|ND|FSL)([^a-z]|$)", "non[-_ ]?commercial", "no[-_ ]?deriv", "BUSL", "business[-_ ]?source", "SSPL", "server[-_ ]?side",
+  "elastic", "commons[-_ ]?clause", "polyform", "functional[-_ ]?source", "source[-_ ]?available",
+].join("|"), "iu");
 const COPYLEFT = /GPL|MPL|EPL|CDDL|-SA(-|$)/iu;
 
 /** Floor rule 10's list for what ships, read from its own words: { any, data, fonts, publicDomain }. */
@@ -168,6 +172,14 @@ export function licenceOk(expression, allow) {
 export function registryName(resolved) {
   const match = /^https:\/\/registry\.npmjs\.org\/((?:@[^/]+\/)?[^/@]+)\/-\/[^/]+\.tgz$/u.exec(resolved ?? "");
   return match?.[1];
+}
+
+/** The version a registry tarball address names (`.../-/<name>-<version>.tgz`, the name without its scope), or undefined. */
+export function registryVersion(resolved) {
+  const name = registryName(resolved);
+  if (name === undefined) return undefined;
+  const file = resolved.slice(resolved.lastIndexOf("/") + 1, -4), base = name.slice(name.indexOf("/") + 1);
+  return file.startsWith(`${base}-`) ? file.slice(base.length + 1) : undefined;
 }
 
 /**
@@ -292,7 +304,7 @@ function lockfilePackages(root, lockPath, ships) {
     .map(([path, entry]) => {
       const target = entry.link ? lock.packages[entry.resolved] ?? {} : entry;
       const name = path.slice(path.lastIndexOf("node_modules/") + 13);
-      return { name, version: target.version, license: target.license, registryName: entry.link ? undefined : registryName(entry.resolved), shipped: shipped.has(path), lockPath };
+      return { name, version: target.version, license: target.license, registryName: entry.link ? undefined : registryName(entry.resolved), registryVersion: entry.link ? undefined : registryVersion(entry.resolved), shipped: shipped.has(path), lockPath };
     });
 }
 
@@ -306,12 +318,13 @@ export function check(config, root) {
   const yesFor = (kind, name) => accepted.find((a) => a[kind] === name);
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
   for (const p of packages) {
-    // (a yes names a package as the registry does, like "data" and "fonts": never by a name a lockfile could be given)
-    const a = p.registryName === undefined ? undefined : yesFor("package", `${p.registryName}@${p.version}`);
+    // (a yes names a package and its version as the registry's address does, like "data" and "fonts": never by a
+    // name or a version a lockfile could be given beside it)
+    const a = p.registryName === undefined || p.registryVersion !== p.version ? undefined : yesFor("package", `${p.registryName}@${p.version}`);
     if (licenceOk(p.license, allowedFor(p.registryName ?? "", p.shipped))) { if (a) onList.add(a); continue; }
     if (a) { needed.add(a); failures.push(...yesFaults(a.package, a, p.shipped, [p.license], lists, '"accepted"')); continue; }
-    const never = typeof p.license === "string" && NEVER.test(p.license);
-    failures.push(`off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license ?? "no licence"}), in ${p.lockPath}${never ? "" : `; one the owner wants anyway is named in the config's "accepted", with the owner's words (floor rule 10)`}`);
+    const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
+    failures.push(`off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? "" : `; one the owner wants anyway is named in the config's "accepted", with the owner's words (floor rule 10)`}`);
   }
   let entries = [];
   if (config.audit) {
@@ -366,6 +379,19 @@ export function check(config, root) {
   return { failures: all, summary };
 }
 
+/**
+ * The dependency review's lists, as lines for $GITHUB_OUTPUT. It holds every package it sees to the tools' list (it
+ * cannot tell what ships), and lets the named data and font packages through to this check, which holds each to its
+ * own list; and, of those the owner accepted, the ones whose accepted licence the tools' list would refuse, which this
+ * check holds to its yes for that exact version (the review knows a package by its name alone, so it reads no version
+ * of such a one).
+ */
+export function actionLists(config) {
+  const lists = policy(config), tools = new Set(lists.tools);
+  const yeses = (config.accepted ?? []).filter((a) => a.package !== undefined && !licenceOk(a.licence, tools)).map((a) => a.package.slice(0, a.package.lastIndexOf("@")));
+  return [`allow-licenses=${lists.tools.join(",")}`, `allow-dependencies-licenses=${[...new Set([...(config.data ?? []), ...(config.fonts ?? []), ...yeses])].map((n) => `pkg:npm/${n}`).join(",")}`];
+}
+
 if (started(import.meta.url)) {
   const fail = (msg) => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const configPath = process.argv.slice(2).find((a) => !a.startsWith("--"));
@@ -376,12 +402,7 @@ if (started(import.meta.url)) {
     root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
   } catch (e) { fail(e.message); }
   if (process.argv.includes("--action")) {
-    // The dependency review holds every package it sees to the tools' list (it cannot tell what ships), and lets the
-    // named data and font packages, and those the owner accepted, through to this check, which holds each to its own
-    // list, or to its yes for that exact version.
-    console.log(`allow-licenses=${policy(config).tools.join(",")}`);
-    const yeses = (config.accepted ?? []).filter((a) => a.package !== undefined).map((a) => a.package.slice(0, a.package.lastIndexOf("@")));
-    console.log(`allow-dependencies-licenses=${[...new Set([...(config.data ?? []), ...(config.fonts ?? []), ...yeses])].map((n) => `pkg:npm/${n}`).join(",")}`);
+    for (const line of actionLists(config)) console.log(line);
   } else {
     let result;
     try { result = check(config, root); } catch (e) { fail(e.message); }
