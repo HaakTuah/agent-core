@@ -188,7 +188,8 @@ export function registryVersion(resolved) {
  * the package.json files (`manifest(dir)`, dir "" for its own), not the lockfile's `dev` flags; each name resolved as
  * Node resolves it, from the nearest node_modules folder up. Peer and optional dependencies count, since they may be
  * bundled. Each package's own `dependencies` and `license` are the lockfile's, as npm wrote them: npm checks a
- * package's bytes against the lockfile, never those fields, so a hand edit to them is a review finding.
+ * package's bytes against the lockfile, never those fields. Each `license` is read back from the installed package by
+ * licence-installed.mjs, beside this file; a hand edit to the `dependencies` is a review finding.
  */
 export function shippedPaths(packages, workspaces, manifest) {
   const deps = (m) => Object.keys({ ...m.dependencies, ...m.optionalDependencies, ...m.peerDependencies });
