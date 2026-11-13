@@ -1,0 +1,13 @@
+  # The NuGet packages of the solution or project files under {{nuget}}/. The core's licence and exact-version checks
+  # read npm's lists alone: a check of the project's own holds these packages (SECURITY.md, rules 7 and 10).
+  - package-ecosystem: "nuget"
+    directory: "/{{nuget}}"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    groups:
+      nuget-packages:
+        patterns: ["*"]
+        update-types: ["minor", "patch"] # a new major is its own PR (core/modules/updates.md)
