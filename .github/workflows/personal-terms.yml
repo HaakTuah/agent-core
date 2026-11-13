@@ -2,8 +2,10 @@
 # from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
 # written into the repository, since the list itself would be personal. Of each commit since the rule it reads the
 # message, the author's and the committer's name and address (save those of a merge GitHub itself made, which floor
-# rule 11 excepts), and the lines it adds (with the files' names), so a term that one commit adds and a later one
-# takes out still fails: merging keeps every commit (core archive 201). It reads
+# rule 11 excepts, told by its committer; one written by hand to look so passes too, which the check, made against
+# slips, does not hold), the lines it adds (a merge's, those its own resolution adds) and the names of the files it
+# writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit (core
+# archive 201). The commits read are the pull request's own, its base's left out. It reads
 # no file git takes for binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where
 # a term was found (file and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project
 # that has not set it) it passes with a note: the check is optional.
@@ -55,8 +57,13 @@ jobs:
             # Only commits made since the rule (2 November 2026): older ones cannot be changed without rewriting history.
             # One commit at a time, so every new commit is checked, not only the newest.
             # --since-as-filter skips older commits without stopping the walk; a failing rev-list fails the job.
-            commits=$(git rev-list --since-as-filter='2026-11-02T17:30:00Z' "$BASE..HEAD")
-            bad="" people="" added=""
+            # The checkout is GitHub's merge of the pull request into its base: what its first parent holds is the
+            # base's, whatever commit the event names as the base, so it is left out.
+            mine=(); if git rev-parse -q --verify 'HEAD^2' > /dev/null; then mine=('^HEAD^1'); fi
+            commits=$(git rev-list --since-as-filter='2026-11-02T17:30:00Z' "$BASE..HEAD" "${mine[@]}")
+            bad="" people="" added="" names=""
+            # (no step here names a shell, so GitHub runs it without pipefail: a grep -q that stops early never makes a
+            # hit read as a miss)
             for c in $commits; do
               short=$(git rev-parse --short "$c")
               if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
@@ -64,12 +71,16 @@ jobs:
               # floor rule 11 excepts it)
               if [ "$(git log -1 --format='%P|%cn <%ce>' "$c" | sed 's/^[^ |]* [^|]*|/merge|/')" != "merge|GitHub <noreply@github.com>" ] \
                 && git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list"; then people="$people $short"; fi
-              # (the lines it adds, and the names of the files it writes: a merge's own diff is none)
-              if git show --format= --patch --diff-merges=off --no-ext-diff --no-textconv --no-color "$c" | grep '^+' | grep -q -i -F -f "$list"; then added="$added $short"; fi
+              # (the lines it adds, a merge's those its own resolution adds)
+              if git show --format= --patch --remerge-diff --no-ext-diff --no-textconv --no-color "$c" | grep '^+' | grep -q -i -F -f "$list"; then added="$added $short"; fi
+              # (the names of every file it writes, as git holds them: empty, renamed or binary ones too, none quoted; a merge's,
+              # those its own resolution writes)
+              if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
             done
             if [ -n "$bad" ]; then echo "A personal term is in these commits' messages:"; echo "$bad"; found=1; fi
             if [ -n "$people" ]; then echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1; fi
-            if [ -n "$added" ]; then echo "A personal term is in a line, or a file's name, that these commits add:"; echo "$added"; found=1; fi
+            if [ -n "$added" ]; then echo "A personal term is in a line that these commits add:"; echo "$added"; found=1; fi
+            if [ -n "$names" ]; then echo "A personal term is in the name of a file that these commits write:"; echo "$names"; found=1; fi
           fi
           if grep -q -i -F -f "$list" <<< "$TITLE"$'\n'"$BODY"; then echo "A personal term is in the PR's title or description."; found=1; fi
           rm -f "$list"
