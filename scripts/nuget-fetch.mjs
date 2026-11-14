@@ -25,8 +25,8 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { baseOf, loadConfig, textAt } from "./licences.mjs";
-import { REGISTRY, lockPackages, nugetConfig, sourcesOf } from "./nuget.mjs";
+import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
+import { REGISTRY, lockPackages, nugetConfig, sourcesOf, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
@@ -67,7 +67,7 @@ export function nuspecOf(zip) {
  */
 export function toolsOf(text, at) {
   let manifest;
-  try { manifest = JSON.parse(text); } catch { return { tools: [], failures: [`${at} is not JSON`], failed: [] }; }
+  try { manifest = JSON.parse(unmarked(text)); } catch { return { tools: [], failures: [`${at} is not JSON`], failed: [] }; }
   const tools = [], failed = [];
   for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
     if (!ID.test(id)) { failed.push({ id, version: entry?.version, failure: `${at}: ${shown(id)}: no tool id it can read` }); continue; }
@@ -79,7 +79,13 @@ export function toolsOf(text, at) {
 /** The tools a manifest held at the base, by id@version as written, in lower case; null where none can be read. */
 function toolsAt(root, base, f) {
   if (!base) return null;
-  try { return new Set(Object.entries(JSON.parse(textAt(root, base, f) ?? "{}")?.tools ?? {}).map(([id, e]) => `${id}@${e?.version}`.toLowerCase())); } catch { return new Set(); }
+  try { return new Set(Object.entries(JSON.parse(unmarked(textAt(root, base, f) ?? "{}"))?.tools ?? {}).map(([id, e]) => `${id}@${e?.version}`.toLowerCase())); } catch { return new Set(); }
+}
+// The id and version a package file's manifest names, as NuGet reads them to tell packages apart: one of each, in the
+// plain form a manifest writes them, or null.
+function named(nuspec) {
+  const ids = [...nuspec.matchAll(/<id>([^<>]*)<\/id>/gu)], versions = [...nuspec.matchAll(/<version>([^<>]*)<\/version>/gu)];
+  return ids.length === 1 && versions.length === 1 ? { id: ids[0][1].trim(), version: versions[0][1].trim() } : null;
 }
 
 const sha512 = (bytes) => createHash("sha512").update(bytes).digest("base64");
@@ -187,8 +193,12 @@ async function fromSource(source, id, version) {
  * Every package and tool, fetched into `into`, read against the pull request's `base` (a commit, or null):
  * { failures, notes, reports, summary }.
  */
-export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null } = {}) {
+export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null, baseConfig = null } = {}) {
   const { ships, tools: toolLocks } = nugetConfig(config);
+  // (a tool counts as the base's only where the base held this config, with the same sources: one a pull request's new
+  // source gives, or read by a config the base did not hold, is judged as new)
+  let sameSources = base === null;
+  try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n").toLowerCase() === [...nugetConfig(config).sources].sort().join("\n").toLowerCase(); } catch { /* (judged as new) */ }
   const failures = [], notes = [], reports = [], wanted = new Map();
   for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
     const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
@@ -199,8 +209,8 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     const text = readFileSync(join(root, f), "utf8"), read = toolsOf(text, f), before = toolsAt(root, base, f);
     // (a tool the base held at that version, or a manifest it held as it stands, was never read before this release:
     // what is wrong with it is reported; with no base to read it against, so is everything)
-    const same = before === null || textAt(root, base, f) === text;
-    const held = (id, version) => same || before.has(`${id}@${version}`.toLowerCase());
+    const same = before === null || (sameSources && textAt(root, base, f) === text);
+    const held = (id, version) => same || (sameSources && before.has(`${id}@${version}`.toLowerCase()));
     for (const x of read.failures.filter((x) => !read.failed.some((t) => t.failure === x))) (same ? reports : failures).push(x);
     for (const t of read.failed) (held(t.id, t.version) ? reports : failures).push(t.failure);
     for (const t of read.tools) if (!wanted.has(`${t.id}@${t.version}`.toLowerCase())) wanted.set(`${t.id}@${t.version}`.toLowerCase(), { ...t, from: f, tool: true, held: held(t.id, t.version) });
@@ -229,6 +239,12 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     if (bytes) {
       let nuspec;
       try { nuspec = nuspecOf(bytes); } catch (e) { out.failures.push(`${name}: ${shown(e.message)}`); }
+      // (a tool has no content hash: the file is the one its manifest names, by id and version as NuGet compares them)
+      const says = nuspec === undefined ? null : named(nuspec);
+      if (nuspec !== undefined && p.tool && (!says || says.id.toLowerCase() !== p.id.toLowerCase() || normal(says.version) !== normal(p.version))) {
+        out.failures.push(`${name}: the file ${taken} gives names ${says ? `${shown(says.id)}@${shown(says.version)}` : "no one id and version"} in its manifest`);
+        nuspec = undefined;
+      }
       if (nuspec !== undefined) {
         const dir = join(into, p.id.toLowerCase(), p.version.toLowerCase());
         mkdirSync(dir, { recursive: true });
@@ -261,7 +277,8 @@ if (started(import.meta.url)) {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
     mkdirSync(into, { recursive: true });
-    result = await fetchAll(loadConfig(configPath), root, tracked, into, undefined, { base: baseOf(root) });
+    const base = baseOf(root);
+    result = await fetchAll(loadConfig(configPath), root, tracked, into, undefined, { base, baseConfig: configAt(root, base, configPath) });
   } catch (e) { fail(e.message); }
   for (const n of result.notes) console.log(`note ${shown(n)}`);
   for (const r of result.reports) console.log(`REPORT: ${shown(r)}`);

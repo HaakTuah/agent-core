@@ -367,7 +367,8 @@ function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join
 
 /**
  * The check, on the project at `root`, read against `base` (a commit, or null) and the config as the base held it
- * (`baseConfig`, or null to read the base by this one): { failures, reports, summary }.
+ * (`baseConfig`; null where the base held none at this config's path, so that nothing counts as shipped there):
+ * { failures, reports, summary }.
  */
 export function check(config, root, base = null, baseConfig = null) {
   config = normalised(config);
@@ -375,7 +376,7 @@ export function check(config, root, base = null, baseConfig = null) {
   const failures = [], reports = [];
   // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the
   // base held only as a tool, or in a lock file whose packages did not ship then, was not shipped)
-  const heldIn = new Map(), then = baseConfig ? normalised(baseConfig) : config;
+  const heldIn = new Map(), then = baseConfig ? normalised(baseConfig) : { ships: [] };
   // (with no base to read it against, as in a checkout of one commit, what ships under a licence moved off is reported
   // and passes, as it passed before: held or not cannot be told, and no sync fails a project over it)
   const held = (lockPath, name, version) => {

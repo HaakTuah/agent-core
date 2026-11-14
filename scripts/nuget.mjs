@@ -96,6 +96,8 @@ const RESPONSE_FILE = /^(?:Directory\.Build|MSBuild)\.rsp$/iu; // options MSBuil
 const ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/u; // a package's id, as NuGet takes one
 const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writes one
 const key = (id, version) => `${id}@${version}`.toLowerCase();
+/** A JSON file's text without the byte-order mark dotnet reads past. */
+export const unmarked = (text) => (text.startsWith("\uFEFF") ? text.slice(1) : text);
 const CUT = "\u0000"; // stands where a comment, CDATA or a processing instruction was cut from a manifest: no XML holds it
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
 const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
@@ -270,8 +272,16 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // (what a lock file held at the base, by id@version: a package under a licence the floor moved off the list that it
   // held, in a lock file whose packages shipped then by the base's own config, is reported and passes; with no base to
   // read, as licences.mjs reads it, it is reported and passes too)
-  let shippedThen = ships;
-  try { if (baseConfig) shippedThen = nugetConfig(baseConfig).ships; } catch { /* (a base's config this cannot read: read by this one) */ }
+  // (where the base held no config at this one's path, or one this cannot read, nothing shipped there, and no tool is
+  // the base's; nor is one where the pull request changed the sources it may come from)
+  let shippedThen = [], sameSources = !base;
+  try {
+    if (baseConfig) {
+      const then = nugetConfig(baseConfig), list = (l) => [...l].map((x) => x.toLowerCase()).sort().join("\n");
+      shippedThen = then.ships;
+      sameSources = sameSources || list(then.sources) === list(sources);
+    }
+  } catch { /* (nothing shipped there) */ }
   const heldIn = new Map();
   const held = (lock, k) => {
     if (!base) return true;
@@ -333,7 +343,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   const toolsRead = new Set();
   for (const f of own.filter((t) => posix.basename(t).toLowerCase() === "dotnet-tools.json")) {
     let manifest = {};
-    try { manifest = JSON.parse(readFileSync(join(root, f), "utf8")); } catch { if (fetched) failures.push(`${f} is not JSON`); }
+    const text = readFileSync(join(root, f), "utf8");
+    try { manifest = JSON.parse(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
     if (!fetched) {
       for (const [id, entry] of Object.entries(manifest?.tools ?? {})) if (typeof entry?.version === "string") toolsRead.add(key(id, entry.version));
       continue;
@@ -342,7 +353,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     // with it is reported and passes, so that no sync fails a project over it; one a pull request adds or updates is
     // held to the list)
     let before = new Set();
-    try { before = base ? new Set(Object.entries(JSON.parse(textAt(root, base, f) ?? "{}")?.tools ?? {}).map(([id, e]) => key(id, String(e?.version)))) : null; } catch { before = new Set(); }
+    try { before = !base ? null : !sameSources ? new Set() : new Set(Object.entries(JSON.parse(unmarked(textAt(root, base, f) ?? "{}"))?.tools ?? {}).map(([id, e]) => key(id, String(e?.version)))); } catch { before = new Set(); }
     for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
       if (ID.test(id) && typeof entry?.version === "string" && VERSION.test(entry.version) && !packages.has(key(id, entry.version))) packages.set(key(id, entry.version), { id, version: entry.version, shipped: false, lock: f, tool: true, heldTool: before === null || before.has(key(id, entry.version)) });
     }
