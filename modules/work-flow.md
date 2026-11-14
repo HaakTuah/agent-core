@@ -18,6 +18,13 @@ Read at the start of every task.
    spots), beside the main lane and never ahead of it. Finds come from every screen of the newest build, at each size it
    is used at; each is its own small PR, with a before-and-after picture and its behaviour proven unchanged.
 
+**The owner's stop switch** (core archive 201): the branch `agents-stop` on the project's own repository, which the
+owner creates from any device to stop its agents and deletes to let them go on. Every session reads it at its start and
+before each commit (`git ls-remote origin refs/heads/agents-stop`; the work-saved hook says so at the start), and the
+orchestrator on every wake: where it stands, no task starts, and a running one commits and pushes what it has and stops,
+saying so; where it cannot be read, the session says so and reads it again before each commit. It stops only that
+repository's agents, never what the owner then asks a session for in person, and no agent creates or deletes it.
+
 **Sessions:** started task by task, stop when your task is merged, saying in your last message what merged and what is
 next (with no orchestrator, also that it can be archived); otherwise carry on with the next task. Before that message,
 on a machine that outlives the session, clean up what you made (core archive 187): what later work needs is pushed, what
