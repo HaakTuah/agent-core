@@ -1,6 +1,7 @@
-# Nothing personal, ever (floor rule 11). Fails a pull request whose files, commits, title or description hold a term
-# from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
-# written into the repository, since the list itself would be personal. Of each commit it reads the message, the
+# Nothing personal, ever (floor rule 11). Fails a pull request whose files, commits, title, description or branch name
+# hold a term from the PERSONAL_TERMS secret: one term per line, the blanks around it and a Windows line end not part
+# of it, set by the owner in the repository's Actions secrets and never written into the repository, since the list
+# itself would be personal. Of each commit it reads the message, the
 # author's and the committer's name and address (save those of a commit GitHub itself made, which floor rule 11 excepts:
 # a merge, "update branch", an edit or a suggestion committed on github.com, under a profile GitHub wrote as the author
 # of a merge it made on the base's side, since one made through GitHub's API takes whatever author its caller names;
@@ -13,9 +14,11 @@
 # there, the agents' too: its failure says how the session that made them mends it in the pull request itself (git's
 # name in the repository set to the login, the pull request's commits rewritten), so it holds a project once, never for
 # good (core archive 202; README.md, "Setting up (the owner's part)"). A file whose older name holds a term is deleted
-# or renamed away freely; a commit that only edits it fails, since the diff names it. It reads no file git takes for
-# binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where a term was found (file
-# and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project that has not set it) it
+# or renamed away freely; a commit that only edits it fails, since the diff names it. It reads no file whose content is
+# binary (a NUL byte, as git tells it: `git grep -I`, a diff's "Binary files differ"), pictures included, whatever a
+# .gitattributes says, which the check never reads. It prints only where a term was found (file and line, a file whose
+# name holds a term by its line alone, or the commit), never the term. Without the secret (a fork, Dependabot, a
+# project that has not set it) it
 # passes with a note: the check is optional. It checks this repository, and every project that takes the core calls it
 # (workflow_call), pinned to a full commit SHA (README.md, point 5), passing only that secret: the caller's event,
 # checkout and token are the caller's own.
@@ -52,15 +55,31 @@ jobs:
           TERMS: ${{ secrets.PERSONAL_TERMS }}
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
           umask 077
           list="$RUNNER_TEMP/terms"
-          printf '%s\n' "$TERMS" | sed '/^[[:space:]]*$/d' > "$list"
+          # (each term without the blanks around it, a carriage return among them, and no empty one)
+          printf '%s\n' "$TERMS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' > "$list"
           found=0
-          hits=$(git grep -I -n -i -F -f "$list" -- . | cut -d: -f1,2 || true)
-          if [ -n "$hits" ]; then echo "A personal term is in these files (file:line):"; echo "$hits"; found=1; fi
+          # (git with no attributes at all, read from the empty tree, so a .gitattributes of the pull request's own
+          # cannot have a file of text taken for binary and left unread; git older than 2.40 fails the check)
+          empty=$(git hash-object -t tree /dev/null); g() { git --attr-source="$empty" "$@"; }
+          rc=0; hits=$(g -c core.quotePath=false grep -I -n -i -F -f "$list" -- .) || rc=$?
+          if [ "$rc" -gt 1 ]; then echo "git could not read the files (it needs git 2.40 or later)"; found=1; fi
+          if [ -n "$hits" ]; then
+            echo "A personal term is in these files (file:line):"
+            # (what is printed is held to the list first: a file whose name holds a term is named by its line alone, a
+            # line number of digits or none, so no part of a name with a colon in it stands in for one)
+            printf '%s\n' "$hits" | cut -d: -f1,2 | while IFS= read -r at; do
+              if printf '%s\n' "$at" | grep -q -i -F -f "$list"; then
+                line=${at##*:}; case $line in '' | *[!0-9]*) line='?' ;; esac; echo "(a file whose name holds a term):$line"
+              else echo "$at"; fi
+            done
+            found=1
+          fi
           if [ -n "$BASE" ]; then
             # One commit at a time, so every new commit is checked, not only the newest; a failing rev-list fails the
             # job. The checkout is GitHub's merge of the pull request into its base: what its first parent holds is the
@@ -106,11 +125,14 @@ jobs:
                 && ! { made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; then
                 people="$people $short"
               fi
-              # (the lines it adds, a merge's those its own resolution adds; git that cannot show them, older than 2.36,
-              # fails the check rather than read nothing)
-              if ! patch=$(git show --format= --patch --remerge-diff --no-ext-diff --no-textconv --no-color "$c"); then
-                echo "git could not show what $short adds (it needs git 2.36 or later)"; found=1
-              elif printf '%s\n' "$patch" | grep '^+' | grep -q -i -F -f "$list"; then added="$added $short"; fi
+              # (the lines it adds, a merge's those its own resolution adds; an octopus merge, which git's remerge-diff
+              # skips, those in none of its parents, as its combined diff marks them; git that cannot show them, older
+              # than 2.40, fails the check rather than read nothing)
+              parents=$(($(git rev-list --parents -n 1 "$c" | wc -w) - 1))
+              if [ "$parents" -gt 2 ]; then how=--cc plus="^[+]{$parents}"; else how=--remerge-diff plus='^[+]'; fi
+              if ! patch=$(g show --format= --patch "$how" --no-ext-diff --no-textconv --no-color "$c"); then
+                echo "git could not show what $short adds (it needs git 2.40 or later)"; found=1
+              elif printf '%s\n' "$patch" | grep -E "$plus" | grep -q -i -F -f "$list"; then added="$added $short"; fi
               # (the names of every file it writes, not of one it deletes, so that an older name is taken out freely, as
               # git holds them: empty, renamed or binary ones too, none quoted; a merge's,
               # those its own resolution writes)
@@ -124,6 +146,6 @@ jobs:
             if [ -n "$added" ]; then echo "A personal term is in a line that these commits add:"; echo "$added"; found=1; fi
             if [ -n "$names" ]; then echo "A personal term is in the name of a file that these commits write:"; echo "$names"; found=1; fi
           fi
-          if grep -q -i -F -f "$list" <<< "$TITLE"$'\n'"$BODY"; then echo "A personal term is in the PR's title or description."; found=1; fi
+          if grep -q -i -F -f "$list" <<< "$TITLE"$'\n'"$BODY"$'\n'"$BRANCH"; then echo "A personal term is in the PR's title, description or branch name."; found=1; fi
           rm -rf "$list" "$RUNNER_TEMP/github-keys"
           exit "$found"
