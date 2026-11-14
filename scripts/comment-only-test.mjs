@@ -75,6 +75,13 @@ fails(edit("# v7.0.1", "# v7.0.2"), "the note beside an action's version, which 
 fails(edit("# the kinds", "# shellcheck disable=SC2086"), "a comment a linter reads as an instruction", "a tool may read as an instruction");
 fails(edit("      - name: The check", "      # zizmor: ignore[template-injection]\n      - name: The check"), "a comment line that silences a check", "a tool may read as an instruction");
 passes(edit("# the kinds", "# the kinds"), "a silencing comment taken out", edit("# the kinds", "# codeql[actions/x] the kinds"));
+fails(edit("# the kinds", "# nosemgrep"), "a semgrep marker", "instruction");
+fails(edit("# the kinds", "# checkov:skip=CKV_GHA_7"), "a checkov marker", "instruction");
+const two = "jobs:\n  a:\n    steps:\n      # codeql[actions/x]\n      - run: echo \"${{ github.event.issue.title }}\" # zizmor: ignore[template-injection]\n      - run: echo \"${{ github.event.pull_request.title }}\"\n";
+passes(two, "silencing comments where they stood", two);
+fails(two.replace(" # zizmor: ignore[template-injection]\n", "\n").replace("pull_request.title }}\"\n", "pull_request.title }}\" # zizmor: ignore[template-injection]\n"), "a silencing comment moved to another line", "added or moved", two);
+fails(two.replace("      # codeql[actions/x]\n", "").replace("      - run: echo \"${{ github.event.pull_request", "      # codeql[actions/x]\n      - run: echo \"${{ github.event.pull_request"), "a silencing comment line moved before another line", "added or moved", two);
+passes(two.replace(" # zizmor: ignore[template-injection]", ""), "a silencing comment taken off its line", two);
 passes(edit(' # a quoted value', ""), "a comment after a quoted value taken out");
 passes(edit("[opened, synchronize] # the kinds", "[opened, synchronize] # what starts it"), "a comment after [ ] changed");
 passes(edit("      - name: The check", "\n\n      - name: The check").replace("permissions:", "\npermissions:"), "blank lines between entries");
@@ -155,10 +162,12 @@ for (const [f, text] of own) {
 
 // ---- which files it reads, and which outside it refuses (a short name tried here, not on a disk: Windows would write
 // CLAUDE~1/settings.json into .claude/) ----
-ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", "action.yml", "tools/act/Action.YAML"].every(f => RUNS.test(f))
-  && !["github/x.yml", "x.github/y", "my-action.yml", "action.yml.md"].some(f => RUNS.test(f)), "what it reads: .github/ and .claude/ at any depth and in any case, and every action.yml");
-ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules"].every(f => RUNS_TOO.test(f))
-  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools' and packages' files, the copy of the core");
+ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", ".claude", "sub/.github", "action.yml", "tools/act/Action.YAML"].every(f => RUNS.test(f))
+  && !["github/x.yml", "x.github/y", "my-action.yml", "action.yml.md"].some(f => RUNS.test(f)), "what it reads: .github/ and .claude/, the folders themselves too, at any depth and in any case, and every action.yml");
+ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules",
+  "Directory.Build.targets", "src/App.csproj", "Directory.Packages.props", "NuGet.Config", "global.json", ".config/dotnet-tools.json", "src/packages.lock.json",
+  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc"].every(f => RUNS_TOO.test(f))
+  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, the copy of the core");
 
 // ---- the script end to end, on a pull request's branch ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "comment-only-test-"));
@@ -259,7 +268,7 @@ ok(r.status === 0 && r.out.includes(`${reviewed.slice(0, 7)}..${head.slice(0, 7)
 r = run();
 ok(r.status === 1, "the same branch against main: refused, for the change reviewed before", r.out);
 r = run(git(work, "rev-parse", "comments"));
-ok(r.status === 1 && r.out.includes("is no commit the head grew from"), "a commit given that the head did not grow from: refused", r.out);
+ok(r.status === 1 && r.out.includes("is no commit before the head that it grew from"), "a commit given that the head did not grow from: refused", r.out);
 
 // a link where it reads, on the side reviewed: what it points to is not read
 const linked = branch("link", () => { const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: work, env, input: "hooks.yml" }).toString().trim(); git(work, "update-index", "--add", "--cacheinfo", `120000,${blob},.claude/hooks.yml`); }, false);
@@ -268,6 +277,25 @@ git(work, "add", "--", WF);
 git(work, "commit", "-q", "-m", "a comment after the link");
 r = run(linked);
 ok(r.status === 1 && r.out.includes(`NOT ALONE .claude/hooks.yml: a link or submodule, at ${linked.slice(0, 7)}`), "a link under .claude/ on the side reviewed: refused", r.out);
+
+// a link named .claude deeper down, on the side reviewed
+const linkedFolder = branch("link-folder", () => { const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: work, env, input: "cfg" }).toString().trim(); git(work, "update-index", "--add", "--cacheinfo", `120000,${blob},sub/.claude`); }, false);
+write(work, WF, COMMENTS);
+git(work, "add", "--", WF);
+git(work, "commit", "-q", "-m", "a comment after the link");
+r = run(linkedFolder);
+ok(r.status === 1 && r.out.includes("NOT ALONE sub/.claude: a link or submodule"), "a link that is itself named .claude: refused", r.out);
+r = run("HEAD");
+ok(r.status === 1 && r.out.includes("is no commit before the head"), "the head given as the commit reviewed: refused, nothing being read", r.out);
+
+// main moves on: a head not up to date with it is not the head that merges
+git(work, "checkout", "-q", "-f", "-B", "moved", MAIN);
+write(work, "README.md", "main moved on\n");
+git(work, "commit", "-q", "-am", "main moves on");
+git(work, "push", "-q", "origin", "HEAD:main");
+branch("behind", () => write(work, WF, COMMENTS));
+r = run();
+ok(r.status === 1 && r.out.includes("the head is not up to date with main"), "a head behind main: refused until it is brought up to date", r.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the proof that a change is comments and steps' names alone`);
 process.exitCode = failed ? 1 : 0;

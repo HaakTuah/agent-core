@@ -29,7 +29,8 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
      PR needs one; otherwise the wait ends.
    - Floor rule 3's two each cover the whole diff; where it lets rule 8's one do (comments and steps' names alone),
      the comment below gives what `comment-only.mjs` printed on the head that merges, and the session's word on each
-     other file it lists; the code reviewer checks both, running it again on that head.
+     other file it lists; the code reviewer checks both, running it again on that head. That one review reads each
+     changed comment as one a tool may take as an instruction.
    - A session posts one, naming the tool and the commit it read, or that none is needed (the code reviewer checks
      that), in a comment that opens "Security review:", which the `security-review` check reads.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its

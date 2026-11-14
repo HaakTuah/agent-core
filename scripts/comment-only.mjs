@@ -6,38 +6,39 @@
 //   node <the core's main>/scripts/comment-only.mjs [<a commit already reviewed>]
 //
 // It reads the head commit, not the working tree, against the merge base with the project's main (fetched), or against
-// the commit given, which the head must have grown from, for a later commit reviewed only for what it changes (floor
-// rule 8). It reads every file the pull request changes under .github/ or .claude/ (any case, at any depth), and every
-// action.yml, a project's own action: each must be a YAML file changed in place, its mode kept, no link or submodule
-// there on either side, whose two versions differ only in YAML comments, blank lines between entries, and the `name` of
-// a job's steps. A step's name is the first key of an item under `jobs.<job>.steps` that YAML reads as text: holding no
-// `${{` and no backslash, which in quotes could spell one, so nothing is evaluated; quoted and not empty, or plain from
-// a letter and none of the words YAML reads as null, true or false. A comment added that a tool may read as an
-// instruction (an ignore, a disable, a linter's name) and a changed note beside an action's version (`uses:`) count as
-// changes. It reads YAML as GitHub's parser does where it reads it at all, and refuses, rather than guess, every line
-// it cannot read for sure: a tab, a carriage return or another control character or line break; a value that runs on to
-// the next line (a quoted or plain one, or one in [ ] or { }); a quote or # inside [ ] or { }; an anchor, alias, tag,
-// explicit key or document marker. A line inside a block scalar (`run: |`) is text, a # line too, and changes nothing
-// only where it is unchanged. Of the files outside what it reads, it refuses those that run by themselves or decide
-// what does (RUNS_TOO below) and lists the rest: it exits 0 where there are none, 1 where it refuses, and 2 where
-// others changed, which the session's "Security review:" comment says of, file by file, why each runs neither by itself
-// nor with credentials (modules/reviews.md, point 3). It prints the head it checked, for that comment and the merge.
-// Git and Node's own modules only; it changes nothing.
+// the commit given, one before the head that it grew from, for a later commit reviewed only for what it changes (floor
+// rule 8); a head not up to date with main is refused, being no head that merges. It reads every file the pull request
+// changes under .github/ or .claude/ (the folders themselves too, any case, at any depth), and every action.yml, a
+// project's own action: each must be a YAML file changed in place, its mode kept, no link or submodule there on either
+// side, whose two versions differ only in YAML comments, blank lines between entries, and the `name` of a job's steps.
+// A step's name is the first key of an item under `jobs.<job>.steps` that YAML reads as text: holding no `${{` and no
+// backslash, which in quotes could spell one, so nothing is evaluated; quoted and not empty, or plain from a letter and
+// none of the words YAML reads as null, true or false. A comment a tool may read as an instruction (an ignore, a
+// disable, a skip, a linter's or scanner's name) must stand word for word beside the same line as before, and the note
+// beside an action's version (`uses:`) must stand. It reads YAML as GitHub's parser does where it reads it at all, and
+// refuses, rather than guess, every line it cannot read for sure: a tab, a carriage return or another control character
+// or line break; a value that runs on to the next line (a quoted or plain one, or one in [ ] or { }); a quote or #
+// inside [ ] or { }; an anchor, alias, tag, explicit key or document marker. A line inside a block scalar (`run: |`) is
+// text, a # line too, and changes nothing only where it is unchanged. Of the files outside what it reads, it refuses
+// those that run by themselves or decide what does (RUNS_TOO below) and lists the rest: it exits 0 where there are
+// none, 1 where it refuses, and 2 where others changed, which the session's "Security review:" comment says of, file by
+// file, why each runs neither by itself nor with credentials (modules/reviews.md, point 3). It prints the head it
+// checked, for that comment and the merge. Git and Node's own modules only; it changes nothing.
 import { execFileSync } from "node:child_process";
 import { started } from "./started.mjs";
 
-export const RUNS = /(?:^|\/)(?:\.(?:github|claude)\/|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
+export const RUNS = /(?:^|\/)(?:\.(?:github|claude)(?:\/|$)|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
 const YAML = /\.ya?ml$/iu;
 // what YAML 1.1 or 1.2 reads as a line break besides \n, a tab, a byte order mark, and every other control character
 const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff]/u;
 const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scalar's header, with its comment if any
-// what else runs by itself or decides what does, refused outright: Claude Code's servers, an editor's or a
-// container's setup, the packages and their install scripts, the copy of the core, git's own attributes and
-// submodules, a container's build, and a name with "~" and a digit, which Windows can read as another folder's short
-// name (CLAUDE~1 for .claude)
-export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.gitmodules|\.gitattributes|Dockerfile[^/]*)$|(?:^|\/)\.(?:vscode|devcontainer)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
+// what else runs by itself or decides what does, refused outright: Claude Code's servers; an editor's, a container's
+// or a shell's setup and git's hooks; npm's and .NET's packages, tools, configs and builds (MSBuild runs a project's
+// targets) and the Node or SDK they pick; the copy of the core; git's own attributes and submodules; a container's
+// build; and a name with "~" and a digit, which Windows can read as another folder's short name (CLAUDE~1 for .claude)
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|Dockerfile[^/]*|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:csproj|fsproj|vbproj|props|targets))$|(?:^|\/)\.(?:vscode|devcontainer|husky)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
-const DIRECTIVE = /\b(?:ignore|disable|suppress|nosec|noqa|codeql|zizmor|actionlint|shellcheck|lint|pragma)/iu;
+const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string
 const NOT_TEXT = /^(?:~|null|true|false|yes|no|on|off|y|n)$/iu;
 
@@ -118,7 +119,7 @@ export function readYaml(text) {
     }
     if (blank) continue;
     const rest = line.slice(indent);
-    if (rest[0] === "#") { comments.push(rest); continue; }
+    if (rest[0] === "#") { comments.push({ text: rest, at: lines.length, own: true }); continue; }
     if (/^(?:---|\.\.\.)(?: |$)/u.test(rest)) { unread.push(`line ${n}: a document marker`); continue; }
     let at = 0, items = 0;
     while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; at++; while (rest[at] === " ") at++; }
@@ -134,7 +135,7 @@ export function readYaml(text) {
     const cut = value.comment === null ? rest.length : value.comment;
     const valueAt = value.kind === "empty" ? null : indent + value.start;
     const note = rest.slice(cut);
-    if (note) comments.push(note);
+    if (note) comments.push({ text: note, at: lines.length, own: false });
     lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
     if (value.kind === "block") block = { from: indent, fixed: value.fixed };
   }
@@ -185,12 +186,17 @@ export function proof(before, after) {
     const where = (lines, side) => lines[i] ? `${side} line ${lines[i].n}` : `${side}: nothing`;
     return { why: `more than a comment or a step's name changed (${where(a.lines, "before")}, ${where(b.lines, "after")})` };
   }
-  // a comment added or changed that a tool may read as an instruction; the note beside an action's version (`uses:`)
+  // a comment that a tool may read as an instruction, added, changed or moved (a tool reads it on its own line, or on
+  // the line after it): each must stand, word for word, beside the same line as before; the note beside an action's
+  // version (`uses:`)
+  const placed = (side, c) => `${c.own ? "before" : "on"} ${side.lines[c.at] ? kept(side.lines[c.at]) : "the end"}\u0000${c.text}`;
   const left = new Map();
-  for (const c of a.comments) left.set(c, (left.get(c) ?? 0) + 1);
+  for (const c of a.comments) if (DIRECTIVE.test(c.text)) left.set(placed(a, c), (left.get(placed(a, c)) ?? 0) + 1);
   for (const c of b.comments) {
-    if (left.get(c)) { left.set(c, left.get(c) - 1); continue; }
-    if (DIRECTIVE.test(c)) return { why: `a comment a tool may read as an instruction: ${c.slice(0, 80)}` };
+    if (!DIRECTIVE.test(c.text)) continue;
+    const key = placed(b, c);
+    if (left.get(key)) { left.set(key, left.get(key) - 1); continue; }
+    return { why: `a comment a tool may read as an instruction, added or moved: ${c.text.slice(0, 80)}` };
   }
   const note = a.lines.findIndex((l, i) => l.key === "uses" && l.note !== b.lines[i].note);
   if (note >= 0) return { why: `the note beside an action's version changed (before line ${a.lines[note].n}, after line ${b.lines[note].n})` };
@@ -201,16 +207,21 @@ if (started(import.meta.url)) {
   const git = (args, encoding = "utf8") => execFileSync("git", args, { encoding, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
   const clean = s => s.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, "?");
   const head = git(["rev-parse", "HEAD"]).trim();
-  let base;
+  git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
+  const main = git(["rev-parse", "FETCH_HEAD"]).trim();
+  try { git(["merge-base", "--is-ancestor", main, head]); } catch {
+    console.log(`the head is not up to date with main (${main.slice(0, 7)}): bring it up to date, and run this on the head that merges`);
+    process.exit(1);
+  }
+  let base = git(["merge-base", main, head]).trim();
   if (process.argv[2]) {
     base = git(["rev-parse", "--verify", "--end-of-options", `${process.argv[2]}^{commit}`]).trim();
-    try { git(["merge-base", "--is-ancestor", base, head]); } catch {
-      console.log(`${clean(process.argv[2])} is no commit the head grew from: a later commit is read only against one before it`);
+    let grew = base !== head;
+    try { git(["merge-base", "--is-ancestor", base, head]); } catch { grew = false; }
+    if (!grew) {
+      console.log(`${clean(process.argv[2])} is no commit before the head that it grew from: a later commit is read only against one before it`);
       process.exit(1);
     }
-  } else {
-    git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
-    base = git(["merge-base", "FETCH_HEAD", head]).trim();
   }
   const fields = git(["-c", "core.quotePath=false", "diff", "--raw", "-z", "--no-renames", "--no-abbrev", "--no-ext-diff", "--ignore-submodules=none", base, head]).split("\0");
   const fails = [], read = [], others = [];
