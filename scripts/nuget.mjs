@@ -126,7 +126,10 @@ export function imported(text) {
  *  relative one: "" for a path outside the project, null for one this cannot know without the build (a property other
  *  than $(MSBuildThisFileDirectory) at its start, which is `from`'s own folder, an item, an escape or a wildcard). */
 export function importPath(from, project) {
-  const p = project.replace(/^\$\(MSBuildThisFileDirectory\)/iu, "").replace(/\\/gu, "/");
+  // (the property ends in a separator, so one more after it is the same folder, never the top of a drive)
+  const here = /^\$\(MSBuildThisFileDirectory\)/iu.exec(project);
+  let p = project.slice(here ? here[0].length : 0).replace(/\\/gu, "/");
+  if (here) p = p.replace(/^\/+/u, "");
   if (/[$@%*?]/u.test(p)) return null;
   if (p.startsWith("/") || /^[A-Za-z]:/u.test(p)) return "";
   const at = posix.normalize(posix.join(posix.dirname(from), p));
@@ -406,20 +409,36 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // a file names is reported where the base held it as it stands and brought it in as well; one a pull request adds,
   // changes or brings into play fails, as does what a build file names)
   const now = importsOf(own, (f) => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } });
-  let then = null;
-  const broughtThen = (f) => {
-    if (!then) {
+  // (the base's files as MSBuild reads them: a link git knows is read through to the file it leads to, as a checkout
+  // that keeps links reads it now; one that leads out of the project, or to no file the base held, holds nothing)
+  let tree = null, then = null;
+  const baseTree = () => {
+    if (!tree) {
       let entries = "";
-      try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: nothing was brought in) */ }
-      const files = entries.split("\0").filter((e) => /^100(?:644|755) blob [0-9a-f]+\t/u.test(e)).map((e) => e.slice(e.indexOf("\t") + 1)).filter((x) => !x.startsWith("core/"));
-      then = importsOf(files, (x) => textAt(root, base, x)).brought;
+      try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
+      tree = new Map();
+      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000) blob [0-9a-f]+\t(.*)$/su.exec(e); if (m && !m[2].startsWith("core/")) tree.set(m[2], m[1]); }
     }
+    return tree;
+  };
+  const baseText = (file) => {
+    for (let f = file, hops = 0; hops < 40; hops++) {
+      const mode = baseTree().get(f), text = mode ? textAt(root, base, f) : null;
+      if (mode !== "120000" || text === null) return text;
+      if (text.startsWith("/") || /^[A-Za-z]:/u.test(text)) return null;
+      f = posix.normalize(posix.join(posix.dirname(f), text));
+      if (f === ".." || f.startsWith("../")) return null;
+    }
+    return null;
+  };
+  const broughtThen = (f) => {
+    if (!then) then = importsOf([...baseTree().keys()], baseText).brought;
     return then.has(f);
   };
   for (const [f, text] of now.files) {
     // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
-    const held = now.brought.has(f) ? !base || (textAt(root, base, f) === text && broughtThen(f))
+    const held = now.brought.has(f) ? !base || (baseText(f) === text && broughtThen(f))
       : /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
     const [to, tail] = held ? [reports, ` ${heldBefore}`] : [failures, ""];
     const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;

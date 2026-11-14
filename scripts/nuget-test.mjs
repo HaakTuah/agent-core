@@ -208,10 +208,10 @@ for (const text of hostile) imported(text);
 ok(imported(`<Import Project="${"a;".repeat(300000)}" />`).length === 300000, "an Import's list however long is read whole, past what a call takes as arguments");
 ok(Date.now() - started < 2000, "a pull request's build file, however long or unclosed, is read in one pass", `${Date.now() - started} ms`);
 ok(imported(`<Import Project="a.xml" Sdk="X" /><Import sdk='Y' Project='b.xml'/><Import Project="c.xml"/>`).map((x) => `${x.project}:${x.sdk}`).join() === "a.xml:true,b.xml:true,c.xml:false", "an Import that names an SDK is told apart, as MSBuild finds its file in the SDK");
-ok(importPath("build/Deps.props", "deps.xml") === "build/deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)..\\shared\\x.config") === "shared/x.config" && importPath("build/Deps.props", "$(msbuildthisfiledirectory)./a//b.xml") === "build/a/b.xml" && importPath("A.props", "deps.xml") === "deps.xml"
+ok(importPath("build/Deps.props", "deps.xml") === "build/deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)..\\shared\\x.config") === "shared/x.config" && importPath("build/Deps.props", "$(msbuildthisfiledirectory)./a//b.xml") === "build/a/b.xml" && importPath("A.props", "deps.xml") === "deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)/deps.xml") === "build/deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)\\\\deps.xml") === "build/deps.xml"
   && importPath("build/Deps.props", "../../x.xml") === "" && importPath("build/Deps.props", "/etc/x.xml") === "" && importPath("build/Deps.props", "C:\\x.xml") === ""
   && ["$(Root)x.xml", "x/$(MSBuildThisFileDirectory)y.xml", "@(Files)", "a%3Bb.xml", "*.xml", "dir/**/x.xml", "x?.xml"].every((p) => importPath("build/Deps.props", p) === null),
-  "an Import's path is read beside the file that imports it, $(MSBuildThisFileDirectory) as that file's folder; one outside the project is no file of its own, and a property, item, escape or wildcard one the check cannot know");
+  "an Import's path is read beside the file that imports it, $(MSBuildThisFileDirectory) as that file's folder, a separator after it or not; one outside the project is no file of its own, and a property, item, escape or wildcard one the check cannot know");
 // a file an Import brings in that git knows is read like a build file (#269): what it names fails, and so does what a
 // file it imports names in turn, however it is spelled; one an SDK's Import names is not looked for in the project
 put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Project="$(MSBuildThisFileDirectory)..\\shared\\more.config" /><Import Project="sdk.xml" Sdk="X" /></Project>`);
@@ -364,6 +364,19 @@ ok(!deps.failures.some(x => x.includes(DEPS)) && deps.reports.some(x => x.includ
 inRepo(DEPS, `${depsText}\n`);
 deps = depsCheck();
 ok(deps.failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)), "the same file changed by the pull request: it fails", JSON.stringify(deps));
+// a link git knows, which an Import brings in, read through to its file at the base as it is now (a checkout that keeps
+// links): unchanged, reported; one whose file the pull request changes, failing
+if (process.platform !== "win32") {
+  fs.symlinkSync("deps.xml", path.join(repo, "build/link.xml"));
+  inRepo(DEPS, depsText); inRepo("Directory.Build.props", `<Project><Import Project="build/link.xml" /></Project>`); git("add", "-A"); git("commit", "-q", "-m", "an imported link");
+  const linked = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS, "build/link.xml"], process.env, { base: "HEAD", baseConfig: null });
+  deps = linked();
+  ok(!deps.failures.some(x => x.includes("build/link.xml")) && deps.reports.some(x => x.includes("build/link.xml, which an Import brings in, names NuGetLockFilePath") && x.includes("held before this check read it")), "an imported link the base held, leading to a file it held, both as they stand: reported, and passes", JSON.stringify(deps));
+  inRepo(DEPS, `${depsText}\n`);
+  deps = linked();
+  ok(deps.failures.some(x => x.includes("build/link.xml, which an Import brings in, names NuGetLockFilePath")), "the same link, whose file the pull request changes: it fails", JSON.stringify(deps));
+  fs.rmSync(path.join(repo, "build/link.xml"));
+}
 fs.rmSync(path.join(repo, DEPS)); fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no imports");
 // a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
 // passing; changed by the pull request, failing
