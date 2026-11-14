@@ -284,15 +284,18 @@ Floor: whole. Modules: <all, or the list of those taken>.
   own. Both are the owner's choice: no check of the core's fails, waits or warns where they are not set up (core
   archive 201).
 - The owner's GitHub profile: GitHub writes the profile's name and the account's address as the author of every merge
-  it makes, into the history of every repository the account merges in, and no check of ours sees a merge before it is
-  made. An owner who wants neither there leaves the name empty, so that GitHub writes the login, and turns on "Keep my
-  email addresses private" (Settings, Emails), so that it writes an address of its own that holds only the login. One
-  who keeps a name on the profile has it in every merge, which the floor leaves to that owner (floor rule 11).
+  it makes, and of every edit or suggestion committed on github.com, into the history of every repository the account
+  works in, and no check of ours sees a merge before it is made. An owner who wants neither there leaves the name
+  empty, so that GitHub writes the login, and turns on "Keep my email addresses private" (Settings, Emails), so that it
+  writes an address of its own that holds only the login. One who keeps a name on the profile has it in each such
+  commit, which the floor leaves to that owner (floor rule 11), and the personal-terms check passes them, as GitHub's
+  own by its signature.
 - Git's own name on each machine that commits: git writes `user.name` and `user.email`, as that machine sets them, as
   the author and committer of every commit made there, the agents' too. An owner who wants neither in the history sets
   them to the login and the account's no-reply address (`git config --global user.name <login>`, and the address
-  under Settings, Emails). The personal-terms check fails such a name in a public repository and only reports it in a
-  private one, where failing it would fail every pull request from that machine.
+  under Settings, Emails). The personal-terms check fails a listed name there in every repository, and its failure
+  says how the session mends that pull request: git's name set in the repository, its commits rewritten (core archive
+  202).
 - Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
   Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
   is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is asked

@@ -2,11 +2,12 @@
 // runs it (workflow-run.mjs, beside this file), on scratch pull requests, each checked out as GitHub checks one out: its
 // merge into its base. What fails: a term in a file, in a line a commit adds and a later one takes away, in a line a
 // merge's own resolution adds, in a file's name (an empty file, a rename, a binary file, a name outside plain ASCII),
-// in a commit's message, author or committer (name or address), and in the title or description; a commit dated before
-// the rule too, since a date is whatever its maker writes. What passes: none of these; a term only in a file git reads
-// as binary (not read); a file on main named with a term before the rule, deleted or renamed away; in a private
-// repository, a term only in a commit's author or committer, reported and not failed; only in the
-// author of a merge GitHub itself made (floor rule 11's exception), committed as GitHub and signed by its key, while
+// in a commit's message, author or committer (name or address), in a private repository too, its failure saying how
+// to mend it, and in the title or description; a commit dated before the rule too, since a date is whatever its maker
+// writes. What passes: none of these; a term only in a file git reads as binary (not read); a file on main named with
+// a term before the rule, deleted or renamed away; only in the
+// author of a commit GitHub itself made (floor rule 11's exception: a merge, or an edit on github.com), committed as
+// GitHub and signed by its key, while
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
@@ -111,13 +112,11 @@ fails("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${t
 fails("a term in a commit's author name", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]));
 fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@example.invalid` }]]));
 fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COMMITTER_NAME: term }]]));
-// in a private repository, a name the machine's git writes into every commit is reported, never failed: failing it
-// would fail every pull request made there (the core's AGENTS.md, "Nothing locks another owner's project")
+// a name the machine's git writes into every commit fails in a private repository too, and the failure says how the
+// session mends the pull request itself (core archive 202), naming both commits
 const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@example.invalid` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
-ok(named.passed && /::warning::A personal term is in the author or committer/.test(named.out) && (named.out.match(/::warning::[^\n]*/)?.[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
-  "in a private repository, a term only in commits' author or committer passes, reported with both commits named and the term never printed", named.out);
-fails("in a private repository, a term in a line a commit adds, whoever its author", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term }], [{ "b.md": "gone\n" }]]), { isPrivate: true });
-fails("in a private repository, a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), { isPrivate: true });
+ok(!named.passed && /To mend it, on the machine that made them/.test(named.out) && /--reset-author/.test(named.out) && (named.out.split("author or committer (name or address):\n")[1]?.split("\n")[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
+  "a term in commits' author or committer fails in a private repository too, both commits named, the mend said and the term never printed", named.out);
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
 const onMain = [[{ "c.md": "y\n" }, {}, "on main"]];
 const update = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], onMain);
@@ -160,7 +159,8 @@ if (gpg) {
   console.log("note gpg cannot run here, so the merges GitHub signs are not tried (the check runs on GitHub's Linux runners alone)");
 }
 fails("a merge anyone else made, with a term in its author", update({}));
-fails("a commit that is no merge, with a term in its author, whoever committed it", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
+if (gpg) passes("a commit that is no merge GitHub itself made (an edit on github.com), its author the acting account's profile", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
+fails("a commit that is no merge, with a term in its author, committed as GitHub but not signed", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...AS_GITHUB }]]));
 // a merge resolved by hand: the lines its resolution adds are read
 const resolved = pull([[{ "a.md": "one\nmine\nthree\n" }], [dir => {
   try { git(dir, ["merge", "-q", "--no-edit", "main"]); } catch { /* (the conflict, resolved below) */ }

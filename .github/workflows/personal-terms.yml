@@ -1,23 +1,23 @@
 # Nothing personal, ever (floor rule 11). Fails a pull request whose files, commits, title or description hold a term
 # from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
 # written into the repository, since the list itself would be personal. Of each commit it reads the message, the
-# author's and the committer's name and address (save those of a merge GitHub itself made, which floor rule 11 excepts:
-# one GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it cannot, no
-# merge is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and the names of
-# the files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit
+# author's and the committer's name and address (save those of a commit GitHub itself made, which floor rule 11 excepts:
+# a merge, "update branch", an edit or a suggestion committed on github.com, each GitHub commits and signs with its own
+# key, which the check fetches from GitHub as it runs, its author the acting account's profile; where it cannot, none is
+# excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and the names of the
+# files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit
 # (core archive 201). The commits read are the pull request's own, its base's left out, whatever date a commit bears: a
-# date is whatever its maker writes, and a commit not yet on main can still be changed. In a private repository a term
-# in a commit's author or committer is reported, naming the commits, and fails nothing (floor rule 11 excepts what git
-# writes there from the committing machine's settings): where the owner works on their own computer, git writes the name
-# set there into every commit, the agents' too, and failing it would fail the sync to a release and every pull request
-# after it (the core's AGENTS.md, "Nothing locks another owner's project"; README.md, "Setting up (the owner's part)",
-# says how to keep the name out). A file whose older name holds a term is deleted or renamed away freely; a commit that
-# only edits it fails, since the diff names it. It reads no file git takes for binary (`git grep -I`, a diff's "Binary
-# files differ"), pictures included. It prints only where a term was found (file and line, or the commit), never the
-# term. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note: the check is
-# optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
-# commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's
-# own.
+# date is whatever its maker writes, and a commit not yet on main can still be changed. A term in a commit's author or
+# committer most often comes from git's own name on the machine that committed, which git writes into every commit made
+# there, the agents' too: its failure says how the session that made them mends it in the pull request itself (git's
+# name in the repository set to the login, the pull request's commits rewritten), so it holds a project once, never for
+# good (core archive 202; README.md, "Setting up (the owner's part)"). A file whose older name holds a term is deleted
+# or renamed away freely; a commit that only edits it fails, since the diff names it. It reads no file git takes for
+# binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where a term was found (file
+# and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project that has not set it) it
+# passes with a note: the check is optional. It checks this repository, and every project that takes the core calls it
+# (workflow_call), pinned to a full commit SHA (README.md, point 5), passing only that secret: the caller's event,
+# checkout and token are the caller's own.
 name: Personal terms
 
 on:
@@ -52,7 +52,6 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
           BASE: ${{ github.event.pull_request.base.sha }}
-          PRIVATE: ${{ github.event.repository.private }}
         run: |
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
           umask 077
@@ -84,9 +83,10 @@ jobs:
             for c in $commits; do
               short=$(git rev-parse --short "$c")
               if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
-              # (save a merge GitHub itself made, "update branch" too, whose author is the merging account's profile:
-              # floor rule 11 excepts it; an OpenPGP signature on it good by a key of GitHub's, by its fingerprint)
-              if { [ "$(git log -1 --format='%P|%cn <%ce>' "$c" | sed 's/^[^ |]* [^|]*|/merge|/')" != "merge|GitHub <noreply@github.com>" ] \
+              # (save a commit GitHub itself made, a merge, "update branch" or an edit on github.com, whose author is the
+              # acting account's profile: floor rule 11 excepts it; an OpenPGP signature on it good by a key of GitHub's,
+              # by its fingerprint)
+              if { [ "$(git log -1 --format='%cn <%ce>' "$c")" != "GitHub <noreply@github.com>" ] \
                   || ! { sig=$(GNUPGHOME="$keys" git -c gpg.program=gpg -c gpg.x509.program=false -c gpg.ssh.program=false \
                            log -1 --format='%G? %GP' "$c" 2> /dev/null) && [ -n "$github" ] \
                          && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"; }; } \
@@ -102,10 +102,10 @@ jobs:
               if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames --diff-filter=d -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
             done
             if [ -n "$bad" ]; then echo "A personal term is in these commits' messages:"; echo "$bad"; found=1; fi
-            if [ -n "$people" ] && [ "$PRIVATE" = true ]; then
-              # (reported, not failed, in a private repository: the header says why)
-              echo "::warning::A personal term is in the author or committer (name or address) of these commits:$people. Reported, not failed, in a private repository: set git's user.name and user.email on each machine that commits here to keep it out (the core's README.md, \"Setting up (the owner's part)\")."
-            elif [ -n "$people" ]; then echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1; fi
+            if [ -n "$people" ]; then
+              echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1
+              echo "To mend it, on the machine that made them: set git's name and address in this repository to the account's login and its no-reply address (git config user.name <login>; git config user.email <the no-reply address under Settings, Emails>), rewrite this pull request's commits with them (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
+            fi
             if [ -n "$added" ]; then echo "A personal term is in a line that these commits add:"; echo "$added"; found=1; fi
             if [ -n "$names" ]; then echo "A personal term is in the name of a file that these commits write:"; echo "$names"; found=1; fi
           fi

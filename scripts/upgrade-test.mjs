@@ -4,18 +4,19 @@
 // unchanged, and no pull request of its own starts a job there that it did not start before the sync, since each job is
 // a billed minute in a private repository. From each, two projects of another owner: one whose packages come from npm,
 // public; one whose packages come from NuGet (.NET), private, held as Windows holds it (every file 100644, line endings
-// converted), every commit of it made under a name its term list holds, as git writes the name a machine sets (the
-// personal-terms check reports that in a private repository, never fails it). Each is synced the way a project of
-// another owner syncs (`node core/scripts/sync.mjs`, the release's own copy, which takes the newest release), and then
-// runs, as GitHub would for it (workflow-run.mjs, beside this file), every workflow of the core its own workflows call:
-// the sync's pull request, the push of its merge to main, a pull request of its own that touches only its docs, one
-// that touches its package files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs
-// them. GitHub's own services (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that
-// gives the security-review check one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from
-// the release it moves to, in both projects. It needs the core's history and release tags (a checkout with fetch-depth
-// 0); on GitHub's runners the .NET SDK too, which takes nothing from the network for a project with no package, while
-// npm takes one small package from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there
-// is one, and Node's own modules.
+// converted), every commit of it made under a name its term list holds, as git writes the name a machine sets, which
+// the personal-terms check fails, saying how the session mends it in the pull request itself, and the sync's pull
+// request is mended so (core archive 202). Each is synced the way a project of another owner syncs (`node
+// core/scripts/sync.mjs`, the release's own copy, which takes the newest release), and then runs, as GitHub would for
+// it (workflow-run.mjs, beside this file), every workflow of the core its own workflows call: the sync's pull request,
+// the push of its merge to main, a pull request of its own that touches only its docs, one that touches its package
+// files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs them. GitHub's own services
+// (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that gives the security-review check
+// one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from the release it moves to, in
+// both projects. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
+// .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
+// from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
+// modules.
 //
 //   node scripts/upgrade-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -146,7 +147,7 @@ function project(name, from, { owner, kit, isPrivate, windows, files, as }) {
   git(dir, "commit", "-q", "-m", "the project");
   const k = node(dir, path.join(from.dir, "scripts", "init.mjs"), "--owner", owner, "--name", name, "--at", from.sha, ...kit);
   ok(k.status === 0, `${name}: the starter kit of ${from.tag} writes it`, k.out);
-  return { name, dir, owner, isPrivate, repo: `${owner}/${name}` };
+  return { name, dir, owner, isPrivate, named: !!as, repo: `${owner}/${name}` };
 }
 const write = (dir, to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true }); fs.writeFileSync(path.join(dir, to), text); };
 
@@ -225,9 +226,21 @@ function upgrade(p, ownChanges, expect) {
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
   git(p.dir, "push", "-q", "origin", "sync");
-  const syncHead = git(p.dir, "rev-parse", "HEAD");
-  const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}` });
-  ok(!failures(onSync), `${p.name}: every check passes on the sync's pull request (${started(onSync).length} jobs)`, failures(onSync));
+  let syncHead = git(p.dir, "rev-parse", "HEAD");
+  let onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}` });
+  if (p.named) {
+    // its machine writes a listed name into every commit: the personal-terms check alone fails, saying how to mend it,
+    // and the session mends it in the pull request itself, as the failure says (core archive 202)
+    const failed = onSync.filter(([, r]) => !r.passed);
+    ok(failed.length === 1 && failed[0][0].startsWith("personal-terms.yml/") && failed[0][1].steps.some(x => /To mend it, on the machine that made them/.test(x.out)),
+      `${p.name}: on the sync's pull request, its commit carrying a listed name, only the personal-terms check fails, and it says how to mend it`, failures(onSync));
+    named.set(p.dir, { GIT_AUTHOR_NAME: p.owner, GIT_AUTHOR_EMAIL: `${p.owner}@users.noreply.github.com`, GIT_COMMITTER_NAME: p.owner, GIT_COMMITTER_EMAIL: `${p.owner}@users.noreply.github.com` });
+    git(p.dir, "rebase", "-q", "--exec", "git commit --amend --no-edit --reset-author", "origin/main");
+    git(p.dir, "push", "-q", "--force-with-lease", "origin", "sync");
+    syncHead = git(p.dir, "rev-parse", "HEAD");
+    onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}` });
+  }
+  ok(!failures(onSync), `${p.name}: every check passes on the sync's pull request (${started(onSync).length} jobs${p.named ? ", once mended" : ""})`, failures(onSync));
   const pure = node(p.dir, path.join(theCore, "scripts", "pure-sync.mjs"));
   ok(pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${p.name}: the sync is pure, as pure-sync.mjs reads it from the release it moves to, whatever modes git here records`, pure.out);
 
@@ -301,7 +314,6 @@ for (const tag of starts) {
   upgrade(dotnetProject, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
-    [results.some(([where, r]) => where.startsWith("personal-terms.yml/") && r.passed && r.steps.some(x => /::warning::A personal term is in the author or committer/.test(x.out))), "the name its machine writes into every commit is reported, not failed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
 
 }

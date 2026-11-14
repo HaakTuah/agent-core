@@ -64,8 +64,8 @@ saved data; a weakened check).
 - No file, commit, PR, issue, comment, log or picture holds personal information about the owner or anyone in their
   life, nor does any prompt or brief given to an agent: no names (only "the owner"), profession, employer or workplace,
   family, home, age, health, memberships or money, nor anything else about the owner's life outside the project.
-  - Excepted: the GitHub account in the repository's own address; the name and address GitHub writes as a merge's
-    author, from the merging account's profile, or git in a private repository, from the committing machine's settings,
+  - Excepted: the GitHub account in the repository's own address; the name and address GitHub itself writes as the
+    author of a commit it makes and signs (a merge, an edit on github.com), from the profile of the account that acts,
     where its owner keeps them there; and the company name a project is sold under, naming no person.
 - The owner's archived words leave such details out as "[…]".
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
