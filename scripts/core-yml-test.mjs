@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
+import { checkoutStandIn, scratchEnv } from "./scratch-core.mjs";
 import { runWorkflow } from "./workflow-run.mjs";
 
 let failed = 0, count = 0;
@@ -24,10 +25,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-yml-test-"));
 process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
 const slash = p => p.replace(/\\/g, "/");
 const theCore = path.join(tmp, "the-core");
-const url = `https://github.com/${CORE}`;
-const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
-Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
-  GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git`, GIT_ALLOW_PROTOCOL: "file" });
+const env = scratchEnv(theCore, tmp);
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 
@@ -48,18 +46,18 @@ const workflow = git(theCore, "show", `${B}:.github/workflows/core.yml`);
 const MANIFEST = (pin = B, more = "") => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${OWNER}\` |\n${more}`;
 const CALLS = (terms = B, core = A) => `name: core\non:\n  pull_request:\njobs:\n  core:\n    uses: ${CORE}/.github/workflows/core.yml@${core}\n  terms:\n    uses: ${CORE}/.github/workflows/personal-terms.yml@${terms}\n    secrets: inherit\n`;
 let n = 0;
-// The check's verdict on a project whose copy is the core at B, with the files given in place of the usual ones.
-function check(files = {}, { branch = "main" } = {}) {
+// The check's verdict on a project whose copy is the core at `at` (B unless said), with the files given in place of the
+// usual ones.
+function check(files = {}, { branch = "main", at = B } = {}) {
   const dir = path.join(tmp, `project-${++n}`);
   fs.mkdirSync(path.join(dir, "core"), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", B], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", at], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
   for (const [f, text] of Object.entries({ "core-manifest.md": MANIFEST(), ".github/workflows/core.yml": CALLS(), ...files })) write(dir, f, text);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "a project");
   const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: branch, private: false }, pull_request: { base: { sha: "" } } } };
-  const [job] = runWorkflow(workflow, { github, base: env, temp: tmp, workspace: () => dir,
-    uses: { "actions/checkout": (w, ws) => { if (!w.repository) return; const to = path.join(ws, w.path); git(tmp, "clone", "-q", "--no-checkout", theCore, to); git(to, "checkout", "-q", "--detach", w.ref); } } });
+  const [job] = runWorkflow(workflow, { github, base: env, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 const passes = (what, ...args) => { const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
@@ -74,11 +72,16 @@ passes("a heading inside a fenced block, and the floor named outside the section
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
 fails("a manifest without the owner's account", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });
+fails("a manifest with the owner's account twice", "owner's account", { "core-manifest.md": MANIFEST().replace(/^(\| \*owner's account\*.*\n)/m, "$1$1") });
 fails("an owner's account that is no login", "owner's account", { "core-manifest.md": MANIFEST().replace(`\`${OWNER}\``, "`two words`") });
 fails("a pin off the core's main", `the pin ${SIDE} is not a commit of the core's main`, { "core-manifest.md": MANIFEST(SIDE) });
 fails("a call pinned where its workflow differs from the core's at the pin", "personal-terms.yml at", { ".github/workflows/core.yml": CALLS(A) });
 fails("a call pinned off the core's main", "is not a commit of the core's main", { ".github/workflows/core.yml": CALLS(SIDE) });
 fails("a call written in another form", "a call to the core not written", { ".github/workflows/core.yml": CALLS().replace(`core.yml@${A}`, "core.yml@main") });
+fails("a call written in other letters, and in another form", "a call to the core not written", { ".github/workflows/core.yml": CALLS().replace(`${CORE}/.github/workflows/core.yml@${A}`, `${CORE.toLowerCase()}/.github/workflows/core.yml@main`) });
+fails("a call in a workflow ending .yaml, quoted", `personal-terms.yml: ${SIDE} is not a commit of the core's main`, { ".github/workflows/other.yaml": `on: push\njobs:\n  terms:\n    uses: "${CORE}/.github/workflows/personal-terms.yml@${SIDE}"\n` });
+passes("a copy of an older commit of the core's main, each call at it", { "core-manifest.md": MANIFEST(A), ".github/workflows/core.yml": CALLS(A, A) }, { at: A });
+fails("a call pinned past the manifest's pin, where its workflow differs from the one at the pin", `personal-terms.yml at ${B} differs`, { "core-manifest.md": MANIFEST(A), ".github/workflows/core.yml": CALLS(B, A) }, { at: A });
 passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check`);

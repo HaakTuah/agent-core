@@ -1,12 +1,13 @@
 // Checks the NuGet check's own steps (.github/workflows/nuget.yml): first "Does the pull request change what NuGet
-// reads?", then the whole job, each run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull requests of a .NET project that
-// holds one real package in its lock file: it says to restore wherever a pull request changes a file it names, and,
-// where none changed, wherever NuGet finds a lock file that no longer holds what its project asks for, however the
-// project asks (in an import, two imports on a line, through a property, a link, a name outside plain ASCII), or a
-// package downloaded beside it; and not to where only other files change. No package is downloaded: the step restores
-// against an empty source. The whole job, on a project with no package: its restore and its check pass, and a lock file
-// that no longer holds what its project asks for fails the restore. Where there is no .NET SDK (never on GitHub's runners) only the first look is tried. On
-// Linux and on Windows. Git, bash, jq, the .NET SDK and Node's own modules.
+// reads?", then the whole job, each run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull
+// requests of a .NET project that holds one real package in its lock file: it says to restore wherever a pull request
+// changes a file it names, and, where none changed, wherever NuGet finds a lock file that no longer holds what its
+// project asks for, however the project asks (in an import, two imports on a line, through a property, a link, a name
+// outside plain ASCII), or a package downloaded beside it; and not to where only other files change. No package is
+// downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
+// its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
+// .NET SDK (never on GitHub's runners) only the first look is tried. On Linux and on Windows. Git, bash, jq, the .NET
+// SDK and Node's own modules.
 //
 //   node scripts/nuget-gate-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -132,7 +133,7 @@ if (sdk) {
   const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });
   ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out);
   const stale = whole({ "src/App/App.csproj": project("") });
-  ok(!stale.passed && /lock file failed|NU1004/.test(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
+  ok(!stale.passed && /NU1004/.test(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check's own steps`);
