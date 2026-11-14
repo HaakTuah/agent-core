@@ -110,11 +110,11 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    - **Only a sync PR moves those pins,** and only when the called workflow changed; `core.yml` fails a call pinned
      where it differs from the core's pin.
    - **A sync changes nothing of the project's own,** and the core tested its scripts before the sync brings them, on a
-     project of the previous release synced to the change (`AGENTS.md`, "Nothing locks another owner's project"): so
-     the project's own suites run on one only for what they take from the copy (all of them where they run on its Node
-     version and `core/.node-version` changed; those that read its scripts for a change under `core/scripts/`), never
-     for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a pin moved
-     (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167).
+     project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks another owner's
+     project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
+     on its Node version and `core/.node-version` changed; those that read its scripts for a change under
+     `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
+     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -284,10 +284,18 @@ Floor: whole. Modules: <all, or the list of those taken>.
   own. Both are the owner's choice: no check of the core's fails, waits or warns where they are not set up (core
   archive 201).
 - The owner's GitHub profile: GitHub writes the profile's name and the account's address as the author of every merge
-  it makes, into the history of every repository the account merges in, and no check of ours sees a merge before it is
-  made. An owner who wants neither there leaves the name empty, so that GitHub writes the login, and turns on "Keep my
-  email addresses private" (Settings, Emails), so that it writes an address of its own that holds only the login. One
-  who keeps a name on the profile has it in every merge, which the floor leaves to that owner (floor rule 11).
+  it makes, and of every edit or suggestion committed on github.com, into the history of every repository the account
+  works in, and no check of ours sees a merge before it is made. An owner who wants neither there leaves the name
+  empty, so that GitHub writes the login, and turns on "Keep my email addresses private" (Settings, Emails), so that it
+  writes an address of its own that holds only the login. One who keeps a name on the profile has it in each such
+  commit, which the floor leaves to that owner (floor rule 11), and the personal-terms check passes them, as GitHub's
+  own by its signature.
+- Git's own name on each machine that commits: git writes `user.name` and `user.email`, as that machine sets them, as
+  the author and committer of every commit made there, the agents' too. An owner who wants neither in the history sets
+  them to the login and the account's no-reply address (`git config --global user.name <login>`, and the address
+  under Settings, Emails). The personal-terms check fails a listed name there in every repository, and its failure
+  says how the session mends that pull request: git's name set in the repository, its commits rewritten (core archive
+  202).
 - Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
   Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
   is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is asked

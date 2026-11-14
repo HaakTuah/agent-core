@@ -2,10 +2,13 @@
 // runs it (workflow-run.mjs, beside this file), on scratch pull requests, each checked out as GitHub checks one out: its
 // merge into its base. What fails: a term in a file, in a line a commit adds and a later one takes away, in a line a
 // merge's own resolution adds, in a file's name (an empty file, a rename, a binary file, a name outside plain ASCII),
-// in a commit's message, author or committer (name or address), and in the title or description. What passes: none of
-// these; a term only in a file git reads as binary (not read); only in a commit from before the rule; a file named with
-// a term before it, deleted or renamed away; only in the
-// author of a merge GitHub itself made (floor rule 11's exception), committed as GitHub and signed by its key, while
+// in a commit's message, author or committer (name or address), in a private repository too, its failure saying how
+// to mend it, and in the title or description; a commit dated before the rule too, since a date is whatever its maker
+// writes. What passes: none of these; a term only in a file git reads as binary (not read); a file on main named with
+// a term before the rule, deleted or renamed away; only in the
+// author of a commit GitHub itself made (floor rule 11's exception: a merge or an edit on github.com, under a profile
+// GitHub wrote on a merge of main's, not one through its API under an author its caller named), committed as GitHub and
+// signed by its key, while
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
@@ -82,11 +85,11 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile, isPrivate = false, opener = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
-  git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], GITHUB);
-  const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } } } };
+  git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
+  const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
   const base = { ...env, ...ME, STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
@@ -110,11 +113,21 @@ fails("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${t
 fails("a term in a commit's author name", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]));
 fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@example.invalid` }]]));
 fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COMMITTER_NAME: term }]]));
+// a name the machine's git writes into every commit fails in a private repository too, and the failure says how the
+// session mends the pull request itself (core archive 202), naming both commits
+const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@example.invalid` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
+ok(!named.passed && /To mend it, on the machine that made them/.test(named.out) && /--reset-author/.test(named.out) && (named.out.split("author or committer (name or address):\n")[1]?.split("\n")[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
+  "a term in commits' author or committer fails in a private repository too, both commits named, the mend said and the term never printed", named.out);
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
 const onMain = [[{ "c.md": "y\n" }, {}, "on main"]];
-const update = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], onMain);
+// a merge GitHub made on main under the profile `name`, as each merge of a pull request is: the profiles the check takes
+const profileOnMain = name => [[dir => { git(dir, ["checkout", "-q", "-b", "side"]); commitAll(dir, [{ "side.md": "s\n" }]); git(dir, ["checkout", "-q", "main"]); git(dir, ["merge", "-q", "--no-ff", "--no-edit", "side"], { GIT_AUTHOR_NAME: name, ...GITHUB }); }, {}, "after that merge"]];
+const update = (committer, more = []) => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], [...onMain, ...more]);
 if (gpg) {
-  passes("a merge GitHub itself made into the branch, its author the merging account's profile (floor rule 11's exception)", update(GITHUB));
+  passes("a merge GitHub itself made into the branch, its author the merging account's profile, which GitHub wrote on a merge of main's (floor rule 11's exception)", update(GITHUB, profileOnMain(`A ${term}`)));
+  fails("a merge GitHub signed into the branch, under an author no merge of GitHub's on main carries (as its API takes one), though it is a merge on the branch's own side", update(GITHUB));
+  passes("a merge GitHub itself made into the branch, under a profile GitHub wrote on a squashed pull request of main's (one parent)", update(GITHUB, [[{ "sq.md": "s\n" }, { GIT_AUTHOR_NAME: `A ${term}`, ...GITHUB }, "a squashed pull request"]]));
+  passes("the merge GitHub makes only to check the pull request, under the opener's profile, where main holds no commit of GitHub's under it", pull([[{ "b.md": "x\n" }]]), { opener: `A ${term}` });
   fails("a merge written to look like GitHub's, committed as GitHub but not signed", update(AS_GITHUB));
   fails("a merge committed as GitHub but signed by another key", update({ ...AS_GITHUB, ...signedBy(stranger, "someone@example.invalid") }));
   // a certificate made to look like GitHub's: an X.509 signature, which carries its own certificate and which gpgsm
@@ -146,13 +159,19 @@ if (gpg) {
   process.on("exit", () => { for (const home of [forger, path.join(tmp, "x509-empty")]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
   if (x509) fails("a merge committed as GitHub but signed with a certificate made to look like GitHub's (X.509)", update({ ...AS_GITHUB, ...x509 }));
   else console.log("note openssl or gpgsm cannot make a certificate here, so a merge signed with one is not tried");
-  const unfetched = check(update(GITHUB), { key: path.join(tmp, "no-such-key") });
+  const unfetched = check(update(GITHUB, profileOnMain(`A ${term}`)), { key: path.join(tmp, "no-such-key") });
   ok(!unfetched.passed && unfetched.out.includes("could not be fetched") && !unfetched.out.includes(term), "where GitHub's key cannot be fetched, no merge is taken for GitHub's, and the run says so", unfetched.out);
 } else {
   console.log("note gpg cannot run here, so the merges GitHub signs are not tried (the check runs on GitHub's Linux runners alone)");
 }
 fails("a merge anyone else made, with a term in its author", update({}));
-fails("a commit that is no merge, with a term in its author, whoever committed it", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
+if (gpg) {
+  // an edit on github.com: GitHub signs it, its author the acting account's profile, which GitHub also wrote as the
+  // author of a merge it made on main; one made through GitHub's API, under an author its caller named, does not pass
+  passes("a commit that is no merge GitHub itself made (an edit on github.com), under the profile GitHub wrote on a merge of main's", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]], profileOnMain(term)));
+  fails("a commit that is no merge GitHub signed, under an author no merge of GitHub's on main carries (as its API takes one)", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
+}
+fails("a commit that is no merge, with a term in its author, committed as GitHub but not signed", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...AS_GITHUB }]]));
 // a merge resolved by hand: the lines its resolution adds are read
 const resolved = pull([[{ "a.md": "one\nmine\nthree\n" }], [dir => {
   try { git(dir, ["merge", "-q", "--no-edit", "main"]); } catch { /* (the conflict, resolved below) */ }
@@ -164,7 +183,7 @@ fails("a term in a line a merge's own resolution adds, taken out again later", r
 fails("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` });
 fails("a term in the description", pull([[{ "b.md": "x\n" }]]), { body: `Words.\n\n${term}` });
 passes("a term only in a file git reads as binary (not read: the check's header says so)", pull([[{ "a.bin": `\u0000${term}\u0000` }]]));
-passes("a term only in a commit from before the rule, added and taken out again", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
+fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
 ok(none.passed && none.out.includes("PERSONAL_TERMS is not set"), "without the secret it passes with a note: the check stays optional", none.out);
