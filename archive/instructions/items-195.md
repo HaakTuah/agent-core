@@ -270,3 +270,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      review had none. Behind "A review already running is waited for" in `modules/reviews.md` and the status
      `code-review` beside `security-review` (`scripts/code-review-wait.mjs`): it waits only while Codex's code review
      runs on the head commit, and a code review of that commit posted by the reviewer that took it over ends the wait.
+
+207. **14 November 2026** (the core, in a chat with the session that fixed the bugs a review of the core's checks
+     found, pull request #233). Told that the personal-terms, NuGet and comment-only checks now read what they had
+     missed, so that a project which changed nothing of its own could fail on what it already held, and asked whether
+     such a thing should fail or be reported first:
+
+     > Report, don't fail, what a project already held before these checks read more. The one exception: a listed
+     > personal term fails, and the failure says how the session takes it out.
+
+     Behind "What a project held before a check read more is reported" and its one exception in "Nothing locks another
+     owner's project" in `AGENTS.md`: the NuGet check reports, and passes, a second content hash, a `.user` file and a
+     tool a lock file also names where the project held them as they stand (`scripts/nuget.mjs`,
+     `scripts/nuget-fetch.mjs`), and every failure of `personal-terms.yml` says how the session takes the term out.

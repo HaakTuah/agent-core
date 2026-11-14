@@ -26,7 +26,7 @@ import { join, posix } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
-import { REGISTRY, lockPackages, nugetConfig, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
+import { REGISTRY, heldBefore, lockPackages, nugetConfig, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
@@ -223,13 +223,18 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
   let sameSources = base === null;
   try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n") === [...nugetConfig(config).sources].sort().join("\n"); } catch { /* (judged as new) */ }
   const failures = [], notes = [], reports = [], wanted = new Map();
+  // (a lock file as the base held it: two content hashes it already named are reported)
+  const asBase = (f) => base === null || textAt(root, base, f) === readFileSync(join(root, f), "utf8");
   for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
     const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
     failures.push(...read.failures);
+    if (asBase(f)) reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
       const k = `${p.id}@${p.version}`.toLowerCase(), was = wanted.get(k);
-      if (was && was.contentHash !== p.contentHash) failures.push(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.from}: ${twoHashes}`);
-      else if (!was) wanted.set(k, { ...p, from: f });
+      if (was && was.contentHash !== p.contentHash) {
+        const x = `${f}: ${p.id}@${p.version} named by another content hash than in ${was.from}: ${twoHashes}`;
+        if (asBase(f) && asBase(was.from)) reports.push(`${x} ${heldBefore}`); else failures.push(x);
+      } else if (!was) wanted.set(k, { ...p, from: f });
     }
   }
   for (const f of tracked.filter((t) => !t.startsWith("core/") && isTools(t))) {
@@ -245,7 +250,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     for (const t of read.tools) {
       const k = `${t.id}@${t.version}`.toLowerCase(), was = wanted.get(k);
       if (!was) wanted.set(k, { ...t, from: f, tool: true, held: held(t.id, t.version) });
-      else if (!was.tool) wanted.set(k, { ...was, alsoTool: f });
+      else if (!was.tool) wanted.set(k, { ...was, alsoTool: f, alsoHeld: held(t.id, t.version) && asBase(was.from) });
     }
   }
   // (each package on its own: what failed for a tool the base held is reported instead)
@@ -263,7 +268,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
       if (!p.tool && h !== p.contentHash) { other ??= source; continue; }
       bytes = got; taken = source; hashed = h; break;
     }
-    if (bytes && p.alsoTool && other) out.failures.push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${other} gives: take the tool from the source that gives the locked file, or name it there first`);
+    if (bytes && p.alsoTool && other) (p.alsoHeld ? out.reports : out.failures).push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${other} gives: take the tool from the source that gives the locked file, or name it there first${p.alsoHeld ? ` ${heldBefore}` : ""}`);
     if (!bytes && !out.failures.length) {
       if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15)`);
       else if (unread && !p.tool) out.notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);

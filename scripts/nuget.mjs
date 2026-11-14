@@ -102,6 +102,10 @@ const key = (id, version) => `${id}@${version}`.toLowerCase();
 export const unmarked = (text) => (text.startsWith("\uFEFF") ? text.slice(1) : text);
 // what a lock entry that names a second content hash for a version is told: a restore keeps one file of each version
 export const twoHashes = "a restore keeps one file of each version, so one entry would fail its hash and the check would read the other's licence: restore again so that each names the one file (floor rule 15)";
+// what is said of something the check came to read only lately (a second content hash, a .user file, a tool a lock
+// file also names) where the project held it as it stands before: reported, and passes (the owner's word, core archive
+// 207: what a project held before a check read more is reported, not failed)
+export const heldBefore = "(held before this check read it: reported, and passes)";
 // what stands where a comment or a processing instruction was cut from a manifest, and where CDATA was: no XML holds either
 const CUT = "\u0000", CDATA = "\u0001";
 // XML's own declaration, as XML writes it: only at a manifest's start, after a byte-order mark if one stands there
@@ -175,14 +179,15 @@ export function sdkPacks(env = process.env, root = null) {
 /**
  * The packages one lock file installs, as { id, version }, and what is wrong with it as lines. A project's own
  * projects (type "Project") are no packages. What a project asks for itself must be the version installed, and one
- * version of a package is one file: its entries (one for each framework) name one content hash.
+ * version of a package is one file: its entries (one for each framework) name one content hash, and where they name
+ * two, that is said apart (`split`), so a caller reports it where the lock file stands as the base held it.
  */
 export function lockPackages(text, lockPath) {
-  const failures = [], packages = new Map();
+  const failures = [], split = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON`] }; }
+  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON`], split }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
-    return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies")`] };
+    return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies")`], split };
   }
   for (const [framework, entries] of Object.entries(lock.dependencies)) {
     if (!entries || typeof entries !== "object" || Array.isArray(entries)) { failures.push(`${lockPath}, ${framework}: not a list of packages`); continue; }
@@ -197,11 +202,11 @@ export function lockPackages(text, lockPath) {
         failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}: ask for one exact version, the one installed (floor rule 7)`);
       }
       const was = packages.get(key(id, resolved));
-      if (was && was.contentHash !== contentHash) { failures.push(`${at}@${resolved}: named by two content hashes: ${twoHashes}`); continue; }
+      if (was && was.contentHash !== contentHash) { split.push(`${at}@${resolved}: named by two content hashes: ${twoHashes}`); continue; }
       packages.set(key(id, resolved), { id, version: resolved, contentHash });
     }
   }
-  return { packages: [...packages.values()], failures: failures.map(shown) };
+  return { packages: [...packages.values()], failures: failures.map(shown), split: split.map(shown) };
 }
 
 /**
@@ -331,9 +336,11 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of own.filter((f) => BUILD_FILE.test(f))) {
     let text = "";
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
-    if (/NuGetLockFilePath/iu.test(text)) failures.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read`);
-    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) failures.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read`);
-    if (/TreatAsLocalProperty/iu.test(text)) failures.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them`);
+    // (a .user file, read only lately, as the base held it: what it names is reported)
+    const [to, tail] = /\.user$/iu.test(f) && (!base || textAt(root, base, f) === text) ? [reports, ` ${heldBefore}`] : [failures, ""];
+    if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
+    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
+    if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
   }
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
@@ -361,12 +368,19 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
 
   const packages = new Map(); // by id@version, lower case: { id, version, shipped, lock }
+  // (a lock file as the base held it: two content hashes it already named are reported)
+  const asBase = (f, text) => !base || textAt(root, base, f) === text;
   for (const f of listed.filter((l) => locks.has(l))) {
-    const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
+    const text = readFileSync(join(root, f), "utf8"), read = lockPackages(text, f);
     failures.push(...read.failures);
+    if (asBase(f, text)) reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
       const k = key(p.id, p.version), shipped = ships.includes(f), was = packages.get(k);
-      if (was && was.contentHash !== p.contentHash) { failures.push(shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`)); continue; }
+      if (was && was.contentHash !== p.contentHash) {
+        const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
+        if (asBase(f, text) && asBase(was.lock, readFileSync(join(root, was.lock), "utf8"))) reports.push(`${x} ${heldBefore}`); else failures.push(x);
+        continue;
+      }
       if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
     }
   }

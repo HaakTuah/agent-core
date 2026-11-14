@@ -47,7 +47,7 @@ ok(/not JSON/.test(read(null, "{").failures.join()) && [`{"version":3,"dependenc
 const two = lockPackages(JSON.stringify({ version: 2, dependencies: { "net10.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net10.0/win-x64": { A: entry("Direct", "1.0.0", "[1.0.0, )"), "runtime.win.B": entry("Transitive", "3.0.0") } } }), "p.lock");
 ok(two.failures.length === 0 && two.packages.length === 2, "a package named under several frameworks is one package, and each framework's own are read");
 const split = lockPackages(JSON.stringify({ version: 2, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } }), "p.lock");
-ok(split.packages.length === 1 && /p\.lock, net9\.0: A@1\.0\.0: named by two content hashes/.test(split.failures.join()), "one version named by two content hashes fails: a restore keeps one file of it, so the check would read one file's licence for both", JSON.stringify(split));
+ok(split.packages.length === 1 && split.failures.length === 0 && /p\.lock, net9\.0: A@1\.0\.0: named by two content hashes/.test(split.split.join()), "one version named by two content hashes is said apart: a restore keeps one file of it, so the check would read one file's licence for both", JSON.stringify(split));
 const marked = read(null, `\uFEFF${lock({ A: entry("Direct", "1.0.0", "[1.0.0, )") })}`);
 ok(marked.failures.length === 0 && marked.packages.length === 1, "a lock file saved with a byte-order mark is read past it, as NuGet reads it", JSON.stringify(marked));
 
@@ -186,8 +186,6 @@ ok(/packages\.config has no lock file/.test(names(["legacy/packages.config"], {}
 ok(/src\/App\/packages\.App\.lock\.json: a lock file under another name/.test(names(["src/App/App.csproj", L, "src/App/packages.App.lock.json"], { ships: [L] })) && /Packages\.X\.Lock\.Json: a lock file under another name/.test(names(["Packages.X.Lock.Json"], {})), "a lock file under the other name NuGet takes first fails: this check would read the plain one and NuGet the other");
 put("src/App/App.csproj", "<Project><PropertyGroup><NuGetLockFilePath>../locks/app.json</NuGetLockFilePath></PropertyGroup></Project>"); put("Directory.Build.props", "<Project><PropertyGroup><nugetlockfilepath>x</nugetlockfilepath></PropertyGroup></Project>"); put("build/Other.targets", "<Project />");
 ok(/src\/App\/App\.csproj names NuGetLockFilePath/.test(names(["src/App/App.csproj", L], { ships: [L] })) && /Directory\.Build\.props names NuGetLockFilePath/.test(names(["Directory.Build.props", "build/Other.targets"], {})) && names(["build/Other.targets", "gone/Missing.props"], {}) === "", "so does a project or build file that names a lock file kept elsewhere");
-put("src/App/App.csproj.user", "<Project><PropertyGroup><NuGetLockFilePath>x</NuGetLockFilePath></PropertyGroup></Project>");
-ok(/src\/App\/App\.csproj\.user names NuGetLockFilePath/.test(names(["src/App/App.csproj.user"], {})), "so does the .user file MSBuild imports beside a project file by itself");
 put("src/App/App.csproj", "<Project><PropertyGroup><RestorePackagesPath>pkgs</RestorePackagesPath></PropertyGroup></Project>");
 put("build/Fallback.props", "<Project><PropertyGroup><RestoreAdditionalProjectFallbackFolders>vendored</RestoreAdditionalProjectFallbackFolders></PropertyGroup></Project>"); put("build/Local.targets", `<Project TreatAsLocalProperty="RestorePackagesPath" />`);
 ok(/build\/Fallback\.props names RestorePackagesPath or a fallback folder/.test(names(["build/Fallback.props"], {})) && /build\/Local\.targets names TreatAsLocalProperty/.test(names(["build/Local.targets"], {})), "so does a build file that names a fallback folder, or that lets a project set for itself what the restore sets for all");
@@ -268,6 +266,30 @@ inRepo("checks/audit.json", JSON.stringify({ entries: [{ ...hand, name: "By.File
 inRepo("checks/licences.json", JSON.stringify({ ships: [], audit: "checks/audit.json", nuget: { tools: [L] } }));
 const licences = spawnSync(process.execPath, [path.join(repo, "core/scripts/licences.mjs"), "checks/licences.json"], { cwd: repo, env, encoding: "utf8" });
 ok(licences.status === 0 && run("checks/licences.json", "--packages", restore("By.File@1.0.0")).status === 0, "the licence check takes the same config and the same audit, holds the NuGet entry to its list, and leaves the rest to this check", licences.stdout + licences.stderr);
+
+// the .user file MSBuild imports beside a project file by itself, which the check reads only lately: as the base held
+// it, what it names is reported and passes; added or changed by the pull request, it fails (core archive 207)
+const USER = "src/App/App.csproj.user", userText = at => `<Project><PropertyGroup><NuGetLockFilePath>${at}</NuGetLockFilePath></PropertyGroup></Project>`;
+const userCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, USER], process.env, { base: "HEAD", baseConfig: null });
+inRepo(USER, userText("x"));
+let user = userCheck();
+ok(user.failures.some(x => x.includes(`${USER} names NuGetLockFilePath`)), "a .user file the pull request adds, naming another lock file, fails", JSON.stringify(user));
+git("add", "-A"); git("commit", "-q", "-m", "a .user file");
+user = userCheck();
+ok(!user.failures.some(x => x.includes(".user")) && user.reports.some(x => x.includes(`${USER} names NuGetLockFilePath`) && x.includes("held before this check read it")), "one the base held as it stands: reported, and passes", JSON.stringify(user));
+inRepo(USER, userText("y"));
+user = userCheck();
+ok(user.failures.some(x => x.includes(`${USER} names NuGetLockFilePath`)), "and one the pull request changes fails", JSON.stringify(user));
+// a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
+// passing; changed by the pull request, failing
+const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });
+fs.rmSync(path.join(repo, USER)); inRepo(L, twoLock); git("add", "-A"); git("commit", "-q", "-m", "a lock file with two hashes");
+const lockCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L], process.env, { base: "HEAD", baseConfig: null });
+let both = lockCheck();
+ok(!both.failures.some(x => x.includes("two content hashes")) && both.reports.some(x => x.includes("A@1.0.0: named by two content hashes") && x.includes("held before this check read it")), "a lock file the base held as it stands, naming one version by two content hashes: reported, and passes", JSON.stringify(both));
+inRepo(L, `${twoLock}\n`);
+both = lockCheck();
+ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file changed by the pull request: it fails", JSON.stringify(both));
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);

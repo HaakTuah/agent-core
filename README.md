@@ -299,7 +299,8 @@ Floor: whole. Modules: <all, or the list of those taken>.
   them to the login and the account's no-reply address (`git config --global user.name <login>`, and the address
   under Settings, Emails). The personal-terms check fails a listed name there in every repository, and its failure
   says how the session mends that pull request: git's name set in the repository, its commits rewritten (core archive
-  202).
+  202). It fails any listed term the same way, one a project held before the check read it included, each failure
+  saying how the session takes it out (core archive 207).
 - Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
   Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
   is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is asked

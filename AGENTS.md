@@ -47,9 +47,10 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
   the release that carries a change makes no check fail, block, wait or start where it did not before, and adds no
   billed job, since a private repository on GitHub's free plan pays a whole minute for each job and its Actions stop
   once the month's are spent. Anything new is inside a job that already runs, advisory, or off until the project turns
-  it on. The one exception, on the owner's word and no other: the personal-terms check fails a listed name that a
-  machine's git writes into each commit, saying how the session mends it in that pull request itself (core archive
-  202).
+  it on. What a project held before a check read more is reported, not failed (core archive 207). The one exception, on
+  the owner's word and no other: the personal-terms check fails a listed term wherever it stands, one the project held
+  before the check read it and a name a machine's git writes into each commit included, its failure saying how the
+  session takes it out in that pull request itself (core archive 202 and 207).
   `scripts/upgrade-test.mjs`, in `.github/workflows/tests.yml`, holds it: a project written by the starter kit of each
   of the last two releases (npm and .NET, the .NET one as Windows holds it, its commits made under a listed name),
   synced to the commit under test, passes every check of the core unchanged, that mend made, and starts no job it did

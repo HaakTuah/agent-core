@@ -4,8 +4,9 @@
 // merge's own resolution adds (an octopus merge's too), in a file's name (an empty file, a rename, a binary file, a
 // name outside plain ASCII; never printed, in whatever case, where the file's content holds one too), in a commit's
 // message, author or committer (name or address), in a private repository too, its failure saying how to mend it, and
-// in the title, description or branch name; a file of text a .gitattributes marks binary; a term listed with blanks
-// or a Windows line end around it; a commit dated before the rule too, since a date is whatever its maker writes.
+// in the title, description or branch name; a file of text a .gitattributes marks binary, main's own too; a term listed
+// with blanks or a Windows line end around it; a commit dated before the rule too, since a date is whatever its maker
+// writes; each failure saying how the session takes the term out.
 // What passes: none of these; a term only in a file whose content is binary (not read); a file on main named with
 // a term before the rule, deleted or renamed away; only in the
 // author of a commit GitHub itself made (floor rule 11's exception: a merge or an edit on github.com, under a profile
@@ -206,6 +207,14 @@ const octopus = pull([[{ "b.md": "x\n" }], [dir => {
   git(dir, ["commit", "-q", "--amend", "--no-edit"]);
 }], [{ "a.md": "one\ntwo\nthree\n" }]]);
 fails("a term in a line an octopus merge adds of its own, taken out again later", octopus);
+// what a project held before the check read more fails too, a listed term being the one exception to reporting it, and
+// each failure says how the session takes the term out (core archive 207)
+const mended = (what, repo, opts, words) => { const r = check(repo, opts); ok(!r.passed && r.out.includes(words) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what}: it fails, saying how to take the term out`, r.out); };
+mended("a term main already held, in a file of text a .gitattributes marks binary, which the check reads only now", pull([[{ "b.md": "x\n" }]], [[{ ".gitattributes": "*.svg binary\n", "logo.svg": `<svg><title>${term}</title></svg>\n` }]]), {}, "edit each of those lines");
+mended("a term added in one commit and taken out in the next", pull([[{ "b.md": `${term}\n` }], [{ "b.md": "gone\n" }]]), {}, "To take it out of those commits");
+mended("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), {}, "git rebase -i origin/main");
+mended("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` }, "edit the title or the description");
+mended("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}` }, "pushing its work to a branch of another name");
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
