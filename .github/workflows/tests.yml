@@ -145,6 +145,12 @@ jobs:
       - name: The pointers in the core's own floor and modules lead somewhere
         if: ${{ !cancelled() }}
         run: node scripts/pointers.mjs --core
+      - name: The check that the core takes each module or gives its reason
+        if: ${{ !cancelled() }}
+        run: node scripts/own-modules-test.mjs
+      - name: The core takes each of its own modules, or its AGENTS.md gives its reason
+        if: ${{ !cancelled() }}
+        run: node scripts/own-modules.mjs
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() }}
         run: node scripts/workflows.mjs
