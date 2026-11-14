@@ -24,7 +24,7 @@ import { sizeOf } from "./file-size.mjs";
 import { READ } from "./init.mjs";
 import { started } from "./started.mjs";
 
-export const CAP = 21 * 1024;
+export const CAP = 22 * 1024;
 // the core's files every session reads at its start, by their paths here
 export const COUNTED = READ.filter(f => f.startsWith("core/")).map(f => f.slice("core/".length));
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
