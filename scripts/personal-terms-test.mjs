@@ -6,7 +6,7 @@
 // to mend it, and in the title or description; a commit dated before the rule too, since a date is whatever its maker
 // writes. What passes: none of these; a term only in a file git reads as binary (not read); a file on main named with
 // a term before the rule, deleted or renamed away; only in the
-// author of a commit GitHub itself made (floor rule 11's exception: a merge, or an edit on github.com under a profile
+// author of a commit GitHub itself made (floor rule 11's exception: a merge or an edit on github.com, under a profile
 // GitHub wrote on a merge of main's, not one through its API under an author its caller named), committed as GitHub and
 // signed by its key, while
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
@@ -120,9 +120,12 @@ ok(!named.passed && /To mend it, on the machine that made them/.test(named.out) 
   "a term in commits' author or committer fails in a private repository too, both commits named, the mend said and the term never printed", named.out);
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
 const onMain = [[{ "c.md": "y\n" }, {}, "on main"]];
-const update = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], onMain);
+// a merge GitHub made on main under the profile `name`, as each merge of a pull request is: the profiles the check takes
+const profileOnMain = name => [[dir => { git(dir, ["checkout", "-q", "-b", "side"]); commitAll(dir, [{ "side.md": "s\n" }]); git(dir, ["checkout", "-q", "main"]); git(dir, ["merge", "-q", "--no-ff", "--no-edit", "side"], { GIT_AUTHOR_NAME: name, ...GITHUB }); }, {}, "after that merge"]];
+const update = (committer, more = []) => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], [...onMain, ...more]);
 if (gpg) {
-  passes("a merge GitHub itself made into the branch, its author the merging account's profile (floor rule 11's exception)", update(GITHUB));
+  passes("a merge GitHub itself made into the branch, its author the merging account's profile, which GitHub wrote on a merge of main's (floor rule 11's exception)", update(GITHUB, profileOnMain(`A ${term}`)));
+  fails("a merge GitHub signed into the branch, under an author no merge of GitHub's on main carries (as its API takes one), though it is a merge on the branch's own side", update(GITHUB));
   fails("a merge written to look like GitHub's, committed as GitHub but not signed", update(AS_GITHUB));
   fails("a merge committed as GitHub but signed by another key", update({ ...AS_GITHUB, ...signedBy(stranger, "someone@example.invalid") }));
   // a certificate made to look like GitHub's: an X.509 signature, which carries its own certificate and which gpgsm
@@ -154,7 +157,7 @@ if (gpg) {
   process.on("exit", () => { for (const home of [forger, path.join(tmp, "x509-empty")]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
   if (x509) fails("a merge committed as GitHub but signed with a certificate made to look like GitHub's (X.509)", update({ ...AS_GITHUB, ...x509 }));
   else console.log("note openssl or gpgsm cannot make a certificate here, so a merge signed with one is not tried");
-  const unfetched = check(update(GITHUB), { key: path.join(tmp, "no-such-key") });
+  const unfetched = check(update(GITHUB, profileOnMain(`A ${term}`)), { key: path.join(tmp, "no-such-key") });
   ok(!unfetched.passed && unfetched.out.includes("could not be fetched") && !unfetched.out.includes(term), "where GitHub's key cannot be fetched, no merge is taken for GitHub's, and the run says so", unfetched.out);
 } else {
   console.log("note gpg cannot run here, so the merges GitHub signs are not tried (the check runs on GitHub's Linux runners alone)");
@@ -163,8 +166,7 @@ fails("a merge anyone else made, with a term in its author", update({}));
 if (gpg) {
   // an edit on github.com: GitHub signs it, its author the acting account's profile, which GitHub also wrote as the
   // author of a merge it made on main; one made through GitHub's API, under an author its caller named, does not pass
-  const profileOnMain = [[dir => { git(dir, ["checkout", "-q", "-b", "side"]); commitAll(dir, [{ "side.md": "s\n" }]); git(dir, ["checkout", "-q", "main"]); git(dir, ["merge", "-q", "--no-ff", "--no-edit", "side"], { GIT_AUTHOR_NAME: term, ...GITHUB }); }, {}, "after that merge"]];
-  passes("a commit that is no merge GitHub itself made (an edit on github.com), under the profile GitHub wrote on a merge of main's", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]], profileOnMain));
+  passes("a commit that is no merge GitHub itself made (an edit on github.com), under the profile GitHub wrote on a merge of main's", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]], profileOnMain(term)));
   fails("a commit that is no merge GitHub signed, under an author no merge of GitHub's on main carries (as its API takes one)", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
 }
 fails("a commit that is no merge, with a term in its author, committed as GitHub but not signed", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...AS_GITHUB }]]));

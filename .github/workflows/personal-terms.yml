@@ -2,23 +2,23 @@
 # from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
 # written into the repository, since the list itself would be personal. Of each commit it reads the message, the
 # author's and the committer's name and address (save those of a commit GitHub itself made, which floor rule 11 excepts:
-# a merge, "update branch", or one that is no merge, an edit or a suggestion committed on github.com, under a profile
-# GitHub wrote as the author of a merge it made here, since one made through GitHub's API takes whatever author its
-# caller names; each GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it
-# cannot, none is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and the
-# names of the files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps
-# every commit (core archive 201). The commits read are the pull request's own, its base's left out, whatever date a
-# commit bears: a date is whatever its maker writes, and a commit not yet on main can still be changed. A term in a
-# commit's author or committer most often comes from git's own name on the machine that committed, which git writes into
-# every commit made there, the agents' too: its failure says how the session that made them mends it in the pull request
-# itself (git's name in the repository set to the login, the pull request's commits rewritten), so it holds a project
-# once, never for good (core archive 202; README.md, "Setting up (the owner's part)"). A file whose older name holds a
-# term is deleted or renamed away freely; a commit that only edits it fails, since the diff names it. It reads no file
-# git takes for binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where a term
-# was found (file and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project that has
-# not set it) it passes with a note: the check is optional. It checks this repository, and every project that takes the
-# core calls it (workflow_call), pinned to a full commit SHA (README.md, point 5), passing only that secret: the
-# caller's event, checkout and token are the caller's own.
+# a merge, "update branch", an edit or a suggestion committed on github.com, under a profile GitHub wrote as the author
+# of a merge it made on the base's side, since one made through GitHub's API takes whatever author its caller names;
+# each GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it cannot, none
+# is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and the names of the
+# files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit
+# (core archive 201). The commits read are the pull request's own, its base's left out, whatever date a commit bears: a
+# date is whatever its maker writes, and a commit not yet on main can still be changed. A term in a commit's author or
+# committer most often comes from git's own name on the machine that committed, which git writes into every commit made
+# there, the agents' too: its failure says how the session that made them mends it in the pull request itself (git's
+# name in the repository set to the login, the pull request's commits rewritten), so it holds a project once, never for
+# good (core archive 202; README.md, "Setting up (the owner's part)"). A file whose older name holds a term is deleted
+# or renamed away freely; a commit that only edits it fails, since the diff names it. It reads no file git takes for
+# binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only where a term was found (file
+# and line, or the commit), never the term. Without the secret (a fork, Dependabot, a project that has not set it) it
+# passes with a note: the check is optional. It checks this repository, and every project that takes the core calls it
+# (workflow_call), pinned to a full commit SHA (README.md, point 5), passing only that secret: the caller's event,
+# checkout and token are the caller's own.
 name: Personal terms
 
 on:
@@ -88,9 +88,9 @@ jobs:
                          log -1 --format='%G? %GP' "$1" 2> /dev/null) \
                 && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"
             }
-            # (the profiles GitHub writes as the author of a merge it made on the base's side: one it made that is no
-            # merge, an edit on github.com, passes only under one of them, since one made through GitHub's API takes
-            # whatever author its caller names)
+            # (the profiles GitHub writes as the author of a merge it made on the base's side, each pull request's merge
+            # into main: a commit it made on the pull request's side, a merge or an edit on github.com, passes only under
+            # one of them, since one made through GitHub's API takes whatever author its caller names)
             side=$BASE; [ "${#mine[@]}" -gt 0 ] && side=HEAD^1
             profiles=$(for m in $(git rev-list --merges --max-count=100 --committer='noreply@github.com' "$side"); do
               made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
@@ -99,11 +99,10 @@ jobs:
             for c in $commits; do
               short=$(git rev-parse --short "$c")
               if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
-              # (save a commit GitHub itself made, whose author is the acting account's profile, as floor rule 11 excepts:
-              # a merge, "update branch" too; or one that is no merge, an edit on github.com, under a profile above)
+              # (save a commit GitHub itself made under a profile above, the acting account's, as floor rule 11 excepts:
+              # a merge, "update branch" too, or an edit on github.com)
               if git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list" \
-                && ! { made "$c" && { [ "$(git rev-list --no-walk --merges "$c")" = "$c" ] \
-                       || printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; }; then
+                && ! { made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; then
                 people="$people $short"
               fi
               # (the lines it adds, a merge's those its own resolution adds; git that cannot show them, older than 2.36,
