@@ -241,3 +241,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "Every stage is a game" in `modules/game-design.md`, and the glance in its "Readable by every player"; a
      first playable slice of Amarna, and its screen, were taken up in Amarna.
+
+205. **14 November 2026** (the core, in the design chat, the same as item 204). Told how a game's screen would be
+     rebuilt so that a person sees at a glance what happened, what waits, what can be done and whether they are winning,
+     in Amarna's case from Civilization's turn and Paradox's clock with the delay of orders and news its own:
+
+     > These rules about playability must all equally apply to what a model seat sees in any game. All players must
+     > play on as equal terms when it comes to readability of the game, as possible. Agreed, expert?
+
+     Behind the computer players in "Readable by every player" in `modules/game-design.md`: what they are shown tells
+     them what the screen tells a person, as plainly and in the same order.
