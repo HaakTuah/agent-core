@@ -75,8 +75,8 @@ ok(same(imps.map(i => `${i.kind} ${i.spec} ${i.names.join(",")}`), [
   "import node:fs default", "import ./x.mjs default,a,b,T", "import ../y *", "import ./types U", "import ./side.css ",
   "export ./z.js d", "export ./w *", "dynamic ./lazy.mjs ", "require ./old ",
 ]), `every form of an import is read, a member's call and a local export not (${imps.map(i => `${i.kind} ${i.spec} ${i.names}`).join("; ")})`);
-const typed = imports(tokens("import type { A } from './a';\nimport { type B, type C as D } from './b';\nimport { type E, f } from './c';\nimport type, { g } from './d';\nexport type { H } from './e';\n"));
-ok(same(typed.map(i => i.types), [true, true, false, false, true]), `an import of types alone is told from one that runs (${typed.map(i => i.types)})`);
+const typed = imports(tokens("import type { A } from './a';\nimport { type B, type C as D } from './b';\nimport { type as factory } from './f';\nimport { type E, f } from './c';\nimport type, { g } from './d';\nexport type { H } from './e';\n"));
+ok(same(typed.map(i => i.types), [true, true, false, false, false, true]), `an import of types alone is told from one that runs, a value named type too (${typed.map(i => i.types)})`);
 const typeCycle = measure({ "x.ts": "import type { Y } from './y';\nexport const x = 1;\n", "y.ts": "import { x } from './x';\nexport type Y = number;\n" });
 ok(typeCycle.cycles.files.length === 0 && typeCycle.cycles.filesWithTypes.length === 1, "a cycle closed only by an import of types is counted apart");
 const bare = imports(tokens("export { local }\nimport { x } from './x.js'\nexport type T = string\nimport y from './y.js'\n"));

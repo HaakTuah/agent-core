@@ -24,7 +24,8 @@
   },
   "cycles": {
     "files": [],
-    "folders": []
+    "folders": [],
+    "filesWithTypes": []
   },
   "hubs": [
     {
@@ -257,7 +258,7 @@
     "inMoreThanOne": []
   },
   "functions": {
-    "count": 550,
+    "count": 551,
     "lines": {
       "median": 4,
       "p90": 21,
@@ -333,7 +334,7 @@
       {
         "file": "scripts/code-shape.mjs",
         "name": "tokens",
-        "line": 49,
+        "line": 55,
         "lines": 66,
         "depth": 4
       },
@@ -382,8 +383,8 @@
       {
         "file": "scripts/code-shape.mjs",
         "name": "measure",
-        "line": 323,
-        "lines": 55,
+        "line": 344,
+        "lines": 56,
         "depth": 3
       },
       {
@@ -426,7 +427,7 @@
       {
         "file": "scripts/code-shape.mjs",
         "name": "tokens",
-        "line": 49,
+        "line": 55,
         "lines": 66,
         "depth": 4
       },
@@ -503,8 +504,8 @@
       {
         "file": "scripts/code-shape.mjs",
         "name": "measure",
-        "line": 323,
-        "lines": 55,
+        "line": 344,
+        "lines": 56,
         "depth": 3
       },
       {
@@ -536,17 +537,17 @@
         "depth": 3
       },
       {
+        "file": "scripts/code-shape.mjs",
+        "name": "main",
+        "line": 424,
+        "lines": 39,
+        "depth": 3
+      },
+      {
         "file": "scripts/licence-installed.mjs",
         "name": "leftOut",
         "line": 60,
         "lines": 37,
-        "depth": 3
-      },
-      {
-        "file": "scripts/code-shape.mjs",
-        "name": "main",
-        "line": 402,
-        "lines": 36,
         "depth": 3
       }
     ]
@@ -989,6 +990,10 @@
         "changes": 19
       },
       {
+        "file": "scripts/personal-terms-test.mjs",
+        "changes": 16
+      },
+      {
         "file": "scripts/sync.mjs",
         "changes": 15
       },
@@ -1003,10 +1008,6 @@
       {
         "file": "scripts/pure-sync.mjs",
         "changes": 13
-      },
-      {
-        "file": "scripts/personal-terms-test.mjs",
-        "changes": 12
       },
       {
         "file": "scripts/licences-test.mjs",

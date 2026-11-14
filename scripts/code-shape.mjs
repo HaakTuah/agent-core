@@ -4,8 +4,9 @@
 // how, is the module's that follows the audit (#246). Node's own modules and git only.
 //
 // What it gives, of the files it reads:
-//   - imports: how many, how many cross a folder, those of code that lead to no file, and the pairs of folders that import each other both ways (no layer
-//     is declared yet, so a pair that runs both ways is the sign of an import against the grain that needs none);
+//   - imports: how many, how many cross a folder, those of code that lead to no file, and the pairs of folders that
+//     import each other both ways (no layer is declared yet, so a pair that runs both ways is the sign of an import
+//     against the grain that needs none);
 //   - import cycles, between files and between folders, of what runs (a dynamic import, or one of types alone, which
 //     TypeScript erases, makes none), and between files with those of types counted too;
 //   - hubs: the files most others import, and the names each gives them;
@@ -27,7 +28,7 @@
 //   <pathspec>   git pathspecs of the code to measure (":!" leaves a path out); left out, the whole repository but for
 //                a copy of the core (core/), where the script runs from that copy or measures another repository
 //   --repo       the repository to measure, a clone this script does not lie in (one read for an audit); left out, the
-//                one it lies in
+//                one it lies in. Its suites, where --suite names them, run its own code
 //   --depth      a folder is the first n parts of a file's path (packages/engine, for 2); left out, its whole folder
 //   --history    how many of the newest commits the count of what changes together reads; 500 if left out
 //   --suite      a command that runs one suite, run alone from the repository's root and timed; may be repeated
@@ -44,6 +45,8 @@ const REGEX_AFTER = new Set(["return", "typeof", "instanceof", "in", "of", "new"
 const CONTROL = new Set(["if", "for", "while", "switch", "catch", "with"]);
 const CONTROL_BARE = new Set(["else", "try", "finally", "do"]);
 const TYPE_TOKENS = new Set([".", "<", ">", "[", "]", "|", "&", ",", "?"]);
+// git's settings that run a command by themselves, off: a folder measured with --repo may hold a .git it was handed
+const SAFE = ["-c", "core.fsmonitor=false"];
 const BULK = 30; // a commit that touches more of the measured files than this is a move or a sweep, not a sign
 const OPEN = { ")": "(", "]": "[", "}": "{" };
 
@@ -145,7 +148,8 @@ function typesOnly(toks, k) {
   let names = 0;
   for (let j = k + 1; j < toks.length && !isP(toks[j], "}"); j++) {
     if (isP(toks[j], ",") || isId(toks[j], "as") || isId(toks[j - 1], "as")) continue;
-    if (!isId(toks[j], "type") || isP(toks[j + 1], ",") || isP(toks[j + 1], "}")) return false;
+    // (`type as x` takes a value named type; `type x` a type)
+    if (!isId(toks[j], "type") || isP(toks[j + 1], ",") || isP(toks[j + 1], "}") || (isId(toks[j + 1], "as") && !isId(toks[j + 2], "as"))) return false;
     names++; j++;
   }
   return names > 0;
@@ -431,12 +435,12 @@ function main(argv) {
     else opts.specs.push(a);
   }
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: opts.repo ?? here, encoding: "utf8" }).trim();
+  const root = execFileSync("git", [...SAFE, "rev-parse", "--show-toplevel"], { cwd: opts.repo ?? here, encoding: "utf8" }).trim();
   // where this script lies in the repository, as git itself says it (a path worked out from the two folders' names can
   // differ in spelling, as a short name of Windows' does from the long one git gives)
-  const self = execFileSync("git", ["rev-parse", "--show-prefix"], { cwd: here, encoding: "utf8" }).trim();
+  const self = execFileSync("git", [...SAFE, "rev-parse", "--show-prefix"], { cwd: here, encoding: "utf8" }).trim();
   const specs = opts.specs.length ? opts.specs : opts.repo || self.startsWith("core/") ? [".", ":!core/"] : ["."];
-  const listed = execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
+  const listed = execFileSync("git", [...SAFE, "ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
   const texts = {}, other = {};
   for (const f of listed) {
     const ext = path.posix.extname(f);
@@ -445,7 +449,7 @@ function main(argv) {
     }
     else if (OTHER.includes(ext)) other[ext] = (other[ext] ?? 0) + 1;
   }
-  const log = execFileSync("git", ["log", "--no-merges", "-n", String(opts.history), "--format=%x00", "--name-only", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+  const log = execFileSync("git", [...SAFE, "log", "--no-merges", "-n", String(opts.history), "--format=%x00", "--name-only", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
   const commits = log.split("\0").slice(1).map(c => c.split("\n").map(s => s.trim()).filter(Boolean));
   const suites = opts.suites.map(command => {
     const start = process.hrtime.bigint();

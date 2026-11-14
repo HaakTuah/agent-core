@@ -71,7 +71,8 @@ it may depend on.
 
 ## 2. The core's own code, measured
 
-The baseline, at `a8528e4` with this pull request's script and its test; every number is in `2026-11-14-code-shape.json`.
+The baseline, at `a8528e4` with this pull request's script and its test; every number is in
+`2026-11-14-code-shape.json`.
 
 **How it is laid out.** All of it in one folder, `scripts/`: 76 files in JavaScript, 36 of them tests, beside two
 shell scripts. In it stand the projects' checks, the two hooks, the starter kit, the sync and the core's own tools,
@@ -95,7 +96,7 @@ files: it is the licence check, and the lists, the lockfile readers and the conf
 
 **Shared global names:** none; every file is a module.
 
-**Functions.** 550; half are 4 lines or fewer, nine in ten 21 or fewer. 17 run past 50 lines and 2 past 100; 5 nest
+**Functions.** 551; half are 4 lines or fewer, nine in ten 21 or fewer. 17 run past 50 lines and 2 past 100; 5 nest
 four blocks deep.
 
 | Function | Lines | Depth |
@@ -141,9 +142,9 @@ own tools, so no boundary between them could be checked until #246 names them.
 
 On the owner's word, given in person to the orchestrator on 14 November 2026 and passed on word for word:
 
-> Yes: sessions may read `amarna-letters` and `barkstreet-snakes` for #243 and #245. Read only; nothing is written there.
-> #245's session also measures what a read-only clone of each allows and puts it in the core's report. #246 and #253
-> wait on that report alone. The games' own halves, in their own issues, hold up no line and no release.
+> Yes: sessions may read `amarna-letters` and `barkstreet-snakes` for #243 and #245. Read only; nothing is written
+> there. #245's session also measures what a read-only clone of each allows and puts it in the core's report. #246 and
+> #253 wait on that report alone. The games' own halves, in their own issues, hold up no line and no release.
 
 Nothing was written to either repository: no branch, push, issue or comment. Each game's own half of the audit stays
 with that game's issue, for its own sessions to do with its own tools.
@@ -238,6 +239,6 @@ in the core. "Never worse" and the baseline that may only shrink are #246's own,
 | One name | Each thing's name stands in one list, which the code and the screen both read | Display code that writes a name from the list as a literal fails | None: no screen |
 
 **What this leaves to others.** The games' own halves, in their own issues, go deeper than a clone allows (their CI's
-times, their reruns, the suites not run here) with their own tools, and hold up no line and no release. #246 writes the module and the checks from this table; #253
-the measure of tests' strength; #248 when the audit repeats; #255 the core's own copies check; #259 the two shell
-scripts with no test.
+times, their reruns, the suites not run here) with their own tools, and hold up no line and no release. #246 writes the
+module and the checks from this table; #253 the measure of tests' strength; #248 when the audit repeats; #255 the core's
+own copies check; #259 the two shell scripts with no test.
