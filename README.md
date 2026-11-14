@@ -353,4 +353,5 @@ is public, and so is every word of an issue, so a report holds only what the lig
 
 ## This repository
 
-How it takes its own core, and how changes are made here: `AGENTS.md`; its security: `SECURITY.md`.
+How it takes its own core, and how changes are made here: `AGENTS.md`; the order of its own work: `QUEUE.md`; its
+security: `SECURITY.md`.

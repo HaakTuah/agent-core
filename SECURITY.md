@@ -4,7 +4,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics.md`
 `floor/threat-model.md`. What this repository adds under the floor's numbers:
 
 - **Rule 3, the protected files:** every file here. The trusted builder: Claude's sessions the owner starts in this
-  repository.
+  repository, and the builder sessions an orchestrator among them starts (`AGENTS.md`, "The queue").
 - **Rules 5, 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
   (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
   tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
