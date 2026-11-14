@@ -19,10 +19,12 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 // (copy-tree.mjs calls git with this process's own variables, so they are set here, not handed to each call)
 for (const name of Object.keys(process.env)) if (!(name in outer)) delete process.env[name];
-Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
+// (and git finds no bare repository by itself, as Git 3.0 has it by default: the scripts name each one they make)
+Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "safe.bareRepository", GIT_CONFIG_VALUE_0: "explicit" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
-const core = path.join(tmp, "core");
+const core = path.join(tmp, "core"), repo = path.join(core, ".git"); // (copy-tree.mjs takes the git folder)
 const write = (file, text) => { fs.mkdirSync(path.dirname(path.join(core, file)), { recursive: true }); fs.writeFileSync(path.join(core, file), text); };
 // a commit of the scratch core whose .gitattributes is `attributes`
 let n = 0;
@@ -52,11 +54,11 @@ write("reports/one.md", "the core's own\n");
 write("reports/deep/two.md", "the core's own\n");
 
 const before = commit("* -text\n");
-ok(copyTree(before, core) === whole(before), "a pin from before the line: the whole tree");
+ok(copyTree(before, repo) === whole(before), "a pin from before the line: the whole tree");
 ok(archived(before) === whole(before), "  and that is what git archive copies");
 
 const pin = commit("* -text\n/reports export-ignore\n");
-const tree = copyTree(pin, core);
+const tree = copyTree(pin, repo);
 ok(tree === archived(pin), "a pin with the line: exactly the tree git archive copies", `${tree} against ${archived(pin)}`);
 ok(tree !== whole(pin), "  which is not the whole tree");
 ok(!paths(tree).some((p) => p.startsWith("reports/")), "  the folder at the top is out");
@@ -75,7 +77,7 @@ for (const [what, attributes] of [
   ["a Windows line ending", "/reports export-ignore\r\n"],
 ]) {
   const other = commit(`* -text\n${attributes}`);
-  ok(copyTree(other, core) === whole(other), `the line with ${what}: the whole tree`);
+  ok(copyTree(other, repo) === whole(other), `the line with ${what}: the whole tree`);
 }
 
 // modes and kinds of entry come through as they are: an executable file and a link, written to the index alone
@@ -86,22 +88,22 @@ git(core, "add", ".gitattributes");
 git(core, "commit", "-q", "-m", "modes");
 const modes = git(core, "rev-parse", "HEAD");
 const listed = (rev) => git(core, "ls-tree", "-r", rev).split("\n");
-ok(JSON.stringify(listed(copyTree(modes, core))) === JSON.stringify(listed(modes).filter((line) => !line.split("\t")[1].startsWith("reports/"))),
+ok(JSON.stringify(listed(copyTree(modes, repo))) === JSON.stringify(listed(modes).filter((line) => !line.split("\t")[1].startsWith("reports/"))),
   "an executable file and a link keep their modes; every entry but the folder's is the pin's own");
 
 // how two copies are compared (core.yml compares the same way): by git's object ids and types, the executable bit aside
 const blob = git(core, "hash-object", "-w", "floor/rules.md");
 const treeOf = (...lines) => execFileSync("git", ["mktree", "--missing"], { cwd: core, input: lines.map((l) => `${l}\n`).join(""), encoding: "utf8" }).trim();
 const plain = treeOf(`100644 blob ${blob}\trun.sh`);
-ok(entries(treeOf(`100755 blob ${blob}\trun.sh`), core) === entries(plain, core), "a file the copy records 100644 where the core's is 100755 is the same file: the executable bit is no difference");
-ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), core) !== entries(plain, core), "a link in its place is not");
-ok(entries(treeOf(`160000 commit ${modes}\trun.sh`), core) !== entries(plain, core), "nor a submodule");
-ok(entries(treeOf(`100644 blob ${git(core, "hash-object", "-w", "reports/one.md")}\trun.sh`), core) !== entries(plain, core), "nor a file of other content");
-ok(entries(treeOf(`100644 blob ${blob}\trun.sh`, `100644 blob ${blob}\textra.md`), core) !== entries(plain, core), "nor a copy with a file more");
+ok(entries(treeOf(`100755 blob ${blob}\trun.sh`), repo) === entries(plain, repo), "a file the copy records 100644 where the core's is 100755 is the same file: the executable bit is no difference");
+ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), repo) !== entries(plain, repo), "a link in its place is not");
+ok(entries(treeOf(`160000 commit ${modes}\trun.sh`), repo) !== entries(plain, repo), "nor a submodule");
+ok(entries(treeOf(`100644 blob ${git(core, "hash-object", "-w", "reports/one.md")}\trun.sh`), repo) !== entries(plain, repo), "nor a file of other content");
+ok(entries(treeOf(`100644 blob ${blob}\trun.sh`, `100644 blob ${blob}\textra.md`), repo) !== entries(plain, repo), "nor a copy with a file more");
 // (a name holding a line's end and what looks like a second entry is one entry, quoted, never two)
 const two = treeOf(`100644 blob ${blob}\ta.md`, `100644 blob ${blob}\tb.md`);
 const one = execFileSync("git", ["mktree", "-z", "--missing"], { cwd: core, input: `100644 blob ${blob}\ta.md\n100644 blob ${blob}\tb.md\0`, encoding: "utf8" }).trim();
-ok(entries(one, core) !== entries(two, core) && entries(one, core).split("\n").length === 1, "a name that reads as two entries is one, quoted as git quotes it", entries(one, core));
+ok(entries(one, repo) !== entries(two, repo) && entries(one, repo).split("\n").length === 1, "a name that reads as two entries is one, quoted as git quotes it", entries(one, repo));
 
 // whether core/ is a folder: never a submodule's pointer, even one whose id names a tree
 // (built through an index of its own, which takes a submodule's pointer to any id, as a pushed commit can hold one)
@@ -109,13 +111,13 @@ const folder = (mode, id) => {
   const env = { ...process.env, GIT_INDEX_FILE: path.join(tmp, `index-${++n}`) };
   execFileSync("git", ["update-index", "--add", "--cacheinfo", `${mode},${id},core`], { cwd: core, env });
   const top = execFileSync("git", ["write-tree", "--missing-ok"], { cwd: core, env, encoding: "utf8" }).trim();
-  return coreIsFolder(git(core, "commit-tree", top, "-m", "probe"), core);
+  return coreIsFolder(git(core, "commit-tree", top, "-m", "probe"), repo);
 };
 const inner = treeOf(`100644 blob ${blob}\trun.sh`);
-ok(coreIsFolder(git(core, "commit-tree", treeOf(`040000 tree ${inner}\tcore`), "-m", "folder"), core), "core/ as a folder is one");
+ok(coreIsFolder(git(core, "commit-tree", treeOf(`040000 tree ${inner}\tcore`), "-m", "folder"), repo), "core/ as a folder is one");
 ok(!folder("160000", inner), "a submodule's pointer named core, whose id is a tree, is none");
 ok(!folder("100644", blob) && !folder("120000", blob), "nor a file or a link named core");
-ok(!coreIsFolder(git(core, "commit-tree", plain, "-m", "none"), core), "nor a commit with no core at all");
+ok(!coreIsFolder(git(core, "commit-tree", plain, "-m", "none"), repo), "nor a commit with no core at all");
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

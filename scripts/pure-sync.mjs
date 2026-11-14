@@ -21,12 +21,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
-import { followsOf, releasesIn } from "./releases.mjs";
+import { followsOf, inBare, releasesIn } from "./releases.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
 const git = (args, cwd) => raw(args, cwd).trim();
-const ok = (args, cwd) => { try { git(args, cwd); return true; } catch { return false; } };
 const PIN = new RegExp(`^Core: ${A} at ([0-9a-f]{40}), copied whole under core\\/`, "mu");
 // the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
 const PIN_REF = new RegExp(`^(Core: ${A} at )([0-9a-f]{40})(?=, copied whole under core\\/)`, "gu");
@@ -76,19 +75,22 @@ const pins = new Set(pin ? [pin] : []);
 for (const f of git(["ls-tree", "--name-only", head, "--", ".github/workflows/"]).split("\n").filter((n) => WORKFLOW.test(n))) {
   for (const m of show(head, f).matchAll(CALL)) pins.add(m[2]);
 }
+// (the core's main, fetched into a bare repository of its own, which every call names outright: releases.mjs)
 const dir = mkdtempSync(join(tmpdir(), "core-main-"));
+const inCore = (args) => { try { inBare(dir, args); return true; } catch { return false; } };
 try {
-  git(["init", "-q", "--bare"], dir);
-  git(["fetch", "-q", "--no-tags", CORE, "+refs/heads/main:refs/heads/main", "+refs/tags/release-*:refs/tags/release-*"], dir);
-  for (const sha of pins) if (!ok(["merge-base", "--is-ancestor", sha, "refs/heads/main"], dir)) fail.push(`${sha} is not a commit of the core's main`);
-  if (oldPin && pin && !ok(["merge-base", "--is-ancestor", oldPin, pin], dir)) fail.push(`the pin goes back: ${pin} is not past ${oldPin}`);
+  inBare(dir, ["init", "-q", "--bare", dir]);
+  inBare(dir, ["fetch", "-q", "--no-tags", CORE, "+refs/heads/main:refs/heads/main", "+refs/tags/release-*:refs/tags/release-*"]);
+  for (const sha of pins) if (!inCore(["merge-base", "--is-ancestor", sha, "refs/heads/main"])) fail.push(`${sha} is not a commit of the core's main`);
+  if (oldPin && pin && !inCore(["merge-base", "--is-ancestor", oldPin, pin])) fail.push(`the pin goes back: ${pin} is not past ${oldPin}`);
   // (a project that follows the core's releases takes, unreviewed, only what the core's owner chose to hand on: a sync
   // to any other commit of main is reviewed like any PR, and merges after its review; core archive 201)
   const follows = followsOf(show(head, "core-manifest.md"));
   if (pin && follows !== "main" && !releasesIn(dir).some((r) => r.sha === pin)) {
     fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR`);
   }
-  if (pin && ok(["cat-file", "-e", `${pin}^{commit}`], dir) && (!coreIsFolder(head, process.cwd()) || entries(copyTree(pin, dir), dir) !== entries(`${head}:core`, process.cwd()))) {
+  const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
+  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own) || entries(copyTree(pin, dir), dir) !== entries(`${head}:core`, own))) {
     fail.push(`core/ is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
   }
 } finally {

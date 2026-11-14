@@ -84,7 +84,7 @@ else {
   // A project that follows the releases: the stand-in git answers every call alike, so the core it shows has no
   // release, and with none cut there is nothing to take, whatever main holds (the releases themselves: releases-test.mjs).
   r = program(A, B, "", [], "| *follows* | `releases` |");
-  ok(r.status === 0 && r.out.includes("no release yet: nothing") && !/gh issue/.test(r.calls) && /^git fetch /m.test(r.calls) && !/ls-remote/.test(r.calls), "following the releases, with none cut: nothing is done, and the core is fetched, not only asked for its main");
+  ok(r.status === 0 && r.out.includes("no release yet: nothing") && !/gh issue/.test(r.calls) && /^git --git-dir=\S+ fetch /m.test(r.calls) && !/ls-remote/.test(r.calls), "following the releases, with none cut: nothing is done, and the core is fetched, not only asked for its main");
   r = program(A, B, line(12, BOT, TITLE), [], "| *follows* | `releases` |");
   ok(r.status === 0 && /gh issue close 12/.test(r.calls), "following the releases with nothing to take closes an issue left open");
   r = program(A, B, "", [], "");
