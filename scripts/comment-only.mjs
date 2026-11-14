@@ -37,7 +37,7 @@ const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scal
 // targets) and the Node or SDK they pick; a task runner's file; the copy of the core; git's own attributes and
 // submodules; a container's build; and a name with "~" and a digit, which Windows can read as another folder's short
 // name (CLAUDE~1 for .claude)
-export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|Dockerfile[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:csproj|fsproj|vbproj|props|targets))$|(?:^|\/)\.(?:vscode|devcontainer|husky)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|Dockerfile[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:csproj|fsproj|vbproj|props|targets))$|(?:^|\/)\.(?:vscode|devcontainer|husky)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
 const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string

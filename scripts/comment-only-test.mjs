@@ -170,7 +170,7 @@ ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", ".claude", "sub/.g
   && !["github/x.yml", "x.github/y", "my-action.yml", "action.yml.md"].some(f => RUNS.test(f)), "what it reads: .github/ and .claude/, the folders themselves too, at any depth and in any case, and every action.yml");
 ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules",
   "Directory.Build.targets", "src/App.csproj", "Directory.Packages.props", "NuGet.Config", "global.json", ".config/dotnet-tools.json", "src/packages.lock.json",
-  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc", "Makefile", "justfile", "Taskfile.yml", ".tool-versions"].every(f => RUNS_TOO.test(f))
+  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc", "Makefile", "GNUmakefile", "justfile", "Taskfile.yml", ".tool-versions", "mise.toml", ".mise.toml"].every(f => RUNS_TOO.test(f))
   && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, a task runner's file, the copy of the core");
 
 // ---- the script end to end, on a pull request's branch ----
