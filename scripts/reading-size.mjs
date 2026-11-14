@@ -5,8 +5,8 @@
 //     own, its size: when the file shrinks, the mark comes down with it), or the project's own among them total past
 //     "total" (the core's copy under core/, which the core's check holds to the core's tree, is left out: the core's
 //     own cap, scripts/size.mjs there, holds what of it every session reads, so that no sync fails a project over what
-//     the core grew, the core's AGENTS.md, "Nothing locks another owner's project"; where "total" still makes room for
-//     much of the core's copy, a note gives the mark to set);
+//     the core grew, the core's AGENTS.md, "Nothing locks another owner's project"; where "total" leaves room above the
+//     project's own files for more than half that copy, a note gives the mark to set);
 //   - when the PR changes a file past "split" (about 50 KB: Step 0, split it by meaning first), unless "past" lists it
 //     with a mark at least its size. The copy of the core (core/, changed only by a sync PR), the paths under "skip"
 //     (such as the archive: dated records, added to by every merge) and binary files are not counted.
@@ -58,8 +58,8 @@ for (const [f, mark] of Object.entries(marks.read)) {
 // in one step, never failed. The mark takes that copy off as often as the room holds it, keeping what room is left,
 // and is never below a KB above the project's own files, as the starter kit writes one)
 const least = (Math.ceil(total / 1024) + 1) * 1024;
-let to = marks.total;
-while (core && to - total > core / 2 && to > least) to = Math.max(to - core, least);
+const over = marks.total - total - core / 2;
+const to = core && over > 0 ? Math.max(marks.total - Math.ceil(over / core) * core, least) : marks.total;
 if (to < marks.total) notes.push(`the total in ${MARKS}, ${marks.total}, leaves ${marks.total - total} bytes of room above the project's own files, more than half what the core's copy every session reads comes to (${core}), which the core's own cap holds: set it to ${to} (core/setup/sync-notes.md, 14 November 2026)`);
 if (total > marks.total) fail.push(`the project's own files every session reads total ${total} bytes, past their mark of ${marks.total}: make them smaller; the mark in ${MARKS} rises only as "A mark on what every session reads" in core/modules/review-guidelines.md says`);
 
