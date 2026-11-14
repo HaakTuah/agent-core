@@ -26,6 +26,7 @@ asks for, in the line's own pull request, which waits for it unmerged while the 
 | #239 | builder | |
 | #251 | builder | |
 | #236 | builder | |
+| #257 | builder | |
 | #234 | builder | |
 | #256 | rule builder | #243; its staged case: #235 |
 | #242 | rule builder | |
@@ -50,7 +51,7 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #250 | the owner | three decisions of the owner's |
+| #250 | the owner | two decisions of the owner's |
 | #204 | builder | a stop that was ignored |
 | #163 | the owner | on hold |
 | #187 | the owner | on hold |

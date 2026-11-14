@@ -25,10 +25,12 @@ Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 the audits and the reports written before 12 November 2026); the archive is `archive/instructions.md`, cited "(core
 archive N)"; the *settling references* and the *descriptions*: `README.md`; the *large file*: past about 50 KB; the
-*owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, in its order; the
-*design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
-issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *other builders*: none, every
-file here being protected (`SECURITY.md`).
+*owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, and all that add to what
+every session reads at its start, whose cap they share, in the queue's order; the *design-checked PRs*: those that add
+or change a rule of the floor or the modules; the *review reference*: the line's issue, with the owner's words quoted
+on it; the *hard work*: a new or changed rule; the *size marks*: the cap of `scripts/size.mjs`, which has no split
+mark; the *major version checks*: the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other
+builders*: none, every file here being protected (`SECURITY.md`), so there are no *other builders' checks*.
 
 ## The queue
 
@@ -52,12 +54,14 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   issue as its source, and takes what they leave open as `modules/inbox.md` says of any open point. This is the second
   difference from that module, where only the design session writes rules from the owner's words.
 - **An orchestrator may work the file** (`modules/orchestrating.md`) while it holds a line a session can take. The
-  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake.
+  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
+  wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
+  a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
-  is the owner's ("A release is cut on the owner's word"). A batch is sized by what the projects can take: once its
-  release is synced, the count of "The core is measured as a feature is" is taken again in each of the owner's
-  projects and named to the owner, who sizes the next by it. It holds back no line the owner has said yes to: there
-  is no pause on new rules.
+  is the owner's ("A release is cut on the owner's word"): an orchestrator cuts none. A batch is sized by what the
+  projects can take: once its release is synced, the count of "The core is measured as a feature is" is taken again in
+  each of the owner's projects and named to the owner, who sizes the next by it. It holds back no line the owner has
+  said yes to: there is no pause on new rules.
 
 ## How changes are made here
 
