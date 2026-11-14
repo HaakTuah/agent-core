@@ -3,13 +3,15 @@
 // core as it stands here) and one commit off it, reached through the core's own address by a git rewrite, so neither
 // script changes for the test and no call reaches the network. A project makes its first copy with the sync script from
 // a clone of the core, syncs, and the sync is pure; then each way a sync branch can be made to carry more than the copy
-// and its pins is tried, and the proof refuses each (the alterations the outside audit's probe tried, core archive
-// 201): a job added, a new workflow, core/ edited, added to, made a link or a submodule (one whose id is the copy's own
-// tree too), a workflow's mode, another manifest line, a call pinned off main, text beside a pin, carriage returns, a
-// root .gitattributes, the pin moved backwards. Where the change lies under core/, the core's own core.yml job, run as
-// GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit alone is no difference to either
-// (copy-tree.mjs). And the sync script's own refusals, and its following of the core's releases. On Linux and on
-// Windows. Git, tar, bash and Node's own modules.
+// and its pins is tried, and the proof refuses each (the alterations the outside audit's probe tried, core archive 201,
+// and more): a job added or removed, a workflow added or deleted, a file outside core/ edited, a hook's settings added,
+// core/ edited, added to, made a link or a submodule (one whose id is the copy's own tree too), a workflow's mode,
+// another manifest line, a call moved to an older commit of main or renamed to another core workflow, the pin off main,
+// text beside a pin, carriage returns, a root .gitattributes, the pin moved backwards; each is refused for the reason
+// it means, so a check of pure-sync.mjs's gone fails the suite. Where the change lies under core/, the core's own
+// core.yml job, run as GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit alone is no difference
+// to either (copy-tree.mjs). And the sync script's own refusals, and its following of the core's releases. On Linux and
+// on Windows. Git, tar, bash and Node's own modules.
 //
 //   node scripts/pure-sync-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -107,28 +109,39 @@ ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 // each way a sync branch can be made to carry more: refused, and where it lies under core/, failed by core.yml too
 let canLink = true;
 try { fs.symlinkSync("nowhere", path.join(tmp, "probe")); } catch { canLink = false; }
+// (each with the refusal it means, so that a case refused for another reason, its own check gone, fails: pure-sync.mjs's
+// words, and where the change lies under core/, core.yml's)
+const NOT_COPY = "is not a folder holding the core's tree", DIFFERS = "core/ differs", NO_FOLDER = "core/ is no folder";
+const removeCore = () => { git(p, "rm", "-q", "-r", "--cached", "core"); fs.rmSync(path.join(p, "core"), { recursive: true, force: true }); };
+const outside = path.join(tmp, "same-outside.md");
 const tries = [
-  ["a job added to a workflow", () => write(p, ".github/workflows/core.yml", calls.replace("jobs:\n", "jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps: [{run: \"echo evil\"}]\n"))],
-  ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n")],
-  ["core/ edited", () => write(p, "core/README.md", `${read(p, "core/README.md")}x\n`), "core"],
-  ["a file added under core/", () => write(p, "core/extra.md", "x\n"), "core"],
-  ["a mode change on a workflow", () => { git(p, "update-index", "--chmod=+x", ".github/workflows/core.yml"); return "staged"; }],
-  ["another manifest line changed", () => write(p, "core-manifest.md", read(p, "core-manifest.md").replace("Modules: all.", "Modules: none."))],
-  ["a call pinned to a commit not on the core's main", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${SIDE}`))],
-  ["text added beside a pin", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${B} # ok`))],
-  ["every workflow line given a carriage return", () => write(p, ".github/workflows/core.yml", calls.replace(/\n/g, "\r\n"))],
-  ["a .gitattributes added at the root", () => write(p, ".gitattributes", "* text eol=crlf\n")],
-  ["core/ made a submodule", () => { git(p, "rm", "-q", "-r", "--cached", "core"); fs.rmSync(path.join(p, "core"), { recursive: true, force: true }); git(p, "update-index", "--add", "--cacheinfo", `160000,${B},core`); return "staged"; }, "core"],
-  ["core/ made a submodule's pointer whose id is the copy's own tree", () => { const tree = git(p, "rev-parse", "HEAD:core"); git(p, "rm", "-q", "-r", "--cached", "core"); fs.rmSync(path.join(p, "core"), { recursive: true, force: true }); git(p, "update-index", "--add", "--cacheinfo", `160000,${tree},core`); return "staged"; }, "core"],
-  ...(canLink ? [["a file of core/ made a link to an identical file", () => { fs.copyFileSync(path.join(p, "core/README.md"), path.join(p, "same.md")); fs.rmSync(path.join(p, "core/README.md")); fs.symlinkSync("../same.md", path.join(p, "core/README.md")); }, "core"]] : []),
+  ["a job added to a workflow", () => write(p, ".github/workflows/core.yml", calls.replace("jobs:\n", "jobs:\n  evil:\n    runs-on: ubuntu-latest\n    steps: [{run: \"echo evil\"}]\n")), "lines added or removed, not only a pin moved"],
+  ["a job removed from a workflow", () => write(p, ".github/workflows/core.yml", calls.replace(/  terms:\n[^]*$/u, "")), "lines added or removed, not only a pin moved"],
+  ["a new workflow", () => write(p, ".github/workflows/new.yml", "on: push\n"), "a file created, deleted or given a new mode"],
+  ["a workflow deleted", () => fs.rmSync(path.join(p, ".github/workflows/core.yml")), "a file created, deleted or given a new mode"],
+  ["a file outside core/ edited", () => write(p, "README.md", "# A project, changed\n"), "README.md: not the core's copy, its pin or a workflow"],
+  ["a hook's settings added", () => write(p, ".claude/settings.json", "{}\n"), ".claude/settings.json: not the core's copy, its pin or a workflow"],
+  ["core/ edited", () => write(p, "core/README.md", `${read(p, "core/README.md")}x\n`), NOT_COPY, DIFFERS],
+  ["a file added under core/", () => write(p, "core/extra.md", "x\n"), NOT_COPY, DIFFERS],
+  ["a mode change on a workflow", () => { git(p, "update-index", "--chmod=+x", ".github/workflows/core.yml"); return "staged"; }, "a file created, deleted or given a new mode"],
+  ["another manifest line changed", () => write(p, "core-manifest.md", read(p, "core-manifest.md").replace("Modules: all.", "Modules: none.")), "a changed line with no pin, or one not the new pin"],
+  ["a call moved to an older commit of the core's main, not the new pin", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${Z}`)), "a changed line with no pin, or one not the new pin"],
+  ["a call renamed to another core workflow at the pin", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `security-review.yml@${B}`)), "a change beyond a pin"],
+  ["the manifest and a call pinned to a commit not on the core's main", () => { write(p, "core-manifest.md", manifest(OWNER, SIDE)); write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${SIDE}`)); }, `${SIDE} is not a commit of the core's main`],
+  ["text added beside a pin", () => write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${B} # ok`)), "a change beyond a pin"],
+  ["every workflow line given a carriage return", () => write(p, ".github/workflows/core.yml", calls.replace(/\n/g, "\r\n")), "a changed line with no pin, or one not the new pin"],
+  ["a .gitattributes added at the root", () => write(p, ".gitattributes", "* text eol=crlf\n"), ".gitattributes: not the core's copy, its pin or a workflow"],
+  ["core/ made a submodule", () => { removeCore(); git(p, "update-index", "--add", "--cacheinfo", `160000,${B},core`); return "staged"; }, NOT_COPY, NO_FOLDER],
+  ["core/ made a submodule's pointer whose id is the copy's own tree", () => { const tree = git(p, "rev-parse", "HEAD:core"); removeCore(); git(p, "update-index", "--add", "--cacheinfo", `160000,${tree},core`); return "staged"; }, NOT_COPY, NO_FOLDER],
+  ...(canLink ? [["a file of core/ made a link to an identical file outside the project", () => { fs.copyFileSync(path.join(p, "core/README.md"), outside); fs.rmSync(path.join(p, "core/README.md")); fs.symlinkSync(path.relative(path.join(p, "core"), outside), path.join(p, "core/README.md")); }, NOT_COPY, DIFFERS]] : []),
 ];
 if (!canLink) console.log("skip the link: this machine lets the test make none");
-for (const [what, alter, under] of tries) {
+for (const [what, alter, refused, failed] of tries) {
   if (alter() !== "staged") git(p, "add", "-A"); // (a change made in the index alone is not undone by an add)
   git(p, "commit", "-q", "-m", what);
   const r = pure();
-  ok(r.status === 1 && r.out.includes("NOT PURE") && !r.out.includes("merge it with"), `${what}: not a pure sync`, r.out);
-  if (under) { const c = coreCheck(); ok(!c.passed && c.out.includes("core/"), `  and the core's own check of the copy fails it`, c.out); }
+  ok(r.status === 1 && r.out.includes(`NOT PURE`) && r.out.includes(refused) && !r.out.includes("merge it with"), `${what}: not a pure sync ("${refused}")`, r.out);
+  if (failed) { const c = coreCheck(); ok(!c.passed && c.out.includes(failed), `  and the core's own check of the copy fails it ("${failed}")`, c.out); }
   git(p, "reset", "-q", "--hard", LEGIT);
   git(p, "clean", "-q", "-fd");
 }
