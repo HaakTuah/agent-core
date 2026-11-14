@@ -6,6 +6,9 @@
 # (scripts/init-dotnet-test.mjs). Another writes projects with the previous release's starter kit, syncs them to the
 # commit under test and runs every check of the core on them, taking one package from npm's registry
 # (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so the checkout fetches them.
+# A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
+# unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
+# run, in the core's audit (scripts/readers-test.mjs, on Linux).
 name: tests
 
 on:

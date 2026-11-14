@@ -81,10 +81,14 @@ function toolsAt(root, base, f) {
   if (!base) return null;
   try { return new Set(Object.entries(JSON.parse(unmarked(textAt(root, base, f) ?? "{}"))?.tools ?? {}).map(([id, e]) => `${id}@${e?.version}`.toLowerCase())); } catch { return new Set(); }
 }
-// The id and version a package file's manifest names, as NuGet reads them to tell packages apart: one of each, in the
-// plain form a manifest writes them, or null.
-function named(nuspec) {
-  const ids = [...nuspec.matchAll(/<id>([^<>]*)<\/id>/gu)], versions = [...nuspec.matchAll(/<version>([^<>]*)<\/version>/gu)];
+// The id and version a package file's manifest names, as NuGet reads them to tell packages apart: one of each, under
+// its one metadata part, in the plain form a manifest writes them, its comments cut first; or null, as for a manifest
+// with CDATA or a document type, which this does not read.
+export function named(nuspec) {
+  if (/<!\[CDATA\[|<!DOCTYPE/iu.test(nuspec)) return null;
+  const plain = nuspec.replace(/<!--[\s\S]*?-->/gu, ""), parts = [...plain.matchAll(/<metadata\b[^>]*>([\s\S]*?)<\/metadata>/gu)];
+  if (parts.length !== 1) return null;
+  const ids = [...parts[0][1].matchAll(/<id>([^<>]*)<\/id>/gu)], versions = [...parts[0][1].matchAll(/<version>([^<>]*)<\/version>/gu)];
   return ids.length === 1 && versions.length === 1 ? { id: ids[0][1].trim(), version: versions[0][1].trim() } : null;
 }
 

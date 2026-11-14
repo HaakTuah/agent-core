@@ -84,7 +84,8 @@ try {
       : kept(x) ? x : "AGPL-3.0-only")).join(" ");
   };
   // what each reader refuses that SPDX's parser reads, as each says: AND and OR mixed without brackets (licenceOk), an
-  // operator not in capitals or run into a word, "+", a DocumentRef, or a licence not on the reader's list
+  // operator not in capitals or run into a word, "+", a DocumentRef, a licence not on the reader's list, or empty
+  // brackets, which SPDX's grammar has none of and its parser reads past at an expression's start
   const mixed = (e) => {
     const levels = [new Set()];
     for (const w of words(e)) {
@@ -95,22 +96,24 @@ try {
     }
     return false;
   };
-  const loose = (e) => words(e).some((w) => (/^(?:AND|OR|WITH)$/iu.test(w) && w !== w.toUpperCase()) || /^(?:AND|OR|WITH)./iu.test(w)) || e.includes("+") || e.includes("DocumentRef-");
+  const loose = (e) => words(e).some((w) => (/^(?:AND|OR|WITH)$/iu.test(w) && w !== w.toUpperCase()) || /^(?:AND|OR|WITH)./iu.test(w)) || e.includes("+") || e.includes("DocumentRef-") || /\([ \t\r\n]*\)/u.test(e);
 
   const rnd = prng(201);
   const lists = [new Set(["MIT", "ISC", "Apache-2.0"]), new Set(["MIT"]), new Set(IDS)];
   const laxer = [], stricter = [], readLaxer = [], readStricter = [];
   for (let i = 0; i < CASES; i++) {
-    const e = spdx(rnd), ast = reference(e);
+    // (licenceOk reads past blanks at an expression's ends, as it always has, so SPDX's parser is asked without them;
+    // readable, which reads the owner's yeses, takes none)
+    const raw = spdx(rnd), e = raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, ""), ast = reference(e);
     for (const allow of lists) {
-      const ours = licenceOk(e, allow);
+      const ours = licenceOk(raw, allow);
       const theirs = reference(asked(e, (x) => allow.has(x)));
       if (ours && !(theirs && allowedBy(theirs, allow))) laxer.push(e);
       if (!ours && ast && allowedBy(ast, allow) && !mixed(e) && !loose(e)) stricter.push(e);
     }
-    const yes = readable(e, new Set(IDS));
-    if (yes && !reference(asked(e, (x) => IDS.includes(x) || /^LicenseRef-/u.test(x)))) readLaxer.push(e);
-    if (!yes && ast && !loose(e) && licences(ast).every((l) => IDS.includes(l))) readStricter.push(e);
+    const yes = readable(raw, new Set(IDS)), rawAst = reference(raw);
+    if (yes && !reference(asked(raw, (x) => IDS.includes(x) || /^LicenseRef-/u.test(x)))) readLaxer.push(raw);
+    if (!yes && rawAst && !loose(raw) && licences(rawAst).every((l) => IDS.includes(l))) readStricter.push(raw);
   }
   const shown = (list) => list.slice(0, 5).map((e) => JSON.stringify(e)).join(" | ");
   ok(!laxer.length, `licenceOk allows nothing SPDX's parser refuses, or reads as not allowed (${CASES} expressions, 3 lists)`, shown(laxer));
@@ -142,11 +145,12 @@ try {
   };
   // the parser's reading, as NuGet reads a manifest: the one license under the one metadata under the root, package,
   // each by its local name in the root's namespace; any error or fatal error is no reading (a decoder drops the BOM)
-  const xmlReading = (text) => {
+  // (`clean`: a warning too is no reading, the parser's word that it read past what XML does not write)
+  const xmlReading = (text, clean = false) => {
     const errors = [];
     let doc;
     try {
-      doc = new DOMParser({ onError: (level, message) => { if (level !== "warning") errors.push(message); } }).parseFromString(text.replace(/^﻿/u, ""), "text/xml");
+      doc = new DOMParser({ onError: (level, message) => { if (clean || level !== "warning") errors.push(message); } }).parseFromString(text.replace(/^﻿/u, ""), "text/xml");
     } catch (e) { return { refused: e.message.split("\n")[0] }; }
     if (errors.length) return { refused: errors[0].split("\n")[0] };
     const root = doc.documentElement, ns = root.namespaceURI;
@@ -157,17 +161,56 @@ try {
     return { type: licence[0].getAttribute("type"), expression: licence[0].textContent.replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, "") };
   };
   ok(MANIFESTS.every(([m, e]) => manifestLicence(m).expression === e && xmlReading(m).expression === e), "a plain manifest: both read its licence, the same");
-  const xrnd = prng(202), differ = [];
+  // what manifestLicence refuses that the parser reads with no warning, each for a reason nuget.mjs's header states, and
+  // no wider: a document type or an entity declared; "--" within a comment; an entity XML does not know, or ]]>,
+  // outside CDATA and comments; a declaration but at the start; a prefix on an element, or on an attribute
+  // but xml, xmlns or one the root declares; one local name twice in a tag; a namespace declared but on the root; a
+  // name beyond plain ASCII; a licence's attributes but type and then version, an empty expression, or an element,
+  // comment, CDATA, reference or blank but a space within it; anything but blanks, comments and instructions after the
+  // root's end, which this parser reads past with no warning
+  const stated = (text) => {
+    const body = text.replace(/^\uFEFF/u, ""), tags = body.match(/<[^>]*>/gu) ?? [];
+    const rootTag = tags.find((t) => /^<[^?!/]/u.test(t)) ?? "";
+    const declared = new Set(["xml", "xmlns", ...[...rootTag.matchAll(/[ \t\r\n]xmlns:([^ \t\r\n=]+)[ \t\r\n]*=/gu)].map((m) => m[1])]);
+    const names = (t) => [...t.replace(/"[^"]*"|'[^']*'/gu, "").matchAll(/[ \t\r\n]([^ \t\r\n=/>]+)[ \t\r\n]*=/gu)].map((m) => m[1]);
+    // (the text with its comments and CDATA cut, where the reader reads past an ampersand or ]]>)
+    const bare = body.replace(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>/gu, "");
+    const licence = /<license\b[^>]*>([\s\S]*)<\/license>/u.exec(body)?.[1]?.replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, "") ?? "";
+    const end = body.indexOf("</package>");
+    return /<!DOCTYPE|<!ENTITY|\u0000|\u0001/u.test(body)
+      || /<!--(?:(?!-->)[\s\S])*?--(?!>)/u.test(body)
+      || /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/u.test(bare)
+      || /\]\]>/u.test(bare)
+      || /<\?xml[ \t\r\n?]/iu.test(body.replace(/^<\?xml[ \t\r\n][^>]*\?>/u, ""))
+      || tags.some((t) => /^<\/?[^ \t\r\n>/!?]*:/u.test(t) || names(t).some((n) => n.includes(":") && !declared.has(n.split(":")[0])))
+      || tags.some((t) => { const local = names(t).filter((n) => n !== "xmlns" && !n.startsWith("xmlns:")).map((n) => n.split(":").pop()); return new Set(local).size !== local.length; })
+      || tags.some((t) => t !== rootTag && /[ \t\r\n]xmlns[ \t\r\n]*[:=]/u.test(t.replace(/"[^"]*"|'[^']*'/gu, "")))
+      || tags.some((t) => /[^\x00-\x7f]/u.test(t.replace(/"[^"]*"|'[^']*'/gu, "")))
+      || !/^[ \t\r\n]+type[ \t\r\n]*=[ \t\r\n]*(?:"[a-z]*"|'[a-z]*')(?:[ \t\r\n]+version[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'))?[ \t\r\n]*$/u.test(/<license\b([^>]*)>/u.exec(body)?.[1] ?? " type=''")
+      || !licence || /[<&\t\r\n]|[^\x20-\x7e]/u.test(licence)
+      || (end >= 0 && /[^ \t\r\n]/u.test(body.slice(end + 10).replace(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>/gu, "")));
+  };
+  // (and what real manifests hold beside their licence: an entity, a schema's namespace on the root, a comment or an
+  // instruction inside, a comment after the root, CDATA and a character's reference in a description, a word beyond
+  // ASCII; and what the reader reads past too: an ampersand or ]]> in a comment, a byte-order mark in text, a namespace
+  // declared beside an attribute of the same local name)
+  const plain = (meta, after = "", root = "") => `<?xml version="1.0" encoding="utf-8"?>\n<package xmlns="${NS}"${root}>\n  <metadata>\n    <id>A</id>\n${meta}    <license type="expression">MIT</license>\n  </metadata>\n</package>\n${after}`;
+  const REAL = [plain("    <description>Tom &amp; Jerry</description>\n"), plain("", "", ` xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="${NS} nuspec.xsd"`),
+    plain("    <!-- a note -->\n    <?pi data?>\n"), plain("", "<!-- after -->\n"), plain("    <description><![CDATA[x < y]]> &#233; Café</description>\n"),
+    plain("    <!-- a & b ]]> -->\n    <description>a\uFEFFb</description>\n", "", ' xmlns:a="urn:a" a="1"')];
+  ok(REAL.every((m) => manifestLicence(m).expression === "MIT" && xmlReading(m, true).expression === "MIT" && !stated(m)), "what real manifests hold beside their licence: both read it, and no reason is stated for it");
+  const xrnd = prng(202), differ = [], refused = [];
   let read = 0;
   for (let i = 0; i < CASES; i++) {
     const text = mutated(xrnd, MANIFESTS[xrnd(MANIFESTS.length)][0]);
     const ours = manifestLicence(text).expression;
-    if (ours === undefined) continue;
+    if (ours === undefined) { const theirs = xmlReading(text, true); if (theirs.type === "expression" && !stated(text)) refused.push(JSON.stringify(text)); continue; }
     read++;
     const theirs = xmlReading(text);
     if (theirs.type !== "expression" || theirs.expression !== ours) differ.push(`${JSON.stringify(text)}: ours ${JSON.stringify(ours)}, the parser's ${theirs.refused ?? `${theirs.type}: ${JSON.stringify(theirs.expression)}`}`);
   }
   ok(!differ.length && read > CASES / 20, `manifestLicence reads no licence the XML parser does not read the same (${CASES} manifests, ${read} read by it)`, differ.slice(0, 3).join("\n     "));
+  ok(!refused.length, "manifestLicence refuses what the XML parser reads only for a reason it states", refused.slice(0, 5).join("\n     "));
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

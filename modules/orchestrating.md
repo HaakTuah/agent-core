@@ -8,13 +8,13 @@ starting and handing over sessions, passing on the owner's word. Only if it cann
 and stop.
 
 - **On every wake,** the hourly one set once to repeat, never anew each turn (core archive 200), on the owner's computer
-  only one the owner set up (floor rule 8; core archive 42, 44 and 124): read the stop switch first (`modules/work-flow.md`),
-  and where it stands, start nothing and tell the running builders to stop; pull `main`, its clone on `main`; if a rule
-  file changed, re-read it and pass what touches them to the running builders in one message; if `setup/sync-notes.md`
-  gained entries, a lane does what they ask; sync the core in a routine lane, as "Sessions" in `modules/work-flow.md`
-  says; turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`); act on what
-  is new in the *progress file*; once an open idea has waited a week with no verdict of the stand-in's, call the
-  stand-in.
+  only one the owner set up (floor rule 8; core archive 42, 44 and 124): read the stop switch first
+  (`modules/work-flow.md`), and where it stands, tell the running builders to stop and do nothing more that wake; pull
+  `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running builders in
+  one message; if `setup/sync-notes.md` gained entries, a lane does what they ask; sync the core in a routine lane, as
+  "Sessions" in `modules/work-flow.md` says; turn back on any scheduled workflow GitHub switched off for want of
+  activity (`gh workflow enable`); act on what is new in the *progress file*; once an open idea has waited a week with
+  no verdict of the stand-in's, call the stand-in.
 - **Hand over at once:** start the next session as soon as a task merges. One session per task, continued for its review
   fixes while its context is under an hour old and small; otherwise a fresh one (core archive 10).
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can
