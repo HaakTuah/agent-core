@@ -89,6 +89,7 @@ const isAncestor = (a, b) => { try { git(theCore, "merge-base", "--is-ancestor",
 const cut = releases.filter(t => isAncestor(`${t}^{commit}`, head)).sort((a, b) => number(a) - number(b));
 const starts = cut.filter(t => git(theCore, "rev-parse", `${t}^{commit}`) !== head).slice(-2); // (the last two releases before it)
 if (!starts.length) {
+  ok(!process.env.GITHUB_ACTIONS, "on GitHub's runners a release of the core's comes before the commit under test");
   console.log(failed ? `${failed} of ${count} failed` : "skip the rest: no release of the core's comes before the commit under test, so none to start from");
   process.exit(failed ? 1 : 0);
 }

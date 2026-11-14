@@ -1,22 +1,23 @@
 # Nothing personal, ever (floor rule 11). Fails a pull request whose files, commits, title or description hold a term
 # from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
 # written into the repository, since the list itself would be personal. Of each commit it reads the message, the
-# author's and the committer's name and address (save those of a merge GitHub itself made, which floor rule 11
-# excepts: one GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it
-# cannot, no merge is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and
-# the names of the files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps
-# every commit (core archive 201). The commits read are the pull request's own, its base's left out, whatever date a
-# commit bears: a date is whatever its maker writes, and a commit not yet on main can still be changed. In a private
-# repository a term in a commit's author or committer is reported, naming the commits, and fails nothing: where the
-# owner works on their own computer, git writes the name set there into every commit, the agents' too, and failing it
-# would fail the sync to a release and every pull request after it (the core's AGENTS.md, "Nothing locks another
-# owner's project"; README.md, "Setting up (the owner's part)", says how to keep the name out). A file whose older
-# name holds a term is deleted or renamed away freely; a commit that only edits it fails, since the diff names it. It
-# reads no file git takes for binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only
-# where a term was found (file and line, or the commit), never the term. Without the secret (a fork, Dependabot, a
-# project that has not set it) it passes with a note: the check is optional.
-# It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full commit SHA
-# (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
+# author's and the committer's name and address (save those of a merge GitHub itself made, which floor rule 11 excepts:
+# one GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it cannot, no
+# merge is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and the names of
+# the files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps every commit
+# (core archive 201). The commits read are the pull request's own, its base's left out, whatever date a commit bears: a
+# date is whatever its maker writes, and a commit not yet on main can still be changed. In a private repository a term
+# in a commit's author or committer is reported, naming the commits, and fails nothing (floor rule 11 excepts what git
+# writes there from the committing machine's settings): where the owner works on their own computer, git writes the name
+# set there into every commit, the agents' too, and failing it would fail the sync to a release and every pull request
+# after it (the core's AGENTS.md, "Nothing locks another owner's project"; README.md, "Setting up (the owner's part)",
+# says how to keep the name out). A file whose older name holds a term is deleted or renamed away freely; a commit that
+# only edits it fails, since the diff names it. It reads no file git takes for binary (`git grep -I`, a diff's "Binary
+# files differ"), pictures included. It prints only where a term was found (file and line, or the commit), never the
+# term. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note: the check is
+# optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
+# commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's
+# own.
 name: Personal terms
 
 on:

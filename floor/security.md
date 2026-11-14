@@ -60,13 +60,13 @@ saved data; a weakened check).
 - **Test data is never real:** fake keys built from pieces when the test runs, sample names and addresses invented
   (core archive 29).
 
-**11. Nothing personal, ever** (core archive 30 and 43).
+**11. Nothing personal, ever** (core archive 30, 43 and 202).
 - No file, commit, PR, issue, comment, log or picture holds personal information about the owner or anyone in their
   life, nor does any prompt or brief given to an agent: no names (only "the owner"), profession, employer or workplace,
   family, home, age, health, memberships or money, nor anything else about the owner's life outside the project.
-  - Excepted: the GitHub account in the repository's own address; the name and address GitHub itself writes as the
-    author of a merge, from the profile of the account that merges, where its owner keeps them there; and the company
-    name a project is sold under, naming no person.
+  - Excepted: the GitHub account in the repository's own address; the name and address GitHub writes as a merge's
+    author, from the merging account's profile, or git in a private repository, from the committing machine's settings,
+    where its owner keeps them there; and the company name a project is sold under, naming no person.
 - The owner's archived words leave such details out as "[…]".
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 
