@@ -30,7 +30,7 @@
 // beside this file) with this file's lists, the same audit and an "accepted" of its own.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, posix } from "node:path";
+import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
@@ -76,9 +76,10 @@ const NEVER = new RegExp([
 ].join("|"), "iu");
 const COPYLEFT = /GPL|MPL|EPL|CDDL|-SA(-|$)|MS-PL/iu;
 // Licences the floor moved off the list for what ships, each with the day it moved (core archive 201): from then on
-// what ships under one waits for the owner's yes, save what a project's lock files or audit already held at the pull
-// request's base, which is reported and passes, so that no sync fails a project over what it holds (the core's
-// AGENTS.md, "Nothing locks another owner's project"); one a pull request adds or updates waits, that pull request alone.
+// what ships under one waits for the owner's yes, save what a project already shipped at the pull request's base (in
+// the same lock file, shipped there by the base's own config, or in its audit as it stands), which is reported and
+// passes, so that no sync fails a project over what it holds (the core's AGENTS.md, "Nothing locks another owner's
+// project"); one a pull request adds, updates or moves into what ships waits, that pull request alone.
 export const MOVED_OFF = new Map([["MS-PL", "13 November 2026"]]);
 /** Whether an expression off a list would pass but for a licence the floor moved off it. */
 export function movedOff(expression, allow) {
@@ -87,6 +88,11 @@ export function movedOff(expression, allow) {
 /** A file's text at a commit of the repository at `root`, or null where git cannot give it. */
 export function textAt(root, rev, file) {
   try { return execFileSync("git", ["show", `${rev}:${file}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { return null; }
+}
+/** The config at `path` as the commit `rev` held it, parsed, or null where it held none git can give as JSON. */
+export function configAt(root, rev, path) {
+  if (!rev) return null;
+  try { const c = JSON.parse(textAt(root, rev, relative(root, resolve(path)).split(sep).join("/"))); return c && typeof c === "object" && !Array.isArray(c) ? c : null; } catch { return null; }
 }
 /** The base a pull request's checkout is read against: the first parent of GitHub's merge of it, or null. */
 export function baseOf(root) {
@@ -342,9 +348,9 @@ export function lockRead(packages, workspaces) {
 }
 
 /** Every package each lockfile installs, with its licence, whether it ships, and the name its registry address gives. */
-function lockfilePackages(root, lockPath, ships) {
+function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join(root, f), "utf8")) {
   const base = posix.dirname(lockPath) === "." ? "" : posix.dirname(lockPath);
-  const read = (p) => JSON.parse(readFileSync(join(root, base, p), "utf8"));
+  const read = (p) => JSON.parse(text(posix.join(base, p)));
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3)`);
   const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
@@ -359,25 +365,30 @@ function lockfilePackages(root, lockPath, ships) {
     });
 }
 
-/** The check, on the project at `root`, read against `base` (a commit, or null): { failures, reports, summary }. */
-export function check(config, root, base = null) {
+/**
+ * The check, on the project at `root`, read against `base` (a commit, or null) and the config as the base held it
+ * (`baseConfig`, or null to read the base by this one): { failures, reports, summary }.
+ */
+export function check(config, root, base = null, baseConfig = null) {
   config = normalised(config);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
-  // (what each lock file held at the base, by name@version, read once each)
-  const heldIn = new Map();
+  // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the
+  // base held only as a tool, or in a lock file whose packages did not ship then, was not shipped)
+  const heldIn = new Map(), then = baseConfig ? normalised(baseConfig) : config;
   // (with no base to read it against, as in a checkout of one commit, what ships under a licence moved off is reported
   // and passes, as it passed before: held or not cannot be told, and no sync fails a project over it)
   const held = (lockPath, name, version) => {
     if (!base) return true;
     if (!heldIn.has(lockPath)) {
-      const names = new Set();
-      try { for (const [path, e] of Object.entries(JSON.parse(textAt(root, base, lockPath)).packages ?? {})) if (lockInstalled(path) && e) names.add(`${path.slice(path.lastIndexOf("node_modules/") + 13)}@${e.version}`); } catch { /* (none held) */ }
+      let names = new Set();
+      const shipped = Array.isArray(then.ships) && then.ships.includes(posix.join(posix.dirname(lockPath), "package.json"));
+      try { names = new Set(lockfilePackages(root, lockPath, shipped, (f) => textAt(root, base, f)).filter((q) => q.shipped).map((q) => `${q.name}@${q.version}`)); } catch { /* (none held) */ }
       heldIn.set(lockPath, names);
     }
     return heldIn.get(lockPath).has(`${name}@${version}`);
   };
-  const report = (what, licence) => `${what} ships under ${licence}, which since ${[...MOVED_OFF].filter(([id]) => licence.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "held before then" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "accepted" or has it replaced`;
+  const report = (what, licence) => `${what} ships under ${licence}, which since ${[...MOVED_OFF].filter(([id]) => licence.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "accepted" or has it replaced`;
   // (the owner's yeses, by what each names; `needed`: those something off its list stood on, `onList`: those nothing did)
   const accepted = config.accepted ?? [], needed = new Set(), onList = new Set();
   const yesFor = (kind, name) => accepted.find((a) => a[kind] === name);
@@ -451,7 +462,7 @@ export function check(config, root, base = null) {
   const shippedCount = packages.filter((p) => p.shipped).length;
   const summary = `${packages.length} packages checked (${shippedCount} shipped or may be, ${packages.length - shippedCount} tools that only run)` +
     `${config.audit ? `, ${entries.length} audit entries` : ""}${scanned ? `, ${scanned.scanned} files scanned for what the audit must hold` : ""}; ` +
-    `${needed.size ? `${needed.size} accepted on the owner's yes; ` : ""}${reports.length ? `${reports.length} held before a licence moved off the list, reported; ` : ""}${all.length} failing (floor rule 10)`;
+    `${needed.size ? `${needed.size} accepted on the owner's yes; ` : ""}${reports.length ? `${reports.length} shipped at the base under a licence moved off the list, reported; ` : ""}${all.length} failing (floor rule 10)`;
   return { failures: all, reports, summary };
 }
 
@@ -481,7 +492,7 @@ if (started(import.meta.url)) {
     for (const line of actionLists(config)) console.log(line);
   } else {
     let result;
-    try { result = check(config, root, baseOf(root)); } catch (e) { fail(e.message); }
+    try { const base = baseOf(root); result = check(config, root, base, configAt(root, base, configPath)); } catch (e) { fail(e.message); }
     for (const r of result.reports) console.log(`REPORT: ${r}`);
     for (const f of result.failures) console.error(`FAIL: ${f}`);
     console.log(result.summary);

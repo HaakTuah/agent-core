@@ -70,6 +70,17 @@ ok(!ships.has("MS-PL") && policy().allowedFor("x", false).has("MS-PL") && movedO
     commit([["held", "1.1.0", "MS-PL"], ["fine", "1.0.0", "MIT"]]);
     const u = check(config, dir, "HEAD^1");
     ok(u.reports.length === 0 && u.failures.length === 1 && u.failures[0].includes("held@1.1.0"), "one the pull request updates fails too: the yes is for that version", JSON.stringify(u));
+    // (a package the base held only as a tool, which a pull request moves into what ships, was not shipped there)
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", dependencies: { fine: "1.0.0" }, devDependencies: { dev: "1.0.0" } }));
+    writeFileSync(join(dir, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: { fine: "1.0.0" }, devDependencies: { dev: "1.0.0" } }, "node_modules/fine": { version: "1.0.0", license: "MIT", resolved: "https://registry.npmjs.org/fine/-/fine-1.0.0.tgz" }, "node_modules/dev": { version: "1.0.0", license: "MS-PL", dev: true, resolved: "https://registry.npmjs.org/dev/-/dev-1.0.0.tgz" } } }));
+    git("add", "-A"); git("commit", "-q", "-m", "a tool");
+    const asTool = check(config, dir, "HEAD^1");
+    commit([["dev", "1.0.0", "MS-PL"], ["fine", "1.0.0", "MIT"]]);
+    const moved = check(config, dir, "HEAD^1");
+    ok(asTool.failures.length === 0 && moved.reports.length === 0 && moved.failures.length === 1 && moved.failures[0].includes("dev@1.0.0"), "one the base held only as a tool, which the pull request moves into what ships, fails: it was not shipped there", JSON.stringify([asTool, moved]));
+    // (and a lock file whose packages the base's own config did not ship, which the pull request's config now ships)
+    const tools = check(config, dir, "HEAD^1", { ships: [], lockfiles: ["package-lock.json"] });
+    ok(tools.reports.length === 0 && tools.failures.some((f) => f.includes("dev@1.0.0")), "one in a lock file the base's own config did not ship fails too, read by that config", JSON.stringify(tools));
     const none = check(config, dir, null);
     ok(none.reports.length === 1 && none.reports[0].includes("no base to read") && none.failures.length === 0, "with no base to read (a checkout of one commit), it is reported and passes, as it passed before: no sync fails a project over it", JSON.stringify(none));
   } finally { rmSync(dir, { recursive: true, force: true }); }

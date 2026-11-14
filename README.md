@@ -146,8 +146,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      and passes without a restore where it changes none; any doubt runs it. Before the restore, which runs the pull
      request's own build files, `nuget-fetch.mjs` fetches every package the lock files name, holds each to its lock
      file's content hash and reads its licence from it, so no build has run beside that verdict; the tools a manifest
-     of dotnet's names (`.config/dotnet-tools.json`) are fetched and held the same way, each at one exact version and to
-     the list for tools that only run (a tool held before this release is reported, not failed).
+     of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are fetched and held the same way, each at one
+     exact version and to the list for tools that only run (what is wrong with a tool the pull request's base held,
+     never read before this release, is reported, not failed). Where the first look restored, which runs the pull
+     request's build files, that read is left out: nothing it reads changed from the base.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull

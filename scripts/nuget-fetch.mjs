@@ -8,26 +8,31 @@
 // reads it), takes the manifest (.nuspec) out of it, and writes it
 // into a folder laid out as a restore lays out its own, with NuGet's record of where it took it from beside it
 // (.nupkg.metadata), for `nuget.mjs <config> --packages <that folder> --fetched` to read before the restore begins.
-//   It fails a locked package whose file is not what its lock file names, a tool whose manifest names no one exact
-// version, and a package or tool it can find nowhere it may look (a registry that cannot be reached among them, which a
-// restore could not reach either). A package that only a source of another kind holds (a feed of NuGet's older form) is
-// left to the check after the restore, and said so. A tool's file has no content hash to hold it to: it is the one the
-// registry, or the first source that holds it, gives. Node's own modules only; the network for the registry and the
-// sources named. It reads and writes only the folder it is given.
+//   It fails a locked package whose file is not what its lock file names (each source tried in turn, as a restore
+// tries them), a tool whose manifest names no one exact version, and a package or tool it can find nowhere it may look
+// (a source that cannot be read among them, which a restore could not read either). A package that only a source of
+// another kind holds (a feed of NuGet's older form) is left to the check after the restore, and said so; a tool, which
+// no restore brings, fails there. A tool's file has no content hash to hold it to: it is the one the registry, or the
+// first source that holds it, gives. What is wrong with a tool the pull request's base already held at that version,
+// never read before this release, is reported and passes (the core's AGENTS.md, "Nothing locks another owner's
+// project"). Node's own modules only; the network for the registry and the sources named, eight files at a time. It
+// writes only into the folder it is given.
 //
 //   node core/scripts/nuget-fetch.mjs <config> --into <a folder of its own>
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { loadConfig } from "./licences.mjs";
+import { baseOf, loadConfig, textAt } from "./licences.mjs";
 import { REGISTRY, lockPackages, nugetConfig, sourcesOf } from "./nuget.mjs";
 import { started } from "./started.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
-const TOOLS = "dotnet-tools.json";
+const TOOLS = "dotnet-tools.json"; // its name, in any case, in .config/ or in any folder, as dotnet reads it
+const isTools = (f) => posix.basename(f).toLowerCase() === TOOLS;
+const MANIFEST_MAX = 1 << 24; // the most a manifest is inflated to: a real one is a few KB
 const EXACT = /^[0-9]+(\.[0-9]+){1,3}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/u; // one version, no range
 const ID = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/u;
 const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
@@ -52,21 +57,29 @@ export function nuspecOf(zip) {
   if (zip.readUInt32LE(local) !== 0x04034b50) throw new Error("a zip whose entry this does not read");
   const data = zip.subarray(local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28)).subarray(0, size);
   if (method === 0) return data.toString("utf8");
-  if (method === 8) return inflateRawSync(data).toString("utf8");
+  if (method === 8) return inflateRawSync(data, { maxOutputLength: MANIFEST_MAX }).toString("utf8");
   throw new Error(`a manifest packed in a way this does not read (method ${method})`);
 }
 
-/** The tools a manifest of dotnet's names: { tools: [{ id, version }], failures }. */
+/**
+ * The tools a manifest of dotnet's names: { tools: [{ id, version }], failures, failed }, `failed` naming each failure's
+ * tool by its id and version as written ({ id, version, failure }).
+ */
 export function toolsOf(text, at) {
   let manifest;
-  try { manifest = JSON.parse(text); } catch { return { tools: [], failures: [`${at} is not JSON`] }; }
-  const tools = [], failures = [];
+  try { manifest = JSON.parse(text); } catch { return { tools: [], failures: [`${at} is not JSON`], failed: [] }; }
+  const tools = [], failed = [];
   for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
-    if (!ID.test(id)) { failures.push(`${at}: ${shown(id)}: no tool id it can read`); continue; }
-    if (typeof entry?.version !== "string" || !EXACT.test(entry.version)) { failures.push(`${at}: ${id}: no one exact version (${shown(JSON.stringify(entry?.version))}): name the one version it runs (floor rule 7)`); continue; }
+    if (!ID.test(id)) { failed.push({ id, version: entry?.version, failure: `${at}: ${shown(id)}: no tool id it can read` }); continue; }
+    if (typeof entry?.version !== "string" || !EXACT.test(entry.version)) { failed.push({ id, version: entry?.version, failure: `${at}: ${id}: no one exact version (${shown(JSON.stringify(entry?.version))}): name the one version it runs (floor rule 7)` }); continue; }
     tools.push({ id, version: entry.version });
   }
-  return { tools, failures };
+  return { tools, failures: failed.map((f) => f.failure), failed };
+}
+/** The tools a manifest held at the base, by id@version as written, in lower case; null where none can be read. */
+function toolsAt(root, base, f) {
+  if (!base) return null;
+  try { return new Set(Object.entries(JSON.parse(textAt(root, base, f) ?? "{}")?.tools ?? {}).map(([id, e]) => `${id}@${e?.version}`.toLowerCase())); } catch { return new Set(); }
 }
 
 const sha512 = (bytes) => createHash("sha512").update(bytes).digest("base64");
@@ -110,83 +123,132 @@ export function contentHash(zip) {
 }
 async function get(url) {
   const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
+  if (!r.url.startsWith("https://")) throw new Error(`${url}: led to an address that is not https`);
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`${url}: ${r.status}`);
   return Buffer.from(await r.arrayBuffer());
 }
-// Where a v3 feed keeps its package files, from its own index; null where the source is no feed of that form.
-const bases = new Map();
-async function baseOf(source) {
-  if (source === REGISTRY) return FLAT;
-  if (!bases.has(source)) {
-    let base = null;
-    try {
-      const index = JSON.parse((await get(source))?.toString("utf8") ?? "{}");
-      base = (index.resources ?? []).find((r) => typeof r?.["@type"] === "string" && r["@type"].startsWith("PackageBaseAddress/3.0.0"))?.["@id"] ?? null;
-      if (base && !base.endsWith("/")) base += "/";
-      if (base && !base.startsWith("https://")) base = null;
-    } catch { base = null; }
-    bases.set(source, base);
-  }
-  return bases.get(source);
+// Where a v3 feed keeps its package files, from its own index; null where the source is a feed of another form (no
+// JSON index, or one with no package files' address). An index that cannot be fetched throws, as it fails a restore.
+const feeds = new Map();
+function feedOf(source) {
+  if (source === REGISTRY) return Promise.resolve(FLAT);
+  if (!feeds.has(source)) feeds.set(source, (async () => {
+    const got = await get(source);
+    if (!got) throw new Error(`${source}: no index there`);
+    let index;
+    try { index = JSON.parse(got.toString("utf8")); } catch { return null; }
+    let base = (index?.resources ?? []).find((r) => typeof r?.["@type"] === "string" && r["@type"].startsWith("PackageBaseAddress/3.0.0"))?.["@id"] ?? null;
+    if (typeof base !== "string") return null;
+    if (!base.endsWith("/")) base += "/";
+    if (!base.startsWith("https://")) throw new Error(`${source}: its package files are at an address that is not https`);
+    return base;
+  })());
+  return feeds.get(source);
+}
+// A version as NuGet compares one: three numbers at least, a fourth only where it is not 0, no build metadata, in
+// lower case ("1.0" is "1.0.0"), or null where the text is no version.
+function normal(version) {
+  const m = /^([0-9]+(?:\.[0-9]+){0,3})(-[0-9a-z.-]+)?(?:\+[0-9a-z.-]+)?$/iu.exec(version);
+  if (!m) return null;
+  const n = m[1].split(".").map((x) => String(Number(x)));
+  while (n.length < 3) n.push("0");
+  if (n.length === 4 && n[3] === "0") n.pop();
+  return `${n.join(".")}${(m[2] ?? "").toLowerCase()}`;
 }
 // A package's file from one source: its bytes, or null where that source does not hold it, or undefined where the
 // source is of a kind this cannot read.
 async function fromSource(source, id, version) {
-  const lid = id.toLowerCase(), lv = version.toLowerCase();
+  const lid = id.toLowerCase(), lv = version.toLowerCase(), want = normal(lv);
   if (!source.startsWith("https://")) {
-    const files = (dir) => { try { return readdirSync(dir); } catch { return []; } };
-    const flat = files(source).find((f) => f.toLowerCase() === `${lid}.${lv}.nupkg`);
-    if (flat) return readFileSync(join(source, flat));
-    const nested = join(source, lid, lv, `${lid}.${lv}.nupkg`);
-    return existsSync(nested) ? readFileSync(nested) : null;
+    // (a folder, as NuGet reads one: <id>.<version>.nupkg at its top, or under <id>/<version>/, each name in any case
+    // and each version as NuGet compares it; never a .symbols.nupkg)
+    const files = (dir) => { try { return readdirSync(dir, { withFileTypes: true }); } catch { return []; } };
+    const file = (e) => {
+      const n = e.name.toLowerCase();
+      return e.isFile() && n.startsWith(`${lid}.`) && n.endsWith(".nupkg") && !n.endsWith(".symbols.nupkg") && normal(n.slice(lid.length + 1, -6)) === want;
+    };
+    const flat = files(source).find(file);
+    if (flat) return readFileSync(join(source, flat.name));
+    for (const d of files(source).filter((e) => e.isDirectory() && e.name.toLowerCase() === lid)) {
+      for (const v of files(join(source, d.name)).filter((e) => e.isDirectory() && normal(e.name.toLowerCase()) === want)) {
+        const nested = files(join(source, d.name, v.name)).find(file);
+        if (nested) return readFileSync(join(source, d.name, v.name, nested.name));
+      }
+    }
+    return null;
   }
-  const base = await baseOf(source);
+  const base = await feedOf(source);
   if (!base) return undefined;
   return get(`${base}${encodeURIComponent(lid)}/${encodeURIComponent(lv)}/${encodeURIComponent(lid)}.${encodeURIComponent(lv)}.nupkg`);
 }
 
-/** Every package and tool, fetched into `into`: { failures, notes, summary }. */
-export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root)) {
+/**
+ * Every package and tool, fetched into `into`, read against the pull request's `base` (a commit, or null):
+ * { failures, notes, reports, summary }.
+ */
+export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null } = {}) {
   const { ships, tools: toolLocks } = nugetConfig(config);
-  const failures = [], notes = [], wanted = new Map();
+  const failures = [], notes = [], reports = [], wanted = new Map();
   for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
     const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
     failures.push(...read.failures);
     for (const p of read.packages) wanted.set(`${p.id}@${p.version}`.toLowerCase(), { ...p, from: f });
   }
-  for (const f of tracked.filter((t) => !t.startsWith("core/") && posix.basename(t) === TOOLS)) {
-    const read = toolsOf(readFileSync(join(root, f), "utf8"), f);
-    failures.push(...read.failures);
-    for (const t of read.tools) if (!wanted.has(`${t.id}@${t.version}`.toLowerCase())) wanted.set(`${t.id}@${t.version}`.toLowerCase(), { ...t, from: f, tool: true });
+  for (const f of tracked.filter((t) => !t.startsWith("core/") && isTools(t))) {
+    const text = readFileSync(join(root, f), "utf8"), read = toolsOf(text, f), before = toolsAt(root, base, f);
+    // (a tool the base held at that version, or a manifest it held as it stands, was never read before this release:
+    // what is wrong with it is reported; with no base to read it against, so is everything)
+    const same = before === null || textAt(root, base, f) === text;
+    const held = (id, version) => same || before.has(`${id}@${version}`.toLowerCase());
+    for (const x of read.failures.filter((x) => !read.failed.some((t) => t.failure === x))) (same ? reports : failures).push(x);
+    for (const t of read.failed) (held(t.id, t.version) ? reports : failures).push(t.failure);
+    for (const t of read.tools) if (!wanted.has(`${t.id}@${t.version}`.toLowerCase())) wanted.set(`${t.id}@${t.version}`.toLowerCase(), { ...t, from: f, tool: true, held: held(t.id, t.version) });
   }
-  let fetched = 0;
-  for (const p of wanted.values()) {
-    const name = `${p.id}@${p.version} (${p.from})`;
-    let bytes = null, taken = null, unread = false;
+  // (each package on its own: what failed for a tool the base held is reported instead)
+  const one = async (p) => {
+    const name = `${p.id}@${p.version} (${p.from})`, out = { failures: [], notes: [], reports: [], fetched: false };
+    let bytes = null, taken = null, hashed = null, unread = false, other = null;
     for (const source of sources) {
       let got;
-      try { got = await fromSource(source, p.id, p.version); } catch (e) { failures.push(`${name}: ${source} could not be read (${shown(e.message)})`); bytes = null; break; }
+      try { got = await fromSource(source, p.id, p.version); } catch (e) { out.failures.push(`${name}: ${source} could not be read (${shown(e.message)})`); break; }
       if (got === undefined) { unread = true; continue; }
-      if (got) { bytes = got; taken = source; break; }
+      if (!got) continue;
+      let h;
+      try { h = contentHash(got); } catch (e) { out.failures.push(`${name}: the file ${source} gives: ${shown(e.message)}`); break; }
+      // (a locked package is the file its lock file names: one source's other file leaves the next source to try)
+      if (!p.tool && h !== p.contentHash) { other ??= source; continue; }
+      bytes = got; taken = source; hashed = h; break;
     }
-    if (!bytes) {
-      if (unread) notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);
-      else if (!failures.some((f) => f.startsWith(name))) failures.push(`${name}: in neither NuGet's registry nor a source the config names`);
-      continue;
+    if (!bytes && !out.failures.length) {
+      if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15)`);
+      else if (unread && !p.tool) out.notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);
+      else if (unread) out.failures.push(`${name}: a tool held by no source this reads (a feed not of NuGet's v3 form), and no restore brings a tool: take it from a source of NuGet's v3 form`);
+      else out.failures.push(`${name}: in neither NuGet's registry nor a source the config names`);
     }
-    let hashed;
-    try { hashed = contentHash(bytes); } catch (e) { failures.push(`${name}: ${shown(e.message)}`); continue; }
-    if (!p.tool && hashed !== p.contentHash) { failures.push(`${name}: the file ${taken} gives is not the one its lock file names by its content hash (floor rule 15)`); continue; }
-    let nuspec;
-    try { nuspec = nuspecOf(bytes); } catch (e) { failures.push(`${name}: ${shown(e.message)}`); continue; }
-    const dir = join(into, p.id.toLowerCase(), p.version.toLowerCase());
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${p.id.toLowerCase()}.nuspec`), nuspec);
-    writeFileSync(join(dir, ".nupkg.metadata"), JSON.stringify({ version: 2, contentHash: hashed, source: taken }));
-    fetched++;
+    if (bytes) {
+      let nuspec;
+      try { nuspec = nuspecOf(bytes); } catch (e) { out.failures.push(`${name}: ${shown(e.message)}`); }
+      if (nuspec !== undefined) {
+        const dir = join(into, p.id.toLowerCase(), p.version.toLowerCase());
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, `${p.id.toLowerCase()}.nuspec`), nuspec);
+        writeFileSync(join(dir, ".nupkg.metadata"), JSON.stringify({ version: 2, contentHash: hashed, source: taken }));
+        out.fetched = true;
+      }
+    }
+    if (p.tool && p.held) { out.reports.push(...out.failures.map((f) => `${f} (a tool held before this check read tools: reported, and passes)`)); out.failures = []; }
+    return out;
+  };
+  const list = [...wanted.values()], results = new Array(list.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(8, list.length) }, async () => { while (next < list.length) { const i = next++; results[i] = await one(list[i]); } }));
+  let fetched = 0;
+  for (const r of results) {
+    failures.push(...r.failures); notes.push(...r.notes); reports.push(...r.reports);
+    if (r.fetched) fetched++;
   }
-  return { failures, notes, summary: `${fetched} of ${wanted.size} NuGet packages and tools fetched before the restore, each held to its lock file's content hash where it has one; ${failures.length} failing` };
+  return { failures, notes, reports, summary: `${fetched} of ${wanted.size} NuGet packages and tools fetched before the restore, each held to its lock file's content hash where it has one; ${failures.length} failing` };
 }
 
 if (started(import.meta.url)) {
@@ -199,9 +261,10 @@ if (started(import.meta.url)) {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
     mkdirSync(into, { recursive: true });
-    result = await fetchAll(loadConfig(configPath), root, tracked, into);
+    result = await fetchAll(loadConfig(configPath), root, tracked, into, undefined, { base: baseOf(root) });
   } catch (e) { fail(e.message); }
   for (const n of result.notes) console.log(`note ${shown(n)}`);
+  for (const r of result.reports) console.log(`REPORT: ${shown(r)}`);
   for (const f of result.failures) console.error(`FAIL: ${shown(f)}`);
   console.log(result.summary);
   process.exit(result.failures.length ? 1 : 0);

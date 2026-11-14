@@ -84,6 +84,7 @@ for (const [what, files, opts] of [
   ["one that changes the licence config", { "checks/licences.json": START["checks/licences.json"].replace("[]", "[ ]") }],
   ["one that changes the audit the config names", { "checks/audit.json": '{ "entries": [ ] }\n' }],
   ["one that changes a folder the config names as a source", { "local-packages/a.nupkg": "x" }],
+  ["one that adds a tools manifest at a folder's top, which dotnet reads as one in .config/", { "dotnet-tools.json": '{ "version": 1, "isRoot": true, "tools": {} }\n' }],
   ["one that changes the calling workflow, under its own name", { ".github/workflows/restore.yml": "name: restore again\n" }, { caller: "restore.yml" }],
   ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
 ]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
@@ -110,7 +111,7 @@ else {
 
 // the whole job, its restore and its check run as GitHub runs them, on a project that holds the core as core/
 if (sdk) {
-  const whole = (files) => {
+  const whole = (files, start = {}) => {
     const dir = path.join(tmp, `whole-${++n}`);
     fs.mkdirSync(dir);
     git(dir, "init", "-q", "-b", "main");
@@ -119,7 +120,7 @@ if (sdk) {
     put({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, ""), "src/App/Program.cs": "System.Console.WriteLine(1);\n",
       "src/App/packages.lock.json": `${JSON.stringify({ version: 1, dependencies: { [tfm]: {} } }, null, 2)}\n`,
       "checks/licences.json": '{ "ships": [], "audit": "checks/licences-audit.json", "scan": { "served": [], "skip": [] }, "nuget": { "ships": ["src/App/packages.lock.json"], "tools": [] } }\n',
-      "checks/licences-audit.json": '{ "entries": [] }\n' });
+      "checks/licences-audit.json": '{ "entries": [] }\n', ...start });
     git(dir, "add", "-A");
     git(dir, "commit", "-q", "-m", "base");
     const baseSha = git(dir, "rev-parse", "HEAD");
@@ -132,6 +133,13 @@ if (sdk) {
   };
   const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });
   ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out);
+  const FETCH = "Every locked package and tool, fetched before the restore and held to its list";
+  ok(good.ran.indexOf(FETCH) >= 0 && good.ran.indexOf(FETCH) < good.ran.indexOf("Restore each project file from its lock file alone"), "and every package's licence is read before the restore, which runs the pull request's build files", good.ran.join(" | "));
+  // (where the first look itself restored, the pull request's build files have run: the read before the restore is
+  // left out, nothing it reads having changed from the base)
+  const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
+  const built = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
+  ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out);
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }

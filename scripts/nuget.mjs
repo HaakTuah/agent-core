@@ -42,20 +42,21 @@
 // project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
 // restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
 // names goes unseen, and such a folder stands in the pull request for the reviews to see); whether the owner said
-// what "accepted"
-// quotes, which the reviews hold, the config being a protected file; a project of another kind than the three above,
-// and a tool a manifest of dotnet's names (.config/dotnet-tools.json), which no restore here brings; and what no lock
-// file names at all (a tool a script installs, a font, an image), which the licence check's audit and scan hold. A
-// restore runs the project's own build files, a pull request's too, which could change anything in the job this
-// runs in, this script and the manifests included: what a pull request does to its project files is the reviews' to
-// read, as with every check that builds.
+// what "accepted" quotes, which the reviews hold, the config being a protected file; a project of another kind than the
+// three above; a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which no restore
+// brings, save before the restore (--fetched, below); and what no lock file names at all (a tool a script installs, a
+// font, an image), which the licence check's audit and scan hold. A restore runs the project's own build files, a pull
+// request's too, which could change anything in the job this runs in, this script and the manifests included: so the
+// licences of what the lock files name are read before it too (--fetched), and what a pull request does to its project
+// files is the reviews' to read, as with every check that builds.
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
 // but on the root, an expression with a comment, CDATA or an entity inside it) counts as no readable licence, since a
 // reader of XML may find another element there than this one does.
-// Node's own modules only, and no network: the restore brought the manifests. It checks the project it lies in
-// (core/scripts/ there), whatever the directory it is started from; the config's own path is read from that directory.
+// Node's own modules only, and no network: the restore, or before it nuget-fetch.mjs, brought the manifests. It checks
+// the project it lies in (core/scripts/ there), whatever the directory it is started from; the config's own path is
+// read from that directory.
 //
 //   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--advisory]
 //   node core/scripts/nuget.mjs <config> --packages <the folder nuget-fetch.mjs filled> --fetched [--advisory]
@@ -77,7 +78,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
-import { MOVED_OFF, baseOf, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
+import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
@@ -262,15 +263,19 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked, env = process.env, { base = null, fetched = false } = {}) {
+export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false } = {}) {
   const { ships, tools, accepted, sources } = nugetConfig(config);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (what a lock file held at the base, by id@version: a package under a licence the floor moved off the list that it
-  // held is reported and passes; with no base to read, as licences.mjs reads it, it is reported and passes too)
+  // held, in a lock file whose packages shipped then by the base's own config, is reported and passes; with no base to
+  // read, as licences.mjs reads it, it is reported and passes too)
+  let shippedThen = ships;
+  try { if (baseConfig) shippedThen = nugetConfig(baseConfig).ships; } catch { /* (a base's config this cannot read: read by this one) */ }
   const heldIn = new Map();
   const held = (lock, k) => {
     if (!base) return true;
+    if (!shippedThen.includes(lock)) return false;
     if (!heldIn.has(lock)) heldIn.set(lock, new Set(lockPackages(textAt(root, base, lock) ?? "", lock).packages.map((q) => key(q.id, q.version))));
     return heldIn.get(lock).has(k);
   };
@@ -323,19 +328,23 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     }
   }
   // the tools a manifest of dotnet's names, read before the restore alone (no restore brings them), each held to the
-  // tools' list, one exact version each (nuget-fetch.mjs fetched them)
-  if (fetched) {
-    for (const f of own.filter((t) => posix.basename(t) === "dotnet-tools.json")) {
-      let manifest = {};
-      try { manifest = JSON.parse(readFileSync(join(root, f), "utf8")); } catch { failures.push(`${f} is not JSON`); }
-      // (a tool the base's manifest already held at that version was never checked before this release: what is wrong
-      // with it is reported and passes, so that no sync fails a project over it; one a pull request adds or updates is
-      // held to the list)
-      let before = new Set();
-      try { before = base ? new Set(Object.entries(JSON.parse(textAt(root, base, f) ?? "{}")?.tools ?? {}).map(([id, e]) => key(id, String(e?.version)))) : null; } catch { before = new Set(); }
-      for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
-        if (ID.test(id) && typeof entry?.version === "string" && VERSION.test(entry.version) && !packages.has(key(id, entry.version))) packages.set(key(id, entry.version), { id, version: entry.version, shipped: false, lock: f, tool: true, heldTool: before === null || before.has(key(id, entry.version)) });
-      }
+  // tools' list, one exact version each (nuget-fetch.mjs fetched them); after the restore, a yes or an audit entry for
+  // one of them stands, since the check before it read that tool
+  const toolsRead = new Set();
+  for (const f of own.filter((t) => posix.basename(t).toLowerCase() === "dotnet-tools.json")) {
+    let manifest = {};
+    try { manifest = JSON.parse(readFileSync(join(root, f), "utf8")); } catch { if (fetched) failures.push(`${f} is not JSON`); }
+    if (!fetched) {
+      for (const [id, entry] of Object.entries(manifest?.tools ?? {})) if (typeof entry?.version === "string") toolsRead.add(key(id, entry.version));
+      continue;
+    }
+    // (a tool the base's manifest already held at that version was never checked before this release: what is wrong
+    // with it is reported and passes, so that no sync fails a project over it; one a pull request adds or updates is
+    // held to the list)
+    let before = new Set();
+    try { before = base ? new Set(Object.entries(JSON.parse(textAt(root, base, f) ?? "{}")?.tools ?? {}).map(([id, e]) => key(id, String(e?.version)))) : null; } catch { before = new Set(); }
+    for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
+      if (ID.test(id) && typeof entry?.version === "string" && VERSION.test(entry.version) && !packages.has(key(id, entry.version))) packages.set(key(id, entry.version), { id, version: entry.version, shipped: false, lock: f, tool: true, heldTool: before === null || before.has(key(id, entry.version)) });
     }
   }
   // what the restore brought that no lock file read here names: held like what ships, with no lock to say otherwise
@@ -379,7 +388,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       if (entry) { read.add(k); failures.push(`${name}: ${config.audit} holds an entry for it, and its manifest names its licence itself (${licence.expression}): remove the entry`); }
       if (licenceOk(licence.expression, allowed)) { if (a) { used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes: remove it`); } return; }
       if (!a && p.shipped && p.lock && movedOff(licence.expression, allowed) && held(p.lock, k)) {
-        reports.push(`${name} (${where}) ships under ${licence.expression}, which since ${[...MOVED_OFF].filter(([id]) => licence.expression.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "held before then" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "nuget.accepted" or has it replaced`);
+        reports.push(`${name} (${where}) ships under ${licence.expression}, which since ${[...MOVED_OFF].filter(([id]) => licence.expression.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "nuget.accepted" or has it replaced`);
         return;
       }
       why = `${licence.expression} is off ${list}`;
@@ -405,6 +414,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     }
     failures.push(`${name} (${where}): ${why}${byHand ? "" : `; one the owner wants anyway is named in the config's "nuget.accepted", with the owner's words (floor rule 10)`}`);
   }
+  for (const k of toolsRead) { used.add(k); read.add(k); }
   // (before the restore, a yes or an entry may be for what only the restore brings: the check after it holds those)
   if (!fetched) for (const a of accepted) if (!used.has(a.package.toLowerCase())) failures.push(`"nuget.accepted" names ${a.package}, which nothing installs: remove it`);
   if (!fetched) for (const [k, e] of audited) if (!read.has(k)) failures.push(`${config.audit}: the entry ${e.name}, of "kind": "nuget", is for no package whose licence had to be read by hand: remove it`);
@@ -444,7 +454,8 @@ if (started(import.meta.url)) {
   let result;
   try {
     const config = loadConfig(configPath), { root, tracked } = project();
-    result = check(config, root, packagesDir, tracked, process.env, { base: baseOf(root), fetched: args.includes("--fetched") });
+    const base = baseOf(root);
+    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched") });
   } catch (e) { fail(e.message); }
   for (const r of result.reports) console.log(`REPORT: ${r}`);
   for (const f of result.failures) console.error(`${advisory ? "WOULD FAIL" : "FAIL"}: ${f}`);

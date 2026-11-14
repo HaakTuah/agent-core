@@ -73,9 +73,9 @@ const commit = (deps, tools) => {
   return git("ls-files").split("\n");
 };
 let into = 0;
-const run = async (tracked, base = null) => {
+const run = async (tracked, base = null, sources = null) => {
   const dir = path.join(tmp, `fetched-${++into}`);
-  const fetched = await fetchAll(config, root, tracked, dir, [path.resolve(source)]);
+  const fetched = await fetchAll(config, root, tracked, dir, sources ?? [path.resolve(source)], { base });
   const checked = check(config, root, dir, tracked, process.env, { base, fetched: true });
   return { fetched, checked, dir };
 };
@@ -87,6 +87,8 @@ let r = await run(tracked, "HEAD^1");
 ok(r.fetched.failures.length === 0 && fs.existsSync(path.join(r.dir, "good.pkg", "1.0.0", "good.pkg.nuspec")) && JSON.parse(fs.readFileSync(path.join(r.dir, "good.pkg", "1.0.0", ".nupkg.metadata"), "utf8")).source === path.resolve(source),
   "each locked package and tool is fetched from a source the config names, held to its content hash, and its manifest laid out as a restore lays out its own", JSON.stringify(r.fetched));
 ok(r.checked.failures.length === 0 && r.checked.reports.length === 1 && r.checked.reports[0].includes("Plpkg@2.0.0") && r.checked.summary.includes("read before the restore"), "the check reads them before the restore: a package under MIT and a tool under Apache-2.0 pass, and one the base already held under MS-PL is reported and passes", JSON.stringify(r.checked));
+const asTools = check(config, root, r.dir, tracked, process.env, { base: "HEAD^1", baseConfig: { ...config, nuget: { ...config.nuget, ships: [], tools: ["src/App/packages.lock.json"] } }, fetched: true });
+ok(asTools.reports.length === 0 && asTools.failures.length === 1 && asTools.failures[0].includes("Plpkg@2.0.0"), "one the base held in a lock file its own config named as tools', which the pull request's config ships, fails: it was not shipped there", JSON.stringify(asTools));
 tracked = commit({ "Good.Pkg": entry("Good.Pkg"), "Plpkg": entry("Plpkg") }, {});
 fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), lock({ "Plpkg": entry("Plpkg") })); git("commit", "-q", "-am", "only plpkg");
 fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), lock({})); git("commit", "-q", "-am", "none");
@@ -106,8 +108,50 @@ tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "tool.b": { version: "1.0.
 r = await run(tracked, "HEAD^1");
 ok(r.checked.failures.length === 0 && r.checked.reports.some(x => x.toLowerCase().includes("tool.b@1.0.0") && x.includes("held before this check read tools")), "one the base already held, never checked before, is reported and passes: no sync fails a project over it", JSON.stringify(r.checked));
 tracked = commit({}, { "tool.c": { version: "1.*" } });
-r = await run(tracked);
+r = await run(tracked, "HEAD^1");
 ok(r.fetched.failures.some(f => f.includes("one exact version")), "a tool at no one exact version fails", JSON.stringify(r.fetched));
+r = await run(tracked);
+ok(r.fetched.failures.length === 0 && r.fetched.reports.some(f => f.includes("one exact version")), "with no base to read it against, it is reported and passes", JSON.stringify(r.fetched));
+tracked = commit({}, { "tool.gone": { version: "1.0.0" } });
+r = await run(tracked, "HEAD^1");
+ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("in neither"), "a tool a pull request adds that no source holds fails", JSON.stringify(r.fetched));
+fs.writeFileSync(path.join(root, "README.md"), "x\n"); tracked = commit({}, { "tool.gone": { version: "1.0.0" } });
+r = await run(tracked, "HEAD^1");
+ok(r.fetched.failures.length === 0 && r.fetched.reports.some(f => f.includes("in neither") && f.includes("held before")), "one the base already held that no source holds is reported and passes: no sync fails a project over a tool it never had read", JSON.stringify(r.fetched));
+// a tools manifest outside .config/, which dotnet reads too
+fs.writeFileSync(path.join(root, "dotnet-tools.json"), JSON.stringify({ version: 1, isRoot: true, tools: { "tool.d": { version: "2.*" } } }));
+tracked = commit({}, {});
+r = await run(tracked, "HEAD^1");
+ok(r.fetched.failures.some(f => f.startsWith("dotnet-tools.json: tool.d")), "a tools manifest at a folder's top is read as one in .config/ is", JSON.stringify(r.fetched));
+fs.rmSync(path.join(root, "dotnet-tools.json"));
+// a folder source as NuGet reads one: names in any case, a version as NuGet compares it, or a folder for each
+const other = path.join(tmp, "other-source"), nested = path.join(source, "Nested.Pkg", "1.0.0");
+fs.mkdirSync(other); fs.mkdirSync(nested, { recursive: true });
+files["Mixed.Case"] = ["1.0.0", "MIT"]; bytes["Mixed.Case"] = pkg("Mixed.Case", "1.0.0", "MIT");
+fs.writeFileSync(path.join(source, "Mixed.Case.1.0.nupkg"), bytes["Mixed.Case"]);
+files["Nested.Pkg"] = ["1.0.0", "MIT"]; bytes["Nested.Pkg"] = pkg("Nested.Pkg", "1.0.0", "MIT");
+fs.writeFileSync(path.join(nested, "Nested.Pkg.1.0.0.nupkg"), bytes["Nested.Pkg"]);
+fs.writeFileSync(path.join(other, "good.pkg.1.0.0.nupkg"), pkg("Good.Pkg", "1.0.0", "Apache-2.0"));
+tracked = commit({ "Mixed.Case": entry("Mixed.Case"), "Nested.Pkg": entry("Nested.Pkg"), "Good.Pkg": entry("Good.Pkg") }, {});
+r = await run(tracked, "HEAD^1", [other, path.resolve(source)]);
+ok(r.fetched.failures.length === 0 && r.fetched.summary.startsWith("3 of 3") && JSON.parse(fs.readFileSync(path.join(r.dir, "good.pkg", "1.0.0", ".nupkg.metadata"), "utf8")).source === path.resolve(source),
+  "a folder's package is found by any case of its name, by its version as NuGet compares it, or in a folder of its own; and where one source gives another file, the next is tried", JSON.stringify(r.fetched));
+// a source whose index cannot be read fails, as it fails a restore: it is not left to the check after the restore
+r = await run(tracked, "HEAD^1", ["https://127.0.0.1:9/v3/index.json", path.resolve(source)]);
+ok(r.fetched.failures.length === 3 && r.fetched.failures.every(f => f.includes("could not be read")) && r.fetched.notes.length === 0, "a source whose index cannot be read fails each package, and leaves none to after the restore", JSON.stringify(r.fetched));
+// a tool whose manifest names a licence file, read by hand into the audit, and one under a licence off the tools' list
+// that the owner accepted: both stand in the check before the restore and in the one after it, which no restore brings
+fs.writeFileSync(path.join(source, "tool.f.1.0.0.nupkg"), zip([["Tool.F.nuspec", nuspec("Tool.F", "1.0.0", "MIT").replace('<license type="expression">MIT</license>', '<license type="file">LICENSE.txt</license>')]]));
+fs.writeFileSync(path.join(root, "audit.json"), JSON.stringify({ entries: [{ name: "Tool.F@1.0.0", kind: "nuget", licence: "MIT", how: "read by hand" }] }));
+config.nuget.accepted = [{ package: "Tool.B@1.0.0", licence: "LicenseRef-Other", ships: false, yes: "the owner, 13 November 2026: take it" }];
+tracked = commit({}, { "tool.f": { version: "1.0.0" }, "tool.b": { version: "1.0.0" } });
+r = await run(tracked);
+const restored = path.join(tmp, "restored-none");
+fs.mkdirSync(restored);
+const after = check(config, root, restored, tracked, process.env, { base: null });
+ok(r.fetched.failures.length === 0 && r.checked.failures.length === 0 && after.failures.length === 0, "a tool's audit entry and its yes stand both before the restore and after it", JSON.stringify([r.checked.failures, after.failures]));
+delete config.nuget.accepted;
+fs.writeFileSync(path.join(root, "audit.json"), '{ "entries": [] }\n');
 
 // a real package from nuget.org, where it can be reached (through the proxy the machine names, if any)
 const reach = spawnSync(process.execPath, ["-e", "fetch(process.argv[1], { method: 'HEAD', signal: AbortSignal.timeout(15000) }).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))", REGISTRY], { env: { ...process.env, NODE_USE_ENV_PROXY: "1" } }).status === 0;
