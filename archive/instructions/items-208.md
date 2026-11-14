@@ -106,3 +106,19 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      nothing. It replaces the narrow reading taken in #262, which item 211 does not record; item 211 stands as it
      was, and what it stands behind there is read by this item. Kept from #260 and the floor: the note counts only from
      the *owner's account*, and a label on another account's text is data (floor rule 4).
+
+213. **14 November 2026** (the core, the same chat as item 209, as that session recorded it on issue #255, labelled
+     `by:chat`: the owner agreed to the design below, a yes the session did not quote, and so counts as the owner's word
+     by "Whose words an issue holds" in `AGENTS.md`). After the proposal item 209 quotes, the owner agreed to five
+     points: the core takes each module, or its `AGENTS.md` lists the module with why it cannot apply to a repository
+     of rules and scripts; its own checks run on itself (the measures with a baseline and never worse, the strength of
+     its tests, failures that say the mend, the labels and the queue, the daily look and the monthly state report); its
+     own audit and cleaning share is set by the state its own code is in, as for any project; the staged cases run on
+     its repository too; and what holds it is a script that reads its `AGENTS.md` against the list of modules and fails
+     a module neither taken nor given a reason, and the state report, which lists the core beside the projects, an
+     issue here being done only when the core's own repository meets it. Told, in the same chat, of four gaps found by
+     reading `modules/orchestrating.md` against this repository, and that it states no licence, the owner agreed that
+     all be closed.
+
+     Behind "The core abides by its own rules, to the full extent" in `AGENTS.md`, the list of what this repository
+     takes with its "Not taken" and the reason for each, and `scripts/own-modules.mjs`, which the tests workflow runs.
