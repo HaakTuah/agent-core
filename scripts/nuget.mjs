@@ -41,14 +41,15 @@
 // where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
 // project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
 // restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
-// names goes unseen, and such a folder stands in the pull request for the reviews to see); whether the owner said
-// what "accepted" quotes, which the reviews hold, the config being a protected file; a project of another kind than the
-// three above; a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which no restore
-// brings, save before the restore (--fetched, below); and what no lock file names at all (a tool a script installs, a
-// font, an image), which the licence check's audit and scan hold. A restore runs the project's own build files, a pull
-// request's too, which could change anything in the job this runs in, this script and the manifests included: so the
-// licences of what the lock files name are read before it too (--fetched), and what a pull request does to its project
-// files is the reviews' to read, as with every check that builds.
+// names goes unseen, and such a folder stands in the pull request for the reviews to see); what a file an Import
+// brings in under another name than a build file's sets (each such Import is reported, and passes); whether the owner
+// said what "accepted" quotes, which the reviews hold, the config being a protected file; a project of another kind
+// than the three above; a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which
+// no restore brings, save before the restore (--fetched, below); and what no lock file names at all (a tool a script
+// installs, a font, an image), which the licence check's audit and scan hold. A restore runs the project's own build
+// files, a pull request's too, which could change anything in the job this runs in, this script and the manifests
+// included: so the licences of what the lock files name are read before it too (--fetched), and what a pull request
+// does to its project files is the reviews' to read, as with every check that builds.
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
@@ -96,6 +97,8 @@ const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<proj
 // where a project can name another lock file: a project file, a .props or .targets, and the .user file MSBuild imports
 // beside a project file by itself
 const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
+// an Import in a build file, and the file it brings in: one of another name than those above goes unread here
+const IMPORT = /<Import\b(?:[^>"']|"[^"]*"|'[^']*')*?\bProject\s*=\s*(?:"([^"]*)"|'([^']*)')/giu;
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
 // an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
 // lists it
@@ -353,6 +356,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
     if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
     if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
+    // (a file an Import brings in under another name: reported, and passes, as the owner agreed for now; reading
+    // every file an Import brings in is the mend to follow, #269)
+    for (const m of text.replace(/<!--[\s\S]*?-->/gu, "").matchAll(IMPORT)) {
+      const brought = (m[1] ?? m[2]).trim();
+      if (!BUILD_FILE.test(brought.split(/[\\/]/u).pop())) reports.push(`${f} imports ${brought}, a file this check does not read: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
+    }
   }
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
@@ -491,7 +500,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   if (!fetched) for (const [k, e] of audited) if (!read.has(k)) failures.push(`${config.audit}: the entry ${e.name}, of "kind": "nuget", is for no package whose licence had to be read by hand: remove it`);
   const all = [...packages.values()], named = all.filter((p) => p.lock), shipped = named.filter((p) => p.shipped).length;
   const summary = `${named.length} NuGet packages in ${listed.length} lock files checked (${shipped} in what ships, ${named.length - shipped} tools that only run)` +
-    `${unnamed ? `, and ${unnamed} more that the restore brought and no lock file names` : ""}${fetched ? ", read before the restore" : ""}, ${[...used].filter((k) => packages.has(k) && yes.has(k)).length} accepted on the owner's yes;${reports.length ? ` ${reports.length} held before a licence moved off the list, reported;` : ""} ${failures.length} failing (floor rules 7 and 10)`;
+    `${unnamed ? `, and ${unnamed} more that the restore brought and no lock file names` : ""}${fetched ? ", read before the restore" : ""}, ${[...used].filter((k) => packages.has(k) && yes.has(k)).length} accepted on the owner's yes;${reports.length ? ` ${reports.length} reported, and passing;` : ""} ${failures.length} failing (floor rules 7 and 10)`;
   return { failures: failures.map(shown), reports: reports.map(shown), summary };
 }
 

@@ -13,7 +13,6 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #240 | builder | |
 | #196 | builder | |
 | #255 | rule builder | |
 | #247 | rule builder | |
