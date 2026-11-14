@@ -75,6 +75,10 @@ ok(same(imps.map(i => `${i.kind} ${i.spec} ${i.names.join(",")}`), [
   "import node:fs default", "import ./x.mjs default,a,b,T", "import ../y *", "import ./types U", "import ./side.css ",
   "export ./z.js d", "export ./w *", "dynamic ./lazy.mjs ", "require ./old ",
 ]), `every form of an import is read, a member's call and a local export not (${imps.map(i => `${i.kind} ${i.spec} ${i.names}`).join("; ")})`);
+const typed = imports(tokens("import type { A } from './a';\nimport { type B, type C as D } from './b';\nimport { type E, f } from './c';\nimport type, { g } from './d';\nexport type { H } from './e';\n"));
+ok(same(typed.map(i => i.types), [true, true, false, false, true]), `an import of types alone is told from one that runs (${typed.map(i => i.types)})`);
+const typeCycle = measure({ "x.ts": "import type { Y } from './y';\nexport const x = 1;\n", "y.ts": "import { x } from './x';\nexport type Y = number;\n" });
+ok(typeCycle.cycles.files.length === 0 && typeCycle.cycles.filesWithTypes.length === 1, "a cycle closed only by an import of types is counted apart");
 const bare = imports(tokens("export { local }\nimport { x } from './x.js'\nexport type T = string\nimport y from './y.js'\n"));
 ok(same(bare.map(i => `${i.kind} ${i.spec} ${i.names.join(",")}`), ["import ./x.js x", "import ./y.js default"]), `with no semicolons, a local export never takes the next statement's from (${bare.map(i => `${i.kind} ${i.spec} ${i.names}`).join("; ")})`);
 ok(!isModule(tokens("var a = 1;\nfunction b() { obj.import('x'); }\n")) && isModule(tokens("module.exports = {};\n")), "a file with no import, export or require is a script; module.exports makes one a module");
@@ -141,6 +145,9 @@ try {
   ok(same(j?.changedTogether.pairs, [{ files: ["src/a.mjs", "src/b.mjs"], together: 3, share: 1 }]), "its history is read for what changes together");
   ok(same(j?.suites.map(s => s.passed), [true, false]) && j?.suites.every(s => typeof s.seconds === "number"), "each suite is run alone and timed, and whether it passed is said");
   ok(/imports: 1, 0 crossing a folder/.test(r.stdout) && /suite: node -e process.exit\(3\): [0-9.]+ s, FAILED/.test(r.stdout), "the summary says what it measured");
+  const outer = spawnSync(process.execPath, [path.join(here, "code-shape.mjs"), "--repo", path.join(dir, "src"), "--json", out], { cwd: here, encoding: "utf8" });
+  const o = outer.status === 0 ? JSON.parse(fs.readFileSync(out, "utf8")) : null;
+  ok(o?.files.code === 2 && o?.changedTogether.commits === 3, `with --repo, another repository is measured, its copy of the core left out (${outer.stdout}${outer.stderr})`);
   const bad = spawnSync(process.execPath, ["core/scripts/code-shape.mjs", "--depth", "two"], { cwd: dir, encoding: "utf8" });
   ok(bad.status === 1 && /FAIL: --depth takes a whole number/.test(bad.stderr), "an option of the wrong shape fails, saying which");
 } finally { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true }); }

@@ -37,8 +37,8 @@ wanted").
 | #249 | rule builder | #247 and #235 |
 | #250 | rule builder | #249 |
 | #185 | builder | |
-| #246 | rule builder | #247 and the reports of #245 |
-| #253 | rule builder | #247, #246 and the reports of #245 |
+| #246 | rule builder | #247 and #245's report |
+| #253 | rule builder | #247, #246 and #245's report |
 | #259 | a builder that built none of the batch | every line above it |
 
 ## Beside any line

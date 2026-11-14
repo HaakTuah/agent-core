@@ -6,7 +6,8 @@
 // What it gives, of the files it reads:
 //   - imports: how many, how many cross a folder, those of code that lead to no file, and the pairs of folders that import each other both ways (no layer
 //     is declared yet, so a pair that runs both ways is the sign of an import against the grain that needs none);
-//   - import cycles, between files and between folders;
+//   - import cycles, between files and between folders, of what runs (a dynamic import, or one of types alone, which
+//     TypeScript erases, makes none), and between files with those of types counted too;
 //   - hubs: the files most others import, and the names each gives them;
 //   - shared global names: in a file with no import, export or require, what its top level declares, and the names
 //     more than one such file declares;
@@ -20,11 +21,13 @@
 // brackets alone (a body after a return type in TypeScript that holds braces, an if with no braces) is measured as the
 // brackets show it. Files in other languages are counted and named, and left to the project's own tools.
 //
-//   node core/scripts/code-shape.mjs [<pathspec>...] [--depth <n>] [--history <n>] [--suite "<command>"]...
-//                                    [--json <file>]
+//   node core/scripts/code-shape.mjs [<pathspec>...] [--repo <folder>] [--depth <n>] [--history <n>]
+//                                    [--suite "<command>"]... [--json <file>]
 //
 //   <pathspec>   git pathspecs of the code to measure (":!" leaves a path out); left out, the whole repository but for
-//                the copy of the core, where the script runs from that copy (core/scripts/)
+//                a copy of the core (core/), where the script runs from that copy or measures another repository
+//   --repo       the repository to measure, a clone this script does not lie in (one read for an audit); left out, the
+//                one it lies in
 //   --depth      a folder is the first n parts of a file's path (packages/engine, for 2); left out, its whole folder
 //   --history    how many of the newest commits the count of what changes together reads; 500 if left out
 //   --suite      a command that runs one suite, run alone from the repository's root and timed; may be repeated
@@ -128,10 +131,24 @@ export function imports(toks) {
     if (tok.v === "require" && isP(toks[k + 1], "(") && toks[k + 2]?.t === "str" && isP(toks[k + 3], ")")) found.push({ spec: toks[k + 2].v, kind: "require", names: [] });
     else if (tok.v === "import" && isP(toks[k + 1], "(") && toks[k + 2]?.t === "str") found.push({ spec: toks[k + 2].v, kind: "dynamic", names: [] });
     else if (tok.v === "import" && toks[k + 1]?.t === "str") found.push({ spec: toks[k + 1].v, kind: "import", names: [] });
-    else if (tok.v === "import" && !isP(toks[k + 1], ".") && !isP(toks[k + 1], "(")) { const f = fromClause(toks, k + 1); if (f) found.push({ ...f, kind: "import" }); }
-    else if (tok.v === "export" && (isP(toks[k + 1], "{") || isP(toks[k + 1], "*") || isId(toks[k + 1], "type"))) { const f = fromClause(toks, k + 1); if (f) found.push({ ...f, kind: "export" }); }
+    else if (tok.v === "import" && !isP(toks[k + 1], ".") && !isP(toks[k + 1], "(")) { const f = fromClause(toks, k + 1); if (f) found.push({ ...f, kind: "import", types: typesOnly(toks, k + 1) }); }
+    else if (tok.v === "export" && (isP(toks[k + 1], "{") || isP(toks[k + 1], "*") || isId(toks[k + 1], "type"))) { const f = fromClause(toks, k + 1); if (f) found.push({ ...f, kind: "export", types: typesOnly(toks, k + 1) }); }
   }
   return found;
+}
+
+// Whether an import or export clause takes types alone, which TypeScript erases before the code runs: `import type`,
+// or braces whose every name is marked `type`.
+function typesOnly(toks, k) {
+  if (isId(toks[k], "type") && !isId(toks[k + 1], "from") && !isP(toks[k + 1], ",")) return true;
+  if (!isP(toks[k], "{")) return false;
+  let names = 0;
+  for (let j = k + 1; j < toks.length && !isP(toks[j], "}"); j++) {
+    if (isP(toks[j], ",") || isId(toks[j], "as") || isId(toks[j - 1], "as")) continue;
+    if (!isId(toks[j], "type") || isP(toks[j + 1], ",") || isP(toks[j + 1], "}")) return false;
+    names++; j++;
+  }
+  return names > 0;
 }
 
 // The names an import or export clause takes, and the module after its `from`; null where none follows it: where the
@@ -327,7 +344,7 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
     try { const p = JSON.parse(text); if (typeof p.name === "string") packages.set(p.name, { dir: path.posix.dirname(file), main: typeof p.main === "string" ? p.main : null }); } catch { /* not a package's */ }
   }
   const code = [...files].filter(f => CODE.includes(path.posix.extname(f))).sort();
-  const fileGraph = new Map(), folderGraph = new Map(), folderEdges = new Map(), offered = new Map(), external = new Map();
+  const fileGraph = new Map(), withTypes = new Map(), folderGraph = new Map(), folderEdges = new Map(), offered = new Map(), external = new Map();
   const fns = [], scripts = [], unresolved = [];
   let total = 0, crossing = 0;
   for (const file of code) {
@@ -339,14 +356,15 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
       const to = resolve(file, imp.spec, files, packages);
       if (!to && /^\.\.?(\/|$)/.test(imp.spec)) { if (!/\.[A-Za-z0-9]+$/.test(imp.spec) || CODE.includes(path.posix.extname(imp.spec))) unresolved.push(`${file}: ${imp.spec}`); continue; }
       if (!to) { const name = imp.spec.startsWith("@") ? imp.spec.split("/").slice(0, 2).join("/") : imp.spec.split("/")[0]; external.set(name, (external.get(name) ?? 0) + 1); continue; }
-      if (imp.kind !== "dynamic") addEdge(fileGraph, file, to);
+      if (imp.kind !== "dynamic") addEdge(withTypes, file, to);
+      if (imp.kind !== "dynamic" && !imp.types) addEdge(fileGraph, file, to);
       if (!offered.has(to)) offered.set(to, { by: new Set(), names: new Set() });
       offered.get(to).by.add(file);
       for (const n of imp.names) offered.get(to).names.add(n);
       const a = folderOf(file, depth), b = folderOf(to, depth);
       if (a !== b) {
         crossing++;
-        if (imp.kind !== "dynamic") addEdge(folderGraph, a, b);
+        if (imp.kind !== "dynamic" && !imp.types) addEdge(folderGraph, a, b);
         const key = `${a}\u0000${b}`;
         folderEdges.set(key, (folderEdges.get(key) ?? 0) + 1);
       }
@@ -367,7 +385,7 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
   return {
     files: { code: code.length, other },
     imports: { total, crossingAFolder: crossing, intoTheRepository: [...offered.values()].reduce((s, o) => s + o.by.size, 0), external: Object.fromEntries([...external].sort((a, b) => b[1] - a[1])), unresolved, foldersBothWays: bothWays.sort((x, y) => Math.min(...y.imports) - Math.min(...x.imports)) },
-    cycles: { files: cycles(fileGraph), folders: cycles(folderGraph) },
+    cycles: { files: cycles(fileGraph), folders: cycles(folderGraph), filesWithTypes: cycles(withTypes) },
     hubs: hubs.filter(h => h.importedBy > 1),
     globals: { scripts: scripts.length, names: scripts.reduce((s, x) => s + x.names.length, 0), inMoreThanOne: [...declared].filter(([, f]) => f.length > 1).map(([name, f]) => ({ name, files: f.sort() })).sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name)) },
     functions: { count: fns.length, lines: { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 }, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length, depth4OrMore: fns.filter(f => f.depth >= 4).length, longest: byLength.slice(0, 20), deepest: byDepth.filter(f => f.depth > 0).slice(0, 20) },
@@ -400,7 +418,7 @@ export function changedTogether(commits, measured) {
 }
 
 function main(argv) {
-  const opts = { specs: [], suites: [], depth: 0, history: 500, json: null };
+  const opts = { specs: [], suites: [], depth: 0, history: 500, json: null, repo: null };
   for (let k = 0; k < argv.length; k++) {
     const a = argv[k];
     const value = () => { if (k + 1 >= argv.length) fail(`${a} needs a value`); return argv[++k]; };
@@ -408,15 +426,16 @@ function main(argv) {
     else if (a === "--history") opts.history = whole(value(), a);
     else if (a === "--suite") opts.suites.push(value());
     else if (a === "--json") opts.json = path.resolve(value());
+    else if (a === "--repo") opts.repo = path.resolve(value());
     else if (a.startsWith("--")) fail(`unknown option ${a}`);
     else opts.specs.push(a);
   }
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8" }).trim();
+  const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: opts.repo ?? here, encoding: "utf8" }).trim();
   // where this script lies in the repository, as git itself says it (a path worked out from the two folders' names can
   // differ in spelling, as a short name of Windows' does from the long one git gives)
   const self = execFileSync("git", ["rev-parse", "--show-prefix"], { cwd: here, encoding: "utf8" }).trim();
-  const specs = opts.specs.length ? opts.specs : self.startsWith("core/") ? [".", ":!core/"] : ["."];
+  const specs = opts.specs.length ? opts.specs : opts.repo || self.startsWith("core/") ? [".", ":!core/"] : ["."];
   const listed = execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
   const texts = {}, other = {};
   for (const f of listed) {
@@ -443,7 +462,7 @@ function print(m) {
   say(`files: ${m.files.code} read${Object.keys(m.files.other).length ? `; left to the project's own tools: ${Object.entries(m.files.other).map(([e, n]) => `${n} ${e}`).join(", ")}` : ""}`);
   say(`imports: ${m.imports.total}, ${m.imports.crossingAFolder} crossing a folder; folders that import each other both ways: ${m.imports.foldersBothWays.length}`);
   for (const b of m.imports.foldersBothWays.slice(0, 5)) say(`  ${b.folders[0]} <-> ${b.folders[1]} (${b.imports[0]} and ${b.imports[1]})`);
-  say(`cycles: ${m.cycles.files.length} between files, ${m.cycles.folders.length} between folders`);
+  say(`cycles: ${m.cycles.files.length} between files, ${m.cycles.folders.length} between folders; ${m.cycles.filesWithTypes.length} between files where imports of types alone count too`);
   for (const c of m.cycles.files.slice(0, 5)) say(`  ${c.length} files: ${c.slice(0, 4).join(", ")}${c.length > 4 ? ", ..." : ""}`);
   say(`hubs (imported by most): ${m.hubs.slice(0, 5).map(h => `${h.file} (${h.importedBy})`).join(", ") || "none"}`);
   say(`files with no import: ${m.globals.scripts}, declaring ${m.globals.names} global names, ${m.globals.inMoreThanOne.length} of them in more than one file`);
