@@ -153,6 +153,23 @@ moved; a move waits for the projects' count.
 3. The stand-in and the orchestrator: where this count has 4 and 2 threads, the projects have the verdicts and the
    orchestrator's own pull requests.
 
+### What a read-only attempt reached (14 November 2026, later the same day)
+
+The owner then allowed sessions to read the two projects for #243 and #245, read only. A session tried; the count of
+the projects' pull requests is still not taken, and the line stays in the queue.
+
+- **The first project: not reached.** The request to attach it for reading was denied by the session's permission
+  classifier, and was not retried or gone around.
+- **The second project: git reads only.** It is public, and the session's git proxy served its history and its
+  `refs/pull/*` (707 refs). No pull request's description, comment or review is in git, and the pull request API is
+  outside what a git-only read covers, so there is no "Readings taken" section or reviewer comment to count by role.
+  What git holds: 2,899 commits, 1,032 of them merges of pull requests, and one commit message that names a "Readings
+  taken" section. A count over commit messages is a different population (every commit is the builder's; no reviewer,
+  stand-in or orchestrator text is in it), so none was taken, since a table from it would read as the by-role count
+  and would not be one.
+- **What would finish it:** a session whose attach for reading reaches the pull requests' threads (the API, not git
+  alone), or the owner's word to attach with the access that reads them. Nothing is written in either project.
+
 ## Readings taken
 
 - **Unsure: the count is closed as half taken, with #243 still open.** The issue asks for the count as 13 November read
