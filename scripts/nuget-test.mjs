@@ -203,6 +203,7 @@ put("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "<!--">]><Project><Import Proj
 ok(reported(["build/Typed.props"]).reports.some(x => x.includes("build/Typed.props has a document type")), "a build file with a document type is reported, its Imports unread");
 const hostile = ["<Import ", '<Import "', '<Import Project="', "<!--", "<![CDATA[", "<Import a=", "<"].map(x => x.repeat(40000)), started = Date.now();
 for (const text of hostile) imported(text);
+ok(imported(`<Import Project="${"a;".repeat(300000)}" />`).length === 300000, "an Import's list however long is read whole, past what a call takes as arguments");
 ok(Date.now() - started < 2000, "a pull request's build file, however long or unclosed, is read in one pass", `${Date.now() - started} ms`);
 put("src/App/App.csproj", "<Project />");
 ok(names(["core/x/y.csproj", "core/packages.lock.json", "core/packages.y.lock.json", "README.md"], {}) === "" && /^0 NuGet packages in 0 lock files/.test(check({ ships: [], nuget: {} }, tmp, restore(), ["README.md"]).summary), "the copy of the core is not the project's, and a project with no NuGet project passes with nothing to read");

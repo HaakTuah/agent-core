@@ -112,7 +112,7 @@ export function imported(text) {
     let end = i + 7, quote = "";
     for (; end < text.length && (quote || text[end] !== ">"); end++) if (quote ? text[end] === quote : text[end] === '"' || text[end] === "'") quote = quote ? "" : text[end];
     if (end >= text.length) break;
-    for (const a of text.slice(i + 7, end).matchAll(ATTRIBUTE)) if (a[1].toLowerCase() === "project") found.push(...(a[2] ?? a[3]).split(";").map((x) => x.trim()).filter(Boolean));
+    for (const a of text.slice(i + 7, end).matchAll(ATTRIBUTE)) if (a[1].toLowerCase() === "project") for (const x of (a[2] ?? a[3]).split(";")) if (x.trim()) found.push(x.trim());
     i = end + 1;
   }
   return found;
