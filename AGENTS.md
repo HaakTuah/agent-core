@@ -1,12 +1,13 @@
 # agent-core
 
 The shared core of the owner's agent-built projects: a floor every project takes whole and modules each project picks
-(`README.md`). A builder of another provider: read `modules/other-builders.md` at the start of every task.
+(`README.md`).
 
 ## The core this repository takes
 
-The floor whole, and the modules that fit a repository of documents. Read whole at the start of every task (Claude Code
-imports them):
+The floor whole, and every module but those "Not taken" below gives its reason for (core archive 209 and 213).
+`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. Read whole at the start
+of every task (Claude Code imports them):
 
 @floor/security.md
 @modules/how-to-work.md
@@ -18,9 +19,17 @@ The last two are read so that whoever builds here finishes the pull request (cor
 have nothing to act on here: the polish lane, since no one uses the core through a screen, and the sync of a copy of
 the core in "Sessions", since this repository is the core and holds no copy.
 
+Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a builder of another
+provider, `modules/other-builders.md`, though none builds here (the *other builders*).
+
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
 `modules/github-calls.md`, `modules/orchestrating.md` and `modules/updates.md`.
+
+Not taken, each for its reason:
+
+- `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
+  player chooses to use, which are all that module governs.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 the audits and the reports written before 12 November 2026); the archive is `archive/instructions.md`, cited "(core
@@ -83,6 +92,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 
 ## How changes are made here
 
+- **The core abides by its own rules, to the full extent** (core archive 209 and 213): this repository keeps every rule
+  the core sets for the projects, the audits and the cleaning it asks of them included, save a module "The core this
+  repository takes" gives its reason for and a step it says has nothing to act on here. A check, measure or report a
+  rule brings runs on the core too: the measures with their baseline, never worse, the strength of its tests, failures
+  that say the mend, the labels and the queue, the daily look and the monthly state report, which lists the core
+  beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
+  the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
   push after every commit as `modules/git.md` says, then ready, its reviews, their findings fixed and the merge as
   `modules/work-flow.md` says (point 1). A PR that changes a rule says what it changes in every project.
