@@ -223,8 +223,11 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
   let sameSources = base === null;
   try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n") === [...nugetConfig(config).sources].sort().join("\n"); } catch { /* (judged as new) */ }
   const failures = [], notes = [], reports = [], wanted = new Map();
-  // (a lock file as the base held it: two content hashes it already named are reported)
-  const asBase = (f) => base === null || textAt(root, base, f) === readFileSync(join(root, f), "utf8");
+  // (a lock file as the base held it, and listed by the base's config, so the check read it there: two content hashes
+  // it already named are reported; one a pull request lists for the first time is not held)
+  let listedThen = [];
+  try { if (baseConfig) listedThen = [...nugetConfig(baseConfig).ships, ...nugetConfig(baseConfig).tools]; } catch { /* (none listed) */ }
+  const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === readFileSync(join(root, f), "utf8"));
   for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
     const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
     failures.push(...read.failures);

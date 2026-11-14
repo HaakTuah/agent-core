@@ -310,12 +310,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // read, as licences.mjs reads it, it is reported and passes too)
   // (where the base held no config at this one's path, or one this cannot read, nothing shipped there, and no tool is
   // the base's; nor is one where the pull request changed the sources it may come from)
-  let shippedThen = [], sameSources = !base;
+  let shippedThen = [], listedThen = [], sameSources = !base;
   try {
     if (baseConfig) {
       // (letter for letter: a folder's name, or an address's path, in another case may be another source)
       const then = nugetConfig(baseConfig), list = (l) => [...l].sort().join("\n");
-      shippedThen = then.ships;
+      shippedThen = then.ships; listedThen = [...then.ships, ...then.tools];
       sameSources = sameSources || list(then.sources) === list(sources);
     }
   } catch { /* (nothing shipped there) */ }
@@ -336,8 +336,10 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of own.filter((f) => BUILD_FILE.test(f))) {
     let text = "";
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
-    // (a .user file, read only lately, as the base held it: what it names is reported)
-    const [to, tail] = /\.user$/iu.test(f) && (!base || textAt(root, base, f) === text) ? [reports, ` ${heldBefore}`] : [failures, ""];
+    // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
+    // what it names is reported; one a pull request brings into play with a project file of its own is not held)
+    const held = /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && textAt(root, base, f.replace(/\.user$/iu, "")) !== null));
+    const [to, tail] = held ? [reports, ` ${heldBefore}`] : [failures, ""];
     if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
     if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
     if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
@@ -368,8 +370,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
 
   const packages = new Map(); // by id@version, lower case: { id, version, shipped, lock }
-  // (a lock file as the base held it: two content hashes it already named are reported)
-  const asBase = (f, text) => !base || textAt(root, base, f) === text;
+  // (a lock file as the base held it, and listed by the base's config, so this check read it there: two content hashes
+  // it already named are reported; one a pull request lists for the first time is not held)
+  const asBase = (f, text) => !base || (listedThen.includes(f) && textAt(root, base, f) === text);
   for (const f of listed.filter((l) => locks.has(l))) {
     const text = readFileSync(join(root, f), "utf8"), read = lockPackages(text, f);
     failures.push(...read.failures);

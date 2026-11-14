@@ -280,13 +280,23 @@ ok(!user.failures.some(x => x.includes(".user")) && user.reports.some(x => x.inc
 inRepo(USER, userText("y"));
 user = userCheck();
 ok(user.failures.some(x => x.includes(`${USER} names NuGetLockFilePath`)), "and one the pull request changes fails", JSON.stringify(user));
+// a .user file the base held beside no project file, which a pull request's new project file brings into play
+const LONE = "src/Lone/Lone.csproj.user";
+inRepo(LONE, userText("z")); git("add", "-A"); git("commit", "-q", "-m", "a .user file alone");
+inRepo("src/Lone/Lone.csproj", "<Project />");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/Lone.csproj", L, LONE], process.env, { base: "HEAD", baseConfig: null });
+ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held with no project file beside it, which the pull request adds: it fails, the pull request having brought it into play", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone");
 // a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
 // passing; changed by the pull request, failing
 const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });
 fs.rmSync(path.join(repo, USER)); inRepo(L, twoLock); git("add", "-A"); git("commit", "-q", "-m", "a lock file with two hashes");
-const lockCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L], process.env, { base: "HEAD", baseConfig: null });
+const lockConfig = { ships: [], nuget: { tools: [L] } };
+const lockCheck = (baseConfig = lockConfig) => check(lockConfig, repo, restore(), ["src/App/App.csproj", L], process.env, { base: "HEAD", baseConfig });
 let both = lockCheck();
-ok(!both.failures.some(x => x.includes("two content hashes")) && both.reports.some(x => x.includes("A@1.0.0: named by two content hashes") && x.includes("held before this check read it")), "a lock file the base held as it stands, naming one version by two content hashes: reported, and passes", JSON.stringify(both));
+ok(!both.failures.some(x => x.includes("two content hashes")) && both.reports.some(x => x.includes("A@1.0.0: named by two content hashes") && x.includes("held before this check read it")), "a lock file the base held as it stands, and listed, naming one version by two content hashes: reported, and passes", JSON.stringify(both));
+both = lockCheck({ ships: [], nuget: { tools: [] } });
+ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file, which the pull request lists in the config for the first time: it fails, the pull request having brought it into play", JSON.stringify(both));
 inRepo(L, `${twoLock}\n`);
 both = lockCheck();
 ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file changed by the pull request: it fails", JSON.stringify(both));

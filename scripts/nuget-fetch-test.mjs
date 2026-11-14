@@ -122,6 +122,8 @@ const twice = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++in
 ok(twice.failures.some(f => f.includes("Good.Pkg@1.0.0 named by another content hash than in src/App/packages.lock.json")), "one version a pull request's lock files name by two content hashes fails: one file of it is fetched, and its licence would stand for both", JSON.stringify(twice));
 const heldTwice = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: both });
 ok(heldTwice.failures.length === 0 && heldTwice.reports.some(f => f.includes("named by another content hash") && f.includes("held before this check read it")), "lock files the base held as they stand: reported, and passes (core archive 207)", JSON.stringify(heldTwice));
+const listedNow = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: config });
+ok(listedNow.failures.some(f => f.includes("named by another content hash")), "the same lock files, one of which the pull request lists in the config for the first time: it fails", JSON.stringify(listedNow));
 fs.rmSync(path.join(root, "src/Tools"), { recursive: true });
 tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "good.pkg": { version: "1.0.0" } });
 const toolToo = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD^1", baseConfig: config });
