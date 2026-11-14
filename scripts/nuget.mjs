@@ -202,7 +202,8 @@ export function lockPackages(text, lockPath) {
         failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}: ask for one exact version, the one installed (floor rule 7)`);
       }
       const was = packages.get(key(id, resolved));
-      if (was && was.contentHash !== contentHash) { split.push(`${at}@${resolved}: named by two content hashes: ${twoHashes}`); continue; }
+      // (the last entry is kept, as before this was said, so the file read is the one read then)
+      if (was && was.contentHash !== contentHash) split.push(`${at}@${resolved}: named by two content hashes: ${twoHashes}`);
       packages.set(key(id, resolved), { id, version: resolved, contentHash });
     }
   }
@@ -379,10 +380,10 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (asBase(f, text)) reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
       const k = key(p.id, p.version), shipped = ships.includes(f), was = packages.get(k);
+      // (the entry kept is the one kept before this was said, so the file read is the one read then)
       if (was && was.contentHash !== p.contentHash) {
         const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
         if (asBase(f, text) && asBase(was.lock, readFileSync(join(root, was.lock), "utf8"))) reports.push(`${x} ${heldBefore}`); else failures.push(x);
-        continue;
       }
       if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
     }

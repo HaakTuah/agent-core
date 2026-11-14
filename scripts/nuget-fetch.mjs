@@ -237,7 +237,8 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
       if (was && was.contentHash !== p.contentHash) {
         const x = `${f}: ${p.id}@${p.version} named by another content hash than in ${was.from}: ${twoHashes}`;
         if (asBase(f) && asBase(was.from)) reports.push(`${x} ${heldBefore}`); else failures.push(x);
-      } else if (!was) wanted.set(k, { ...p, from: f });
+      }
+      wanted.set(k, { ...p, from: f }); // (the last lock file's entry, as before this was said: the file fetched then)
     }
   }
   for (const f of tracked.filter((t) => !t.startsWith("core/") && isTools(t))) {

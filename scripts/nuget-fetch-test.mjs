@@ -125,6 +125,18 @@ ok(heldTwice.failures.length === 0 && heldTwice.reports.some(f => f.includes("na
 const listedNow = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: config });
 ok(listedNow.failures.some(f => f.includes("named by another content hash")), "the same lock files, one of which the pull request lists in the config for the first time: it fails", JSON.stringify(listedNow));
 fs.rmSync(path.join(root, "src/Tools"), { recursive: true });
+// a lock file the base held, naming one version by two content hashes, the GPL file's under its first framework and
+// the MIT file's under its last: the conflict is reported, and the check reads the file it read before, the last
+// entry's, so nothing the project held newly fails (core archive 207)
+const split = `${JSON.stringify({ version: 1, dependencies: { "net8.0": { "Good.Pkg": entry("Good.Pkg", hash(otherFile)) }, "net9.0": { "Good.Pkg": entry("Good.Pkg") } } }, null, 2)}\n`;
+fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), split);
+git("add", "-A"); git("commit", "-q", "-m", "a lock file with two hashes");
+tracked = git("ls-files").split("\n");
+const heldDir = path.join(tmp, `fetched-${++into}`);
+const heldSplit = await fetchAll(config, root, tracked, heldDir, [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: config });
+const heldChecked = check(config, root, heldDir, tracked, process.env, { base: "HEAD", baseConfig: config, fetched: true });
+ok(heldSplit.failures.length === 0 && heldSplit.reports.some(f => f.includes("named by two content hashes") && f.includes("held before this check read it"))
+  && heldChecked.failures.length === 0, "a lock file the base held with one version under two content hashes: reported, and the file it read before is read again, so it passes", JSON.stringify([heldSplit, heldChecked]));
 tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "good.pkg": { version: "1.0.0" } });
 const toolToo = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD^1", baseConfig: config });
 ok(toolToo.failures.length === 1 && toolToo.failures[0].includes("also a tool of .config/dotnet-tools.json"), "a tool a pull request adds that a lock file also names, of which a source before the locked file's gives another file, fails: its restore holds it to no hash", JSON.stringify(toolToo));
