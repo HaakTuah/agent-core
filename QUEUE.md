@@ -49,7 +49,6 @@ They read and change no rule.
 | --- | --- | --- |
 | #245 | builder | |
 | #243 | builder | |
-| #261 | builder | |
 
 ## Not taken up
 

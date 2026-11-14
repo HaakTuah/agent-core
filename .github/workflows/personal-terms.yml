@@ -17,7 +17,11 @@
 # it fails, since the diff names it. It reads no file whose content is binary (a NUL byte, as git tells it:
 # `git grep -I`, a diff's "Binary files differ"), pictures included, whatever a .gitattributes says, which the check
 # never reads. It prints only where a term was found (file and line, a file whose name holds a term by its line alone,
-# or the commit), never the term. Each failure says how the session takes the term out, one the project held before the
+# or the commit), never the term. Of all it reads, it leaves unread only the random id of a link to a Claude Code
+# session (https://claude.ai/code/session_01 and 22 characters of base58, a whole link, a blank, the line's end or a
+# mark of punctuation after it), which a
+# tool writes at the end of every builder's commit message and description: such a run of characters holds a short term
+# by chance and is no one's personal information, while the rest of the link and of its line is read (#261). Each failure says how the session takes the term out, one the project held before the
 # check read it too: of what a project held before a check read more, a listed term alone fails rather than being
 # reported (core archive 207). Without the secret (a fork, Dependabot, a project that has not set it) it passes with a
 # note: the check is optional. It checks this repository, and every project that takes the core calls it
@@ -65,20 +69,35 @@ jobs:
           # (each term without the blanks around it, a carriage return among them, and no empty one)
           printf '%s\n' "$TERMS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' > "$list"
           found=0
+          # (a Claude Code session's id, of its one shape alone, taken out of what is read: a whole link, starting a
+          # line or after a blank or an opening mark, so none inside another address; one of any other length,
+          # characters or host stays; twice over, since a link whose mark before it the first pass took as the one after
+          # the link before is left to the second, so that links side by side are each found; LC_ALL=C, so that each
+          # range is of those letters and digits alone, in any locale)
+          link='s#(^|[[:space:](<["`])(https://claude\.ai/code/session_01)[1-9A-HJ-NP-Za-km-z]{22}([[:space:].,;:!?)>"`/*]|$)#\1\2\3#g'
+          unlinked() { LC_ALL=C sed -E -e "$link" -e "$link"; }
           # (git with no attributes at all, read from the empty tree, so a .gitattributes of the pull request's own
           # cannot have a file of text taken for binary and left unread; git older than 2.40 fails the check)
           empty=$(git hash-object -t tree /dev/null); g() { git --attr-source="$empty" "$@"; }
-          rc=0; hits=$(g -c core.quotePath=false grep -I -n -i -F -f "$list" -- .) || rc=$?
+          rc=0; g -c core.quotePath=false grep -I -z -n -i -F -f "$list" -- . > "$RUNNER_TEMP/hits" || rc=$?
           if [ "$rc" -gt 1 ]; then echo "git could not read the files (it needs git 2.40 or later)"; found=1; fi
+          # (each hit as git gives it: the file's name and the line's number each ended by a NUL, the line by a newline;
+          # one is dropped only where grep finds a term in the line and none once a session's id is out, so a hit grep
+          # would not make alone, as in a case it folds otherwise than git, still fails; what is printed is held to the
+          # list first: a file whose name holds a term is named by its line alone, a line number of digits or none, and a
+          # name's control characters shown as "?")
+          hits=$(while IFS= read -r -d '' name && IFS= read -r -d '' line && IFS= read -r text; do
+            if printf '%s\n' "$text" | grep -q -i -F -f "$list" && ! printf '%s\n' "$text" | unlinked | grep -q -i -F -f "$list"; then continue; fi
+            if printf '%s\n' "$name" | grep -q -i -F -f "$list"; then name='(a file whose name holds a term)'; fi
+            name=${name//[[:cntrl:]]/?}
+            case $line in '' | *[!0-9]*) line='?' ;; esac; printf '%s:%s\n' "$name" "$line"
+          done < "$RUNNER_TEMP/hits")
           if [ -n "$hits" ]; then
             echo "A personal term is in these files (file:line), held before this pull request or added by it:"
-            # (what is printed is held to the list first: a file whose name holds a term is named by its line alone, a
-            # line number of digits or none, so no part of a name with a colon in it stands in for one)
-            printf '%s\n' "$hits" | cut -d: -f1,2 | while IFS= read -r at; do
-              if printf '%s\n' "$at" | grep -q -i -F -f "$list"; then
-                line=${at##*:}; case $line in '' | *[!0-9]*) line='?' ;; esac; echo "(a file whose name holds a term):$line"
-              else echo "$at"; fi
-            done
+            # (the names between GitHub's own marks that stop its runner reading workflow commands, under a token of
+            # this run's alone, so that no name is read as one)
+            token=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); echo "::stop-commands::$token"
+            printf '%s\n' "$hits"; echo "::$token::"
             echo "To take it out: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included."
             found=1
           fi
@@ -120,7 +139,7 @@ jobs:
             # hit read as a miss)
             for c in $commits; do
               short=$(git rev-parse --short "$c")
-              if git log -1 --format=%B "$c" | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
+              if git log -1 --format=%B "$c" | unlinked | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
               # (save a commit GitHub itself made under a profile above, the acting account's, as floor rule 11 excepts:
               # a merge, "update branch" too, or an edit on github.com)
               if git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list" \
@@ -134,7 +153,9 @@ jobs:
               if [ "$parents" -gt 2 ]; then how=--cc plus="^[+]{$parents}"; else how=--remerge-diff plus='^[+]'; fi
               if ! patch=$(g show --format= --patch "$how" --no-ext-diff --no-textconv --no-color "$c"); then
                 echo "git could not show what $short adds (it needs git 2.40 or later)"; found=1
-              elif printf '%s\n' "$patch" | grep -E "$plus" | grep -q -i -F -f "$list"; then added="$added $short"; fi
+              # (each line read without its own marks of an added line, and no more of it, so a link can start it; a line
+              # that is not UTF-8 read too, never taken for binary and left out)
+              elif printf '%s\n' "$patch" | grep -a -E "$plus" | sed -E "s/$plus//" | unlinked | grep -q -i -F -f "$list"; then added="$added $short"; fi
               # (the names of every file it writes, not of one it deletes, so that an older name is taken out freely, as
               # git holds them: empty, renamed or binary ones too, none quoted; a merge's,
               # those its own resolution writes)
@@ -151,9 +172,9 @@ jobs:
               echo "To take it out of those commits, though a later one took it away (merging keeps every commit): rewrite them without it (git rebase -i origin/main, a message reworded, a commit edited) and push the branch again (git push --force-with-lease). main is never rewritten."
             fi
           fi
-          if grep -q -i -F -f "$list" <<< "$TITLE"$'\n'"$BODY"$'\n'"$BRANCH"; then
+          if printf '%s\n' "$TITLE" "$BODY" "$BRANCH" | unlinked | grep -q -i -F -f "$list"; then
             echo "A personal term is in the PR's title, description or branch name."; found=1
             echo "To take it out: edit the title or the description; a branch's name is taken out by pushing its work to a branch of another name and opening the pull request from it."
           fi
-          rm -rf "$list" "$RUNNER_TEMP/github-keys"
+          rm -rf "$list" "$RUNNER_TEMP/hits" "$RUNNER_TEMP/github-keys"
           exit "$found"
