@@ -7,9 +7,11 @@
 //   - that every project file git knows (.csproj, .fsproj, .vbproj) has its lock file beside it, and that every lock
 //     file is named in the config as one whose packages ship or as one of tools that only run, so no project's
 //     packages go unread. A lock file under another name (packages.<project>.lock.json, which NuGet takes before the
-//     plain one, or a NuGetLockFilePath a project or build file names; the workflow's restore also sets that
-//     property empty for every project, wherever it was set) fails, and so do the older packages.config, which has
-//     none, and a response file that gives every build options this check cannot read (Directory.Build.rsp);
+//     plain one, or a NuGetLockFilePath a project or build file names, or a file an Import in one brings in; the
+//     workflow's restore also sets that property empty for every project, wherever it was set) fails, and so do the
+//     older packages.config, which has none, and a response file that gives every build options this check cannot
+//     read (Directory.Build.rsp). A file an Import brings in, read only lately, is reported where the base held it as
+//     it stands and brought it in (core archive 207);
 //   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
@@ -42,14 +44,15 @@
 // project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
 // restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
 // names goes unseen, and such a folder stands in the pull request for the reviews to see); what a file an Import
-// brings in under another name than a build file's sets (each such Import is reported, and passes); whether the owner
-// said what "accepted" quotes, which the reviews hold, the config being a protected file; a project of another kind
-// than the three above; a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which
-// no restore brings, save before the restore (--fetched, below); and what no lock file names at all (a tool a script
-// installs, a font, an image), which the licence check's audit and scan hold. A restore runs the project's own build
-// files, a pull request's too, which could change anything in the job this runs in, this script and the manifests
-// included: so the licences of what the lock files name are read before it too (--fetched), and what a pull request
-// does to its project files is the reviews' to read, as with every check that builds.
+// brings in sets where the check cannot know which file it is without the build (a property, a wildcard, an SDK's), or
+// where git does not know it (each such Import is reported, and passes); whether the owner said what "accepted"
+// quotes, which the reviews hold, the config being a protected file; a project of another kind than the three above;
+// a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which no restore brings, save
+// before the restore (--fetched, below); and what no lock file names at all (a tool a script installs, a font, an
+// image), which the licence check's audit and scan hold. A restore runs the project's own build files, a pull
+// request's too, which could change anything in the job this runs in, this script and the manifests included: so the
+// licences of what the lock files name are read before it too (--fetched), and what a pull request does to its
+// project files is the reviews' to read, as with every check that builds.
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
@@ -99,8 +102,9 @@ const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<proj
 const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
 /**
  * The files a build file's Imports bring in, as each Import's Project names them (a list parted by ";", as MSBuild
- * reads one), read in one pass from tag to tag: a comment, CDATA or a processing instruction is passed over whole,
- * and a tag's attributes are read only within it, so no text, however long or unclosed, is read more than once.
+ * reads one), each with whether its Import names an SDK, which MSBuild then finds the file in: [{ project, sdk }],
+ * read in one pass from tag to tag: a comment, CDATA or a processing instruction is passed over whole, and a tag's
+ * attributes are read only within it, so no text, however long or unclosed, is read more than once.
  */
 export function imported(text) {
   const found = [], ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
@@ -112,10 +116,44 @@ export function imported(text) {
     let end = i + 7, quote = "";
     for (; end < text.length && (quote || text[end] !== ">"); end++) if (quote ? text[end] === quote : text[end] === '"' || text[end] === "'") quote = quote ? "" : text[end];
     if (end >= text.length) break;
-    for (const a of text.slice(i + 7, end).matchAll(ATTRIBUTE)) if (a[1].toLowerCase() === "project") for (const x of (a[2] ?? a[3]).split(";")) if (x.trim()) found.push(x.trim());
+    const attributes = [...text.slice(i + 7, end).matchAll(ATTRIBUTE)], sdk = attributes.some((a) => a[1].toLowerCase() === "sdk");
+    for (const a of attributes) if (a[1].toLowerCase() === "project") for (const x of (a[2] ?? a[3]).split(";")) if (x.trim()) found.push({ project: x.trim(), sdk });
     i = end + 1;
   }
   return found;
+}
+/** Where an Import in the build file `from` finds `project`, as git lists a path, beside `from` as MSBuild reads a
+ *  relative one: "" for a path outside the project, null for one this cannot know without the build (a property other
+ *  than $(MSBuildThisFileDirectory) at its start, which is `from`'s own folder, an item, an escape or a wildcard). */
+export function importPath(from, project) {
+  const p = project.replace(/^\$\(MSBuildThisFileDirectory\)/iu, "").replace(/\\/gu, "/");
+  if (/[$@%*?]/u.test(p)) return null;
+  if (p.startsWith("/") || /^[A-Za-z]:/u.test(p)) return "";
+  const at = posix.normalize(posix.join(posix.dirname(from), p));
+  return at === ".." || at.startsWith("../") ? "" : at;
+}
+/**
+ * The build files among `own` (the project's files git knows, as git lists them), each read by `read` (its text, or
+ * null), and every file of another name that an Import in one of them, or in a file one brings in, brings in where git
+ * knows it, its name's case aside, as MSBuild on Windows finds it: { files: each such file's path to its text,
+ * brought: those an Import brought in, unread: each Import this cannot follow, typed: the files with a document type,
+ * whose Imports are not read }. A build file git knows is read as one, whoever imports it.
+ */
+export function importsOf(own, read) {
+  const byName = new Map(), files = new Map(), brought = new Set(), unread = [], typed = [];
+  for (const f of own) byName.set(f.toLowerCase(), [...(byName.get(f.toLowerCase()) ?? []), f]);
+  for (const f of own.filter((x) => BUILD_FILE.test(x))) files.set(f, read(f) ?? "");
+  for (const [f, text] of files) {
+    // (a document type can name text that reads as a comment's start: its Imports are not read)
+    if (/<!DOCTYPE/iu.test(text)) { typed.push(f); continue; }
+    for (const { project, sdk } of imported(text)) {
+      if (BUILD_FILE.test(project.split(/[\\/]/u).pop())) continue;
+      const at = sdk ? null : importPath(f, project), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
+      if (!found.length) unread.push({ from: f, project, why: at === null ? "a file whose path this check cannot know without the build" : "no file of the project's that git knows" });
+      for (const g of found) if (!files.has(g)) { brought.add(g); files.set(g, read(g) ?? ""); }
+    }
+  }
+  return { files, brought, unread, typed };
 }
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
 // an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
@@ -364,24 +402,33 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   }
   for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read: move the project to PackageReference`);
   for (const f of own.filter((f) => OTHER_LOCK.test(posix.basename(f)))) failures.push(`${f}: a lock file under another name, which NuGet takes before ${LOCK} and this check does not read: keep the one name`);
-  for (const f of own.filter((f) => BUILD_FILE.test(f))) {
-    let text = "";
-    try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
+  // (each build file, and each file an Import brings in under another name, which the check reads only lately: what such
+  // a file names is reported where the base held it as it stands and brought it in as well; one a pull request adds,
+  // changes or brings into play fails, as does what a build file names)
+  const now = importsOf(own, (f) => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } });
+  let then = null;
+  const broughtThen = (f) => {
+    if (!then) {
+      let entries = "";
+      try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: nothing was brought in) */ }
+      const files = entries.split("\0").filter((e) => /^100(?:644|755) blob [0-9a-f]+\t/u.test(e)).map((e) => e.slice(e.indexOf("\t") + 1)).filter((x) => !x.startsWith("core/"));
+      then = importsOf(files, (x) => textAt(root, base, x)).brought;
+    }
+    return then.has(f);
+  };
+  for (const [f, text] of now.files) {
     // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
-    const held = /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
+    const held = now.brought.has(f) ? !base || (textAt(root, base, f) === text && broughtThen(f))
+      : /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
     const [to, tail] = held ? [reports, ` ${heldBefore}`] : [failures, ""];
-    if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
-    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
-    if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
-    // (a file an Import brings in under another name: reported, and passes, as #240 settled for now; reading
-    // every file an Import brings in is the mend to follow, #269)
-    // (a document type can name text that reads as a comment's start: its Imports are not read, and that is reported)
-    if (/<!DOCTYPE/iu.test(text)) reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
-    else for (const brought of imported(text)) {
-      if (!BUILD_FILE.test(brought.split(/[\\/]/u).pop())) reports.push(`${f} imports ${brought}, a file this check does not read: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
-    }
+    const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;
+    if (/NuGetLockFilePath/iu.test(text)) to.push(`${named} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
+    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${named} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
+    if (/TreatAsLocalProperty/iu.test(text)) to.push(`${named} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
   }
+  for (const f of now.typed) reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
+  for (const { from, project, why } of now.unread) reports.push(`${from} imports ${project}, ${why}: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
   // one git knows, and none is a link that leads elsewhere)
