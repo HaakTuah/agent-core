@@ -199,3 +199,25 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      start from each of the last two releases, its private project's commits made under a listed name and its sync
      mended so; and in item 201, that description taken out, the one change to a dated record here, on the owner's
      word.
+
+203. **14 November 2026** (the core, the same chat as item 202). While the fixes of item 202 were under way, the owner
+     asked:
+
+     > Why do we need secondary security reviews? Are we trying to waste usage?
+
+     Told that floor rule 3 asks a second security review of every change to what runs by itself or with credentials,
+     that those reviews had caught real faults in the fixes, and that one cheaper option was to keep two only for
+     workflows that can write or hold secrets and one for read-only checks, the owner quoted that option and asked:
+
+     > What is your expert recommendation?
+
+     Told to keep two: a read-only check guards, and a fault in one either stops it guarding or fails every project's
+     pull requests; on `core.yml`'s check of the copy, read-only, the second reviewer found three faults where Codex's
+     review found none; the core's workflows reach every project; and about a third of the core's pull requests since
+     1 November changed a workflow. The one cut endorsed: a change of comments and steps' names alone, proven so by a
+     script, passes one security review. The owner answered:
+
+     > Agreed, expertly!
+
+     Behind: floor rule 3, such a change passing rule 8's one, as `scripts/comment-only.mjs`, run from the core's
+     `main`, proves; `modules/reviews.md`, point 3, the "Security review:" comment giving what it printed.

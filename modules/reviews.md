@@ -27,7 +27,8 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
      fallback reviewer's check.
    - One not begun in about 5 minutes or finished in about 30 is the fallback reviewer's, over the whole diff, where the
      PR needs one; otherwise the wait ends.
-   - Floor rule 3's two each cover the whole diff.
+   - Floor rule 3's two each cover the whole diff; where it lets rule 8's one do (comments and steps' names alone),
+     the comment below gives what `comment-only.mjs` printed, which the code reviewer checks.
    - A session posts one, naming the tool and the commit it read, or that none is needed (the code reviewer checks
      that), in a comment that opens "Security review:", which the `security-review` check reads.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
