@@ -39,7 +39,7 @@ and what it waits on. A task is a line; its issue is the item and its spec, read
 one says it does, and its conditions stand there. The main lane is the lines in order.
 
 - **An idea is built only from a line, and a line joins in a PR of its own** (core archive 211). A new or changed rule
-  joins only where that PR quotes the owner's yes to its issue, as the chat session records it ("Whose words an issue
+  joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `modules/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
   audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
@@ -54,15 +54,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   branch.
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
-  What the chat session records is the owner's word on any day (core archive 211): an issue or note from the *owner's
-  account*, labelled `by:chat` or opening as from a chat session with the owner, holds the owner's decisions where it
-  quotes them, or quotes the owner agreeing to what it sets out, word for word as floor rule 4 asks; what it says the
-  owner agreed to without the owner's words is its own account, and a label or opening on another account's text
+  What the chat session records is the owner's word on any day (core archive 211 and 212): an issue or note from the
+  *owner's account*, labelled `by:chat` or opening as from a chat session with the owner, carries the owner's decision
+  where it quotes the owner's words, and equally where it sets out a design and says the owner agreed to it, since a
+  bare yes is never quoted (#252). Such a record sets the design out in full, as what binds, and says plainly that the
+  owner agreed to it, as the notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of
+  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word (floor rule
+  4), and the review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
   session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
-  writes it from the owner's words quoted on the issue, adds them to the archive as an item of their own, naming the
-  issue as its source, and takes what they leave open as `modules/inbox.md` says of any open point. This is the second
+  writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
+  item of its own, naming the issue as its source, and takes what it leaves open as `modules/inbox.md` says of any
+  open point. This is the second
   difference from that module, where only the design session writes rules from the owner's words.
 - **An orchestrator may work the file** (`modules/orchestrating.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
