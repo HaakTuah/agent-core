@@ -25,7 +25,7 @@ wanted").
 | #236 | builder | |
 | #257 | rule builder | |
 | #234 | builder | |
-| #256 | rule builder | #243; its staged case: #235 |
+| #256 | rule builder | its staged case: #235 |
 | #242 | rule builder | |
 | #157 | builder | #247 |
 | #252 | rule builder | #247 |
@@ -44,7 +44,6 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #245 | builder | |
-| #243 | builder | |
 
 ## Not taken up
 
