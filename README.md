@@ -17,11 +17,13 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
   `orchestrating.md`, `github-calls.md` and `updates.md`; and, for games only, `game-design.md`.
-- **The cap:** the floor and the modules together stay within 52 KB (core archive 164, 169, 171, 179, 181, 182, 187 and 191),
-  checked on every PR here (`scripts/size.mjs`), so a new rule replaces text rather than adding to it (core archive
-  134). It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a
-  change that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all
-  the rules for room and found too little (`AGENTS.md`).
+- **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
+  stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
+  every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
+  needed is held by the reviews' "content put where its readers must read past it" (`modules/review-guidelines.md`).
+  It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a change
+  that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all the
+  rules for room and found too little (`AGENTS.md`).
 
 ## How a project takes the core
 
