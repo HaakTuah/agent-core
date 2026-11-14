@@ -65,6 +65,8 @@ is any move, rule or power a player can choose to use.
 - **Everything new belongs** (core archive 105). Every new feature feels balanced, cohesive and purposeful, and fits the
   rest of the game: it reads and changes quantities other systems use, never keeping its own beside them (core archive
   114).
+- **Every stage is a game** (core archive 204). A game built in stages ends each stage in one someone can play from
+  start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **No stopgaps** (core archive 107). The work serves the finished game, so nothing is built for the meantime: where a
   change comes before a feature it would want, the game stays as it is until that feature comes, and the change says so.
   - A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
@@ -99,5 +101,6 @@ is any move, rule or power a player can choose to use.
   - A game whose rules changed while it was played replays exactly only from the change on.
 - **The polish lane** also takes its finds from whole games watched at top speed, on a phone and on desktop, and proves
   play unchanged by "Same seed, same game".
-- **Readable by every player** (core archive 112). Nothing is told apart by colour alone, reduced motion keeps whatever
-  informs, and each thing has one name everywhere the game shows it.
+- **Readable by every player** (core archive 112 and 204). What the game shows tells a player at a glance what is
+  happening and what it can do. Nothing is told apart by colour alone, reduced motion keeps whatever informs, and each
+  thing has one name everywhere the game shows it.
