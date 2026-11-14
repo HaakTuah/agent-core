@@ -19,7 +19,8 @@
 // refuses, rather than guess, every line it cannot read for sure: a tab, a carriage return or another control character
 // or line break, a byte order mark, a character YAML refuses; a value that runs on to the next line (a quoted or plain
 // one, or one in [ ] or { }); a quote or # inside [ ] or { }; an anchor, alias, tag, explicit key or document marker. A
-// line inside a block scalar (`run: |`) is text, a # line too, and changes nothing only where it is unchanged. Of the
+// line inside a block scalar (`run: |`) is text, a # line too, and changes nothing only where it is unchanged; the blank
+// lines after its last are not, unless it keeps them (`|+`). Of the
 // files outside what it reads, it refuses those that run by themselves or decide what does (RUNS_TOO below) and lists
 // the rest: it exits 0 where there are none, 1 where it refuses, and 2 where others changed, which the session's
 // "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
@@ -110,23 +111,39 @@ export function readYaml(text) {
   const unread = [], lines = [], comments = [];
   const bad = UNREAD.exec(text);
   if (bad) return { lines, comments, unread: [`line ${text.slice(0, bad.index).split("\n").length}: a tab, carriage return, byte order mark, another control character or line break, or a character YAML refuses`] };
-  const raw = text.split("\n");
-  let block = null; // in a block scalar: { from, at }, the line that opened it and, once read, its content's indentation
+  const raw = text.split("\n"), broken = text.endsWith("\n");
+  if (broken) raw.pop(); // (what follows the last line break is no line)
+  // in a block scalar: { from, keep, at, blanks }: the column its text must pass (its key's, or the last "- "'s where it
+  // has no key), whether its trailing blank lines are kept (`|+`), its text's indentation, from its header where given
+  // (one column past `from`, which reads more as text than YAML may, never less) or else once read, and the blank
+  // lines held until a line of its text follows. Blank lines after its last line
+  // are no part of it unless kept, nor are they where YAML reads a line of spaces past its indentation as text; and its
+  // last line, a blank one too, where the file ends with no line break, is marked, the break being part of the text
+  let block = null;
+  const close = () => { if (block.keep) lines.push(...block.blanks); block = null; };
   for (let i = 0; i < raw.length; i++) {
     const line = raw[i], n = i + 1;
     const indent = /^ */u.exec(line)[0].length;
     const blank = indent === line.length;
     if (block) {
-      if (block.at === undefined && !blank) block.at = block.fixed ? block.from + 1 : Math.max(block.from + 1, indent);
-      if (blank || indent >= (block.at ?? Infinity)) { lines.push({ n, content: true, text: line }); continue; }
-      block = null;
+      if (blank && !(indent > (block.at ?? Infinity))) { block.blanks.push({ n, content: true, text: line, last: i === raw.length - 1 && !broken }); continue; }
+      if (block.at === undefined) {
+        block.at = Math.max(block.from + 1, indent);
+        if (indent >= block.at && block.blanks.some(b => b.text.length > indent)) unread.push(`line ${n}: a block scalar's first line less indented than a blank line before it`);
+      }
+      if (indent >= block.at) {
+        lines.push(...block.blanks, { n, content: true, text: line, last: i === raw.length - 1 && !broken });
+        block.blanks = [];
+        continue;
+      }
+      close();
     }
     if (blank) continue;
     const rest = line.slice(indent);
     if (rest[0] === "#") { comments.push({ text: rest, at: lines.length, own: true }); continue; }
     if (/^(?:---|\.\.\.)(?: |$)/u.test(rest)) { unread.push(`line ${n}: a document marker`); continue; }
-    let at = 0, items = 0;
-    while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; at++; while (rest[at] === " ") at++; }
+    let at = 0, items = 0, dash = indent;
+    while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; dash = indent + at; at++; while (rest[at] === " ") at++; }
     let first = node(rest, at), key = null, keyCol = null, value = first;
     if (first.why) { unread.push(`line ${n}: ${first.why}`); continue; }
     if (first.kind === "key") {
@@ -141,8 +158,12 @@ export function readYaml(text) {
     const note = rest.slice(cut);
     if (note) comments.push({ text: note, at: lines.length, own: false });
     lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
-    if (value.kind === "block") block = { from: indent, fixed: value.fixed };
+    if (value.kind === "block") {
+      const from = key !== null ? keyCol : dash;
+      block = { from, at: value.fixed ? from + 1 : undefined, keep: value.text.includes("+"), blanks: [] };
+    }
   }
+  if (block) close();
   // one entry a line: a line that is no key and no item continues a value, or stands alone where YAML would read it so;
   // and nothing deeper may follow a line that holds its value, where YAML would read it as that value running on
   const entries = lines.filter(l => !l.content);
@@ -183,7 +204,7 @@ export function proof(before, after) {
   const a = readYaml(before), b = readYaml(after);
   if (a.unread.length) return { why: `before: ${a.unread.join("; ")}` };
   if (b.unread.length) return { why: `after: ${b.unread.join("; ")}` };
-  const kept = l => l.content ? `C${l.text}` : `L${l.stepName ? `${l.text.slice(0, l.valueAt)}\u0000a step's name` : l.text}`;
+  const kept = l => l.content ? `C${l.text}${l.last ? "\u0000no line break after it" : ""}` : `L${l.stepName ? `${l.text.slice(0, l.valueAt)}\u0000a step's name` : l.text}`;
   const x = a.lines.map(kept), y = b.lines.map(kept);
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
     if (x[i] === y[i]) continue;
