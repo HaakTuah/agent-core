@@ -42,19 +42,20 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    first copy is the sync script's too, run from a clone of this repository once the manifest is written (the script's
    header says how); the copy's own `.gitattributes` keeps every line ending as it is.
 
-   **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N`
-   on a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's
-   checks have passed (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose
-   *owner's account* is not the account the core is under follows the releases, unless its manifest's *follows* row
-   says `main`; the projects of the core's own owner follow `main`, unless theirs says `releases`
-   (`scripts/releases.mjs`). Following the releases, the sync script takes the newest release past the project's pin
-   and nothing in between, and wherever this README or a script says the core has moved, it has moved only when such a
-   release is cut; a full SHA still takes any commit of `main`. Why: a pure sync brings scripts, hooks and workflows
-   that no review in the project reads (floor rule 8), so what another owner's project runs was reviewed in the core
-   alone, and its owner takes only what the core's owner chose to hand on. So that nothing of the core's newer than a
-   release runs in such a project's sessions either, its merger runs `scripts/pure-sync.mjs` from a checkout of the
-   release the sync moves to, itself a commit of `main` (floor rule 8), and its first copy is made from a clone at a
-   release.
+   **What a project follows:** the core's `main`, or its releases (core archive 195). A release is a tag `release-N` on
+   a commit of `main`, cut on the owner's word by this repository's `release` workflow, only where that commit's checks
+   have passed (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
+   account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
+   the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
+   the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
+   this README or a script says the core has moved, it has moved only when such a release is cut; a full SHA still takes
+   any commit of `main`, but such a sync is no pure sync there: it is reviewed like any PR (core archive 201). Why: a
+   pure sync brings scripts, hooks and workflows that no review in the project reads (floor rule 8), so what another
+   owner's project runs was reviewed in the core alone, and its owner takes only what the core's owner chose to hand on.
+   So that nothing of the core's newer than a release runs in such a project's sessions either, its merger runs
+   `scripts/pure-sync.mjs` from a checkout of the release the sync moves to, itself a commit of `main` (floor rule 8; a
+   sync to a commit that is no release is no pure sync, and any check of it is run from the core's `main`), and its
+   first copy is made from a clone at a release.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and the list is read against

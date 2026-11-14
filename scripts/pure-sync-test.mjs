@@ -10,8 +10,9 @@
 // text beside a pin, carriage returns, a root .gitattributes, the pin moved backwards; each is refused for the reason
 // it means, so a check of pure-sync.mjs's gone fails the suite. Where the change lies under core/, the core's own
 // core.yml job, run as GitHub runs it (workflow-run.mjs), fails it too; a file's executable bit alone is no difference
-// to either (copy-tree.mjs). And the sync script's own refusals, and its following of the core's releases. On Linux and
-// on Windows. Git, tar, bash and Node's own modules.
+// to either (copy-tree.mjs). And the sync script's own refusals, and its following of the core's releases: a project
+// that follows them takes a commit that is no release only through review. On Linux and on Windows. Git, tar, bash and
+// Node's own modules.
 //
 //   node scripts/pure-sync-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -134,12 +135,12 @@ const tries = [
   ...(canLink ? [["a file of core/ made a link to an identical file outside the project", () => { fs.copyFileSync(path.join(p, "core/README.md"), outside); fs.rmSync(path.join(p, "core/README.md")); fs.symlinkSync(path.relative(path.join(p, "core"), outside), path.join(p, "core/README.md")); }, NOT_COPY, DIFFERS]] : []),
 ];
 if (!canLink) console.log("skip the link: this machine lets the test make none");
-for (const [what, alter, refused, failed] of tries) {
+for (const [what, alter, refused, coreFails] of tries) {
   if (alter() !== "staged") git(p, "add", "-A"); // (a change made in the index alone is not undone by an add)
   git(p, "commit", "-q", "-m", what);
   const r = pure();
   ok(r.status === 1 && r.out.includes(`NOT PURE`) && r.out.includes(refused) && !r.out.includes("merge it with"), `${what}: not a pure sync ("${refused}")`, r.out);
-  if (failed) { const c = coreCheck(); ok(!c.passed && c.out.includes(failed), `  and the core's own check of the copy fails it ("${failed}")`, c.out); }
+  if (coreFails) { const c = coreCheck(); ok(!c.passed && c.out.includes(coreFails), `  and the core's own check of the copy fails it ("${coreFails}")`, c.out); }
   git(p, "reset", "-q", "--hard", LEGIT);
   git(p, "clean", "-q", "-fd");
 }
@@ -170,6 +171,8 @@ const same = node(p, "core/scripts/sync.mjs", A);
 ok(same.status === 0 && same.out.includes("already at") && git(p, "status", "--porcelain") === "", "at the pin already, there is nothing to sync", same.out);
 write(p, "core-manifest.md", manifest("someone-else"));
 git(p, "commit", "-q", "-am", "another owner");
+const other = git(p, "rev-parse", "HEAD");
+git(p, "push", "-q", "-f", "origin", "HEAD:main"); // (the project of another owner is now main's own)
 const none = node(p, "core/scripts/sync.mjs");
 ok(none.status === 0 && none.out.includes("no release yet") && git(p, "status", "--porcelain") === "", "a project of another owner follows the releases: where the core has cut none, it takes nothing", none.out);
 git(theCore, "tag", "release-1", A);
@@ -178,6 +181,39 @@ ok(atOne.status === 0 && atOne.out.includes("release-1") && git(p, "status", "--
 git(theCore, "tag", "release-2", B);
 const atTwo = node(p, "core/scripts/sync.mjs");
 ok(atTwo.status === 0 && atTwo.out.includes(`${SHA(A)} -> ${SHA(B)} (release-2)`) && read(p, "core-manifest.md") === manifest("someone-else", B), "and once a newer release is cut, it takes that release", atTwo.out);
+git(p, "commit", "-q", "-am", "to release-2");
+const released = pure();
+ok(released.status === 0 && released.out.includes("a pure sync"), "  a sync to a release, in a project that follows the releases, is pure", released.out);
+// (it takes a commit of main that is no release only through review: the sync is made, and is no pure sync; core archive 201)
+write(theCore, "c.md", "only in C\n");
+const C = commit("C");
+git(p, "checkout", "-q", "-B", "unreleased", other);
+const toC = node(p, "core/scripts/sync.mjs", C);
+git(p, "commit", "-q", "-am", "to C");
+const unreleased = pure();
+ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`),
+  "a sync to a commit that is no release, in a project that follows the releases, is made, and is no pure sync: it is reviewed like any PR", `${toC.out}\n${unreleased.out}`);
+// (and a manifest that does not say what it follows, two rows of it, is read as following nothing: no sync to a commit
+// that is no release is pure there either)
+git(p, "checkout", "-q", "-B", "unclear", other);
+write(p, "core-manifest.md", `${manifest("someone-else")}| *follows* | \`main\` |\n| *follows* | \`releases\` |\n`);
+git(p, "commit", "-q", "-am", "two rows");
+git(p, "push", "-q", "-f", "origin", "HEAD:main");
+const toCAgain = node(p, "core/scripts/sync.mjs", C);
+git(p, "commit", "-q", "-am", "to C");
+const unclear = pure();
+ok(unclear.status === 1 && unclear.out.includes(`does not say what it follows, and ${C} is no release of the core`), "a sync to a commit that is no release, in a project whose manifest does not say what it follows, is no pure sync either", `${toCAgain.out}\n${unclear.out}`);
+
+// (a release tag on a commit off the core's main comes in with the tags, so that commit is there to read: a pin at it is
+// still no commit of main)
+git(p, "push", "-q", "-f", "origin", `${base}:main`);
+git(p, "checkout", "-q", "-B", "side", LEGIT);
+git(theCore, "tag", "release-3", SIDE);
+write(p, "core-manifest.md", manifest(OWNER, SIDE));
+write(p, ".github/workflows/core.yml", calls.replace(`personal-terms.yml@${B}`, `personal-terms.yml@${SIDE}`));
+git(p, "commit", "-q", "-am", "to the side");
+const tagged = pure();
+ok(tagged.status === 1 && tagged.out.includes(`${SIDE} is not a commit of the core's main`), "a pin at a commit off the core's main that a release tag names is no commit of main all the same", tagged.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the sync and the proof that it is pure`);
 process.exitCode = failed ? 1 : 0;
