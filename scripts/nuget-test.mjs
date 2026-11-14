@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { REGISTRY, check, lockPackages, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
+import { REGISTRY, check, imported, lockPackages, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -193,10 +193,14 @@ ok(/src\/App\/App\.csproj names RestorePackagesPath/.test(names(["src/App/App.cs
   "a project file that sends its packages to another folder than the restore's fails, and so does a response file that gives every build options of its own");
 // a file an Import brings in under a name this check does not read: reported, and passes (#240)
 const reported = (tracked) => check({ ships: [], nuget: {} }, tmp, restore(), tracked);
-put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Condition="'$(A)' > '1'" Project='$(MSBuildThisFileDirectory)..\\shared\\more.config ' /><!-- <Import Project="old.xml" /> --><ImportGroup><Import Project="Sdk.props" Sdk="X" /><Import Project="$(MSBuildToolsPath)\\Microsoft.CSharp.targets" /><Import Project="../src/App/App.csproj.user" /></ImportGroup></Project>`);
-const imported = reported(["build/Deps.props"]);
-ok(imported.failures.length === 0 && imported.reports.length === 2 && imported.reports.some(x => x.includes("build/Deps.props imports deps.xml, a file this check does not read")) && imported.reports.some(x => x.includes("imports $(MSBuildThisFileDirectory)..\\shared\\more.config,")) && / 2 reported, and passing;/.test(imported.summary),
-  "an Import of a file of another name than a build file's is reported and passes; one of a build file's name, or in a comment, is not", JSON.stringify(imported));
+put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Condition="'$(A)' > '1'" Project='$(MSBuildThisFileDirectory)..\\shared\\more.config ' /><!-- <Import Project="old.xml" /> --><Imp<!-- -->ort Project="joined.xml" /><ImportGroup><Import Project="Sdk.props" Sdk="X" /><Import Project="$(MSBuildToolsPath)\\Microsoft.CSharp.targets" /><Import Project="../src/App/App.csproj.user" /></ImportGroup></Project>`);
+const importing = reported(["build/Deps.props"]);
+ok(importing.failures.length === 0 && importing.reports.length === 2 && importing.reports.some(x => x.includes("build/Deps.props imports deps.xml, a file this check does not read")) && importing.reports.some(x => x.includes("imports $(MSBuildThisFileDirectory)..\\shared\\more.config,")) && / 2 reported, and passing;/.test(importing.summary),
+  "an Import of a file of another name than a build file's is reported and passes; one of a build file's name, or in a comment, is not", JSON.stringify(importing));
+ok(imported(`<Project><Import Project="deps.xml; x.props" /><P><![CDATA[<!--]]></P><Import Project="hidden.xml" /><P><![CDATA[-->]]></P></Project>`).join() === "deps.xml,x.props,hidden.xml", "each file of an Import's list is read, and CDATA is no comment");
+const hostile = ["<Import ", '<Import "', '<Import Project="', "<!--", "<![CDATA[", "<Import a=", "<"].map(x => x.repeat(40000)), started = Date.now();
+for (const text of hostile) imported(text);
+ok(Date.now() - started < 2000, "a pull request's build file, however long or unclosed, is read in one pass", `${Date.now() - started} ms`);
 put("src/App/App.csproj", "<Project />");
 ok(names(["core/x/y.csproj", "core/packages.lock.json", "core/packages.y.lock.json", "README.md"], {}) === "" && /^0 NuGet packages in 0 lock files/.test(check({ ships: [], nuget: {} }, tmp, restore(), ["README.md"]).summary), "the copy of the core is not the project's, and a project with no NuGet project passes with nothing to read");
 ok(projectFiles(["src/App/App.csproj", "a b/C.FSPROJ", "core/x/y.csproj", "x.csproj.bak", "README.md", "t/T.vbproj"]).join() === "src/App/App.csproj,a b/C.FSPROJ,t/T.vbproj", "the project files it lists for the restore are the same it asks a lock file of");

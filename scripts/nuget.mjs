@@ -97,8 +97,25 @@ const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<proj
 // where a project can name another lock file: a project file, a .props or .targets, and the .user file MSBuild imports
 // beside a project file by itself
 const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
-// an Import in a build file, and the file it brings in: one of another name than those above goes unread here
-const IMPORT = /<Import\b(?:[^>"']|"[^"]*"|'[^']*')*?\bProject\s*=\s*(?:"([^"]*)"|'([^']*)')/giu;
+/**
+ * The files a build file's Imports bring in, as each Import's Project names them (a list parted by ";", as MSBuild
+ * reads one), read in one pass from tag to tag: a comment or CDATA is passed over whole, and a tag's attributes are
+ * read only within it, so no text, however long or unclosed, is read more than once.
+ */
+export function imported(text) {
+  const found = [], ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
+  for (let i = text.indexOf("<"); i >= 0; i = text.indexOf("<", i)) {
+    if (text.startsWith("<!--", i)) { const end = text.indexOf("-->", i + 4); if (end < 0) break; i = end + 3; continue; }
+    if (text.startsWith("<![CDATA[", i)) { const end = text.indexOf("]]>", i + 9); if (end < 0) break; i = end + 3; continue; }
+    if (!/^<Import(?![A-Za-z0-9_.:-])/iu.test(text.slice(i, i + 8))) { i++; continue; }
+    let end = i + 7, quote = "";
+    for (; end < text.length && (quote || text[end] !== ">"); end++) if (quote ? text[end] === quote : text[end] === '"' || text[end] === "'") quote = quote ? "" : text[end];
+    if (end >= text.length) break;
+    for (const a of text.slice(i + 7, end).matchAll(ATTRIBUTE)) if (a[1].toLowerCase() === "project") found.push(...(a[2] ?? a[3]).split(";").map((x) => x.trim()).filter(Boolean));
+    i = end + 1;
+  }
+  return found;
+}
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
 // an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
 // lists it
@@ -356,10 +373,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
     if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
     if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
-    // (a file an Import brings in under another name: reported, and passes, as the owner agreed for now; reading
+    // (a file an Import brings in under another name: reported, and passes, as #240 settled for now; reading
     // every file an Import brings in is the mend to follow, #269)
-    for (const m of text.replace(/<!--[\s\S]*?-->/gu, "").matchAll(IMPORT)) {
-      const brought = (m[1] ?? m[2]).trim();
+    for (const brought of imported(text)) {
       if (!BUILD_FILE.test(brought.split(/[\\/]/u).pop())) reports.push(`${f} imports ${brought}, a file this check does not read: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
     }
   }
