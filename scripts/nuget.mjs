@@ -82,6 +82,14 @@ import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, t
 import { started } from "./started.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
+// Whether the commit `rev` held a file (a blob, never a folder of that name) at `file`, its name's case aside, as
+// MSBuild on Windows finds a project's .user file whatever the case.
+function fileAt(root, rev, file) {
+  const dir = posix.dirname(file), name = posix.basename(file).toLowerCase();
+  let entries = "";
+  try { entries = execFileSync("git", ["ls-tree", "-z", rev, ...(dir === "." ? [] : ["--", `${dir}/`])], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return false; }
+  return entries.split("\0").some((e) => / blob [0-9a-f]+\t/u.test(e) && posix.basename(e.slice(e.indexOf("\t") + 1)).toLowerCase() === name);
+}
 const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
 // where a project can name another lock file: a project file, a .props or .targets, and the .user file MSBuild imports
@@ -339,7 +347,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
     // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
-    const held = /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && textAt(root, base, f.replace(/\.user$/iu, "")) !== null));
+    const held = /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
     const [to, tail] = held ? [reports, ` ${heldBefore}`] : [failures, ""];
     if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
     if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);

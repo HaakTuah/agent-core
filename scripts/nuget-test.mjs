@@ -287,6 +287,16 @@ inRepo("src/Lone/Lone.csproj", "<Project />");
 user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/Lone.csproj", L, LONE], process.env, { base: "HEAD", baseConfig: null });
 ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held with no project file beside it, which the pull request adds: it fails, the pull request having brought it into play", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone");
+// a .user file the base held beside a folder of the project file's name, which a pull request makes a project file:
+// not held; and one beside a project file named in another case, which MSBuild on Windows imports all the same: held
+inRepo(LONE, userText("z")); inRepo("src/Lone/Lone.csproj/inside.md", "x\n"); git("add", "-A"); git("commit", "-q", "-m", "a folder of that name");
+fs.rmSync(path.join(repo, "src/Lone/Lone.csproj"), { recursive: true }); inRepo("src/Lone/Lone.csproj", "<Project />");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/Lone.csproj", L, LONE], process.env, { base: "HEAD", baseConfig: null });
+ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held beside a folder of the project file's name, which the pull request makes a project file: it fails", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); inRepo(LONE, userText("z")); inRepo("src/Lone/LONE.CSPROJ", "<Project />"); git("add", "-A"); git("commit", "-q", "-m", "another case");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/LONE.CSPROJ", L, LONE], process.env, { base: "HEAD", baseConfig: null });
+ok(!user.failures.some(x => x.includes(LONE)) && user.reports.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "one the base held beside its project file named in another case: reported, and passes", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone again");
 // a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
 // passing; changed by the pull request, failing
 const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });
