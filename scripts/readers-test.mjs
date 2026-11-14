@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readable } from "./licence-yes.mjs";
 import { licenceOk } from "./licences.mjs";
+import { cut } from "./nuget-fetch.mjs";
 import { manifestLicence } from "./nuget.mjs";
 
 // what the call below fetches, each by its sha512 as the registry gives it (npm pack's array is the one place each
@@ -174,7 +175,7 @@ try {
     const declared = new Set(["xml", "xmlns", ...[...rootTag.matchAll(/[ \t\r\n]xmlns:([^ \t\r\n=]+)[ \t\r\n]*=/gu)].map((m) => m[1])]);
     const names = (t) => [...t.replace(/"[^"]*"|'[^']*'/gu, "").matchAll(/[ \t\r\n]([^ \t\r\n=/>]+)[ \t\r\n]*=/gu)].map((m) => m[1]);
     // (the text with its comments and CDATA cut, where the reader reads past an ampersand or ]]>)
-    const bare = body.replace(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>/gu, "");
+    const bare = cut(cut(body, "<!--", "-->") ?? "", "<![CDATA[", "]]>") ?? "";
     const licence = /<license\b[^>]*>([\s\S]*)<\/license>/u.exec(body)?.[1]?.replace(/^[ \t\r\n]+|[ \t\r\n]+$/gu, "") ?? "";
     const end = body.indexOf("</package>");
     return /<!DOCTYPE|<!ENTITY|\u0000|\u0001/u.test(body)
@@ -188,7 +189,7 @@ try {
       || tags.some((t) => /[^\x00-\x7f]/u.test(t.replace(/"[^"]*"|'[^']*'/gu, "")))
       || !/^[ \t\r\n]+type[ \t\r\n]*=[ \t\r\n]*(?:"[a-z]*"|'[a-z]*')(?:[ \t\r\n]+version[ \t\r\n]*=[ \t\r\n]*(?:"[^"]*"|'[^']*'))?[ \t\r\n]*$/u.test(/<license\b([^>]*)>/u.exec(body)?.[1] ?? " type=''")
       || !licence || /[<&\t\r\n]|[^\x20-\x7e]/u.test(licence)
-      || (end >= 0 && /[^ \t\r\n]/u.test(body.slice(end + 10).replace(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>/gu, "")));
+      || (end >= 0 && /[^ \t\r\n]/u.test(cut(cut(body.slice(end + 10), "<!--", "-->") ?? "x", "<?", "?>") ?? "x"));
   };
   // (and what real manifests hold beside their licence: an entity, a schema's namespace on the root, a comment or an
   // instruction inside, a comment after the root, CDATA and a character's reference in a description, a word beyond

@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
-import { fetchAll, fileAddress, named, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
+import { cut, fetchAll, fileAddress, named, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
 import { REGISTRY, check } from "./nuget.mjs";
 
 let failed = 0, count = 0;
@@ -49,6 +49,9 @@ ok(nuspecOf(pkg("A", "1.0.0", "MIT")).includes("<license type=\"expression\">MIT
 ok(throws(() => nuspecOf(zip([["a.nuspec", "x"], ["b.nuspec", "y"]]))) && throws(() => nuspecOf(zip([["lib/a.nuspec", "x"]]))) && throws(() => nuspecOf(Buffer.from("not a zip"))), "two manifests at its root, one in a folder alone, or no zip at all: none is read");
 // a package's address on a v3 feed, its version as NuGet writes one: no build metadata, three numbers at least
 ok(fileAddress("https://feed.example/flat/", "Foo.Bar", "1.0+build.1") === "https://feed.example/flat/foo.bar/1.0.0/foo.bar.1.0.0.nupkg" && fileAddress("https://feed.example/flat/", "Foo", "2.1.0.0-Beta") === "https://feed.example/flat/foo/2.1.0-beta/foo.2.1.0-beta.nupkg", "a package's address names its version as NuGet writes one", fileAddress("https://feed.example/flat/", "Foo.Bar", "1.0+build.1"));
+// a part cut leaves a space, so that no two halves it leaves join into another; one never closed gives nothing
+ok(!cut("<!<!---->--", "<!--", "-->").includes("<!--") && cut("a<!-- b -->c", "<!--", "-->") === "a c" && cut("a<!-- b", "<!--", "-->") === null && named(nuspec("A", "1.0.0", "MIT").replace("<id>", "<!-- <id>")) === null,
+  "a comment is cut so that no new one forms, and a manifest with one never closed names nothing");
 // the name a manifest gives, its comments cut: a decoy in one is no name
 const decoy = nuspec("Foo", "1.1.0", "MIT").replace("<id>Foo</id>", "<!--<id>foo.1</id><version>1.0.0</version>--><id>Foo</id>").replace("<version>1.1.0</version>", "<version >1.1.0</version>");
 ok(JSON.stringify(named(nuspec("Foo", "1.1.0", "MIT"))) === '{"id":"Foo","version":"1.1.0"}' && named(decoy)?.id !== "foo.1" && named(nuspec("A", "1.0.0", "MIT").replace("</metadata>", "</metadata><metadata><id>B</id></metadata>")) === null,
