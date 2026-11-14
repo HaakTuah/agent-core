@@ -297,6 +297,26 @@ fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); inRepo(LONE, userTe
 user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/LONE.CSPROJ", L, LONE], process.env, { base: "HEAD", baseConfig: null });
 ok(!user.failures.some(x => x.includes(LONE)) && user.reports.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "one the base held beside its project file named in another case: reported, and passes", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone again");
+// what stands at the project file's path at the base must be a file of its own: never a link (whose target a pull request
+// may add), nor a name git reads as more than a path (a root folder named ":", which git takes for pathspec magic)
+const userAt = (projectFile) => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", projectFile, L, `${projectFile}.user`], process.env, { base: "HEAD", baseConfig: null });
+inRepo(LONE, userText("z")); git("add", "-A");
+const target = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: repo, env, input: "elsewhere/Lone.csproj", encoding: "utf8" }).stdout.trim();
+git("update-index", "--add", "--cacheinfo", `120000,${target},src/Lone/Lone.csproj`); git("commit", "-q", "-m", "a link where the project file would be");
+git("rm", "-q", "--cached", "src/Lone/Lone.csproj"); inRepo("src/Lone/Lone.csproj", "<Project />");
+user = userAt("src/Lone/Lone.csproj");
+ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held beside a link of the project file's name, which the pull request makes a project file: it fails", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no link");
+if (process.platform !== "win32") {
+  // (a folder named ":" at the root: git would read ":/top/..." as the whole tree's top, where the base holds a project
+  // file at top/Lone/Lone.csproj; Windows writes no such name)
+  const COLON = ":/top/Lone/Lone.csproj";
+  inRepo("top/Lone/Lone.csproj", "<Project />"); inRepo(`${COLON}.user`, userText("z")); git("add", "-A"); git("commit", "-q", "-m", "a folder named :");
+  inRepo(COLON, "<Project />");
+  user = userAt(COLON);
+  ok(user.failures.some(x => x.includes(`${COLON}.user names NuGetLockFilePath`)), "a .user file the base held in a root folder named \":\", whose project file only the pull request adds: it fails, the path read as a path", JSON.stringify(user));
+  fs.rmSync(path.join(repo, ":"), { recursive: true }); fs.rmSync(path.join(repo, "top"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone");
+}
 // a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
 // passing; changed by the pull request, failing
 const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });

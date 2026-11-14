@@ -82,13 +82,14 @@ import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, t
 import { started } from "./started.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
-// Whether the commit `rev` held a file (a blob, never a folder of that name) at `file`, its name's case aside, as
-// MSBuild on Windows finds a project's .user file whatever the case.
+// Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
+// at `file`, its name's case aside, as MSBuild on Windows finds a project's .user file whatever the case. The folder
+// is read as a path, letter for letter (--literal-pathspecs): no name of it is taken for git's pathspec magic.
 function fileAt(root, rev, file) {
   const dir = posix.dirname(file), name = posix.basename(file).toLowerCase();
   let entries = "";
-  try { entries = execFileSync("git", ["ls-tree", "-z", rev, ...(dir === "." ? [] : ["--", `${dir}/`])], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return false; }
-  return entries.split("\0").some((e) => / blob [0-9a-f]+\t/u.test(e) && posix.basename(e.slice(e.indexOf("\t") + 1)).toLowerCase() === name);
+  try { entries = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-z", rev, ...(dir === "." ? [] : ["--", `${dir}/`])], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return false; }
+  return entries.split("\0").some((e) => /^100(?:644|755) blob [0-9a-f]+\t/u.test(e) && posix.basename(e.slice(e.indexOf("\t") + 1)).toLowerCase() === name);
 }
 const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
