@@ -2,9 +2,9 @@
 
 14 November 2026, for #245. The audit asks two things of every codebase the owner keeps: what the rules and checks say
 of how code is built, set against a list of practices, and where the code stands, measured, the numbers kept as a
-baseline. Each of the owner's projects has its own half, filed there (#245's comments name the issues); this report is
-the core's: the core's rules and checks against the practices, the core's own code measured, and for each practice a
-proposal for #246. The audit writes no rule.
+baseline. Each of the owner's projects has its own half, filed there (#245's comments name the issues). This report is
+the core's: the core's rules and checks against the practices, the core's own code measured, the owner's two games
+measured from a read-only clone, and for each practice a proposal for #246. The audit writes no rule.
 
 What the audit asked for, in the owner's words on the issue:
 
@@ -13,7 +13,8 @@ What the audit asked for, in the owner's words on the issue:
 > practices?
 
 **The measures are a script now,** so the next audit is a run and not a study: `node core/scripts/code-shape.mjs` in a
-project (`node scripts/code-shape.mjs` here) prints the summary below, and with `--json` writes every number. It reads
+project (`node scripts/code-shape.mjs` here, `--repo <folder>` for a clone it does not lie in) prints the summary
+below, and with `--json` writes every number. It reads
 JavaScript and TypeScript; a project in another language counts its files there and measures with its own tools. Its
 reader is a lexer that knows comments, strings, template literals and regular expressions, not a parser, so where a
 check must never guess (#246) it is a start, not the check. The core's numbers stand in
@@ -177,7 +178,11 @@ does not know, so their function counts are rough.
     runner's `parseArgs` (596).
 - **What changes together:** `engine/src/turn/kings-fate.ts` changed in 33 of 497 commits, with `resolve.ts`,
   `views.ts` and `model/state.ts`. The state and the save-version test changed together all 13 times the test changed.
-- **Suites,** run alone from the clone: AMARNA_SUITES.
+- **Suites,** run alone from the clone:
+  - the type check passed in 20 s and the lint, with its unused-code check, in 13 s;
+  - the whole of vitest did not finish within 20 minutes on this session's four cores, and was stopped (CI splits it
+    four ways);
+  - one package's tests run without the rest: the engine's 777 tests passed in 66 s, the web package's 244 in 134 s.
 
 **barkstreet-snakes** (`d14a7d3`; JavaScript with no build):
 
@@ -232,7 +237,7 @@ in the core. "Never worse" and the baseline that may only shrink are #246's own,
 | Budgets held where a benchmark exists | A benchmark's result has a mark | As tests' time marks | None |
 | One name | Each thing's name stands in one list, which the code and the screen both read | Display code that writes a name from the list as a literal fails | None: no screen |
 
-**What this leaves to others.** The projects' numbers are in their own halves, measured by their own sessions with this
-script or their own tools, and their reports stand there. #246 writes the module and the checks from this table; #253
+**What this leaves to others.** The games' own halves, in their own issues, go deeper than a clone allows (their CI's
+times, their reruns, the suites not run here) with their own tools, and hold up no line and no release. #246 writes the module and the checks from this table; #253
 the measure of tests' strength; #248 when the audit repeats; #255 the core's own copies check; #259 the two shell
 scripts with no test.
