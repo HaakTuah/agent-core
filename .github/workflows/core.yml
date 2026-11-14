@@ -91,10 +91,17 @@ jobs:
           # (core/ a folder, and entry by entry as the core's scripts/copy-tree.mjs compares, which says why; each path
           # quoted as git quotes it, so none prints raw or passes for two entries)
           entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
-          want=$(entries .core-at-pin "$PIN") id=$(git rev-parse -q --verify HEAD:core || true)
+          # (the pin's tree without its top-level reports entry, built as scripts/copy-tree.mjs builds it, so that no
+          # name inside that folder, however git quotes it, is taken for part of the copy)
+          tree=$PIN
+          if grep -q -s -x '/reports export-ignore' .core-at-pin/.gitattributes; then
+            # (the whole entry matched, its name after the first tab exactly "reports"; grep's "none left" is no fault,
+            # any other failure is)
+            tree=$(git -C .core-at-pin ls-tree -z "$PIN" | { grep -z -v -x -e $'[^\t]*\treports' || [ $? -eq 1 ]; } | git -C .core-at-pin mktree -z)
+          fi
+          want=$(entries .core-at-pin "$tree") id=$(git rev-parse -q --verify HEAD:core || true)
           if [ -n "$id" ] && [ "$(git ls-tree HEAD -- core)" = "040000 tree $id"$'\t'"core" ]; then have=$(entries . HEAD:core)
           else echo "core/ is no folder of this commit (a submodule, a file, a link or nothing)"; have=""; bad=1; fi
-          if grep -q -s -x '/reports export-ignore' .core-at-pin/.gitattributes; then want=$(printf '%s\n' "$want" | awk -F '\t' '$2 !~ /^reports\//'); fi
           if [ "$want" != "$have" ]; then
             echo "core/ differs from the core at its pin, by git's object ids (< the core's, > core/'s):"
             diff <(printf '%s\n' "$want") <(printf '%s\n' "$have") | grep '^[<>]' | head -n 20 || true
