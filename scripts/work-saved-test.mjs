@@ -41,6 +41,12 @@ r = hook("stop", project, '{"stop_hook_active": true}');
 ok(r.status === 0, "a second stop in a row goes through", `${r.status} ${r.stderr}`);
 r = hook("start", project);
 ok(r.status === 0 && /not committed/.test(r.stdout), "at a session's start it reports and stops nothing", `${r.status} ${r.stdout}`);
+// with no node on the path, the start says in a line that the helper hook is off, and stops nothing
+const noNode = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => d && !["node", "node.exe"].some(n => fs.existsSync(path.join(d, n)))).join(path.delimiter);
+const pathKey = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+const bare2 = spawnSync("sh", ["-c", command("start")], { input: "{}", encoding: "utf8", env: { ...env, [pathKey]: noNode, CLAUDE_PROJECT_DIR: project } });
+ok(bare2.status === 0 && /The helper hook is off here: Node is not on the path/.test(bare2.stdout) && /not committed/.test(bare2.stdout), "with no Node on the path, the start says in a line that the helper hook is off, beside what it reports, and stops nothing", `${bare2.status} ${bare2.stdout}${bare2.stderr}`);
+ok(!/helper hook is off/.test(r.stdout), "with Node on the path it says nothing of it", r.stdout);
 git(project, "add", "-A");
 git(project, "commit", "-q", "-m", "a note");
 r = hook("stop", project);

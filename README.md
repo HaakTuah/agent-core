@@ -143,7 +143,13 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
      private repository calls it like any other: it needs nothing of GitHub's paid code security. Like the signature
      check, it first looks whether the pull request changes anything NuGet reads (its workflow's header lists what),
-     and passes without a restore where it changes none; any doubt runs it.
+     and passes without a restore where it changes none; any doubt runs it. Before the restore, which runs the pull
+     request's own build files, `nuget-fetch.mjs` fetches every package the lock files name, holds each to its lock
+     file's content hash and reads its licence from it, so no build has run beside that verdict; the tools a manifest
+     of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are fetched and held the same way, each at one
+     exact version and to the list for tools that only run (what is wrong with a tool the pull request's base held,
+     never read before this release, is reported, not failed). Where the first look restored, which runs the pull
+     request's build files, that read is left out: nothing it reads changed from the base.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
@@ -171,8 +177,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    - **The default branch is `main`,** which the hooks read their scripts from, letting every call through where there
      is none (`core.yml` fails another name).
    - **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on the path; where either is
-     missing, the hook stops nothing. The core's own tests run the scripts and both hooks there on every change
-     (`.github/workflows/tests.yml`).
+     missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start. The
+     core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
    - **Another tool's session** has neither hook, which are Claude Code's: what holds its work is its reading of
      `AGENTS.md` and the checks on every pull request.
    - **The copy's own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`, `core/.claude/`) are this
@@ -264,6 +270,11 @@ Floor: whole. Modules: <all, or the list of those taken>.
 - Each repository's secret scanning with push protection (Settings, Advanced Security), where the repository has it:
   GitHub then refuses a push that holds a key of a kind it knows, before the key reaches the history, which no check
   on a pull request can (floor rule 1).
+- A private repository on GitHub's free plan has neither rulesets nor GitHub's secret scanning. GitHub Pro gives it
+  rulesets, and so the ruleset above. Where it has no secret scanning of GitHub's, its owner may add a secret scanner
+  at one pinned version, run as a tool that only runs (floor rule 10's tools' list), from a workflow of the project's
+  own. Both are the owner's choice: no check of the core's fails, waits or warns where they are not set up (core
+  archive 201).
 - The owner's GitHub profile: GitHub writes the profile's name and the account's address as the author of every merge
   it makes, into the history of every repository the account merges in, and no check of ours sees a merge before it is
   made. An owner who wants neither there leaves the name empty, so that GitHub writes the login, and turns on "Keep my
