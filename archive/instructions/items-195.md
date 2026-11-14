@@ -179,10 +179,23 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > This is incorrect information, remove it
 
-     Behind: in `.github/workflows/personal-terms.yml`, a term in a commit's author or committer reported in a private
-     repository and failed in a public one, as the owner's words of item 201 had it ("when [the] repo is private
-     anyways"), and no commit left out by its date; `README.md`, "Setting up (the owner's part)", on git's own name on
-     each machine; in `.github/workflows/core.yml`, the reports left out by the pin's tree's own entry; in
-     `scripts/upgrade-test.mjs`, a start from each of the last two releases, its private project's commits made under a
-     listed name; and in item 201, that description taken out, the one change to a dated record here, on the owner's
+     The fix first built reported such a name in a private repository and failed it in a public one; Codex's security
+     review and the fallback reviewer each found that it broke floor rule 11 and the threat model ("everything counts as
+     public"). Asked how the check should treat a listed name that a machine's git writes into each commit, the owner
+     first asked:
+
+     > But my account has my name, will this block me too now, expert?
+
+     Told that the agents commit as Claude or under the login, and that GitHub's own merges are excepted, but that an
+     edit or a suggestion committed on github.com carries the profile's name and is not, and that this would be
+     excepted too, the owner chose, of two answers offered, "Block, self-fixing".
+
+     Behind: in `.github/workflows/personal-terms.yml`, such a name failed in every repository, the failure saying how
+     the session mends the pull request itself (git's name in the repository set to the login, its commits rewritten),
+     every commit GitHub itself makes and signs excepted, not only a merge, as floor rule 11 now says, and no commit
+     left out by its date; `AGENTS.md`'s "Nothing locks another owner's project", its one exception that mend; a sync
+     note, and `README.md`, "Setting up (the owner's part)", on git's own name on each machine; in
+     `.github/workflows/core.yml`, the reports left out by the pin's tree's own entry; in `scripts/upgrade-test.mjs`, a
+     start from each of the last two releases, its private project's commits made under a listed name and its sync
+     mended so; and in item 201, that description taken out, the one change to a dated record here, on the owner's
      word.
