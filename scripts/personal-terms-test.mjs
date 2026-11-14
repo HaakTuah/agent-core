@@ -2,9 +2,10 @@
 // runs it (workflow-run.mjs, beside this file), on scratch pull requests, each checked out as GitHub checks one out: its
 // merge into its base. What fails: a term in a file, in a line a commit adds and a later one takes away, in a line a
 // merge's own resolution adds, in a file's name (an empty file, a rename, a binary file, a name outside plain ASCII),
-// in a commit's message, author or committer (name or address), and in the title or description. What passes: none of
-// these; a term only in a file git reads as binary (not read); only in a commit from before the rule; a file named with
-// a term before it, deleted or renamed away; only in the
+// in a commit's message, author or committer (name or address), and in the title or description; a commit dated before
+// the rule too, since a date is whatever its maker writes. What passes: none of these; a term only in a file git reads
+// as binary (not read); a file on main named with a term before the rule, deleted or renamed away; in a private
+// repository, a term only in a commit's author or committer, reported and not failed; only in the
 // author of a merge GitHub itself made (floor rule 11's exception), committed as GitHub and signed by its key, while
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
@@ -82,11 +83,11 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile, isPrivate = false } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], GITHUB);
-  const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } } } };
+  const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
   const base = { ...env, ...ME, STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
@@ -110,6 +111,13 @@ fails("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${t
 fails("a term in a commit's author name", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]));
 fails("a term in a commit's author address", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_EMAIL: `${other}@example.invalid` }]]));
 fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COMMITTER_NAME: term }]]));
+// in a private repository, a name the machine's git writes into every commit is reported, never failed: failing it
+// would fail every pull request made there (the core's AGENTS.md, "Nothing locks another owner's project")
+const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@example.invalid` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
+ok(named.passed && /::warning::A personal term is in the author or committer/.test(named.out) && (named.out.match(/::warning::[^\n]*/)?.[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
+  "in a private repository, a term only in commits' author or committer passes, reported with both commits named and the term never printed", named.out);
+fails("in a private repository, a term in a line a commit adds, whoever its author", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term }], [{ "b.md": "gone\n" }]]), { isPrivate: true });
+fails("in a private repository, a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), { isPrivate: true });
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
 const onMain = [[{ "c.md": "y\n" }, {}, "on main"]];
 const update = committer => pull([[{ "b.md": "x\n" }], [dir => { git(dir, ["merge", "-q", "--no-ff", "--no-edit", "main"], { GIT_AUTHOR_NAME: `A ${term}`, ...committer }); }]], onMain);
@@ -164,7 +172,7 @@ fails("a term in a line a merge's own resolution adds, taken out again later", r
 fails("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` });
 fails("a term in the description", pull([[{ "b.md": "x\n" }]]), { body: `Words.\n\n${term}` });
 passes("a term only in a file git reads as binary (not read: the check's header says so)", pull([[{ "a.bin": `\u0000${term}\u0000` }]]));
-passes("a term only in a commit from before the rule, added and taken out again", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
+fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
 ok(none.passed && none.out.includes("PERSONAL_TERMS is not set"), "without the secret it passes with a note: the check stays optional", none.out);

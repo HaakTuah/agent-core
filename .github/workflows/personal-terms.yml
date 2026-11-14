@@ -1,11 +1,16 @@
 # Nothing personal, ever (floor rule 11). Fails a pull request whose files, commits, title or description hold a term
 # from the PERSONAL_TERMS secret: one term per line, set by the owner in the repository's Actions secrets and never
-# written into the repository, since the list itself would be personal. Of each commit since the rule it reads the
-# message, the author's and the committer's name and address (save those of a merge GitHub itself made, which floor
-# rule 11 excepts: one GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it
+# written into the repository, since the list itself would be personal. Of each commit it reads the message, the
+# author's and the committer's name and address (save those of a merge GitHub itself made, which floor rule 11
+# excepts: one GitHub commits and signs with its own key, which the check fetches from GitHub as it runs; where it
 # cannot, no merge is excepted, and the run says so), the lines it adds (a merge's, those its own resolution adds) and
 # the names of the files it writes, so a term that one commit adds and a later one takes out still fails: merging keeps
-# every commit (core archive 201). The commits read are the pull request's own, its base's left out. A file whose older
+# every commit (core archive 201). The commits read are the pull request's own, its base's left out, whatever date a
+# commit bears: a date is whatever its maker writes, and a commit not yet on main can still be changed. In a private
+# repository a term in a commit's author or committer is reported, naming the commits, and fails nothing: where the
+# owner works on their own computer, git writes the name set there into every commit, the agents' too, and failing it
+# would fail the sync to a release and every pull request after it (the core's AGENTS.md, "Nothing locks another
+# owner's project"; README.md, "Setting up (the owner's part)", says how to keep the name out). A file whose older
 # name holds a term is deleted or renamed away freely; a commit that only edits it fails, since the diff names it. It
 # reads no file git takes for binary (`git grep -I`, a diff's "Binary files differ"), pictures included. It prints only
 # where a term was found (file and line, or the commit), never the term. Without the secret (a fork, Dependabot, a
@@ -46,6 +51,7 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
           BASE: ${{ github.event.pull_request.base.sha }}
+          PRIVATE: ${{ github.event.repository.private }}
         run: |
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
           umask 077
@@ -55,13 +61,12 @@ jobs:
           hits=$(git grep -I -n -i -F -f "$list" -- . | cut -d: -f1,2 || true)
           if [ -n "$hits" ]; then echo "A personal term is in these files (file:line):"; echo "$hits"; found=1; fi
           if [ -n "$BASE" ]; then
-            # Only commits made since the rule (2 November 2026): older ones cannot be changed without rewriting history.
-            # One commit at a time, so every new commit is checked, not only the newest.
-            # --since-as-filter skips older commits without stopping the walk; a failing rev-list fails the job.
-            # The checkout is GitHub's merge of the pull request into its base: what its first parent holds is the
-            # base's, whatever commit the event names as the base, so it is left out.
+            # One commit at a time, so every new commit is checked, not only the newest; a failing rev-list fails the
+            # job. The checkout is GitHub's merge of the pull request into its base: what its first parent holds is the
+            # base's, whatever commit the event names as the base, so it is left out, and with it every commit main
+            # already holds, which cannot be changed without rewriting history; none is left out by its date.
             mine=(); if git rev-parse -q --verify 'HEAD^2' > /dev/null; then mine=('^HEAD^1'); fi
-            commits=$(git rev-list --since-as-filter='2026-11-02T17:30:00Z' "$BASE..HEAD" "${mine[@]}")
+            commits=$(git rev-list "$BASE..HEAD" "${mine[@]}")
             bad="" people="" added="" names=""
             # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
             # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
@@ -96,7 +101,10 @@ jobs:
               if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames --diff-filter=d -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
             done
             if [ -n "$bad" ]; then echo "A personal term is in these commits' messages:"; echo "$bad"; found=1; fi
-            if [ -n "$people" ]; then echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1; fi
+            if [ -n "$people" ] && [ "$PRIVATE" = true ]; then
+              # (reported, not failed, in a private repository: the header says why)
+              echo "::warning::A personal term is in the author or committer (name or address) of these commits:$people. Reported, not failed, in a private repository: set git's user.name and user.email on each machine that commits here to keep it out (the core's README.md, \"Setting up (the owner's part)\")."
+            elif [ -n "$people" ]; then echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1; fi
             if [ -n "$added" ]; then echo "A personal term is in a line that these commits add:"; echo "$added"; found=1; fi
             if [ -n "$names" ]; then echo "A personal term is in the name of a file that these commits write:"; echo "$names"; found=1; fi
           fi
