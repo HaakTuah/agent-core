@@ -17,6 +17,8 @@ ok(same(verdict("**The stand-in's verdict: yes, SURE.** Build it when"), { kind:
 ok(verdict("Queued, since the stand-in's verdict is a sure yes") === null && verdict("Not queued: the stand-in's verdict is unsure") === null
   && verdict("The stand-in's verdict matched the owner's answer.") === null, "a comment that only speaks of a verdict is none");
 ok(verdict("A first line about something else.\n**The stand-in's verdict: yes, sure.**") === null && verdict(null) === null, "only the first line counts, so a quote further down is no verdict");
+ok(verdict("> The stand-in's verdict: yes, unsure.\n\nBuilt. The stand-in's verdict matched.") === null && same(verdict("The stand-in's verdict: later, not sure."), { kind: "later", sure: "unsure" }),
+  "a first line that quotes a verdict is none, and \"not sure\" is unsure");
 
 const c = (issue, at, body, writer = true) => ({ issue, at, body, writer });
 const t = tally([

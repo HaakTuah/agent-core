@@ -62,8 +62,9 @@ export function reading(body) {
   return [answers, input, written, read, out].every(Number.isSafeInteger) ? { answers, input, written, read, out } : null;
 }
 
-// The session a description names (the link a cloud session ends it with), or "" where it names none.
-export const sessionOf = body => /claude\.ai\/code\/(session_[A-Za-z0-9]+)/.exec(String(body ?? ""))?.[1] ?? "";
+// The session a description names (the link a cloud session ends it with: the last, so a link it quotes of another
+// session's further up is not taken for its own), or "" where it names none.
+export const sessionOf = body => [...String(body ?? "").matchAll(/claude\.ai\/code\/(session_[A-Za-z0-9]+)/g)].at(-1)?.[1] ?? "";
 
 // The pull requests whose descriptions count, from what gh gave of each ([number, the repository its branch is in, its
 // description]): only those from a branch of the repository itself, at or past the oldest merge read. A fork's is left

@@ -5,7 +5,8 @@
 # the .NET SDK the runner holds, in a scratch folder, and takes a few packages from nuget.org for it
 # (scripts/init-dotnet-test.mjs). Another writes projects with the starter kit of each of the last two releases, syncs
 # them to the commit under test and runs every check of the core on them, taking one package from npm's registry
-# (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so the checkout fetches them.
+# (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so its checkout fetches them, and
+# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them.
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
@@ -34,7 +35,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0 # the history and the release tags: the last two releases, for the upgrade test
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
@@ -124,9 +124,6 @@ jobs:
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
         if: ${{ !cancelled() }}
         run: node scripts/init-dotnet-test.mjs
-      - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
-        if: ${{ !cancelled() }}
-        run: node scripts/upgrade-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() }}
         run: node scripts/nuget-gate-test.mjs
@@ -152,15 +149,43 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/licences.mjs .github/licences.json
 
-  # (the one check the ruleset asks for by name: it passes only where the suites passed on both)
+  upgrade:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the history and the release tags: the last two releases, for the upgrade test
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
+        run: node scripts/upgrade-test.mjs
+
+  # (the one check the ruleset asks for by name: it passes only where the suites and the upgrade test passed on both; a
+  # job that ran out of its time is cancelled, which no failing test is, so the gate says which it was)
   tests:
-    needs: suites
+    needs: [suites, upgrade]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: The suites passed on Linux and on Windows
+      - name: The suites and the upgrade test passed on Linux and on Windows
         env:
-          RESULT: ${{ needs.suites.result }}
+          SUITES: ${{ needs.suites.result }}
+          UPGRADE: ${{ needs.upgrade.result }}
         run: |
-          echo "the suites: $RESULT"; [ "$RESULT" = success ]
+          echo "the suites: $SUITES; the upgrade test: $UPGRADE"
+          if [ "$SUITES" = cancelled ] || [ "$UPGRADE" = cancelled ]; then
+            echo "::error::a job was cancelled: it ran out of its time (timeout-minutes) or was stopped, which is no" \
+              "failing test; its log shows the step it stood in, and re-running it is the first thing to try"
+          fi
+          [ "$SUITES" = success ] && [ "$UPGRADE" = success ]

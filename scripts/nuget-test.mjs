@@ -46,6 +46,10 @@ ok(/does not know/.test(read({ A: { type: "Odd", resolved: "1.0.0" } }).failures
 ok(/not JSON/.test(read(null, "{").failures.join()) && [`{"version":3,"dependencies":{}}`, `{"version":1}`, `[]`, `{"version":1,"dependencies":[]}`].every(v => /no lock file this check knows/.test(read(null, v).failures.join())), "what is no lock file of NuGet's version 1 or 2 fails");
 const two = lockPackages(JSON.stringify({ version: 2, dependencies: { "net10.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net10.0/win-x64": { A: entry("Direct", "1.0.0", "[1.0.0, )"), "runtime.win.B": entry("Transitive", "3.0.0") } } }), "p.lock");
 ok(two.failures.length === 0 && two.packages.length === 2, "a package named under several frameworks is one package, and each framework's own are read");
+const split = lockPackages(JSON.stringify({ version: 2, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } }), "p.lock");
+ok(split.packages.length === 1 && split.failures.length === 0 && /p\.lock, net9\.0: A@1\.0\.0: named by two content hashes/.test(split.split.join()), "one version named by two content hashes is said apart: a restore keeps one file of it, so the check would read one file's licence for both", JSON.stringify(split));
+const marked = read(null, `\uFEFF${lock({ A: entry("Direct", "1.0.0", "[1.0.0, )") })}`);
+ok(marked.failures.length === 0 && marked.packages.length === 1, "a lock file saved with a byte-order mark is read past it, as NuGet reads it", JSON.stringify(marked));
 
 // a manifest's licence
 const nuspec = (inner, more = "") => `<?xml version="1.0" encoding="utf-8"?>\n<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">\n  <metadata>\n    <id>A</id>\n    <version>1.0.0</version>\n    ${inner}\n    <description>x &gt; y</description>\n    <dependencies><group targetFramework="net8.0"><dependency id="B" version="1.0.0" exclude="Build,Analyzers" /></group></dependencies>\n  </metadata>\n  ${more}\n</package>`;
@@ -262,6 +266,70 @@ inRepo("checks/audit.json", JSON.stringify({ entries: [{ ...hand, name: "By.File
 inRepo("checks/licences.json", JSON.stringify({ ships: [], audit: "checks/audit.json", nuget: { tools: [L] } }));
 const licences = spawnSync(process.execPath, [path.join(repo, "core/scripts/licences.mjs"), "checks/licences.json"], { cwd: repo, env, encoding: "utf8" });
 ok(licences.status === 0 && run("checks/licences.json", "--packages", restore("By.File@1.0.0")).status === 0, "the licence check takes the same config and the same audit, holds the NuGet entry to its list, and leaves the rest to this check", licences.stdout + licences.stderr);
+
+// the .user file MSBuild imports beside a project file by itself, which the check reads only lately: as the base held
+// it, what it names is reported and passes; added or changed by the pull request, it fails (core archive 207)
+const USER = "src/App/App.csproj.user", userText = at => `<Project><PropertyGroup><NuGetLockFilePath>${at}</NuGetLockFilePath></PropertyGroup></Project>`;
+const userCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, USER], process.env, { base: "HEAD", baseConfig: null });
+inRepo(USER, userText("x"));
+let user = userCheck();
+ok(user.failures.some(x => x.includes(`${USER} names NuGetLockFilePath`)), "a .user file the pull request adds, naming another lock file, fails", JSON.stringify(user));
+git("add", "-A"); git("commit", "-q", "-m", "a .user file");
+user = userCheck();
+ok(!user.failures.some(x => x.includes(".user")) && user.reports.some(x => x.includes(`${USER} names NuGetLockFilePath`) && x.includes("held before this check read it")), "one the base held as it stands: reported, and passes", JSON.stringify(user));
+inRepo(USER, userText("y"));
+user = userCheck();
+ok(user.failures.some(x => x.includes(`${USER} names NuGetLockFilePath`)), "and one the pull request changes fails", JSON.stringify(user));
+// a .user file the base held beside no project file, which a pull request's new project file brings into play
+const LONE = "src/Lone/Lone.csproj.user";
+inRepo(LONE, userText("z")); git("add", "-A"); git("commit", "-q", "-m", "a .user file alone");
+inRepo("src/Lone/Lone.csproj", "<Project />");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/Lone.csproj", L, LONE], process.env, { base: "HEAD", baseConfig: null });
+ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held with no project file beside it, which the pull request adds: it fails, the pull request having brought it into play", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone");
+// a .user file the base held beside a folder of the project file's name, which a pull request makes a project file:
+// not held; and one beside a project file named in another case, which MSBuild on Windows imports all the same: held
+inRepo(LONE, userText("z")); inRepo("src/Lone/Lone.csproj/inside.md", "x\n"); git("add", "-A"); git("commit", "-q", "-m", "a folder of that name");
+fs.rmSync(path.join(repo, "src/Lone/Lone.csproj"), { recursive: true }); inRepo("src/Lone/Lone.csproj", "<Project />");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/Lone.csproj", L, LONE], process.env, { base: "HEAD", baseConfig: null });
+ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held beside a folder of the project file's name, which the pull request makes a project file: it fails", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); inRepo(LONE, userText("z")); inRepo("src/Lone/LONE.CSPROJ", "<Project />"); git("add", "-A"); git("commit", "-q", "-m", "another case");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", "src/Lone/LONE.CSPROJ", L, LONE], process.env, { base: "HEAD", baseConfig: null });
+ok(!user.failures.some(x => x.includes(LONE)) && user.reports.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "one the base held beside its project file named in another case: reported, and passes", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone again");
+// what stands at the project file's path at the base must be a file of its own: never a link (whose target a pull request
+// may add), nor a name git reads as more than a path (a root folder named ":", which git takes for pathspec magic)
+const userAt = (projectFile) => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", projectFile, L, `${projectFile}.user`], process.env, { base: "HEAD", baseConfig: null });
+inRepo(LONE, userText("z")); git("add", "-A");
+const target = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: repo, env, input: "elsewhere/Lone.csproj", encoding: "utf8" }).stdout.trim();
+git("update-index", "--add", "--cacheinfo", `120000,${target},src/Lone/Lone.csproj`); git("commit", "-q", "-m", "a link where the project file would be");
+git("rm", "-q", "--cached", "src/Lone/Lone.csproj"); inRepo("src/Lone/Lone.csproj", "<Project />");
+user = userAt("src/Lone/Lone.csproj");
+ok(user.failures.some(x => x.includes(`${LONE} names NuGetLockFilePath`)), "a .user file the base held beside a link of the project file's name, which the pull request makes a project file: it fails", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Lone"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no link");
+if (process.platform !== "win32") {
+  // (a folder named ":" at the root: git would read ":/top/..." as the whole tree's top, where the base holds a project
+  // file at top/Lone/Lone.csproj; Windows writes no such name)
+  const COLON = ":/top/Lone/Lone.csproj";
+  inRepo("top/Lone/Lone.csproj", "<Project />"); inRepo(`${COLON}.user`, userText("z")); git("add", "-A"); git("commit", "-q", "-m", "a folder named :");
+  inRepo(COLON, "<Project />");
+  user = userAt(COLON);
+  ok(user.failures.some(x => x.includes(`${COLON}.user names NuGetLockFilePath`)), "a .user file the base held in a root folder named \":\", whose project file only the pull request adds: it fails, the path read as a path", JSON.stringify(user));
+  fs.rmSync(path.join(repo, ":"), { recursive: true }); fs.rmSync(path.join(repo, "top"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone");
+}
+// a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
+// passing; changed by the pull request, failing
+const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });
+fs.rmSync(path.join(repo, USER)); inRepo(L, twoLock); git("add", "-A"); git("commit", "-q", "-m", "a lock file with two hashes");
+const lockConfig = { ships: [], nuget: { tools: [L] } };
+const lockCheck = (baseConfig = lockConfig) => check(lockConfig, repo, restore(), ["src/App/App.csproj", L], process.env, { base: "HEAD", baseConfig });
+let both = lockCheck();
+ok(!both.failures.some(x => x.includes("two content hashes")) && both.reports.some(x => x.includes("A@1.0.0: named by two content hashes") && x.includes("held before this check read it")), "a lock file the base held as it stands, and listed, naming one version by two content hashes: reported, and passes", JSON.stringify(both));
+both = lockCheck({ ships: [], nuget: { tools: [] } });
+ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file, which the pull request lists in the config for the first time: it fails, the pull request having brought it into play", JSON.stringify(both));
+inRepo(L, `${twoLock}\n`);
+both = lockCheck();
+ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file changed by the pull request: it fails", JSON.stringify(both));
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);

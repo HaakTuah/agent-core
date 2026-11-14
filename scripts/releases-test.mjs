@@ -34,7 +34,9 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "releases-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 // (git's own variables that point at a repository are left out, so every call lands in the scratch one)
 for (const name of Object.keys(process.env)) if (elsewhere.test(name)) delete process.env[name];
-Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
+// (and git finds no bare repository by itself, as Git 3.0 has it by default: the scripts name each one they make)
+Object.assign(process.env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "safe.bareRepository", GIT_CONFIG_VALUE_0: "explicit" });
 // (the test's own calls never take a variable that points elsewhere, even while one is set to try the scripts)
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([name]) => !elsewhere.test(name))), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const core = path.join(tmp, "core");
@@ -82,7 +84,7 @@ git(core, "tag", "-a", "-m", "a tag of a tag", "release-5", "inner");
 git(core, "tag", "release-6", c1); // (numbered newest, on main's oldest commit: a mistake)
 dir = fetched();
 const five = releasesIn(dir)[0];
-ok(five.name === "release-5" && five.sha === c4 && git(dir, "cat-file", "-t", five.sha) === "commit", "a release made as a tag of a tag is the commit it leads to, never a tag", JSON.stringify(five));
+ok(five.name === "release-5" && five.sha === c4 && git(dir, `--git-dir=${dir}`, "cat-file", "-t", five.sha) === "commit", "a release made as a tag of a tag is the commit it leads to, never a tag", JSON.stringify(five));
 ok(!releasesIn(dir).some(r => r.name === "release-6") && namedReleases(dir).at(-1).name === "release-6" && newestRelease(c1, dir).name === "release-5", "a tag numbered newest on an older commit is no release: the newest by number is the newest in main's history");
 ok(next(dir) === null, "with the newest release on main's newest commit there is nothing to release");
 commit(`${head}- **First.** Done when one.\n- **Second.** Done when two.\n- **Third.** Done when three.\n`);

@@ -5,7 +5,9 @@
 // For the tests of a sync or of a core workflow (pure-sync-test.mjs, core-yml-test.mjs): the environment they run git
 // and a workflow's steps in, reaching their scratch core through the core's own address (a git rewrite), with the
 // runner's git settings, credentials and GitHub variables left out and no transport but local files, so no call reaches
-// the network or the real core; and the stand-in for actions/checkout they hand workflow-run.mjs. Tests only: no project
+// the network or the real core, and with git finding no bare repository by itself (safe.bareRepository=explicit, Git
+// 3.0's default), so a script that makes one must name it (releases.mjs); and the stand-in for actions/checkout they
+// hand workflow-run.mjs. Tests only: no project
 // and no workflow of the core's uses it. Git and Node's own modules only.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -49,7 +51,8 @@ export function scratchEnv(theCore, tmp) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
   return Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid",
     GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_ALLOW_PROTOCOL: "file",
-    GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git` });
+    GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git`,
+    GIT_CONFIG_KEY_2: "safe.bareRepository", GIT_CONFIG_VALUE_2: "explicit" });
 }
 
 /** The stand-in for actions/checkout: the job's own checkout is the workspace the test made; any other repository is

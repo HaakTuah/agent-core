@@ -17,29 +17,32 @@
 // disable, a skip, a linter's or scanner's name) must stand word for word beside the same line as before, and the note
 // beside an action's version (`uses:`) must stand. It reads YAML as GitHub's parser does where it reads it at all, and
 // refuses, rather than guess, every line it cannot read for sure: a tab, a carriage return or another control character
-// or line break; a value that runs on to the next line (a quoted or plain one, or one in [ ] or { }); a quote or #
-// inside [ ] or { }; an anchor, alias, tag, explicit key or document marker. A line inside a block scalar (`run: |`) is
-// text, a # line too, and changes nothing only where it is unchanged. Of the files outside what it reads, it refuses
-// those that run by themselves or decide what does (RUNS_TOO below) and lists the rest: it exits 0 where there are
-// none, 1 where it refuses, and 2 where others changed, which the session's "Security review:" comment says of, file by
-// file, why each runs neither by itself nor with credentials (modules/reviews.md, point 3). It prints the head it
-// checked, for that comment and the merge. Git and Node's own modules only; it changes nothing.
+// or line break, a byte order mark, a character YAML refuses; a value that runs on to the next line (a quoted or plain
+// one, or one in [ ] or { }); a quote or # inside [ ] or { }; an anchor, alias, tag, explicit key or document marker. A
+// line inside a block scalar (`run: |`) is text, a # line too, and changes nothing only where it is unchanged. Of the
+// files outside what it reads, it refuses those that run by themselves or decide what does (RUNS_TOO below) and lists
+// the rest: it exits 0 where there are none, 1 where it refuses, and 2 where others changed, which the session's
+// "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
+// (modules/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git and Node's own
+// modules only; it changes nothing.
 import { execFileSync } from "node:child_process";
 import { started } from "./started.mjs";
 
 export const RUNS = /(?:^|\/)(?:\.(?:github|claude)(?:\/|$)|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
 const YAML = /\.ya?ml$/iu;
-// what YAML 1.1 or 1.2 reads as a line break besides \n, a tab, a byte order mark, and every other control character
-const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff]/u;
+// what YAML 1.1 or 1.2 reads as a line break besides \n, a tab, a byte order mark, every other control character, and
+// the two characters YAML refuses in a file (U+FFFE and U+FFFF), which would stop the whole file being read
+const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff\ufffe\uffff]/u;
 const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scalar's header, with its comment if any
 // what else runs by itself or decides what does, refused outright: Claude Code's servers; an editor's, a container's or
-// a shell's setup and git's hooks; npm's and .NET's packages, tools, configs and builds (MSBuild runs a project's
-// targets) and the Node or SDK they pick; a task runner's file; the copy of the core; git's own attributes and
-// submodules; a container's build; and a name with "~" and a digit, which Windows can read as another folder's short
-// name (CLAUDE~1 for .claude)
-export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|Dockerfile[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:csproj|fsproj|vbproj|props|targets))$|(?:^|\/)\.(?:vscode|devcontainer|husky)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
+// a shell's setup and git's hooks; npm's, pnpm's, yarn's and .NET's packages, tools, configs, hooks and builds (MSBuild
+// runs a project's targets, and reads by itself a project's .user file and a folder's Directory.Build.rsp) and the
+// Node or SDK they pick; a task runner's file; the copy of the core; git's own attributes and submodules; a
+// container's build; and a name with "~" and a digit, which Windows can read as another folder's short name (CLAUDE~1
+// for .claude). It is asked first: a file of the copy of the core is refused even where it is one this proof reads.
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|(?:[^/]*\.)?(?:Dockerfile|Containerfile)[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:(?:cs|fs|vb)?proj(?:\.user)?|projitems|shproj|props|targets)|Directory\.Build\.rsp|\.pnpmfile\.cjs)$|(?:^|\/)\.(?:vscode|devcontainer|husky|yarn\/releases)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
-const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
+const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|lgtm|nosonar|ggignore|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string
 const NOT_TEXT = /^(?:~|null|true|false|yes|no|on|off|y|n)$/iu;
 
@@ -106,7 +109,7 @@ function after(rest, at, end, kind) {
 export function readYaml(text) {
   const unread = [], lines = [], comments = [];
   const bad = UNREAD.exec(text);
-  if (bad) return { lines, comments, unread: [`line ${text.slice(0, bad.index).split("\n").length}: a tab, carriage return, byte order mark, or another control character or line break`] };
+  if (bad) return { lines, comments, unread: [`line ${text.slice(0, bad.index).split("\n").length}: a tab, carriage return, byte order mark, another control character or line break, or a character YAML refuses`] };
   const raw = text.split("\n");
   let block = null; // in a block scalar: { from, at }, the line that opened it and, once read, its content's indentation
   for (let i = 0; i < raw.length; i++) {
@@ -199,7 +202,9 @@ export function proof(before, after) {
     if (left.get(key)) { left.set(key, left.get(key) - 1); continue; }
     return { why: `a comment a tool may read as an instruction, added or moved: ${c.text.slice(0, 80)}` };
   }
-  const note = a.lines.findIndex((l, i) => l.key === "uses" && l.note !== b.lines[i].note);
+  // (the key however it is written: quoted, or with an escape that could spell it, is taken for one)
+  const uses = key => typeof key === "string" && (/^(["']?)uses\1$/u.test(key) || (key.startsWith('"') && key.includes("\\")));
+  const note = a.lines.findIndex((l, i) => uses(l.key) && l.note !== b.lines[i].note);
   if (note >= 0) return { why: `the note beside an action's version changed (before line ${a.lines[note].n}, after line ${b.lines[note].n})` };
   return { same: true };
 }
@@ -224,21 +229,24 @@ if (started(import.meta.url)) {
       process.exit(1);
     }
   }
-  const fields = git(["-c", "core.quotePath=false", "diff", "--raw", "-z", "--no-renames", "--no-abbrev", "--no-ext-diff", "--ignore-submodules=none", base, head]).split("\0");
+  // (the whole tree, from whatever folder it is run in, whatever git's diff.relative says)
+  const fields = git(["-c", "core.quotePath=false", "diff", "--raw", "-z", "--no-relative", "--no-renames", "--no-abbrev", "--no-ext-diff", "--ignore-submodules=none", base, head]).split("\0");
   const fails = [], read = [], others = [];
   // a link or a submodule where this proof reads, on either side: what it points to is not read
   for (const commit of [base, head]) {
     for (const entry of git(["ls-tree", "-r", "-z", "--full-tree", commit]).split("\0")) {
-      const [meta, file] = entry.split("\t");
+      const tab = entry.indexOf("\t"), meta = entry.slice(0, tab), file = tab < 0 ? "" : entry.slice(tab + 1); // (a path may hold a tab)
       if (file && RUNS.test(file) && /^1[26]0000 /u.test(meta)) fails.push(`${file}: a link or submodule, at ${commit.slice(0, 7)}`);
     }
   }
-  const utf8 = new TextDecoder("utf-8", { fatal: true });
+  // (a byte order mark at the start is kept, to be refused as one anywhere else is, never dropped unseen)
+  const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   const blob = sha => utf8.decode(git(["cat-file", "blob", sha], "buffer"));
   for (let i = 0; i + 1 < fields.length; i += 2) {
     const [modeA, modeB, shaA, shaB, status] = fields[i].replace(/^:/u, "").split(" ");
     const file = fields[i + 1];
-    if (!RUNS.test(file)) { if (RUNS_TOO.test(file)) fails.push(`${file}: a file that runs by itself or decides what does`); else others.push(file); continue; }
+    if (RUNS_TOO.test(file)) { fails.push(`${file}: a file that runs by itself or decides what does`); continue; }
+    if (!RUNS.test(file)) { others.push(file); continue; }
     if (status !== "M" || modeA !== modeB || !["100644", "100755"].includes(modeA)) { fails.push(`${file}: added, deleted, or its mode or kind changed`); continue; }
     if (!YAML.test(file)) { fails.push(`${file}: not a YAML file`); continue; }
     let result;

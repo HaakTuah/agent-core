@@ -1,10 +1,13 @@
 // Checks the personal-terms check (floor rule 11; .github/workflows/personal-terms.yml): its own job, run as GitHub
 // runs it (workflow-run.mjs, beside this file), on scratch pull requests, each checked out as GitHub checks one out: its
 // merge into its base. What fails: a term in a file, in a line a commit adds and a later one takes away, in a line a
-// merge's own resolution adds, in a file's name (an empty file, a rename, a binary file, a name outside plain ASCII),
-// in a commit's message, author or committer (name or address), in a private repository too, its failure saying how
-// to mend it, and in the title or description; a commit dated before the rule too, since a date is whatever its maker
-// writes. What passes: none of these; a term only in a file git reads as binary (not read); a file on main named with
+// merge's own resolution adds (an octopus merge's too), in a file's name (an empty file, a rename, a binary file, a
+// name outside plain ASCII; never printed, in whatever case, where the file's content holds one too), in a commit's
+// message, author or committer (name or address), in a private repository too, its failure saying how to mend it, and
+// in the title, description or branch name; a file of text a .gitattributes marks binary, main's own too; a term listed
+// with blanks or a Windows line end around it; a commit dated before the rule too, since a date is whatever its maker
+// writes; each failure saying how the session takes the term out.
+// What passes: none of these; a term only in a file whose content is binary (not read); a file on main named with
 // a term before the rule, deleted or renamed away; only in the
 // author of a commit GitHub itself made (floor rule 11's exception: a merge or an edit on github.com, under a profile
 // GitHub wrote on a merge of main's, not one through its API under an author its caller named), committed as GitHub and
@@ -85,16 +88,17 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile, isPrivate = false, opener = null } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
-  const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
+  const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
   const base = { ...env, ...ME, STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
-const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && ![term, other, wide].some(t => r.out.includes(t)), `${what} fails, and the term is never printed`, r.out); };
+// (never printed in any case: GitHub's masking of the secret matches its case exactly)
+const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
 const passes = (what, repo, opts) => { const r = check(repo, opts); ok(r.passed, `${what} passes`, r.out); };
 
 passes("a pull request with no term anywhere", pull([[{ "b.md": "plain words\n" }]]));
@@ -182,7 +186,35 @@ const resolved = pull([[{ "a.md": "one\nmine\nthree\n" }], [dir => {
 fails("a term in a line a merge's own resolution adds, taken out again later", resolved);
 fails("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` });
 fails("a term in the description", pull([[{ "b.md": "x\n" }]]), { body: `Words.\n\n${term}` });
-passes("a term only in a file git reads as binary (not read: the check's header says so)", pull([[{ "a.bin": `\u0000${term}\u0000` }]]));
+fails("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}-notes` });
+passes("a term only in a file whose content is binary (not read: the check's header says so)", pull([[{ "a.bin": `\u0000${term}\u0000` }]]));
+// a .gitattributes of the pull request's own that marks text binary hides nothing: the check reads no attributes
+fails("a term in a file of text a .gitattributes marks -diff", pull([[{ ".gitattributes": "*.md -diff\n", "b.md": `x ${term} y\n` }]]));
+fails("a term in a line added to a file of text a .gitattributes marks binary, taken out again", pull([[{ ".gitattributes": "*.svg binary\n", "p.svg": `<svg><title>${other}</title></svg>\n` }], [{ "p.svg": "<svg></svg>\n" }]]));
+// the list as an owner may paste it: a Windows line end after each term, blanks around one
+fails("a term listed with a Windows line end, in a message, an added line taken out again and the title", pull([[{ "b.md": `x ${term} y\n` }, {}, `msg ${term}`], [{ "b.md": "gone\n" }]]), { terms: `${term}\r\n${other}\r\n`, title: `About ${term}` });
+fails("a term listed with blanks around it", pull([[{ "b.md": `${term} starts this line\n` }]]), { terms: ` ${term} \n` });
+// a file whose name and content both hold a term: its line is said, never its name, in whatever case it is written
+fails("a term in a file's content and in its name, in capitals", pull([[{ [`notes-${term.toUpperCase()}.md`]: `x ${term}\n` }]]));
+if (process.platform !== "win32") fails("a term in a file's content and in its name, the name holding a colon", pull([[{ [`x:notes-${term}.md`]: `x ${term}\n` }]]));
+// an octopus merge, which git's remerge-diff skips: the lines in none of its parents are read
+const octopus = pull([[{ "b.md": "x\n" }], [dir => {
+  for (const side of ["o1", "o2"]) { git(dir, ["checkout", "-q", "-b", side, "main"]); commitAll(dir, [{ [`${side}.md`]: "s\n" }]); }
+  git(dir, ["checkout", "-q", "change"]);
+  git(dir, ["merge", "-q", "--no-edit", "o1", "o2"]);
+  fs.writeFileSync(path.join(dir, "a.md"), `one\n${term}\nthree\n`);
+  git(dir, ["add", "a.md"]);
+  git(dir, ["commit", "-q", "--amend", "--no-edit"]);
+}], [{ "a.md": "one\ntwo\nthree\n" }]]);
+fails("a term in a line an octopus merge adds of its own, taken out again later", octopus);
+// what a project held before the check read more fails too, a listed term being the one exception to reporting it, and
+// each failure says how the session takes the term out (core archive 207)
+const mended = (what, repo, opts, words) => { const r = check(repo, opts); ok(!r.passed && r.out.includes(words) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what}: it fails, saying how to take the term out`, r.out); };
+mended("a term main already held, in a file of text a .gitattributes marks binary, which the check reads only now", pull([[{ "b.md": "x\n" }]], [[{ ".gitattributes": "*.svg binary\n", "logo.svg": `<svg><title>${term}</title></svg>\n` }]]), {}, "edit each of those lines");
+mended("a term added in one commit and taken out in the next", pull([[{ "b.md": `${term}\n` }], [{ "b.md": "gone\n" }]]), {}, "To take it out of those commits");
+mended("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), {}, "git rebase -i origin/main");
+mended("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` }, "edit the title or the description");
+mended("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}` }, "pushing its work to a branch of another name");
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });

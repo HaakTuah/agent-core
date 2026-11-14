@@ -28,6 +28,7 @@ const sample = line({ answers: 1234, sum: { input_tokens: 7, cache_creation_inpu
 ok(JSON.stringify(reading(`The change.\n\n${sample}\n\nmore`)) === JSON.stringify({ answers: 1234, input: 7, written: 2000000, read: 30000000, out: 456789 }), "the line session-cost.mjs prints is read back, count for count", sample);
 ok(reading("no line here") === null && reading(`> ${sample}`) === null && reading(null) === null, "a description without the line at a line's start gives none");
 ok(sessionOf("x\nhttps://claude.ai/code/session_01AbC\n") === "session_01AbC" && sessionOf("nothing") === "", "the session is the one the description's link names");
+ok(sessionOf("Follows https://claude.ai/code/session_01Old.\n\nhttps://claude.ai/code/session_01New\n") === "session_01New", "a description that cites another session's link above its own is its own session's");
 
 const r = (answers, out) => ({ answers, input: 1, written: answers * 10, read: answers * 100, out });
 const took = priced([

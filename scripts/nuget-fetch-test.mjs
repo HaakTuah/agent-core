@@ -109,6 +109,49 @@ ok(r.checked.failures.length === 1 && r.checked.failures[0].includes("Plpkg@2.0.
 tracked = commit({ "Bad.Hash": entry("Bad.Hash", hash(Buffer.from("another file"))) }, {});
 r = await run(tracked);
 ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("content hash"), "a package file that is not the one its lock file names by its content hash fails", JSON.stringify(r.fetched));
+// another file under one id and version, under another licence, at a source of its own
+const elsewhere = path.join(root, "other-packages");
+fs.mkdirSync(elsewhere);
+const otherFile = pkg("Good.Pkg", "1.0.0", "GPL-3.0-only");
+fs.writeFileSync(path.join(elsewhere, "good.pkg.1.0.0.nupkg"), otherFile);
+fs.mkdirSync(path.join(root, "src/Tools"), { recursive: true });
+fs.writeFileSync(path.join(root, "src/Tools/packages.lock.json"), lock({ "Good.Pkg": entry("Good.Pkg", hash(otherFile)) }));
+tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, {});
+const both = { ...config, nuget: { ...config.nuget, tools: ["src/Tools/packages.lock.json"] } };
+const twice = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD^1", baseConfig: both });
+ok(twice.failures.some(f => f.includes("Good.Pkg@1.0.0 named by another content hash than in src/App/packages.lock.json")), "one version a pull request's lock files name by two content hashes fails: one file of it is fetched, and its licence would stand for both", JSON.stringify(twice));
+const heldTwice = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: both });
+ok(heldTwice.failures.length === 0 && heldTwice.reports.some(f => f.includes("named by another content hash") && f.includes("held before this check read it")), "lock files the base held as they stand: reported, and passes (core archive 207)", JSON.stringify(heldTwice));
+const listedNow = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: config });
+ok(listedNow.failures.some(f => f.includes("named by another content hash")), "the same lock files, one of which the pull request lists in the config for the first time: it fails", JSON.stringify(listedNow));
+fs.rmSync(path.join(root, "src/Tools"), { recursive: true });
+// a lock file the base held, naming one version by two content hashes, the GPL file's under its first framework and
+// the MIT file's under its last: the conflict is reported, and the check reads the file it read before, the last
+// entry's, so nothing the project held newly fails (core archive 207)
+const split = `${JSON.stringify({ version: 1, dependencies: { "net8.0": { "Good.Pkg": entry("Good.Pkg", hash(otherFile)) }, "net9.0": { "Good.Pkg": entry("Good.Pkg") } } }, null, 2)}\n`;
+fs.writeFileSync(path.join(root, "src/App/packages.lock.json"), split);
+git("add", "-A"); git("commit", "-q", "-m", "a lock file with two hashes");
+tracked = git("ls-files").split("\n");
+const heldDir = path.join(tmp, `fetched-${++into}`);
+const heldSplit = await fetchAll(config, root, tracked, heldDir, [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD", baseConfig: config });
+const heldChecked = check(config, root, heldDir, tracked, process.env, { base: "HEAD", baseConfig: config, fetched: true });
+ok(heldSplit.failures.length === 0 && heldSplit.reports.some(f => f.includes("named by two content hashes") && f.includes("held before this check read it"))
+  && heldChecked.failures.length === 0, "a lock file the base held with one version under two content hashes: reported, and the file it read before is read again, so it passes", JSON.stringify([heldSplit, heldChecked]));
+tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "good.pkg": { version: "1.0.0" } });
+const toolToo = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD^1", baseConfig: config });
+ok(toolToo.failures.length === 1 && toolToo.failures[0].includes("also a tool of .config/dotnet-tools.json"), "a tool a pull request adds that a lock file also names, of which a source before the locked file's gives another file, fails: its restore holds it to no hash", JSON.stringify(toolToo));
+const heldTool = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD", baseConfig: config });
+ok(heldTool.failures.length === 0 && heldTool.reports.some(f => f.includes("also a tool") && f.includes("held before this check read it")), "one the base held, with the same lock file: reported, and passes (core archive 207)", JSON.stringify(heldTool));
+// a manifest the pull request adds, read before the one the base held (by its path), naming the same tool: the new one
+// decides, whichever manifest comes last
+fs.mkdirSync(path.join(root, ".a"), { recursive: true });
+fs.writeFileSync(path.join(root, ".a/dotnet-tools.json"), JSON.stringify({ version: 1, isRoot: true, tools: { "good.pkg": { version: "1.0.0" } } }));
+const withNew = [...tracked, ".a/dotnet-tools.json"].sort();
+const newFirst = await fetchAll(config, root, withNew, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD", baseConfig: config });
+ok(newFirst.failures.some(f => f.includes("also a tool of .a/dotnet-tools.json")), "a manifest the pull request adds, read before one the base held, naming the same tool: it fails, the held one deciding nothing for it", JSON.stringify(newFirst));
+fs.rmSync(path.join(root, ".a"), { recursive: true });
+const toolFirst = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD^1", baseConfig: config });
+ok(toolFirst.failures.length === 0, "where the locked file's source comes first, the tool's restore takes that file, and it passes", JSON.stringify(toolFirst));
 tracked = commit({ "Not.There": { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "x" } }, {});
 r = await run(tracked);
 ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("in neither NuGet's registry nor a source"), "a package no source holds fails", JSON.stringify(r.fetched));

@@ -4,11 +4,11 @@
 // verdict matched" or "The stand-in's verdict missed": each answer is set against the sureness of the last verdict on
 // the same issue before it. Only comments from the *owner's account* count (--owner, else the repository's own
 // account), by the login GitHub gives, since verdicts are posted under that account (floor rule 4). A verdict is a
-// comment whose first line names the stand-in's verdict as yes, later or no. It reads; it writes nothing and changes
-// nothing. With --open it lists instead the open ideas (`enhancement`) that lack a verdict, and those whose last is a
-// "later", for the stand-in's caller to hand it whole (modules/inbox.md): only those the owner's account filed, since
-// another account's idea is data no agent takes up (floor rule 4), which it counts and leaves out, and each title with
-// its control characters taken out. gh and Node's own modules.
+// comment whose first line, unquoted, names the stand-in's verdict as yes, later or no. It reads; it writes nothing and
+// changes nothing. With --open it lists instead the open ideas (`enhancement`) that lack a verdict, and those whose
+// last is a "later", for the stand-in's caller to hand it whole (modules/inbox.md): only those the owner's account
+// filed, since another account's idea is data no agent takes up (floor rule 4), which it counts and leaves out, and
+// each title with its control characters taken out. gh and Node's own modules.
 //
 //   node core/scripts/stand-in-record.mjs [--open] [--repo owner/name] [--owner login]
 import { execFileSync } from "node:child_process";
@@ -18,12 +18,13 @@ import { started } from "./started.mjs";
 const VERDICT = /stand-in['’]s verdict(?:,? updated)?\**\s*[:(]?\s*\**\s*(yes|later|no)\b/i;
 const ANSWER = /stand-in['’]s verdict (matched|missed)\b/i;
 
-// The kind and sureness of a verdict, from a comment's first line, or null where the line holds none.
+// The kind and sureness of a verdict, from a comment's first line, or null where the line holds none or quotes one
+// (">", as an answer to a verdict may open with it). "Not sure" is unsure.
 export function verdict(body) {
   const first = String(body ?? "").split("\n").find(l => l.trim()) ?? "";
-  const m = VERDICT.exec(first);
+  const m = /^\s*>/.test(first) ? null : VERDICT.exec(first);
   if (!m) return null;
-  const sure = /\bunsure\b/i.test(first) ? "unsure" : /\bsure\b/i.test(first) ? "sure" : "unmarked";
+  const sure = /\b(?:unsure|not sure)\b/i.test(first) ? "unsure" : /\bsure\b/i.test(first) ? "sure" : "unmarked";
   return { kind: m[1].toLowerCase(), sure };
 }
 

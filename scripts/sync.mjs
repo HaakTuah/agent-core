@@ -19,11 +19,11 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
-import { NOTES, asksBetween, followsOf, newestRelease, past, plainEnv } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past } from "./releases.mjs";
 
-const URL = `https://github.com/${CORE}`;
-// (git's own variables that point elsewhere are left out, so every call lands in the folder it names: releases.mjs)
-const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+// (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
+// git's own variables that point elsewhere left out: releases.mjs)
+const git = (args, tmp) => inBare(tmp, args).trim();
 class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
 
@@ -35,7 +35,7 @@ function sync(tmp) {
   const text = fs.readFileSync(manifest, "utf8");
   const old = text.match(lineRe)?.[1] ?? fail(`${manifest} has no "Core: ${CORE} at <full commit SHA>, copied whole under core/" line`);
 
-  git(["clone", "--quiet", "--bare", URL, tmp]);
+  fetchCore(tmp);
   const arg = process.argv[2];
   if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
   let pin = arg ?? (first ? old : null), release = "";
@@ -55,7 +55,7 @@ function sync(tmp) {
   fs.rmSync("core", { recursive: true, force: true });
   fs.mkdirSync("core");
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { input: execFileSync("git", ["archive", pin], { cwd: tmp, env: plainEnv(), maxBuffer: 1 << 28 }) });
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
 
   const moved = [];
@@ -90,7 +90,7 @@ function sync(tmp) {
       : `This sync asks nothing of the project beyond the copy (core/${NOTES}).`);
 }
 
-// The clone lives in a temporary folder, removed however the sync ends.
+// The core is fetched into a temporary folder, removed however the sync ends.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
 try {
   sync(tmp);

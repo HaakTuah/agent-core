@@ -98,6 +98,15 @@ ok(r.status === 2 && /task holds 1 commit\(s\) on no remote branch/.test(r.stder
 git(project, "push", "-q", "-u", "origin", "task");
 r = hook("stop", project);
 ok(r.status === 0, "pushed, the reply ends", `${r.status} ${r.stderr}`);
+git(project, "checkout", "-q", "--detach");
+r = hook("stop", project);
+ok(r.status === 0, "a detached HEAD at a pushed commit: the reply ends", `${r.status} ${r.stderr}`);
+fs.writeFileSync(path.join(project, "detached.txt"), "x\n");
+git(project, "add", "-A");
+git(project, "commit", "-q", "-m", "on a detached head");
+r = hook("stop", project);
+ok(r.status === 2 && /a detached HEAD holds 1 commit\(s\) on no remote branch/.test(r.stderr), "a commit on a detached HEAD, on no branch at all, keeps the reply from ending", `${r.status} ${r.stderr}`);
+git(project, "checkout", "-q", "task");
 // The working tree's copy is never the one that runs: an edit there changes nothing until it is merged into main.
 fs.writeFileSync(path.join(project, "core", "scripts", "work-saved.sh"), "exit 0\n");
 r = hook("stop", project);

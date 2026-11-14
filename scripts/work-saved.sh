@@ -29,6 +29,10 @@ if [ -n "$branch" ]; then
     alone=$(g rev-list --count HEAD --not --remotes 2>/dev/null || echo 0)
     [ "$alone" -gt 0 ] && issues+=("$branch holds $alone commit(s) on no remote branch: push it with -u")
   fi
+elif g rev-parse -q --verify HEAD >/dev/null 2>&1; then
+  # (a detached HEAD: a commit made there is on no branch at all, and goes with the machine unless one holds it)
+  alone=$(g rev-list --count HEAD --not --remotes 2>/dev/null || echo 0)
+  [ "$alone" -gt 0 ] && issues+=("a detached HEAD holds $alone commit(s) on no remote branch: put them on a branch (git switch -c <name>) and push it")
 fi
 stashes=$(g stash list 2>/dev/null | wc -l | tr -d ' ')
 [ "$stashes" -gt 0 ] && issues+=("$stashes stash(es): commit what they hold to a branch and push it, or drop them")

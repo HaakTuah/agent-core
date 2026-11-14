@@ -31,7 +31,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pure-sync-test-"));
 process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
 const slash = p => p.replace(/\\/g, "/");
-const theCore = path.join(tmp, "the-core");
+const theCore = path.join(tmp, "the-core"), coreRepo = path.join(theCore, ".git"); // (copy-tree.mjs takes the git folder)
 const env = scratchEnv(theCore, tmp);
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
@@ -76,7 +76,7 @@ git(p, "add", "-A");
 git(p, "commit", "-q", "-m", "base");
 git(p, "push", "-q", "origin", "main");
 const base = git(p, "rev-parse", "HEAD");
-ok(entries(git(p, "rev-parse", "HEAD:core"), p) === entries(copyTree(A, theCore), theCore), "  core/ is the core's tree at A, without the folder it keeps to itself");
+ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(copyTree(A, coreRepo), coreRepo), "  core/ is the core's tree at A, without the folder it keeps to itself");
 
 // ---- the sync ----
 git(p, "checkout", "-q", "-b", "sync");
@@ -88,7 +88,7 @@ ok(s.out.includes("a note for the test"), "  and prints the sync notes the core 
 git(p, "add", "-A");
 git(p, "commit", "-q", "-m", "sync");
 const LEGIT = git(p, "rev-parse", "HEAD");
-ok(entries(git(p, "rev-parse", "HEAD:core"), p) === entries(copyTree(B, theCore), theCore), "  core/ is now the core's tree at B");
+ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(copyTree(B, coreRepo), coreRepo), "  core/ is now the core's tree at B");
 
 // the proof, from the core at B, and the core's own check of the copy, as GitHub runs core.yml
 const pure = () => node(p, path.join(theCore, "scripts", "pure-sync.mjs"));

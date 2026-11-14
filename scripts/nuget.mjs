@@ -82,9 +82,20 @@ import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, t
 import { started } from "./started.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
+// Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
+// at `file`, its name's case aside, as MSBuild on Windows finds a project's .user file whatever the case. The folder
+// is read as a path, letter for letter (--literal-pathspecs): no name of it is taken for git's pathspec magic.
+function fileAt(root, rev, file) {
+  const dir = posix.dirname(file), name = posix.basename(file).toLowerCase();
+  let entries = "";
+  try { entries = execFileSync("git", ["--literal-pathspecs", "ls-tree", "-z", rev, ...(dir === "." ? [] : ["--", `${dir}/`])], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return false; }
+  return entries.split("\0").some((e) => /^100(?:644|755) blob [0-9a-f]+\t/u.test(e) && posix.basename(e.slice(e.indexOf("\t") + 1)).toLowerCase() === name);
+}
 const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
-const BUILD_FILE = /\.(?:cs|fs|vb)proj$|\.props$|\.targets$/iu; // where a project can name another lock file
+// where a project can name another lock file: a project file, a .props or .targets, and the .user file MSBuild imports
+// beside a project file by itself
+const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
 // an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
 // lists it
@@ -98,6 +109,12 @@ const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writ
 const key = (id, version) => `${id}@${version}`.toLowerCase();
 /** A JSON file's text without the byte-order mark dotnet reads past. */
 export const unmarked = (text) => (text.startsWith("\uFEFF") ? text.slice(1) : text);
+// what a lock entry that names a second content hash for a version is told: a restore keeps one file of each version
+export const twoHashes = "a restore keeps one file of each version, so one entry would fail its hash and the check would read the other's licence: restore again so that each names the one file (floor rule 15)";
+// what is said of something the check came to read only lately (a second content hash, a .user file, a tool a lock
+// file also names) where the project held it as it stands before: reported, and passes (the owner's word, core archive
+// 207: what a project held before a check read more is reported, not failed)
+export const heldBefore = "(held before this check read it: reported, and passes)";
 // what stands where a comment or a processing instruction was cut from a manifest, and where CDATA was: no XML holds either
 const CUT = "\u0000", CDATA = "\u0001";
 // XML's own declaration, as XML writes it: only at a manifest's start, after a byte-order mark if one stands there
@@ -170,14 +187,16 @@ export function sdkPacks(env = process.env, root = null) {
 
 /**
  * The packages one lock file installs, as { id, version }, and what is wrong with it as lines. A project's own
- * projects (type "Project") are no packages. What a project asks for itself must be the version installed.
+ * projects (type "Project") are no packages. What a project asks for itself must be the version installed, and one
+ * version of a package is one file: its entries (one for each framework) name one content hash, and where they name
+ * two, that is said apart (`split`), so a caller reports it where the lock file stands as the base held it.
  */
 export function lockPackages(text, lockPath) {
-  const failures = [], packages = new Map();
+  const failures = [], split = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(text); } catch { return { packages: [], failures: [`${lockPath} is not JSON`] }; }
+  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON`], split }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
-    return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies")`] };
+    return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies")`], split };
   }
   for (const [framework, entries] of Object.entries(lock.dependencies)) {
     if (!entries || typeof entries !== "object" || Array.isArray(entries)) { failures.push(`${lockPath}, ${framework}: not a list of packages`); continue; }
@@ -191,10 +210,13 @@ export function lockPackages(text, lockPath) {
       if (entry.type !== "Transitive" && ![`[${resolved}, )`, `[${resolved}]`, `[${resolved}, ${resolved}]`].includes(requested)) {
         failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}: ask for one exact version, the one installed (floor rule 7)`);
       }
+      const was = packages.get(key(id, resolved));
+      // (the last entry is kept, as before this was said, so the file read is the one read then)
+      if (was && was.contentHash !== contentHash) split.push(`${at}@${resolved}: named by two content hashes: ${twoHashes}`);
       packages.set(key(id, resolved), { id, version: resolved, contentHash });
     }
   }
-  return { packages: [...packages.values()], failures: failures.map(shown) };
+  return { packages: [...packages.values()], failures: failures.map(shown), split: split.map(shown) };
 }
 
 /**
@@ -298,12 +320,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // read, as licences.mjs reads it, it is reported and passes too)
   // (where the base held no config at this one's path, or one this cannot read, nothing shipped there, and no tool is
   // the base's; nor is one where the pull request changed the sources it may come from)
-  let shippedThen = [], sameSources = !base;
+  let shippedThen = [], listedThen = [], sameSources = !base;
   try {
     if (baseConfig) {
       // (letter for letter: a folder's name, or an address's path, in another case may be another source)
       const then = nugetConfig(baseConfig), list = (l) => [...l].sort().join("\n");
-      shippedThen = then.ships;
+      shippedThen = then.ships; listedThen = [...then.ships, ...then.tools];
       sameSources = sameSources || list(then.sources) === list(sources);
     }
   } catch { /* (nothing shipped there) */ }
@@ -324,9 +346,13 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of own.filter((f) => BUILD_FILE.test(f))) {
     let text = "";
     try { text = readFileSync(join(root, f), "utf8"); } catch { /* (a file git knows and the folder lacks holds nothing) */ }
-    if (/NuGetLockFilePath/iu.test(text)) failures.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read`);
-    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) failures.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read`);
-    if (/TreatAsLocalProperty/iu.test(text)) failures.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them`);
+    // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
+    // what it names is reported; one a pull request brings into play with a project file of its own is not held)
+    const held = /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
+    const [to, tail] = held ? [reports, ` ${heldBefore}`] : [failures, ""];
+    if (/NuGetLockFilePath/iu.test(text)) to.push(`${f} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
+    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${f} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
+    if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
   }
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
@@ -354,12 +380,21 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
 
   const packages = new Map(); // by id@version, lower case: { id, version, shipped, lock }
+  // (a lock file as the base held it, and listed by the base's config, so this check read it there: two content hashes
+  // it already named are reported; one a pull request lists for the first time is not held)
+  const asBase = (f, text) => !base || (listedThen.includes(f) && textAt(root, base, f) === text);
   for (const f of listed.filter((l) => locks.has(l))) {
-    const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
+    const text = readFileSync(join(root, f), "utf8"), read = lockPackages(text, f);
     failures.push(...read.failures);
+    if (asBase(f, text)) reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
-      const k = key(p.id, p.version), shipped = ships.includes(f);
-      if (!packages.has(k) || (shipped && !packages.get(k).shipped)) packages.set(k, { ...p, shipped, lock: f });
+      const k = key(p.id, p.version), shipped = ships.includes(f), was = packages.get(k);
+      // (the entry kept is the one kept before this was said, so the file read is the one read then)
+      if (was && was.contentHash !== p.contentHash) {
+        const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
+        if (asBase(f, text) && asBase(was.lock, readFileSync(join(root, was.lock), "utf8"))) reports.push(`${x} ${heldBefore}`); else failures.push(x);
+      }
+      if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
     }
   }
   // the tools a manifest of dotnet's names, read before the restore alone (no restore brings them), each held to the

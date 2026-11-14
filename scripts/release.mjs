@@ -20,7 +20,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { NOTES, RELEASE, asksBetween, fetchCore, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
 
 const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -32,7 +32,7 @@ const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), enc
 // would be no release's name any more, and where `at` is given and main's newest commit is another: main has moved
 // on since whoever asks looked at it.
 export function next(dir, at = null) {
-  const tip = git(["rev-parse", "refs/heads/main"], dir);
+  const tip = inBare(dir, ["rev-parse", "refs/heads/main"]).trim();
   if (at !== null && at !== tip) throw new Error(`main's newest commit is ${tip}, not ${at}: main has moved on, so start the release again`);
   const [before] = releasesIn(dir);
   if (before?.sha === tip) return null;
@@ -106,7 +106,7 @@ function main(argv) {
     const reasons = held(list);
     if (reasons.length) return fail(`${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}`);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
-    git(["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`], dir);
+    inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);
     console.log(`${name} is cut.`);
   } catch (e) {
     fail(e.stderr?.toString().trim() || e.message);

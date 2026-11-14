@@ -18,8 +18,13 @@ export const NOTES = "setup/sync-notes.md";
 // and nowhere else.
 export const elsewhere = /^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|COMMON_DIR|NAMESPACE)$/i;
 export const plainEnv = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !elsewhere.test(name)));
-const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const holds = (args, cwd) => { try { git(args, cwd); return true; } catch { return false; } };
+// Git in the bare repository at `dir`, which every call names outright (--git-dir), never finding it from the folder it
+// runs in: git refuses that where its safe.bareRepository is `explicit`, as Git 3.0 makes it by default. Each script
+// that makes such a repository (fetchCore, sync.mjs, pure-sync.mjs, release.mjs) reaches it through this alone.
+export const inBare = (dir, args, options = {}) =>
+  execFileSync("git", [`--git-dir=${dir}`, ...args], { cwd: dir, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...options });
+const git = (args, dir) => inBare(dir, args).trim();
+const holds = (args, dir) => { try { git(args, dir); return true; } catch { return false; } };
 
 // The manifest's *owner's account* (core.yml checks the row's form), or null where it has no one such row.
 export function ownerOf(manifest) {

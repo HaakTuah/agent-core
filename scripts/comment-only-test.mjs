@@ -1,13 +1,14 @@
 // Tests of the proof that a change to what runs by itself is only comments and steps' names (comment-only.mjs; floor
-// rule 3): first its reading of two versions of a workflow, against each way a change can hide where a comment seems
-// to be (a block scalar's # lines, a heredoc's, a quoted or plain value that runs on, [ ] or { }, an input, a matrix
+// rule 3): first its reading of two versions of a workflow, against each way a change can hide where a comment seems to
+// be (a block scalar's # lines, a heredoc's, a quoted or plain value that runs on, [ ] or { }, an input, a matrix
 // entry, a job or the workflow named `name`, an expression in a step's name, a composite action's steps, every
 // character YAML reads as a line break or this proof does not read); then each workflow of this repository, a comment
 // and a step's name changed in it where it reads; then the script run end to end, as its builder runs it, on a pull
 // request's branch in a scratch clone: what it reads under .github/ and .claude/ (any case, any depth) and a project's
-// own action.yml, a file added,
-// deleted or its mode changed, a file not YAML, text not UTF-8, the working tree left unread, and a later commit read
-// against the one reviewed. On Linux and on Windows. Git and Node's own modules only.
+// own action.yml, a file added, deleted or its mode changed, a file not YAML, text not UTF-8 or opening with a byte
+// order mark, the copy of the core, a link whose path holds a tab, the script run from a folder below the root, the
+// working tree left unread, and a later commit read against the one reviewed. On Linux and on Windows. Git and Node's
+// own modules only.
 //
 //   node scripts/comment-only-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -77,6 +78,9 @@ fails(edit("      - name: The check", "      # zizmor: ignore[template-injection
 passes(edit("# the kinds", "# the kinds"), "a silencing comment taken out", edit("# the kinds", "# codeql[actions/x] the kinds"));
 fails(edit("# the kinds", "# nosemgrep"), "a semgrep marker", "instruction");
 fails(edit("# the kinds", "# checkov:skip=CKV_GHA_7"), "a checkov marker", "instruction");
+for (const [marker, whose] of [["# lgtm[js/unsafe-shell]", "CodeQL's older"], ["# NOSONAR", "SonarQube's"], ["# ggignore", "GitGuardian's"]]) fails(edit("# the kinds", marker), `${whose} marker`, "instruction");
+const quotedUses = edit("- uses: actions", '- "uses": actions');
+fails(edit("# v7.0.1", "# v7.0.2", quotedUses), "the note beside an action's version under a quoted key", "the note beside an action's version", quotedUses);
 const two = "jobs:\n  a:\n    steps:\n      # codeql[actions/x]\n      - run: echo \"${{ github.event.issue.title }}\" # zizmor: ignore[template-injection]\n      - run: echo \"${{ github.event.pull_request.title }}\"\n";
 passes(two, "silencing comments where they stood", two);
 fails(two.replace(" # zizmor: ignore[template-injection]\n", "\n").replace("pull_request.title }}\"\n", "pull_request.title }}\" # zizmor: ignore[template-injection]\n"), "a silencing comment moved to another line", "added or moved", two);
@@ -145,7 +149,7 @@ unread(edit("  contents: read", "  ? contents\n  : read"), "an explicit key", "e
 unread(`---\n${BASE}`, "a document marker", "document marker");
 unread(edit("  contents: read", "  contents: read: write"), "two keys on one line", "two keys");
 unread(edit("          echo folded", "          echo folded\n        # less indented\n          echo after"), "text after a less indented comment in a block", "a line of its own");
-for (const [ch, name] of [["\t", "a tab"], ["\r", "a carriage return"], ["\u2028", "a line separator"], ["\u2029", "a paragraph separator"], ["\u0085", "a next line"], ["\ufeff", "a byte order mark"], ["\u0000", "a null"]]) {
+for (const [ch, name] of [["\t", "a tab"], ["\r", "a carriage return"], ["\u2028", "a line separator"], ["\u2029", "a paragraph separator"], ["\u0085", "a next line"], ["\ufeff", "a byte order mark"], ["\u0000", "a null"], ["\uffff", "a character YAML refuses in a file"]]) {
   unread(edit("# A workflow for the test", `# A workflow ${ch}for the test`), `${name}, even in a comment`, "control character");
 }
 const fixed = "jobs:\n  a:\n    steps:\n      - run: |2\n          # text\n        echo\n";
@@ -170,7 +174,8 @@ ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", ".claude", "sub/.g
   && !["github/x.yml", "x.github/y", "my-action.yml", "action.yml.md"].some(f => RUNS.test(f)), "what it reads: .github/ and .claude/, the folders themselves too, at any depth and in any case, and every action.yml");
 ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules",
   "Directory.Build.targets", "src/App.csproj", "Directory.Packages.props", "NuGet.Config", "global.json", ".config/dotnet-tools.json", "src/packages.lock.json",
-  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc", "Makefile", "GNUmakefile", "justfile", "Taskfile.yml", ".tool-versions", "mise.toml", ".mise.toml"].every(f => RUNS_TOO.test(f))
+  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc", "Makefile", "GNUmakefile", "justfile", "Taskfile.yml", ".tool-versions", "mise.toml", ".mise.toml",
+  "src/App.csproj.user", "Directory.Build.rsp", "build/All.proj", "src/Shared.projitems", "src/Shared.shproj", ".pnpmfile.cjs", ".yarn/releases/yarn-4.0.0.cjs", "app.Dockerfile", "Containerfile", "core/.github/workflows/x.yml"].every(f => RUNS_TOO.test(f))
   && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, a task runner's file, the copy of the core");
 
 // ---- the script end to end, on a pull request's branch ----
@@ -291,6 +296,30 @@ r = run(linkedFolder);
 ok(r.status === 1 && r.out.includes("NOT ALONE sub/.claude: a link or submodule"), "a link that is itself named .claude: refused", r.out);
 r = run("HEAD");
 ok(r.status === 1 && r.out.includes("is no commit before the head"), "the head given as the commit reviewed: refused, nothing being read", r.out);
+
+// a byte order mark added at the very start: refused as one anywhere else is
+branch("bom", () => write(work, WF, `\ufeff${BASE}`));
+r = run();
+ok(r.status === 1 && r.out.includes(`NOT ALONE ${WF}`) && r.out.includes("byte order mark"), "a byte order mark added before the first line: refused", r.out);
+// run from a folder below the root where git's diff.relative is set: the whole tree is read all the same
+branch("relative", () => write(work, WF, edit("echo hi", "echo bye")));
+const below = spawnSync(process.execPath, [script], { cwd: path.join(work, "tools"), env: { ...env, GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_1: "diff.relative", GIT_CONFIG_VALUE_1: "true" }, encoding: "utf8" });
+ok(below.status === 1 && `${below.stdout}${below.stderr}`.includes(`NOT ALONE ${WF}: more than a comment`), "run from a folder below the root, with diff.relative set: the change outside that folder is read and refused", `${below.stdout}${below.stderr}`);
+// a file of the copy of the core under .github/, only a comment of it changed: refused as the copy, never read as YAML
+const copied = branch("copy", () => write(work, "core/.github/workflows/c.yml", "# the core's\nname: c\n"));
+write(work, "core/.github/workflows/c.yml", "# the core's, changed\nname: c\n");
+git(work, "commit", "-q", "-am", "a comment in the copy");
+r = run(copied);
+ok(r.status === 1 && r.out.includes("NOT ALONE core/.github/workflows/c.yml: a file that runs by itself or decides what does"), "a comment changed in the copy of the core's workflows: refused as the copy", r.out);
+// a link whose path holds a tab, on the side reviewed: read whole, past the tab (a name Windows writes no file under)
+if (process.platform !== "win32") {
+  const tabbed = branch("link-tab", () => { const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: work, env, input: "cfg" }).toString().trim(); git(work, "update-index", "--add", "--cacheinfo", `120000,${blob},dir\tx/.claude`); }, false);
+  write(work, WF, COMMENTS);
+  git(work, "add", "--", WF);
+  git(work, "commit", "-q", "-m", "a comment after the link");
+  r = run(tabbed);
+  ok(r.status === 1 && r.out.includes("NOT ALONE dir?x/.claude: a link or submodule"), "a link whose path holds a tab: refused", r.out);
+}
 
 // main moves on: a head not up to date with it is not the head that merges
 git(work, "checkout", "-q", "-f", "-B", "moved", MAIN);
