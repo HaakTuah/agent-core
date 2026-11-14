@@ -48,3 +48,15 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind the two modules this repository reads at the start of every task since then (`AGENTS.md`, "The core this
      repository takes"), so that whoever builds here marks the pull request ready, asks for its reviews, fixes their
      findings and merges. The rest of what issue #255 asks is built from its line in `QUEUE.md`.
+
+210. **14 November 2026** (the core, to the design session, while the pull request that built the queue waited for its
+     checks). Told that the queue's rule left the release after a batch to the owner's word, so that an orchestrator
+     would cut none:
+
+     > When the queue holds no line a session can take and every check on main is green, start the release workflow.
+
+     Behind the release of the first batch in "One batch, then one release" in `AGENTS.md`: the owner's word for it,
+     given ahead, so the session that finds the file worked through starts the `release` workflow, which itself cuts
+     nothing unless every check on `main`'s newest commit has passed. Read as the word for the batch the file first
+     held, since a release once cut is never moved or deleted: a later batch's release waits for the owner's word
+     again.

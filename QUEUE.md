@@ -4,9 +4,9 @@ The order this repository's open issues are built in, and nothing else (`AGENTS.
 issue, who builds it and what it waits on; the issue holds the rest, its conditions too. The first line that waits on
 nothing is next, and a line leaves in the pull request that closes its issue.
 
-**Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's words on
-the issue; *the owner*, no session takes it up before the owner's own word. **The owner's yes** is the one floor rule 3
-asks for, in the line's own pull request, which waits for it unmerged while the next line goes on.
+**Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's words
+on the issue; *the owner*, no session takes it up before the owner's own word. **The owner's yes** is the one floor
+rule 3 asks for, in the line's own pull request, which waits for it unmerged while the next line goes on.
 
 ## In order
 

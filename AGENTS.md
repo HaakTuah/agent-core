@@ -58,10 +58,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
-  is the owner's ("A release is cut on the owner's word"): an orchestrator cuts none. A batch is sized by what the
-  projects can take: once its release is synced, the count of "The core is measured as a feature is" is taken again in
-  each of the owner's projects and named to the owner, who sizes the next by it. It holds back no line the owner has
-  said yes to: there is no pause on new rules.
+  is the owner's ("A release is cut on the owner's word"): no session cuts one by its own choice. For the batch the
+  file first held, that word is given (core archive 210): once the file holds no line a session can take or is still
+  building, and every check on `main`'s newest commit has passed, the session that finds it so, the orchestrator at
+  the end of its work, starts the `release` workflow, once. A later batch's release waits for the owner's word again.
+- **A batch is sized by what the projects can take:** once its release is synced, the count of "The core is measured
+  as a feature is" is taken again in each of the owner's projects and named to the owner, who sizes the next by it. It
+  holds back no line the owner has said yes to: there is no pause on new rules.
 
 ## How changes are made here
 
