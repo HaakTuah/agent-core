@@ -85,10 +85,10 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile, isPrivate = false } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", stale = false, key = keyFile, isPrivate = false, opener = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
-  git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], GITHUB);
+  git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
   const base = { ...env, ...ME, STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
@@ -126,6 +126,8 @@ const update = (committer, more = []) => pull([[{ "b.md": "x\n" }], [dir => { gi
 if (gpg) {
   passes("a merge GitHub itself made into the branch, its author the merging account's profile, which GitHub wrote on a merge of main's (floor rule 11's exception)", update(GITHUB, profileOnMain(`A ${term}`)));
   fails("a merge GitHub signed into the branch, under an author no merge of GitHub's on main carries (as its API takes one), though it is a merge on the branch's own side", update(GITHUB));
+  passes("a merge GitHub itself made into the branch, under a profile GitHub wrote on a squashed pull request of main's (one parent)", update(GITHUB, [[{ "sq.md": "s\n" }, { GIT_AUTHOR_NAME: `A ${term}`, ...GITHUB }, "a squashed pull request"]]));
+  passes("the merge GitHub makes only to check the pull request, under the opener's profile, where main holds no commit of GitHub's under it", pull([[{ "b.md": "x\n" }]]), { opener: `A ${term}` });
   fails("a merge written to look like GitHub's, committed as GitHub but not signed", update(AS_GITHUB));
   fails("a merge committed as GitHub but signed by another key", update({ ...AS_GITHUB, ...signedBy(stranger, "someone@example.invalid") }));
   // a certificate made to look like GitHub's: an X.509 signature, which carries its own certificate and which gpgsm

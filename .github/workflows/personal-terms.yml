@@ -65,9 +65,11 @@ jobs:
             # One commit at a time, so every new commit is checked, not only the newest; a failing rev-list fails the
             # job. The checkout is GitHub's merge of the pull request into its base: what its first parent holds is the
             # base's, whatever commit the event names as the base, so it is left out, and with it every commit main
-            # already holds, which cannot be changed without rewriting history; none is left out by its date.
-            mine=(); if git rev-parse -q --verify 'HEAD^2' > /dev/null; then mine=('^HEAD^1'); fi
-            commits=$(git rev-list "$BASE..HEAD" "${mine[@]}")
+            # already holds, which cannot be changed without rewriting history; none is left out by its date. That
+            # merge itself is left out too: GitHub makes it only to check the pull request, under the opener's profile,
+            # adds nothing of its own, never reaches main, and no mend could change it.
+            side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
+            commits=$(git rev-list "$BASE..$head" "^$side")
             bad="" people="" added="" names=""
             # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
             # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
@@ -88,11 +90,10 @@ jobs:
                          log -1 --format='%G? %GP' "$1" 2> /dev/null) \
                 && printf '%s\n' "$github" | sed 's/^/G /; p; s/^G /U /' | grep -q -x -F -e "$sig"
             }
-            # (the profiles GitHub writes as the author of a merge it made on the base's side, each pull request's merge
-            # into main: a commit it made on the pull request's side, a merge or an edit on github.com, passes only under
-            # one of them, since one made through GitHub's API takes whatever author its caller names)
-            side=$BASE; [ "${#mine[@]}" -gt 0 ] && side=HEAD^1
-            profiles=$(for m in $(git rev-list --merges --max-count=100 --committer='noreply@github.com' "$side"); do
+            # (the profiles GitHub writes as the author of what it made on the base's side, each pull request's merge or
+            # squash into main: a commit it made on the pull request's side, a merge or an edit on github.com, passes
+            # only under one of them, since one made through GitHub's API takes whatever author its caller names)
+            profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
               made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
             # (no step here names a shell, so GitHub runs it without pipefail: a grep -q that stops early never makes a
             # hit read as a miss)
