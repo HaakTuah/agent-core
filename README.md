@@ -85,8 +85,9 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
    - **With the copies check,** `pointers.mjs` and `reading-size.mjs`, the pointer check and the reading-size check,
-     the second with marks of its own (the *size marks*), and `workflows.mjs`, which needs no config and fails a
-     workflow that names `pull_request_target` (floor rule 2).
+     the second with marks of its own (the *size marks*), whose total counts the project's own files alone (the core's
+     copy is held to the core's own cap), and `workflows.mjs`, which needs no config and fails a workflow that names
+     `pull_request_target` (floor rule 2).
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has

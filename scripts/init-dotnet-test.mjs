@@ -112,10 +112,12 @@ if (kit.status === 0) {
   const read = Object.keys(marks.read), onDisk = root => read.reduce((n, f) => n + fs.statSync(path.join(root, f)).size, 0), total = root => read.reduce((n, f) => n + sizeOf(path.join(root, f)), 0);
   ok(onDisk(converted) > onDisk(plain) && total(converted) === total(plain) && total(plain) === onDisk(plain), "the files every session reads lie on disk larger in the converted clone, and count the same in both: what GitHub holds");
   ok(sizeLine(plain) !== "" && sizeLine(plain) === sizeLine(converted), "the reading-size check says the same of both, to the byte", `${sizeLine(plain)}\n     ${sizeLine(converted)}`);
-  // (a mark set exactly at the count: one byte more would fail, and the converted clone lies on disk well past it)
-  for (const root of [plain, converted]) fs.writeFileSync(path.join(root, "checks/sizes.json"), JSON.stringify({ ...marks, total: total(plain) }));
+  // (a mark set exactly at the project's own count, the core's copy aside: one byte more would fail, and the converted
+  // clone lies on disk well past it)
+  const own = root => read.filter(f => !f.startsWith("core/")).reduce((n, f) => n + sizeOf(path.join(root, f)), 0);
+  for (const root of [plain, converted]) fs.writeFileSync(path.join(root, "checks/sizes.json"), JSON.stringify({ ...marks, total: own(plain) }));
   const exact = [plain, converted].map(root => check(root, ["core/scripts/reading-size.mjs", "checks/sizes.json"]));
-  for (const root of [plain, converted]) fs.writeFileSync(path.join(root, "checks/sizes.json"), JSON.stringify({ ...marks, total: total(plain) - 1 }));
+  for (const root of [plain, converted]) fs.writeFileSync(path.join(root, "checks/sizes.json"), JSON.stringify({ ...marks, total: own(plain) - 1 }));
   const under = [plain, converted].map(root => check(root, ["core/scripts/reading-size.mjs", "checks/sizes.json"]));
   ok(exact.every(r => r.status === 0) && under.every(r => r.status === 1 && r.out.includes("past their mark")), "a total that stands exactly at its mark passes in both, and one byte past it fails in both", exact.concat(under).map(r => r.out.slice(0, 200)).join("\n     "));
   for (const root of [plain, converted]) git(root, "checkout", "-q", "--", "checks/sizes.json");
