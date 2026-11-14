@@ -6,8 +6,10 @@
 // message, author or committer (name or address), in a private repository too, its failure saying how to mend it, and
 // in the title, description or branch name; a file of text a .gitattributes marks binary, main's own too; a term listed
 // with blanks or a Windows line end around it; a commit dated before the rule too, since a date is whatever its maker
-// writes; each failure saying how the session takes the term out.
-// What passes: none of these; a term only in a file whose content is binary (not read); a file on main named with
+// writes; each failure saying how the session takes the term out; a term in a link like a Claude Code session's but of
+// another shape or host, inside another address, or beside one (#261).
+// What passes: none of these; a term only in a file whose content is binary (not read); one only inside a Claude Code
+// session link's random id, wherever the check reads text; a file on main named with
 // a term before the rule, deleted or renamed away; only in the
 // author of a commit GitHub itself made (floor rule 11's exception: a merge or an edit on github.com, under a profile
 // GitHub wrote on a merge of main's, not one through its API under an author its caller named), committed as GitHub and
@@ -88,12 +90,12 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
-  const base = { ...env, ...ME, STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
+  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
@@ -187,6 +189,34 @@ fails("a term in a line a merge's own resolution adds, taken out again later", r
 fails("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` });
 fails("a term in the description", pull([[{ "b.md": "x\n" }]]), { body: `Words.\n\n${term}` });
 fails("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}-notes` });
+// a Claude Code session's link, whose random id holds a term by chance: of its one shape (01 and 22 characters of
+// base58), the id alone is left unread; any other shape, host, or a term beside it still fails (#261)
+const id = (inside, size = 22) => `01${`A${inside}BCDEFGHJKMNPQRSTUVWXYZabc`.slice(0, size)}`;
+const link = (inside, size, host = "claude.ai/code/session_") => `https://${host}${id(inside, size)}`;
+const signed = text => `A change\n\nCo-Authored-By: t <t@example.invalid>\nClaude-Session: ${text}\n`;
+passes("a term only inside a session link's id, in a commit's message, a line added and taken out, a file and the description", pull([[{ "b.md": `See ${link(term)}.\n`, "c.md": `x\n${link(other.toUpperCase())}\n` }, {}, signed(link(term))], [{ "c.md": "x\n" }]]), { body: `Words.\n\n${link(other)}` });
+fails("a term in a session link's id one character longer", pull([[{ "b.md": "x\n" }, {}, signed(link(term, 23))]]));
+fails("a term in a session link's id one character shorter", pull([[{ "b.md": `${link(term, 21)}\n` }]]));
+fails("a term in a session link's id holding a character outside base58", pull([[{ "b.md": "x\n" }]]), { body: link(`0${term}`) });
+fails("a term in such an id under another host", pull([[{ "b.md": `${link(term, 22, "example.invalid/code/session_")}\n` }]]));
+fails("a term in such an id in another address's path", pull([[{ "b.md": `${link(term, 22, "example.invalid/claude.ai/code/session_")}\n` }]]));
+fails("a term in such an id in another address's query", pull([[{ "b.md": "x\n" }]]), { body: `https://example.invalid/?u=${link(term)}` });
+passes("a term inside the ids of two session links side by side, and of one in Markdown's brackets", pull([[{ "b.md": `${link(term)} ${link(other)}\n[here](${link(term)}) <${link(other)}>\n` }]]));
+fails("a term right after a session link's id", pull([[{ "b.md": "x\n" }, {}, signed(`${link("")}${term}`)]]));
+fails("a term right after a session link's id and a letter outside plain ASCII", pull([[{ "b.md": `${link(term)}\u00e9\n` }]]));
+// a hit left out beside one kept: only the second file is named, and a name is never printed as a command
+const kept = check(pull([[{ "b.md": `${link(term)}\n`, "c.md": `x ${term}\n` }]]));
+ok(!kept.passed && /^c\.md:1$/m.test(kept.out) && !/^b\.md:/m.test(kept.out), "a file whose term is only in a session link's id is left out, one beside it still named", kept.out);
+if (process.platform !== "win32") {
+  const odd = check(pull([[{ "::notice::odd\nname.md": `x ${term}\n` }]]));
+  const [, token, inside] = /^::stop-commands::([0-9a-f]{32})\n([^]*?)^::\1::$/m.exec(odd.out) ?? [];
+  ok(!odd.passed && token && inside === "::notice::odd?name.md:1\n", "a file's name made like a command is printed only where GitHub reads no command", odd.out);
+}
+// (under a UTF-8 locale, as GitHub's runners have, where grep would take such a line for binary)
+fails("a term in a line added in Latin-1, taken out again", pull([[{ "b.md": Buffer.from(`caf\u00e9 ${term}\n`, "latin1") }], [{ "b.md": "x\n" }]]), { locale: "C.UTF-8" });
+passes("a term inside the ids of three session links side by side", pull([[{ "b.md": `${link(term)} ${link(other)} ${link(term)}\n` }]]));
+fails("a term on the same line as a session link, in a file", pull([[{ "b.md": `${link(term)} and ${other}\n` }]]));
+fails("a term on the same line as a session link, in the title", pull([[{ "b.md": "x\n" }]]), { title: `${link(term)} ${term}` });
 passes("a term only in a file whose content is binary (not read: the check's header says so)", pull([[{ "a.bin": `\u0000${term}\u0000` }]]));
 // a .gitattributes of the pull request's own that marks text binary hides nothing: the check reads no attributes
 fails("a term in a file of text a .gitattributes marks -diff", pull([[{ ".gitattributes": "*.md -diff\n", "b.md": `x ${term} y\n` }]]));
