@@ -164,7 +164,8 @@ export function plainText(bytes) {
   try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(b); } catch { return null; }
   const declared = /^<\?xml[ \t\r\n][^>]*?\bencoding[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)')/u.exec(text);
   const named = (declared?.[1] ?? declared?.[2] ?? "utf-8").toLowerCase();
-  return named === "utf-8" || named === "utf8" || ((named === "us-ascii" || named === "ascii") && /^[\u0000-\u007f]*$/u.test(text)) ? text : null;
+  // (a file all of whose bytes are ASCII reads the same in any encoding that keeps ASCII as it is)
+  return named === "utf-8" || named === "utf8" || (/^(?:us-ascii|ascii|iso-8859-[0-9]{1,2}|latin1|windows-125[0-8])$/u.test(named) && /^[\u0000-\u007f]*$/u.test(text)) ? text : null;
 }
 /**
  * The build files among `own` (the project's files git knows, as git lists them), each read by `read` (its bytes, or
@@ -194,9 +195,9 @@ export function importsOf(own, read) {
       const key = at?.toLowerCase();
       if (!found.length || looked.has(key)) continue;
       looked.add(key);
-      if (!by.has(key)) by.set(key, new Set());
+      // (the names git knows in every case are taken once, by the first file that imports them)
+      if (!by.has(key)) { by.set(key, new Set()); for (const g of found) if (!files.has(g)) { brought.set(g, by.get(key)); take(g); } }
       by.get(key).add(f);
-      for (const g of found) if (!files.has(g)) { brought.set(g, by.get(key)); take(g); }
     }
   }
   return { files, brought, unread, typed, unreadable };
@@ -465,7 +466,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       let entries = "";
       try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
       tree = new Map();
-      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000) blob ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith("core/")) tree.set(m[3], { mode: m[1], id: m[2] }); }
+      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000) blob [0-9a-f]+\t(.*)$/su.exec(e); if (m && !m[2].startsWith("core/")) tree.set(m[2], { mode: m[1] }); }
     }
     return tree;
   };
@@ -487,12 +488,13 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (!then) then = importsOf([...baseTree().keys()], baseBytes).brought;
     return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
-  // (whether a file stands as the base held it, by the id git would give it as committed at its path, so that a checkout
-  // that writes its own line endings, core.autocrlf on Windows, changes nothing)
+  // (whether a file stands as the base held it, byte for byte, as MSBuild reads it, save the line endings a checkout
+  // writes for itself (core.autocrlf on Windows), which XML reads as one: never through git's own filters, which a pull
+  // request's .gitattributes could point at a file to make other bytes read as the base's)
+  const lf = (bytes) => Buffer.from(bytes.toString("latin1").replace(/\r\n/gu, "\n"), "latin1");
   const same = (f, follow = true) => {
-    const at = baseFile(f, follow), here = readNow(f);
-    if (at === null || here === null) return false;
-    try { return execFileSync("git", ["hash-object", "--stdin", `--path=${f}`], { cwd: root, input: here, encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }).trim() === baseTree().get(at).id; } catch { return false; }
+    const at = baseFile(f, follow), was = at === null ? null : bytesAt(at), here = readNow(f);
+    return was !== null && here !== null && (was.equals(here) || lf(was).equals(lf(here)));
   };
   for (const [f, text] of now.files) {
     const found = now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
@@ -505,8 +507,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
     // (a file not plain UTF-8 the check reads only lately too: as the base held it, reported)
     const held = now.brought.has(f) ? !base || (same(f) && broughtThen(f))
-      : now.unreadable.has(f) ? !base || same(f)
-      : /\.user$/iu.test(f) && (!base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, ""))));
+      : /\.user$/iu.test(f) ? !base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, "")))
+      : now.unreadable.has(f) && (!base || same(f));
     const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;
     for (const what of found) (held ? reports : failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
   }

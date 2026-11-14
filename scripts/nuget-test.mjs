@@ -236,9 +236,9 @@ ok(projects(`<Import Project="a&amp;b.xml;x&lt;y&#59;z;&bogus;" />`) === "a&b.xm
 // MSBuild reads it, so it fails where the pull request brings it, and is reported where the base held it (#272)
 const latin = Buffer.concat([Buffer.from('<?xml version="1.0" encoding="iso-8859-1"?><Project><Import Project="d'), Buffer.from([0xe9]), Buffer.from('.xml" /></Project>')]);
 const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project><RestorePackagesPath>x</RestorePackagesPath></Project>", "utf16le")]);
-ok(plainText(Buffer.from("\uFEFF<Project />")) === "<Project />" && plainText(Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Project />')) !== null && plainText(Buffer.from('<?xml version="1.0" encoding="us-ascii"?><Project />')) !== null && plainText(null) === ""
-  && [latin, utf16, Buffer.from([0xfe, 0xff, 0, 0x3c]), Buffer.from("<Project>\u0000</Project>"), Buffer.from([0x3c, 0xc3, 0x28, 0x3e]), Buffer.from('<?xml version="1.0" encoding="windows-1252"?><Project />'), Buffer.from('<?xml version="1.0" encoding=\'us-ascii\'?><P a="\u00e9" />')].every(b => plainText(b) === null),
-  "a build file is read only as plain UTF-8, a UTF-8 byte-order mark passed over: another byte-order mark, encoding, a NUL or bytes UTF-8 does not allow is one this check cannot read as MSBuild does");
+ok(plainText(Buffer.from("\uFEFF<Project />")) === "<Project />" && plainText(Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Project />')) !== null && plainText(Buffer.from('<?xml version="1.0" encoding="us-ascii"?><Project />')) !== null && plainText(null) === "" && plainText(Buffer.from('<?xml version="1.0" encoding="windows-1252"?><Project />')) !== null && plainText(Buffer.from('<?xml version="1.0" encoding="ISO-8859-1"?><Project />')) !== null
+  && [latin, utf16, Buffer.from([0xfe, 0xff, 0, 0x3c]), Buffer.from("<Project>\u0000</Project>"), Buffer.from([0x3c, 0xc3, 0x28, 0x3e]), Buffer.concat([Buffer.from('<?xml version="1.0" encoding="windows-1252"?><Project a="'), Buffer.from([0x80]), Buffer.from('" />')]), Buffer.from('<?xml version="1.0" encoding=\'us-ascii\'?><P a="\u00e9" />')].every(b => plainText(b) === null),
+  "a build file is read only as plain UTF-8, a UTF-8 byte-order mark passed over, or as ASCII under an encoding that keeps it: another byte-order mark, encoding, a NUL or bytes UTF-8 does not allow is one this check cannot read as MSBuild does");
 put("build/Deps.props", latin); put("build/d\uFFFD.xml", "<Project />"); put("Odd.props", utf16);
 const encoded = reported(["build/Deps.props", "build/d\uFFFD.xml", "Odd.props"]);
 ok(encoded.reports.some(x => x.startsWith("build/Deps.props is not plain UTF-8")) && encoded.reports.some(x => x.startsWith("Odd.props is not plain UTF-8")) && !encoded.reports.some(x => x.includes("d\uFFFD.xml")) && encoded.failures.length === 0,
@@ -442,6 +442,25 @@ inRepo(USER, `\uFEFF${userText("bom")}`); git("add", "-A"); git("commit", "-q", 
 user = userCheck();
 ok(!user.failures.some(x => x.includes(".user")) && user.reports.some(x => x.includes(`${USER} names NuGetLockFilePath`) && x.includes("held before this check read it")), "a .user file with a UTF-8 byte-order mark, as the base held it: reported, and passes", JSON.stringify(user));
 fs.rmSync(path.join(repo, USER)); git("add", "-A"); git("commit", "-q", "-m", "no .user file");
+
+// a filter the machine's git config holds (git-lfs's, on GitHub's runners), which a pull request's .gitattributes points
+// at an imported file so that its own bytes would clean into the base's: the bytes MSBuild reads are compared (#272)
+if (process.platform !== "win32") {
+  inRepo(DEPS, "<Project />\n"); inRepo("Directory.Build.props", `<Project><Import Project="build/deps.xml" /></Project>`); git("add", "-A"); git("commit", "-q", "-m", "an imported file naming nothing");
+  inRepo("base-copy.txt", "<Project />\n"); git("config", "filter.same.clean", "cat base-copy.txt");
+  inRepo(".gitattributes", "build/deps.xml filter=same\n"); inRepo(DEPS, `${depsText}\n`);
+  deps = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS, ".gitattributes"], process.env, { base: "HEAD", baseConfig: null });
+  ok(deps.failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)), "a file the pull request changes, which a filter its .gitattributes names would clean into the base's: it fails", JSON.stringify(deps));
+  git("config", "--unset", "filter.same.clean"); for (const f of [".gitattributes", "base-copy.txt", DEPS, "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no filter");
+}
+// a .user file not plain UTF-8, which the base held beside no project file and the pull request brings into play with
+// one: it fails, as any .user file so brought (#272)
+const WIDE_USER = "src/Wide/Wide.csproj.user";
+inRepo(WIDE_USER, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")])); git("add", "-A"); git("commit", "-q", "-m", "a wide .user file alone");
+inRepo("src/Wide/Wide.csproj", "<Project />");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "src/Wide/Wide.csproj", WIDE_USER], process.env, { base: "HEAD", baseConfig: null });
+ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);
