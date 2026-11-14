@@ -101,6 +101,7 @@ is any move, rule or power a player can choose to use.
   - A game whose rules changed while it was played replays exactly only from the change on.
 - **The polish lane** also takes its finds from whole games watched at top speed, on a phone and on desktop, and proves
   play unchanged by "Same seed, same game".
-- **Readable by every player** (core archive 112 and 204). What the game shows tells a player at a glance what is
-  happening and what it can do. Nothing is told apart by colour alone, reduced motion keeps whatever informs, and each
-  thing has one name everywhere the game shows it.
+- **Readable by every player** (core archive 112, 204 and 205). What the game shows tells a player at a glance what is
+  happening and what it can do, and *what they are shown* tells the *computer players* the same, as plainly and in the
+  same order, so that every player reads the game on equal terms. Nothing is told apart by colour alone, reduced motion
+  keeps whatever informs, and each thing has one name everywhere the game shows it.
