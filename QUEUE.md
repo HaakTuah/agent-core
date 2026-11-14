@@ -4,7 +4,7 @@ The order this repository's open issues are built in, and nothing else (`AGENTS.
 issue, who builds it and what it waits on; the issue holds the rest, its conditions too. The first line that waits on
 nothing is next, and a line leaves in the pull request that closes its issue.
 
-**Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's words
+**Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's word
 on the issue; *the owner*, no session takes it up before the owner's own word. **The owner's yes** that floor rule 3
 asks for is the one given when the line's issue was queued, relayed into its pull request (`AGENTS.md`, "Queued means
 wanted").
