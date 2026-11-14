@@ -13,7 +13,6 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #240 | builder | |
 | #196 | builder | |
 | #255 | rule builder | |
 | #247 | rule builder | |
@@ -26,7 +25,7 @@ wanted").
 | #239 | builder | |
 | #251 | builder | |
 | #236 | builder | |
-| #257 | builder | |
+| #257 | rule builder | |
 | #234 | builder | |
 | #256 | rule builder | #243; its staged case: #235 |
 | #242 | rule builder | |
