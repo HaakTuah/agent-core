@@ -122,13 +122,15 @@ if (p.status === 0) {
   const setTotal = t => fs.writeFileSync(sizesAt, JSON.stringify({ ...JSON.parse(was), total: t }));
   setTotal(own + coreBytes + 4000);
   const roomy = sizeCheck();
+  setTotal(own + 3 * coreBytes);
+  const roomier = sizeCheck();
   setTotal(own + coreBytes);
   undo = grow("core/floor/security.md", 2000);
   const grownPast = sizeCheck();
   undo();
   fs.writeFileSync(sizesAt, was);
-  ok(roomy.status === 0 && roomy.stdout.includes(`set it to ${own + 4000}`) && grownPast.status === 0 && grownPast.stdout.includes(`set it to ${own}`) && !/still makes room/.test(sizeCheck().stdout),
-    "a total set when it counted the core's copy passes, and a note gives the mark that keeps the project's room, a KB above its own at least, after the core grew past that room too; a total of the project's own says nothing", `${roomy.stdout}\n${grownPast.stdout}`);
+  ok(roomy.status === 0 && roomy.stdout.includes(`set it to ${own + 4000}`) && grownPast.status === 0 && grownPast.stdout.includes(`set it to ${own}`) && roomier.stdout.includes(`set it to ${own}`) && !/leaves [0-9]+ bytes of room/.test(sizeCheck().stdout),
+    "a total set when it counted the core's copy passes, and a note gives the mark that keeps the project's room in one step, a KB above its own at least, after the core grew past that room too; a total of the project's own says nothing", `${roomy.stdout}\n${grownPast.stdout}\n${roomier.stdout}`);
   const again = run(p.dir, script, "--owner", "someone-else");
   ok(again.status === 1 && again.out.includes("never overwrites") && git(p.dir, "status", "--porcelain") === "", "run again, it overwrites nothing and says which files stand");
 }
