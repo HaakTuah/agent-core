@@ -34,7 +34,7 @@ const DEPENDABOT = "dependabot[bot]";
 // the first two lines of the summary Codex's app keeps: the second is its state, as JSON (GitHub's API gives its braces
 // as they are; one written as &#123; or &#125;, as a delivery may show it, is read as one too)
 const SUMMARY = /^<!-- codex-pull-request-review-summary -->\r?\n<!-- codex-review-state:v1 ([^\r\n]{1,4000}) -->\r?\n/u;
-const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
+export const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
 const POSTED = /^(?:\*\*)?Security review:/u;
 const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
@@ -44,21 +44,26 @@ const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry
 const codexs = (comment) => comment.user?.login === CODEX && comment.user.type === "Bot" && typeof comment.body === "string";
 const newest = (times) => times.reduce((latest, at) => (at > latest ? at : latest), -Infinity); // -Infinity: none
 
-// what the summary Codex's app keeps says of its security review: { review }, review undefined where there is none it
-// can read, and { unread: true } where a summary of Codex's is there but its state cannot be read, a form nobody
-// documents having changed (core archive 201). The app keeps one summary and edits it, so the first comment of its that
-// opens as one is read, never a later look-alike.
+// what the summary Codex's app keeps says of its reviews: { state }, the whole state, or {} where there is no summary,
+// and { unread: true } where a summary of Codex's is there but its state cannot be read, a form nobody documents having
+// changed (core archive 201). The app keeps one summary and edits it, so the first comment of its that opens as one is
+// read, never a later look-alike. scripts/code-review-wait.mjs reads its code review from it too.
 const OPENS = /^<!-- codex-pull-request-review-summary -->/u;
-function codex(comments) {
-  for (const comment of comments) {
+export function codexState(comments) {
+  for (const comment of flat(comments)) {
     if (!codexs(comment) || !OPENS.test(comment.body)) continue;
     const text = SUMMARY.exec(comment.body)?.[1];
     let state;
     try { state = text === undefined ? undefined : JSON.parse(text.replaceAll("&#123;", "{").replaceAll("&#125;", "}")); } catch { state = undefined; }
     if (state === null || typeof state !== "object" || !("security_review" in state)) return { unread: true };
-    return { review: state.security_review };
+    return { state };
   }
   return {};
+}
+// of its security review: { review }, review undefined where there is none it can read, or { unread: true }
+function codex(comments) {
+  const read = codexState(comments);
+  return read.state ? { review: read.state.security_review } : read;
 }
 // what the check says where Codex's summary is there but cannot be read: a warning beside the status, which waits or
 // passes as it would with no summary at all
@@ -94,12 +99,13 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits) {
   return { sha, done: false, why: "no security review has run yet" };
 }
 
-// the commit status GitHub is given: while advisory always a pass, saying what the check would have done
-export function status(verdict, advisory, url) {
+// the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the
+// status's name, this check's unless scripts/code-review-wait.mjs gives its own)
+export function status(verdict, advisory, url, context = CONTEXT) {
   const state = verdict.done || advisory ? "success" : "pending";
   // (where Codex's summary cannot be read, the status says so too, where the owner sees it; GitHub takes 140 characters)
   const description = `${advisory ? "Advisory: " : ""}${verdict.done ? "" : advisory ? "would wait, " : "Waiting: "}${verdict.why}${verdict.warning ? "; summary unreadable" : ""}`.slice(0, 140);
-  return { state, description, context: CONTEXT, ...(typeof url === "string" && /^https:\/\/[\w./-]{1,200}$/u.test(url) ? { target_url: url } : {}) };
+  return { state, description, context, ...(typeof url === "string" && /^https:\/\/[\w./-]{1,200}$/u.test(url) ? { target_url: url } : {}) };
 }
 
 if (started(import.meta.url)) {

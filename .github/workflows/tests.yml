@@ -88,6 +88,9 @@ jobs:
       - name: The security-review check
         if: ${{ !cancelled() }}
         run: node scripts/security-review-test.mjs
+      - name: The code-review wait
+        if: ${{ !cancelled() }}
+        run: node scripts/code-review-wait-test.mjs
       - name: The workflow check
         if: ${{ !cancelled() }}
         run: node scripts/workflows-test.mjs

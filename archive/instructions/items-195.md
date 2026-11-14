@@ -251,3 +251,22 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind the computer players in "Readable by every player" in `modules/game-design.md`: what they are shown tells
      them what the screen tells a person, as plainly and in the same order.
+
+206. **14 November 2026** (the core, in the design chat). Told why a pure sync of a project waited for a security
+     review although the core's own pull request had passed both of its reviews, the owner first asked:
+
+     > Right, I forgot. Codex doesn't have that level of customization, so it was either all or none. And when a
+     > review is already being run, there is no use in not waiting and seeing if it finds something, I believe was a
+     > rule I have already penned?
+
+     Told that it was, floor rule 8's wait for a security review that starts by itself, and that the session had just
+     merged a pull request past a code review it had asked for that was still running:
+
+     > Ideally it would block merging before reviews are finished. But then you would have to make sure it doesn't
+     > Bottleneck if a reviewer goes wrong or runs out of usage.
+
+     Told that the security review already had such a check, `security-review`, advisory for its first week and with
+     the fallback reviewer taking over a review not begun in about 5 minutes or finished in about 30, and that a code
+     review had none. Behind "A review already running is waited for" in `modules/reviews.md` and the status
+     `code-review` beside `security-review` (`scripts/code-review-wait.mjs`): it waits only while Codex's code review
+     runs on the head commit, and a code review of that commit posted by the reviewer that took it over ends the wait.
