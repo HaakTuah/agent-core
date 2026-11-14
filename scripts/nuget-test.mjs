@@ -197,7 +197,10 @@ put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Condition
 const importing = reported(["build/Deps.props"]);
 ok(importing.failures.length === 0 && importing.reports.length === 2 && importing.reports.some(x => x.includes("build/Deps.props imports deps.xml, a file this check does not read")) && importing.reports.some(x => x.includes("imports $(MSBuildThisFileDirectory)..\\shared\\more.config,")) && / 2 reported, and passing;/.test(importing.summary),
   "an Import of a file of another name than a build file's is reported and passes; one of a build file's name, or in a comment, is not", JSON.stringify(importing));
-ok(imported(`<Project><Import Project="deps.xml; x.props" /><P><![CDATA[<!--]]></P><Import Project="hidden.xml" /><P><![CDATA[-->]]></P></Project>`).join() === "deps.xml,x.props,hidden.xml", "each file of an Import's list is read, and CDATA is no comment");
+ok(imported(`<Project><Import Project="deps.xml; x.props" /><P><![CDATA[<!--]]></P><Import Project="hidden.xml" /><P><![CDATA[-->]]></P></Project>`).join() === "deps.xml,x.props,hidden.xml" && imported(`<?x <!-- ?><Project><Import Project="pi.xml"/></Project><?y --> ?>`).join() === "pi.xml",
+  "each file of an Import's list is read, and neither CDATA nor a processing instruction starts a comment");
+put("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "<!--">]><Project><Import Project="deps.xml" /></Project>`);
+ok(reported(["build/Typed.props"]).reports.some(x => x.includes("build/Typed.props has a document type")), "a build file with a document type is reported, its Imports unread");
 const hostile = ["<Import ", '<Import "', '<Import Project="', "<!--", "<![CDATA[", "<Import a=", "<"].map(x => x.repeat(40000)), started = Date.now();
 for (const text of hostile) imported(text);
 ok(Date.now() - started < 2000, "a pull request's build file, however long or unclosed, is read in one pass", `${Date.now() - started} ms`);

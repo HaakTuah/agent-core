@@ -99,14 +99,15 @@ const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<proj
 const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
 /**
  * The files a build file's Imports bring in, as each Import's Project names them (a list parted by ";", as MSBuild
- * reads one), read in one pass from tag to tag: a comment or CDATA is passed over whole, and a tag's attributes are
- * read only within it, so no text, however long or unclosed, is read more than once.
+ * reads one), read in one pass from tag to tag: a comment, CDATA or a processing instruction is passed over whole,
+ * and a tag's attributes are read only within it, so no text, however long or unclosed, is read more than once.
  */
 export function imported(text) {
   const found = [], ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
   for (let i = text.indexOf("<"); i >= 0; i = text.indexOf("<", i)) {
     if (text.startsWith("<!--", i)) { const end = text.indexOf("-->", i + 4); if (end < 0) break; i = end + 3; continue; }
     if (text.startsWith("<![CDATA[", i)) { const end = text.indexOf("]]>", i + 9); if (end < 0) break; i = end + 3; continue; }
+    if (text.startsWith("<?", i)) { const end = text.indexOf("?>", i + 2); if (end < 0) break; i = end + 2; continue; }
     if (!/^<Import(?![A-Za-z0-9_.:-])/iu.test(text.slice(i, i + 8))) { i++; continue; }
     let end = i + 7, quote = "";
     for (; end < text.length && (quote || text[end] !== ">"); end++) if (quote ? text[end] === quote : text[end] === '"' || text[end] === "'") quote = quote ? "" : text[end];
@@ -375,7 +376,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (/TreatAsLocalProperty/iu.test(text)) to.push(`${f} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
     // (a file an Import brings in under another name: reported, and passes, as #240 settled for now; reading
     // every file an Import brings in is the mend to follow, #269)
-    for (const brought of imported(text)) {
+    // (a document type can name text that reads as a comment's start: its Imports are not read, and that is reported)
+    if (/<!DOCTYPE/iu.test(text)) reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
+    else for (const brought of imported(text)) {
       if (!BUILD_FILE.test(brought.split(/[\\/]/u).pop())) reports.push(`${f} imports ${brought}, a file this check does not read: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
     }
   }
