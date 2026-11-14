@@ -437,5 +437,11 @@ inRepo(L, `${twoLock}\n`);
 both = lockCheck();
 ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file changed by the pull request: it fails", JSON.stringify(both));
 
+// a .user file saved with a UTF-8 byte-order mark, as the base held it: reported, and passes (#272)
+inRepo(USER, `\uFEFF${userText("bom")}`); git("add", "-A"); git("commit", "-q", "-m", "a .user file with a mark");
+user = userCheck();
+ok(!user.failures.some(x => x.includes(".user")) && user.reports.some(x => x.includes(`${USER} names NuGetLockFilePath`) && x.includes("held before this check read it")), "a .user file with a UTF-8 byte-order mark, as the base held it: reported, and passes", JSON.stringify(user));
+fs.rmSync(path.join(repo, USER)); git("add", "-A"); git("commit", "-q", "-m", "no .user file");
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);
