@@ -109,6 +109,23 @@ ok(r.checked.failures.length === 1 && r.checked.failures[0].includes("Plpkg@2.0.
 tracked = commit({ "Bad.Hash": entry("Bad.Hash", hash(Buffer.from("another file"))) }, {});
 r = await run(tracked);
 ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("content hash"), "a package file that is not the one its lock file names by its content hash fails", JSON.stringify(r.fetched));
+// another file under one id and version, under another licence, at a source of its own
+const elsewhere = path.join(root, "other-packages");
+fs.mkdirSync(elsewhere);
+const otherFile = pkg("Good.Pkg", "1.0.0", "GPL-3.0-only");
+fs.writeFileSync(path.join(elsewhere, "good.pkg.1.0.0.nupkg"), otherFile);
+fs.mkdirSync(path.join(root, "src/Tools"), { recursive: true });
+fs.writeFileSync(path.join(root, "src/Tools/packages.lock.json"), lock({ "Good.Pkg": entry("Good.Pkg", hash(otherFile)) }));
+tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, {});
+const both = { ...config, nuget: { ...config.nuget, tools: ["src/Tools/packages.lock.json"] } };
+const twice = await fetchAll(both, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)]);
+ok(twice.failures.some(f => f.includes("Good.Pkg@1.0.0 named by another content hash than in src/App/packages.lock.json")), "one version two lock files name by two content hashes fails: one file of it is fetched, and its licence would stand for both", JSON.stringify(twice));
+fs.rmSync(path.join(root, "src/Tools"), { recursive: true });
+tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "good.pkg": { version: "1.0.0" } });
+const toolToo = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)]);
+ok(toolToo.failures.length === 1 && toolToo.failures[0].includes("also a tool of .config/dotnet-tools.json"), "a tool a lock file also names, of which a source before the locked file's gives another file, fails: its restore holds it to no hash", JSON.stringify(toolToo));
+const toolFirst = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)]);
+ok(toolFirst.failures.length === 0, "where the locked file's source comes first, the tool's restore takes that file, and it passes", JSON.stringify(toolFirst));
 tracked = commit({ "Not.There": { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "x" } }, {});
 r = await run(tracked);
 ok(r.fetched.failures.length === 1 && r.fetched.failures[0].includes("in neither NuGet's registry nor a source"), "a package no source holds fails", JSON.stringify(r.fetched));

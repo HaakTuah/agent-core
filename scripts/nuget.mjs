@@ -84,7 +84,9 @@ import { started } from "./started.mjs";
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 const LOCK = "packages.lock.json";
 const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<project>.lock.json before the plain one
-const BUILD_FILE = /\.(?:cs|fs|vb)proj$|\.props$|\.targets$/iu; // where a project can name another lock file
+// where a project can name another lock file: a project file, a .props or .targets, and the .user file MSBuild imports
+// beside a project file by itself
+const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
 // an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
 // lists it
@@ -98,6 +100,8 @@ const VERSION = /^[0-9][0-9A-Za-z.+-]{0,99}$/u; // a version as a lock file writ
 const key = (id, version) => `${id}@${version}`.toLowerCase();
 /** A JSON file's text without the byte-order mark dotnet reads past. */
 export const unmarked = (text) => (text.startsWith("\uFEFF") ? text.slice(1) : text);
+// what a lock entry that names a second content hash for a version is told: a restore keeps one file of each version
+export const twoHashes = "a restore keeps one file of each version, so one entry would fail its hash and the check would read the other's licence: restore again so that each names the one file (floor rule 15)";
 // what stands where a comment or a processing instruction was cut from a manifest, and where CDATA was: no XML holds either
 const CUT = "\u0000", CDATA = "\u0001";
 // XML's own declaration, as XML writes it: only at a manifest's start, after a byte-order mark if one stands there
@@ -170,12 +174,13 @@ export function sdkPacks(env = process.env, root = null) {
 
 /**
  * The packages one lock file installs, as { id, version }, and what is wrong with it as lines. A project's own
- * projects (type "Project") are no packages. What a project asks for itself must be the version installed.
+ * projects (type "Project") are no packages. What a project asks for itself must be the version installed, and one
+ * version of a package is one file: its entries (one for each framework) name one content hash.
  */
 export function lockPackages(text, lockPath) {
   const failures = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(text); } catch { return { packages: [], failures: [`${lockPath} is not JSON`] }; }
+  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON`] }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
     return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies")`] };
   }
@@ -191,6 +196,8 @@ export function lockPackages(text, lockPath) {
       if (entry.type !== "Transitive" && ![`[${resolved}, )`, `[${resolved}]`, `[${resolved}, ${resolved}]`].includes(requested)) {
         failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}: ask for one exact version, the one installed (floor rule 7)`);
       }
+      const was = packages.get(key(id, resolved));
+      if (was && was.contentHash !== contentHash) { failures.push(`${at}@${resolved}: named by two content hashes: ${twoHashes}`); continue; }
       packages.set(key(id, resolved), { id, version: resolved, contentHash });
     }
   }
@@ -358,8 +365,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
     failures.push(...read.failures);
     for (const p of read.packages) {
-      const k = key(p.id, p.version), shipped = ships.includes(f);
-      if (!packages.has(k) || (shipped && !packages.get(k).shipped)) packages.set(k, { ...p, shipped, lock: f });
+      const k = key(p.id, p.version), shipped = ships.includes(f), was = packages.get(k);
+      if (was && was.contentHash !== p.contentHash) { failures.push(shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`)); continue; }
+      if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
     }
   }
   // the tools a manifest of dotnet's names, read before the restore alone (no restore brings them), each held to the
