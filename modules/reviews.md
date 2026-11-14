@@ -12,6 +12,9 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
    says.
 2. **No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review:** the next reviewer,
    last the fallback reviewer, takes the PR at once (core archive 19 and 20).
+   - **A review already running is waited for,** never merged past (core archive 206): the `code-review` status holds a
+     code review as `security-review` holds the security review. The reviewer that takes one over posts its review in
+     a comment that opens "Code review:" and names the commit it read, which ends the wait.
    - **A late review is still read,** the security reviewer's too: a finding of the last week by a reviewer the project
      asks, made after its PR merged, with no reply, is answered as point 5 says, and what holds is a bug (a weakness:
      floor rule 9). No other account's comment is read for this (floor rule 4); who looks: "Sessions" in

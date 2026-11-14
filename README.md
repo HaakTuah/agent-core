@@ -165,7 +165,10 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      line itself changed is not known as one, and counts as none); its tests keep real summaries as GitHub's API gives
      them. It is advisory until the core says otherwise: the status always passes and says what the check would have
      done. Dependabot's own pull request passes it (floor rule 17); one that needs no security review and gets none by
-     itself (floor rule 8) says so in such a comment. It runs a short job at each push and each such comment, a dozen
+     itself (floor rule 8) says so in such a comment. Beside it, in the same job, the status `code-review` waits while
+     Codex's code review runs on the head commit, until it finishes or a comment that opens "Code review:" from the
+     owner, a member or a collaborator names that commit (`modules/reviews.md`, point 2); it advises as the first does,
+     and a code review that never starts holds nothing. It runs a short job at each push and each such comment, a dozen
      or so a pull request, which a private repository pays for: there the job is skipped, and so not billed, unless
      the project turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without

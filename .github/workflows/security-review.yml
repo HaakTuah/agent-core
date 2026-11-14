@@ -1,6 +1,9 @@
 # The security-review check (floor rule 8: a PR that touches a way in merges only after its security review has run, and
 # none with a blocking security finding open), for every project that takes the core: it gives the head commit of each
-# open pull request that is no draft a commit status, "security-review", that says whether its security review has run.
+# open pull request that is no draft a commit status, "security-review", that says whether its security review has run,
+# and beside it a second, "code-review", that says whether a code review running on that commit has finished
+# (scripts/code-review-wait.mjs; modules/reviews.md, point 2: a review already running is waited for, and one that
+# hangs is taken over, its review posted in a comment that opens "Code review:" naming the commit, which ends the wait).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a member or a collaborator, which is how the fallback
 # reviewer's or another reviewer's is posted (modules/reviews.md, point 3); where Codex marks a finding of its security
@@ -24,13 +27,13 @@
 # requires the status while it advises waits for good in a private repository: such a project passes "private".
 #
 # What keeps it safe, since a comment starts it and it may write a status (floor rule 2): it checks out the default
-# branch, never the pull request, and runs only that branch's copy of the script; a comment's text is read only in the
-# job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where that is
-# the summary of Codex's app or opens "Security review:" from the owner, a member or a collaborator; on pull_request it
-# runs only for a branch of the repository itself and not for Dependabot, whose token could not write the status (theirs
-# is written when the first comment that counts arrives: on Dependabot's own, Codex's summary, once the code review that
-# floor rule 17 asks for is asked); and the token can read, and write a commit status, nothing more. A posted review
-# that is later edited away or deleted is seen at the next push, not at once.
+# branch, never the pull request, and runs only that branch's copies of the scripts; a comment's text is read only in
+# the job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where
+# that is the summary of Codex's app or opens "Security review:" or "Code review:" from the owner, a member or a
+# collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token
+# could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
+# summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
+# status, nothing more. A posted review that is later edited away or deleted is seen at the next push, not at once.
 name: security-review
 
 on:
@@ -68,7 +71,9 @@ jobs:
       && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
       || (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
       && (startsWith(github.event.comment.body, 'Security review:')
-      || startsWith(github.event.comment.body, '**Security review:')))))) }}
+      || startsWith(github.event.comment.body, '**Security review:')
+      || startsWith(github.event.comment.body, 'Code review:')
+      || startsWith(github.event.comment.body, '**Code review:')))))) }}
     # one at a time for a pull request, in the order they came: the last to run has read the newest comments
     concurrency:
       group: security-review-${{ github.event.issue.number || github.event.pull_request.number }}
@@ -83,7 +88,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ inputs.root }}/.node-version # the one exact Node ("Node" in modules/updates.md)
-      - name: Has the security review run?
+      - name: Has the security review run, and has a running code review finished?
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -113,3 +118,10 @@ jobs:
           # (a summary of Codex's it cannot read: the check's own fixed words, never the comment's)
           if jq -e '.warning' "$d/out.json" > /dev/null; then echo "::warning::$(jq -r '.warning' "$d/out.json")"; fi
           jq '.status' "$d/out.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null
+          # the second status, code-review: whether a code review running on that commit has finished (a default branch
+          # whose core is older has no such script, and says nothing of it)
+          if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
+            node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" "$d/comments.json" > "$d/code.json"
+            jq -r '.status | "\(.state): \(.description)"' "$d/code.json"
+            jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null
+          fi
