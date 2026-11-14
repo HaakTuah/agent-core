@@ -199,3 +199,21 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      start from each of the last two releases, its private project's commits made under a listed name and its sync
      mended so; and in item 201, that description taken out, the one change to a dated record here, on the owner's
      word.
+
+204. **14 November 2026** (the core, in the design chat). Told, of a new game being designed that is only ever added
+     to, that it could be played from its first stage on, unlike Amarna, which was built toward its finished form:
+
+     > Yes, unlike amarna, this is a game that you only add to. Amarna still doesn't feel like a game. Something I
+     > should get better at. Mvps and stages that feel playable. With amarna, I am trying to get to the end station,
+     > and that was a mistake. But I still want to see it through. This game is inherently limited by scope at the
+     > core, but can have lots of fun additions around. And is maybe the easiest game to actually get someone else to
+     > play with me and the models.
+
+     Asked whether the core should say that each stage of a build ends in a game someone can play from start to finish
+     and enjoy, a feature that makes sense only once later ones exist waiting for them:
+
+     > Yes. But the bigger problem is the ui in amarna right now. It is a mess. No way you can play a game this
+     > complex when you can't even tell what is going on on the screen.
+
+     Behind "Every stage is a game" in `modules/game-design.md`, and the glance in its "Readable by every player"; a
+     first playable slice of Amarna, and its screen, were taken up in Amarna.
