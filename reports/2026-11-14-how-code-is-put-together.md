@@ -136,7 +136,79 @@ where change meets tangle"): the licence and NuGet checks, whose longest functio
 files change most, and change together. And its one folder: nothing marks the projects' checks apart from the core's
 own tools, so no boundary between them could be checked until #246 names them.
 
-## 3. A proposal for each practice
+## 3. The owner's two games, read from a clone
+
+On the owner's word, given in person to the orchestrator on 14 November 2026 and passed on word for word:
+
+> Yes: sessions may read `amarna-letters` and `barkstreet-snakes` for #243 and #245. Read only; nothing is written there.
+> #245's session also measures what a read-only clone of each allows and puts it in the core's report. #246 and #253
+> wait on that report alone. The games' own halves, in their own issues, hold up no line and no release.
+
+Nothing was written to either repository: no branch, push, issue or comment. Each game's own half of the audit stays
+with that game's issue, for its own sessions to do with its own tools.
+
+**What a read-only clone allowed.** Both repositories are public, so this session could clone them without credentials.
+It could also:
+
+- read the history, the newest 500 commits of each, by a bounded fetch;
+- install amarna-letters's packages from its lockfile (`npm ci --ignore-scripts`, five seconds);
+- run the suites with Node and the session's own Chromium.
+
+It could not reach GitHub's API for either repository. That rules out their issues and their CI runs, so the CI times
+and the reruns that the core's own numbers draw on are missing here. Attaching amarna-letters read-only was refused by
+this session's own permission check; the anonymous clone read the same files. Not run: barkstreet-snakes's `ui` and
+`layout` suites (the second takes about 30 minutes one part after another, by its own script's word) and its copies and
+versions checks. Not read: amarna-letters's 14 files of Python. The `.tsx` files hold JSX, which the script's reader
+does not know, so their function counts are rough.
+
+**amarna-letters** (`98b1e63`; TypeScript, five packages: engine, game, llm, web, batch):
+
+- **Size:** 714 files of code, 474 of them not tests.
+- **Imports:** 4,287.
+  - Between the packages' own code there is no cycle, and no two packages import each other both ways.
+  - Inside them, 8 cycles between files at run time (imports of types alone left out, since TypeScript erases them).
+    The largest joins 41 files of the engine's `rules` and `turn` folders.
+  - Seven pairs of folders import each other both ways, the most `rules` and `turn` (8 imports one way, 195 the other).
+- **Hubs:** the engine's entry file is imported by 416 files and gives 790 names, which is a package declaring what it
+  offers, as the practice asks. Its `model/power.ts` is imported by 134 files; the tests' shared support by 216.
+- **Functions,** not counting the tests: 3,684.
+  - Half are 7 lines or fewer, nine in ten 34 or fewer; 211 run past 50 lines and 89 past 100; 17 nest four deep.
+  - The longest: the play page's component (822 lines), the computer players' `makePlan` (631, four deep) and the batch
+    runner's `parseArgs` (596).
+- **What changes together:** `engine/src/turn/kings-fate.ts` changed in 33 of 497 commits, with `resolve.ts`,
+  `views.ts` and `model/state.ts`. The state and the save-version test changed together all 13 times the test changed.
+- **Suites,** run alone from the clone: AMARNA_SUITES.
+
+**barkstreet-snakes** (`d14a7d3`; JavaScript with no build):
+
+- **Size:** 313 files, 152 of them the game's own (not `tools/` or `scripts/`).
+- **Shared global names:** the page loads 130 scripts, and 129 have no import at all. Their top levels share one space
+  of 1,734 names, none declared twice (the issue's first count was about 1,650).
+- **Imports:** only the tools have any (248, 11 crossing a folder, no cycle).
+- **Functions,** the game's own: 1,482.
+  - Half are 8 lines or fewer, nine in ten 31 or fewer; 71 run past 50 lines and 25 past 100; 40 nest four deep.
+  - The longest: `SnakeAudioCues` (614 lines). Like several others, it is a whole file wrapped in one function, so it
+    reads as one function. Then `drawFace` (485, four deep) and the engine's `step` (368, six deep, the deepest).
+- **What changes together:** `game/core.js` and `game/friends.js` (20 times), `engine/view.js` and `tuning.js` (13).
+  The files changed most are the version stamp (41), `friends.js` (32), `core.js` (30) and `tuning.js` (29).
+- **Suites,** twelve run alone from the clone, all passed:
+  - the touch-input suite took 124 s and the render suite 60 s, both in a browser;
+  - the network suite 69 s, the rules 14, the content-security policy 11, online play 10, the scope check 7, the
+    licences 3 and the type check 1; the rest under one second.
+  - The input suite already measures time from touch to a swipe registering, in milliseconds: a benchmark that a
+    budget held by a check (practice 15) could hold.
+
+**What this says to #246.** The two games need different first checks:
+
+- **amarna-letters** has boundaries between its packages that hold; its tangle is inside them, so a cycle check with a
+  baseline bites at once.
+- **barkstreet-snakes** has no imports for a boundary check to read. Until it has modules, what holds its shape is a
+  check on its one global space: no new name without its file declaring it once.
+
+A mark on a function's size would list hundreds of functions in amarna-letters and dozens in barkstreet-snakes on its
+first day.
+
+## 4. A proposal for each practice
 
 For #246, which writes the rules and checks; each with the check that would hold it without guessing, and its baseline
 in the core. "Never worse" and the baseline that may only shrink are #246's own, on the owner's word recorded there.
