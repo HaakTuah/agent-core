@@ -141,8 +141,11 @@ if (sdk) {
   // (where the first look itself restored, the pull request's build files have run: the read before the restore is
   // left out, nothing it reads having changed from the base)
   const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
-  const built = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
+  // (a file a property brings in, which only NuGet's own word sees: an imported one the first look names by itself)
+  const built = whole({ "build/two.xml": ADDS }, { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY });
   ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out);
+  const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
+  ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out);
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
