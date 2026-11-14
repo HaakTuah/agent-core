@@ -251,8 +251,8 @@ Floor: whole. Modules: <all, or the list of those taken>.
 - This repository's tags: a ruleset on `release-*` that blocks a tag's update and its deletion, so a release stays on
   the commit it was cut on (core archive 195).
 - This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
-  request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check` required
-  (core archive 201).
+  request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
+  required, branches up to date (core archive 201).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
   approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
