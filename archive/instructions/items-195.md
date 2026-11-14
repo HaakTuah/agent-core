@@ -113,9 +113,8 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
 201. **13 November 2026** (the core, handed to its design session in a message of the owner's: the brief of an outside
      session that had audited the core at release-2 that day, which the owner had gone through point by point, the
-     owner's word quoted under each section). On section 0, that nothing may lock the project of another owner, which
-     is private, built on .NET on Windows, follows the releases and is on GitHub's free plan, where every check job
-     costs at least one whole minute of the account's 2,000 a month and Actions stop once they are spent:
+     owner's word quoted under each section). On section 0, that nothing may lock another owner's project (what the
+     brief said of that project here was not so, and is taken out: core archive 202):
 
      > Guarantee me nothing of this will stun lock […]
 
@@ -164,3 +163,26 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      With it: section 0 first, every later PR keeping its test green; never a release cut by a session, the owner
      told when one is ready. Behind, in `AGENTS.md`: "Nothing locks another owner's project", held by
      `scripts/upgrade-test.mjs`; and each section's own change, in the PR that cites this item.
+
+202. **14 November 2026** (the core, in a chat with the outside session of item 201, which the owner had asked to audit
+     what that item built, at d76174c, and then to fix what it found). Told that every section was built and checked,
+     and of four things left: the personal-terms check failing a commit whose author or committer holds a term, which
+     fails every pull request where the machine that commits writes a listed name into each commit, the sync to the
+     next release among them, while the upgrade test, its projects committing as "t", did not see it; a commit dated
+     before 2 November 2026 read by no per-commit check, though a commit's date is whatever its maker writes;
+     `core.yml` keeping, of the core's reports, one whose name git quotes, which the copy leaves out; and the upgrade
+     test starting from the previous release alone, while a project that missed a release jumps two:
+
+     > Make all of the fixes, big and small, expertly!
+
+     Told that item 201 described the project of another owner, from what the brief had said of it:
+
+     > This is incorrect information, remove it
+
+     Behind: in `.github/workflows/personal-terms.yml`, a term in a commit's author or committer reported in a private
+     repository and failed in a public one, as the owner's words of item 201 had it ("when [the] repo is private
+     anyways"), and no commit left out by its date; `README.md`, "Setting up (the owner's part)", on git's own name on
+     each machine; in `.github/workflows/core.yml`, the reports left out by the pin's tree's own entry; in
+     `scripts/upgrade-test.mjs`, a start from each of the last two releases, its private project's commits made under a
+     listed name; and in item 201, that description taken out, the one change to a dated record here, on the owner's
+     word.
