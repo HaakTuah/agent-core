@@ -95,7 +95,9 @@ jobs:
           # name inside that folder, however git quotes it, is taken for part of the copy)
           tree=$PIN
           if grep -q -s -x '/reports export-ignore' .core-at-pin/.gitattributes; then
-            tree=$(git -C .core-at-pin ls-tree -z "$PIN" | { grep -z -v -e $'\treports$' || true; } | git -C .core-at-pin mktree -z)
+            # (the whole entry matched, its name after the first tab exactly "reports"; grep's "none left" is no fault,
+            # any other failure is)
+            tree=$(git -C .core-at-pin ls-tree -z "$PIN" | { grep -z -v -x -e $'[^\t]*\treports' || [ $? -eq 1 ]; } | git -C .core-at-pin mktree -z)
           fi
           want=$(entries .core-at-pin "$tree") id=$(git rev-parse -q --verify HEAD:core || true)
           if [ -n "$id" ] && [ "$(git ls-tree HEAD -- core)" = "040000 tree $id"$'\t'"core" ]; then have=$(entries . HEAD:core)
