@@ -11,31 +11,75 @@ imports them):
 @floor/security.md
 @modules/how-to-work.md
 @modules/inbox.md
+@modules/work-flow.md
+@modules/git.md
+
+The last two are read so that whoever builds here finishes the pull request (core archive 209). Two things in them
+have nothing to act on here: the polish lane, since no one uses the core through a screen, and the sync of a copy of
+the core in "Sessions", since this repository is the core and holds no copy.
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
-`modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md` and
-`modules/github-calls.md`.
+`modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
+`modules/github-calls.md`, `modules/orchestrating.md` and `modules/updates.md`.
 
-The slots here: the *progress file*: this repository's open PRs; the *report*: the PR's description (`reports/` keeps
+The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 the audits and the reports written before 12 November 2026); the archive is `archive/instructions.md`, cited "(core
 archive N)"; the *settling references* and the *descriptions*: `README.md`; the *large file*: past about 50 KB; the
-*owner's account*: `HaakTuah`.
+*owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, and all that add to what
+every session reads at its start, whose cap they share, in the queue's order; the *design-checked PRs*: those that add
+or change a rule of the floor or the modules; the *review reference*: the line's issue, with the owner's words quoted
+on it; the *hard work*: a new or changed rule; the *size marks*: the cap of `scripts/size.mjs`, which has no split
+mark; the *major version checks*: the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other
+builders*: none, every file here being protected (`SECURITY.md`), so there are no *other builders' checks*.
+
+## The queue
+
+`QUEUE.md` holds the order of the work here and nothing else (core archive 208): each line an open issue, who builds it
+and what it waits on. A task is a line; its issue is the item and its spec, read with the note that gathers it where
+one says it does, and its conditions stand there. The main lane is the lines in order.
+
+- **An idea is built only from a line, and a line joins in a PR that quotes the owner's yes to its issue.** That PR is
+  the gate: an issue can say the owner agreed as easily as quote it (floor rule 4), so no verdict of the stand-in's
+  queues one here, a difference from `modules/inbox.md`. A bug waits for no line, as that module says. A line leaves in
+  the PR that closes its issue.
+- **The file holds no note.** Where a module asks for one in the *progress file* (where to pick up after a passed
+  gate, a lane that waits), it goes in the description of the line's own PR, which the next builder reads with the
+  branch.
+- **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
+  said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
+  What a session adds to an issue after that day is that session's word (floor rule 4).
+- **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
+  session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
+  writes it from the owner's words quoted on the issue, adds them to the archive as an item of their own, naming the
+  issue as its source, and takes what they leave open as `modules/inbox.md` says of any open point. This is the second
+  difference from that module, where only the design session writes rules from the owner's words.
+- **An orchestrator may work the file** (`modules/orchestrating.md`) while it holds a line a session can take. The
+  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
+  wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
+  a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
+- **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
+  is the owner's ("A release is cut on the owner's word"): no session cuts one by its own choice. For the release that
+  follows `release-5`, and for no other, that word is given (core archive 210): once the file holds no line a session
+  can take, no PR of a session's is open but one that waits only on the owner's yes, and every check on `main`'s
+  newest commit has passed, the session that finds it so, the orchestrator at the end of its work, starts the
+  `release` workflow. Every later release waits for the owner's word again.
+- **A batch is sized by what the projects can take:** once its release is synced, the count of "The core is measured
+  as a feature is" is taken again in each of the owner's projects and named to the owner, who sizes the next by it. It
+  holds back no line the owner has said yes to: there is no pause on new rules.
 
 ## How changes are made here
 
-- **A branch of its own, with a draft PR into `main`, pushed after every commit.** A PR that changes a rule says what it
-  changes in every project.
+- **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
+  push after every commit as `modules/git.md` says, then ready, its reviews, their findings fixed and the merge as
+  `modules/work-flow.md` says (point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
-  owner's yes in it.
+  owner's yes in it, and waits for it unmerged while its builder takes the next line.
 - **The size cap keeps the rules lean and decides nothing else** (`scripts/size.mjs`; core archive 179 and 181): no rule
   is moved from where it belongs, cut short or left out to fit, nor is another rule's reason, name or example cut to
   make room. It rises, one step of a whole KB, only as "A mark on what every session reads" in
   `modules/review-guidelines.md` says of any such mark (core archive 182): here those files are what every session
   reads at its start, the core's part of the starter kit's list (core archive 201), and `.github/workflows/size.yml`
   fails a raise of more than one step, and one in a PR with no "Leanness check:" comment.
-- **The design session writes and merges changes here,** each carried into every project by that project's sync PR. It
-  also does here what "Sessions" in `modules/work-flow.md` asks of a session that ends: it reads what reviews left after
-  a merge (`modules/reviews.md`, point 2) and cleans up what it made.
 - **A release is cut on the owner's word** (core archive 195 and 196): another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, about once a week, and never by a session's own choice. The owner tags nothing by hand:
