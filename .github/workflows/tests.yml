@@ -94,6 +94,9 @@ jobs:
       - name: The tree a copy must be
         if: ${{ !cancelled() }}
         run: node scripts/copy-tree-test.mjs
+      - name: The copy of the core's check (core.yml), its own job on scratch projects
+        if: ${{ !cancelled() }}
+        run: node scripts/core-yml-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() }}
         run: node scripts/pure-sync-test.mjs
@@ -109,7 +112,7 @@ jobs:
       - name: A project of the previous release, synced to this commit, passes every check unchanged
         if: ${{ !cancelled() }}
         run: node scripts/upgrade-test.mjs
-      - name: The NuGet check's first step, which says whether a pull request needs a restore
+      - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() }}
         run: node scripts/nuget-gate-test.mjs
       - name: The personal-terms check, its own job on scratch pull requests

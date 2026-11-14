@@ -8,7 +8,9 @@
 # ("Differences") from the floor or the review guidelines.
 # A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
 # pinned to a full commit SHA. Reads only, with no secret: it fetches this public repository at the pin it reads, which
-# must be a full commit SHA before it is used, and runs nothing from either repository.
+# must be a full commit SHA before it is used, and runs nothing from either repository. Its own shell is tested in the
+# core before any project runs it: scripts/core-yml-test.mjs runs this job on scratch projects, and
+# scripts/pure-sync-test.mjs on every way a copy can differ.
 name: core
 
 on:

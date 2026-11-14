@@ -194,8 +194,10 @@ export const fill = (text, contexts, state) => (typeof text === "string" ? text.
 /** Whether an `if` holds: a whole `${{ }}`, or an expression written bare. Left out: success(). */
 export function holds(cond, contexts, state) {
   if (cond === undefined || cond === null) return !state.failed;
-  if (typeof cond === "boolean") return cond;
+  if (typeof cond === "boolean") return cond && !state.failed;
   const t = String(cond).trim();
+  // (as GitHub reads it: a condition that asks no status of its own is read as success() && it)
+  if (!/\b(?:success|failure|always|cancelled)\s*\(/u.test(t) && state.failed) return false;
   const whole = /^\$\{\{([\s\S]*)\}\}$/.exec(t);
   return truthy(whole ? evaluate(whole[1], contexts, state) : t.includes("${{") ? fill(t, contexts, state) : evaluate(t, contexts, state));
 }
@@ -280,7 +282,15 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
         const handler = uses[action];
         if (!handler) throw new Error(`an action this test has no part for: ${action} (in ${id})`);
         const w = Object.fromEntries(Object.entries(step.with ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
-        const did = handler(w, dir, env);
+        let did;
+        try {
+          did = handler(w, dir, env);
+        } catch (e) {
+          // (a stand-in that refuses what the step asks of it fails the step, as the action would)
+          result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
+          state.failed = true; result.passed = false;
+          continue;
+        }
         result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
         continue;
       }
