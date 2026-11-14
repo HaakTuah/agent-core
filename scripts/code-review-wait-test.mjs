@@ -36,6 +36,7 @@ const SAME = HEAD.slice(0, 7) + "e".repeat(33);
 const same = judge({ ...pull, head: { sha: SAME } }, [summary({ ...running, commit_sha: SAME }), said(`Code review: of ${HEAD}`)]);
 ok(same?.sha === SAME && same.done === false && same.why.includes("still running"), "an earlier review of a commit with the same first seven characters does not end the wait on a new head");
 ok(is(judge(pull, [summary(running), said(`Code review: of ${HEAD.toUpperCase()}`)]), true, "is posted"), "the whole SHA in capitals counts too");
+ok(is(judge(pull, [summary(running), said(`Code review: of f${HEAD}`)]), false, "still running") && is(judge(pull, [summary(running), said(`Code review: of ${HEAD}0`)]), false, "still running") && is(judge(pull, [summary(running), said(`Code review: of ${HEAD}.`)]), true, "is posted"), "the SHA must stand alone: glued to more hex it names no commit, and the wait goes on");
 ok(["MEMBER", "COLLABORATOR"].every((a) => is(judge(pull, [summary(running), said(`**Code review:** of ${HEAD}`, a)]), true, "is posted")), "and so does one from a member or collaborator, in bold too, naming the whole commit");
 ok(is(judge(pull, [summary(running), said(`Code review: of ${OLD}`)]), false, "still running"), "one posted of another commit does not");
 ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", null].every((a) => is(judge(pull, [summary(running), said(`Code review: of ${HEAD}`, a)]), false, "still running")), "nor one from anyone else");
