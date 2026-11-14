@@ -161,10 +161,11 @@ export function files(o, pin, moduleNames, read) {
   });
 }
 
-// The reading-size check's first marks: each file every session reads at about 20 KB, and their total at what they
-// come to today, rounded up to a whole KB with one to spare, so the first task has room and the mark means something.
+// The reading-size check's first marks: each file every session reads at about 20 KB, and the total of the project's
+// own among them (the core's copy, under core/, is held to the core's own cap) at what they come to today, rounded up
+// to a whole KB with one to spare, so the first task has room and the mark means something.
 export function sizes(bytes) {
-  const total = Object.values(bytes).reduce((a, b) => a + b, 0);
+  const total = Object.entries(bytes).filter(([f]) => !f.startsWith("core/")).reduce((a, [, b]) => a + b, 0);
   return { each: 20 * KB, read: Object.fromEntries(Object.keys(bytes).map(f => [f, 20 * KB])), total: (Math.ceil(total / KB) + 1) * KB, split: 50 * KB, skip: [], past: {} };
 }
 

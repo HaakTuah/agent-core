@@ -38,8 +38,8 @@ for (const [what, bad] of [["a line break", "two\nlines"], ["a template's word",
 // what the templates become
 ok(modules(["b.md", "game-design.md", "a.md"], false) === "`a.md`, `b.md`" && modules(["b.md", "game-design.md"], true) === "all", "a game takes every module, any other project each but the games' own, by name");
 ok(fill("{{owner}} at {{pin}}", { owner: "x", pin: A }) === `x at ${A}` && throws(() => fill("{{owner}} {{other}}", { owner: "x" })), "a template's words are filled in, and one left unfilled fails");
-const marks = sizes({ "a.md": 1000, "b.md": 1500 });
-ok(marks.each === 20480 && marks.read["a.md"] === 20480 && marks.total === 4096 && marks.split === 51200, "the first marks: about 20 KB a file, the total a whole KB above what the files come to, with one to spare");
+const marks = sizes({ "a.md": 1000, "b.md": 1500, "core/floor/security.md": 9000 });
+ok(marks.each === 20480 && marks.read["a.md"] === 20480 && marks.read["core/floor/security.md"] === 20480 && marks.total === 4096 && marks.split === 51200, "the first marks: about 20 KB a file, the project's own total a whole KB above what its files come to, with one to spare, the core's copy held to the core's own cap");
 ok(JSON.stringify(licences({}, () => true)) === JSON.stringify({ ships: [], audit: "checks/licences-audit.json", scan: { served: [], skip: [] } }), "the first licence config: nothing ships, and no npm file where the project has no npm");
 ok(licences({ packages: "tools" }, f => f === "tools/package-lock.json").lockfiles.join() === "tools/package-lock.json" && licences({ packages: "tools" }, () => false).lockfiles.length === 0 && licences({ packages: "." }, () => true).ignoreScriptsIn.join() === ".npmrc", "of npm's files only those that stand are named, from the project's root");
 
@@ -104,6 +104,17 @@ if (p.status === 0) {
     const r = spawnSync(process.execPath, args, { cwd: p.dir, env: { ...env, SIZES_BASE: "HEAD" }, encoding: "utf8" });
     ok(r.status === 0, `${what} passes on the project it wrote`, (r.stdout + r.stderr).split("\n").filter(l => /FAIL|Error/.test(l)).slice(0, 5).join("\n     "));
   }
+  // (the core's copy may grow, as a sync brings it, past the project's own total, and the check still passes; the
+  // project's own files may not)
+  const sizeCheck = () => spawnSync(process.execPath, ["core/scripts/reading-size.mjs", "checks/sizes.json"], { cwd: p.dir, env: { ...env, SIZES_BASE: "HEAD" }, encoding: "utf8" });
+  const grow = (f, n) => { const at = path.join(p.dir, f), was = fs.readFileSync(at, "utf8"); fs.writeFileSync(at, `${was}${"x".repeat(n)}\n`); return () => fs.writeFileSync(at, was); };
+  let undo = grow("core/floor/security.md", 3000);
+  const coreGrew = sizeCheck();
+  undo();
+  undo = grow("AGENTS.md", 3000);
+  const ownGrew = sizeCheck();
+  undo();
+  ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total/.test(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
   const again = run(p.dir, script, "--owner", "someone-else");
   ok(again.status === 1 && again.out.includes("never overwrites") && git(p.dir, "status", "--porcelain") === "", "run again, it overwrites nothing and says which files stand");
 }
