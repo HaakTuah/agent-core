@@ -82,6 +82,10 @@ passes(two, "silencing comments where they stood", two);
 fails(two.replace(" # zizmor: ignore[template-injection]\n", "\n").replace("pull_request.title }}\"\n", "pull_request.title }}\" # zizmor: ignore[template-injection]\n"), "a silencing comment moved to another line", "added or moved", two);
 fails(two.replace("      # codeql[actions/x]\n", "").replace("      - run: echo \"${{ github.event.pull_request", "      # codeql[actions/x]\n      - run: echo \"${{ github.event.pull_request"), "a silencing comment line moved before another line", "added or moved", two);
 passes(two.replace(" # zizmor: ignore[template-injection]", ""), "a silencing comment taken off its line", two);
+const steps2 = "jobs:\n  a:\n    steps:\n      # nosemgrep: run-shell-injection\n      - name: One # zizmor: ignore[template-injection]\n        run: echo one\n      - name: Two\n        run: echo \"${{ github.event.pull_request.title }}\"\n";
+fails(steps2.replace("      # nosemgrep: run-shell-injection\n", "").replace("      - name: Two", "      # nosemgrep: run-shell-injection\n      - name: Two"), "a silencing comment line moved from one step to another, their names read alike", "added or moved", steps2);
+fails(steps2.replace("One # zizmor: ignore[template-injection]", "One").replace("- name: Two", "- name: Two # zizmor: ignore[template-injection]"), "a silencing note moved from one step's name to another's", "added or moved", steps2);
+passes(steps2.replace("- name: One #", "- name: First #"), "a step renamed beside its silencing note", steps2);
 passes(edit(' # a quoted value', ""), "a comment after a quoted value taken out");
 passes(edit("[opened, synchronize] # the kinds", "[opened, synchronize] # what starts it"), "a comment after [ ] changed");
 passes(edit("      - name: The check", "\n\n      - name: The check").replace("permissions:", "\npermissions:"), "blank lines between entries");
@@ -166,8 +170,8 @@ ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", ".claude", "sub/.g
   && !["github/x.yml", "x.github/y", "my-action.yml", "action.yml.md"].some(f => RUNS.test(f)), "what it reads: .github/ and .claude/, the folders themselves too, at any depth and in any case, and every action.yml");
 ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules",
   "Directory.Build.targets", "src/App.csproj", "Directory.Packages.props", "NuGet.Config", "global.json", ".config/dotnet-tools.json", "src/packages.lock.json",
-  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc"].every(f => RUNS_TOO.test(f))
-  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, the copy of the core");
+  ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc", "Makefile", "justfile", "Taskfile.yml", ".tool-versions"].every(f => RUNS_TOO.test(f))
+  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, a task runner's file, the copy of the core");
 
 // ---- the script end to end, on a pull request's branch ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "comment-only-test-"));

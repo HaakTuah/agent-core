@@ -32,11 +32,12 @@ const YAML = /\.ya?ml$/iu;
 // what YAML 1.1 or 1.2 reads as a line break besides \n, a tab, a byte order mark, and every other control character
 const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff]/u;
 const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scalar's header, with its comment if any
-// what else runs by itself or decides what does, refused outright: Claude Code's servers; an editor's, a container's
-// or a shell's setup and git's hooks; npm's and .NET's packages, tools, configs and builds (MSBuild runs a project's
-// targets) and the Node or SDK they pick; the copy of the core; git's own attributes and submodules; a container's
-// build; and a name with "~" and a digit, which Windows can read as another folder's short name (CLAUDE~1 for .claude)
-export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|Dockerfile[^/]*|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:csproj|fsproj|vbproj|props|targets))$|(?:^|\/)\.(?:vscode|devcontainer|husky)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
+// what else runs by itself or decides what does, refused outright: Claude Code's servers; an editor's, a container's or
+// a shell's setup and git's hooks; npm's and .NET's packages, tools, configs and builds (MSBuild runs a project's
+// targets) and the Node or SDK they pick; a task runner's file; the copy of the core; git's own attributes and
+// submodules; a container's build; and a name with "~" and a digit, which Windows can read as another folder's short
+// name (CLAUDE~1 for .claude)
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|Dockerfile[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:csproj|fsproj|vbproj|props|targets))$|(?:^|\/)\.(?:vscode|devcontainer|husky)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
 const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string
@@ -187,9 +188,9 @@ export function proof(before, after) {
     return { why: `more than a comment or a step's name changed (${where(a.lines, "before")}, ${where(b.lines, "after")})` };
   }
   // a comment that a tool may read as an instruction, added, changed or moved (a tool reads it on its own line, or on
-  // the line after it): each must stand, word for word, beside the same line as before; the note beside an action's
-  // version (`uses:`)
-  const placed = (side, c) => `${c.own ? "before" : "on"} ${side.lines[c.at] ? kept(side.lines[c.at]) : "the end"}\u0000${c.text}`;
+  // the line after it): each must stand, word for word, beside the same line as before, by its place, the two versions'
+  // lines being matched one to one by now (two lines may read alike); the note beside an action's version (`uses:`)
+  const placed = (side, c) => `${c.own ? "before" : "on"} ${c.at}\u0000${c.text}`;
   const left = new Map();
   for (const c of a.comments) if (DIRECTIVE.test(c.text)) left.set(placed(a, c), (left.get(placed(a, c)) ?? 0) + 1);
   for (const c of b.comments) {
