@@ -4,7 +4,8 @@
 // name, a difference from the floor or the review guidelines, a manifest without its one pin or one owner's account, a
 // pin off the core's main, a call pinned where its workflow differs or written in another form). The copy's own faults
 // (an edit, a file added, a link, a submodule, one whose id is the copy's own tree; the executable bit no difference)
-// are pure-sync-test.mjs's, which runs this job on each. A scratch core of two commits on its main and one off it,
+// are pure-sync-test.mjs's, which runs this job on each; a report whose name git quotes is left out here as the copy
+// leaves it out. A scratch core of two commits on its main and one off it,
 // reached through the core's address by a git rewrite, so no call reaches the network. On Linux and on Windows. Git,
 // tar, bash and Node's own modules.
 //
@@ -41,6 +42,12 @@ write(theCore, ".github/workflows/personal-terms.yml", terms);
 git(theCore, "commit", "-q", "-am", "B");
 const B = git(theCore, "rev-parse", "HEAD");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
+// C: a report whose name git quotes (a letter beyond ASCII), in the folder the core keeps to itself
+const quoted = `reports/2026-01-01-${String.fromCodePoint(0xf8)}.md`;
+write(theCore, quoted, "A report.\n");
+git(theCore, "add", "-A");
+git(theCore, "commit", "-q", "-m", "C");
+const C = git(theCore, "rev-parse", "HEAD");
 const workflow = git(theCore, "show", `${B}:.github/workflows/core.yml`);
 
 const MANIFEST = (pin = B, more = "") => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${OWNER}\` |\n${more}`;
@@ -82,6 +89,7 @@ fails("a call written in other letters, and in another form", "a call to the cor
 fails("a call in a workflow ending .yaml, quoted", `personal-terms.yml: ${SIDE} is not a commit of the core's main`, { ".github/workflows/other.yaml": `on: push\njobs:\n  terms:\n    uses: "${CORE}/.github/workflows/personal-terms.yml@${SIDE}"\n` });
 passes("a copy of an older commit of the core's main, each call at it", { "core-manifest.md": MANIFEST(A), ".github/workflows/core.yml": CALLS(A, A) }, { at: A });
 fails("a call pinned past the manifest's pin, where its workflow differs from the one at the pin", `personal-terms.yml at ${B} differs`, { "core-manifest.md": MANIFEST(A), ".github/workflows/core.yml": CALLS(B, A) }, { at: A });
+passes("a copy of a commit whose report git quotes the name of, the reports left out as the copy leaves them", { "core-manifest.md": MANIFEST(C) }, { at: C });
 passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check`);
