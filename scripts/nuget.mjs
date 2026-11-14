@@ -68,6 +68,8 @@
 //                                               and of the tools a manifest of dotnet's names, read from files no pull
 //                                               request's build has run beside (core archive 201)
 //   node core/scripts/nuget.mjs --projects     the project files git knows, a line each: what the workflow restores
+//   node core/scripts/nuget.mjs --imports      the files of another name than a build file's that an Import brings in,
+//                                               a line each: what the workflow's first look adds to what it diffs
 //   node core/scripts/nuget.mjs <config> --sources   where the workflow's restore takes packages from, a line each,
 //                                                    a folder by its whole path
 //
@@ -106,6 +108,16 @@ const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
  * read in one pass from tag to tag: a comment, CDATA or a processing instruction is passed over whole, and a tag's
  * attributes are read only within it, so no text, however long or unclosed, is read more than once.
  */
+// (an attribute's value as XML gives it to MSBuild: a line break or a tab is a blank, and a reference to a character
+// is that character, so a ";" written as one parts a list; an entity XML does not know stays as written, and MSBuild
+// would not read the file at all)
+const xmlValue = (value) => value.replace(/\r\n?|[\t\n]/gu, " ").replace(/&(?:#([0-9]{1,7})|#x([0-9A-Fa-f]{1,6})|(amp|lt|gt|quot|apos));/gu, (whole, dec, hex, name) => {
+  if (name) return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[name];
+  const code = dec ? Number(dec) : parseInt(hex, 16);
+  return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+});
+// (the blanks .NET trims from each name of a list, as MSBuild does: a byte-order mark is no blank there)
+const TRIM = /^[\p{Zs}\p{Zl}\p{Zp}\t-\r\u0085]+|[\p{Zs}\p{Zl}\p{Zp}\t-\r\u0085]+$/gu;
 export function imported(text) {
   const found = [], ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
   for (let i = text.indexOf("<"); i >= 0; i = text.indexOf("<", i)) {
@@ -117,20 +129,21 @@ export function imported(text) {
     for (; end < text.length && (quote || text[end] !== ">"); end++) if (quote ? text[end] === quote : text[end] === '"' || text[end] === "'") quote = quote ? "" : text[end];
     if (end >= text.length) break;
     const attributes = [...text.slice(i + 7, end).matchAll(ATTRIBUTE)], sdk = attributes.some((a) => a[1].toLowerCase() === "sdk");
-    for (const a of attributes) if (a[1].toLowerCase() === "project") for (const x of (a[2] ?? a[3]).split(";")) if (x.trim()) found.push({ project: x.trim(), sdk });
+    for (const a of attributes) if (a[1].toLowerCase() === "project") for (const x of xmlValue(a[2] ?? a[3]).split(";")) { const name = x.replace(TRIM, ""); if (name) found.push({ project: name, sdk }); }
     i = end + 1;
   }
   return found;
 }
 /** Where an Import in the build file `from` finds `project`, as git lists a path, beside `from` as MSBuild reads a
  *  relative one: "" for a path outside the project, null for one this cannot know without the build (a property other
- *  than $(MSBuildThisFileDirectory) at its start, which is `from`'s own folder, an item, an escape or a wildcard). */
+ *  than $(MSBuildThisFileDirectory) at its start, which is `from`'s own folder, an item, an escape, an entity or a
+ *  wildcard). */
 export function importPath(from, project) {
   // (the property ends in a separator, so one more after it is the same folder, never the top of a drive)
   const here = /^\$\(MSBuildThisFileDirectory\)/iu.exec(project);
   let p = project.slice(here ? here[0].length : 0).replace(/\\/gu, "/");
   if (here) p = p.replace(/^\/+/u, "");
-  if (/[$@%*?]/u.test(p)) return null;
+  if (/[$@%&*?]/u.test(p)) return null;
   if (p.startsWith("/") || /^[A-Za-z]:/u.test(p)) return "";
   const at = posix.normalize(posix.join(posix.dirname(from), p));
   return at === ".." || at.startsWith("../") ? "" : at;
@@ -139,21 +152,28 @@ export function importPath(from, project) {
  * The build files among `own` (the project's files git knows, as git lists them), each read by `read` (its text, or
  * null), and every file of another name that an Import in one of them, or in a file one brings in, brings in where git
  * knows it, its name's case aside, as MSBuild on Windows finds it: { files: each such file's path to its text,
- * brought: those an Import brought in, unread: each Import this cannot follow, typed: the files with a document type,
- * whose Imports are not read }. A build file git knows is read as one, whoever imports it.
+ * brought: each file an Import brought in, to the files whose Imports bring it in, unread: each Import this cannot
+ * follow, typed: the files with a document type, whose Imports are not read }. A build file git knows is read as one,
+ * whoever imports it. Each file is read once, and each place an Import leads to looked up once from each file.
  */
 export function importsOf(own, read) {
-  const byName = new Map(), files = new Map(), brought = new Set(), unread = [], typed = [];
-  for (const f of own) byName.set(f.toLowerCase(), [...(byName.get(f.toLowerCase()) ?? []), f]);
+  const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [];
+  for (const f of own) { const k = f.toLowerCase(); if (byName.has(k)) byName.get(k).push(f); else byName.set(k, [f]); }
   for (const f of own.filter((x) => BUILD_FILE.test(x))) files.set(f, read(f) ?? "");
   for (const [f, text] of files) {
     // (a document type can name text that reads as a comment's start: its Imports are not read)
     if (/<!DOCTYPE/iu.test(text)) { typed.push(f); continue; }
+    const looked = new Set();
     for (const { project, sdk } of imported(text)) {
       if (BUILD_FILE.test(project.split(/[\\/]/u).pop())) continue;
       const at = sdk ? null : importPath(f, project), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
-      if (!found.length) unread.push({ from: f, project, why: at === null ? "a file whose path this check cannot know without the build" : "no file of the project's that git knows" });
-      for (const g of found) if (!files.has(g)) { brought.add(g); files.set(g, read(g) ?? ""); }
+      if (!found.length) unread.push({ from: f, project, why: at === null ? "a file whose path this check cannot know without the build" : "a path outside the project, or no file of the project's that git knows" });
+      if (!found.length || looked.has(at.toLowerCase())) continue;
+      looked.add(at.toLowerCase());
+      for (const g of found) {
+        if (!files.has(g)) { brought.set(g, new Set()); files.set(g, read(g) ?? ""); }
+        brought.get(g)?.add(f);
+      }
     }
   }
   return { files, brought, unread, typed };
@@ -406,8 +426,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read: move the project to PackageReference`);
   for (const f of own.filter((f) => OTHER_LOCK.test(posix.basename(f)))) failures.push(`${f}: a lock file under another name, which NuGet takes before ${LOCK} and this check does not read: keep the one name`);
   // (each build file, and each file an Import brings in under another name, which the check reads only lately: what such
-  // a file names is reported where the base held it as it stands and brought it in as well; one a pull request adds,
-  // changes or brings into play fails, as does what a build file names)
+  // a file names is reported where the base held it as it stands, brought in by every file that brings it in now; one
+  // a pull request adds, changes or brings into play with an Import of its own fails, as does what a build file names)
   const now = importsOf(own, (f) => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } });
   // (the base's files as MSBuild reads them: a link git knows is read through to the file it leads to, as a checkout
   // that keeps links reads it now; one that leads out of the project, or to no file the base held, holds nothing)
@@ -433,18 +453,21 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   };
   const broughtThen = (f) => {
     if (!then) then = importsOf([...baseTree().keys()], baseText).brought;
-    return then.has(f);
+    return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
   for (const [f, text] of now.files) {
+    const found = [
+      /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read",
+      /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read",
+      /TreatAsLocalProperty/iu.test(text) && "names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them",
+    ].filter(Boolean);
+    if (!found.length) continue;
     // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
     const held = now.brought.has(f) ? !base || (baseText(f) === text && broughtThen(f))
       : /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
-    const [to, tail] = held ? [reports, ` ${heldBefore}`] : [failures, ""];
     const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;
-    if (/NuGetLockFilePath/iu.test(text)) to.push(`${named} names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read${tail}`);
-    if (/RestorePackagesPath|FallbackFolders/iu.test(text)) to.push(`${named} names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read${tail}`);
-    if (/TreatAsLocalProperty/iu.test(text)) to.push(`${named} names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them${tail}`);
+    for (const what of found) (held ? reports : failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
   }
   for (const f of now.typed) reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
   for (const { from, project, why } of now.unread) reports.push(`${from} imports ${project}, ${why}: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
@@ -603,6 +626,14 @@ if (started(import.meta.url)) {
     // (a line each, for a shell to read: a name that would be more than one line is refused, never cut)
     const odd = files.filter((f) => shown(f) !== f);
     if (odd.length) fail(`a project file whose name holds a line break or a control character: ${odd.join(", ")}`);
+    for (const f of files) console.log(f);
+    process.exit(0);
+  }
+  if (args.includes("--imports")) {
+    let files;
+    try { const { root, tracked } = project(); files = [...importsOf(tracked.filter((f) => !f.startsWith("core/")), (f) => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } }).brought.keys()]; } catch (e) { fail(e.message); }
+    const odd = files.filter((f) => shown(f) !== f);
+    if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}`);
     for (const f of files) console.log(f);
     process.exit(0);
   }
