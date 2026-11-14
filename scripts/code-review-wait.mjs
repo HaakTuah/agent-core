@@ -5,8 +5,8 @@
 // copy, on what GitHub's own API gives of the pull request and its comments. It waits only while the summary Codex's own
 // app keeps on the pull request says its code review is running on the pull request's head commit. The wait ends when
 // Codex's code review finishes, or when a comment that opens "Code review:" from the repository's owner, a member or a
-// collaborator names that commit by at least its first seven characters: how the next reviewer, or the fallback
-// reviewer, posts the review it took over. A code review that never starts (one not asked, or a reviewer out of
+// collaborator names that commit by its whole SHA, all forty characters, since a commit can be made to share a short
+// one's first characters: how the next reviewer, or the fallback reviewer, posts the review it took over. A code review that never starts (one not asked, or a reviewer out of
 // usage) has nothing running, and holds nothing. It does not hold that a code review was asked, nor what one says: those
 // stay with the builder and the reviews. It prints, as JSON, the commit to mark and the status to give it, named
 // "code-review", or {} for a pull request that is closed or a draft. While "advisory" (the workflow's input, on unless
@@ -37,7 +37,9 @@ export function judge(pull, comments) {
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (!running) return { sha, done: true, why: "no code review is running" };
   const short = sha.slice(0, 7);
-  const posted = list.some((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && comment.body.includes(short));
+  // the whole SHA, never a prefix: an old review naming the first characters of another commit must not end this wait
+  const named = (body) => (body.match(/[0-9a-f]{40}/giu) ?? []).some((found) => found.toLowerCase() === sha);
+  const posted = list.some((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && named(comment.body));
   if (posted) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
   return { sha, done: false, why: `Codex's code review of ${short} is still running` };
 }

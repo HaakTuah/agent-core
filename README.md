@@ -159,18 +159,19 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
      request or by a comment that opens "Security review:" from the owner, a member or a collaborator
-     (`modules/reviews.md`, point 3), the second alone where Codex marks a finding of its review open, posted after
-     it. Where a summary of Codex's is there but its state cannot be read, a form nobody documents having changed, the
+     (`modules/reviews.md`, point 3), the second alone where Codex marks a finding of its review open, posted after it.
+     Where a summary of Codex's is there but its state cannot be read, a form nobody documents having changed, the
      status says so, the run warns, and the check waits or passes as it would with no summary (a summary whose first
      line itself changed is not known as one, and counts as none); its tests keep real summaries as GitHub's API gives
      them. It is advisory until the core says otherwise: the status always passes and says what the check would have
      done. Dependabot's own pull request passes it (floor rule 17); one that needs no security review and gets none by
      itself (floor rule 8) says so in such a comment. Beside it, in the same job, the status `code-review` waits while
      Codex's code review runs on the head commit, until it finishes or a comment that opens "Code review:" from the
-     owner, a member or a collaborator names that commit (`modules/reviews.md`, point 2); it advises as the first does,
-     and a code review that never starts holds nothing. It runs a short job at each push and each such comment, a dozen
-     or so a pull request, which a private repository pays for: there the job is skipped, and so not billed, unless
-     the project turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
+     owner, a member or a collaborator names that commit by its whole SHA (`modules/reviews.md`, point 2); it advises as
+     the first does, and a code review that never starts holds nothing. It runs a short job at each push and each such
+     comment, a dozen or so a pull request, which a private repository pays for: there the job is skipped, and so not
+     billed, unless the project turns it on (the input `private`) or has turned advisory off, since a ruleset may then
+     wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds and `core/scripts/exact-versions.mjs` for its lockfiles, and its own check holds its

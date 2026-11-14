@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Tests for scripts/code-review-wait.mjs: a code review running on the head commit is waited for, a code review of that
-// commit posted by another reviewer ends the wait, and nothing else holds a pull request. Run by tests.yml.
+// commit, named by its whole SHA, posted by another reviewer ends the wait, and nothing else holds a pull request. Run by tests.yml.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,11 +30,16 @@ ok(is(judge(pull, [summary({ ...running, status: "completed" })]), true, "no cod
 ok(is(judge(pull, [summary({ ...running, status: "failed" })]), true, "no code review is running") && is(judge(pull, [summary({ ...running, status: "something new" })]), true, "no code review is running"), "a word not known as running holds nothing, so no form of Codex's can hold a pull request for good");
 ok(is(judge(pull, [summary({ commit_sha: null, status: null })]), true, "no code review is running") && is(judge(pull, []), true, "no code review is running") && is(judge(pull, null), true, "no code review is running"), "none asked, or no summary at all (a reviewer out of usage never starts), holds nothing");
 ok(is(judge(pull, [summary({ ...running, commit_sha: OLD })]), true, "no code review is running"), "one running on an earlier commit does not hold the newest");
-ok(is(judge(pull, [summary(running), said(`Code review: the fallback reviewer's, of ${HEAD.slice(0, 7)}. Blocking: none.`)]), true, "is posted"), "a code review of the head commit posted by the owner's account ends the wait");
+ok(is(judge(pull, [summary(running), said(`Code review: the fallback reviewer's, of ${HEAD}. Blocking: none.`)]), true, "is posted"), "a code review of the head commit, named whole, posted by the owner's account ends the wait");
+ok(is(judge(pull, [summary(running), said(`Code review: of ${HEAD.slice(0, 7)}`)]), false, "still running") && is(judge(pull, [summary(running), said(`Code review: of ${HEAD.slice(0, 39)}`)]), false, "still running"), "one naming only the commit's first characters does not, since a commit can be made to share them");
+const SAME = HEAD.slice(0, 7) + "e".repeat(33);
+const same = judge({ ...pull, head: { sha: SAME } }, [summary({ ...running, commit_sha: SAME }), said(`Code review: of ${HEAD}`)]);
+ok(same?.sha === SAME && same.done === false && same.why.includes("still running"), "an earlier review of a commit with the same first seven characters does not end the wait on a new head");
+ok(is(judge(pull, [summary(running), said(`Code review: of ${HEAD.toUpperCase()}`)]), true, "is posted"), "the whole SHA in capitals counts too");
 ok(["MEMBER", "COLLABORATOR"].every((a) => is(judge(pull, [summary(running), said(`**Code review:** of ${HEAD}`, a)]), true, "is posted")), "and so does one from a member or collaborator, in bold too, naming the whole commit");
-ok(is(judge(pull, [summary(running), said(`Code review: of ${OLD.slice(0, 7)}`)]), false, "still running"), "one posted of another commit does not");
-ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", null].every((a) => is(judge(pull, [summary(running), said(`Code review: of ${HEAD.slice(0, 7)}`, a)]), false, "still running")), "nor one from anyone else");
-ok(["code review: of " + HEAD.slice(0, 7), "> Code review: of " + HEAD.slice(0, 7), "The Code review: of " + HEAD.slice(0, 7), "Security review: of " + HEAD.slice(0, 7)].every((b) => is(judge(pull, [summary(running), said(b)]), false, "still running")), "nor one that does not open with the words");
+ok(is(judge(pull, [summary(running), said(`Code review: of ${OLD}`)]), false, "still running"), "one posted of another commit does not");
+ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", null].every((a) => is(judge(pull, [summary(running), said(`Code review: of ${HEAD}`, a)]), false, "still running")), "nor one from anyone else");
+ok(["code review: of " + HEAD, "> Code review: of " + HEAD, "The Code review: of " + HEAD, "Security review: of " + HEAD].every((b) => is(judge(pull, [summary(running), said(b)]), false, "still running")), "nor one that does not open with the words");
 ok(is(judge(pull, [summary(running, { login: "chatgpt-codex-connector", type: "User" })]), true, "no code review is running") && is(judge(pull, [{ ...summary(running), body: `Quoted:\n${summary(running).body}` }]), true, "no code review is running"), "a look-alike summary, by another account or not at a comment's start, is none");
 ok(is(judge(pull, [summary(running), summary({ ...running, status: "completed" })]), false, "still running"), "the first summary of Codex's is read, never a later look-alike");
 const unread = judge(pull, [{ ...summary(running), body: summary(running).body.replace("codex-review-state:v1", "codex-review-state:v2") }]);
@@ -54,7 +59,7 @@ try {
   const advisory = run(pull, [[summary(running)]]);
   ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.context === "code-review" && advisory.status.description.startsWith("Advisory: would wait, Codex's code review"), "run with no word on it, it is advisory and names its status");
   const strict = run(pull, [[summary(running)]], { ADVISORY: "false", RUN_URL: "https://github.com/o/r/actions/runs/9" });
-  ok(strict.status.state === "pending" && strict.status.target_url.endsWith("/runs/9") && run(pull, [[summary(running), said(`Code review: of ${HEAD.slice(0, 7)}`)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review finishes or another's is posted");
+  ok(strict.status.state === "pending" && strict.status.target_url.endsWith("/runs/9") && run(pull, [[summary(running), said(`Code review: of ${HEAD}`)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review finishes or another's is posted");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
