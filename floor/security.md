@@ -28,8 +28,9 @@ attack: `floor/threat-model.md`.
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
   the fallback reviewer's, neither of which wrote it (`modules/reviews.md`; core archive 134 and 138).
   - Save an action's pinned version alone (rule 17).
-  - One of comments and steps' names alone passes rule 8's one, as the core's `scripts/comment-only.mjs`, run from
-    the core's `main`, proves (core archive 203).
+  - One that changes, of what runs by itself or with credentials, only comments and steps' names passes rule 8's one:
+    the core's `scripts/comment-only.mjs`, run from the core's `main` on the head that merges, proves it of the files
+    it reads, and the session says of each other file changed why it is not among them (core archive 203).
 - `.claude/settings.json` runs what Claude Code starts by itself from its copy on `main`, and denies Claude's file tools
   any edit inside `.git`.
 

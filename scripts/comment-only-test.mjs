@@ -4,7 +4,8 @@
 // entry, a job or the workflow named `name`, an expression in a step's name, a composite action's steps, every
 // character YAML reads as a line break or this proof does not read); then each workflow of this repository, a comment
 // and a step's name changed in it where it reads; then the script run end to end, as its builder runs it, on a pull
-// request's branch in a scratch clone: what it reads under .github/ and .claude/ (any case, any depth), a file added,
+// request's branch in a scratch clone: what it reads under .github/ and .claude/ (any case, any depth) and a project's
+// own action.yml, a file added,
 // deleted or its mode changed, a file not YAML, text not UTF-8, the working tree left unread, and a later commit read
 // against the one reviewed. On Linux and on Windows. Git and Node's own modules only.
 //
@@ -69,7 +70,11 @@ passes(BASE, "a file unchanged");
 passes(edit("# A workflow for the test", "# Another note"), "a comment line changed");
 passes(edit("      - name: The check", "      # before the check\n      - name: The check"), "a comment line added between steps");
 passes(edit("# A workflow for the test\n", ""), "a comment line taken out");
-passes(edit("# v7.0.1", "# v7.0.2"), "a line's own comment changed");
+passes(edit('"y" # a quoted value', '"y" # the value, quoted'), "a line's own comment changed");
+fails(edit("# v7.0.1", "# v7.0.2"), "the note beside an action's version, which reviewers trust", "the note beside an action's version");
+fails(edit("# the kinds", "# shellcheck disable=SC2086"), "a comment a linter reads as an instruction", "a tool may read as an instruction");
+fails(edit("      - name: The check", "      # zizmor: ignore[template-injection]\n      - name: The check"), "a comment line that silences a check", "a tool may read as an instruction");
+passes(edit("# the kinds", "# the kinds"), "a silencing comment taken out", edit("# the kinds", "# codeql[actions/x] the kinds"));
 passes(edit(' # a quoted value', ""), "a comment after a quoted value taken out");
 passes(edit("[opened, synchronize] # the kinds", "[opened, synchronize] # what starts it"), "a comment after [ ] changed");
 passes(edit("      - name: The check", "\n\n      - name: The check").replace("permissions:", "\npermissions:"), "blank lines between entries");
@@ -77,9 +82,11 @@ passes(edit("        env:", "        # about env, after the block\n        env:"
 passes(edit("        run: >-", "        run: >- # folded"), "a comment on a block scalar's header");
 passes(edit("      - name: The check", "      - name: The checks, all of them"), "a step's name changed");
 passes(edit("'Single'", '"Double, quoted"'), "a step's name quoted another way and changed");
-passes(edit("      - name: The check", "      - name: Checked # with a comment").replace("# v7.0.1", "# pinned"), "a step's name and comments changed together");
+passes(edit("      - name: The check", "      - name: Checked # with a comment").replace("# the kinds", "# kinds of event"), "a step's name and comments changed together");
+passes(edit("      - name: The check", "      - name: Nullable check"), "a step's name that only begins with a word YAML reserves");
+for (const name of ["null", "~", "true", "Yes", "off", "123", "1st check", "''", '""']) fails(edit("      - name: The check", `      - name: ${name}`), `a step's name YAML may read as no text, or none: ${name}`);
 const compact = "jobs:\n  a:\n    steps:\n    - name: First\n      run: echo\n    - uses: x # pinned\n";
-passes(compact.replace("First", "Second").replace("# pinned", "# v1"), "a step's name in steps written at their key's own indentation", compact);
+passes(compact.replace("First", "Second"), "a step's name in steps written at their key's own indentation", compact);
 
 // ---- what fails: text, not comments; keys named `name` that are no step's; anything not read for sure ----
 fails(edit("# the shell's own comment", "# the shell's comment, changed"), "a # line inside a run block is the script's text", "more than a comment");
@@ -95,6 +102,8 @@ fails(edit("    name: Build", "    name: Built"), "a job's name");
 fails(edit("name: t", "name: u"), "the workflow's name");
 fails(edit("github.ref }}", "github.sha }}"), "a step's name with an expression");
 fails(edit("      - name: The check", "      - name: ${{ secrets.X }}"), "an expression put into a step's name");
+fails(edit("'Single'", '"\\x24{{ toJSON(secrets) }}"'), "an expression spelt with an escape in a quoted step's name");
+fails(edit("'Single'", '"a \\\\ b"'), "any backslash in a step's name");
 fails(edit("runs-on: ubuntu-latest", "runs-on: windows-latest"), "a value");
 fails(edit("        shell: bash\n", ""), "a line taken out");
 fails(edit("persist-credentials: false", "persist-credentials: false#x"), "a # with no space before it is text");
@@ -161,6 +170,8 @@ write(work, ".claude/settings.json", "{}\n");
 write(work, ".github/CODEOWNERS", "* @someone\n");
 write(work, "tools/.Claude/notes.md", "notes\n");
 write(work, "README.md", "readme\n");
+const ACTION = "name: a\nruns:\n  using: composite\n  steps:\n    - name: First # a note\n      shell: bash\n      run: echo\n";
+write(work, "action.yml", ACTION);
 git(work, "add", "-A");
 git(work, "commit", "-q", "-m", "main");
 git(work, "push", "-q", "origin", "HEAD:main");
@@ -168,15 +179,26 @@ const MAIN = git(work, "rev-parse", "HEAD");
 const branch = (name, change, add = true) => { git(work, "checkout", "-q", "-f", "-B", name, MAIN); change(); if (add) git(work, "add", "-A"); git(work, "commit", "-q", "-m", name); return git(work, "rev-parse", "HEAD"); };
 const run = (...args) => { const r = spawnSync(process.execPath, [script, ...args], { cwd: work, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 
-let head = branch("comments", () => { write(work, WF, edit("# v7.0.1", "# v7.0.2", edit("- name: The check", "- name: Checked"))); write(work, "README.md", "readme, changed\n"); });
+const COMMENTS = edit("# the kinds", "# what starts it", edit("- name: The check", "- name: Checked"));
+let head = branch("comments", () => write(work, WF, COMMENTS));
 let r = run();
-ok(r.status === 0 && r.out.includes(`comments and steps' names alone in .github/ and .claude/, ${MAIN.slice(0, 7)}..${head.slice(0, 7)}: ${WF}`)
-  && r.out.includes("changed outside .github/ and .claude/ (none of these may run by itself or with credentials): README.md") && r.out.includes(`checked head ${head}`),
-  "a comment and a step's name changed, and a file outside: proven, the file outside listed, the head printed", r.out);
+ok(r.status === 0 && r.out.includes(`comments and steps' names alone in .github/, .claude/ and actions, ${MAIN.slice(0, 7)}..${head.slice(0, 7)}: ${WF}`)
+  && r.out.includes(`checked head ${head}`) && !r.out.includes("also changed"), "a comment and a step's name changed, nothing else: proven, the head printed", r.out);
 write(work, WF, edit("runs-on: ubuntu-latest", "runs-on: windows-latest"));
 r = run();
 ok(r.status === 0, "the working tree is not read: the head commit is", r.out);
 git(work, "checkout", "-q", "--", WF);
+
+head = branch("and-outside", () => { write(work, WF, COMMENTS); write(work, "scripts/x.mjs", "// a script\n"); });
+r = run();
+ok(r.status === 2 && r.out.includes(`: ${WF}`) && r.out.includes("also changed, outside what this proof reads: scripts/x.mjs")
+  && r.out.includes("says of each of these why it runs neither by itself nor with credentials") && r.out.includes(`checked head ${head}`),
+  "a file changed outside what it reads: proven for what it reads, the file listed, and not passed (2) until the session says of it", r.out);
+for (const file of [".mcp.json", "package.json", "web/package-lock.json", ".vscode/tasks.json", ".devcontainer/devcontainer.json", "core/scripts/x.mjs", ".gitattributes", "Dockerfile", "CLAUDE~1/settings.json"]) {
+  branch(`too-${file.replace(/\W/gu, "-")}`, () => { write(work, WF, COMMENTS); write(work, file, "{}\n"); });
+  r = run();
+  ok(r.status === 1 && r.out.includes(`NOT ALONE ${file}: a file that runs by itself or decides what does`), `${file}, which runs by itself or decides what does: refused`, r.out);
+}
 
 branch("code", () => write(work, WF, edit("echo hi", "echo bye")));
 r = run();
@@ -206,13 +228,20 @@ branch("nested", () => write(work, "tools/.Claude/notes.md", "notes, changed\n")
 r = run();
 ok(r.status === 1 && r.out.includes("NOT ALONE tools/.Claude/notes.md"), "a .claude folder deeper down and in another case: read as one", r.out);
 
+branch("action-code", () => write(work, "action.yml", ACTION.replace("run: echo", "run: echo more")));
+r = run();
+ok(r.status === 1 && r.out.includes("NOT ALONE action.yml: more than a comment"), "a project's own action outside .github/: its run line read", r.out);
+head = branch("action-comment", () => write(work, "action.yml", ACTION.replace("# a note", "# another note")));
+r = run();
+ok(r.status === 0 && r.out.includes(`and actions, ${MAIN.slice(0, 7)}..${head.slice(0, 7)}: action.yml`), "a project's own action: a comment alone proven", r.out);
+
 branch("binary", () => fs.writeFileSync(path.join(work, WF), Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a])));
 r = run();
 ok(r.status === 1 && r.out.includes(`NOT ALONE ${WF}: not text in UTF-8`), "a workflow that is not UTF-8: refused", r.out);
 
 head = branch("outside", () => write(work, "README.md", "readme, changed\n"));
 r = run();
-ok(r.status === 0 && r.out.includes("nothing changed in .github/ or .claude/") && r.out.includes("README.md"), "nothing changed under .github/ or .claude/: said, and the files outside listed", r.out);
+ok(r.status === 2 && r.out.includes("nothing changed in .github/, .claude/ or an action.yml") && r.out.includes("also changed, outside what this proof reads: README.md"), "nothing changed under .github/ or .claude/: said, and the files outside listed", r.out);
 
 const reviewed = branch("later", () => write(work, WF, edit("echo hi", "echo bye")));
 write(work, WF, edit("# A workflow for the test", "# A note added after the review", edit("echo hi", "echo bye")));
@@ -222,6 +251,16 @@ r = run(reviewed);
 ok(r.status === 0 && r.out.includes(`${reviewed.slice(0, 7)}..${head.slice(0, 7)}: ${WF}`), "a later commit read against the one reviewed: only what it changes", r.out);
 r = run();
 ok(r.status === 1, "the same branch against main: refused, for the change reviewed before", r.out);
+r = run(git(work, "rev-parse", "comments"));
+ok(r.status === 1 && r.out.includes("is no commit the head grew from"), "a commit given that the head did not grow from: refused", r.out);
+
+// a link where it reads, on the side reviewed: what it points to is not read
+const linked = branch("link", () => { const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: work, env, input: "hooks.yml" }).toString().trim(); git(work, "update-index", "--add", "--cacheinfo", `120000,${blob},.claude/hooks.yml`); }, false);
+write(work, WF, COMMENTS);
+git(work, "add", "--", WF);
+git(work, "commit", "-q", "-m", "a comment after the link");
+r = run(linked);
+ok(r.status === 1 && r.out.includes(`NOT ALONE .claude/hooks.yml: a link or submodule, at ${linked.slice(0, 7)}`), "a link under .claude/ on the side reviewed: refused", r.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the proof that a change is comments and steps' names alone`);
 process.exitCode = failed ? 1 : 0;

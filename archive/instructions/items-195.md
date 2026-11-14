@@ -220,4 +220,6 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Agreed, expertly!
 
      Behind: floor rule 3, such a change passing rule 8's one, as `scripts/comment-only.mjs`, run from the core's
-     `main`, proves; `modules/reviews.md`, point 3, the "Security review:" comment giving what it printed.
+     `main` on the head that merges, proves of the files it reads, the session saying of each other file changed why
+     it runs neither by itself nor with credentials; `modules/reviews.md`, point 3, the "Security review:" comment
+     giving what it printed and that word, which the code reviewer checks.
