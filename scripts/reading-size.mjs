@@ -3,9 +3,10 @@
 // rule 3, among the checks on the work), and it fails:
 //   - when a file every session reads ("read") is past its mark (about 20 KB, "each"; one past that has a mark of its
 //     own, its size: when the file shrinks, the mark comes down with it), or the project's own among them total past
-//     "total" (the files of the core's copy that the core's own cap counts, scripts/size.mjs there, are left out, so
-//     that no sync fails a project over what the core grew: the core's AGENTS.md, "Nothing locks another owner's
-//     project"; where "total" still makes room for them, a note says by how much to lower it);
+//     "total" (the core's copy under core/, which the core's check holds to the core's tree, is left out: the core's
+//     own cap, scripts/size.mjs there, holds what of it every session reads, so that no sync fails a project over what
+//     the core grew, the core's AGENTS.md, "Nothing locks another owner's project"; where "total" still makes room for
+//     much of the core's copy, a note gives the mark to set);
 //   - when the PR changes a file past "split" (about 50 KB: Step 0, split it by meaning first), unless "past" lists it
 //     with a mark at least its size. The copy of the core (core/, changed only by a sync PR), the paths under "skip"
 //     (such as the archive: dated records, added to by every merge) and binary files are not counted.
@@ -23,7 +24,6 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sizeOf as size } from "./file-size.mjs";
-import { READ } from "./init.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
@@ -44,18 +44,20 @@ const kb = n => (n / 1024).toFixed(1);
 const skip = ["core/", ...(marks.skip ?? [])];
 const fail = [], notes = [];
 
-// the files every session reads; their total, the project's own alone (the core's that its own cap counts left out)
-const capped = new Set(READ.filter(f => f.startsWith("core/")));
+// the files every session reads; their total, the project's own alone (the core's copy under core/ left out)
 let total = 0, core = 0;
 for (const [f, mark] of Object.entries(marks.read)) {
   if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file: update ${MARKS}`); continue; }
   const n = size(f);
-  if (capped.has(f)) core += n; else total += n;
+  if (f.startsWith("core/")) core += n; else total += n;
   if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}: make it smaller; its mark in ${MARKS} rises only as "A mark on what every session reads" in core/modules/review-guidelines.md says`);
   else if (mark > marks.each && n < mark) fail.push(`${f} has shrunk to ${n} bytes: lower its mark in ${MARKS} from ${mark} to ${Math.max(n, marks.each)}`);
 }
-// (a total set when it counted the core's copy too still makes room for it: said, never failed)
-if (core && marks.total >= total + core) notes.push(`the total in ${MARKS}, ${marks.total}, still makes room for the core's copy, which the core's own cap holds: lower it by ${core}, what that copy's files every session reads come to (core/setup/sync-notes.md, 14 November 2026)`);
+// (a total set when it counted the core's copy too still leaves room for much of it, more than half of what that
+// copy's files come to, however the core grew since: said, with the mark to set, never failed. The mark keeps the
+// room the project had, and at least a KB above its own files, as the starter kit writes one)
+const room = marks.total - total, to = Math.max(marks.total - core, (Math.ceil(total / 1024) + 1) * 1024);
+if (core && room > core / 2 && to < marks.total) notes.push(`the total in ${MARKS}, ${marks.total}, still makes room for the core's copy, which the core's own cap holds: set it to ${to} (core/setup/sync-notes.md, 14 November 2026)`);
 if (total > marks.total) fail.push(`the project's own files every session reads total ${total} bytes, past their mark of ${marks.total}: make them smaller; the mark in ${MARKS} rises only as "A mark on what every session reads" in core/modules/review-guidelines.md says`);
 
 // Step 0: files past the split mark that the PR changes

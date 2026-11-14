@@ -115,12 +115,20 @@ if (p.status === 0) {
   const ownGrew = sizeCheck();
   undo();
   ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total/.test(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
-  // (a total set when it counted the core's copy too is said, by how much to lower it, and fails nothing)
-  const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8");
-  fs.writeFileSync(sizesAt, JSON.stringify({ ...JSON.parse(was), total: JSON.parse(was).total + 30000 }));
+  // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
+  // grew past the room that total had left; a total of the project's own says nothing)
+  const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;
+  const coreBytes = Object.keys(JSON.parse(was).read).filter(f => f.startsWith("core/")).reduce((n, f) => n + Buffer.byteLength(fs.readFileSync(path.join(p.dir, f), "utf8").replace(/\r\n/g, "\n")), 0);
+  const setTotal = t => fs.writeFileSync(sizesAt, JSON.stringify({ ...JSON.parse(was), total: t }));
+  setTotal(own + coreBytes + 4000);
   const roomy = sizeCheck();
+  setTotal(own + coreBytes);
+  undo = grow("core/floor/security.md", 2000);
+  const grownPast = sizeCheck();
+  undo();
   fs.writeFileSync(sizesAt, was);
-  ok(roomy.status === 0 && /still makes room for the core's copy, which the core's own cap holds: lower it by [0-9]+/.test(roomy.stdout) && !/still makes room/.test(sizeCheck().stdout), "a total that still makes room for the core's copy passes, and a note says by how much to lower it; a total of the project's own says nothing", roomy.stdout);
+  ok(roomy.status === 0 && roomy.stdout.includes(`set it to ${own + 4000}`) && grownPast.status === 0 && grownPast.stdout.includes(`set it to ${own}`) && !/still makes room/.test(sizeCheck().stdout),
+    "a total set when it counted the core's copy passes, and a note gives the mark that keeps the project's room, a KB above its own at least, after the core grew past that room too; a total of the project's own says nothing", `${roomy.stdout}\n${grownPast.stdout}`);
   const again = run(p.dir, script, "--owner", "someone-else");
   ok(again.status === 1 && again.out.includes("never overwrites") && git(p.dir, "status", "--porcelain") === "", "run again, it overwrites nothing and says which files stand");
 }
