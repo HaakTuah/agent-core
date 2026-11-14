@@ -85,7 +85,10 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits) {
     if (review.has_unresolved_findings !== true) return { sha, done: true, why: `Codex's security review has run${on}` };
     // a finding of it is marked open: only a review posted after its newest finding settles it
     const found = newest([...list, ...flat(reviewComments)].filter((comment) => codexs(comment) && FINDING.test(comment.body)).map((comment) => Date.parse(comment.created_at) || Infinity));
-    if (newest(posted.map((comment) => Date.parse(comment.created_at) || -Infinity)) > found) return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted after its newest finding` };
+    // (where no finding is to be found among the comments, the status says so, rather than an order it never read)
+    if (newest(posted.map((comment) => Date.parse(comment.created_at) || -Infinity)) > found) {
+      return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted ${found === -Infinity ? "(its open finding is not among the comments)" : "after its newest finding"}` };
+    }
     return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
   }
   if (posted.length > 0) return { sha, done: true, why: "a security review is posted on the pull request" };
