@@ -10,8 +10,9 @@
 //     plain one, or a NuGetLockFilePath a project or build file names, or a file an Import in one brings in; the
 //     workflow's restore also sets that property empty for every project, wherever it was set) fails, and so do the
 //     older packages.config, which has none, and a response file that gives every build options this check cannot
-//     read (Directory.Build.rsp). A file an Import brings in, read only lately, is reported where the base held it as
-//     it stands and brought it in (core archive 207);
+//     read (Directory.Build.rsp). So does a build file, or a file an Import brings in, that is not plain UTF-8, which
+//     MSBuild reads by an encoding of its own. A file an Import brings in, or one not plain UTF-8, read only lately, is
+//     reported where the base held it as it stands, and brought it in by the same Imports (core archive 207);
 //   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
@@ -149,18 +150,40 @@ export function importPath(from, project) {
   return at === ".." || at.startsWith("../") ? "" : at;
 }
 /**
- * The build files among `own` (the project's files git knows, as git lists them), each read by `read` (its text, or
- * null), and every file of another name that an Import in one of them, or in a file one brings in, brings in where git
+ * A build file's bytes as text, where they are plain UTF-8 as MSBuild would read them too: null for one MSBuild reads
+ * by another encoding than this would (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names)
+ * or that holds a NUL or bytes UTF-8 does not allow, since a name in it could read as another here than there. A
+ * UTF-8 byte-order mark is passed over, and no file at all holds nothing.
+ */
+export function plainText(bytes) {
+  if (bytes === null || bytes === undefined) return "";
+  if (typeof bytes === "string") return bytes;
+  const b = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? bytes.subarray(3) : bytes;
+  if ((b[0] === 0xfe && b[1] === 0xff) || (b[0] === 0xff && b[1] === 0xfe) || b.includes(0)) return null;
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(b); } catch { return null; }
+  const declared = /^<\?xml[ \t\r\n][^>]*?\bencoding[ \t\r\n]*=[ \t\r\n]*(?:"([^"]*)"|'([^']*)')/u.exec(text);
+  const named = (declared?.[1] ?? declared?.[2] ?? "utf-8").toLowerCase();
+  return named === "utf-8" || named === "utf8" || ((named === "us-ascii" || named === "ascii") && /^[\u0000-\u007f]*$/u.test(text)) ? text : null;
+}
+/**
+ * The build files among `own` (the project's files git knows, as git lists them), each read by `read` (its bytes, or
+ * null where it is not there), and every file of another name that an Import in one of them, or in a file one brings in, brings in where git
  * knows it, its name's case aside, as MSBuild on Windows finds it: { files: each such file's path to its text,
  * brought: each file an Import brought in, to the files whose Imports bring it in, unread: each Import this cannot
- * follow, typed: the files with a document type, whose Imports are not read }. A build file git knows is read as one,
+ * follow, typed: the files with a document type, unreadable: those not plain UTF-8 (plainText), whose Imports are not
+ * read either }. A build file git knows is read as one,
  * whoever imports it. Each file is read once, and each place an Import leads to looked up once from each file.
  */
 export function importsOf(own, read) {
-  const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [];
+  const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [], unreadable = new Set();
+  // (the files that bring in each place, one list for all the names git knows there in any case)
+  const by = new Map();
+  const take = (f) => { const text = plainText(read(f)); if (text === null) unreadable.add(f); files.set(f, text ?? ""); };
   for (const f of own) { const k = f.toLowerCase(); if (byName.has(k)) byName.get(k).push(f); else byName.set(k, [f]); }
-  for (const f of own.filter((x) => BUILD_FILE.test(x))) files.set(f, read(f) ?? "");
+  for (const f of own.filter((x) => BUILD_FILE.test(x))) take(f);
   for (const [f, text] of files) {
+    if (unreadable.has(f)) continue;
     // (a document type can name text that reads as a comment's start: its Imports are not read)
     if (/<!DOCTYPE/iu.test(text)) { typed.push(f); continue; }
     const looked = new Set();
@@ -168,15 +191,15 @@ export function importsOf(own, read) {
       if (BUILD_FILE.test(project.split(/[\\/]/u).pop())) continue;
       const at = sdk ? null : importPath(f, project), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
       if (!found.length) unread.push({ from: f, project, why: at === null ? "a file whose path this check cannot know without the build" : "a path outside the project, or no file of the project's that git knows" });
-      if (!found.length || looked.has(at.toLowerCase())) continue;
-      looked.add(at.toLowerCase());
-      for (const g of found) {
-        if (!files.has(g)) { brought.set(g, new Set()); files.set(g, read(g) ?? ""); }
-        brought.get(g)?.add(f);
-      }
+      const key = at?.toLowerCase();
+      if (!found.length || looked.has(key)) continue;
+      looked.add(key);
+      if (!by.has(key)) by.set(key, new Set());
+      by.get(key).add(f);
+      for (const g of found) if (!files.has(g)) { brought.set(g, by.get(key)); take(g); }
     }
   }
-  return { files, brought, unread, typed };
+  return { files, brought, unread, typed, unreadable };
 }
 // NuGet's own registry, where every restore here takes packages from; and what else a config may name as a source:
 // an https address of a named host, with no sign-in or question in it, or a folder of the project's own, as git
@@ -428,7 +451,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // (each build file, and each file an Import brings in under another name, which the check reads only lately: what such
   // a file names is reported where the base held it as it stands, brought in by every file that brings it in now; one
   // a pull request adds, changes or brings into play with an Import of its own fails, as does what a build file names)
-  const now = importsOf(own, (f) => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } });
+  const bytesNow = new Map();
+  const readNow = (f) => {
+    if (!bytesNow.has(f)) { let b = null; try { b = readFileSync(join(root, f)); } catch { /* (a file git knows and the folder lacks holds nothing) */ } bytesNow.set(f, b); }
+    return bytesNow.get(f);
+  };
+  const now = importsOf(own, readNow);
   // (the base's files as MSBuild reads them: a link git knows is read through to the file it leads to, as a checkout
   // that keeps links reads it now; one that leads out of the project, or to no file the base held, holds nothing)
   let tree = null, then = null;
@@ -441,10 +469,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     }
     return tree;
   };
-  const baseText = (file) => {
+  const bytesAt = (f) => { try { return execFileSync("git", ["show", `${base}:${f}`], { cwd: root, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { return null; } };
+  const baseBytes = (file) => {
     for (let f = file, hops = 0; hops < 40; hops++) {
-      const mode = baseTree().get(f), text = mode ? textAt(root, base, f) : null;
-      if (mode !== "120000" || text === null) return text;
+      const mode = baseTree().get(f), bytes = mode ? bytesAt(f) : null;
+      if (mode !== "120000" || bytes === null) return bytes;
+      const text = bytes.toString("utf8");
       if (text.startsWith("/") || /^[A-Za-z]:/u.test(text)) return null;
       f = posix.normalize(posix.join(posix.dirname(f), text));
       if (f === ".." || f.startsWith("../")) return null;
@@ -452,11 +482,12 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     return null;
   };
   const broughtThen = (f) => {
-    if (!then) then = importsOf([...baseTree().keys()], baseText).brought;
+    if (!then) then = importsOf([...baseTree().keys()], baseBytes).brought;
     return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
+  const same = (f) => { const was = baseBytes(f), here = readNow(f); return was !== null && here !== null && was.equals(here); };
   for (const [f, text] of now.files) {
-    const found = [
+    const found = now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
       /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read",
       /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read",
       /TreatAsLocalProperty/iu.test(text) && "names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them",
@@ -464,7 +495,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (!found.length) continue;
     // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
-    const held = now.brought.has(f) ? !base || (baseText(f) === text && broughtThen(f))
+    // (a file not plain UTF-8 the check reads only lately too: as the base held it, reported)
+    const held = now.brought.has(f) ? !base || (same(f) && broughtThen(f))
+      : now.unreadable.has(f) ? !base || same(f)
       : /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
     const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;
     for (const what of found) (held ? reports : failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
@@ -631,7 +664,7 @@ if (started(import.meta.url)) {
   }
   if (args.includes("--imports")) {
     let files;
-    try { const { root, tracked } = project(); files = [...importsOf(tracked.filter((f) => !f.startsWith("core/")), (f) => { try { return readFileSync(join(root, f), "utf8"); } catch { return null; } }).brought.keys()]; } catch (e) { fail(e.message); }
+    try { const { root, tracked } = project(); files = [...importsOf(tracked.filter((f) => !f.startsWith("core/")), (f) => { try { return readFileSync(join(root, f)); } catch { return null; } }).brought.keys()]; } catch (e) { fail(e.message); }
     const odd = files.filter((f) => shown(f) !== f);
     if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}`);
     for (const f of files) console.log(f);

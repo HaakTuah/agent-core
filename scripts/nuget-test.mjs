@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { REGISTRY, check, importPath, imported, lockPackages, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
+import { REGISTRY, check, importPath, imported, importsOf, lockPackages, plainText, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -231,6 +231,20 @@ const decoded = reported(["build/Deps.props", "build/dep s.xml", "build/dep\ts.x
 ok(["build/dep s.xml, which", "build/b.xml, which", "build/c.xml, which", "build/bom.xml\uFEFF, which", "build/more.props\uFEFF, which", "build/nb.xml, which"].every(x => decoded.reports.some(r => r.startsWith(x))) && decoded.reports.length === 6 && !decoded.reports.some(r => r.startsWith("build/bom.xml,")),
   "an Import's value is read as XML gives it: a tab is a blank, a reference its character, and a byte-order mark is kept in the name, as .NET trims none", JSON.stringify(decoded));
 ok(projects(`<Import Project="a&amp;b.xml;x&lt;y&#59;z;&bogus;" />`) === "a&b.xml,x<y,z,&bogus" && importPath("A.props", "&bogus") === null, "a reference to & < > \" ' is decoded, and an entity XML does not know is one the check cannot know");
+// a file MSBuild reads by another encoding than UTF-8: neither what it names nor what it imports can be read here as
+// MSBuild reads it, so it fails where the pull request brings it, and is reported where the base held it (#272)
+const latin = Buffer.concat([Buffer.from('<?xml version="1.0" encoding="iso-8859-1"?><Project><Import Project="d'), Buffer.from([0xe9]), Buffer.from('.xml" /></Project>')]);
+const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project><RestorePackagesPath>x</RestorePackagesPath></Project>", "utf16le")]);
+ok(plainText(Buffer.from("\uFEFF<Project />")) === "<Project />" && plainText(Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Project />')) !== null && plainText(Buffer.from('<?xml version="1.0" encoding="us-ascii"?><Project />')) !== null && plainText(null) === ""
+  && [latin, utf16, Buffer.from([0xfe, 0xff, 0, 0x3c]), Buffer.from("<Project>\u0000</Project>"), Buffer.from([0x3c, 0xc3, 0x28, 0x3e]), Buffer.from('<?xml version="1.0" encoding="windows-1252"?><Project />'), Buffer.from('<?xml version="1.0" encoding=\'us-ascii\'?><P a="\u00e9" />')].every(b => plainText(b) === null),
+  "a build file is read only as plain UTF-8, a UTF-8 byte-order mark passed over: another byte-order mark, encoding, a NUL or bytes UTF-8 does not allow is one this check cannot read as MSBuild does");
+put("build/Deps.props", latin); put("build/d\uFFFD.xml", "<Project />"); put("Odd.props", utf16);
+const encoded = reported(["build/Deps.props", "build/d\uFFFD.xml", "Odd.props"]);
+ok(encoded.reports.some(x => x.startsWith("build/Deps.props is not plain UTF-8")) && encoded.reports.some(x => x.startsWith("Odd.props is not plain UTF-8")) && !encoded.reports.some(x => x.includes("d\uFFFD.xml")) && encoded.failures.length === 0,
+  "a build file in another encoding is reported with no base to read (its Imports never followed to a decoy UTF-8 reads its name as)", JSON.stringify(encoded));
+const crowd = Array.from({ length: 2048 }, (_, i) => [..."abcdefghijk"].map((c, j) => (i >> j) & 1 ? c.toUpperCase() : c).join("") + ".xml"), crowdStart = Date.now();
+const crowded = importsOf([...crowd, ...crowd.map((_, i) => `i${i}.props`)], f => f.endsWith(".props") ? `<Project><Import Project="abcdefghijk.xml" /></Project>` : "<Project />");
+ok(crowded.brought.size === 2048 && crowded.brought.get(crowd[5]).size === 2048 && Date.now() - crowdStart < 3000, "many files that import a name git knows in many cases share one list of who imports it", `${Date.now() - crowdStart} ms`);
 put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Project="$(MSBuildThisFileDirectory)..\\shared\\more.config" /><Import Project="sdk.xml" Sdk="X" /></Project>`);
 ok(reported(["build/Deps.props", "build/deps.xml"]).reports.some(x => x.includes("build/deps.xml imports Deeper.XML, a path outside the project, or no file of the project's that git knows")), "an Import in a file brought in, of a file git does not know, is reported too");
 put("src/App/App.csproj", "<Project />");
@@ -394,6 +408,14 @@ if (process.platform !== "win32") {
   fs.rmSync(path.join(repo, "build/link.xml"));
 }
 fs.rmSync(path.join(repo, DEPS)); fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no imports");
+// a build file not plain UTF-8: one the pull request adds fails; as the base held it, reported (#272)
+const wide = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")]);
+const wideCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props"], process.env, { base: "HEAD", baseConfig: null });
+inRepo("Directory.Build.props", wide);
+ok(wideCheck().failures.some(x => x.startsWith("Directory.Build.props is not plain UTF-8")), "a build file in UTF-16 the pull request adds: it fails");
+git("add", "-A"); git("commit", "-q", "-m", "a wide build file");
+ok(!wideCheck().failures.some(x => x.includes("Directory.Build.props")) && wideCheck().reports.some(x => x.startsWith("Directory.Build.props is not plain UTF-8") && x.includes("held before this check read it")), "one the base held as it stands: reported, and passes");
+fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no wide file");
 // a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
 // passing; changed by the pull request, failing
 const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });
