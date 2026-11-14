@@ -40,6 +40,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the gate: an issue can say the owner agreed as easily as quote it (floor rule 4), so no verdict of the stand-in's
   queues one here, a difference from `modules/inbox.md`. A bug waits for no line, as that module says. A line leaves in
   the PR that closes its issue.
+- **The file holds no note.** Where a module asks for one in the *progress file* (where to pick up after a passed
+  gate, a lane that waits), it goes in the description of the line's own PR, which the next builder reads with the
+  branch.
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What a session adds to an issue after that day is that session's word (floor rule 4).
@@ -53,7 +56,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
   is the owner's ("A release is cut on the owner's word"). A batch is sized by what the projects can take: once its
   release is synced, the count of "The core is measured as a feature is" is taken again in each of the owner's
-  projects, before more lines join.
+  projects and named to the owner, who sizes the next by it. It holds back no line the owner has said yes to: there
+  is no pause on new rules.
 
 ## How changes are made here
 
