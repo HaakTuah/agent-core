@@ -15,7 +15,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { proof, readYaml } from "./comment-only.mjs";
+import { RUNS, RUNS_TOO, proof, readYaml } from "./comment-only.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200).replace(/\n/g, "\n     ")}`}`); } };
@@ -153,6 +153,13 @@ for (const [f, text] of own) {
   ok(r.same === true && s.same === true, `${f}: a comment added${named ? " and a step renamed" : ""}`, r.why ?? s.why);
 }
 
+// ---- which files it reads, and which outside it refuses (a short name tried here, not on a disk: Windows would write
+// CLAUDE~1/settings.json into .claude/) ----
+ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", "action.yml", "tools/act/Action.YAML"].every(f => RUNS.test(f))
+  && !["github/x.yml", "x.github/y", "my-action.yml", "action.yml.md"].some(f => RUNS.test(f)), "what it reads: .github/ and .claude/ at any depth and in any case, and every action.yml");
+ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules"].every(f => RUNS_TOO.test(f))
+  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools' and packages' files, the copy of the core");
+
 // ---- the script end to end, on a pull request's branch ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "comment-only-test-"));
 process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
@@ -194,7 +201,7 @@ r = run();
 ok(r.status === 2 && r.out.includes(`: ${WF}`) && r.out.includes("also changed, outside what this proof reads: scripts/x.mjs")
   && r.out.includes("says of each of these why it runs neither by itself nor with credentials") && r.out.includes(`checked head ${head}`),
   "a file changed outside what it reads: proven for what it reads, the file listed, and not passed (2) until the session says of it", r.out);
-for (const file of [".mcp.json", "package.json", "web/package-lock.json", ".vscode/tasks.json", ".devcontainer/devcontainer.json", "core/scripts/x.mjs", ".gitattributes", "Dockerfile", "CLAUDE~1/settings.json"]) {
+for (const file of [".mcp.json", "package.json", "web/package-lock.json", ".vscode/tasks.json", ".devcontainer/devcontainer.json", "core/scripts/x.mjs", ".gitattributes", "Dockerfile"]) {
   branch(`too-${file.replace(/\W/gu, "-")}`, () => { write(work, WF, COMMENTS); write(work, file, "{}\n"); });
   r = run();
   ok(r.status === 1 && r.out.includes(`NOT ALONE ${file}: a file that runs by itself or decides what does`), `${file}, which runs by itself or decides what does: refused`, r.out);

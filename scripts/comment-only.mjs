@@ -26,7 +26,7 @@
 import { execFileSync } from "node:child_process";
 import { started } from "./started.mjs";
 
-const RUNS = /(?:^|\/)(?:\.(?:github|claude)\/|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
+export const RUNS = /(?:^|\/)(?:\.(?:github|claude)\/|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
 const YAML = /\.ya?ml$/iu;
 // what YAML 1.1 or 1.2 reads as a line break besides \n, a tab, a byte order mark, and every other control character
 const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff]/u;
@@ -35,7 +35,7 @@ const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scal
 // container's setup, the packages and their install scripts, the copy of the core, git's own attributes and
 // submodules, a container's build, and a name with "~" and a digit, which Windows can read as another folder's short
 // name (CLAUDE~1 for .claude)
-const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.gitmodules|\.gitattributes|Dockerfile[^/]*)$|(?:^|\/)\.(?:vscode|devcontainer)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.gitmodules|\.gitattributes|Dockerfile[^/]*)$|(?:^|\/)\.(?:vscode|devcontainer)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
 const DIRECTIVE = /\b(?:ignore|disable|suppress|nosec|noqa|codeql|zizmor|actionlint|shellcheck|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string
