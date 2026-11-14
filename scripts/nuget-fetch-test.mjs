@@ -142,6 +142,14 @@ const toolToo = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${
 ok(toolToo.failures.length === 1 && toolToo.failures[0].includes("also a tool of .config/dotnet-tools.json"), "a tool a pull request adds that a lock file also names, of which a source before the locked file's gives another file, fails: its restore holds it to no hash", JSON.stringify(toolToo));
 const heldTool = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD", baseConfig: config });
 ok(heldTool.failures.length === 0 && heldTool.reports.some(f => f.includes("also a tool") && f.includes("held before this check read it")), "one the base held, with the same lock file: reported, and passes (core archive 207)", JSON.stringify(heldTool));
+// a manifest the pull request adds, read before the one the base held (by its path), naming the same tool: the new one
+// decides, whichever manifest comes last
+fs.mkdirSync(path.join(root, ".a"), { recursive: true });
+fs.writeFileSync(path.join(root, ".a/dotnet-tools.json"), JSON.stringify({ version: 1, isRoot: true, tools: { "good.pkg": { version: "1.0.0" } } }));
+const withNew = [...tracked, ".a/dotnet-tools.json"].sort();
+const newFirst = await fetchAll(config, root, withNew, path.join(tmp, `fetched-${++into}`), [path.resolve(elsewhere), path.resolve(source)], { base: "HEAD", baseConfig: config });
+ok(newFirst.failures.some(f => f.includes("also a tool of .a/dotnet-tools.json")), "a manifest the pull request adds, read before one the base held, naming the same tool: it fails, the held one deciding nothing for it", JSON.stringify(newFirst));
+fs.rmSync(path.join(root, ".a"), { recursive: true });
 const toolFirst = await fetchAll(config, root, tracked, path.join(tmp, `fetched-${++into}`), [path.resolve(source), path.resolve(elsewhere)], { base: "HEAD^1", baseConfig: config });
 ok(toolFirst.failures.length === 0, "where the locked file's source comes first, the tool's restore takes that file, and it passes", JSON.stringify(toolFirst));
 tracked = commit({ "Not.There": { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "x" } }, {});

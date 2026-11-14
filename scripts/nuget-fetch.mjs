@@ -254,7 +254,11 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     for (const t of read.tools) {
       const k = `${t.id}@${t.version}`.toLowerCase(), was = wanted.get(k);
       if (!was) wanted.set(k, { ...t, from: f, tool: true, held: held(t.id, t.version) });
-      else if (!was.tool) wanted.set(k, { ...was, alsoTool: f, alsoHeld: held(t.id, t.version) && asBase(was.from) });
+      else if (!was.tool) {
+        // (held only where every manifest that names it held it: one the pull request brings decides, whatever its place)
+        const h = held(t.id, t.version) && asBase(was.from), first = !was.alsoTool;
+        wanted.set(k, { ...was, alsoTool: first || (was.alsoHeld && !h) ? f : was.alsoTool, alsoHeld: (first || was.alsoHeld) && h });
+      }
     }
   }
   // (each package on its own: what failed for a tool the base held is reported instead)
