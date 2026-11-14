@@ -407,6 +407,12 @@ if (process.platform !== "win32") {
   ok(deps.failures.some(x => x.includes("build/link.xml, which an Import brings in, names NuGetLockFilePath")), "the same link, whose file the pull request changes: it fails", JSON.stringify(deps));
   fs.rmSync(path.join(repo, "build/link.xml"));
 }
+// (a checkout that writes its own line endings, core.autocrlf on Windows: the file stands as the base held it)
+inRepo(DEPS, `<Project>\n${depsText}\n</Project>\n`); inRepo("Directory.Build.props", `<Project><Import Project="build/deps.xml" /></Project>`); git("add", "-A"); git("commit", "-q", "-m", "lines");
+git("config", "core.autocrlf", "true"); inRepo(DEPS, `<Project>\r\n${depsText}\r\n</Project>\r\n`);
+deps = depsCheck();
+ok(!deps.failures.some(x => x.includes(DEPS)) && deps.reports.some(x => x.includes(DEPS) && x.includes("held before this check read it")), "one a checkout wrote with its own line endings stands as the base held it: reported, and passes", JSON.stringify(deps));
+git("config", "--unset", "core.autocrlf");
 fs.rmSync(path.join(repo, DEPS)); fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no imports");
 // a build file not plain UTF-8: one the pull request adds fails; as the base held it, reported (#272)
 const wide = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")]);

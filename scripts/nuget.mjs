@@ -465,27 +465,35 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       let entries = "";
       try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
       tree = new Map();
-      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000) blob [0-9a-f]+\t(.*)$/su.exec(e); if (m && !m[2].startsWith("core/")) tree.set(m[2], m[1]); }
+      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000) blob ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith("core/")) tree.set(m[3], { mode: m[1], id: m[2] }); }
     }
     return tree;
   };
   const bytesAt = (f) => { try { return execFileSync("git", ["show", `${base}:${f}`], { cwd: root, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { return null; } };
-  const baseBytes = (file) => {
+  // (the file a base's path leads to, a link git knows followed where `follow` says so: its path, or null)
+  const baseFile = (file, follow = true) => {
     for (let f = file, hops = 0; hops < 40; hops++) {
-      const mode = baseTree().get(f), bytes = mode ? bytesAt(f) : null;
-      if (mode !== "120000" || bytes === null) return bytes;
-      const text = bytes.toString("utf8");
-      if (text.startsWith("/") || /^[A-Za-z]:/u.test(text)) return null;
-      f = posix.normalize(posix.join(posix.dirname(f), text));
+      const entry = baseTree().get(f);
+      if (!entry || entry.mode !== "120000") return entry ? f : null;
+      const to = follow ? bytesAt(f)?.toString("utf8") : null;
+      if (!to || to.startsWith("/") || /^[A-Za-z]:/u.test(to)) return null;
+      f = posix.normalize(posix.join(posix.dirname(f), to));
       if (f === ".." || f.startsWith("../")) return null;
     }
     return null;
   };
+  const baseBytes = (file) => { const f = baseFile(file); return f === null ? null : bytesAt(f); };
   const broughtThen = (f) => {
     if (!then) then = importsOf([...baseTree().keys()], baseBytes).brought;
     return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
-  const same = (f) => { const was = baseBytes(f), here = readNow(f); return was !== null && here !== null && was.equals(here); };
+  // (whether a file stands as the base held it, by the id git would give it as committed at its path, so that a checkout
+  // that writes its own line endings, core.autocrlf on Windows, changes nothing)
+  const same = (f, follow = true) => {
+    const at = baseFile(f, follow), here = readNow(f);
+    if (at === null || here === null) return false;
+    try { return execFileSync("git", ["hash-object", "--stdin", `--path=${f}`], { cwd: root, input: here, encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }).trim() === baseTree().get(at).id; } catch { return false; }
+  };
   for (const [f, text] of now.files) {
     const found = now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
       /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read",
@@ -498,7 +506,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     // (a file not plain UTF-8 the check reads only lately too: as the base held it, reported)
     const held = now.brought.has(f) ? !base || (same(f) && broughtThen(f))
       : now.unreadable.has(f) ? !base || same(f)
-      : /\.user$/iu.test(f) && (!base || (textAt(root, base, f) === text && fileAt(root, base, f.replace(/\.user$/iu, ""))));
+      : /\.user$/iu.test(f) && (!base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, ""))));
     const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;
     for (const what of found) (held ? reports : failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
   }
