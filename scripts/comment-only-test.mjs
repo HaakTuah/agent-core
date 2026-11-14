@@ -109,7 +109,22 @@ fails(edit("# data, not a comment", "# other data"), "a heredoc's # line inside 
 fails(edit('echo "a #b"', 'echo "a #c"'), "text after # inside a run block");
 fails(edit("          echo folded", "          # a line\n          echo folded"), "a # line added inside a block scalar");
 fails(edit("        run: echo hi", "        run: |\n          echo hi"), "a value turned into a block scalar");
-fails(edit("          EOF\n", "          EOF\n\n"), "a blank line added inside a block scalar");
+fails(edit("          cat <<EOF\n", "          cat <<EOF\n\n"), "a blank line added inside a block scalar");
+passes(BASE, "a blank line taken out between a block scalar and the next entry", edit("          EOF\n", "          EOF\n\n"));
+passes(edit("          EOF\n", "          EOF\n\n  \n"), "blank lines added after a block scalar's last line");
+passes(`${BASE}# end\n`, "a comment added at the end of a file whose last value is a block scalar");
+fails(edit("          EOF\n", "          EOF\n             \n"), "a line of spaces past a block scalar's indentation, which YAML reads as its text");
+const kept = edit("        run: |\n", "        run: |+\n");
+fails(edit("          EOF\n", "          EOF\n\n", kept), "a blank line added after a block scalar whose trailing lines are kept", "", kept);
+for (const [before, after] of [["x: |+\n  a\n\n", "x: |+\n  a\n\n\n# c\n"], ["x: |+\n  a\n  ", "x: |+\n  a\n  \n# c"], ["x: |+\n\n", "x: |+\n\n\n# c\n"], ["x: |2+\n  a\n\n", "x: |2+\n  a\n\n\n# c\n"]]) {
+  fails(after, `a blank line kept by |+ added at the end of the file, a comment after it: ${JSON.stringify(before)}`, "", before);
+}
+passes("x: |+\n  a\n\n# c\n", "a comment added after a block's kept blank lines at the end of the file", "x: |+\n  a\n\n");
+const unbroken = "jobs:\n  a:\n    steps:\n      - run: |\n          echo";
+fails(`${unbroken}\n# end\n`, "a line break added after a block scalar's last line, at the end of the file", "", unbroken);
+const sibling = "jobs:\n  a:\n    steps:\n      - run: |\n        shell: bash\n";
+passes(sibling.replace("        shell", "        # a note\n        shell"), "a comment at the key's column after `- run: |`, which YAML reads as no text of it", sibling);
+fails(sibling.replace("        shell", "          # a note\n        shell"), "a # line past the key's column after `- run: |`, its text", "", sibling);
 fails(BASE.replace(/\n$/u, ""), "the last line's break taken off a block scalar");
 fails(edit("          - name: one", "          - name: two"), "a matrix entry's name");
 fails(edit("          name: an-input", "          name: another-input"), "an input named `name`");
@@ -149,10 +164,15 @@ unread(edit("  contents: read", "  ? contents\n  : read"), "an explicit key", "e
 unread(`---\n${BASE}`, "a document marker", "document marker");
 unread(edit("  contents: read", "  contents: read: write"), "two keys on one line", "two keys");
 unread(edit("          echo folded", "          echo folded\n        # less indented\n          echo after"), "text after a less indented comment in a block", "a line of its own");
+unread(edit("        run: |\n", "        run: |\n                \n"), "a blank line before a block scalar's first line, with more spaces than it", "less indented than a blank line");
+const spaces = "env:\n  X: |2\n    \n  Y: z\n";
+fails(spaces.replace("    \n", "\n"), "a line of spaces past a given indentation, in a block of nothing else, which YAML reads as its text", "", spaces);
+const empty = "env:\n  X: |\n      \n  Y: z\n";
+passes(empty.replace("  Y", "  # a note\n  Y"), "a comment after a block of blank lines alone, which YAML reads as empty", empty);
 for (const [ch, name] of [["\t", "a tab"], ["\r", "a carriage return"], ["\u2028", "a line separator"], ["\u2029", "a paragraph separator"], ["\u0085", "a next line"], ["\ufeff", "a byte order mark"], ["\u0000", "a null"], ["\uffff", "a character YAML refuses in a file"]]) {
   unread(edit("# A workflow for the test", `# A workflow ${ch}for the test`), `${name}, even in a comment`, "control character");
 }
-const fixed = "jobs:\n  a:\n    steps:\n      - run: |2\n          # text\n        echo\n";
+const fixed = "jobs:\n  a:\n    steps:\n      - run: |2\n            # text\n          echo\n";
 fails(fixed.replace("# text", "# other"), "a # line in a block scalar with its indentation given", "", fixed);
 passes(fixed.replace("      - run: |2", "      # before\n      - run: |2"), "a comment before a block scalar with its indentation given", fixed);
 
