@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
-import { fetchAll, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
+import { fetchAll, fileAddress, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
 import { REGISTRY, check } from "./nuget.mjs";
 
 let failed = 0, count = 0;
@@ -47,6 +47,8 @@ const hash = bytes => createHash("sha512").update(bytes).digest("base64");
 // the manifest, out of a package file
 ok(nuspecOf(pkg("A", "1.0.0", "MIT")).includes("<license type=\"expression\">MIT</license>") && nuspecOf(zip([["A.nuspec", nuspec("A", "1.0.0", "MIT"), false]])).includes("MIT"), "a package file's manifest is read out of it, deflated or stored");
 ok(throws(() => nuspecOf(zip([["a.nuspec", "x"], ["b.nuspec", "y"]]))) && throws(() => nuspecOf(zip([["lib/a.nuspec", "x"]]))) && throws(() => nuspecOf(Buffer.from("not a zip"))), "two manifests at its root, one in a folder alone, or no zip at all: none is read");
+// a package's address on a v3 feed, its version as NuGet writes one: no build metadata, three numbers at least
+ok(fileAddress("https://feed.example/flat/", "Foo.Bar", "1.0+build.1") === "https://feed.example/flat/foo.bar/1.0.0/foo.bar.1.0.0.nupkg" && fileAddress("https://feed.example/flat/", "Foo", "2.1.0.0-Beta") === "https://feed.example/flat/foo/2.1.0-beta/foo.2.1.0-beta.nupkg", "a package's address names its version as NuGet writes one", fileAddress("https://feed.example/flat/", "Foo.Bar", "1.0+build.1"));
 // a tool, at one exact version
 const t = toolsOf(JSON.stringify({ version: 1, isRoot: true, tools: { "dotnet-ef": { version: "9.0.1", commands: ["dotnet-ef"] }, "range-tool": { version: "[1.0,2.0)" }, "star-tool": { version: "1.*" }, "no-version": {} } }), "x/.config/dotnet-tools.json");
 ok(t.tools.length === 1 && t.tools[0].id === "dotnet-ef" && t.failures.length === 3 && t.failures.every(f => f.includes("one exact version")), "a tool is held to one exact version: a range, a wildcard or none fails", JSON.stringify(t));
@@ -110,7 +112,8 @@ tracked = commit({ "Good.Pkg": entry("Good.Pkg") }, { "tool.b": { version: "1.0.
 r = await run(tracked, "HEAD^1");
 ok(r.checked.failures.length === 0 && r.checked.reports.some(x => x.toLowerCase().includes("tool.b@1.0.0") && x.includes("held before this check read tools")), "one the base already held, never checked before, is reported and passes: no sync fails a project over it", JSON.stringify(r.checked));
 const newSource = check(config, root, r.dir, tracked, process.env, { base: "HEAD^1", baseConfig: { ...config, nuget: { ...config.nuget, sources: [] } }, fetched: true });
-ok(newSource.reports.length === 0 && newSource.failures.some(x => x.toLowerCase().includes("tool.b@1.0.0")), "but where the pull request changed the sources it may come from, it is judged as new", JSON.stringify(newSource));
+const recased = check(config, root, r.dir, tracked, process.env, { base: "HEAD^1", baseConfig: { ...config, nuget: { ...config.nuget, sources: ["LOCAL-packages/"] } }, fetched: true });
+ok(newSource.reports.length === 0 && newSource.failures.some(x => x.toLowerCase().includes("tool.b@1.0.0")) && recased.failures.some(x => x.toLowerCase().includes("tool.b@1.0.0")), "but where the pull request changed the sources it may come from, in any letter, it is judged as new", JSON.stringify([newSource, recased]));
 tracked = commit({}, { "tool.c": { version: "1.*" } });
 r = await run(tracked, "HEAD^1");
 ok(r.fetched.failures.some(f => f.includes("one exact version")), "a tool at no one exact version fails", JSON.stringify(r.fetched));

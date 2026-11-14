@@ -361,7 +361,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join
     .map(({ path, entry: target }) => {
       const entry = lock.packages[path];
       const name = path.slice(path.lastIndexOf("node_modules/") + 13);
-      return { name, version: target.version, license: target.license, registryName: entry.link ? undefined : registryName(entry.resolved), registryVersion: entry.link ? undefined : registryVersion(entry.resolved), shipped: shipped.has(path), lockPath };
+      return { name, version: target.version, license: target.license, resolved: entry.resolved, registryName: entry.link ? undefined : registryName(entry.resolved), registryVersion: entry.link ? undefined : registryVersion(entry.resolved), shipped: shipped.has(path), lockPath };
     });
 }
 
@@ -379,15 +379,18 @@ export function check(config, root, base = null, baseConfig = null) {
   const heldIn = new Map(), then = baseConfig ? normalised(baseConfig) : { ships: [] };
   // (with no base to read it against, as in a checkout of one commit, what ships under a licence moved off is reported
   // and passes, as it passed before: held or not cannot be told, and no sync fails a project over it)
-  const held = (lockPath, name, version) => {
+  // (a package is known by what it is, not the name it is installed under: its registry's name and version, or where it
+  // has none, its name, version and where it came from, so that an alias moved to another package is another)
+  const identity = (q) => (q.registryName !== undefined ? `${q.registryName}@${q.registryVersion}` : `${q.name}@${q.version}@${q.resolved ?? ""}`);
+  const held = (lockPath, p) => {
     if (!base) return true;
     if (!heldIn.has(lockPath)) {
       let names = new Set();
       const shipped = Array.isArray(then.ships) && then.ships.includes(posix.join(posix.dirname(lockPath), "package.json"));
-      try { names = new Set(lockfilePackages(root, lockPath, shipped, (f) => textAt(root, base, f)).filter((q) => q.shipped).map((q) => `${q.name}@${q.version}`)); } catch { /* (none held) */ }
+      try { names = new Set(lockfilePackages(root, lockPath, shipped, (f) => textAt(root, base, f)).filter((q) => q.shipped).map(identity)); } catch { /* (none held) */ }
       heldIn.set(lockPath, names);
     }
-    return heldIn.get(lockPath).has(`${name}@${version}`);
+    return heldIn.get(lockPath).has(identity(p));
   };
   const report = (what, licence) => `${what} ships under ${licence}, which since ${[...MOVED_OFF].filter(([id]) => licence.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "accepted" or has it replaced`;
   // (the owner's yeses, by what each names; `needed`: those something off its list stood on, `onList`: those nothing did)
@@ -405,7 +408,7 @@ export function check(config, root, base = null, baseConfig = null) {
     const a = p.registryName === undefined || p.registryVersion !== p.version ? undefined : yesFor("package", `${p.registryName}@${p.version}`);
     if (licenceOk(p.license, allowedFor(p.registryName ?? "", p.shipped))) { if (a) onList.add(a); continue; }
     if (a) { needed.add(a); failures.push(...yesFaults(a.package, a, p.shipped, [p.license], lists, '"accepted"')); continue; }
-    if (p.shipped && movedOff(p.license, allowedFor(p.registryName ?? "", true)) && held(p.lockPath, p.name, p.version)) { reports.push(report(`${p.name}@${p.version}, in ${p.lockPath},`, p.license)); continue; }
+    if (p.shipped && movedOff(p.license, allowedFor(p.registryName ?? "", true)) && held(p.lockPath, p)) { reports.push(report(`${p.name}@${p.version}, in ${p.lockPath},`, p.license)); continue; }
     const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
     failures.push(`off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? "" : `; one the owner wants anyway is named in the config's "accepted", with the owner's words (floor rule 10)`}`);
   }

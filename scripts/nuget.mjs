@@ -277,7 +277,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   let shippedThen = [], sameSources = !base;
   try {
     if (baseConfig) {
-      const then = nugetConfig(baseConfig), list = (l) => [...l].map((x) => x.toLowerCase()).sort().join("\n");
+      // (letter for letter: a folder's name, or an address's path, in another case may be another source)
+      const then = nugetConfig(baseConfig), list = (l) => [...l].sort().join("\n");
       shippedThen = then.ships;
       sameSources = sameSources || list(then.sources) === list(sources);
     }

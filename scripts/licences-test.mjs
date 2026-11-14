@@ -84,6 +84,16 @@ ok(!ships.has("MS-PL") && policy().allowedFor("x", false).has("MS-PL") && movedO
     // (and where the base held no config at this one's path, as when a pull request moves it, nothing shipped there)
     const elsewhere = check(config, dir, "HEAD^1", null);
     ok(elsewhere.reports.length === 0 && elsewhere.failures.some((f) => f.includes("dev@1.0.0")), "where the base held no config at this one's path, nothing counts as shipped there", JSON.stringify(elsewhere));
+    // (a package is known by what it is: an alias moved to another package of the same version is another)
+    const alias = (to, note = "") => {
+      writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", description: note, dependencies: { compat: `npm:${to}@1.0.0` } }));
+      writeFileSync(join(dir, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: { compat: `npm:${to}@1.0.0` } }, "node_modules/compat": { version: "1.0.0", license: "MS-PL", resolved: `https://registry.npmjs.org/${to}/-/${to}-1.0.0.tgz` } } }));
+      git("add", "-A"); git("commit", "-q", "-m", to);
+      return check(config, dir, "HEAD^1", config);
+    };
+    alias("old-pkg");
+    const kept = alias("old-pkg", "again"), swapped = alias("new-pkg");
+    ok(kept.failures.length === 0 && kept.reports.length === 1 && swapped.reports.length === 0 && swapped.failures.some((f) => f.includes("compat@1.0.0")), "an alias the base shipped is reported; one moved to another package of the same version fails, known by what it is", JSON.stringify([kept, swapped]));
     const none = check(config, dir, null);
     ok(none.reports.length === 1 && none.reports[0].includes("no base to read") && none.failures.length === 0, "with no base to read (a checkout of one commit), it is reported and passes, as it passed before: no sync fails a project over it", JSON.stringify(none));
   } finally { rmSync(dir, { recursive: true, force: true }); }

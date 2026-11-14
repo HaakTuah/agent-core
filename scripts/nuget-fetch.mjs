@@ -152,6 +152,11 @@ function feedOf(source) {
   })());
   return feeds.get(source);
 }
+/** Where a v3 feed whose package files are at `base` keeps one: its id in lower case, its version as NuGet writes one. */
+export function fileAddress(base, id, version) {
+  const lid = encodeURIComponent(id.toLowerCase()), nv = encodeURIComponent(normal(version.toLowerCase()) ?? version.toLowerCase());
+  return `${base}${lid}/${nv}/${lid}.${nv}.nupkg`;
+}
 // A version as NuGet compares one: three numbers at least, a fourth only where it is not 0, no build metadata, in
 // lower case ("1.0" is "1.0.0"), or null where the text is no version.
 function normal(version) {
@@ -186,7 +191,7 @@ async function fromSource(source, id, version) {
   }
   const base = await feedOf(source);
   if (!base) return undefined;
-  return get(`${base}${encodeURIComponent(lid)}/${encodeURIComponent(lv)}/${encodeURIComponent(lid)}.${encodeURIComponent(lv)}.nupkg`);
+  return get(fileAddress(base, id, version));
 }
 
 /**
@@ -198,7 +203,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
   // (a tool counts as the base's only where the base held this config, with the same sources: one a pull request's new
   // source gives, or read by a config the base did not hold, is judged as new)
   let sameSources = base === null;
-  try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n").toLowerCase() === [...nugetConfig(config).sources].sort().join("\n").toLowerCase(); } catch { /* (judged as new) */ }
+  try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n") === [...nugetConfig(config).sources].sort().join("\n"); } catch { /* (judged as new) */ }
   const failures = [], notes = [], reports = [], wanted = new Map();
   for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
     const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
