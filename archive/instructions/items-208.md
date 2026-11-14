@@ -57,6 +57,6 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind the release of the first batch in "One batch, then one release" in `AGENTS.md`: the owner's word for it,
      given ahead, so the session that finds the file worked through starts the `release` workflow, which itself cuts
-     nothing unless every check on `main`'s newest commit has passed. Read as the word for the batch the file first
-     held, since a release once cut is never moved or deleted: a later batch's release waits for the owner's word
-     again.
+     nothing unless every check on `main`'s newest commit has passed. Read narrowly, as the word for the one release
+     that follows `release-5`: the words could also stand for every batch, and a release once cut is never moved or
+     deleted, so every later release waits for the owner's word again until the owner says otherwise.
