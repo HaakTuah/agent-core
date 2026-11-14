@@ -6,8 +6,9 @@
 // to mend it, and in the title or description; a commit dated before the rule too, since a date is whatever its maker
 // writes. What passes: none of these; a term only in a file git reads as binary (not read); a file on main named with
 // a term before the rule, deleted or renamed away; only in the
-// author of a commit GitHub itself made (floor rule 11's exception: a merge, or an edit on github.com), committed as
-// GitHub and signed by its key, while
+// author of a commit GitHub itself made (floor rule 11's exception: a merge, or an edit on github.com under a profile
+// GitHub wrote on a merge of main's, not one through its API under an author its caller named), committed as GitHub and
+// signed by its key, while
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
@@ -159,7 +160,13 @@ if (gpg) {
   console.log("note gpg cannot run here, so the merges GitHub signs are not tried (the check runs on GitHub's Linux runners alone)");
 }
 fails("a merge anyone else made, with a term in its author", update({}));
-if (gpg) passes("a commit that is no merge GitHub itself made (an edit on github.com), its author the acting account's profile", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
+if (gpg) {
+  // an edit on github.com: GitHub signs it, its author the acting account's profile, which GitHub also wrote as the
+  // author of a merge it made on main; one made through GitHub's API, under an author its caller named, does not pass
+  const profileOnMain = [[dir => { git(dir, ["checkout", "-q", "-b", "side"]); commitAll(dir, [{ "side.md": "s\n" }]); git(dir, ["checkout", "-q", "main"]); git(dir, ["merge", "-q", "--no-ff", "--no-edit", "side"], { GIT_AUTHOR_NAME: term, ...GITHUB }); }, {}, "after that merge"]];
+  passes("a commit that is no merge GitHub itself made (an edit on github.com), under the profile GitHub wrote on a merge of main's", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]], profileOnMain));
+  fails("a commit that is no merge GitHub signed, under an author no merge of GitHub's on main carries (as its API takes one)", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }]]));
+}
 fails("a commit that is no merge, with a term in its author, committed as GitHub but not signed", pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: term, ...AS_GITHUB }]]));
 // a merge resolved by hand: the lines its resolution adds are read
 const resolved = pull([[{ "a.md": "one\nmine\nthree\n" }], [dir => {
