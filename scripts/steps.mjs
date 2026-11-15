@@ -97,17 +97,26 @@ const passedTo = (own, name) => {
 // manifest's *copies check* slot names, else, of the licence check, the NuGet check's input, else the starter kit's
 // path; and the licence check's audit and the copies check's baseline as those configs name them, else the kit's.
 export const KIT_CONFIGS = { licences: "checks/licences.json", audit: "checks/licences-audit.json", copies: "checks/copies.json", baseline: "checks/copies-baseline.json" };
-export function configs(p) {
+const key = (p, file, name) => { try { const v = JSON.parse(p.read(file) ?? "null")?.[name]; return typeof v === "string" && v ? v : null; } catch { return null; } };
+// Each check's apart, so that one whose config cannot be read throws alone (Unread, above), never the other's.
+export function licenceConfigs(p) {
   const licences = call(p, "licences.yml")?.with?.config
     ?? (calls(p, "licences.yml").length ? undefined : passedTo(runsOwn(p, "agent-tools.mjs"), "agent-tools.mjs") ?? passedTo(runsOwn(p, "licences.mjs"), "licences.mjs"))
     ?? call(p, "nuget.yml")?.with?.config ?? KIT_CONFIGS.licences;
+  return { licences, audit: key(p, licences, "audit") ?? KIT_CONFIGS.audit };
+}
+export function copiesConfigs(p) {
   const slotted = (/^\|\s*\*copies check\*\s*\|(.*)\|\s*$/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? []).map(v => v.slice(1, -1)).find(v => !v.startsWith("core/"));
   const copies = call(p, "copies.yml")?.with?.config ?? passedTo(runsOwn(p, "copies.mjs"), "copies.mjs") ?? slotted ?? KIT_CONFIGS.copies;
-  const key = (file, name) => { try { const v = JSON.parse(p.read(file) ?? "null")?.[name]; return typeof v === "string" && v ? v : null; } catch { return null; } };
-  return { licences, audit: key(licences, "audit") ?? KIT_CONFIGS.audit, copies, baseline: key(copies, "baseline") ?? KIT_CONFIGS.baseline };
+  return { copies, baseline: key(p, copies, "baseline") ?? KIT_CONFIGS.baseline };
+}
+// Both, each path null where its check's config cannot be read.
+export function configs(p) {
+  const or = (read, names) => { try { return read(p); } catch { return Object.fromEntries(names.map(n => [n, null])); } };
+  return { ...or(licenceConfigs, ["licences", "audit"]), ...or(copiesConfigs, ["copies", "baseline"]) };
 }
 // The licence check's config, and the NuGet check's: its own input where the project calls it, else the licence check's.
-const licenceConfig = p => configs(p).licences;
+const licenceConfig = p => licenceConfigs(p).licences;
 const nugetConfig = p => call(p, "nuget.yml")?.with?.config ?? licenceConfig(p);
 
 export const STEPS = [

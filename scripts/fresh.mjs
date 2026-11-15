@@ -120,11 +120,11 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
     // (the choice records at the path the manifest names for them)
     // (the checks' configs at the paths the project holds them, as its workflows and manifest name them: configs, in
-    // steps.mjs. One a workflow names only when it runs is compared nowhere here: steps.mjs reports it not read)
-    let at = null;
-    try { at = configs(p); } catch { /* (left out, below) */ }
-    const moved = { [KIT_CONFIGS.copies]: at?.copies, [KIT_CONFIGS.audit]: at?.audit };
-    const kit = built.filter(([to]) => !gone.has(to) && (at || !(to in moved)))
+    // steps.mjs. One a workflow names only when it runs is compared nowhere here, the other check's still are: steps.mjs
+    // reports it not read)
+    const at = configs(p);
+    const moved = { [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
+    const kit = built.filter(([to]) => !gone.has(to) && moved[to] !== null)
       .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : moved[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
@@ -132,7 +132,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
     const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
-    return [...kit, [slot, json(marks)], ...(at ? [[at.licences, json(licences(o, () => false))], [at.baseline, json({ windows: {} })]] : [])];
+    return [...kit, [slot, json(marks)], [at.licences, json(licences(o, () => false))], [at.baseline, json({ windows: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];
