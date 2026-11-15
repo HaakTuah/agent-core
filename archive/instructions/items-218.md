@@ -331,26 +331,3 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind the core's own files named in "A release that brings nothing a project takes asks no sync of it" in
      `README.md`, "How a project takes the core", point 1, and `OWN_FILES` in `scripts/releases.mjs`.
-
-228. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
-     session recorded it on issue #282, labelled `by:chat`; first added to #277, which had already been built and
-     closed, so it stands as an issue of its own). The owner asked:
-
-     > should there be any priming? Like telling builders that they are experts in what they are doing? Or that the
-     > fate of the world relies on them getting this perfectly right?
-
-     and agreed to four points, under the heading "A brief is written as a rule is (#277, built), with no priming":
-     what a session is handed says its role by what it does ("you built none of this; find what is wrong with it"), the
-     task, what done looks like and the reason; it calls the session no expert and invents no stakes, since neither
-     changes the work and a brief, like any request, may not imply what is not true; it holds for the briefs an
-     orchestrator writes for its builders, those a session writes for a helper or a reviewer, and the templates of the
-     starter kit; and it is held by the list of phrases a rule may not use, reading the brief templates too, and by a
-     point of the review guidelines on a brief written in a pull request. To the orchestrator, passed on word for word
-     to the builder of this rule:
-
-     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
-     > it: quote this in those pull requests.
-
-     Behind "A brief is written as a rule is" in `modules/helpers.md`, its point under "A brief written in a pull
-     request" in `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json` as
-     `scripts/general.mjs` reads it in the starter kit's templates.
