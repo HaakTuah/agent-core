@@ -24,18 +24,14 @@
 //   node scripts/personal-terms-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { runWorkflow } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
+import { root, scratchDir, tally } from "./scratch-core.mjs";
 
-let failed = 0, count = 0;
-const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } };
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { ok, done } = tally();
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/personal-terms.yml"), "utf8");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "personal-terms-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("personal-terms-test-");
 const [term, other, wide] = [["qz", "vk", "wy"], ["xj", "qq", "zf"], ["zç", "qñ", "x"]].map(t => t.join(""));
 const TERMS = `${term}\n${other}\n${wide}\n`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$)/i.test(name)));
@@ -282,5 +278,4 @@ passes("a term only in a commit of the base's, though the event names an older b
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
 ok(none.passed && none.out.includes("PERSONAL_TERMS is not set"), "without the secret it passes with a note: the check stays optional", none.out);
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the personal-terms check`);
-process.exitCode = failed ? 1 : 0;
+done("the personal-terms check");

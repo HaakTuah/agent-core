@@ -22,7 +22,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
 import { copyTree, entries } from "./copy-tree.mjs";
-import { checkoutStandIn, scratchEnv } from "./scratch-core.mjs";
+import { checkoutStandIn, ghStandIn, scratchEnv } from "./scratch-core.mjs";
 import { runWorkflow } from "./workflow-run.mjs";
 
 let failed = 0, count = 0;
@@ -110,21 +110,7 @@ ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 // the security-review check proves the sync pure itself, as GitHub runs its workflow on the sync's pull request (#99):
 // the default branch's pure-sync.mjs, in a clone of the head that checks nothing out, the token sent to the project's
 // own address alone; GitHub's API is a stand-in that gives the pull request and logs the status it is given
-const stubs = path.join(tmp, "bin"), ghData = path.join(tmp, "gh-data.json"), ghLog = path.join(tmp, "gh-log");
-fs.mkdirSync(stubs);
-fs.writeFileSync(path.join(stubs, "gh"), `#!/usr/bin/env node
-const fs = require("fs");
-const a = process.argv.slice(2), data = JSON.parse(fs.readFileSync(process.env.GH_DATA, "utf8"));
-const route = a.find((x, i) => i > 0 && !x.startsWith("-") && !["-X", "--input", "--jq"].includes(a[i - 1]));
-if (a.includes("-X")) { fs.appendFileSync(process.env.GH_LOG, route + " " + fs.readFileSync(0, "utf8") + "\\n"); process.exit(0); }
-const found = Object.entries(data).find(([pattern]) => new RegExp(pattern).test(route));
-if (!found) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }
-console.log(JSON.stringify(a.includes("--slurp") ? [found[1]] : found[1]));
-`, { mode: 0o755 });
-const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
-const n = Number(env.GIT_CONFIG_COUNT);
-const reviewEnv = { ...env, [PATHKEY]: `${stubs}${path.delimiter}${env[PATHKEY]}`, GH_DATA: ghData, GH_LOG: ghLog,
-  GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(origin)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: "https://github.com/someone/project.git" };
+const { env: reviewEnv, ghData, ghLog } = ghStandIn(env, tmp, origin);
 const reviewCheck = () => {
   const sha = git(p, "rev-parse", "HEAD");
   git(p, "push", "-q", "-f", "origin", `${sha}:refs/pull/1/head`);
