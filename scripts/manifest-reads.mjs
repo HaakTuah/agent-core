@@ -131,7 +131,9 @@ function main() {
       return 0;
     }
     const found = notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), ...texts });
-    for (const f of found) console.log(`note ${f}`);
+    // (a manifest's text is data: a control character, a lone carriage return too, would start a line of its own in the
+    // log, and a line led by "::" is a command to the runner)
+    for (const f of found) console.log(`note ${f.replace(/[\u0000-\u001f\u007f]/gu, " ")}`);
     console.log(found.length ? `note ${found.length} lines of the manifest to add; nothing fails over them (AGENTS.md of the core, "Nothing locks a project")` : "ok   the manifest takes or leaves out each module, and fills each slot they use");
   } catch (e) {
     // (a project that cannot be read this way is told so, never failed over it)

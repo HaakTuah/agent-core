@@ -79,6 +79,8 @@ try {
   ok(r.status === 0 && /^ok /m.test(r.stdout), "a list of each module but one left out with its reason, and the starter kit's rows, has no note", r.stdout + r.stderr);
   r = start("all", kit);
   ok(r.status === 0 && /no row for \*computer players\*/.test(r.stdout) && !/^note.*no row for \*(progress file|report)\*/m.test(r.stdout), "a game that takes all is asked for the rows its module uses", r.stdout + r.stderr);
+  r = start("`how-to-work.md`\r::error title=x::y", "| *owner's account* | `me` |");
+  ok(r.status === 0 && !/[\r]/.test(r.stdout) && !/^::/m.test(r.stdout) && /^note /m.test(r.stdout), "a control character in the manifest's text never starts a line of the log, so no workflow command is made of it", JSON.stringify(r.stdout.slice(0, 300)));
   fs.rmSync(path.join(root, "core-manifest.md"));
   r = spawnSync(process.execPath, ["core/scripts/manifest-reads.mjs"], { cwd: root, encoding: "utf8" });
   ok(r.status === 0 && /^note the manifest could not be read/m.test(r.stdout), "no manifest at all is a note, never a failure", r.stdout + r.stderr);
