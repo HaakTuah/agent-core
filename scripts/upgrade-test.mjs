@@ -20,7 +20,7 @@
 // step a release asks reads done (steps.mjs), but one the commit under test adds that it asks of every project (a
 // check's own list to write), which is reported, alone, and done by its mend as written; each step the commit under
 // test adds over the release started from, taken out, is reported, and its mend as written makes it done; and steps
-// taken out at random are reported, exactly those; then that a release changing only a test of the core's own asks no
+// taken out at random are reported, exactly those; then that a release changing only the core's own files (a test, its queue, a workflow no project calls) asks no
 // sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
 // queued, built and closed there passes every check on each pull request. And a copy older than the first release,
@@ -475,25 +475,25 @@ for (const tag of starts) {
 
 }
 
-// A release that brings nothing a project takes asks no sync of it (#242): with the copy it has just taken, the project
-// stays at the release that carries the change while the next one changes only a test of the core's own scripts, and
+// A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
+// project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
 if (synced) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
-  const testOnly = () => {
-    fs.appendFileSync(path.join(theCore, "scripts", "upgrade-test.mjs"), "\n");
+  const ownOnly = (...own) => {
+    for (const f of ["scripts/upgrade-test.mjs", ...own]) fs.appendFileSync(path.join(theCore, f), "\n");
     git(theCore, "add", "-A");
-    git(theCore, "commit", "-q", "-m", "a test of the core's own, alone");
+    git(theCore, "commit", "-q", "-m", "only the core's own files");
     git(theCore, "tag", `release-${++n}`);
     return git(theCore, "rev-parse", "HEAD");
   };
-  testOnly();
+  ownOnly("QUEUE.md", ".github/workflows/tests.yml"); // (and the core's own queue and a workflow no project calls: #342)
   git(p.dir, "checkout", "-q", "-B", "stays", "main");
   const was = git(p.dir, "status", "--porcelain"), manifest = () => fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8");
   let s = node(p.dir, "core/scripts/sync.mjs");
-  ok(s.status === 0 && /changes nothing this project takes/.test(s.out) && git(p.dir, "status", "--porcelain") === was && manifest().includes(head), `${p.name}: a release that changes only a test of the core's own scripts asks no sync of it, and changes nothing`, s.out);
-  const third = testOnly();
+  ok(s.status === 0 && /changes nothing this project takes/.test(s.out) && git(p.dir, "status", "--porcelain") === was && manifest().includes(head), `${p.name}: a release that changes only a test of the core's own scripts, its queue and its tests workflow asks no sync of it, and changes nothing`, s.out);
+  const third = ownOnly();
   s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(`release-${n}`) && manifest().includes(third), `${p.name}: at the next release it syncs all the same, two releases on`, s.out);
 }
