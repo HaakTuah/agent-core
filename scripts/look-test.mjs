@@ -90,6 +90,9 @@ const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copie
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });
 ok(proj.includes("- copies: 4 old copies in its baseline (`checks/copies-baseline.json`), 6 at the last report.") && proj.includes("- #7 Steps of a release not done: open since 2026-11-01."),
   "a project's report: its baseline against the last report's, and what is overdue", proj);
+const shaped = body({ core: true, month: "2026-12", measures: null, shape: { at: ".github/shape-baseline.json", count: 40, state: "paying down" }, previous: "- how the code is put together: 56 old breaches in its baseline", overdue: [], scripts: "scripts" });
+ok(shaped.includes("- how the code is put together: 40 old breaches in its baseline (`.github/shape-baseline.json`), 56 at the last report; the codebase is paying down.") && !/no baseline may stand/.test(shaped),
+  "the shape check's baseline is a measure of the report, with its count at the last one and the state it gives", shaped);
 ok(proj.includes(`- copy: ${"a".repeat(40)}, 3 commits behind the core's main.`) && proj.includes("- steps not done: 2.") && proj.includes("- merged in 2026-10: 4, the core's share 50% (sync 1, upkeep 1, update 0, own 2)."),
   "and its counts for the core, of the month before", proj);
 ok(body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: { pin: null, behind: null, steps: null, merged: null }, scripts: "core/scripts" }).includes("- merged in 2026-10: not read"),

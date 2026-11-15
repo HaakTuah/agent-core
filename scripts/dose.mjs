@@ -141,7 +141,7 @@ export function auditBody(r, at, home) {
 
 // The rules a project's dose is read from, and where its copy of the core lies: its manifest, else the core's own
 // AGENTS.md.
-function rulesOf(manifest, root) {
+export function rulesOf(manifest, root) {
   if (manifest !== null && manifest !== undefined) return { rules: manifest, home: "core/" };
   return { rules: tolerant(() => fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), ""), home: "" };
 }
