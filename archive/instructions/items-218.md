@@ -149,3 +149,65 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind floor rule 11's exception for a copyright holder's name, the exemption and shape check in
      `.github/workflows/personal-terms.yml`, `LICENSE`, `NOTICE` and "Licence" in `README.md`.
+
+222. **15 November 2026** (the core; in chats with a session the owner had asked to look through the core, not the
+     design session, as that session recorded them on issue #256, labelled `by:chat`, its note "What this issue asks to
+     be built, in one place" gathering what the owner agreed to). The owner asked:
+
+     > It seems fresh sessions on a new project often just mentions whatever is most common? Obviously we should not
+     > add rules demanding rewrites or anything like that. But it does make me a bit concerned in relation to session
+     > that pick solutions, tools, etc. Are they always considering the whole? Are they thinking long ahead, and what
+     > is actually best on quantifiable criterias? This goes both for advice to owner, and season making autonomous
+     > calls.
+
+     and agreed to a record for each choice that is hard to undo: criteria first, at least three options, a measure
+     where cheap, popularity only for what it buys, a fresh session arguing against the pick, the sign that would
+     reopen it, and nothing waiting on the owner; and, asked what the queue would do for a project that already
+     stands, to a record of the choices it already made, with no rewrite asked. Of what reopens a choice:
+
+     > What will repoen it for us? Will there at least be suggestions if obvious optimizations or migrations are
+     > superior?
+
+     So a tripped sign, and a pass twice a year, each ending in a suggestion to the owner, never an act. Of a feature
+     and another language:
+
+     > New features, does it ever evaluate another stack or code language? Like many godot games write much of their
+     > code in rust for performance? Or does it always stick religiously to what is already there
+
+     > Seems sensible to me to just let them write the consuming parts in rust forexample, without having to try to fit
+     > it into say c# first or something. And not wait on me to make it good?
+
+     > And a split should maybe preferably be decided earlier, from the start? Like if you have a godot project? Write
+     > it some in this and some in that based on cealr sensible criterias, that anchors why there is such a division?
+
+     So the stack is kept by default and left for a part only on a measured miss, the trial a benchmark of the heavy
+     path, the session deciding, the owner asked in two cases only, and a split decided at the start where a project's
+     aims name a need in numbers, with the line between the languages written down. Of the platforms a project builds
+     on, as recorded on issue #246:
+
+     > […] And definetly not consciously make a repo platform dependant from the start. […] I just think such
+     > architectural choices should have very good grounding.
+
+     So which platforms the code builds and tests on is a recorded choice. To the orchestrator, passed on word for word
+     to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `modules/choices.md`, its two lines in `modules/how-to-work.md`, `scripts/choices.mjs` with its reader in
+     `scripts/look.mjs`, the starter kit's `docs/choices.md`, the slots *choice records* and *owner's choices*, and the
+     core's own `CHOICES.md`.
+
+223. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it on issues #326 and #331, the one in a note, the other in its text under "The owner's word", and
+     as the owner then told the orchestrator, who passed it on word for word to the builder of these trims). Shown three
+     trims of the floor that leanness checks had found and left, since no queued yes covered a change to the floor
+     (floor rule 14's first bullet, which its heading already says; "never force-pushed" in rule 12, which "never pushed
+     to" covers; and the first "`AGENTS.md`, `CLAUDE.md`" in rule 3's list of rule files, which "an `AGENTS.md` or
+     `CLAUDE.md` in any folder" covers), the owner agreed to all three, and told the orchestrator:
+
+     > Also from the owner:
+     > - Yes to three floor trims: #326, and the two that the leanness check on pull request #287 found and left ("never
+     >   force-pushed" in rule 12, and the first `AGENTS.md`, `CLAUDE.md` in rule 3's list).
+
+     Behind floor rules 3, 12 and 14 as they read since, each the same rule in fewer words.

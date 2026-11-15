@@ -1,12 +1,12 @@
 // The starter kit (README.md, "How a project takes the core"; setup/starter-kit.md): run from a clone of the core, in
 // the root of a project that has none of these files yet, it writes what the project needs before its first task (the
 // manifest, the rule files, the hooks' settings, the configs of the copies, reading-size and licence checks, the issue
-// forms, Dependabot's config and its calls to the core's workflows, each pinned to the commit the manifest pins) and
-// makes the first copy of the core under core/. The templates and the copy are both read from the commit the manifest
-// pins, never from the clone's working folder, so what it writes is what was reviewed. It never overwrites: where one
-// of its files exists, it names them and writes nothing; nor does it write through a link, which could lead outside
-// the project (floor rule 13). It ends by listing what is left: the lines the project fills in itself, and the owner's
-// settings. It commits and pushes nothing. Git, tar and Node's own modules only.
+// forms, the choice records, Dependabot's config and its calls to the core's workflows, each pinned to the commit the
+// manifest pins) and makes the first copy of the core under core/. The templates and the copy are both read from the
+// commit the manifest pins, never from the clone's working folder, so what it writes is what was reviewed. It never
+// overwrites: where one of its files exists, it names them and writes nothing; nor does it write through a link, which
+// could lead outside the project (floor rule 13). It ends by listing what is left: the lines the project fills in
+// itself, and the owner's settings. It commits and pushes nothing. Git, tar and Node's own modules only.
 //
 //   node <the clone>/scripts/init.mjs --owner <login> [--name <the project's name>] [--at <full SHA>]
 //                                     [--npm <the folder of package-lock.json>] [--nuget <the folder of the solution>]
@@ -53,6 +53,7 @@ export const FILES = [
   ["SECURITY.md.tmpl", "SECURITY.md"],
   ["threat-model.md.tmpl", "docs/threat-model.md"],
   ["PROGRESS.md.tmpl", "docs/PROGRESS.md"],
+  ["choices.md.tmpl", "docs/choices.md"],
   ["claude-settings.json.tmpl", ".claude/settings.json"],
   ["copies.json.tmpl", "checks/copies.json"],
   ["licences-audit.json.tmpl", "checks/licences-audit.json"],
