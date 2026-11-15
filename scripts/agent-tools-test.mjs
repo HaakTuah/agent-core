@@ -57,7 +57,9 @@ const passes = (r, what) => ok(r.status === 0 && !/FAIL/.test(r.out), what, r.ou
 const fails = (r, what, ...says) => ok(r.status === 1 && mended(r.out) && says.every(s => r.out.includes(s)), `${what}, and says the mend`, r.out);
 
 // ---- the kit's own hooks are the core's ----
-ok(JSON.stringify(kitHooks()) === JSON.stringify(["hook SessionStart startup|resume", "hook PreToolUse Agent|Task", "hook Stop"]), "the starter kit's hooks are read by event and matcher", JSON.stringify(kitHooks()));
+const kitGroups = JSON.parse(KIT).hooks;
+ok(JSON.stringify(kitHooks().map(k => k.slice(0, k.indexOf(":")))) === JSON.stringify(["hook SessionStart startup|resume", "hook PreToolUse Agent|Task", "hook Stop"]) && kitHooks()[2] === `hook Stop: ${kitGroups.Stop[0].hooks[0].command}`,
+  "the starter kit's hooks are read by event, matcher and command", JSON.stringify(kitHooks()));
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");
@@ -71,8 +73,15 @@ fails(run(project({ ".mcp.json": { mcpServers: { files: { command: "files-server
 fails(run(project({ ".claude/skills/release-notes/SKILL.md": "---\nname: release-notes\n---\n", ...listing() })), "a skill not listed fails", 'the skill "release-notes"');
 passes(run(project({ ".claude/skills/release-notes/SKILL.md": "x", ...listing({ kind: "skill", name: "release-notes", publisher: "this project" }) })), "a skill of the project's own needs no version");
 const ownHook = JSON.stringify({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ matcher: "Write", hooks: [{ type: "command", command: "true" }] }] } });
-fails(run(project({ ".claude/settings.json": ownHook, ...listing() })), "a hook beside the kit's, not listed, fails", 'the hook "PostToolUse Write"');
-passes(run(project({ ".claude/settings.json": ownHook, ...listing({ kind: "hook", name: "PostToolUse Write", publisher: "this project" }) })), "and passes once listed");
+fails(run(project({ ".claude/settings.json": ownHook, ...listing() })), "a hook beside the kit's, not listed, fails", 'the hook "PostToolUse Write: true"');
+passes(run(project({ ".claude/settings.json": ownHook, ...listing({ kind: "hook", name: "PostToolUse Write: true", publisher: "this project" }) })), "and passes once listed");
+const sameMatcher = JSON.parse(KIT);
+sameMatcher.hooks.Stop[0].hooks.push({ type: "command", command: "fetch-and-run" });
+fails(run(project({ ".claude/settings.json": JSON.stringify(sameMatcher), ...listing() })), "a command added beside a kit's hook, under the same event, fails: only the kit's own command is the core's", 'the hook "Stop: fetch-and-run"');
+const changed = JSON.parse(KIT);
+changed.hooks.PreToolUse[0].hooks[0].command = "fetch-and-run";
+fails(run(project({ ".claude/settings.json": JSON.stringify(changed), ...listing() })), "and so does a kit's hook whose command is changed", 'the hook "PreToolUse Agent|Task: fetch-and-run"');
+fails(run(project({ ".claude/settings.local.json": { enabledPlugins: { "helper@example-market": true } }, ...listing() })), "a plug-in turned on in a committed settings.local.json, not listed, fails", "configured in .claude/settings.local.json");
 fails(run(project({ ...listing(PLUGIN) })), "an entry nothing configures fails", 'lists the plug-in "helper@example-market", which nothing configures');
 fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }), ...listing({ ...PLUGIN, version: "^1.4.0" }) })), "a plug-in at a range fails", 'its version "^1.4.0" is not one exact version');
 fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }), ...listing({ ...PLUGIN, version: undefined }) })), "a plug-in with no version fails", "it gives no version");
@@ -82,6 +91,31 @@ fails(run(project({ ...listing({ kind: "extension", name: "x", publisher: "y", v
 fails(run(project({ "checks/licences.json": { lockfiles: [], agentTools: {} } })), "a list that is no list fails", '"agentTools" is no list');
 fails(run(project({ ".mcp.json": "{ not json" })), "a tool's settings that are no JSON fail", ".mcp.json cannot be read as a JSON object");
 fails(run(project({ "checks/licences.json": "{" })), "a config that is no JSON fails", "checks/licences.json cannot be read");
+const linkedSettings = project({ ...listing() });
+fs.rmSync(path.join(linkedSettings, ".claude/settings.json"));
+fs.writeFileSync(path.join(linkedSettings, "elsewhere.json"), KIT);
+fs.symlinkSync("../elsewhere.json", path.join(linkedSettings, ".claude/settings.json"));
+fails(run(linkedSettings), "a settings file that is a link fails, never followed out of the checkout", '".claude/settings.json" is a link');
+const linkedSkills = project({ ...listing() });
+fs.mkdirSync(path.join(linkedSkills, "outside/notes"), { recursive: true });
+fs.writeFileSync(path.join(linkedSkills, "outside/notes/SKILL.md"), "x");
+fs.symlinkSync("../outside", path.join(linkedSkills, ".claude/skills"));
+fails(run(linkedSkills), "and so does a skills folder that is a link", '".claude/skills" is a link');
+if (process.platform !== "win32") {
+  const odd = run(project({ ".claude/skills/x\n::warning::injected/SKILL.md": "x", ...listing() }));
+  ok(odd.status === 1 && !/^::warning::/m.test(odd.out) && mended(odd.out), "a skill folder's name with a line break in it prints on the failure's own line, so it writes no workflow command", odd.out);
+}
+// a sync that changes the kit's hooks: the project's own, as the base's kit wrote them, still count as the core's
+const synced = project({ ...listing() });
+const HERE = fileURLToPath(new URL("..", import.meta.url));
+fs.cpSync(path.join(HERE, "scripts"), path.join(synced, "core/scripts"), { recursive: true });
+fs.cpSync(path.join(HERE, "setup/template"), path.join(synced, "core/setup/template"), { recursive: true });
+git(synced, "add", "-A"); git(synced, "commit", "-q", "-m", "the copy");
+const newKit = JSON.parse(KIT);
+newKit.hooks.Stop[0].hooks[0].command = "a newer stop";
+pr(synced, { "core/setup/template/claude-settings.json.tmpl": JSON.stringify(newKit, null, 2) });
+const fromCopy = spawnSync(process.execPath, ["core/scripts/agent-tools.mjs", "checks/licences.json"], { cwd: synced, encoding: "utf8" });
+ok(fromCopy.status === 0 && !/FAIL/.test(fromCopy.stdout + fromCopy.stderr), "a sync that changes the kit's hooks fails no project whose hooks the base's kit wrote", fromCopy.stdout + fromCopy.stderr);
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 
 // ---- with no list yet: the pull request's base counts as it (nothing locks a project) ----

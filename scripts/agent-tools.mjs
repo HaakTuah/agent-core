@@ -6,11 +6,15 @@
 // The hooks the starter kit writes (setup/template/claude-settings.json.tmpl, beside this copy) are the core's, listed
 // by it at the core's pin. An entry nothing configures fails too, so the list stays true.
 //
-// What it reads as configured, in the files committed at the project's root: `.claude/settings.json`, each hook by its
-// event and matcher ("PreToolUse Agent|Task") and each plug-in its "enabledPlugins" turns on ("name@marketplace");
-// `.mcp.json`, each tool server of its "mcpServers"; and `.claude/skills/`, each folder holding a SKILL.md. What a
-// person or a machine configures outside the repository is no file of the project's (floor rule 18), and another
-// provider's settings are read by the review.
+// What it reads as configured, in the files committed at the project's root: `.claude/settings.json` and, where it is
+// committed, `.claude/settings.local.json`, each hook by its event, matcher and command ("Stop: bash -c '...'") and
+// each plug-in their "enabledPlugins" turn on ("name@marketplace"); `.mcp.json`, each tool server of its "mcpServers";
+// and `.claude/skills/`, each folder holding a SKILL.md. A link among them, which would be read outside the checkout,
+// fails. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
+// another provider's settings, where a plug-in's marketplace or a tool server's command points, and whether the version
+// listed is the one run, are the review's. A hook the starter kit writes counts as the core's only where its command is
+// the kit's, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
+// changes them asks in its sync note that a project whose list is written lists the hooks it kept.
 //
 // Nothing locks a project (AGENTS.md): until the config holds "agentTools", a pull request's base counts as the list,
 // read against the first parent of GitHub's merge (licences.mjs's baseOf), so only what the pull request itself adds
@@ -46,22 +50,27 @@ export function configured(read, skills) {
     problems.push(`${file} cannot be read as a JSON object. Mend: correct it to JSON, as the tool that reads it takes it`);
     return null;
   };
-  const settings = json(".claude/settings.json");
-  for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
-    for (const group of Array.isArray(groups) ? groups : []) {
-      const matcher = typeof group?.matcher === "string" ? group.matcher : "";
-      tools.set(`hook ${matcher ? `${event} ${matcher}` : event}`, ".claude/settings.json");
+  for (const file of [".claude/settings.json", ".claude/settings.local.json"]) {
+    const settings = json(file);
+    for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
+      for (const group of Array.isArray(groups) ? groups : []) {
+        const matcher = typeof group?.matcher === "string" && group.matcher ? ` ${group.matcher}` : "";
+        for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
+          tools.set(`hook ${event}${matcher}: ${typeof hook?.command === "string" ? hook.command : JSON.stringify(hook)}`, file);
+        }
+      }
     }
+    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) tools.set(`plugin ${name}`, file);
   }
-  for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) tools.set(`plugin ${name}`, ".claude/settings.json");
   for (const name of Object.keys(json(".mcp.json")?.mcpServers ?? {})) tools.set(`server ${name}`, ".mcp.json");
   for (const name of skills()) tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`);
   return { tools, problems };
 }
 
-// The hooks the starter kit writes: the core's, listed by it.
-export function kitHooks(kit = KIT) {
-  try { return [...configured(f => (f === ".claude/settings.json" ? fs.readFileSync(kit, "utf8") : null), () => []).tools.keys()]; } catch { return []; }
+// The hooks the starter kit writes: the core's, listed by it. `text` is the kit's settings as a copy holds them.
+const kitText = () => { try { return fs.readFileSync(KIT, "utf8"); } catch { return null; } };
+export function kitHooks(text = kitText()) {
+  return text === null ? [] : [...configured(f => (f === ".claude/settings.json" ? text : null), () => []).tools.keys()];
 }
 
 // The list a config holds: { keys, problems }, keys the "kind name" of each well-formed entry; null where the config
@@ -101,19 +110,32 @@ export function check(tools, list, kit, file) {
   return { problems, unlisted: list ? [] : unlisted };
 }
 
-// The project at `root`, at its working tree or at a commit `rev`.
+// The project at `root`, at its working tree or at a commit `rev`. In the working tree a link on the way to a file is
+// not followed: it is a problem, since it would be read outside the checkout.
 export function readProject(root, rev = null) {
-  const read = rev ? f => textAt(root, rev, f) : f => { try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+  const links = [];
+  const linked = f => {
+    const parts = f.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const at = parts.slice(0, i).join("/");
+      try { if (fs.lstatSync(path.join(root, at)).isSymbolicLink()) { if (!links.includes(at)) links.push(at); return true; } } catch { return false; }
+    }
+    return false;
+  };
+  const read = rev ? f => textAt(root, rev, f) : f => { if (linked(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
   const skills = () => {
     if (rev) {
       let out = "";
       try { out = execFileSync("git", ["ls-tree", "-r", "--name-only", rev, "--", ".claude/skills"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { /* (none) */ }
       return out.split("\n").map(f => /^\.claude\/skills\/([^/]+)\/SKILL\.md$/u.exec(f)?.[1]).filter(Boolean);
     }
+    if (linked(".claude/skills")) return [];
     const dir = path.join(root, ".claude/skills");
-    try { return fs.readdirSync(dir).filter(n => fs.existsSync(path.join(dir, n, "SKILL.md"))); } catch { return []; }
+    try { return fs.readdirSync(dir).filter(n => !linked(`.claude/skills/${n}`) && fs.existsSync(path.join(dir, n, "SKILL.md")) && !linked(`.claude/skills/${n}/SKILL.md`)); } catch { return []; }
   };
-  return configured(read, skills);
+  const out = configured(read, skills);
+  for (const at of links) out.problems.push(`${show(at)} is a link, which would be read outside the checkout. Mend: replace it with the file or folder itself, committed in the project`);
+  return out;
 }
 
 // The whole check, from the project's root: { fail, notes }.
@@ -122,7 +144,8 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   try { config = JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${clean(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
-  const head = readProject(root), kit = kitHooks();
+  const head = readProject(root);
+  const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
   let list = listed(config, file);
   if (!list && core) list = { keys: new Set(), problems: [] };
   const { problems, unlisted } = check(head.tools, list, kit, file);
@@ -145,8 +168,8 @@ if (started(import.meta.url)) {
   const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
   if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
   const { fail, notes } = run(process.cwd(), file, { core: args.includes("--core") });
-  for (const n of notes) console.log(`note ${n}`);
-  for (const f of fail) console.error(`FAIL: ${f}`);
+  for (const n of notes) console.log(`note ${clean(n)}`);
+  for (const f of fail) console.error(`FAIL: ${clean(f)}`);
   console.log(fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed");
   process.exitCode = fail.length ? 1 : 0;
 }
