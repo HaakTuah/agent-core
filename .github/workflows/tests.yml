@@ -169,6 +169,12 @@ jobs:
       - name: Each check's failure says its mend, and each check's test reads it
         if: ${{ !cancelled() }}
         run: node scripts/mend-test.mjs
+      - name: The manifest check
+        if: ${{ !cancelled() }}
+        run: node scripts/manifest-reads-test.mjs
+      - name: The core's own AGENTS.md fills each slot its modules use
+        if: ${{ !cancelled() }}
+        run: node scripts/manifest-reads.mjs --core
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() }}
         run: node scripts/workflows.mjs

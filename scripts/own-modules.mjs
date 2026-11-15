@@ -3,9 +3,10 @@
 // start of every task or when needed, or is listed under that section's "Not taken" with the reason it cannot apply to
 // a repository of rules and scripts. It fails a module the section names nowhere, a name there that is no module, a
 // module listed as not taken with no reason or in no form it can read, and one both listed so and named elsewhere in
-// the section. Whether a reason holds stays with the reviews. This repository only; no project runs it. Its tests
-// workflow runs it on every pull request here and every push to main (.github/workflows/tests.yml). It checks the
-// repository it lies in, from any directory; Node's own modules only.
+// the section. Whether a reason holds stays with the reviews. This repository only: no project runs it, though
+// manifest-reads.mjs, beside this file, reads this section's list with it. Its tests workflow runs it on every pull
+// request here and every push to main (.github/workflows/tests.yml). It checks the repository it lies in, from any
+// directory; Node's own modules only.
 //
 //   node scripts/own-modules.mjs
 import fs from "node:fs";
@@ -18,12 +19,13 @@ const NOT_TAKEN = /^Not taken\b/u;
 const NAMED = /(?:^@|`)modules\/([^`\s/]+\.md)/gmu;
 const BULLET = /^- `modules\/([^`\s/]+\.md)`:(.*)$/u;
 
-// What is wrong, one line each, with how AGENTS.md (its text) holds the modules (their file names): an empty list where
-// nothing is.
-export function faults(agents, modules) {
+// What AGENTS.md (its text) says of the modules this repository takes: the section's lines, the modules it names as
+// taken (where it is read), the "Not taken" list with each reason, and what is wrong with the list's form. `error`
+// says the section is missing.
+export function readSection(agents) {
   const lines = String(agents).split(/\r?\n/u);
   const start = lines.indexOf(SECTION);
-  if (start < 0) return [`AGENTS.md has no section "${SECTION.slice(3)}", which names the modules this repository takes. Mend: put the section back, naming each module of modules/ or listing it under "Not taken" with its reason`];
+  if (start < 0) return { error: `AGENTS.md has no section "${SECTION.slice(3)}", which names the modules this repository takes. Mend: put the section back, naming each module of modules/ or listing it under "Not taken" with its reason` };
   let end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
   if (end < 0) end = lines.length;
   const section = lines.slice(start + 1, end);
@@ -48,6 +50,14 @@ export function faults(agents, modules) {
   }
   const taken = new Set();
   section.forEach((l, i) => { if (!inList.has(i)) for (const m of l.matchAll(NAMED)) taken.add(m[1]); });
+  return { section, taken, notTaken, found };
+}
+
+// What is wrong, one line each, with how AGENTS.md (its text) holds the modules (their file names): an empty list where
+// nothing is.
+export function faults(agents, modules) {
+  const { error, taken, notTaken, found } = readSection(agents);
+  if (error) return [error];
   const all = new Set(modules);
   for (const name of [...taken, ...notTaken.keys()].filter(n => !all.has(n)).sort()) {
     found.push(`AGENTS.md, "${SECTION.slice(3)}", names modules/${name}, which is no module of modules/. Mend: correct the name, or take it out where the module is gone`);

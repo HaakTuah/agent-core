@@ -18,7 +18,6 @@ wanted").
 | #257 | rule builder | |
 | #256 | rule builder | its staged case: #235 |
 | #242 | rule builder | |
-| #157 | builder | |
 | #252 | rule builder | |
 | #235 | rule builder | |
 | #296 | builder | #235 |
