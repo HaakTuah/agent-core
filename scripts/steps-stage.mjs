@@ -33,6 +33,19 @@ export const STAGES = {
       : `name: signatures\n\non:\n  pull_request:\n    paths: ["package-lock.json"]\n\njobs:\n  signatures:\n    uses: ${CORE}/.github/workflows/signatures.yml@${PIN}\n`),
     mend: dir => write(dir, ".github/workflows/signatures.yml", read(dir, ".github/workflows/signatures.yml").replace(/^    paths: .*\r?\n/m, "")),
   },
+  "12 November 2026, exact versions": {
+    // (an npm project that runs the licence script from a workflow of its own, without the exact-versions check)
+    stage: dir => {
+      if (!fs.existsSync(at(dir, "package-lock.json"))) write(dir, "stage-npm/package-lock.json", "{}\n");
+      const core = at(dir, ".github/workflows/licences.yml");
+      if (fs.existsSync(core)) { write(dir, ".stage-licences/licences.yml", fs.readFileSync(core, "utf8")); fs.rmSync(core); }
+      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n");
+    },
+    mend: dir => {
+      write(dir, ".github/workflows/licences-own.yml", `${read(dir, ".github/workflows/licences-own.yml")}      - run: node core/scripts/exact-versions.mjs checks/licences.json\n`);
+      if (fs.existsSync(at(dir, ".stage-licences"))) { write(dir, ".github/workflows/licences.yml", read(dir, ".stage-licences/licences.yml")); fs.rmSync(at(dir, ".stage-licences"), { recursive: true }); }
+    },
+  },
   "12 November 2026, the security review shown on every pull request": {
     stage: dir => {
       const file = at(dir, ".github/workflows/security-review.yml");

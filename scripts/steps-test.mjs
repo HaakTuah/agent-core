@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
-import { TEMPLATES, files } from "./init.mjs";
+import { TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { COST, STEPS, leads, notDone, plain, project, report } from "./steps.mjs";
@@ -41,7 +41,9 @@ function kit(name, o) {
     fs.writeFileSync(path.join(dir, to), text);
   }
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify({ ships: [], audit: "checks/licences-audit.json", ...(o.nuget ? { nuget: { ships: [], tools: [] } } : {}) }, null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes({ "AGENTS.md": 2000 }), null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
   return dir;
 }
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
@@ -117,6 +119,19 @@ fs.rmSync(path.join(bare, ".github/workflows/signatures.yml"));
 found = differences(project(bare), fresh(project(bare)));
 ok(found.some(d => d.startsWith(".claude/settings.json: lacks") && d.includes("Edit(//**/.git/**)")) && found.includes(".github/workflows/signatures.yml: missing (the starter kit writes it today)"),
   "hooks' settings emptied, and a signature check lost from an npm project, are listed (its packages read from its lock file too)", found.join("\n"));
+
+// ---- the configs the kit writes beside its templates, and a workflow the core's reader cannot read ----
+const plainProject = kit("a-plain-project", {});
+fs.rmSync(path.join(plainProject, "checks/sizes.json"));
+fs.writeFileSync(path.join(plainProject, "checks/copies-baseline.json"), "{}\n");
+found = differences(project(plainProject), fresh(project(plainProject)));
+ok(found.includes("checks/sizes.json: missing (the starter kit writes it today)") && found.some(d => d.startsWith("checks/copies-baseline.json: lacks the key \"windows\"")) && found.length === 2,
+  "a config the kit writes beside its templates, missing or lacking a key, is listed", found.join("\n"));
+const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
+fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: {SAMPLE: value}\n\njobs:"));
+const unread = notDone(plainProject);
+ok(unread.length === 1 && unread[0].lead.endsWith("the security review shown on every pull request") && unread[0].mend.includes("could not read the project") && unread[0].mend.includes("security-review.yml"),
+  "a workflow in a form the core's reader does not know is reported as not read, never as a call that is missing or a step done", report(unread));
 
 // ---- the wording an earlier kit wrote and the kit has left: listed where the project still holds it ----
 const older = path.join(tmp, "older", "setup", "template");

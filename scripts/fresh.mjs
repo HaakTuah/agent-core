@@ -1,7 +1,8 @@
 // A project beside a fresh start (AGENTS.md, "Nothing locks a project"; core archive 215): what the starter kit of the
 // copy this file lies in would write for a new project of the same kind today, against what the project holds, so
 // that an earlier sync taken in part, or a row filled poorly, shows where no step's check reads it (steps.mjs, beside
-// this file). It lists each difference: a file the kit writes that the project lacks; of a rule file, the manifest or
+// this file). It lists each difference: a file the kit writes that the project lacks (the configs it writes beside
+// its templates too, at the paths the project names for them); of a rule file, the manifest or
 // an issue form, a paragraph of the kit's that the project holds nowhere in that file (the words compared with their
 // spacing made one, so a reflowed line is no difference), and of a table, a row whose first cell it lacks (a row's
 // value is the project's to fill); of a workflow or the hooks' settings, a line of the kit's it lacks (a pin and its
@@ -21,12 +22,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TEMPLATES, files } from "./init.mjs";
+import { TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { call, plain, project } from "./steps.mjs";
+import { call as callOf, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
+// reports it)
+const call = (p, name) => { try { return callOf(p, name); } catch { return null; } };
 const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the project's own from its first task)
 
 // The starter kit's options for a project of the same kind as `p` (steps.mjs reads it), and the pin its manifest names.
@@ -54,8 +58,8 @@ const firstCell = row => /^\|([^|]*)\|/.exec(row)?.[1]?.trim();
 const short = t => `${t.slice(0, 70)}${t.length > 70 ? "…" : ""}`;
 
 // What a file holds, as the comparison reads it: of Markdown, its tables' rows by their first cell and its prose with
-// the spacing made one; of a check's config (under checks/), its keys, since their values are the project's to fill;
-// of anything else, the hooks' settings included, its lines, each with its spacing and a comma after it left out. `has` asks whether a unit of another such file
+// the spacing made one; of a check's config (JSON), its keys, since their values are the project's to fill; of
+// anything else, the hooks' settings included, its lines, each with its spacing and a comma after it left out. `has` asks whether a unit of another such file
 // stands in this one; `units` are this one's own, a paragraph the kit leaves to the project (FILL IN) left out.
 function readAs(to, text) {
   const t = text.replace(/\r\n/g, "\n");
@@ -65,7 +69,7 @@ function readAs(to, text) {
     const paras = t.split(/\n\s*\n/).filter(b => b.trim() && !b.includes("FILL IN")).map(b => oneSpace(pinsAsOne(b.split("\n").filter(l => !l.startsWith("|")).join("\n")))).filter(Boolean);
     return { units: [...[...rows].map(r => ({ row: r })), ...paras.map(para => ({ para }))], has: u => u.row !== undefined ? rows.has(u.row) : prose.includes(u.para) };
   }
-  if (/^checks\/.*\.json$/.test(to)) {
+  if (/\.json$/.test(to) && to !== ".claude/settings.json") {
     let keys = null;
     try { keys = Object.keys(JSON.parse(t)); } catch { /* (read below as holding nothing) */ }
     return { units: (keys ?? []).map(key => ({ key })), has: u => !!keys?.includes(u.key), unread: keys === null };
@@ -103,7 +107,17 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
   const { o, pin } = kind(p);
   const modules = fs.readdirSync(path.join(HERE, "modules")).filter(n => n.endsWith(".md"));
   try {
-    return files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"));
+    const kit = files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"));
+    if (templates !== path.join(HERE, TEMPLATES)) return kit;
+    // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
+    // (sizes.json's optional "skip" and "past" left out)
+    const { skip, past, ...marks } = sizes({});
+    const json = v => `${JSON.stringify(v, null, 2)}\n`;
+    const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
+    let copies = null;
+    try { copies = JSON.parse(p.read("checks/copies.json") ?? "null"); } catch { /* (the kit's path, below) */ }
+    const licenceAt = call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
+    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })]];
   } catch (e) {
     if (templates === path.join(HERE, TEMPLATES)) throw e;
     return [];
