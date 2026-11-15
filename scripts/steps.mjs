@@ -77,7 +77,8 @@ export const call = (p, name) => calls(p, name)[0] ?? null;
 // read, never read as a path.
 const input = (p, name, key = "config") => {
   const v = call(p, name)?.with?.[key];
-  if (typeof v === "string" && v.includes("${{")) throw new Unread(`the project's call to the core's ${name} passes its ${key} as ${v}, which names it only when the workflow runs`);
+  if (v !== undefined && typeof v !== "string") throw new Unread(`the project's call to the core's ${name} passes its ${key} as no text`);
+  if (v?.includes("${{")) throw new Unread(`the project's call to the core's ${name} passes its ${key} as ${v}, which names it only when the workflow runs`);
   return v;
 };
 
@@ -91,7 +92,7 @@ const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 // next, and a shell comment (a line's, or the end of one after a space) left out, so that a comment naming a script is
 // never read as running it (#364).
 const runs = w => Object.values(w.yaml?.jobs ?? {}).flatMap(job => (job?.steps ?? []).map(s => typeof s?.run === "string" ? s.run : ""))
-  .join("\n").replace(/\\\r?\n/g, " ").split("\n").map(l => l.replace(/(^|[ \t])#.*$/, "")).join("\n");
+  .join("\n").split("\n").map(l => l.replace(/(^|[ \t])#.*$/, "")).join("\n").replace(/\\\r?\n/g, " ");
 const script = name => new RegExp(`(?<![\\w./-])(?:\\./)?core/scripts/${name.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}(?![\\w.-])`);
 // The project's own workflows that run a script of its copy of the core (`core/scripts/<name>`), as [file, workflow].
 export const runsOwn = (p, name) => (readable(p, text => text.includes(name)), Object.entries(p.workflows)).filter(([, w]) => script(name).test(runs(w)));
@@ -99,7 +100,7 @@ export const runsOwn = (p, name) => (readable(p, text => text.includes(name)), O
 // only when the workflow runs (a variable or an expression) throws, so the check that needs it is reported not read.
 // (each word after the script as the shell reads it: quoted, or bare up to a space or an operator; an option, which
 // starts with "-", is passed over)
-const WORD = /^[ \t]+(?:"([^"]*)"|'([^']*)'|([^\s"'\\;&|<>]+))/;
+const WORD = /^[ \t]+(?:"([^"\n]*)"|'([^'\n]*)'|([^\s"'\\;&|<>]+))/;
 const passedTo = (own, name) => {
   const at = new RegExp(`${script(name).source}["']?`, "g");
   for (const [, w] of own) {
