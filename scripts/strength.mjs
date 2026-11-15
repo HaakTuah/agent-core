@@ -261,7 +261,8 @@ function onPullRequest(p, base) {
 // The whole run: the tool on every file of the code, and the baseline written from it, keeping the reasons of the
 // entries that still stand.
 function whole(p) {
-  const faults = faultsOf(runTool(p.tool.command, p.code.join(",")), null);
+  const faults = faultsOf(runTool(p.tool.command, p.code.join(",")), null), unrun = faults.filter(f => f.status === "Pending").length;
+  if (unrun) refuse(`the mutation tool left ${unrun} faults not run, so the whole run is not whole`, "run it again with no budget (MUTATE_BUDGET unset for the core's tool)");
   const old = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const listed = {};
   for (const f of faults.filter(f => SURVIVED.includes(f.status))) listed[f.id] = { count: (listed[f.id]?.count ?? 0) + 1 };

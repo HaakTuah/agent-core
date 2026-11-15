@@ -89,6 +89,8 @@ try {
   sh("commit", "-qam", "a change");
   let r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 0 && r.stdout.includes("survived: src/a.js:2") && r.stdout.includes("Reported only") && !r.stdout.includes("src/a.js:1:"), "a pull request's run, with no baseline: the tool is told the changed line alone, its survivor shown, nothing failed", r.stdout + r.stderr);
+  r = run(["--whole"], { STATUS: "Pending" });
+  ok(r.status === 1 && mended(r.stderr) && !fs.existsSync(path.join(dir, "checks/strength-baseline.json")), "a whole run that left faults not run writes no baseline, and says the mend", r.stdout + r.stderr);
   r = run(["--whole"]);
   const written = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
   ok(r.status === 0 && Object.keys(written.listed).length === 1 && written.whole?.commit && /^\d{4}-\d\d-\d\d$/.test(written.whole.day), "the whole run writes the baseline, with the day and commit it ran on", r.stdout + r.stderr);

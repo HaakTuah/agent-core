@@ -26,7 +26,7 @@ import { tokens } from "./code-shape.mjs";
 import { notLinked, parseConfig, standing, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
-const LONGEST = 120; // seconds: a test that takes longer as it stands is no test a fault is run against
+const LONGEST = 60; // seconds: a test slower as it stands (a whole upgrade) is no test a fault is run against
 // (git's settings that run a command by themselves, off: no hook runs as a working copy is checked out)
 const SAFE = ["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${os.devNull}`];
 const git = (args, cwd = ".") => execFileSync("git", [...SAFE, ...args], { cwd, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
