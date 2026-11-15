@@ -94,12 +94,27 @@ function changesOf(config, root) {
   return { changes, commits: commits.length };
 }
 
+// The debt a baseline's text lists: how many entries, and the sum of their numbers; null where it cannot be read.
+function debtOf(text) {
+  const listed = tolerant(() => JSON.parse(text).listed, null);
+  if (!listed || typeof listed !== "object") return null;
+  const numbers = Object.values(listed).flatMap(n => (n === true ? [] : Object.values(n)));
+  return { entries: Object.keys(listed).length, sum: numbers.reduce((a, b) => a + b, 0) };
+}
+
 // The share the cleaning lane got: of the changes that reached this branch in the last DAYS days, as its first parents
-// show them (a merged pull request is one), those that changed the baseline.
+// show them (a merged pull request is one), those that lowered the baseline: fewer entries than before, or the same
+// with smaller numbers. One that only records an audit, or moves an entry, lowered nothing.
 function shareGot(config, at, root) {
   const since = new Date(Date.parse(at) - DAYS * 86400000).toISOString();
-  const count = (paths, ...how) => tolerant(() => git(["log", "--first-parent", `--since=${since}`, "--format=%H", ...how, "--", ...paths], root).split("\n").filter(Boolean).length, null);
-  return { all: count(["."]), cleaning: count([config.baseline], "--diff-filter=M") }; // (the change that first wrote the baseline lowered nothing)
+  const commits = paths => tolerant(() => git(["log", "--first-parent", `--since=${since}`, "--format=%H", "--", ...paths], root).split("\n").filter(Boolean), null);
+  const all = commits(["."]), touched = commits([config.baseline]);
+  if (!all || !touched) return { all: null, cleaning: null };
+  const lowered = commit => {
+    const [now, was] = [commit, `${commit}^`].map(c => debtOf(tolerant(() => git(["show", `${c}:${config.baseline}`], root), "")));
+    return !!now && !!was && (now.entries < was.entries || (now.entries === was.entries && now.sum < was.sum));
+  };
+  return { all: all.length, cleaning: touched.filter(lowered).length };
 }
 
 // The project at `root` as the dose reads it: null where it has no config of the shape check yet; else its config,
