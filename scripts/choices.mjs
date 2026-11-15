@@ -161,7 +161,8 @@ export function trippedBody(file, held, found, home) {
 // What a line of that issue's lists stands for, apart from the numbers read today: a choice and its condition, or a
 // choice and what names no measure; null for the count of the rest. The look compares these (look.mjs, updating), so a
 // number that moves changes nothing, and a choice the issue did not name before puts it back to queued.
-export const signKey = line => (line.startsWith("- and ") ? null : line.replace(/, and it reads .*$/u, ""));
+const READS = ", and it reads ";
+export const signKey = line => (line.startsWith("- and ") ? null : line.includes(READS) ? line.slice(0, line.indexOf(READS)) : line);
 
 // The scheduled look's reader of the signs written in a measure (look.mjs, DUE): its issue's body null where none
 // holds and every line "Trips when:" names measures alone, so the look closes one it keeps; `unread` where the records

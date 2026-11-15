@@ -50,6 +50,8 @@ ok(/- `one`: `files > 150`, and it reads 151/.test(handed.body) && !("labels" in
   "a number that moves (151 files, then 152, then 160) leaves the measured sign's issue that a session handed to the owner as it is labelled", handed.body);
 ok(JSON.stringify(updating(handed, bodyAt(161), signKey).labels) === JSON.stringify(["by:look", "queued"]),
   "a second choice whose sign trips puts it back to queued, for its fresh record");
+const slow = `- ${", and it reads ".repeat(4000)}\u2028`, t0 = Date.now();
+ok(signKey(slow) === "- " && Date.now() - t0 < 100, "a line's key is cut at its first number read, in time linear in the line, whatever an issue's body holds");
 
 // ---- its own issues: GitHub's job's or the owner's account's, the newest of each title ----
 const issues = [
