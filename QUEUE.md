@@ -13,13 +13,12 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #254 | rule builder | its second point: #235 |
-| #256 | rule builder | its staged case: #235 |
+| #254 | rule builder | |
+| #256 | rule builder | |
 | #242 | rule builder | |
 | #252 | rule builder | |
-| #235 | rule builder | |
-| #296 | builder | #235 |
-| #249 | rule builder | #235 |
+| #296 | builder | |
+| #249 | rule builder | |
 | #250 | rule builder | #249 |
 | #246 | rule builder | #245's report |
 | #253 | rule builder | #246 and #245's report |
@@ -27,15 +26,15 @@ wanted").
 | #321 | rule builder | #275, or built with it |
 | #282 | rule builder | |
 | #284 | rule builder | #246 |
-| #285 | rule builder | #235 and #249 |
+| #285 | rule builder | #249 |
 | #286 | rule builder | #284 |
 | #302 | rule builder | |
-| #303 | rule builder | #235 and #302 |
+| #303 | rule builder | #302 |
 | #304 | rule builder | #249 |
 | #305 | rule builder | #282 and #304 |
 | #322 | rule builder | #304 and #305 |
 | #306 | rule builder | #304 |
-| #307 | rule builder | #235 |
+| #307 | rule builder | |
 | #308 | rule builder | #253 and #304 |
 | #309 | rule builder | #304 |
 | #310 | rule builder | #246, #256 and #285 |
@@ -56,7 +55,7 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #204 | builder | a stop that was ignored |
+| #204 | builder | a stop that was ignored, as the staged case `stop` shows by failing |
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
 | #163 | the owner | on hold |
 | #187 | the owner | on hold |

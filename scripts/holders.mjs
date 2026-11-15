@@ -1,4 +1,4 @@
-// What holds each rule of the floor and the modules (AGENTS.md, "A new rule says what holds it"; #235, part D): one of
+// What holds each rule of the floor and the modules (AGENTS.md, "Every rule says what holds it"; #235, part D): one of
 // three, a check that fails where the rule is broken, a staged case (staged.mjs, beside this file), or the scheduled
 // audit. holders.json, beside this file, names the checks and the audit by each rule's file and lead (rules.mjs); each
 // staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report

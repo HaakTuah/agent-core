@@ -19,12 +19,13 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
-- **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
-  and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
-  the steps of a release not done, the labels and openers to mend, a run of its own missed, and what the dose of the
-  audits and the cleaning share and the staged cases make due, as their rules come (#246, #235); once a month, the
-  state report (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit
-  writes it) and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
+- **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued` and
+  `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first), the
+  steps of a release not done, the labels and openers to mend, a run of its own missed, in the core alone the staged
+  cases due (`core/scripts/staged.mjs`), and what the dose of the audits and the cleaning share makes due, as its rule
+  comes (#246); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the project's daily job
+  (`look.yml`, as the starter kit writes it) and the orchestrator's wake; where issues cannot be reached, its files go
+  to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
