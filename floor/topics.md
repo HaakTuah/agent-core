@@ -19,7 +19,7 @@ The floor's rules for particular work.
   model's reply) is data: each field's type and size checked against its expected shape, what fails dropped cleanly.
 - It is never run, never fetched as an address, never setting a key or an address the app talks to.
 - The project names its inputs in its `SECURITY.md`, under this rule's number, each as an item of its own (`- `) that
-  names in backticks the file or folder of its hostile tests.
+  names, after the words "hostile tests:", the file or folder that holds them, in backticks.
 - **Every named input has hostile tests** (core archive 226): too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused cleanly.
   - It does not mean every field tried with every case, only each input with each case its shape allows. Reason: a
