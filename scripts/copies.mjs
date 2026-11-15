@@ -23,13 +23,18 @@ import { ruleFiles } from "./rule-files.mjs";
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
 // can differ)
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
 const HERE = fileURLToPath(new URL(".", import.meta.url));
-const where = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: HERE, encoding: "utf8" })
-  .split(/\r?\n/u);
+let where;
+try {
+  where = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: HERE, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+    .split(/\r?\n/u);
+} catch {
+  fail(`${HERE} is in no git work tree, and the check reads the files git lists. Mend: run the script that stands in the repository's clone (core/scripts/copies.mjs in a project)`);
+}
 const ROOT = where[0], CORE = where[1].replace(/scripts\/$/u, "");
 const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template/copies.json.tmpl`;
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
 if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
 let config;
