@@ -49,6 +49,8 @@ let r = perPull([summary(done(true), done(false)), issue(CODEX, "<!-- codex-revi
   [inline(CODEX, badge("P1")), inline(CODEX, badge("P2")), inline(CODEX, badge("P1"), { in_reply_to_id: 3 }), inline(CODEX, secure("P2"))], OWNER);
 ok(same(r.codexCode, { got: true, blocked: "yes", points: 1, other: 1 }) && same(r.codexSecurity, { got: true, blocked: "no", points: 0, other: 1 }) && !r.postedCode.got && !r.postedSecurity.got && !r.postedDesign.got,
   "Codex's finds count by review and priority, a reply counts for nothing", JSON.stringify(r));
+r = perPull([summary(done(true), done(true)), issue(CODEX, secure("P1"))], [], OWNER);
+ok(r.codexSecurity.blocked === "yes" && r.codexSecurity.points === 1 && r.codexCode.blocked === "unread", "a find of Codex's given as an issue comment counts as one, as security-review.mjs reads it");
 r = perPull([summary(done(true), done(false))], [], OWNER);
 ok(r.codexCode.blocked === "unread" && r.codexSecurity.blocked === "no", "a summary that says there are finds when none is found is not read, never none");
 r = perPull([issue(CODEX, "<!-- codex-pull-request-review-summary -->\nno state here")], [], OWNER);

@@ -22,7 +22,7 @@ import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
 const within = (file, dir) => file === dir || file.startsWith(`${dir}/`);
 
@@ -110,6 +110,12 @@ export function table(merged, groupOf) {
   return [...rows.values()].sort((a, b) => a.key < b.key ? -1 : 1);
 }
 
+// The rows of a table as text, the first column left and the rest right, each as wide as its widest cell.
+export function grid(lines) {
+  const width = lines[0].map((_, i) => Math.max(...lines.map(l => l[i].length)));
+  return lines.map(l => l.map((c, i) => i ? c.padStart(width[i]) : c.padEnd(width[i])).join("  ")).join("\n");
+}
+
 export function print(rows, cost) {
   const pct = (a, b) => b ? `${Math.round(100 * a / b)}%` : "-";
   const head = ["", "merged", "own", "sync", "upkeep", "update", "the core's share", "own lines"];
@@ -123,8 +129,7 @@ export function print(rows, cost) {
     }
     return row.map(String);
   })];
-  const width = head.map((_, i) => Math.max(...lines.map(l => l[i].length)));
-  return lines.map(l => l.map((c, i) => i ? c.padStart(width[i]) : c.padEnd(width[i])).join("  ")).join("\n");
+  return grid(lines);
 }
 
 // The repository this clone is of (GitHub's own variable, else origin's address), or null where it is not known.

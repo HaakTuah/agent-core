@@ -24,17 +24,13 @@
 //
 //   node core/scripts/review-record.mjs [--since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
-import { mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
-import { codexState } from "./security-review.mjs";
+import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
+import { FINDING, codexState, codexs } from "./security-review.mjs";
 import { started } from "./started.mjs";
 import { pages } from "./stand-in-record.mjs";
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const CODEX = "chatgpt-codex-connector[bot]";
-const SECURITY_MARK = /^<!-- codex-security-review-finding:v1 -->/u;
 const RECEIPT = /^<!-- codex-review-receipt:v1 -->/u;
 const BADGE = /!\[(P[0-3]) Badge\]/u;
-const codexIs = c => c?.user?.login === CODEX && c.user.type === "Bot" && typeof c.body === "string";
 
 export const REVIEWS = [
   ["codexCode", "Codex's code review"], ["postedCode", "Code review posted (the next reviewer's or the fallback's)"],
@@ -71,21 +67,21 @@ export function blockingOf(body) {
 // One inline comment as a find of Codex's: { review: "code" | "security", badge, blocking }, or null where it is not
 // one of Codex's, replies to another comment, or has no priority badge.
 export function codexFind(comment) {
-  if (!codexIs(comment) || (comment.in_reply_to_id ?? null) !== null) return null;
+  if (!codexs(comment) || (comment.in_reply_to_id ?? null) !== null) return null;
   const badge = BADGE.exec(comment.body)?.[1];
   if (!badge) return null;
-  return { review: SECURITY_MARK.test(comment.body) ? "security" : "code", badge, blocking: badge === "P0" || badge === "P1" };
+  return { review: FINDING.test(comment.body) ? "security" : "code", badge, blocking: badge === "P0" || badge === "P1" };
 }
 
 // What the five reviews did on one pull request, from its comments (issue comments and inline ones, as GitHub's API
 // gives them): each of REVIEWS' keys gives { got, blocked: null | "yes" | "no" | "unread", points, other }.
 export function perPull(issueComments, inline, owner) {
   const state = codexState(issueComments);
-  const finds = inline.map(codexFind).filter(Boolean);
+  const finds = [...inline, ...issueComments].map(codexFind).filter(Boolean); // (a find can be an issue comment too, as security-review.mjs reads them)
   const codex = review => {
     const mine = finds.filter(f => f.review === review);
     const said = state.state?.[review === "code" ? "code_review" : "security_review"];
-    const got = said?.status === "completed" || mine.length > 0 || (review === "code" && issueComments.some(c => codexIs(c) && RECEIPT.test(c.body)));
+    const got = said?.status === "completed" || mine.length > 0 || (review === "code" && issueComments.some(c => codexs(c) && RECEIPT.test(c.body)));
     const points = mine.filter(f => f.blocking).length;
     // (the summary says there are finds, or cannot be read, and none of them was found: not read, never none)
     const unread = state.unread === true || said?.has_any_findings === true && mine.length === 0;
@@ -141,11 +137,6 @@ export function bugs(list, comments, merged, owner) {
     out.tied++; out.byKind[pull.kind]++;
   }
   return out;
-}
-
-function grid(lines) {
-  const width = lines[0].map((_, i) => Math.max(...lines.map(l => l[i].length)));
-  return lines.map(l => l.map((c, i) => i ? c.padStart(width[i]) : c.padEnd(width[i])).join("  ")).join("\n");
 }
 
 export function print(repo, since, pulls, t, bug) {
