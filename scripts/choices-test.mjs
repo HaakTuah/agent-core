@@ -103,6 +103,9 @@ ok(lines[1].conditions.length === 0 && lines[1].unknown.join() === "when it feel
 const reads = { listed: 4, read: 200, found: { read: { files: 151, functions: 150, imports: 50, unnamed: 0 }, entries: new Map([["cycle: a.js -> b.js", true], ["function: a.js#f", {}]]) } };
 ok(JSON.stringify(Object.fromEntries(Object.entries(MEASURES).map(([k, [, of]]) => [k, of(reads)]))) === JSON.stringify({ files: 151, functions: 150, imports: 50, listed: 4, debt: 2, cycles: 1, unnamed: 0 }),
   "each measure is read from what the shape check reads");
+const thin = { ...reads, listed: 1, read: 3000 };
+ok(MEASURES.debt[1](thin) > 0 && tripped(parse("## Choice: a\nTrips when: `debt > 0`\n"), thin).length === 1 && /reads 0\.033 the share/.test(trippedBody("d.md", tripped(parse("## Choice: a\nTrips when: `debt > 0`\n"), thin), parse(""), "")),
+  "a share is compared exact, and only shown rounded: one breach in 3000 trips debt > 0");
 ok(JSON.stringify(tripped(parse("## Choice: a\nTrips when: `files > 150`, `files > 151`, `debt <= 2`\n"), reads).map(c => `${c.measure}${c.op}${c.limit}=${c.value}`)) === JSON.stringify(["files>150=151", "debt<=2=2"]),
   "a condition trips where the number read holds it, and only then");
 const measuredProject = fs.mkdtempSync(path.join(os.tmpdir(), "choices-measured-"));
@@ -152,8 +155,8 @@ const widest = trippedBody("docs/choices.md", tripped(wide, reads), wide, "core/
 ok(widest.length < 30000 && /, and 37 more/.test(widest), "nor does a file of long names and long lines of what names no measure take the body past it", `${widest.length}`);
 ok(DUE.includes(signs), "the scheduled look reads the signs too");
 const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
-ok(!ownSigns.unread && ownSigns.body === null && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),
-  "the core's own records name a measure the look reads, and none holds today", JSON.stringify(ownSigns));
+ok(!ownSigns.unread && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),
+  "the core's own records name a measure the look reads, and every condition they write reads (whether one holds is the look's to say, never a test's: a sign that trips fails no pull request)", JSON.stringify(ownSigns));
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);

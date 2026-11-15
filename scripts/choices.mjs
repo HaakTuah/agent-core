@@ -45,13 +45,15 @@ export const MEASURES = {
   functions: ["functions it reads", r => r.found.read.functions],
   imports: ["imports it reads", r => r.found.read.imports],
   listed: ["old breaches its baseline lists", r => r.listed],
-  debt: ["the share of what it reads that its baseline lists, in percent", r => (r.read > 0 ? Math.round(1000 * r.listed / r.read) / 10 : 0)],
+  debt: ["the share of what it reads that its baseline lists, in percent", r => (r.read > 0 ? 100 * r.listed / r.read : 0)],
   cycles: ["imports that lie on a cycle between files", r => [...r.found.entries.keys()].filter(id => id.startsWith("cycle: ")).length],
   unnamed: ["files of code that lie in no system", r => r.found.read.unnamed],
 };
 export const OPS = { ">": (a, b) => a > b, ">=": (a, b) => a >= b, "<": (a, b) => a < b, "<=": (a, b) => a <= b };
 const CONDITION = /^([a-z]+) *(>=|<=|>|<) *(\d{1,9}(?:\.\d{1,3})?)$/u;
 const measured = said => { const m = CONDITION.exec(said); return m && Object.hasOwn(MEASURES, m[1]) ? { measure: m[1], op: m[2], limit: Number(m[3]) } : null; };
+// (a number as shown: whole, or to three places; the comparison takes it exact)
+const figure = n => String(Math.round(n * 1000) / 1000);
 const shown = text => `\`${plain(text).replace(/`/gu, "'")}\``;
 
 // A record's line "Trips when:": the conditions it names that the look reads, and, quoted, what else it holds in
@@ -150,7 +152,7 @@ export function trippedBody(file, held, found, home) {
   const some = (list, line) => [...list.slice(0, LISTED).map(line), ...(list.length > LISTED ? [`- and ${list.length - LISTED} more: \`node ${home}scripts/choices.mjs\` lists them`] : [])];
   const rule = `\`${home}modules/choices.md\`, "What reopens a choice"`;
   return [...(held.length ? [`A choice's sign, written in a measure the shape check keeps, holds today in \`${file}\` (${rule}):`,
-    ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${c.value} ${MEASURES[c.measure][0]}.`), ""] : []),
+    ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${figure(c.value)} ${MEASURES[c.measure][0]}.`), ""] : []),
   ...(unknown.length ? [`A line "Trips when:" in \`${file}\` names what is no measure the look reads, so that sign is not read (${rule}; the measures: ${Object.keys(MEASURES).join(", ")}):`,
     ...some(unknown, rec => `- ${shown(rec.name)}: ${rec.unknown.slice(0, 3).map(shown).join(", ")}${rec.unknown.length > 3 ? `, and ${rec.unknown.length - 3} more` : ""}`), ""] : []),
   [held.length ? "A session takes this issue: for each choice whose sign holds, it writes in a comment here a fresh record that compares the options, staying as it is among them, with the gain and what the move would cost, and labels this issue needs-owner in place of queued; no session makes the choice. Where the owner keeps it, the session that acts on the answer writes its sign anew in a pull request." : "",
@@ -178,7 +180,7 @@ export function signs({ manifest, root = "." }) {
 // One record as the script prints it: its name, whether it names its sign, and each condition of its line "Trips
 // when:" with the number read (`r`, the dose's reading; a string where the measures could not be read).
 function recordLine(rec, r) {
-  const read = c => (typeof r === "string" ? `${c.measure} ${c.op} ${c.limit} (${r})` : `${c.measure} ${c.op} ${c.limit} (${MEASURES[c.measure][1](r)} now${OPS[c.op](MEASURES[c.measure][1](r), c.limit) ? ": it holds" : ""})`);
+  const read = c => (typeof r === "string" ? `${c.measure} ${c.op} ${c.limit} (${r})` : `${c.measure} ${c.op} ${c.limit} (${figure(MEASURES[c.measure][1](r))} now${OPS[c.op](MEASURES[c.measure][1](r), c.limit) ? ": it holds" : ""})`);
   return [`- ${rec.name}${rec.sign ? "" : ": names no sign on a line \"Reopens it:\""}`,
     ...(rec.conditions.length ? [`  trips when: ${rec.conditions.map(read).join("; ")}`] : []),
     ...(rec.unknown.length ? [`  names no measure this reads, on its line "Trips when:": ${rec.unknown.map(shown).join(", ")} (the measures: ${Object.keys(MEASURES).join(", ")})`] : [])];
