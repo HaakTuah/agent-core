@@ -1,5 +1,6 @@
 # The description check on this repository's own pull requests: the same script projects run from their copy
-# (scripts/pr-description.mjs), here from its source. A description put right is checked again by itself (the type
+# (scripts/pr-description.mjs), here from its source, with the line that says what a pull request opened since it came
+# waits on (PR_CREATED). A description put right is checked again by itself (the type
 # "edited"). A pull request that changes the floor or the modules is asked for one heading more, "What holds it"
 # (AGENTS.md, "A new rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
 # setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (AGENTS.md, "Nothing locks a
