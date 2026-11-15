@@ -29,10 +29,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseBaseline, parseConfig, standing, where } from "./shape.mjs";
+import { CODE, OTHER } from "./code-shape.mjs";
+import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
-const SAFE = ["-c", "core.fsmonitor=false"];
+const SAFE = ["-c", "core.fsmonitor=false", "-c", "core.quotePath=false"];
 const git = args => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const tolerant = read => { try { return read(); } catch { return null; } };
 const CAUGHT = ["Killed", "Timeout"], SURVIVED = ["Survived", "NoCoverage"];
@@ -40,6 +41,8 @@ const ROW = "*mutation tool*";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
+// A file of the project's, read and written through no link (shape.mjs, notLinked): its path, or a refusal.
+export const unlinked = file => { try { return notLinked(file); } catch (e) { const [what, mend] = String(e.message).split(". Mend: "); return refuse(what, mend ?? "make it a plain file of the project's own"); } };
 
 // The project's rules: its manifest, else (the core) its AGENTS.md; and where the core's scripts lie from its root.
 export function rulesHere(root = ".") {
@@ -137,17 +140,40 @@ export function counted(faults) {
   return { caught, survived, pending, line: `${caught} of ${judged} faults put in on purpose were caught (${share})${survived ? `, ${survived} survived` : ""}${pending ? `, ${pending} not run (the tool's budget)` : ""}` };
 }
 
-// The survivors no entry of the baseline claims: each id's count against the count listed.
-export function unlisted(faults, listed) {
-  const counts = new Map();
-  for (const f of faults.filter(f => SURVIVED.includes(f.status))) counts.set(f.id, [...(counts.get(f.id) ?? []), f]);
-  return [...counts].filter(([id, all]) => all.length > (listed.get(id)?.count ?? 0)).map(([, all]) => all[0]);
+// An id's parts: its file, its line's text and what became what.
+const partsOf = id => { const m = /^survivor: (.+?): (.*) (\[.*\])$/u.exec(id); return m ? { file: m[1], line: m[2], what: m[3] } : null; };
+
+// The entries whose line no longer stands in their file as it is now (`texts`, a function of a file to its text or
+// null): a Map of id to its count. A fault on a line a pull request rewrote may claim one of these.
+export function moved(listedMap, texts) {
+  const out = new Map(), lines = new Map();
+  for (const [id, n] of listedMap) {
+    const parts = partsOf(id);
+    if (!parts) continue;
+    if (!lines.has(parts.file)) lines.set(parts.file, new Set((texts(parts.file) ?? "").split(/\r?\n/u).map(l => collapse(l, 100))));
+    if (!lines.get(parts.file).has(parts.line)) out.set(id, n.count ?? 0);
+  }
+  return out;
 }
 
-// The entries that joined the baseline since the base with no reason under "grown", where the pull request records no
-// new whole run: [id].
-export function joinedUnsaid(now, was) {
-  if (!was || JSON.stringify(now.whole ?? null) !== JSON.stringify(was.whole ?? null)) return [];
+// The survivors no entry of the baseline claims: each id's count against the count listed; then, of what is left, a
+// survivor claims an entry of `gone` (moved()) of the same file and the same fault, where one is left.
+export function unlisted(faults, listedMap, gone = new Map()) {
+  const counts = new Map(), left = [], free = new Map(gone);
+  for (const f of faults.filter(f => SURVIVED.includes(f.status))) counts.set(f.id, [...(counts.get(f.id) ?? []), f]);
+  for (const [id, all] of counts) left.push(...all.slice(listedMap.get(id)?.count ?? 0));
+  return left.filter(f => {
+    const mine = partsOf(f.id), fit = [...free].find(([id, c]) => c > 0 && partsOf(id)?.file === mine?.file && partsOf(id)?.what === mine?.what);
+    if (fit) free.set(fit[0], fit[1] - 1);
+    return !fit;
+  }).filter((f, i, all) => all.findIndex(g => g.id === f.id) === i);
+}
+
+// The entries that joined the baseline since the base with no reason under "grown": [id]. None counts where the base
+// has no baseline (the first), or where the pull request records a new whole run and changes no file of code or of the
+// tests (`touched` false), so that what the run found stood on the base.
+export function joinedUnsaid(now, was, touched = true) {
+  if (!was || (!touched && JSON.stringify(now.whole ?? null) !== JSON.stringify(was.whole ?? null))) return [];
   return [...now.listed].filter(([id, n]) => (n.count ?? 0) > (was.listed.get(id)?.count ?? 0) && !(now.grown[id] ?? "").trim()).map(([id]) => id);
 }
 
@@ -165,7 +191,7 @@ export function runTool(command, lines, cwd = ".") {
   try {
     const args = command.map(w => w.replaceAll("{lines}", lines).replaceAll("{report}", report));
     const r = spawnSync(args[0], args.slice(1), { cwd, encoding: "utf8", stdio: ["ignore", "inherit", "inherit"], shell: false });
-    if (r.error || r.status !== 0) refuse(`the mutation tool (${command.join(" ")}) ${r.error ? `could not start: ${r.error.code ?? r.error.message}` : `ended with ${r.status ?? r.signal}`}`, `run the row's command by hand, mend what it says, and see that it writes its report to {report}`);
+    if (r.error || r.status !== 0) refuse(`the mutation tool (${command.join(" ")}) ${r.error ? `could not start (${r.error.code ?? "no code given"})` : `ended with ${r.status ?? r.signal}`}`, `run the row's command by hand, mend what it says, and see that it writes its report to {report}`);
     if (!fs.existsSync(report)) refuse(`the mutation tool (${command.join(" ")}) wrote no report`, "put {report} in the row's command where the tool takes the path of its report in the mutation-testing-elements schema");
     return fs.readFileSync(report, "utf8");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -175,7 +201,7 @@ const placed = f => `${f.file}:${f.line}`;
 const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replacement === "" ? "taken out" : `made "${collapse(f.replacement, 40)}"`}`;
 
 // What the check says of a pull request's run, and whether it fails: { lines, fails }.
-export function verdict({ faults, baseline, was, at, deleted }) {
+export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map() }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
   if (!baseline) {
@@ -183,7 +209,8 @@ export function verdict({ faults, baseline, was, at, deleted }) {
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
     return { lines, fails: false };
   }
-  const news = unlisted(faults, baseline.listed), unsaid = joinedUnsaid(baseline, was);
+  const news = unlisted(faults, baseline.listed, gone), unsaid = joinedUnsaid(baseline, was, touched);
+  if (c.pending) lines.push(`${c.pending} faults on the changed lines were not run (the tool's budget): they are not held here, and the next whole run reads them.`);
   for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, and ${at} does not list it. Mend: write a test that fails on it and run the check again; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const id of unsaid) lines.push(`FAIL: ${at} lists "${id}" where the base did not, with no reason under "grown". Mend: take it out and write a test that catches the fault, or give its reason under "grown" (the fault changes nothing the program does), say so in the pull request, and have a fresh session say there that it found no other way`);
   return { lines, fails: news.length + unsaid.length > 0 };
@@ -194,27 +221,34 @@ const deletedTests = (base, tests) => (tests.length ? git(["diff", "--name-only"
 
 const summary = lines => { if (process.env.GITHUB_STEP_SUMMARY) tolerant(() => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.map(l => `- ${l}`).join("\n")}\n`)); };
 
-// The project as the check reads it: its tool, its config, its code (no tests) and the baseline's path.
+// The files git lists under pathspecs, none a link.
+const listed = specs => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs]).split("\0").filter(f => f && !tolerant(() => fs.lstatSync(f).isSymbolicLink())) : []);
+
+// The project as the check reads it: its tool, its config, its code (each file of the config's "code" in a language
+// the core knows by its ending, JavaScript's, TypeScript's or another's, that is no test) and the baseline's path.
 function project() {
   const { text, home } = rulesHere(), tool = toolOf(text);
   const configAt = where(text);
-  if (!fs.existsSync(configAt)) return { tool, home, config: null };
-  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt), now = standing(config);
-  const code = Object.keys(now.texts).filter(f => !now.tests.has(f) && path.posix.basename(f) !== "package.json");
+  if (!fs.existsSync(unlinked(configAt))) return { tool, home, config: null };
+  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt), tests = new Set(listed(config.tests));
+  const code = listed(config.code).filter(f => !tests.has(f) && [...CODE, ...OTHER].includes(path.posix.extname(f)));
   return { tool, home, config, code, at: baselineOf(config) };
 }
 
 // A pull request's run. Before the baseline stands, a tool that cannot run is said and fails nothing.
 function onPullRequest(p, base) {
   const changed = changedLines(base, p.code), deleted = deletedTests(base, p.config.tests);
-  const baseline = baselineFrom(tolerant(() => fs.readFileSync(p.at, "utf8")), p.at);
+  const baseline = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const was = baselineFrom(tolerant(() => git(["show", `${base}:${p.at}`])), `${base}:${p.at}`);
   let faults = [];
   try { if (changed.size) faults = faultsOf(runTool(p.tool.command, linesArg(changed)), changed); } catch (e) {
     if (baseline || !(e instanceof Refused)) throw e;
     console.log(`Reported only, and not measured: ${e.message}`);
   }
-  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted });
+  const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
+  const touched = changed.size > 0 || git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).trim() !== "";
+  const gone = baseline ? moved(baseline.listed, f => tolerant(() => fs.readFileSync(unlinked(f), "utf8"))) : new Map();
+  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
   return fails ? 1 : 0;
@@ -224,14 +258,14 @@ function onPullRequest(p, base) {
 // entries that still stand.
 function whole(p) {
   const faults = faultsOf(runTool(p.tool.command, p.code.join(",")), null);
-  const old = baselineFrom(tolerant(() => fs.readFileSync(p.at, "utf8")), p.at);
+  const old = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const listed = {};
   for (const f of faults.filter(f => SURVIVED.includes(f.status))) listed[f.id] = { count: (listed[f.id]?.count ?? 0) + 1 };
   const grown = Object.fromEntries(Object.entries(old?.grown ?? {}).filter(([id]) => id in listed));
   const head = tolerant(() => git(["rev-parse", "HEAD"]).trim()) ?? "unknown";
   const sorted = Object.fromEntries(Object.entries(listed).sort(([a], [b]) => a.localeCompare(b)));
-  fs.mkdirSync(path.dirname(p.at), { recursive: true });
-  fs.writeFileSync(p.at, `${JSON.stringify({ whole: { day: new Date().toISOString().slice(0, 10), commit: head }, ...(Object.keys(grown).length ? { grown } : {}), listed: sorted }, null, 2)}\n`);
+  fs.mkdirSync(path.dirname(unlinked(p.at)), { recursive: true });
+  fs.writeFileSync(unlinked(p.at), `${JSON.stringify({ whole: { day: new Date().toISOString().slice(0, 10), commit: head }, ...(Object.keys(grown).length ? { grown } : {}), listed: sorted }, null, 2)}\n`);
   console.log(`The whole run: ${counted(faults).line}. ${p.at} lists ${Object.keys(listed).length} faults that survive${old ? `, against ${old.listed.size} before` : ""}.`);
   return 0;
 }
@@ -242,14 +276,14 @@ function lower(p, named) {
   const files = named.split(",").filter(Boolean);
   const outside = files.find(f => !p.code.includes(f));
   if (outside !== undefined) refuse(`${outside} is no file of the code the shape check's config reads`, "name files of its \"code\" that are no tests, joined by commas");
-  const old = baselineFrom(tolerant(() => fs.readFileSync(p.at, "utf8")), p.at);
+  const old = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   if (!old) refuse(`there is no baseline at ${p.at} to lower`, "write it first with the audit's whole run (--whole)");
   const now = new Map();
   for (const f of faultsOf(runTool(p.tool.command, files.join(",")), null).filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
   const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `));
   const listed = Object.fromEntries([...old.listed].map(([id, n]) => [id, ours(id) ? Math.min(n.count ?? 0, now.get(id) ?? 0) : n.count ?? 0]).filter(([, c]) => c > 0).map(([id, c]) => [id, { count: c }]));
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => id in listed));
-  fs.writeFileSync(p.at, `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);
+  fs.writeFileSync(unlinked(p.at), `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);
   console.log(`${p.at} lists ${Object.keys(listed).length} faults that survive, against ${old.listed.size} before.`);
   return 0;
 }

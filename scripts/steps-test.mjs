@@ -62,6 +62,17 @@ for (const [name, dir] of Object.entries(dirs)) {
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
 }
+// (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
+{
+  const dir = dirs["an-npm-project"], test = path.join(dir, "src", "first.test.js");
+  fs.mkdirSync(path.dirname(test), { recursive: true });
+  fs.writeFileSync(test, "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const said = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  ok(said?.mend.includes("has tests now"), "the starter kit's mutation-tool row, none for no tests yet, is reported once the project's own code holds a test", JSON.stringify(said));
+  execFileSync("git", ["rm", "-q", "--cached", "src/first.test.js"], { cwd: dir });
+  fs.rmSync(test);
+}
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
 const dir = dirs["a-dotnet-project"];

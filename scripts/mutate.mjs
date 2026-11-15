@@ -23,11 +23,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { tokens } from "./code-shape.mjs";
-import { parseConfig, standing, where } from "./shape.mjs";
+import { notLinked, parseConfig, standing, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 const LONGEST = 120; // seconds: a test that takes longer as it stands is no test a fault is run against
-const SAFE = ["-c", "core.fsmonitor=false"];
+// (git's settings that run a command by themselves, off: no hook runs as a working copy is checked out)
+const SAFE = ["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${os.devNull}`];
 const git = (args, cwd = ".") => execFileSync("git", [...SAFE, ...args], { cwd, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const OPERATORS = { "===": "!==", "!==": "===", "==": "!=", "!=": "==", "<=": "<", ">=": ">", "&&": "||", "||": "&&" };
 const SINGLE = { "<": "<=", ">": ">=" };
@@ -109,8 +110,10 @@ export function testsOf(file, tests) {
 // One run of a test file in a working copy: "passed", "failed" or "timeout", and how long it took, in seconds.
 function run(test, cwd, limit) {
   return new Promise(done => {
-    const start = Date.now(), child = spawn(process.execPath, [test], { cwd, stdio: "ignore" });
-    const timer = setTimeout(() => { child.kill("SIGKILL"); done({ result: "timeout", took: limit }); }, limit * 1000);
+    // (in a group of its own off Windows, so that a test past its time is stopped with what it started)
+    const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test], { cwd, stdio: "ignore", detached: group });
+    const stop = () => { try { if (group) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* (it ended) */ } };
+    const timer = setTimeout(() => { stop(); done({ result: "timeout", took: limit }); }, limit * 1000);
     child.on("exit", code => { clearTimeout(timer); done({ result: code === 0 ? "passed" : "failed", took: (Date.now() - start) / 1000 }); });
   });
 }
@@ -186,7 +189,9 @@ async function main(argv) {
   if (!out || !(budget > 0)) refuse("the mutation tool was not told where to write its report, or its budget is no number of seconds", "run node scripts/mutate.mjs --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]");
   const named = argv.filter((a, i) => i !== at && i !== at + 1 && i !== b && i !== b + 1);
   const rules = [path.join(".", "core-manifest.md"), path.join(".", "AGENTS.md")].map(f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null)).find(t => t !== null);
-  const configAt = where(rules), config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt);
+  const configAt = where(rules);
+  try { notLinked(configAt); } catch (e) { refuse(String(e.message).split(". Mend: ")[0], "make the shape check's config a plain file of the project's own"); }
+  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt);
   const { texts, tests } = standing(config);
   const code = Object.keys(texts).filter(f => !tests.has(f) && !f.endsWith("package.json"));
   const wanted = wantedOf(named, code), testTexts = Object.fromEntries([...tests].filter(t => t in texts).map(t => [t, texts[t]]));
@@ -201,7 +206,7 @@ async function main(argv) {
     fs.writeFileSync(out, `${JSON.stringify(report(texts, jobs))}\n`);
     const count = s => jobs.filter(j => j.status === s).length;
     if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}`);
-    console.log(`mutate: ${jobs.length} faults in ${wanted.size} files: ${count("Killed") + count("Timeout")} caught, ${count("Survived") + count("NoCoverage")} survived, ${count("Pending")} not run (the budget); the report is at ${out}`);
+    console.log(`mutate: ${jobs.length} faults in ${wanted.size} files: ${count("Killed") + count("Timeout")} caught, ${count("Survived") + count("NoCoverage")} survived, ${count("Pending")} not run (the budget); the report is written`);
   } finally { takeAway(copies, scratch); }
   return 0;
 }

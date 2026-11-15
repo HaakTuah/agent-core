@@ -68,8 +68,9 @@ orchestrator when it hands out lanes (core archive 226). What the code is held t
   - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
     work today.
   - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
-    audit's task runs it on the whole codebase, outside the suite (`core/scripts/strength.mjs --whole`), which writes
-    the tests' strength baseline in the same pull request, and the reader reads its number beside the last one's
+    audit's task runs it on the whole codebase, outside the suite and on a machine where the project's tests may run
+    (floor rule 18), with `core/scripts/strength.mjs --whole`, which writes the tests' strength baseline in the same
+    pull request, one that changes no code or test; the reader reads its number beside the last one's
     (`modules/code-shape.md`, #253); the tests' other measures come with #275.
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made

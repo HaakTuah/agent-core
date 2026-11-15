@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, counted, faultsOf, idOf, joinedUnsaid, linesArg, toolOf, unlisted, verdict } from "./strength.mjs";
+import { baselineOf, counted, faultsOf, idOf, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -48,8 +48,13 @@ ok(same(unlisted([f("survivor: x", "Survived")], listed), []) && unlisted([f("su
 const b = (entries, grown = {}, whole = null) => ({ listed: new Map(Object.entries(entries)), grown, whole });
 ok(same(joinedUnsaid(b({ p: { count: 1 }, q: { count: 2 } }), b({ p: { count: 1 }, q: { count: 1 } })), ["q"]) && same(joinedUnsaid(b({ q: { count: 2 } }, { q: "it changes nothing the program does" }), b({ q: { count: 1 } })), []),
   "an entry that joins the baseline, or grows, needs its reason under \"grown\"");
-ok(same(joinedUnsaid(b({ q: { count: 2 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })), []) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
-  "with no reason, only in the pull request that records a new whole run, or writes the first baseline");
+const runs = [b({ q: { count: 2 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
+ok(same(joinedUnsaid(...runs, false), []) && same(joinedUnsaid(...runs, true), ["q"]) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
+  "with no reason, only in the pull request that records a new whole run and changes no code or test, or writes the first baseline: one that changes code cannot take in its own survivors so");
+const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", gone = moved(new Map([[old, { count: 1 }], ["survivor: a.js: kept(); [! -> ]", { count: 1 }]]), () => "kept();\nif (y === 1) return;\n");
+const renamed = { ...f("survivor: a.js: if (y === 1) return; [=== -> !==]", "Survived") }, other = { ...f("survivor: a.js: if (y === 1) return; [=== -> ==]", "Survived") };
+ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1,
+  "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once; another fault there is the change's own");
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });
@@ -57,6 +62,8 @@ ok(!before.fails && before.lines.some(l => l.startsWith("survived: a.js:2")) && 
   "before the baseline stands, a survivor is shown and fails nothing; a deleted test file is named", before.lines.join("\n"));
 const after = verdict({ faults: [f("survivor: z", "Survived"), f("survivor: x", "Survived")], baseline: b({ "survivor: x": { count: 1 } }), was: b({ "survivor: x": { count: 1 } }), at: "checks/strength-baseline.json", deleted: [] });
 ok(after.fails && after.lines.filter(l => l.startsWith("FAIL")).length === 1 && mended(after.lines.join("\n")) && after.lines.join("\n").includes('"survivor: z"'), "once it stands, a survivor it does not list fails, naming its id, with its mend; one listed passes", after.lines.join("\n"));
+const short = verdict({ faults: [f("k", "Killed"), f("p", "Pending")], baseline: b({}), was: b({}), at: "s.json", deleted: [] });
+ok(!short.fails && short.lines.some(l => l.startsWith("1 faults on the changed lines were not run")), "once it stands, faults past the tool's budget are said to be held nowhere", short.lines.join("\n"));
 const grew = verdict({ faults: [], baseline: b({ "survivor: x": { count: 2 } }), was: b({ "survivor: x": { count: 1 } }), at: "s.json", deleted: [] });
 ok(grew.fails && mended(grew.lines.join("\n")), "an entry that joined with no reason fails, with its mend", grew.lines.join("\n"));
 
@@ -88,6 +95,17 @@ try {
   sh("commit", "-qam", "another");
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && mended(r.stdout + r.stderr) && r.stderr.includes("src/a.js:3"), "once the baseline stands, a survivor on a changed line it does not list fails, with its mend", r.stdout + r.stderr);
+  write("src/a.js", "export const a = z => z === 1;\nexport const b = y => y === 2;\nexport const c = z => z === 3;\n");
+  r = run(["--whole"]);
+  r = run([], { STRENGTH_BASE: "main" });
+  ok(r.status === 1 && mended(r.stderr) && r.stderr.includes("where the base did not"), "a pull request that changes code cannot take its own survivors in by a whole run of its own", r.stdout + r.stderr);
+  sh("checkout", "--", "checks/strength-baseline.json");
+  write("src/a.js", "export const a = y => y === 1;\nexport const b = y => y === 2;\n");
+  write("src/Game.cs", "class Game { bool Over(int x) { return x == 1; } }\n");
+  sh("add", "-A");
+  r = run([], { STRENGTH_BASE: "main" });
+  ok(r.status === 1 && !r.stderr.includes("src/a.js:1") && r.stderr.includes("src/Game.cs:1"), "a listed fault whose line the change rewrote passes; a file in another language the tool reports is held too", r.stdout + r.stderr);
+  sh("checkout", "--", "src/a.js"); sh("rm", "-q", "-f", "--cached", "src/Game.cs"); fs.rmSync(path.join(dir, "src/Game.cs"));
   r = run(["--lower", "src/a.js"], { STATUS: "Killed" });
   const lowered = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
   const refused = run(["--lower", "test/a.test.js"]);

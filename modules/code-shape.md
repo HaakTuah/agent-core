@@ -83,13 +83,15 @@ one declared entrance.
   project's tests runs its *mutation tool* on those lines through `core/scripts/strength.mjs`, which shows on the pull
   request how many of the faults put in on purpose a test caught, and fails nothing. The project names the tool in its
   manifest, a tool of development only, under the floor's rules for dependencies and licences, that writes its report
-  in an open form, the mutation-testing-elements schema; a project with no such tool for its language says `none`
-  there with its reason, and the measure is left out. The one condition that changes it: once the project's baseline stands, a fault that
-  survives on a changed line and the baseline does not list fails, and the session writes a test that catches it; only
-  where the fault changes nothing the program does, it lists it with that reason, as "Never worse" says of any entry.
-  The baseline lists what survives a whole run, which is the audit's, outside the suite (`modules/cleaning.md`): a
-  debt worked down at the dose. It does not mean that a pull request runs the whole codebase, that a score is the aim,
-  or that the tests that stand are rewritten on demand. Reason: the projects lean on their suites as the proof that a
+  in an open form, the mutation-testing-elements schema; a project with no such tool for its language, or with no
+  tests yet, says `none` there with its reason, and the measure is left out. The one condition that changes it: once
+  the project's baseline stands, a fault that survives on a changed line and the baseline does not list fails, and the
+  session writes a test that catches it; only where the fault changes nothing the program does, it lists it with that
+  reason, as "Never worse" says of any entry. The baseline lists what survives a whole run, which is the audit's,
+  outside the suite and in a pull request that changes no code or test (`modules/cleaning.md`): a debt worked down at
+  the dose. It does not mean that a pull request runs the whole codebase, that a score is the aim, or that the tests
+  that stand are rewritten on demand; a listed fault whose line the change rewrote stays listed, and any other fault on
+  a changed line is the change's own. Reason: the projects lean on their suites as the proof that a
   change kept behaviour, and nothing measured whether a test fails where the code is wrong. Held by the strength
   check, which fails a survivor no entry claims and an entry that joins with no reason, and by the reviews of that
   reason.
