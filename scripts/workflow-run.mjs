@@ -247,11 +247,12 @@ const outputsOf = file => {
  * temporary folder is made under `temp` and removed when the job ends.
  */
 // Whether a trigger's `paths:` filter lets a change through, as GitHub reads one: a pattern of `*` (no slash), `**`
-// (any folders, none included, where `**/` begins it), `?` and `[...]`, and `!` before one taking out what it matches;
-// the last pattern a file matches decides, and the workflow starts where any changed file is let through.
+// (any folders, none included, where `**/` begins it), `?` and `[...]`, `\` before a character taking it as itself,
+// and `!` before one taking out what it matches; the last pattern a file matches decides, and the workflow starts
+// where any changed file is let through.
 export function pathsLetThrough(patterns, changed) {
-  const re = glob => new RegExp(`^${glob.replace(/\*\*\/|\*\*|\*|\?|\[[^\]]*\]|[.+^${}()|\\]/g, t =>
-    t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*" : t === "?" ? "[^/]" : t.startsWith("[") ? t : `\\${t}`)}$`);
+  const re = glob => new RegExp(`^${glob.replace(/\\.|\*\*\/|\*\*|\*|\?|\[[^\]]*\]|[.+^${}()|\\]/g, t =>
+    t.length === 2 && t[0] === "\\" ? `\\${t[1]}` : t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*" : t === "?" ? "[^/]" : t.startsWith("[") ? t : `\\${t}`)}$`);
   const rules = patterns.map(p => (p.startsWith("!") ? [false, re(p.slice(1))] : [true, re(p)]));
   return changed.some(f => rules.reduce((let_, [keep, r]) => (r.test(f) ? keep : let_), false));
 }
