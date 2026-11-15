@@ -6,8 +6,8 @@
 // The hooks the starter kit writes (setup/template/claude-settings.json.tmpl, beside this copy) are the core's, listed
 // by it at the core's pin. An entry nothing configures fails too, so the list stays true.
 //
-// What it reads as configured, in the files committed at the project's root: `.claude/settings.json` and, where it is
-// committed, `.claude/settings.local.json`, each hook by its event, matcher and command ("Stop: bash -c '...'") and
+// What it reads as configured, in the files at the project's root that git does not ignore: `.claude/settings.json`
+// and, where it is committed, `.claude/settings.local.json`, each hook by its event, matcher and command ("Stop: bash -c '...'") and
 // each plug-in their "enabledPlugins" turn on ("name@marketplace"); `.mcp.json`, each tool server of its "mcpServers";
 // and `.claude/skills/`, each folder holding a SKILL.md. A link inside the checkout is followed; one that leads out of
 // it is not, and fails, save one the base held as it stands. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
@@ -161,8 +161,11 @@ export function readProject(root, rev = null) {
     }
     return { f, type: tree(f).find(e => e.f === f)?.type ?? "tree" };
   };
+  // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
+  // is, and no file of the project's: floor rule 18)
+  const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
   const read = rev ? f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; }
-    : f => { if (outside(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+    : f => { if (outside(f) || ignored(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
   const skills = () => {
     if (rev) {
       const dir = resolve(".claude/skills");
@@ -172,7 +175,7 @@ export function readProject(root, rev = null) {
     }
     if (outside(".claude/skills")) return [];
     const dir = path.join(root, ".claude/skills");
-    try { return fs.readdirSync(dir).filter(n => !outside(`.claude/skills/${n}/SKILL.md`) && fs.existsSync(path.join(dir, n, "SKILL.md"))); } catch { return []; }
+    try { return fs.readdirSync(dir).filter(n => !outside(`.claude/skills/${n}/SKILL.md`) && fs.existsSync(path.join(dir, n, "SKILL.md")) && !ignored(`.claude/skills/${n}/SKILL.md`)); } catch { return []; }
   };
   return { ...configured(read, skills), links };
 }
@@ -191,6 +194,14 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const head = readProject(root);
   const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
   let list = listed(config, file);
+  // (a list the base held is no longer missing: taking it out does not bring back the time before it was written)
+  if (!list && base) {
+    let held = null;
+    try { held = JSON.parse(textAt(root, base, path.relative(root, path.resolve(root, file)).split(path.sep).join("/")) ?? "null"); } catch { /* (none) */ }
+    if (held && typeof held === "object" && Object.hasOwn(held, "agentTools")) {
+      return { fail: [`${file}: "agentTools" is gone, which the base held. Mend: put the list back as the base held it, changing only the entries this pull request's task names`], notes: [] };
+    }
+  }
   if (!list && core) list = { keys: new Set(), problems: [] };
   const { problems, unlisted } = check(head, list, kit, file);
   const fail = [...head.problems, ...problems], notes = [];

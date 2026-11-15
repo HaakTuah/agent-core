@@ -207,6 +207,10 @@ ok(byVariable.length === 1 && byVariable[0].mend.includes("could not read the pr
 ok(notDone(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }) }), step)[0]?.mend.includes('the plug-in "helper@example-market"'), "and not done where a tool is configured and the list is not written");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 
+passes(run(project({ ".gitignore": ".claude/settings.local.json\n", ".claude/settings.local.json": { enabledPlugins: { "helper@example-market": true } }, ...listing() })), "a settings.local.json git ignores is a person's own, and not read");
+fails(run(pr(project({ ".mcp.json": { mcpServers: { files: { command: "files-server" } } }, ...listing({ kind: "server", name: "files", publisher: "Example Tools", version: "2.0.0" }) }), { "checks/licences.json": { lockfiles: [] } })),
+  "a pull request that takes out the list the base held fails", '"agentTools" is gone, which the base held');
+
 // ---- with no list yet: the pull request's base counts as it (nothing locks a project) ----
 const old = project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }) });
 const noted = run(old);
