@@ -30,7 +30,9 @@
 //                                                     project has none yet
 //   node core/scripts/shape.mjs <config> --first      write the first baseline, what stands when a project takes the
 //                                                     check; only where no baseline exists yet
-//   node core/scripts/shape.mjs <config> --write      lower the baseline to what still stands (it never adds)
+//   node core/scripts/shape.mjs <config> --write      lower the baseline to what still stands; it adds only what
+//                                                     "grown" gives a reason for and, with SHAPE_BASE set, what
+//                                                     that branch held already, where the config reads more
 //   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and hold its
 //                                                     time to its mark
 //   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  hold the time since a start the workflow
@@ -370,12 +372,24 @@ const SAID = {
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
 };
 
-// The breaches that are new: no entry of the baseline covers them. One that only moved, under its name, claims its old
-// entry and is none: the old entry is stale, and --write lists it where it stands now.
-function fresh(config, found, baseline, current) {
+// The breaches no entry of the baseline covers. One that only moved, under its name, claims its old entry and is
+// none: the old entry is stale, and --write lists it where it stands now. One that the base held already, as this
+// config reads the base's code, is no new breach either: the check reads more than it did (a system named, a mark
+// lowered), or the baseline was lowered in this same change past what stands, and --write, told the base, lists it.
+// The rest are new, each kind with its mend.
+function fresh({ config, at, self, found, baseline, current, base }) {
+  let news = unclaimed(current, baseline.listed, config.marks);
+  const fail = [];
+  if (base && news.length) {
+    const left = new Set(unclaimed(new Map(news.map(id => [id, current.get(id)])), base.stood(), config.marks));
+    const readMore = news.filter(id => !left.has(id));
+    news = news.filter(id => left.has(id));
+    if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, or the baseline was lowered past what stands. Mend: list them with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
+  }
   const byKind = new Map();
-  for (const id of unclaimed(current, baseline.listed, config.marks)) { const k = found.entries.get(id).kind; byKind.set(k, [...(byKind.get(k) ?? []), id]); }
-  return [...byKind].map(([kind, ids]) => { const [what, mend] = SAID[kind](ids.length, config); return [`FAIL: ${what}. Mend: ${mend}`, ...some(ids, current)]; });
+  for (const id of news) { const k = found.entries.get(id).kind; byKind.set(k, [...(byKind.get(k) ?? []), id]); }
+  for (const [kind, ids] of byKind) { const [what, mend] = SAID[kind](ids.length, config); fail.push([`FAIL: ${what}. Mend: ${mend}`, ...some(ids, current)]); }
+  return fail;
 }
 
 // The marks the config raises or drops against the base's: each by the id its reason stands under in "grown".
@@ -391,6 +405,9 @@ function raised(config, old) {
 }
 
 const tolerant = read => { try { return read(); } catch { return null; } }; // (what the base cannot be read by holds nothing there)
+const once = make => { let made = null; return () => (made ??= make()); };
+// What the base held, as this config reads the base's code: each breach's id to its numbers.
+const stoodAt = (base, config) => { const before = base.standing(); return new Map([...survey(before.texts, config, before.tests).entries].map(([id, e]) => [id, e.n])); };
 
 // Against the pull request's base: what joined the baseline that the base neither listed nor held, and each mark
 // raised, where "grown" gives no reason.
@@ -399,11 +416,7 @@ function againstBase({ config, at, baseline, base }) {
   const was = base.baseline === null ? null : tolerant(() => parseBaseline(base.baseline, base.name, "").listed);
   const old = base.config === null ? null : tolerant(() => parseConfig(base.config, base.name));
   let joined = unclaimed(baseline.listed, was ?? new Map(), config.marks);
-  if (joined.length) {
-    const before = base.standing();
-    const stood = new Map([...survey(before.texts, config, before.tests).entries].map(([id, e]) => [id, e.n]));
-    joined = unclaimed(new Map(joined.map(id => [id, baseline.listed.get(id)])), stood, config.marks).filter(id => !said(baseline.grown, id));
-  }
+  if (joined.length) joined = unclaimed(new Map(joined.map(id => [id, baseline.listed.get(id)])), base.stood(), config.marks).filter(id => !said(baseline.grown, id));
   if (joined.length) fail.push([`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} neither listed nor held, and the baseline only shrinks. Mend: take each out of the baseline and mend the code as the check then says; only where there is no other way, give each its reason under "grown" in the baseline, by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...some(joined, baseline.listed)]);
   const unsaid = (old ? raised(config, old) : []).filter(id => !said(baseline.grown, id));
   if (unsaid.length) fail.push([`FAIL: ${at} raises or drops ${plural(unsaid.length, "mark")} against ${base.name}. Mend: first make the code or the suite fit its mark; only where it cannot, give the raise its reason under "grown" in ${config.baseline}, by the id below, and in the pull request, with a fresh session's word there that it found no other way`, ...unsaid.map(id => `  ${id}`)]);
@@ -427,7 +440,8 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const restore = base ? `take it back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write` : `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`;
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
-  const fail = fresh(config, found, baseline, current);
+  if (base) base.stood = once(() => stoodAt(base, config));
+  const fail = fresh({ config, at, self, found, baseline, current, base });
   // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
   const stale = [...baseline.listed.keys()].filter(id => !current.has(id));
   if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
@@ -470,14 +484,17 @@ function first(config, at, self, numbers) {
 }
 
 // The baseline lowered to what still stands: an entry that is gone goes, one that moved is listed where it stands, a
-// number that fell is lowered, and nothing joins but what "grown" gives a reason for.
-function write(config, at, self, numbers) {
+// number that fell is lowered, and nothing joins but what "grown" gives a reason for and, where the base is told,
+// what the base held already as this config reads its code (the check reads more than it did).
+function write(config, at, self, numbers, base) {
   const old = parseBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`);
-  const joins = new Set(unclaimed(numbers, old.listed, config.marks));
+  let joins = unclaimed(numbers, old.listed, config.marks);
+  if (base && joins.length) joins = unclaimed(new Map(joins.map(id => [id, numbers.get(id)])), stoodAt({ standing: () => standingAt(base.name, config) }, config), config.marks);
+  joins = new Set(joins);
   const kept = new Map([...numbers].filter(([id]) => !joins.has(id) || said(old.grown, id)));
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => kept.has(id) || id.startsWith("mark: ")));
   fs.writeFileSync(config.baseline, written(kept, grown, old.audited));
-  console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} kept, ${old.listed.size - kept.size} fewer than before`);
+  console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} listed, ${old.listed.size} before`);
   return 0;
 }
 
@@ -505,7 +522,7 @@ function check(config, at, self, found, base) {
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
     base: base && { name: base.name, baseline: base.show(config.baseline), config: base.show(at), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${note}`);
-  if (!base) console.log("note no base to compare with (set SHAPE_BASE), so the baseline was not checked for what joined it");
+  if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(line);
   if (v.fail.length) return 1;
   console.log(`ok   nothing new in how the code is put together: ${plural(found.read.functions, "function")} and ${plural(found.read.imports, "import")} read, ${plural(v.listed, "old breach", "old breaches")} listed in ${config.baseline}, to be cleaned`);
@@ -524,7 +541,7 @@ function main(argv) {
   const now = standing(config), found = survey(now.texts, config, now.tests);
   if (!command) return check(config, at, self, found, base);
   if (command === write && !fs.existsSync(config.baseline)) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
-  return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])));
+  return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base);
 }
 
 if (started(import.meta.url)) {

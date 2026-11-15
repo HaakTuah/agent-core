@@ -31,6 +31,7 @@ export const COST = {
   line: "a line or two of a protected file: one small pull request of the trusted builder's",
   workflow: "a workflow's change: one small pull request, with floor rule 3's two security reviews",
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
+  config: "a check's config and its first baseline: one small pull request of the trusted builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
 };
 
@@ -210,6 +211,7 @@ export const STEPS = [
   { lead: "16 November 2026, the daily look", cost: COST.workflow, unread: "whether the project's daily job is to run, or its orchestrator carries the look, is no file's to say, as of the core has moved; where a `look.yml` is missing, `core/scripts/fresh.mjs` lists it at every sync, and the old daily job runs the look meanwhile" },
   { lead: "16 November 2026, the line that says what a pull request waits on", cost: COST.check, held: "the description check" },
   { lead: "16 November 2026, choices that are hard to undo", cost: COST.read, unread: "which of a project's choices are hard to undo is a reading of the project, not a file's to say; where its *choice records* are missing, `core/scripts/fresh.mjs` lists the file at every sync, and `core/scripts/choices.mjs` lists the records it holds" },
+  { lead: "16 November 2026, how code is put together", cost: COST.config, unread: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, not a file's to say; where the shape check's config or its baseline is missing, `core/scripts/fresh.mjs` lists the file at every sync, and the copies workflow's step says on every pull request that the check is not taken yet" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
