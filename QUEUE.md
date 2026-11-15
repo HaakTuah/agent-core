@@ -40,7 +40,6 @@ wanted").
 | #309 | rule builder | #304 |
 | #310 | rule builder | #246, #256 and #285 |
 | #311 | rule builder | #286 |
-| #312 | rule builder | |
 | #313 | rule builder | #312 |
 | #314 | rule builder | #313 and #304 |
 | #259 | a builder that built none of the batch | every line above it |
