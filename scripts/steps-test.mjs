@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
-import { TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { COST, STEPS, leads, notDone, plain, project, report } from "./steps.mjs";
@@ -42,7 +42,10 @@ function kit(name, o) {
   }
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
-  fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes({ "AGENTS.md": 2000 }), null, 2)}\n`);
+  // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
+  for (const part of ["floor", "modules", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
+  execFileSync("git", ["add", "-A"], { cwd: dir });
   fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
   return dir;
 }
@@ -141,7 +144,8 @@ ok(found.includes("checks/sizes.json: missing (the starter kit writes it today)"
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
 fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: {SAMPLE: value}\n\njobs:"));
 const unread = notDone(plainProject);
-ok(unread.length === 1 && unread[0].lead.endsWith("the security review shown on every pull request") && unread[0].mend.includes("could not read the project") && unread[0].mend.includes("security-review.yml"),
+const unreadSec = unread.find(m => m.lead.endsWith("the security review shown on every pull request"));
+ok(unreadSec?.mend.includes("could not read the project") && unreadSec.mend.includes("security-review.yml") && unread.every(m => m.mend.includes("could not read the project")),
   "a workflow in a form the core's reader does not know is reported as not read, never as a call that is missing or a step done", report(unread));
 
 // ---- a path a project's own file names is read only inside the project ----

@@ -13,7 +13,7 @@
 // nothing. It reads only. Node's own modules and git only.
 //
 //   node core/scripts/steps.mjs          from a project's root: the steps not done, each with its mend; nothing else
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -165,7 +165,17 @@ export const STEPS = [
   { lead: "13 November 2026, MS-PL waits for the owner's yes", cost: COST.owner, owner: true, unread: "whether an issue for the owner is open is GitHub's, not a file's" },
   { lead: "13 November 2026, .NET's local tools and the fetch before the restore", cost: COST.check, held: "the NuGet check" },
   { lead: "13 November 2026, a game's previews share its origin", cost: COST.line, unread: "what the threat model says of a preview's origin is a reading of it" },
-  { lead: "14 November 2026, the size marks' total counts the project's own files", cost: COST.check, held: "the reading-size check (its note gives the mark)" },
+  { lead: "14 November 2026, the size marks' total counts the project's own files", cost: COST.line,
+    // (the reading-size check passes and says so in a note, which no run of it turns red: this step reads that note,
+    // from the project's own copy of the check, and gives its number)
+    check: p => {
+      const marks = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
+      const script = path.join(p.root, "core", "scripts", "reading-size.mjs");
+      if (!fs.existsSync(script) || p.read(marks) === null) throw new Unread(`no copy of the reading-size check, or no ${marks}, to read`);
+      const r = spawnSync(process.execPath, [script, marks], { cwd: p.root, encoding: "utf8", env: { ...process.env, SIZES_BASE: "" } });
+      const to = /set it to (\d+) \(core\/setup\/sync-notes\.md, 14 November 2026\)/.exec(`${r.stdout}`)?.[1];
+      return to ? `The "total" in \`${marks}\` is set to ${to}, the number the reading-size check's note gives, so the project keeps the room it had and the core's copy is held by the core's own cap.` : null;
+    } },
   { lead: "14 November 2026, a listed name in a commit's author", cost: COST.check, held: "the personal-terms check" },
   { lead: "15 November 2026, every step has its check", cost: COST.check, unread: "it asks that the steps above be run, which every sync from this one on does by itself" },
 ];

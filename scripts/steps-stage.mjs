@@ -2,6 +2,7 @@
 // check, how a project that missed it holds it (`stage`, written into the project at `dir`) and its mend as the step
 // words it (`mend`), so that a test can take a step out of a synced project, see the sync report exactly that, and
 // see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. Node's own modules.
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,5 +74,15 @@ export const STAGES = {
   "13 November 2026, the core's scripts started through bash": {
     stage: dir => write(dir, ".github/workflows/publish-staged.yml", "name: publish-staged\n\non:\n  push:\n\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: core/scripts/site-publish.sh root site\n"),
     mend: dir => write(dir, ".github/workflows/publish-staged.yml", read(dir, ".github/workflows/publish-staged.yml").replace("- run: core/scripts/", "- run: bash core/scripts/")),
+  },
+  "14 November 2026, the size marks' total counts the project's own files": {
+    // (a total that still counts the core's copy, as one written before the core's own cap held it)
+    stage: dir => { const m = JSON.parse(read(dir, "checks/sizes.json")); write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, total: 1000000 }, null, 2)}\n`); },
+    mend: dir => {
+      const r = spawnSync(process.execPath, ["core/scripts/reading-size.mjs", "checks/sizes.json"], { cwd: dir, encoding: "utf8", env: { ...process.env, SIZES_BASE: "" } });
+      const to = Number(/set it to (\d+)/.exec(r.stdout)[1]);
+      const m = JSON.parse(read(dir, "checks/sizes.json"));
+      write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, total: to }, null, 2)}\n`);
+    },
   },
 };
