@@ -348,7 +348,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   (core archive 152).
 - Each repository's secret scanning with push protection (Settings, Advanced Security), where the repository has it:
   GitHub then refuses a push that holds a key of a kind it knows, before the key reaches the history, which no check
-  on a pull request can (floor rule 1).
+  on a pull request can (floor rule 1). Who switches it on stands in floor topic 9: in a public repository a session, and
+  in a private one, where it may be billed, the owner (the sync note "16 November 2026, secret scanning with push
+  protection" says how).
 - A private repository on GitHub's free plan has neither rulesets nor GitHub's secret scanning. GitHub Pro gives it
   rulesets, and so the ruleset above. Where it has no secret scanning of GitHub's, its owner may add a secret scanner
   at one pinned version, run as a tool that only runs (floor rule 10's tools' list), from a workflow of the project's

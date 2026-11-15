@@ -111,6 +111,45 @@ function nugetPathsHold(p) {
   return wrong.length ? `The \`paths:\` of a call to the NuGet check let through a change to every file a build of the project's reads, or the check starts on none of its changes: add each, by its exact path, to ${wrong.map(([f, missed]) => `\`.github/workflows/${f}\`: ${missed.map(asPattern).join(", ")}`).join("; ")} (a name shown with "?" holds a control character or a backtick: rename it).` : null;
 }
 
+// Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
+// first without its number and title; null where there is none.
+function rule5(text) {
+  const lines = text?.split("\n") ?? [], at = lines.findIndex(l => /^5\.\s/.test(l));
+  if (at < 0) return null;
+  const end = lines.findIndex((l, i) => i > at && /^(\d+\.\s|#)/.test(l));
+  return [lines[at].replace(/^5\.\s*(\*\*[^*]*\*\*)?:?/, ""), ...lines.slice(at + 1, end < 0 ? undefined : end)];
+}
+// A block's items: each a list line at its outermost depth, with the lines under it indented deeper (its wrapped text
+// and the items nested in it).
+function listItems(block) {
+  const items = [];
+  let depth = null;
+  for (const l of block) {
+    const indent = /^\s*/.exec(l)[0].length, item = /^\s*[-*]\s/.test(l);
+    if (item && (depth === null || indent <= depth)) { depth = indent; items.push(l); }
+    else if (items.length && l.trim() && indent > depth) items[items.length - 1] += `\n${l}`;
+  }
+  return items;
+}
+// Whether an item names its tests: a path in backticks after the words "hostile tests" that is a file or folder of the
+// project (one the item names for what checks the input does not count).
+function namesTests(p, item) {
+  const there = f => { const n = f.replace(/^\.\//, "").replace(/\/+$/, ""); return !!n && p.files.some(x => x === n || x.startsWith(`${n}/`)); };
+  return [...(/hostile\s+tests\b([\s\S]*)/i.exec(item)?.[1] ?? "").matchAll(/`([^`]+)`/g)].some(m => there(m[1]));
+}
+const CASES = "too long, the wrong type, markup, a file path, a number out of range, nothing at all";
+// The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
+// once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
+function hostileTests(p) {
+  const block = rule5(p.read("SECURITY.md"));
+  if (!block) throw new Unread("no SECURITY.md with a rule 5 to read");
+  const items = listItems(block), said = block.join("\n");
+  if (!items.length && (/FILL IN/.test(said) || /^None\b/i.test(said.trim()))) return null;
+  if (!items.length) return `In \`SECURITY.md\`, rule 5, list each input anyone but the user at hand can shape as an item of its own (a line that opens \`- \`), saying what checks it and then, after the words "hostile tests:", naming in backticks the file or folder that holds them (${CASES}), or write "None" where the project takes none.`;
+  const bare = items.filter(l => !namesTests(p, l)).map(l => l.split("\n")[0].trim().slice(2).trim());
+  return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
@@ -269,6 +308,9 @@ export const STEPS = [
     } },
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
     partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
+  { lead: "16 November 2026, hostile tests for every named input", cost: COST.read, check: hostileTests,
+    partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
+  { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
 ];
