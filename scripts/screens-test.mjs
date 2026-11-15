@@ -76,7 +76,9 @@ ok(rw.checks.has("values") && rw.listed.has("values: cart: #0f0") && rw.listed.h
 const widened = { listed: new Map([["values: home: #f00 in the button", true]]), grown: {}, checks: both() };
 const counted = parseFound(found(["home"], { "values: home: #f00 in the button": { count: 100 } }), "f", c);
 v = verdict({ config: c, at: "c", self: "s", found: counted, baseline: widened, base: { name: "origin/main", listed: new Map([["values: home: #f00 in the button", { count: 1 }]]), checks: both() } });
-ok(v.fail.some(l => l.includes("only shrinks")) && v.fail.some(l => l.includes("#f00 in the button: new")), "a count listed as true covers no count: it joins the baseline against the base, and the finding is new", v.fail.join("\n"));
+ok(v.fail[0]?.includes("only shrinks") && v.fail.includes("  values: home: #f00 in the button") && mended(v.fail.join("\n")), "a count the base listed, listed as true, joins the baseline against the base, since true covers any count", v.fail.join("\n"));
+v = verdict({ config: c, at: "c", self: "s", found: counted, baseline: widened, base: { name: "origin/main", listed: widened.listed, checks: both() } });
+ok(v.fail.length === 0, "a finding read as a count where the baseline lists true, as the base did, fails nothing: a tool that changes how it reports locks nothing", v.fail.join("\n"));
 
 // ---- the baseline lowered ----
 const listed = new Map([["rendered: cart: contrast of the total", { count: 3 }], ["rendered: cart: gone", true], ["values: about: #0f0", true]]);
