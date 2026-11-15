@@ -125,7 +125,9 @@ function main(args) {
   const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
   const at = args.indexOf("--since"), by = args.indexOf("--owner"), make = args.includes("--make");
   // (the day the copy gained this file, as git's history here holds it: the core's own path, or a project's copy)
-  const added = spawnSync("git", ["log", "--diff-filter=A", "--format=%cI", "--", "core/scripts/labels.mjs", "scripts/labels.mjs"], { encoding: "utf8" }).stdout;
+  // (a shallow clone shows its oldest commit adding every file, so there the rule's own day holds)
+  const shallow = spawnSync("git", ["rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).stdout.trim() !== "false";
+  const added = shallow ? "" : spawnSync("git", ["log", "--diff-filter=A", "--format=%cI", "--", "core/scripts/labels.mjs", "scripts/labels.mjs"], { encoding: "utf8" }).stdout;
   const since = at >= 0 ? args[at + 1] : cameOn(added);
   if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return fail("--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z");
   if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return fail("--owner needs the owner's account after it");
@@ -152,13 +154,15 @@ function main(args) {
     const have = pages(`repos/${repo}/labels`);
     if (make) {
       const todo = toMake(have);
+      // (a label set anew is named with what it was before it is set, so a project that used the name otherwise can
+      // restore it, even where a later call fails)
+      const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
       for (const l of todo) {
+        if (l.how === "set") console.log(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
         if (l.how === "make") gh("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
         else gh("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
       }
-      // (a label set anew is named with what it was, so a project that used the name otherwise can restore it)
-      const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
-      console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.how === "make" ? l.name : `${l.name} (was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}")`).join("; ")}.` : `Every label of the list stands in ${repo} as it says.`);
+      console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
       return 0;
     }
     const open = pages(`repos/${repo}/issues?state=open`);

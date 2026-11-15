@@ -15,7 +15,8 @@ import { execFileSync } from "node:child_process";
 import { REPO } from "./core-cost.mjs";
 import { started } from "./started.mjs";
 
-export const VERDICT = /stand-in['’]s verdict(?:,? updated)?\**\s*[:(]?\s*\**\s*(yes|later|no)\b/i;
+// (no two runs that can take the same spaces, so a line of any shape is read in time in step with its length)
+export const VERDICT = /stand-in['’]s verdict(?:,? updated)?\**\s*(?:[:(]\s*)?(?:\*+\s*)?(yes|later|no)\b/i;
 const ANSWER = /stand-in['’]s verdict (matched|missed)\b/i;
 
 // The kind and sureness of a verdict, from a comment's first line, or null where the line holds none or quotes one

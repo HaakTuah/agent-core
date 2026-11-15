@@ -103,10 +103,13 @@ function sync(tmp) {
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
   for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"]]) {
     if (!fs.existsSync(path.join("core", "scripts", script))) continue;
-    // (each given ten minutes, so that none can hold the sync: one that runs past them is named)
-    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8", timeout: 600000 });
-    console.log(`${r.stdout ?? ""}${r.stderr ?? ""}`.trim() || `core/scripts/${script} said nothing`);
-    if (r.error) console.log(`core/scripts/${script} was stopped after ten minutes: run it again by itself`);
+    // (each given ten minutes, so that none can hold the sync. Of what it writes to stderr only its own "FAIL:" lines are
+    // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)
+    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+    const said = String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL:")).join("\n");
+    console.log(`${r.stdout ?? ""}${said}`.trim() || (r.status === 0 ? `core/scripts/${script} said nothing` : ""));
+    if (r.error?.code === "ETIMEDOUT") console.log(`core/scripts/${script} was stopped after ten minutes: run it again by itself`);
+    else if (r.status !== 0 && !said) console.log(`core/scripts/${script} failed: run it again by itself to see why`);
   }
 }
 
