@@ -13,11 +13,17 @@
 // The config (left out: the one the manifest's *screen checks* row names, in backticks, else checks/screens.json; with
 // none, every check is off and nothing is read): { "baseline": "<path>", "checks": { "<check>": "reports" | "binds" } },
 // each check one of CHECKS. What was found (a file the project's tool writes): { "screens": [<the screens it ran>],
-// "found": { "<check>: <screen>: <what>": true | { "count": <n> } } }.
+// "all": true where it ran every screen, "found": { "<check>: <screen>: <what>": true | { "count": <n> } } }. The
+// baseline holds, beside shape.mjs's "listed" and "grown", "checks": those whose findings it listed from a run over
+// every screen. A check turned on that it has not listed fails until --write lists it from such a run, so what stands
+// on a screen no pull request has changed since is listed first and never turns a later one red.
 //
 //   node core/scripts/screens.mjs <found> [<config>]           the check
-//   node core/scripts/screens.mjs <found> [<config>] --first   write the first baseline; only where none exists yet
-//   node core/scripts/screens.mjs <found> [<config>] --write   lower the baseline to what still stands on the screens run
+//   node core/scripts/screens.mjs <found> [<config>] --first   write the first baseline, from a run over every screen;
+//                                                              only where none exists yet
+//   node core/scripts/screens.mjs <found> [<config>] --write   lower the baseline to what still stands on the screens
+//                                                              run, and list each check turned on since, from a run
+//                                                              over every screen
 // Run from the project's root by the project's own workflow, after its tool. Reads only, but for the baseline it writes
 // when told; git and Node's own modules.
 import { execFileSync } from "node:child_process";
@@ -67,12 +73,15 @@ export function parseConfig(text, at) {
   return { baseline: c.baseline, checks: new Map(Object.entries(c.checks)) };
 }
 
-// What the project's tool found, as the check reads it: { screens: Set, found: Map of id to numbers or true, off: the
-// count of findings of checks the config leaves off }; it throws where it cannot.
+// Whether what the project's tool wrote has the form the check reads: its screens, whether it ran all, its findings.
+const foundForm = f => isObject(f) && Array.isArray(f.screens) && f.screens.every(s => typeof s === "string" && s) && isObject(f.found) && [undefined, true, false].includes(f.all);
+
+// What the project's tool found, as the check reads it: { screens: Set, all: whether it ran every screen, found: Map
+// of id to numbers or true, off: the count of findings of checks the config leaves off }; it throws where it cannot.
 export function parseFound(text, at, config) {
-  const form = `have the project's tool write {"screens": [<the screens it ran>], "found": {"<check>: <screen>: <what>": true or {"count": <n>}}}`;
+  const form = `have the project's tool write {"screens": [<the screens it ran>], "all": true where it ran every screen, "found": {"<check>: <screen>: <what>": true or {"count": <n>}}}`;
   const f = json(text, at, form);
-  if (!isObject(f) || !Array.isArray(f.screens) || !f.screens.every(s => typeof s === "string" && s) || !isObject(f.found)) refuse(`${at} is not in the form the check reads`, form);
+  if (!foundForm(f)) refuse(`${at} is not in the form the check reads`, form);
   const found = new Map();
   let off = 0;
   for (const [id, n] of Object.entries(f.found)) {
@@ -81,31 +90,56 @@ export function parseFound(text, at, config) {
     if (!(n === true || (isObject(n) && Number.isInteger(n.count) && n.count > 0 && Object.keys(n).length === 1))) refuse(`${at} gives "${id}" what is neither true nor a count`, form);
     if (config.checks.has(check)) found.set(id, n); else off++;
   }
-  return { screens: new Set(f.screens), found, off };
+  return { screens: new Set(f.screens), all: f.all === true, found, off };
 }
 
 // The verdict on what was found against the baseline and, where known, the base's baseline: { fail, said, listed }.
 export function verdict({ config, at, self, found, baseline, base }) {
   const fail = [], said = [];
-  for (const id of unclaimed(found.found, baseline.listed, {}, own)) {
+  // a check turned on whose findings were never listed from a run over every screen: what stands on the screens no
+  // pull request has changed since is listed first, so none of it turns a later one red
+  const unlisted = [...config.checks.keys()].filter(check => !baseline.checks.has(check));
+  if (unlisted.length) fail.push(`FAIL: ${config.baseline} has never listed what the ${unlisted.join(", ")} ${unlisted.length === 1 ? "check finds" : "checks find"} on every screen. Mend: run the project's tool over every screen, writing "all": true, then node ${self} <found> ${at} --write, which lists what stands, and commit the baseline`);
+  for (const id of unclaimed(new Map([...found.found].filter(([id]) => baseline.checks.has(partsOf(id).check))), baseline.listed, {}, own)) {
     if (config.checks.get(partsOf(id).check) === "binds") fail.push(`FAIL: ${id}: new, and the check ${partsOf(id).check} binds here. Mend: ${MENDS[partsOf(id).check]}; then run the project's tool and this check again`);
     else said.push(`said ${id}: new; the check ${partsOf(id).check} reports here and fails nothing`);
   }
   const gone = [...baseline.listed].filter(([id, n]) => config.checks.get(partsOf(id).check) === "binds" && JSON.stringify(lowered(new Map([[id, n]]), found).get(id)) !== JSON.stringify(n)).map(([id]) => id);
   if (gone.length) fail.push(`FAIL: ${config.baseline} lists ${plural(gone.length, "entry", "entries")} of a screen this run read that ${gone.length === 1 ? "is" : "are"} mended or smaller now, and the baseline lists only what stands. Mend: lower it with node ${self} <found> ${at} --write, and commit the baseline`, ...gone.map(id => `  ${id}`));
   if (base?.listed) {
-    // an entry of a check the base did not turn on joins freely: the check reads more, and what stood is listed
+    // an entry of a check the base had not listed joins freely: the check reads more, and what stood is listed
     const joined = unclaimed(baseline.listed, base.listed, {}, own).filter(id => base.checks.has(partsOf(id).check) && !(baseline.grown[id] ?? "").trim());
     if (joined.length) fail.push(`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} did not, and the baseline only shrinks. Mend: take each out of the baseline (git checkout ${base.name} -- ${config.baseline}, then node ${self} <found> ${at} --write) and mend the screen; only where there is no other way, give each its reason under "grown" by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...joined.map(id => `  ${id}`));
   }
   return { fail, said, listed: baseline.listed.size };
 }
 
-// A baseline as the check writes it: what grew kept for what stays, the entries sorted.
-const written = (listed, grown) => {
+// A baseline as the check reads it: shape.mjs's form, and "checks", those whose findings it has listed from a run over
+// every screen.
+export function readBaseline(text, at, restore) {
+  const b = parseBaseline(text, at, restore), { checks = [] } = JSON.parse(text);
+  if (!Array.isArray(checks) || !checks.every(c => CHECKS.includes(c))) refuse(`"checks" in ${at} is not a list of the module's checks`, restore);
+  return { ...b, checks: new Set(checks) };
+}
+
+// A baseline as the check writes it: the checks it has listed, what grew kept for what stays, the entries sorted.
+const written = (listed, grown, checks) => {
   const kept = Object.fromEntries(Object.entries(grown).filter(([id]) => listed.has(id)));
-  return `${JSON.stringify({ ...(Object.keys(kept).length ? { grown: kept } : {}), listed: Object.fromEntries([...listed].sort(([a], [b]) => a.localeCompare(b))) }, null, 2)}\n`;
+  return `${JSON.stringify({ checks: [...checks].sort(), ...(Object.keys(kept).length ? { grown: kept } : {}), listed: Object.fromEntries([...listed].sort(([a], [b]) => a.localeCompare(b))) }, null, 2)}\n`;
 };
+
+// What --write lists: the baseline lowered to what stands, and, of each check turned on that it has not listed yet,
+// what a run over every screen found; it throws where the run did not cover every screen.
+export function rewritten(baseline, config, found, self) {
+  const listed = lowered(baseline.listed, found), checks = new Set(baseline.checks);
+  const unlisted = [...config.checks.keys()].filter(check => !checks.has(check));
+  if (unlisted.length && !found.all) refuse(`the ${unlisted.join(", ")} ${unlisted.length === 1 ? "check has" : "checks have"} never been listed, and this run did not cover every screen`, `run the project's tool over every screen, writing "all": true, then node ${self} <found> --write again`);
+  for (const check of unlisted) {
+    for (const [id, n] of found.found) if (partsOf(id).check === check) listed.set(id, n);
+    checks.add(check);
+  }
+  return { listed, checks };
+}
 
 // The baseline lowered to what still stands: an entry of a screen that was run stays only where it was found again,
 // at the smaller count; one of a screen not run stays as it is.
@@ -148,22 +182,23 @@ function baseOf() {
   return { name, show, config };
 }
 
-// What the base's baseline listed, read where the base's own config put it, and the checks that config turned on:
-// null only where the base had no config (the pull request turns the checks on, and writes the first baseline); an
-// empty list where its baseline is gone.
+// What the base's baseline listed, read where the base's own config put it, and the checks it had listed: null only
+// where the base had no config (the pull request turns the checks on, and writes the first baseline). Where the base's
+// baseline is gone, an empty list and the checks its config turned on; where its config does not read, every check, so
+// nothing joins freely.
 function baseListed(base, at) {
   const held = base.config(at);
   if (held === null) return null;
   const was = tolerant(() => parseConfig(base.show(held), `${base.name}:${held}`));
-  const listed = was && tolerant(() => parseBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, "").listed);
-  // a config the base held that does not read as one counts every check as on, so nothing joins freely
-  return { listed: listed ?? new Map(), checks: was?.checks ?? new Map(CHECKS.map(check => [check, "binds"])) };
+  const b = was && tolerant(() => readBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, ""));
+  return { listed: b?.listed ?? new Map(), checks: b?.checks ?? new Set(was ? was.checks.keys() : CHECKS) };
 }
 
 function first(config, at, self, found) {
   if (fs.existsSync(inside(config.baseline, "the baseline"))) refuse(`${config.baseline} stands already`, `lower it with node ${self} <found> ${at} --write instead`);
+  if (!found.all) refuse("the first baseline lists what stands on every screen, and this run did not cover every screen", `run the project's tool over every screen, writing "all": true, then node ${self} <found> ${at} --first again`);
   fs.mkdirSync(path.dirname(config.baseline), { recursive: true });
-  fs.writeFileSync(inside(config.baseline, "the baseline"), written(found.found, {}));
+  fs.writeFileSync(inside(config.baseline, "the baseline"), written(found.found, {}, config.checks.keys()));
   console.log(`${config.baseline}: ${plural(found.found.size, "entry", "entries")} listed, the first baseline`);
   return 0;
 }
@@ -172,11 +207,11 @@ function run(config, at, self, found, command) {
   if (command === "--first") return first(config, at, self, found);
   if (!fs.existsSync(inside(config.baseline, "the baseline"))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} <found> ${at} --first, and commit it`);
   const restore = `take it back as the base holds it, or write it again with node ${self} <found> ${at} --first, in a pull request the reviews read`;
-  const baseline = parseBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, restore);
+  const baseline = readBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, restore);
   if (command === "--write") {
-    const kept = lowered(baseline.listed, found);
-    fs.writeFileSync(config.baseline, written(kept, baseline.grown));
-    return console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} listed, ${baseline.listed.size} before`), 0;
+    const { listed, checks } = rewritten(baseline, config, found, self);
+    fs.writeFileSync(config.baseline, written(listed, baseline.grown, checks));
+    return console.log(`${config.baseline}: ${plural(listed.size, "entry", "entries")} listed, ${baseline.listed.size} before`), 0;
   }
   const b = baseOf(), was = b && baseListed(b, at);
   const v = verdict({ config, at, self, found, baseline, base: was && { name: b.name, ...was } });

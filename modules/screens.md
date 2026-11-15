@@ -151,8 +151,9 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
 - the critique (point 18).
 
 By default each check is off in a project. The trigger is the project naming it in its *screen checks* with the tool
-that runs it, which the module leaves to the project: from that pull request on, the check runs on every pull request
-that changes a screen, over only the screens it changes, at two or three of the *screen sizes*. Each reports first,
+that runs it, which the module leaves to the project: that pull request lists what the check finds on every screen,
+and from then on the check runs on every pull request that changes a screen, over only the screens it changes, at two
+or three of the *screen sizes*. Each reports first,
 and binds only where the *screen checks* say so and a session can mend what it finds ("Nothing locks a project" in the
 core's `AGENTS.md`). Each keeps a baseline that may not get worse, in the shape check's form (`modules/code-shape.md`,
 "Never worse"): the project's tool writes what it found, and `core/scripts/screens.mjs` holds that against the baseline

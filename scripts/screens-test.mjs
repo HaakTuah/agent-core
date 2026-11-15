@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { lowered, parseConfig, parseFound, verdict, where } from "./screens.mjs";
+import { lowered, parseConfig, parseFound, rewritten, verdict, where } from "./screens.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -41,7 +41,8 @@ const f = parseFound(found(["home", "cart"], { "values: home: #f00 in the button
 ok(f.found.size === 2 && f.off === 1, "a finding of a check the config leaves off is not read, only counted");
 
 // ---- the verdict ----
-const base = { listed: new Map([["rendered: cart: contrast of the total", { count: 3 }]]), grown: {} };
+const both = () => new Set(["values", "rendered"]);
+const base = { listed: new Map([["rendered: cart: contrast of the total", { count: 3 }]]), grown: {}, checks: both() };
 let v = verdict({ config: c, at: "c.json", self: "screens.mjs", found: f, baseline: base });
 ok(v.fail.length === 1 && v.fail[0].includes("values: home") && mended(v.fail.join("\n")) && v.said.length === 0, "a new finding of a check that binds fails, with its mend; a listed one that shrank does not", v.fail.join("\n"));
 v = verdict({ config: parseConfig(config({ values: "reports", rendered: "reports" }), "c"), at: "c.json", self: "s", found: f, baseline: base });
@@ -50,19 +51,27 @@ const grew = parseFound(found(["cart"], { "rendered: cart: contrast of the total
 ok(verdict({ config: c, at: "c", self: "s", found: grew, baseline: base }).said.length === 1, "a listed entry that grows is new");
 const other = parseFound(found(["home"], { "rendered: home: contrast of the total": { count: 1 } }), "f", c);
 ok(verdict({ config: c, at: "c", self: "s", found: other, baseline: base }).said.length === 1, "an entry of another screen covers nothing, though that screen was not run");
-const joined = { listed: new Map([...base.listed, ["values: home: #f00 in the button", true]]), grown: {} };
-v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed, checks: c.checks } });
+const joined = { listed: new Map([...base.listed, ["values: home: #f00 in the button", true]]), grown: {}, checks: both() };
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed, checks: both() } });
 ok(v.fail[0]?.includes("only shrinks") && v.fail[1] === "  values: home: #f00 in the button" && mended(v.fail.join("\n")), "an entry that joins the baseline against the base fails, with its mend", v.fail.join("\n"));
-v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...joined, grown: { "values: home: #f00 in the button": "the button's red is the brand's, which the direction keeps" } }, base: { name: "origin/main", listed: base.listed, checks: c.checks } });
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...joined, grown: { "values: home: #f00 in the button": "the button's red is the brand's, which the direction keeps" } }, base: { name: "origin/main", listed: base.listed, checks: both() } });
 ok(v.fail.length === 0, "one given its reason under \"grown\" joins");
-v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed, checks: new Map([["rendered", "reports"]]) } });
-ok(v.fail.length === 0, "an entry of a check the base did not turn on joins freely: the check reads more, and what stood is listed", v.fail.join("\n"));
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed, checks: new Set(["rendered"]) } });
+ok(v.fail.length === 0, "an entry of a check the base had not listed joins freely: the check reads more, and what stood is listed", v.fail.join("\n"));
 
-const stale = { listed: new Map([["values: home: #f00 in the button", true], ["values: cart: #0f0", true]]), grown: {} };
+const stale = { listed: new Map([["values: home: #f00 in the button", true], ["values: cart: #0f0", true]]), grown: {}, checks: both() };
 v = verdict({ config: c, at: "c", self: "s", found: parseFound(found(["home"], {}), "f", c), baseline: stale });
 ok(v.fail[0]?.includes("--write") && v.fail.includes("  values: home: #f00 in the button") && !v.fail.includes("  values: cart: #0f0") && mended(v.fail.join("\n")), "a listed entry of a binding check that a run of its screen no longer finds fails until --write lowers the baseline; one of a screen not run stays", v.fail.join("\n"));
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: base });
 ok(v.fail[0]?.includes("from the one system the direction names"), "a new finding's mend is its check's own, which a session acts on with no rule file open", v.fail[0]);
+
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...base, checks: new Set(["rendered"]) } });
+ok(v.fail.length === 1 && v.fail[0].includes("never listed what the values check finds") && mended(v.fail[0]), "a check turned on that the baseline has never listed fails, with its mend, and its findings are not read as new", v.fail.join("\n"));
+const partial = parseFound(found(["home"], { "values: home: #f00 in the button": true }), "f", c);
+ok(mended(refused(() => rewritten({ ...base, checks: new Set(["rendered"]) }, c, partial, "s"))), "--write refuses to list a check from a run that did not cover every screen, with its mend");
+const whole = parseFound(JSON.stringify({ screens: ["home", "cart"], all: true, found: { "values: home: #f00 in the button": true, "values: cart: #0f0": true } }), "f", c);
+const rw = rewritten({ ...base, checks: new Set(["rendered"]) }, c, whole, "s");
+ok(rw.checks.has("values") && rw.listed.has("values: cart: #0f0") && rw.listed.has("values: home: #f00 in the button") && !rw.listed.has("rendered: cart: contrast of the total"), "--write lists a newly turned-on check from a run over every screen, and lowers the rest", JSON.stringify([...rw.listed.keys()]));
 
 // ---- the baseline lowered ----
 const listed = new Map([["rendered: cart: contrast of the total", { count: 3 }], ["rendered: cart: gone", true], ["values: about: #0f0", true]]);
@@ -84,6 +93,9 @@ try {
   ok(r.code === 1 && mended(r.out), "a config with no baseline fails, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "checks/screens.json"), JSON.stringify({ baseline: "checks/screens/baseline.json", checks: { values: "binds" } }));
   r = run(["found.json", "--first"]);
+  ok(r.code === 1 && mended(r.out) && r.out.includes("every screen"), "--first refuses a run that did not cover every screen, with its mend", r.out);
+  fs.writeFileSync(path.join(dir, "found.json"), JSON.stringify({ screens: ["home"], all: true, found: { "values: home: #f00 in the button": true } }));
+  r = run(["found.json", "--first"]);
   ok(r.code === 0 && fs.existsSync(path.join(dir, "checks/screens/baseline.json")), "--first makes the baseline's folder where it is missing", r.out);
   fs.rmSync(path.join(dir, "checks/screens"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
@@ -95,7 +107,7 @@ try {
   fs.writeFileSync(path.join(dir, "found.json"), found(["home"], { "values: home: #f00 in the button": true, "values: home: 13px in the title": true }));
   r = run(["found.json"]);
   ok(r.code === 1 && mended(r.out) && r.out.includes("13px"), "a new finding fails, with its mend", r.out);
-  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
+  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
   r = run(["found.json"], { SCREENS_BASE: "main" });
   ok(r.code === 1 && mended(r.out) && r.out.includes("only shrinks"), "a finding put in the baseline by hand fails against the base, with its mend", r.out);
   r = run(["found.json"], { SCREENS_BASE: "origin/nowhere" });
@@ -114,10 +126,10 @@ try {
   r = run(["found.json"], { SCREENS_BASE: "custom" });
   ok(r.code === 1 && mended(r.out) && r.out.includes("checks/custom.json is gone"), "a config the base's manifest named, taken out with its row, fails, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "checks/screens.json"), "{ not a config");
-  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ listed: { "values: home: #f00 in the button": true } }));
+  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true } }));
   git("add", "-A"); git("commit", "-qm", "broken"); git("branch", "broken");
   fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
-  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
+  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
   r = run(["found.json"], { SCREENS_BASE: "broken" });
   ok(r.code === 1 && r.out.includes("only shrinks"), "a config the base held that does not read as one lets nothing join freely", r.out);
   r = run(["../found.json"]);
