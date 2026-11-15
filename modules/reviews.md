@@ -51,6 +51,16 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
+   - **What a posted review declares** (#299; core archive 232): by default a review posted in a comment that opens
+     "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
+     lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
+     finding.". Whoever posts it, session or reviewer, writes both. The one condition that changes it: a note that no
+     review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
+     blocks or what a builder mends (point 5; #315), that they stand in for the findings written out, nor that Codex's
+     own reviews, read by their badges, are asked anything; a comment that covers two kinds counts as the kind its first
+     line names. Reason: run on 10 to 15 November 2026, the count of what the reviews find read 4 of 24 posted security
+     reviews, their wording varying. Held by `core/scripts/review-record.mjs`, which counts a review without its line as "not
+     read", never as none, so the share not read shows where the form is not kept; no check fails a pull request for it.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would (core archive 22).
 5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,
