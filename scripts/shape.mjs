@@ -26,7 +26,8 @@
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }).
 //
 //   node core/scripts/shape.mjs [<config>]            the check; with no config named, the one the manifest's *shape
-//                                                     check* names, else checks/shape.json. A project that has not
+//                                                     check* names (in the core, its AGENTS.md's), else
+//                                                     checks/shape.json. A project that has not
 //                                                     written one yet is held to the starter kit's own, with the
 //                                                     pull request's base as its baseline: from the sync that
 //                                                     brings the check nothing gets worse, and nothing that stood
@@ -516,9 +517,10 @@ function baseOf() {
   return { name, show: file => tolerant(() => git(["show", `${name}:${file}`])) };
 }
 
-// Where the config is: the one named, else the manifest's, else the kit's; null where the project has none yet.
+// Where the config is: the one named, else the one the project's rules name (its manifest; in the core, its
+// AGENTS.md), else the kit's; null where the project has none yet.
 function configAt(named, self, base) {
-  const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
+  const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")) ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
   if (fs.existsSync(at)) return at;
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
   if (base?.show(at) != null) refuse(`${at} is gone, and ${base.name} holds it: no pull request takes the shape check's config out`, `take it back as ${base.name} holds it (git checkout ${base.name} -- ${at})`);

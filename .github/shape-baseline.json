@@ -1,4 +1,9 @@
 {
+  "audited": {
+    "day": "2026-11-14",
+    "listed": 56,
+    "read": 1084
+  },
   "listed": {
     "function: scripts/code-review-wait.mjs#judgeWith": {
       "lines": 24,
