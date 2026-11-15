@@ -91,8 +91,9 @@ if (!pathPart.startsWith(`repos/${repo}`)) fail(404, "Not Found");
 const rest = pathPart.slice(`repos/${repo}`.length).replace(/^\//, "");
 
 const asRepo = () => ({ full_name: repo, name: state.repo, owner: { login: state.owner }, private: state.private, visibility: state.private ? "private" : "public", has_issues: state.hasIssues, default_branch: "main", permissions: { admin: true, maintain: true, push: true, triage: true, pull: true }, ...(state.securityAndAnalysis ? { security_and_analysis: state.securityAndAnalysis } : {}) });
-// (fields as gh sends them, "a[b][c]=v", read as the object they name)
-const nested = fields => { const o = {}; for (const [k, v] of Object.entries(fields)) { const parts = k.match(/[^[\]]+/g) ?? [k]; let at = o; for (const p of parts.slice(0, -1)) at = at[p] = at[p] && typeof at[p] === "object" ? at[p] : {}; at[parts[parts.length - 1]] = v; } return o; };
+// (fields as gh sends them, "a[b][c]=v", read as the object they name; a name that would reach an object's prototype is
+// left out)
+const nested = fields => { const o = {}; for (const [k, v] of Object.entries(fields)) { const parts = k.match(/[^[\]]+/g) ?? [k]; if (parts.some(p => ["__proto__", "constructor", "prototype"].includes(p))) continue; let at = o; for (const p of parts.slice(0, -1)) at = at[p] = at[p] && typeof at[p] === "object" ? at[p] : {}; at[parts[parts.length - 1]] = v; } return o; };
 if (rest === "" && method === "GET") out(asRepo());
 if (rest === "" && method === "PATCH") {
   const asked = nested(body).security_and_analysis ?? {};
