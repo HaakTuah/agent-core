@@ -69,10 +69,10 @@ saved data; a weakened check).
   family, home, age, health, memberships or money, nor anything else about the owner's life outside the project.
   - Excepted: the GitHub account in the repository's own address; the name and address GitHub itself writes as the
     author of a commit it makes and signs (a merge, an edit on github.com), from the profile of the account that acts,
-    where its owner keeps them there; and the company name a project is sold under, naming no person.
-  - Excepted too: a copyright holder's name, a person's or a company's, that the holder alone types into `LICENSE` or
-    `NOTICE` at a repository's root or in its copy of the core, no session told it or writing it, and nothing else
-    there (core archive 221). Reason: an account's name can change.
+    where its owner keeps them there; the company name a project is sold under, naming no person; and a copyright
+    holder's name, a person's or a company's, that the holder alone types into `LICENSE` or `NOTICE` at a repository's
+    root or in its copy of the core, no session told it or writing it, and nothing else there (core archive 221).
+    Reason: an account's name can change.
 - The owner's archived words leave such details out as "[…]".
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 
@@ -83,7 +83,7 @@ saved data; a weakened check).
 **13. Each project's files stay in its own repository,** never written into another's (core archive 4).
 
 **14. Nothing waits for the owner but the yeses the floor names** (core archive 76 and 134).
-- These yeses alone wait, and only the step that needs one; the rest goes on:
+- Only the step that needs one of these waits; the rest goes on:
   - a step that cannot be undone or spends money beyond what the owner personally set aside (never a new purchase);
   - the changes rule 3 asks the owner's yes for or leaves to the owner;
   - rule 10's licence exception.
