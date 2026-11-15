@@ -65,7 +65,7 @@ export const FILES = [
   ["workflows/security-review.yml.tmpl", ".github/workflows/security-review.yml"],
   ["workflows/personal-terms.yml.tmpl", ".github/workflows/personal-terms.yml"],
   ["workflows/delete-merged-branches.yml.tmpl", ".github/workflows/delete-merged-branches.yml"],
-  ["workflows/core-moved.yml.tmpl", ".github/workflows/core-moved.yml"],
+  ["workflows/look.yml.tmpl", ".github/workflows/look.yml"],
   ["workflows/codeql.yml.tmpl", ".github/workflows/codeql.yml", o => !o.private],
   ["workflows/licences.yml.tmpl", ".github/workflows/licences.yml", o => !o.private],
   ["workflows/signatures.yml.tmpl", ".github/workflows/signatures.yml", o => o.packages !== undefined],

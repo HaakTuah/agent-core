@@ -2,7 +2,7 @@
 // with its words. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/pr-description-test.mjs
-import { asked, missing, PARTS } from "./pr-description.mjs";
+import { asked, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -24,6 +24,14 @@ ok(asked().join() === PARTS.join() && asked("").join() === PARTS.join() && asked
 ok(asked("Risks| Rollback ").join() === "Risks,Rollback", "a project's own parts stand in place of the two");
 ok(asked("+What holds it").join() === [...PARTS, "What holds it"].join() && asked(" +A|B").join() === [...PARTS, "A", "B"].join() && asked("+Readings taken").join() === PARTS.join(), "parts led by a + are added to the two, none of them twice");
 ok(missing(whole, asked("+What holds it")).join() === "What holds it" && missing(`${whole}## What holds it\n\nNone.\n`, asked("+What holds it")).length === 0, "an added part is asked for, and found");
+// the line that says what a pull request waits on
+ok(["nothing", "a review", "checks", "#241"].every(w => waitsOn(`x\n\nWaits on: ${w}\n`)?.kind) && waitsOn("Waits on: the owner: may the old saves go?").kind === "the owner",
+  "each form of the line is read: nothing, a review, checks, an item, and the owner with the question");
+ok(waitsOn("x") === null && waitsOn("Waits on: soon").kind === null && waitsOn("Waits on: the owner").kind === null && waitsOn("Waits on: the owner: why").kind === null,
+  "no line is none; one in no form, or the owner without a question in one sentence ending in a question mark, is no form");
+ok(waitsOn("Waits on: the owner: a?\r\nWaits on: nothing").kind === "nothing" && waitsOn("  Waits on:   a review  ").said === "a review", "the last such line counts, trimmed");
+ok(waitsMend("Waits on: nothing") === null && /has no line "Waits on:"/.test(waitsMend("x")) && /"Waits on: soon" is in none of the forms/.test(waitsMend("Waits on: soon")) && /needs-owner/.test(waitsMend("")),
+  "the mend names what is missing or wrong, and the forms, with the label for the owner");
 const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
 ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time");

@@ -1,0 +1,48 @@
+# The daily job of a project that takes the core: once a day, the core-moved check (core/scripts/core-moved.mjs: one
+# issue open while the core is past the project's copy, as core-moved.yml says) and then the scheduled look
+# (core/scripts/look.mjs: the issues it keeps of what has stopped, what is due and what is overdue, and once a month the
+# state report; modules/orchestrating.md, "The scheduled look"). One job, so a project gains no billed minute over the
+# core-moved job it ran before. A project calls it (workflow_call) from a daily schedule of its own (it runs on a
+# schedule or when started by hand, and on no other event), pinned to a full commit SHA, from a job that grants
+# `contents: read`, `issues: write`, `pull-requests: read` and `checks: read`, as the starter kit's look.yml has it
+# (core/setup/template/workflows/look.yml.tmpl). It runs the project's own scripts on the core's one exact Node; Node's
+# own modules only, no package installed. Nothing is checked out but the calling repository's default branch, and no
+# text of a pull request or an issue reaches a command: the scripts read them through gh's answers alone. It may write
+# issues, and read pull requests and checks; nothing else.
+name: look
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  look:
+    # never on a pull request's or a push's event (floor rule 2); the checkout below takes the default branch whatever
+    # branch a manual start names, so the scripts it runs and the files they read are always that branch's
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }} # the project's own state, not a task's branch
+          persist-credentials: false # gh below takes its token from GH_TOKEN, nothing from the checkout
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
+      - name: One issue while the core is ahead of the project's copy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node core/scripts/core-moved.mjs
+      - name: The scheduled look
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node core/scripts/look.mjs
