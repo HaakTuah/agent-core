@@ -287,8 +287,9 @@ export function loadConfig(path) {
   try { config = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("the config is not a JSON object. Mend: write it as one, as the starter kit writes it");
   const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
-  // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file)
-  const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted"].includes(k));
+  // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file; "agentTools" the agent-tools
+  // check's: agent-tools.mjs)
+  const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted", "agentTools"].includes(k));
   if (unknown.length) throw new Error(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out, or correct their spelling`);
   for (const key of lists) {
     const v = config[key];

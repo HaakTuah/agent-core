@@ -200,7 +200,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   core works in other projects, and only those that hold use to read.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
-- **Every rule says what holds it** (core archive 195 and 225). By default a rule of the floor or the modules is held by
+- **Every rule says what holds it** (core archive 195 and 226). By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
   none holds it yet, it is listed. Whoever writes or changes a rule names its holder in that PR: in
@@ -215,7 +215,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   November found 43 of 122 rules held by nothing but a session reading them, and nothing listed them. Held by
   `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
   stands or a check that is not there, and by the heading's check.
-- **Staged cases hold what no check reads** (core archive 225; #235). By default a rule is held by a check; where none
+- **Staged cases hold what no check reads** (core archive 226; #235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
   the case's script on what the session did, read from the project (its commits, its pushes, what it wrote to GitHub),

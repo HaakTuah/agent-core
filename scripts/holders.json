@@ -24,7 +24,10 @@
       "check: scripts/versions.mjs, in part"
     ],
     "floor/topics.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
-    "floor/topics.md: 15. Dependencies": "check: scripts/licences.mjs, in part",
+    "floor/topics.md: 15. Dependencies": [
+      "check: scripts/licences.mjs, in part",
+      "check: scripts/agent-tools.mjs, in part"
+    ],
     "floor/topics.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
     "modules/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
     "modules/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds, in part",

@@ -33,14 +33,26 @@ const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? 
 // machine's but where programs are found (no sign-in or token), and stops after a time; every ref it is given follows
 // --end-of-options at the call. Gives the output, or null where git failed.
 export const LIMITS = { run: 20000 };
-const SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${os.devNull}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
+// (the readers' own empty folder and empty config, made once in a folder of their own, the same on every platform:
+// git for Windows reads no hooks folder or config file at its device name for "nothing")
+let quietFolder = null;
+const quiet = () => {
+  if (!quietFolder) {
+    quietFolder = fs.mkdtempSync(path.join(os.tmpdir(), "staged-quiet-"));
+    fs.mkdirSync(path.join(quietFolder, "no-hooks"));
+    fs.writeFileSync(path.join(quietFolder, "no-config"), "");
+    process.on("exit", () => fs.rmSync(quietFolder, { recursive: true, force: true }));
+  }
+  return quietFolder;
+};
+const SAFE_ = () => ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${path.join(quiet(), "no-hooks")}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
   // (nothing of the session's that would change what git reads: its commit-graph, pack indexes and bitmaps go unread)
   "-c", "core.commitGraph=false", "-c", "core.multiPackIndex=false", "-c", "pack.useBitmaps=false",
   // (and no .gitattributes of any tree's: attributes are read from git's empty tree alone)
   "-c", "attr.tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904"];
-const QUIET = { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: "", GIT_NO_REPLACE_OBJECTS: "1" };
+const QUIET_ = () => ({ ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(quiet(), "no-config"), GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: path.join(quiet(), "no-hooks"), GIT_NO_REPLACE_OBJECTS: "1" });
 export const readGit = (cwd, ...args) => {
-  const r = spawnSync("git", [...SAFE, ...args], { cwd, env: QUIET, encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
+  const r = spawnSync("git", [...SAFE_(), ...args], { cwd, env: QUIET_(), encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
   return r.status === 0 ? r.stdout : null;
 };
 
@@ -95,11 +107,12 @@ function view(dir, which) {
   if (was) fs.rmSync(path.dirname(was.at), { recursive: true, force: true });
   real(path.join(gitDir, "objects"), "dir");
   const at = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-")), "view.git");
-  const run = (args, input) => spawnSync("git", [...SAFE, ...args], { env: QUIET, encoding: "utf8", input, timeout: LIMITS.run });
-  if (run(["init", "-q", "--bare", at]).status !== 0) throw new Unreadable("the reader's own repository could not be made");
+  const run = (args, input) => spawnSync("git", [...SAFE_(), ...args], { env: QUIET_(), encoding: "utf8", input, timeout: LIMITS.run });
+  const made = run(["init", "-q", "--bare", at]);
+  if (made.status !== 0) throw new Unreadable(`the reader's own repository could not be made (git: ${String(made.stderr ?? made.error ?? "").trim().slice(0, 300)})`);
   // (its HEAD names a ref the reader never writes; attributes come from the empty tree in any case, SAFE's attr.tree)
   run([`--git-dir=${at}`, "symbolic-ref", "HEAD", "refs/staged-reader/none"]);
-  fs.writeFileSync(path.join(at, "objects", "info", "alternates"), `${fs.realpathSync(path.join(gitDir, "objects"))}\n`);
+  fs.writeFileSync(path.join(at, "objects", "info", "alternates"), `${fs.realpathSync(path.join(gitDir, "objects")).replace(/\\/g, "/")}\n`);
   const lines = Object.entries(refs).filter(([r, sha]) => r !== "HEAD" && !r.startsWith("refs/replace/") && sha).map(([r, sha]) => `update ${r} ${sha}\n`).join("");
   if (lines && run([`--git-dir=${at}`, "update-ref", "--stdin"], lines).status !== 0) throw new Unreadable(`${gitDir} holds a ref to no object it has`);
   views.set(gitDir, { key, at, refs });
@@ -344,7 +357,7 @@ export function touched(dir) {
   const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
   walk(project, "");
   if (have.length !== want.size || have.some(([r, p]) => !p || !want.has(r))) return true;
-  const r = spawnSync("git", [...SAFE, `--git-dir=${view(dir, "origin")}`, "hash-object", "--no-filters", "--stdin-paths"], { env: QUIET, encoding: "utf8", input: have.map(([, p]) => p).join("\n"), timeout: LIMITS.run, maxBuffer: 1 << 26 });
+  const r = spawnSync("git", [...SAFE_(), `--git-dir=${view(dir, "origin")}`, "hash-object", "--no-filters", "--stdin-paths"], { env: QUIET_(), encoding: "utf8", input: have.map(([, p]) => p).join("\n"), timeout: LIMITS.run, maxBuffer: 1 << 26 });
   if (r.status !== 0) return true;
   const ids = r.stdout.trim().split("\n");
   return have.some(([f], i) => want.get(f) !== ids[i]);
