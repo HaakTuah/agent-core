@@ -1,0 +1,111 @@
+// Tests steps.mjs and fresh.mjs (what a release asks of a project, and a project beside a fresh start) on projects the
+// starter kit of this commit writes in a scratch folder (init.mjs's `files`, read from the working folder), each a git
+// repository with nothing committed. Node's own modules and git.
+//
+//   node scripts/steps-test.mjs
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
+import { TEMPLATES, files } from "./init.mjs";
+import { NOTES } from "./releases.mjs";
+import { STAGES } from "./steps-stage.mjs";
+import { COST, STEPS, leads, notDone, project, report } from "./steps.mjs";
+
+let failed = 0, count = 0;
+const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
+process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const PIN = "a".repeat(40);
+const modules = fs.readdirSync(path.join(root, "modules")).filter(n => n.endsWith(".md"));
+
+// ---- every entry of the sync notes has its step, and each step is told done one way ----
+const notes = leads(fs.readFileSync(path.join(root, NOTES), "utf8"));
+ok(notes.length > 0 && JSON.stringify(notes) === JSON.stringify(STEPS.map(s => s.lead)), `every entry of ${NOTES} has its step in steps.mjs, in the same order, and no step stands without one`,
+  `entries without a step: ${notes.filter(l => !STEPS.some(s => s.lead === l)).join("; ") || "none"}\nsteps without an entry: ${STEPS.filter(s => !notes.includes(s.lead)).map(s => s.lead).join("; ") || "none"}`);
+const ways = STEPS.filter(s => [s.check, s.held, s.unread].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
+ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
+const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);
+ok(!unstaged.length && Object.keys(STAGES).every(l => STEPS.some(s => s.lead === l && s.check)), "each step with a check has a stage and a mend in steps-stage.mjs, so the tests can take it out and put it back", unstaged.join("\n"));
+
+// ---- a project the starter kit writes: every step done, no difference from a fresh start ----
+function kit(name, o) {
+  const dir = path.join(tmp, name);
+  fs.mkdirSync(dir);
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  for (const [to, text] of files({ owner: "someone-else", name, ...o }, PIN, modules, n => fs.readFileSync(path.join(root, TEMPLATES, n), "utf8"))) {
+    fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true });
+    fs.writeFileSync(path.join(dir, to), text);
+  }
+  fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify({ ships: [], audit: "checks/licences-audit.json", ...(o.nuget ? { nuget: { ships: [], tools: [] } } : {}) }, null, 2)}\n`);
+  return dir;
+}
+const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
+const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
+for (const [name, dir] of Object.entries(dirs)) {
+  const missed = notDone(dir);
+  ok(!missed.length && report(missed).startsWith("Every step a check reads is done"), `${name}, as the starter kit writes it: no step is reported not done`, report(missed));
+  const p = project(dir);
+  const { o } = kind(p);
+  ok(o.owner === "someone-else" && o.name === name && o.packages === kinds[name].packages && o.nuget === kinds[name].nuget && !!o.private === !!kinds[name].private && !!o.game === !!kinds[name].game,
+    `${name}: its kind is read from what it holds, as the starter kit was told it`, JSON.stringify(o));
+  const found = differences(p, fresh(p));
+  ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
+}
+
+// ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
+const dir = dirs["a-dotnet-project"];
+for (const step of STEPS.filter(s => s.check)) {
+  STAGES[step.lead].stage(dir);
+  const missed = notDone(dir);
+  ok(missed.length === 1 && missed[0].lead === step.lead && missed[0].mend.length > 20 && missed[0].cost === step.cost, `taken out, "${step.lead}" is reported, alone, with its mend and cost`, report(missed));
+  STAGES[step.lead].mend(dir);
+  ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
+}
+// several at once, in a project of another kind: exactly those
+const npm = dirs["an-npm-project"];
+const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
+for (const lead of some) STAGES[lead].stage(npm);
+ok(JSON.stringify(notDone(npm).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(npm)));
+for (const lead of some) STAGES[lead].mend(npm);
+ok(!notDone(npm).length, "and their mends make every one done");
+
+// ---- a step left undone on purpose, on the owner's word: declared, not reported ----
+const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
+const sec = STAGES["12 November 2026, the security review shown on every pull request"];
+sec.stage(npm);
+ok(notDone(npm).length === 1, "a private repository with no security-review workflow is reported");
+declare(npm, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
+ok(!notDone(npm).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
+sec.mend(npm);
+
+// ---- a check that cannot read the project is reported, never read as done ----
+const throwing = [{ lead: "a step", cost: COST.check, check: () => { throw new Error("cannot read it"); } }];
+ok(notDone(npm, throwing)[0]?.mend.includes("could not read the project"), "a check that throws is reported as not read, never as done");
+
+// ---- beside a fresh start: each kind of difference is listed, and a declared file is not compared ----
+const game = dirs["a-game"];
+const agents = path.join(game, "AGENTS.md");
+fs.writeFileSync(agents, fs.readFileSync(agents, "utf8").replace(/\n## Starting a task\n[\s\S]*?\n## Commands/, "\n## Commands").replace("These whole", "these whole")
+  .replace(/at\nthe start of every task\./, "at the start\n  of every task."));
+fs.rmSync(path.join(game, ".github/workflows/core-moved.yml"));
+const wf = path.join(game, ".github/workflows/copies.yml");
+fs.writeFileSync(wf, fs.readFileSync(wf, "utf8").replace(/@[0-9a-f]{40}/g, `@${"b".repeat(40)}`));
+const manifest = path.join(game, "core-manifest.md");
+fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^\| \*large file\* \|.*\n/m, "").replace("| `docs/PROGRESS.md` |", "| `PLAN.md` |"));
+const cfg = path.join(game, "checks/copies.json");
+fs.writeFileSync(cfg, JSON.stringify({ baseline: "checks/copies-baseline.json", code: ["src"] }, null, 2));
+let found = differences(project(game), fresh(project(game)));
+const has = (file, what) => found.some(d => d.startsWith(`${file}:`) && d.includes(what));
+ok(found.length === 4 && has("AGENTS.md", "Starting a task") && has(".github/workflows/core-moved.yml", "missing") && has("core-manifest.md", "the row \"*large file*\"") && has("checks/copies.json", "the key \"prose\""),
+  "a paragraph, a file, a table's row and a config's key that the project lacks are listed; a reflowed line, a row's own value and a pin moved are no difference", found.join("\n"));
+declare(game, '"AGENTS.md": its own way of starting a task, on the owner\'s word.');
+found = differences(project(game), fresh(project(game)));
+ok(found.length === 3 && !found.some(d => d.startsWith("AGENTS.md:")), "a file the manifest's \"Differences\" quotes is not compared", found.join("\n"));
+
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
+process.exitCode = failed ? 1 : 0;
