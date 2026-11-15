@@ -46,6 +46,7 @@ ok(/switched off/.test(off) && /State: <new, needs-owner, queued, later, on-hold
   "issues not reachable, no folder: the folder is made as said, its item format given, and the owner's setting named once", off);
 const kept = report({ yes: false, why: "its issues are switched off" }, ["a.md"], true);
 ok(/is the folder `inbox\/` \(1 item/.test(kept) && !/name it to the owner/.test(kept), "the folder standing: it is the inbox, and the owner is not named again", kept);
+ok(/the 2 item\(s\) of `inbox\/` move over/.test(report(null, Object.assign(["a.md"], { odd: 1 }), true)), "nothing asked: the count of items takes in those whose name is not plain");
 ok(/could not be asked here/.test(report(null, [], false)) && /nothing moves/.test(report(null, [], false)) && /own GitHub tools/.test(report(null, [], false)), "nothing asked: nothing moves, and it says what to ask with the session's own tools");
 
 ok(/\(1 item\(s\), and 1 whose name is not plain: rename each/.test(report({ yes: false, why: "x" }, Object.assign(["a.md"], { odd: 1 }), true)), "the folder standing, a name that is not plain is counted and its mend said");
