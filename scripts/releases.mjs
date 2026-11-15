@@ -95,13 +95,15 @@ export function asksBetween(old, pin, dir) {
 }
 
 // What never matters to a project (#242; README.md, point 1): a list exact and short, never a guess. A module its
-// manifest's "Modules:" line does not name (all of them matter where it says "all" or cannot be read), a test of the
-// core's own scripts and the core's own issue forms. Every other file of the core is something the project takes.
+// manifest's "Modules:" line does not name and its "Not taken:" line does (any other module matters: one the list
+// forgot, or every one where the line says "all" or cannot be read), a test of the core's own scripts (which nothing a
+// project runs names: releases-test.mjs) and the core's own issue forms. Every other file of the core is something the
+// project takes.
 export function matters(file, manifest) {
   if (/^scripts\/[^/]+-test\.mjs$/.test(file) || file.startsWith(".github/ISSUE_TEMPLATE/")) return false;
   const module = /^modules\/([^/]+\.md)$/.exec(file)?.[1];
-  const { taken } = modulesOf(manifest);
-  return !(module && taken instanceof Set && !taken.has(module));
+  const { taken, notTaken } = modulesOf(manifest);
+  return !(module && taken instanceof Set && !taken.has(module) && notTaken.has(module));
 }
 
 // What of what the project takes changed from `old` to `pin` (each file, a removed or renamed one by both its names),

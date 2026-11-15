@@ -65,10 +65,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    release past a project's pin is synced. Where the pin is the release just before the newest and nothing the project
    takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes nothing, and
    `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every file of the
-   core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does not name,
-   the tests of the core's own scripts (`scripts/*-test.mjs`) and the core's own issue forms
-   (`.github/ISSUE_TEMPLATE/`). In doubt it syncs: a change that cannot be read is a change, and every module is taken
-   where the line says "all" or cannot be read. One release at most is passed over, since the upgrade test proves a sync
+   core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does not name and
+   its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a project runs
+   names) and the core's own issue forms (`.github/ISSUE_TEMPLATE/`). In doubt it syncs: a change that cannot be read
+   is a change, and a module is taken where the list forgot it or the line says "all" or cannot be read. One release at most is passed over, since the upgrade test proves a sync
    from each of the last two (`scripts/upgrade-test.mjs`): at the next release the project syncs, whatever that one
    changes. It does not mean the copy is ever partial (it stays whole and exact at its pin, which `core.yml` checks as
    before), nor that a project following `main` waits, nor that a full SHA is refused. Reason: every release moved

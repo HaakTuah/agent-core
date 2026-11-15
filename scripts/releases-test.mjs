@@ -103,11 +103,21 @@ try { next(dir, c4); } catch (e) { moved = e.message; }
 ok(next(dir, tip).sha === tip && moved.includes("main has moved on"), "asked for one commit, the cut is refused where main's newest commit is another");
 
 // a release that brings nothing a project takes asks no sync of it (#242)
-const taking = list => `# Core manifest\n\nFloor: whole. Modules: ${list}.\n`;
+const taking = (list, left = "`b.md` (no use here)") => `# Core manifest\n\nFloor: whole. Modules: ${list}.\nNot taken: ${left}.\n`;
 const onlyA = taking("`how-to-work.md`, `modules/a.md`");
-ok(!matters("scripts/x-test.mjs", onlyA) && !matters(".github/ISSUE_TEMPLATE/f.md", onlyA) && !matters("modules/b.md", onlyA), "what never matters: a test of the core's own scripts, its own issue forms, a module the manifest does not name");
+ok(!matters("scripts/x-test.mjs", onlyA) && !matters(".github/ISSUE_TEMPLATE/f.md", onlyA) && !matters("modules/b.md", onlyA), "what never matters: a test of the core's own scripts, its own issue forms, a module the manifest leaves out by name");
+ok(matters("modules/c.md", onlyA) && matters("modules/b.md", taking("`a.md`", "")) && matters("modules/b.md", taking("every module but `game-design.md`", "`game-design.md` (no game)")), "a module the list forgot, named nowhere, still matters: in doubt it syncs");
 ok(["modules/a.md", "modules/how-to-work.md", "scripts/x.mjs", "scripts/x-test-data.json", "scripts/sub/y-test.mjs", "floor/security.md", NOTES, ".github/workflows/core.yml", "README.md", "QUEUE.md", "archive/instructions.md"].every(f => matters(f, onlyA)), "everything else matters: a module it names, a script, the floor, the notes, a workflow, the rest of the copy");
 ok(matters("modules/b.md", taking("all")) && matters("modules/b.md", "# Core manifest\n") && matters("modules/b.md", taking("<the list>")), "every module matters where the manifest takes all, or its list cannot be read");
+// (that a test of the core's own scripts never matters holds only while nothing a project runs names one: no script but
+// a test, no file of the starter kit and no workflow but the core's own tests.yml, outside its comments)
+const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+const runs = [...fs.readdirSync(path.join(repo, "scripts")).filter(f => !/-test\.mjs$/.test(f)).map(f => path.join(repo, "scripts", f)), ...walk(path.join(repo, "setup", "template")),
+  ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => f !== "tests.yml").map(f => path.join(repo, ".github", "workflows", f))];
+const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
+  .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);
+ok(!naming.length, "nothing a project runs names a test of the core's own scripts, outside a comment", `${naming.join(", ")}\n     Mend: a project runs no test of the core's: move what it needs into a script without -test in its name, or take ${"`scripts/*-test.mjs`"} off the list of what never matters (matters in releases.mjs)`);
 const other = path.join(tmp, "other");
 fs.mkdirSync(other);
 git(other, "init", "-q", "-b", "main");
@@ -134,7 +144,7 @@ dir = otherDir();
 ok(!staysAt(r1, onlyA, dir) && staysAt(r2, onlyA, dir), "one release is passed over at most: a project that stayed syncs at the next, which the upgrade test proves from either of the last two");
 const r4 = change({ "modules/b.md": null, "modules/c.md": "b2" }, "release-4");
 dir = otherDir();
-ok(takenBetween(r3, r4, taking("`b.md`"), dir).join() === "modules/b.md" && takenBetween(r3, r4, taking("`c.md`"), dir).join() === "modules/c.md", "a module moved matters by either name: a project that names the old one or the new one is asked");
+ok(takenBetween(r3, r4, taking("`b.md`", "`c.md` (x)"), dir).join() === "modules/b.md" && takenBetween(r3, r4, taking("`c.md`", "`b.md` (x)"), dir).join() === "modules/c.md", "a module moved matters by either name: a project that names the old one or the new one is asked");
 change({ [NOTES]: `${head}- **New.** Done when new.\n` }, "release-5");
 dir = otherDir();
 ok(!staysAt(r4, onlyA, dir), "a release whose notes ask something new asks a sync");
