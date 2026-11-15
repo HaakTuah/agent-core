@@ -499,7 +499,8 @@ function preRelease(name, { windows }) {
   if (windows) { git(dir, "config", "core.fileMode", "false"); git(dir, "config", "core.autocrlf", "true"); }
   git(dir, "remote", "add", "origin", origin);
   fs.mkdirSync(path.join(dir, "core"));
-  execFileSync("tar", ["-x", "-f", "-", "-C", path.join(dir, "core")], { input: execFileSync("git", ["archive", pre], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  // (a relative folder, as the old sync script gives it: the tar Windows' runners find reads a drive's colon as a host)
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", pre], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
   const lines = (...l) => `${l.join(eol)}${eol}`;
   const at = () => `${CORE}/.github/workflows`;
   write(dir, "core-manifest.md", lines("# Core manifest", "", `Core: ${CORE} at ${pre}, copied whole under core/ (never edited here).`,
