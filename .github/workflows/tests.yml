@@ -1,8 +1,8 @@
-# The core's scripts' own tests, and its own licence audit, on every pull request here and every push to main, on Linux
-# and on Windows, where a project built there runs the scripts and both hooks (in Git Bash, as Claude Code does). Every
-# suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only,
-# with no secret, on the core's one exact Node; nothing is installed. One suite writes and builds a .NET project with
-# the .NET SDK the runner holds, in a scratch folder, and takes a few packages from nuget.org for it
+# The core's scripts' own tests, and its own licence audit and copies check, on every pull request here and every push
+# to main, on Linux and on Windows, where a project built there runs the scripts and both hooks (in Git Bash, as Claude
+# Code does). Every suite runs though another failed, so one run shows them all. This repository only; no project calls
+# it. Reads only, with no secret, on the core's one exact Node; nothing is installed. One suite writes and builds a .NET
+# project with the .NET SDK the runner holds, in a scratch folder, and takes a few packages from nuget.org for it
 # (scripts/init-dotnet-test.mjs). Another writes projects with the starter kit of each of the last two releases, syncs
 # them to the commit under test and runs every check of the core on them, taking one package from npm's registry
 # (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so its checkout fetches them, and
@@ -187,6 +187,16 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: The base branch's latest commit, for the core's copies baseline (once, on Linux; not the whole history)
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name == 'pull_request' }}
+        env:
+          BASE: ${{ github.base_ref }}
+        run: git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+      - name: No new copy in the core's own code, rule files and descriptions, and its baseline only shrinks (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: node scripts/copies.mjs .github/copies.json
 
   upgrade:
     strategy:
