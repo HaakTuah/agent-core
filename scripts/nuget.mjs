@@ -348,8 +348,13 @@ export function importsOf(own, read, roots = []) {
     if (/<!DOCTYPE/iu.test(text)) { typed.push(f); continue; }
     const looked = new Set();
     for (const { project, sdk, via, loose } of imported(text)) {
-      if (BUILD_FILE.test(project.split(/[\\/]/u).pop())) continue;
       const at = sdk ? null : importPath(f, project, { anchored: Boolean(via) }), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
+      // (a build file git knows is read as one already; one an SDK's Import names by a plain path inside the SDK's
+      // folder (no property, item, escape or wildcard, not rooted, no ".." part) is the SDK's own, as a Project's Sdk
+      // attribute brings in; any other Import of a build file's name, through a property, out of the SDK's folder or
+      // into the copy of the core, is reported as one of any other name is (#280))
+      const sdkOwn = sdk && !/[$@%&*?]/u.test(project) && !/^(?:[\\/]|[A-Za-z]:)/u.test(project) && !project.split(/[\\/]/u).includes("..");
+      if (BUILD_FILE.test(project.split(/[\\/]/u).pop()) && (sdkOwn || found.length)) continue;
       // (any other property only says what brings in a project already read for what it is: nothing more is read)
       if (loose) {
         for (const g of found) if (roots.includes(g)) { if (!brought.has(g)) brought.set(g, new Set()); brought.get(g).add(f); }
