@@ -45,8 +45,8 @@
 // that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which the
 // workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so it
 // says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
-// open, and of one that names no commit the head stands on (AGENTS.md, "Nothing locks a project"); brought up to date
-// with main, it is held. What it does not hold: what a posted review says, whether a finding is blocking, who posted
+// open, and of one that names no commit the head stands on, and it counts a member's or collaborator's review that
+// it does not name, saying so (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it does not hold: what a posted review says, whether a finding is blocking, who posted
 // each of two reviews (one login may post both), that comment-only.mjs's printout is true (its code reviewer runs it
 // again), and that a merge from main brought no change of its own; those stay with the builder and the reviews. It
 // prints, as JSON, the commit to mark and the status to give it, or {} for a pull request that is closed or a draft.
@@ -121,7 +121,12 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const sha = pull.head.sha;
   const list = flat(comments);
   const whose = counted(pull, more.reviewers);
-  const all = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user?.login));
+  const writers = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
+  // (of a pull request whose head does not hold this check as the default branch does, which stood before it came, a
+  // member's or collaborator's review counts as it did then, and the status says so: AGENTS.md, "Nothing locks a
+  // project")
+  const all = bound ? writers.filter((comment) => whose(comment.user?.login)) : writers;
+  const unnamed = !bound && writers.some((comment) => !whose(comment.user?.login));
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
   // while Codex's own runs, only a review posted after it began counts (a time that cannot be read is taken as the
   // newest, so nothing is posted after it)
@@ -151,6 +156,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
       verdict = bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
     } else verdict = { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
   }
+  if (unnamed && verdict.done) verdict = { ...verdict, why: `${verdict.why}; a review from an account not named counts, as before this check came` };
   return warning ? { ...verdict, warning } : verdict;
 }
 
