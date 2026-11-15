@@ -99,6 +99,32 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
   return { pin, behind, steps, merged };
 }
 
+// A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
+// whole-line form that holds numbers and fixed words alone, and written anew from what it holds, so no other text of
+// the project's reaches the core's report; null where none is in its form. The commit its copy holds is kept only where
+// `named` (the owner's public project).
+export function countsFrom(text, named) {
+  const part = String(text ?? "").split(`**${COUNTS}**`)[1] ?? "";
+  const out = [];
+  for (const line of part.split(/\r?\n/)) {
+    let m;
+    if ((m = /^- copy: ([0-9a-f]{40}|not read)(?:, (\d{1,9}) commits behind the core's main)?\.$/.exec(line))) out.push(`copy${named && m[1] !== "not read" ? ` ${m[1]}` : ""}${m[2] ? ` ${m[2]} commits behind the core's main` : m[1] === "not read" ? " not read" : ""}`);
+    else if ((m = /^- steps not done: (\d{1,6}|not read)\.$/.exec(line))) out.push(`steps not done: ${m[1]}`);
+    else if ((m = /^- merged in (\d{4}-\d\d): (\d{1,6}), the core's share (\d{1,3}%|none merged) \(sync (\d{1,6}), upkeep (\d{1,6}), update (\d{1,6}), own (\d{1,6})\)\.$/.exec(line)))
+      out.push(`merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`);
+    else if ((m = /^- merged in (\d{4}-\d\d): not read /.exec(line))) out.push(`merged in ${m[1]}: not read`);
+  }
+  return out.length ? out.join("; ") : null;
+}
+
+// How a project is shown in the core's public report: by name only the owner's own public project.
+export const shownAs = (name, own, isPrivate) => (own && !isPrivate ? `\`${name}\`` : own ? "a private project of the owner's" : "a project of another owner");
+
+// The state report a project's look wrote: the newest issue titled "State report, YYYY-MM" opened by GitHub's job or by
+// the project owner's account, never another's.
+export const reportOf = (issues, owner) => [...issues].filter(i => /^State report, \d{4}-\d\d$/.test(i.title) && !i.pull_request
+  && ["github-actions[bot]", String(owner).toLowerCase()].includes(String(i.user?.login ?? "").toLowerCase())).sort((a, b) => b.title.localeCompare(a.title))[0] ?? null;
+
 // --projects: each project the account reaches, with its kind and the counts from its own newest state report.
 function projects(named) {
   const gh = ghApi;
@@ -117,14 +143,13 @@ function projects(named) {
     try { manifest = Buffer.from(JSON.parse(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch { continue; }
     if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) continue;
     const own = String(r.owner).toLowerCase() === account.toLowerCase();
-    const shown = own && !r.private ? `\`${name}\`` : own ? "a private project of the owner's" : "a project of another owner";
+    const shown = shownAs(name, own, r.private);
     let counts = "its counts could not be read here: a session started in it reads its newest state report and passes back the lines under its heading";
     try {
-      const reports = pagesOf(`repos/${name}/issues?state=all&labels=by%3Alook`, gh).filter(i => /^State report, \d{4}-\d\d$/.test(i.title)).sort((a, b) => b.title.localeCompare(a.title));
-      const lines = (reports[0]?.body ?? "").split(`**${COUNTS}**`)[1]?.split("\n").filter(l => /^- (copy|steps not done|merged in)\b/.test(l));
-      // (a commit's name only from the owner's public projects: of any other, counts alone)
-      if (lines?.length) counts = `from its report of ${reports[0].title.slice(-7)}: ${lines.map(l => l.slice(2).replace(/\.$/, "")).map(l => (own && !r.private ? l : l.replace(/^copy: [0-9a-f]{40},? ?/, "copy "))).join("; ")}`;
-      else if (reports.length === 0) counts = "it has no state report yet";
+      const report = reportOf(pagesOf(`repos/${name}/issues?state=all&labels=by%3Alook`, gh), r.owner);
+      const read = report && countsFrom(report.body, own && !r.private);
+      if (read) counts = `from its report of ${report.title.slice(-7)}: ${read}`;
+      else if (!report) counts = "it has no state report yet";
     } catch { /* (the default above) */ }
     rows.push(`- ${shown}: ${counts}.`);
   }
@@ -134,7 +159,7 @@ function projects(named) {
 if (started(import.meta.url)) {
   const [what, ...rest] = process.argv.slice(2);
   const named = rest.filter((a, i) => rest[i - 1] === "--repo");
-  if (what !== "--projects" || rest.some((a, i) => a !== "--repo" && rest[i - 1] !== "--repo") || !named.every(n => /^[\w-]+\/[\w.-]+$/.test(n))) {
+  if (what !== "--projects" || rest.some((a, i) => a !== "--repo" && rest[i - 1] !== "--repo") || !named.every(n => /^[\w-]+\/[\w.-]+$/.test(n) && !/\/\.+$/.test(n))) {
     console.error("FAIL: it takes --projects, and --repo owner/name for each repository to read in place of the account's (the look writes the monthly report itself)");
     process.exitCode = 1;
   } else try { projects(named); } catch { console.error("FAIL: gh gave no answer here for the account or a repository named: run it where gh answers for the owner's account, or name the repositories it can reach by --repo"); process.exitCode = 1; }
