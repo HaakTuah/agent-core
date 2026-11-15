@@ -129,10 +129,19 @@ putIn("src/b.js", "import { a } from \"./a.js\";\nexport const b = 1;\nexport co
 ok(/`cycles > 0`, and it reads 2 imports that lie on a cycle/.test(signs({ manifest: "", root: measuredProject }).body ?? ""), "a cycle the code holds now trips a sign that names cycles");
 ok(/trips when: cycles > 0 \(2 now: it holds\)/.test(report(records("", measuredProject), at("2026-11-16"), { ...reads, found: { ...reads.found, entries: new Map([["cycle: x", true], ["cycle: y", true]]) } })),
   "the script prints each condition with the number it reads, and whether it holds");
+putIn("docs/choices.md", sign("`fiels > 150`"));
+const typo = signs({ manifest: "", root: measuredProject });
+ok(/names what is no measure the look reads/.test(typo.body ?? "") && /`fiels > 150`/.test(typo.body) && /mended in a pull request/.test(typo.body) && !/fresh record/.test(typo.body),
+  "a line \"Trips when:\" that names no measure keeps the issue open the day it stands, with its mend, so a typo is never a sign silently unread", typo.body);
+putIn("docs/choices.md", sign("`cycles > 0`"));
 putIn("checks/shape.json", "{");
 ok(signs({ manifest: "", root: measuredProject }).body === null && /the shape check could not be read/.test(signs({ manifest: "", root: measuredProject }).unread ?? ""), "a config that cannot be read leaves the issue as it stands");
 putIn("docs/choices.md", "## Choice: a\n- Reopens it: x.\n");
 ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "records that name no measure are not read against the shape check at all");
+putIn("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["lib"] }));
+putIn("docs/choices.md", sign("`files > 0`"));
+ok(signs({ manifest: "", root: measuredProject }).body === null && /reads no file of code here/.test(signs({ manifest: "", root: measuredProject }).unread ?? ""),
+  "where the shape check reads no file of code (a project in another language), a measure is said unread, never a sign that silently cannot trip");
 fs.rmSync(measuredProject, { recursive: true, force: true });
 const many = parse(Array.from({ length: 5000 }, (_, i) => `## Choice: c${i}\nTrips when: \`files > 1\`, \`nothing > 1\`\n`).join(""));
 const long = trippedBody("docs/choices.md", tripped(many, reads), many, "core/");

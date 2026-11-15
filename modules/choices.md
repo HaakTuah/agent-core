@@ -39,17 +39,19 @@ sign written in a measure.
   that anything changes in the code: it is a record of what stands. Reason: a choice never written down cannot show
   when it stops paying off.
 - **What reopens a choice.** A recorded choice stands until one of two triggers:
-  - **its sign trips:** by default, the session that runs the trial, the audit or the measure in which it shows
-    tripped files the suggestion below. Where the sign is a measure a check already keeps, the session that writes
-    the record writes it a second time, on a line that opens `Trips when:`, each condition in backticks: a measure
-    `core/scripts/choices.mjs` lists (what the shape check reads: its files, functions and imports, the old breaches
-    its baseline lists and their share, the imports on a cycle, the files in no system), `>`, `>=`, `<` or `<=`, and
-    a number (`` `files > 150` ``). The trigger is such a condition that holds: the scheduled look reads it each day
-    and keeps the issue "A choice's sign has tripped" open while it holds, and the session that takes that issue writes
-    the suggestion there and labels it `needs-owner` in place of `queued`. Where the choice stands, its sign is
-    written anew, and the issue closes. It does not mean that the look runs anything a records file says: that file
-    is no protected file, and the look's job holds a token that writes issues, so it compares numbers the shape check
-    already reads; nor that every sign is written so. Reason: a sign the look cannot read is caught only twice a
+  - **its sign trips:** by default, the session that runs the trial, the audit or the measure in which it shows tripped
+    files the suggestion below. Where the sign is a measure a check already keeps, the session that writes the record
+    writes it a second time, on a line that opens `Trips when:`, each condition in backticks: a measure
+    `core/scripts/choices.mjs` lists (what the shape check reads: its files, functions and imports, the old breaches its
+    baseline lists and their share, the imports on a cycle, the files in no system), `>`, `>=`, `<` or `<=`, and a
+    number (`` `files > 150` ``). The trigger is such a condition that holds: the scheduled look reads it each day and
+    keeps the issue "A choice's measured sign to act on" open while it holds, and the session that takes that issue
+    writes the suggestion there and labels it `needs-owner` in place of `queued`. Where the owner keeps the choice, the
+    session that acts on the answer writes its sign anew, and the issue closes; it opens again as `queued` where a sign
+    trips anew, and goes back to `queued` where another choice's trips. A condition that names no measure keeps the
+    issue open too, until its line is mended. It does not mean that the look runs anything a records file says: that
+    file is no protected file, and the look's job holds a token that writes issues, so it compares numbers the shape
+    check already reads; nor that every sign is written so. Reason: a sign the look cannot read is caught only twice a
     year, or when someone happens to measure it (#330);
   - **the pass twice a year:** the scheduled look keeps an issue open once the day on the records' line `Read whole:`
     is 182 days old, and a fresh reader goes through every record, reads its sign, and asks whether an option plainly

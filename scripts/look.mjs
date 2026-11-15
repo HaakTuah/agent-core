@@ -4,8 +4,10 @@
 // look.yml, and core-moved.yml for a project that still calls it), on an orchestrator's wake where that job does not
 // run it, and in the core by its own workflow (.github/workflows/own-look.yml). Each thing due is one issue it keeps,
 // labelled queued and by:look, found again by its title among the issues with that label that the workflow's account
-// or the *owner's account* opened, and never opened twice: updated while it stands, reopened when it comes back, closed
-// with a comment once nothing of it stands. Each is a task an agent takes alone; none asks the owner anything.
+// or the *owner's account* opened, and never opened twice: updated while it stands, reopened when it comes back, a task
+// again, its state label set as its reader says (`reopening`), closed with a comment once nothing of it stands. Each is
+// a task an agent takes alone; one whose session hands it to the owner is labelled needs-owner, and one its reader says
+// is the owner's to see too.
 //   - Pull requests that stand idle: every open pull request of this repository's own branches, Dependabot's left out,
 //     with no push for longer than stalled.mjs's hours: draft or ready, its checks, what its description says it waits
 //     on (pr-description.mjs) and for how long, a draft with green checks first; and one whose line and label
@@ -63,10 +65,11 @@ export const TITLES = {
 // issue it keeps and `unread` leaving it as it stands: the pass over the choices that are hard to undo and a sign of
 // theirs that has tripped (choices.mjs), the cleaning and the audit the dose makes due (dose.mjs), and, as their rule
 // comes, the staged cases (#235). One that says `owner`, true or false, has its issue's state label kept to it:
-// needs-owner where true, else queued.
+// needs-owner where true, else queued; one that says `requeue` has it put back to queued where an update brings a line
+// the issue did not hold (`updating`).
 export const DUE = [choicesDue, signs, cleaningDue, auditIsDue];
 export const OWNERS = "needs-owner";
-export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner }));
+export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(d.requeue ? { requeue: true } : {}) }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
 
 // The labels an issue the look keeps should carry where its state label is not the one that fits: the others as they
@@ -77,6 +80,24 @@ export function relabelled(labels, owner) {
   if (labels.includes("later") || labels.includes("on-hold")) return null;
   return labels.includes(want) && !labels.includes(drop) ? null : [...labels.filter(l => l !== drop && l !== want), want];
 }
+
+// What reopening an issue the look keeps writes: its body, open, and, since what came back is a task again, its state
+// label as its reader says (needs-owner where the issue is the owner's to see, else queued), whatever a session set
+// while it stood before (a tripped sign's needs-owner, say); later and on-hold, a session's own, stay.
+export const reopening = (issue, body, owner) => {
+  const labels = relabelled(issue.labels ?? [], owner === true);
+  return { body, state: "open", ...(labels ? { labels } : {}) };
+};
+
+// What updating an issue the look keeps writes: its body, and, for a reader that says `requeue`, queued in place of a
+// needs-owner a session set, where the new body holds a line of a list ("- ") the old one did not: something new for a
+// session to take up first (a second choice's sign that trips).
+export const updating = (issue, body, requeue = false) => {
+  const before = new Set(String(issue.body ?? "").split("\n"));
+  const fresh = requeue && (issue.labels ?? []).includes(OWNERS) && body.split("\n").some(l => l.startsWith("- ") && !before.has(l));
+  const labels = fresh ? relabelled(issue.labels, false) : null;
+  return { body, ...(labels ? { labels } : {}) };
+};
 
 function write(method, route, payload) {
   const r = spawnSync("gh", ["api", "-X", method, route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24 });
@@ -274,7 +295,7 @@ function main(args) {
     write("PATCH", `repos/${repo}/issues/${number}`, { state: "closed", state_reason: "completed" });
   };
   const did = [];
-  const act = (title, body, issue, unread, { closes = true, labels = LABELS } = {}) => {
+  const act = (title, body, issue, unread, { closes = true, labels = LABELS, requeue = false } = {}) => {
     const step = plan(body, issue, unread);
     const shown = step === "close" && !closes ? "nothing" : step;
     did.push(`${title}: ${unread ? `not read (${unread})` : shown}${issue ? ` (#${issue.number})` : ""}`);
@@ -282,8 +303,8 @@ function main(args) {
     try {
       // (an owner GitHub will not let be assigned here leaves the issue unassigned, never unopened)
       if (shown === "open") try { write("POST", `repos/${repo}/issues`, { title, body, labels, assignees: owner ? [owner] : [] }); } catch { write("POST", `repos/${repo}/issues`, { title, body, labels }); }
-      else if (shown === "update") write("PATCH", `repos/${repo}/issues/${issue.number}`, { body });
-      else if (shown === "reopen") write("PATCH", `repos/${repo}/issues/${issue.number}`, { body, state: "open" });
+      else if (shown === "update") write("PATCH", `repos/${repo}/issues/${issue.number}`, updating(issue, body, requeue));
+      else if (shown === "reopen") write("PATCH", `repos/${repo}/issues/${issue.number}`, reopening(issue, body, labels.includes(OWNERS)));
       else if (shown === "close") close(issue.number, "nothing of this stands today, so this closes; it opens again if it comes back.");
     } catch (e) { did.push(`  ${e.message}`); }
   };
@@ -292,7 +313,7 @@ function main(args) {
     did.push(`a second issue of the same thing: closed (#${t.number})`);
     if (!dry) try { close(t.number, "another issue of the look's holds this same thing, so this one closes."); } catch (e) { did.push(`  ${e.message}`); }
   }
-  for (const f of findings) { act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner) }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
+  for (const f of findings) { act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner), requeue: f.requeue === true }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
   if (monthly) act(reportTitle, text(monthly, carrier), null, null);
   // the record, written last: a closed issue of its own
   const recordBody = `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n`;

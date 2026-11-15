@@ -21,6 +21,10 @@ import { started } from "./started.mjs";
 
 export const KIT = "docs/choices.md";
 export const TITLE = "Choices to read again";
+// The issue of the signs written in a measure: one that holds, or a line "Trips when:" that names no measure.
+export const TRIPPED = "A choice's measured sign to act on";
+// The most conditions, and records naming no measure, its issue lists one by one.
+export const LISTED = 30;
 // Twice a year: the pass is due once the day on the line "Read whole:" is this many days old.
 export const DAYS = 182;
 
@@ -116,12 +120,8 @@ export function look({ manifest, at, root = "." }) {
   const found = parse(got.text), why = due(found, at);
   if (!why) return { title: TITLE, body: null };
   const unsigned = found.records.filter(r => !r.sign).length, unknown = found.records.filter(r => r.unknown.length).length;
-  return { title: TITLE, body: `The pass over the choices that are hard to undo is due (\`${home}modules/choices.md\`, "What reopens a choice"): \`${got.file}\` holds ${found.records.length} records, and ${why}; the pass falls ${DAYS} days after the last.${unsigned ? ` ${unsigned} of them name no sign on a line "Reopens it:".` : ""}${unknown ? ` ${unknown} of them hold, on their line "Trips when:", what names no measure the look reads.` : ""} A fresh reader goes through each record as that rule says, files an issue for the owner, labelled needs-owner, for each choice whose sign has tripped or for which a plainly better option exists now, and writes the day of its pass on that line, in a pull request of its own. \`node ${home}scripts/choices.mjs\` lists the records.` };
+  return { title: TITLE, body: `The pass over the choices that are hard to undo is due (\`${home}modules/choices.md\`, "What reopens a choice"): \`${got.file}\` holds ${found.records.length} records, and ${why}; the pass falls ${DAYS} days after the last.${unsigned ? ` ${unsigned} of them name no sign on a line "Reopens it:".` : ""}${unknown ? ` ${unknown} of them hold, on their line "Trips when:", what names no measure the look reads.` : ""} A fresh reader goes through each record as that rule says, files an issue for the owner, labelled needs-owner, for each choice whose sign has tripped or for which a plainly better option exists now, save one the issue \"${TRIPPED}\" already names, and writes the day of its pass on that line, in a pull request of its own. \`node ${home}scripts/choices.mjs\` lists the records.` };
 }
-
-export const TRIPPED = "A choice's sign has tripped";
-// The most conditions, and records naming no measure, its issue lists one by one.
-export const LISTED = 30;
 
 // Each condition of the records that holds today, with the number read: [{ name, measure, op, limit, value }].
 export const tripped = (found, r) => found.records.flatMap(rec => rec.conditions.map(c => ({ name: rec.name, ...c, value: MEASURES[c.measure][1](r) })))
@@ -136,27 +136,36 @@ function measuredSigns(manifest, root) {
   if (!found.records.some(rec => rec.conditions.length)) return { got, found, home, r: null };
   let r;
   try { r = reading(rules, root); } catch (e) { return { unread: `the shape check could not be read (${String(e.message).split(". Mend: ")[0]})` }; }
-  return r ? { got, found, home, r } : { unread: "a record names a measure, and the shape check has no config here to read it from" };
+  if (!r) return { unread: "a record names a measure, and the shape check has no config here to read it from" };
+  // (a project whose code the shape check does not read, in another language, would read 0 and never trip)
+  return r.found.read.files > 0 ? { got, found, home, r } : { unread: "a record names a measure, and the shape check reads no file of code here" };
 }
 
-// The issue of a tripped sign's text: each condition that holds, what names no measure, and what its session does.
+// The text of the issue of the signs written in a measure: each condition that holds, each line that names no measure,
+// and what its session does about each.
 export function trippedBody(file, held, found, home) {
   const unknown = found.records.filter(rec => rec.unknown.length);
   // (a few lines each, the rest counted, so the body stays far under GitHub's limit however many a file holds)
   const some = (list, line) => [...list.slice(0, LISTED).map(line), ...(list.length > LISTED ? [`- and ${list.length - LISTED} more: \`node ${home}scripts/choices.mjs\` lists them`] : [])];
-  return [`A choice's sign, written in a measure the shape check keeps, holds today in \`${file}\` (\`${home}modules/choices.md\`, "What reopens a choice"):`,
-    ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${c.value} ${MEASURES[c.measure][0]}.`),
-    ...(unknown.length ? ["", `What names no measure the look reads, on a line "Trips when:" (the measures: ${Object.keys(MEASURES).join(", ")}):`, ...some(unknown, rec => `- ${shown(rec.name)}: ${rec.unknown.slice(0, LISTED).map(shown).join(", ")}`)] : []), "",
-    `A session takes this issue: for each choice above, it writes in a comment here a fresh record that compares the options, staying as it is among them, with the gain and what the move would cost, and labels this issue needs-owner in place of queued; no session makes the choice. Where the owner keeps it, its record's sign is written anew in a pull request, and this issue closes on the look's next run. \`node ${home}scripts/choices.mjs\` reads the signs as they stand.`].join("\n");
+  const rule = `\`${home}modules/choices.md\`, "What reopens a choice"`;
+  return [...(held.length ? [`A choice's sign, written in a measure the shape check keeps, holds today in \`${file}\` (${rule}):`,
+    ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${c.value} ${MEASURES[c.measure][0]}.`), ""] : []),
+  ...(unknown.length ? [`A line "Trips when:" in \`${file}\` names what is no measure the look reads, so that sign is not read (${rule}; the measures: ${Object.keys(MEASURES).join(", ")}):`,
+    ...some(unknown, rec => `- ${shown(rec.name)}: ${rec.unknown.slice(0, LISTED).map(shown).join(", ")}`), ""] : []),
+  [held.length ? "A session takes this issue: for each choice whose sign holds, it writes in a comment here a fresh record that compares the options, staying as it is among them, with the gain and what the move would cost, and labels this issue needs-owner in place of queued; no session makes the choice. Where the owner keeps it, the session that acts on the answer writes its sign anew in a pull request." : "",
+    unknown.length ? "Each line that names no measure is mended in a pull request: to a measure the look reads, or taken out where the sign is none a check keeps." : "",
+    `This issue closes on the look's next run once nothing above stands, and opens again as queued if something comes back. \`node ${home}scripts/choices.mjs\` reads the signs as they stand.`].filter(Boolean).join(" ")].join("\n");
 }
 
 // The scheduled look's reader of the signs written in a measure (look.mjs, DUE): its issue's body null where none
-// holds, so the look closes one it keeps; `unread` where the records or the measures could not be read.
+// holds and every line "Trips when:" names measures alone, so the look closes one it keeps; `unread` where the records
+// or the measures could not be read. `requeue`: a choice the issue did not name before puts it back to queued.
 export function signs({ manifest, root = "." }) {
   const s = measuredSigns(manifest, root);
   if (s.unread) return { title: TRIPPED, body: null, unread: s.unread };
   const held = s.r ? tripped(s.found, s.r) : [];
-  return { title: TRIPPED, body: held.length ? trippedBody(s.got.file, held, s.found, s.home) : null };
+  const stands = held.length || s.found.records.some(rec => rec.unknown.length);
+  return { title: TRIPPED, body: stands ? trippedBody(s.got.file, held, s.found, s.home) : null, requeue: true };
 }
 
 // One record as the script prints it: its name, whether it names its sign, and each condition of its line "Trips
