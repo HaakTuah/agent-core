@@ -247,9 +247,7 @@ jobs:
   # job that ran out of its time is cancelled, which no failing test is, so the gate says which it was)
   tests:
     needs: [suites, upgrade]
-    # (whatever the two ended in, save where the whole run was cancelled: a newer run for the same pull request took
-    # its place, and that run's own gate reports on the newer head; #388)
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
