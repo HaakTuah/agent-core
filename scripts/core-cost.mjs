@@ -126,20 +126,21 @@ export function print(rows, cost) {
   return lines.map(l => l.map((c, i) => i ? c.padStart(width[i]) : c.padEnd(width[i])).join("  ")).join("\n");
 }
 
-function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
-  const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
-  const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
-  for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
-  let rules;
-  try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = ruleFiles(); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
-  const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
-  if (!ref) fail("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
-  const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
-  // (the repository, from GitHub's own variable or origin's address: whose branches are its own, and where --cost asks)
+// The repository this clone is of (GitHub's own variable, else origin's address), or null where it is not known.
+export function repoOf() {
   let repo = process.env.GITHUB_REPOSITORY;
   if (!repo) try { repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(git(["remote", "get-url", "origin"]).trim())?.[1]; } catch { /* (no origin) */ }
-  if (!REPO.test(repo ?? "")) repo = null;
+  return REPO.test(repo ?? "") ? repo : null;
+}
+
+// The pull requests merged into the default branch from `since` (a day, or none), as { number, when, kind, lines },
+// and the repository ({ repo, merged }): read from the clone the process runs in, whose root is its directory. It
+// throws where the clone knows no default branch. Without a repository no branch counts as Dependabot's, which it says.
+export function mergedPulls(rules, since = null) {
+  const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
+  if (!ref) throw new Error("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
+  const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
+  const repo = repoOf();
   // (said, never passed over: without it no branch counts as Dependabot's, and its merges count by what they changed)
   if (!repo) console.error("note: the repository is not known (GITHUB_REPOSITORY, or origin's address), so no merge is counted as an update of Dependabot's");
   const owner = repo?.split("/")[0].toLowerCase();
@@ -159,6 +160,18 @@ function main(argv) {
     }
     merged.push({ number: Number(m[1]), when, kind, lines });
   }
+  return { repo, merged };
+}
+
+function main(argv) {
+  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+  const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
+  const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
+  for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
+  let rules;
+  try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = ruleFiles(); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
+  let repo, merged;
+  try { ({ repo, merged } = mergedPulls(rules, since)); } catch (e) { fail(e.message); }
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
 
   if (cost) {
