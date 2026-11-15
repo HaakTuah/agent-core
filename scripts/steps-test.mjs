@@ -62,6 +62,18 @@ for (const [name, dir] of Object.entries(dirs)) {
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
 }
+// (a named tool is done only where a workflow on pull requests runs the check with its base)
+{
+  const dir = dirs["an-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  const step = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), flow = path.join(dir, ".github/workflows/strength.yml");
+  fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |"));
+  const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return step.check(project(dir)); };
+  const comment = said("      # TODO: node core/scripts/strength.mjs\n      - run: echo later\n");
+  const bare = said("      - run: node core/scripts/strength.mjs\n");
+  const runs = said("      - run: node core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
+  ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
+  fs.writeFileSync(manifest, was); fs.rmSync(flow);
+}
 // (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
 {
   const dir = dirs["an-npm-project"], test = path.join(dir, "src", "first.test.js");

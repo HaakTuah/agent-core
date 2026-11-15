@@ -58,6 +58,15 @@ try {
   const named = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:2-2"], { cwd: dir, encoding: "utf8" });
   const lines = new Set(JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.map(m => m.location.start.line));
   ok(named.status === 0 && same([...lines], [2]), "the lines named alone take faults", named.stdout + named.stderr);
+  // (a package the project installed, ignored by git, is reached from the working copies)
+  write("package.json", "{}\n"); write(".gitignore", "node_modules/\n"); write("node_modules/limit/index.js", "module.exports = 20;\n");
+  write("test/c-test.mjs", "import limit from 'limit';\nimport { big } from '../src/a.mjs';\nif (!big(limit)) process.exit(1);\n");
+  git("add", "package.json", ".gitignore", "test/c-test.mjs");
+  const installed = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
+  const strict = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
+  ok(installed.status === 0 && !installed.stdout.includes("test/c-test.mjs") && strict?.status !== "NoCoverage", "a test that imports an installed package runs in the working copies, as it does in the project", installed.stdout + installed.stderr + JSON.stringify(strict));
+  git("rm", "-q", "-f", "--cached", "package.json", ".gitignore", "test/c-test.mjs");
+  for (const f of ["package.json", ".gitignore", "test/c-test.mjs", "node_modules"]) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
   write("test/b-test.mjs", "import { big } from '../src/a.mjs';\nif (big(10)) process.exit(1);\n");
   git("add", "test/b-test.mjs");
   const staged = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });

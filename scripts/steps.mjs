@@ -92,6 +92,17 @@ function testsStand(p) {
   return config.tests.length > 0 && [...files(config.tests)].some(f => code.has(f));
 }
 
+// Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
+// step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
+const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
+const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
+const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
+function strengthRuns(p) {
+  readable(p, text => text.includes("strength.mjs"));
+  return Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
+    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && STRENGTH_RUN.test(step.run) && based(step.env, job.env, yaml.env))));
+}
+
 // Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the
 // strength check (core/modules/code-shape.md, "How strong the tests are is measured on the lines a pull request
 // changes").
@@ -101,7 +112,7 @@ function strengthNamed(p) {
   if (!tool) return `${row}. Until then the measure does not run, and nothing fails for it.`;
   if (tool.none !== undefined && !tool.none) return "The manifest's row *mutation tool* says `none` with no reason: add the reason after it (`none`: <why>).";
   if (tool.none !== undefined) return tool.none.startsWith("no tests yet") && testsStand(p) ? `The manifest's row *mutation tool* says \`none\`: no tests yet, as the starter kit wrote it, and the project has tests now: ${row.charAt(0).toLowerCase()}${row.slice(1)}.` : null;
-  if (Object.values(p.workflows).some(w => /core\/scripts\/strength\.mjs/u.test(w.text ?? ""))) return null;
+  if (strengthRuns(p)) return null;
   return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
 }
 

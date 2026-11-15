@@ -124,7 +124,7 @@ function run(test, cwd, limit) {
 }
 
 // A working copy of the project: a git worktree of HEAD, with the files that differ from it, staged or not, and the new
-// ones copied in.
+// ones copied in, and its installed dependencies linked.
 function copyOf(dir) {
   git(["worktree", "add", "--detach", "--quiet", dir, "HEAD"]);
   const differ = [...git(["diff", "-z", "--name-only", "--no-renames", "HEAD"]).split("\0"), ...git(["ls-files", "-z", "--others", "--exclude-standard"]).split("\0")].filter(Boolean);
@@ -133,6 +133,12 @@ function copyOf(dir) {
     if (!fs.existsSync(from) || fs.lstatSync(from).isSymbolicLink()) continue;
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
+  }
+  // (the dependencies a Node project installed, beside each package.json and ignored by git, reached from the copy by a
+  // link to them, a junction on Windows, so that a test that imports one runs there as it does in the project)
+  for (const manifest of git(["ls-files", "-z", "--", ":(glob)**/package.json"]).split("\0").filter(Boolean)) {
+    const installed = path.join(path.dirname(manifest), "node_modules"), to = path.join(dir, installed);
+    if (fs.existsSync(installed) && !fs.existsSync(to)) fs.symlinkSync(path.resolve(installed), to, "junction");
   }
   return dir;
 }
