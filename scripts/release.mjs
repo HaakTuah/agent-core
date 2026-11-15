@@ -8,7 +8,9 @@
 // --cut it says the same, and how such a copy takes it once it is cut. The owner tags nothing by hand: the release
 // workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands it the
 // commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has moved on
-// from that commit, or where a check on it has not passed. Git and Node's own modules only.
+// from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
+// beside this file), where one failed in its last run as that commit's record holds it. Git and Node's own modules
+// only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file>
@@ -23,6 +25,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -93,6 +96,16 @@ function after(flag, argv) {
   return argv[i + 1];
 }
 
+// Why the release `name` at `sha` is not cut, or null: the staged cases hold it (`staged`, from atRelease), or a check
+// on that commit has not passed, as the list of the runs there (`runs`, a file) says.
+function whyNot(name, sha, staged, runs) {
+  if (staged.held) return `${name} is not cut: ${staged.held}.`;
+  let list = null;
+  try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
+  const reasons = held(list);
+  return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
+}
+
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
   if (!inTheCore()) return fail("run it in the core's own repository: a project cuts no release");
@@ -113,11 +126,11 @@ function main(argv) {
       : asks.length
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
+    const staged = atRelease(sha, before, rev => inBare(dir, rev));
+    console.log(staged.said);
     if (!cut) { console.log(older(name, sha)); console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    let list = null;
-    try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
-    const reasons = held(list);
-    if (reasons.length) return fail(`${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}`);
+    const stop = whyNot(name, sha, staged, runs);
+    if (stop) return fail(stop);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);
     console.log(`${name} is cut.`);

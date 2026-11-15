@@ -114,7 +114,7 @@ ok(matters("modules/b.md", taking("all")) && matters("modules/b.md", "# Core man
 // a test, no file of the starter kit and no workflow but the core's own tests.yml, outside its comments)
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
-const runs = [...fs.readdirSync(path.join(repo, "scripts")).filter(f => !/-test\.mjs$/.test(f)).map(f => path.join(repo, "scripts", f)), ...walk(path.join(repo, "setup", "template")),
+const runs = [...walk(path.join(repo, "scripts")).filter(f => !/-test\.mjs$/.test(f)), ...walk(path.join(repo, "setup", "template")),
   ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => f !== "tests.yml").map(f => path.join(repo, ".github", "workflows", f))];
 const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
   .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);

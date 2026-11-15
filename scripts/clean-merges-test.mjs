@@ -152,7 +152,7 @@ ok(gits.passed && gits.out.includes("Merges from main that are the ones git make
   && gits.code.state === "success" && gits.code.description.includes("nothing but updates from main since"), "the workflow: a review of the commit before a merge git makes stands for the head, in both statuses", gits.out + JSON.stringify([gits.security, gits.code]));
 const own = check(2, OWN);
 ok(own.passed && own.out.includes("Merges from main that are the ones git makes: 0.") && own.security.state === "pending" && own.code.state === "pending"
-  && [own.security, own.code].every((s) => s.description.includes(`merge ${OWN.slice(0, 7)} is not the merge git makes`) && mended(s.description)),
+  && own.security.description.includes(`unproved merge ${OWN.slice(0, 7)}`) && own.code.description.includes(`merge ${OWN.slice(0, 7)} is not the merge git makes`) && [own.security, own.code].every((s) => mended(s.description)),
   "  and one before a merge with a change of its own waits, both statuses naming that merge and the mend", own.out + JSON.stringify([own.security, own.code]));
 
 console.log(`\n${count - failed} of ${count} passed`);
