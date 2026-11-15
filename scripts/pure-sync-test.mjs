@@ -85,6 +85,8 @@ const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
 ok(s.out.includes("a note for the test"), "  and prints the sync notes the core gained between the two pins", s.out);
+ok(/For the sync PR's description[\s\S]*Steps not done[\s\S]*security review shown on every pull request[\s\S]*Beside a fresh start[\s\S]*AGENTS\.md: missing/.test(s.out),
+  "  then, from the copy it wrote, every step not done, a standing one too, and every difference from a fresh start, for the PR's description", s.out);
 git(p, "add", "-A");
 git(p, "commit", "-q", "-m", "sync");
 const LEGIT = git(p, "rev-parse", "HEAD");

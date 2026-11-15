@@ -3,7 +3,8 @@
 // project that follows the releases (releases.mjs, beside this file) takes the core only from such a tag, so a release
 // is what the core's owner hands on to another owner's project, on purpose. Run in the core's own repository alone: in
 // a project's copy it refuses, since a project cuts no release. Without --cut it says what the release would be and
-// what it would ask of a project (the sync notes it carries), and cuts nothing. The owner tags nothing by hand: the
+// what it would ask of a project (the sync notes it carries, each with roughly what it costs a project where it is not
+// done yet: steps.mjs, beside this file), and cuts nothing. The owner tags nothing by hand: the
 // release workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands
 // it the commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has
 // moved on from that commit, or where a check on it has not passed. Git and Node's own modules only.
@@ -22,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { started } from "./started.mjs";
+import { STEPS } from "./steps.mjs";
 
 const git = (args, cwd) => execFileSync("git", args, { cwd, env: plainEnv(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
@@ -40,6 +42,12 @@ export function next(dir, at = null) {
   if (!RELEASE.test(name)) throw new Error(`${name} is no release's name: a tag numbered too high stands in the way, and is the owner's to remove`);
   return { name, sha: tip, before: before ?? null, asks: before ? asksBetween(before.sha, tip, dir) : [] };
 }
+
+// An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so.
+export const costed = entry => {
+  const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
+  return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps.mjs"}.`;
+};
 
 // This repository's own release workflow: its runs on a commit are no check of that commit.
 export const OWN = ".github/workflows/release.yml";
@@ -98,7 +106,7 @@ function main(argv) {
     console.log(asks === null
       ? `What it asks of a project beyond the copy could not be read: read ${NOTES} for the entries newer than ${before.name}.`
       : asks.length
-        ? `It asks more of a project than the copy (${NOTES}):\n${asks.join("\n")}`
+        ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
     let list = null;

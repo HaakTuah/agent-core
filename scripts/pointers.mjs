@@ -16,7 +16,7 @@
 // A run of these joined only by a comma, "and", "in", "of" or an opening bracket is one pointer: one file, its sections
 // and its points; a floor rule and an archive item stand alone. One of those two that leads nowhere fails the core's
 // own run, and is listed in a project's, so that a sync never fails a project's check over a citation of its own
-// (AGENTS.md of the core, "Nothing locks another owner's project").
+// (AGENTS.md of the core, "Nothing locks a project").
 //
 //   node core/scripts/pointers.mjs
 //
