@@ -82,6 +82,9 @@ jobs:
       - name: The stand-in's record
         if: ${{ !cancelled() }}
         run: node scripts/stand-in-record-test.mjs
+      - name: The count of what the reviews find
+        if: ${{ !cancelled() }}
+        run: node scripts/review-record-test.mjs
       - name: The stalled lanes
         if: ${{ !cancelled() }}
         run: node scripts/stalled-test.mjs

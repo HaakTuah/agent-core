@@ -18,10 +18,11 @@
 //
 //   node core/scripts/core-cost.mjs [--since YYYY-MM-DD] [--split YYYY-MM-DD] [--cost]
 import { execFileSync } from "node:child_process";
+import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
 const within = (file, dir) => file === dir || file.startsWith(`${dir}/`);
 
@@ -109,6 +110,12 @@ export function table(merged, groupOf) {
   return [...rows.values()].sort((a, b) => a.key < b.key ? -1 : 1);
 }
 
+// The rows of a table as text, the first column left and the rest right, each as wide as its widest cell.
+export function grid(lines) {
+  const width = lines[0].map((_, i) => Math.max(...lines.map(l => l[i].length)));
+  return lines.map(l => l.map((c, i) => i ? c.padStart(width[i]) : c.padEnd(width[i])).join("  ")).join("\n");
+}
+
 export function print(rows, cost) {
   const pct = (a, b) => b ? `${Math.round(100 * a / b)}%` : "-";
   const head = ["", "merged", "own", "sync", "upkeep", "update", "the core's share", "own lines"];
@@ -122,24 +129,30 @@ export function print(rows, cost) {
     }
     return row.map(String);
   })];
-  const width = head.map((_, i) => Math.max(...lines.map(l => l[i].length)));
-  return lines.map(l => l.map((c, i) => i ? c.padStart(width[i]) : c.padEnd(width[i])).join("  ")).join("\n");
+  return grid(lines);
 }
 
-function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
-  const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
-  const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
-  for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
-  let rules;
-  try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = ruleFiles(); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
-  const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
-  if (!ref) fail("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
-  const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
-  // (the repository, from GitHub's own variable or origin's address: whose branches are its own, and where --cost asks)
+// The repository this clone is of (GitHub's own variable, else origin's address), or null where it is not known.
+export function repoOf() {
   let repo = process.env.GITHUB_REPOSITORY;
   if (!repo) try { repo = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(git(["remote", "get-url", "origin"]).trim())?.[1]; } catch { /* (no origin) */ }
-  if (!REPO.test(repo ?? "")) repo = null;
+  return REPO.test(repo ?? "") ? repo : null;
+}
+
+// The project's rule files for `classify`: in the core's own repository every file is protected (its SECURITY.md, rule 3),
+// so every file is a rule file and its pull requests count as upkeep; anywhere else, the list its SECURITY.md gives
+// (`read`, rule-files.mjs).
+export const EVERY = { includes: () => true };
+export const rulesFor = (repo, read = ruleFiles) => (repo === CORE ? EVERY : read());
+
+// The pull requests merged into the default branch from `since` (a day, or none), as { number, when, kind, lines },
+// and the repository ({ repo, merged }): read from the clone the process runs in, whose root is its directory. It
+// throws where the clone knows no default branch. Without a repository no branch counts as Dependabot's, which it says.
+export function mergedPulls(rules, since = null) {
+  const ref = defaultRef(name => { try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); return true; } catch { return false; } });
+  if (!ref) throw new Error("the clone knows no default branch: neither origin's, nor a main of origin's or of its own");
+  const log = git(["log", "--first-parent", "--merges", "--format=%H%x09%cI%x09%s", ...(since ? [`--since=${since}T00:00:00Z`] : []), ref]);
+  const repo = repoOf();
   // (said, never passed over: without it no branch counts as Dependabot's, and its merges count by what they changed)
   if (!repo) console.error("note: the repository is not known (GITHUB_REPOSITORY, or origin's address), so no merge is counted as an update of Dependabot's");
   const owner = repo?.split("/")[0].toLowerCase();
@@ -159,6 +172,18 @@ function main(argv) {
     }
     merged.push({ number: Number(m[1]), when, kind, lines });
   }
+  return { repo, merged };
+}
+
+function main(argv) {
+  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+  const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
+  const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
+  for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
+  let rules;
+  try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = rulesFor(repoOf()); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
+  let repo, merged;
+  try { ({ repo, merged } = mergedPulls(rules, since)); } catch (e) { fail(e.message); }
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
 
   if (cost) {

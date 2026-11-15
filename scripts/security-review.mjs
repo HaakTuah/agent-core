@@ -54,14 +54,14 @@ import { readFileSync } from "node:fs";
 import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
 
-const CODEX = "chatgpt-codex-connector[bot]";
+export const CODEX = "chatgpt-codex-connector[bot]";
 const DEPENDABOT = "dependabot[bot]";
 // the first two lines of the summary Codex's app keeps: the second is its state, as JSON (GitHub's API gives its braces
 // as they are; one written as &#123; or &#125;, as a delivery may show it, is read as one too)
 const SUMMARY = /^<!-- codex-pull-request-review-summary -->\r?\n<!-- codex-review-state:v1 ([^\r\n]{1,4000}) -->\r?\n/u;
 export const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
 const POSTED = /^(?:\*\*)?Security review:/u;
-const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
+export const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
 // the words Codex's app writes for a review under way; any other (completed, none, or one not known) is none running,
 // so that a form nobody documents can never hold a pull request for good (scripts/code-review-wait.mjs reads them too)
@@ -69,7 +69,7 @@ export const RUNNING = ["running", "queued", "pending", "in_progress"];
 export const CONTEXT = "security-review";
 
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
-const codexs = (comment) => comment.user?.login === CODEX && comment.user.type === "Bot" && typeof comment.body === "string";
+export const codexs = (comment) => comment.user?.login === CODEX && comment.user.type === "Bot" && typeof comment.body === "string";
 const newest = (times) => times.reduce((latest, at) => (at > latest ? at : latest), -Infinity); // -Infinity: none
 
 // what the summary Codex's app keeps says of its reviews: { state, at, body }, the whole state, when the summary last
