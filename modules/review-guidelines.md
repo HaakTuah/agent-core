@@ -50,6 +50,11 @@ A finding, not blocking:
 - Blocking: a trim that fails this; and a raise with no "Leanness check:" comment in the PR giving that session's
   answer, save for growth a sync of the core brought.
 
+**A screen changed** (`modules/screens.md`; core archive 227):
+- Blocking: a pull request that changes a screen with no critique on it (point 18), or with no pictures of point 17.
+- A finding: a difference between the critique's answers to its first two questions and the builder's three lines
+  (point 16).
+
 **A rule file changed:**
 - Blocking: a rule that departs from the owner's archived words it cites.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in

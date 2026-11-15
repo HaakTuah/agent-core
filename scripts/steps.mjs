@@ -251,6 +251,7 @@ export const STEPS = [
     } },
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
     partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
+  { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

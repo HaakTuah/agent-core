@@ -291,14 +291,15 @@ const size = n => (n === true ? 0 : NUMBERS.reduce((s, k) => s + (n[k] ?? 0), 0)
 
 // The entries of `want` that nothing in `pool` covers: each claims one entry of the pool, the one of its own id where
 // its numbers are within that one's, else one of its kind and group that no entry of `want` stands under any more (what
-// was listed moved, under its name), the smallest that covers it. Both are Maps of id to numbers (or true).
-export function unclaimed(want, pool, marks = {}) {
+// was listed moved, under its name), the smallest that covers it. Both are Maps of id to numbers (or true). `groups`
+// gives an id's kind and group: another check that keeps a baseline in this form passes its own (screens.mjs).
+export function unclaimed(want, pool, marks = {}, groups = groupOf) {
   const free = new Map(pool), later = [], left = [];
   for (const [id, n] of want) { if (free.has(id) && within(n, free.get(id), marks)) free.delete(id); else later.push([id, n]); }
   for (const id of want.keys()) free.delete(id); // one that stands, and grew, lends its place to no other
   for (const [id, n] of later) {
-    const { kind, group } = groupOf(id);
-    const covers = ([other, listed]) => { const o = groupOf(other); return o.kind === kind && o.group === group && within(n, listed, marks); };
+    const { kind, group } = groups(id);
+    const covers = ([other, listed]) => { const o = groups(other); return o.kind === kind && o.group === group && within(n, listed, marks); };
     const fit = [...free].filter(covers).sort((a, b) => size(a[1]) - size(b[1]) || a[0].localeCompare(b[0]))[0];
     if (fit) free.delete(fit[0]); else left.push(id);
   }
