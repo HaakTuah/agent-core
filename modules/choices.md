@@ -1,12 +1,13 @@
 # Choices that are hard to undo
 
 Read before a session makes a choice that is hard to undo or advises the owner on one, and by the reader of a pass
-over the recorded choices (core archive 222).
+over the recorded choices (core archive 222 and 231).
 
 A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
 kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
 and tests on, apart from those the product ships for. Its record stands once, in the *choice records*, under a heading
-`## Choice: ` and what was chosen; `core/scripts/choices.mjs` lists them and says when their pass is due.
+`## Choice: ` and what was chosen; `core/scripts/choices.mjs` lists them, says when their pass is due, and reads each
+sign written in a measure.
 
 - **A choice that is hard to undo gets a record.** By default a choice is made on the best reading and noted in a line
   of the *report*, as any reading is. One that is hard to undo gets a record before it stands, written by the session
@@ -38,8 +39,20 @@ and tests on, apart from those the product ships for. Its record stands once, in
   that anything changes in the code: it is a record of what stands. Reason: a choice never written down cannot show
   when it stops paying off.
 - **What reopens a choice.** A recorded choice stands until one of two triggers:
-  - **its sign trips:** the session that runs the trial, the audit or the measure in which it shows tripped files the
-    suggestion below (#330 asks that the scheduled look read a sign written in a measure a check keeps);
+  - **its sign trips:** by default, the session that runs the trial, the audit or the measure in which it shows tripped
+    files the suggestion below. Where the sign is a measure a check already keeps, the session that writes the record
+    writes it a second time, on a line that opens `Trips when:`, each condition in backticks: a measure
+    `core/scripts/choices.mjs` lists (what the shape check reads: its files, functions and imports, the old breaches its
+    baseline lists and their share, the imports on a cycle, the files in no system), `>`, `>=`, `<` or `<=`, and a
+    number (`` `files > 150` ``). The trigger is such a condition that holds: the scheduled look reads it each day and
+    keeps the issue "A choice's measured sign to act on" open while it holds, and the session that takes that issue
+    writes the suggestion there and labels it `needs-owner` in place of `queued`. Where the owner keeps the choice, the
+    session that acts on the answer writes its sign anew, and the issue closes; it opens again as `queued` where a sign
+    trips anew, and goes back to `queued` where another choice's trips. A condition that names no measure keeps the
+    issue open too, until its line is mended. It does not mean that the look runs anything a records file says: that
+    file is no protected file, and the look's job holds a token that writes issues, so it compares numbers the shape
+    check already reads; nor that every sign is written so. Reason: a sign the look cannot read is caught only twice a
+    year, or when someone happens to measure it (#330);
   - **the pass twice a year:** the scheduled look keeps an issue open once the day on the records' line `Read whole:`
     is 182 days old, and a fresh reader goes through every record, reads its sign, and asks whether an option plainly
     better exists now (a new version, a tool that did not exist, a need that has gone), reading what it needs, on the
@@ -79,5 +92,6 @@ and tests on, apart from those the product ships for. Its record stands once, in
   stands is kept meanwhile. Reason: the owner wants these calls made well, without waiting on the owner.
 
 Held by: the starter kit, whose *choice records* ask for a new project's stack before its first code; the scheduled
-look, which keeps the pass's issue (`core/scripts/choices.mjs`); a staged case (#235), in which the common answer is
-the wrong one for a project's stated aims; and, for the rest, the reviews alone.
+look, which keeps the pass's issue and that of a sign written in a measure while it holds (`core/scripts/choices.mjs`,
+its test running both on a project made for it, and on the core's own records); a staged case (#256), in which the
+common answer is the wrong one for a project's stated aims; and, for the rest, the reviews alone.

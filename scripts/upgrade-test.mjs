@@ -23,7 +23,8 @@
 // taken out at random are reported, exactly those; then that a release changing only the core's own files (a test, its queue, a workflow no project calls) asks no
 // sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
-// queued, built and closed there passes every check on each pull request. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
+// queued, built and closed there passes every check on each pull request. And a copy older than the first release,
+// written by hand since no starter kit stood then, takes the release as the sync notes say (preRelease, below). It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.
@@ -164,7 +165,7 @@ const write = (dir, to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to))
 let runs = 0;
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
 // would run it on the commit `sha` (a pull request: the head, against `baseSha`). Each result: [file/job, result].
-function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, dry = false, only = null } = {}) {
+function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, dry = false, only = null, ownToo = false } = {}) {
   const repository = { default_branch: "main", private: p.isPrivate, full_name: p.repo };
   const pull = { number: 1, state: "open", draft: false, title, body, base: { sha: baseSha, ref: "main" }, head: { sha, ref: "change", repo: { full_name: p.repo } }, user: { login: p.owner } };
   const github = { event_name: event, repository: p.repo, actor: p.owner, server_url: "https://github.com", run_id: "1", token: "", sha,
@@ -205,6 +206,12 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       const changed = git(p.dir, "diff", "--name-only", `${baseSha}...${sha}`).split("\n").filter(Boolean);
       if (trigger.paths && !pathsLetThrough(trigger.paths, changed)) continue;
       if (trigger["paths-ignore"] && changed.every(f => pathsLetThrough(trigger["paths-ignore"], [f]))) continue;
+    }
+    // (a workflow of the project's own that calls none of the core's, run as GitHub would where asked: its steps run the
+    // project's copy of the core's scripts)
+    if (ownToo && Object.values(wf.jobs ?? {}).every(job => !String(job?.uses ?? "").toLowerCase().startsWith(`${CORE.toLowerCase()}/`))) {
+      for (const r of runWorkflow(git(p.dir, "show", `${sha}:.github/workflows/${file}`), { github, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${r.job}`, { ...r, own: true }]);
+      continue;
     }
     for (const [id, job] of Object.entries(wf.jobs ?? {})) {
       const call = new RegExp(`^${CORE.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
@@ -363,6 +370,35 @@ function upgrade(p, from, ownChanges, expect) {
   if (process.platform !== "win32") inboxCase(p);
 }
 
+// A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
+// `paths:` (what fresh.mjs lists as lacking where the call has none) starts no job on a pull request that changes
+// nothing NuGet reads by name, and one where a project file changed; and a project whose owner declines the check, in
+// the manifest's "Differences", is told no step about it and starts no job for it at all.
+function nugetInPrivate(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const wf = path.join(p.dir, ".github/workflows/nuget.yml"), manifest = path.join(p.dir, "core-manifest.md");
+  const fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
+  const commit = what => { git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", what); git(p.dir, "push", "-q", "origin", "main"); return git(p.dir, "rev-parse", "HEAD"); };
+  const pr = (from, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); const head = git(p.dir, "rev-parse", "HEAD"); git(p.dir, "checkout", "-q", "main"); return started(checks(p, "pull_request", head, { baseSha: from, dry: true })); };
+  const docs = dir => fs.appendFileSync(path.join(dir, "README.md"), "\nMore words.\n");
+  const projectFile = dir => fs.appendFileSync(path.join(dir, "src/App/App.csproj"), "<!-- a note -->\n");
+  const nuget = jobs => jobs.some(w => w.startsWith("nuget.yml/"));
+  const had = fs.readFileSync(wf, "utf8");
+  ok(/^on:\r?\n {2}pull_request:\r?\n\r?\n/m.test(had) ? /nuget\.yml: lacks [^\n]*paths:/.test(fresh()) : true, `${p.name}: where its call to the NuGet check has no paths, fresh.mjs lists the starter kit's as lacking`, fresh());
+  fs.writeFileSync(wf, had.replace(/^ {2}pull_request:\r?\n(?! {4}paths:)/m, on => `${on}${fs.readFileSync(path.join(theCore, "setup/template/workflows/nuget-paths.yml.tmpl"), "utf8")}`));
+  const kit = commit("the NuGet check where it can matter");
+  ok(!/nuget\.yml/.test(fresh()), `${p.name}: with the starter kit's paths, fresh.mjs lists nothing of its NuGet call`, fresh());
+  ok(!nuget(pr(kit, docs)), `${p.name}: a pull request that changes nothing NuGet reads by name starts no NuGet job`);
+  ok(nuget(pr(kit, projectFile)), `${p.name}: one that changes a project file starts it`);
+  const before = pr(kit, projectFile);
+  fs.rmSync(wf);
+  fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^## Differences\r?\nNone\.\r?\n/m, d => `${d.split(/\r?\n/)[0]}\n- "13 November 2026, the NuGet check" and ".github/workflows/nuget.yml": not taken, on the owner's word; the project's own build job restores with --locked-mode and runs core/scripts/nuget.mjs after it.\n`));
+  const declined = commit("the NuGet check declined");
+  const r = node(p.dir, "core/scripts/steps.mjs"), after = pr(declined, projectFile);
+  ok(r.out.includes("Every step a check reads is done") && !/nuget\.yml/.test(fresh()), `${p.name}: its owner declining the NuGet check in "Differences", no step and no difference is reported for it`, `${r.out}\n${fresh()}`);
+  ok(!nuget(after) && after.every(w => before.includes(w)), `${p.name}: and a pull request that changes a project file starts no NuGet job, and no job it did not start before`, after.join("\n"));
+}
+
 // The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo` (left out: gh gives no answer at
 // all), origin's address on github.com for the call alone.
 function inbox(p, repo) {
@@ -486,7 +522,7 @@ for (const tag of starts) {
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-
+  nugetInPrivate(dotnetProject);
 }
 
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
@@ -511,6 +547,97 @@ if (synced) {
   s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(`release-${n}`) && manifest().includes(third), `${p.name}: at the next release it syncs all the same, two releases on`, s.out);
 }
+
+// A copy older than the first release (#365, #366): no starter kit stood before release-1, so the project is written by
+// hand, as one took the core then: core/ at a commit before release-1, its manifest, calls to the core's workflows
+// pinned there, and a workflow of its own that runs the copies, licence, pointer and reading-size scripts with configs
+// at paths of its own, which its manifest's slots name, a comment naming the licence script before them. Its own old
+// sync script, run with no SHA, takes the core's newest main, which no release holds, and pure-sync.mjs says so; with
+// the release's full SHA the sync is pure, every check passes, its own workflow's too, no job starts that did not
+// before, and steps.mjs and fresh.mjs name the project's own configs. Once as Linux holds it, once as Windows does.
+const PRE = "2532c6b"; // (12 November 2026: its sync.mjs takes main and knows no release; no core-moved.mjs)
+function preRelease(name, { windows }) {
+  const eol = windows ? "\r\n" : "\n";
+  const pre = git(theCore, "rev-parse", `${PRE}^{commit}`);
+  const dir = path.join(tmp, name), origin = path.join(tmp, `${name}.git`);
+  git(tmp, "init", "-q", "--bare", "-b", "main", origin);
+  fs.mkdirSync(dir);
+  git(dir, "init", "-q", "-b", "main");
+  if (windows) { git(dir, "config", "core.fileMode", "false"); git(dir, "config", "core.autocrlf", "true"); }
+  git(dir, "remote", "add", "origin", origin);
+  fs.mkdirSync(path.join(dir, "core"));
+  // (a relative folder, as the old sync script gives it: the tar Windows' runners find reads a drive's colon as a host)
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", pre], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  const lines = (...l) => `${l.join(eol)}${eol}`;
+  const at = () => `${CORE}/.github/workflows`;
+  write(dir, "core-manifest.md", lines("# Core manifest", "", `Core: ${CORE} at ${pre}, copied whole under core/ (never edited here).`,
+    "Paths: in the core's files, one into floor/, modules/, scripts/, setup/, archive/ or reports/ is under core/; any other is ours.", "Floor: whole. Modules: all.", "",
+    "## Names", "", "## Slots", "| Slot | Here |", "| --- | --- |", "| *owner's account* | `someone-else` |",
+    "| *copies check* | `core/scripts/copies.mjs` with `config/copies.json` |", "| *size marks* | `config/sizes.json` |"));
+  write(dir, "AGENTS.md", lines(`# ${name}`, "", "Read `core-manifest.md` and `SECURITY.md` at the start of every task."));
+  write(dir, "SECURITY.md", lines("# Security", "", "3. The protected files.", "   - **the rule files:** `AGENTS.md`;"));
+  write(dir, "README.md", lines(`# ${name}`));
+  write(dir, "config/copies.json", lines(JSON.stringify({ baseline: "config/copies-baseline.json", code: [], prose: ["README.md"], proseFromSecurity: true })));
+  write(dir, "config/licences.json", lines(JSON.stringify({ lockfiles: [], ships: [], audit: "config/licences-audit.json" })));
+  write(dir, "config/licences-audit.json", lines(JSON.stringify({ entries: [] })));
+  write(dir, "config/sizes.json", lines(JSON.stringify({ each: 20480, read: { "AGENTS.md": 20480, "core-manifest.md": 20480, "core/floor/security.md": 20480 }, total: 81920, split: 51200 })));
+  write(dir, ".github/workflows/checks.yml", lines("name: checks", "", "on:", "  pull_request:", "", "jobs:", "  checks:", "    runs-on: ubuntu-latest", "    steps:",
+    "      - uses: actions/checkout@0000000000000000000000000000000000000000", "      # core/scripts/licences.mjs reads the config below",
+    "      - run: |", "          # core/scripts/licences.mjs takes its config first", "          node core/scripts/copies.mjs config/copies.json", "          node core/scripts/licences.mjs config/licences.json",
+    "      - run: node core/scripts/pointers.mjs", "      - run: node core/scripts/reading-size.mjs config/sizes.json"));
+  write(dir, ".github/workflows/core.yml", lines("name: core", "", "on:", "  pull_request:", "", "jobs:", "  core:", `    uses: ${at()}/core.yml@${pre}`,
+    "  personal-terms:", `    uses: ${at()}/personal-terms.yml@${pre}`, "    secrets:", "      PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}", "  description:", `    uses: ${at()}/pr-description.yml@${pre}`));
+  git(dir, "add", "-A");
+  const first = node(dir, "core/scripts/copies.mjs", "config/copies.json", "--first");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "the project, its copy of the core older than the first release");
+  git(dir, "push", "-q", "origin", "main");
+  ok(first.status === 0 && !fs.existsSync(path.join(dir, "core/scripts/core-moved.mjs")), `${name}: written by hand at ${PRE}, its copies baseline by its own copy of the check, and no core-moved.mjs`, first.out);
+  const p = { name, dir, owner: "someone-else", isPrivate: true, repo: `someone-else/${name}` };
+  const main0 = git(dir, "rev-parse", "HEAD");
+  const docs = from => { git(dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(dir, "README.md"), `${eol}More words.${eol}`); git(dir, "commit", "-q", "-am", "a change of its own"); return git(dir, "rev-parse", "HEAD"); };
+  const before = started(checks(p, "pull_request", docs(main0), { baseSha: main0, dry: true }));
+
+  // its own old sync script, run as its rules say, with no SHA: the core's newest main, which no release holds
+  git(theCore, "commit", "-q", "--allow-empty", "-m", "a commit of main past the newest release");
+  git(dir, "checkout", "-q", "-B", "sync", main0);
+  let s = node(dir, "core/scripts/sync.mjs");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "Sync the core");
+  let pure = node(dir, path.join(theCore, "scripts", "pure-sync.mjs"));
+  ok(s.status === 0 && fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").includes(git(theCore, "rev-parse", "HEAD")) && pure.status === 1 && /is no release of the core/.test(pure.out),
+    `${name}: its own old sync script, with no SHA, takes the core's main, a commit no release holds, and pure-sync.mjs refuses it`, `${s.out}\n${pure.out}`);
+
+  // with the release's full SHA, as the top of the sync notes says
+  git(dir, "checkout", "-q", "-B", "sync", main0);
+  s = node(dir, "core/scripts/sync.mjs", head);
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
+  git(dir, "push", "-q", "-f", "origin", "sync");
+  const syncHead = git(dir, "rev-parse", "HEAD");
+  pure = node(dir, path.join(theCore, "scripts", "pure-sync.mjs"));
+  ok(s.status === 0 && pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${name}: with the release's full SHA its own old sync script makes a pure sync to ${carrying}`, `${s.out}\n${pure.out}`);
+  const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}`, ownToo: true });
+  ok(!failures(onSync) && onSync.some(([w, r]) => w.startsWith("checks.yml/") && r.ran), `${name}: every check passes on the sync's pull request, its own workflow's scripts from the new copy too (${started(onSync).length} jobs)`, failures(onSync));
+  git(dir, "checkout", "-q", "main");
+  git(dir, "merge", "-q", "--no-ff", "-m", "Merge the sync", "sync");
+  git(dir, "push", "-q", "origin", "main");
+  const main1 = git(dir, "rev-parse", "HEAD");
+  const after = checks(p, "pull_request", docs(main1), { baseSha: main1, ownToo: true });
+  const more = started(after).filter(w => !before.includes(w));
+  ok(!failures(after) && !more.length, `${name}: a pull request of its own passes after the sync and starts no job it did not start before (${started(after).length} now, ${before.length} before)`, `${failures(after)}\n${more.join("\n")}`);
+
+  // the steps and the differences name the configs where the project holds them, and read no comment as a run
+  git(dir, "checkout", "-q", "main");
+  const steps = node(dir, "core/scripts/steps.mjs"), fresh = node(dir, "core/scripts/fresh.mjs");
+  const tools = steps.out.split("\n").find(l => l.startsWith("- 16 November 2026, an agent's own tools listed:")) ?? "";
+  ok(steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),
+    `${name}: steps.mjs names the licence config the project's own workflow passes, never a comment's word or the starter kit's path`, steps.out);
+  ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
+    `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);
+}
+preRelease("a-project-older-than-release-1", { windows: false });
+preRelease("a-windows-project-older-than-release-1", { windows: true });
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: a project of each of the last two releases, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;

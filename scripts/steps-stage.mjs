@@ -133,6 +133,22 @@ export const STAGES = {
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
+  "16 November 2026, the NuGet check where it can matter": {
+    // (a project file that imports a build file of another name than those the call's paths name)
+    stage: dir => {
+      const call = fs.existsSync(at(dir, ".github/workflows/nuget.yml")) ? read(dir, ".github/workflows/nuget.yml") : NUGET;
+      write(dir, ".github/workflows/nuget.yml", /^ {4}paths:/m.test(call) ? call : call.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${read(fileURLToPath(new URL("..", import.meta.url)), "setup/template/workflows/nuget-paths.yml.tmpl")}`));
+      write(dir, "staged-import/Imports.csproj", '<Project Sdk="Microsoft.NET.Sdk">\n  <Import Project="deps.xml" />\n</Project>\n');
+      write(dir, "staged-import/deps.xml", "<Project>\n</Project>\n");
+      write(dir, "staged-import/packages.lock.json", "{\n  \"version\": 1,\n  \"dependencies\": {}\n}\n");
+      const config = JSON.parse(read(dir, "checks/licences.json"));
+      config.nuget ??= { ships: [], tools: [] };
+      config.nuget.ships = [...(config.nuget.ships ?? []), "staged-import/packages.lock.json"];
+      write(dir, "checks/licences.json", `${JSON.stringify(config, null, 2)}\n`);
+    },
+    // (as the step words it: the file added to the paths, by its exact path)
+    mend: dir => write(dir, ".github/workflows/nuget.yml", read(dir, ".github/workflows/nuget.yml").replace(/^( {4}paths:\r?\n)/m, "$1      - 'staged-import/deps.xml'\n")),
+  },
   // (last, so that its mend, which lists the files that hold only calls to the core's workflows, sees every such file
   // the other stages and mends write)
   "12 November 2026, a sync and the project's own suites": {

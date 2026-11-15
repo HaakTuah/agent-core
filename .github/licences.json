@@ -8,7 +8,9 @@
       "scripts/licence-commands.mjs",
       "scripts/licence-scan-stage.mjs",
       "scripts/licence-scan-test.mjs",
-      "scripts/licence-fetch-test.mjs"
+      "scripts/licence-fetch-test.mjs",
+      "scripts/agent-tools.mjs",
+      "scripts/agent-tools-test.mjs"
     ]
   },
   "agentTools": [

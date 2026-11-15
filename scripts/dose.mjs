@@ -118,8 +118,9 @@ function shareGot(config, at, root) {
 }
 
 // The project at `root` as the dose reads it: null where it has no config of the shape check yet; else its config,
-// what the baseline lists, what the check reads, the state and the last audit. It throws where the config or the
-// baseline cannot be read, with the mend the shape check gives.
+// what the baseline lists, what the check reads (`found`, the survey's own: its counts and what stands today), the state
+// and the last audit. It throws where the config or the baseline cannot be read, with the mend the shape check gives.
+// The measures a choice's sign may name are read from it (choices.mjs, MEASURES).
 export function reading(rules, root = ".") {
   const at = where(rules);
   if (!fs.existsSync(notLinked(at, root))) return null;
@@ -127,7 +128,7 @@ export function reading(rules, root = ".") {
   const baseline = parseBaseline(fs.readFileSync(notLinked(config.baseline, root), "utf8"), config.baseline, "run the shape check, which says how");
   const now = standing(config, root), found = survey(now.texts, config, now.tests);
   const counts = { listed: baseline.listed.size, read: found.read.functions + found.read.imports };
-  return { at, config, baseline, ...counts, state: stateOf(counts, named(rules)), named: named(rules) };
+  return { at, config, baseline, found, ...counts, state: stateOf(counts, named(rules)), named: named(rules) };
 }
 
 const percent = (n, of) => `${of > 0 ? Math.round(1000 * n / of) / 10 : 0}%`;
