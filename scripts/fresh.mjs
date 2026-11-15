@@ -26,7 +26,7 @@ import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { call as callOf, plain, project } from "./steps.mjs";
+import { KIT_CONFIGS, call as callOf, configs, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
@@ -119,18 +119,20 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const gone = new Set(FILES.filter(([t]) => lacking.has(t)).map(([, to]) => to));
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
     // (the choice records at the path the manifest names for them)
-    const kit = built.filter(([to]) => !gone.has(to))
-      .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
+    // (the checks' configs at the paths the project holds them, as its workflows and manifest name them: configs, in
+    // steps.mjs. One a workflow names only when it runs is compared nowhere here: steps.mjs reports it not read)
+    let at = null;
+    try { at = configs(p); } catch { /* (left out, below) */ }
+    const moved = { [KIT_CONFIGS.copies]: at?.copies, [KIT_CONFIGS.audit]: at?.audit };
+    const kit = built.filter(([to]) => !gone.has(to) && (at || !(to in moved)))
+      .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : moved[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
     const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
-    let copies = null;
-    try { copies = JSON.parse(p.read("checks/copies.json") ?? "null"); } catch { /* (the kit's path, below) */ }
-    const licenceAt = call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
-    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })]];
+    return [...kit, [slot, json(marks)], ...(at ? [[at.licences, json(licences(o, () => false))], [at.baseline, json({ windows: {} })]] : [])];
   } catch (e) {
     if (!older) throw e;
     return [];
