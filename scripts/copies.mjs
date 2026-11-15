@@ -3,8 +3,9 @@
 // places, unless the baseline lists every window of it (a run of lines or words) in as many places, as one of the old
 // copies, which are removed over time and never added to. A listed window gone or in fewer places fails too, so the
 // baseline only shrinks. A copy may move (cut from one place, pasted in another), since its places do not grow: moving
-// is how a fact reaches its better home. Node's own modules only, so the check needs no install. It runs from the
-// project's root, whatever the directory it is started from.
+// is how a fact reaches its better home. It also lists the near-copies, the runs of code that match once names and
+// numbers are set aside, and fails none of them. Node's own modules only, so the check needs no install. It runs from
+// the project's root, whatever the directory it is started from.
 //
 //   node core/scripts/copies.mjs <config>            the check
 //   node core/scripts/copies.mjs <config> --write    lower the baseline to what still stands (it never adds a copy)
@@ -154,6 +155,28 @@ if (from) {
   const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => !(h in old) || n > old[h]) : [];
   if (raised.length) { console.error(`FAIL: ${BASELINE} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
+}
+// Near-copies (modules/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
+// numbers are set aside, and are no exact copy. Reported, never failed: code that only looks alike is no second copy
+// of a fact, and whether one function should serve both is a reader's call, the audit's.
+const KEPT = new Set(("if else for while do switch case default break continue return function class const let var new try catch finally throw import export from async await yield typeof "
+  + "instanceof in of void delete this super extends static public private protected readonly interface type enum namespace def elif pass lambda with as and or not is using struct foreach true false null").split(" "));
+const skeleton = line => line.replace(/\b\d[\w.]*/g, "0").replace(/[A-Za-z_$][\w$]*/g, w => (KEPT.has(w) ? w : "N"));
+const NEAR_CHARS = 120;
+function nearCopies() {
+  const lines = new Map();
+  const exact = place => {
+    const [, file, from, to] = /^(.*):(\d+)-(\d+)$/.exec(place);
+    if (!lines.has(file)) lines.set(file, fs.readFileSync(file, "utf8").split("\n"));
+    return codeUnits(lines.get(file).slice(from - 1, to).join("\n")).map(u => u.t).join("\n");
+  };
+  return find(ls(CODE_SPECS), text => codeUnits(text).map(u => ({ ...u, t: skeleton(u.t) })), LINES, "\n", NEAR_CHARS).copies.filter(c => new Set(c.places.map(exact)).size > 1);
+}
+if (!process.argv.includes("--write")) {
+  const near = nearCopies();
+  if (near.length) console.log(`note ${near.length} ${near.length === 1 ? "run of code matches another" : "runs of code match others"} once names and numbers are set aside (reported, never failed: the audit's reader judges whether one function should serve both)`);
+  for (const c of near.slice(0, 10)) console.log(`  ${c.places.join(" and ")}`);
+  if (near.length > 10) console.log(`  and ${near.length - 10} more`);
 }
 const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 const fresh = found.filter(c => c.windows.some(over));
