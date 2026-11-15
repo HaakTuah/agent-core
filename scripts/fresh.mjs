@@ -10,7 +10,7 @@
 // Each difference is one the manifest's "Differences" declares on purpose, on the owner's word, by a line that quotes
 // the file's path ("AGENTS.md"), so that file is not compared, or a task the project's agents take. The kind is read
 // from the project: its owner and name from the manifest and AGENTS.md, npm and NuGet from its calls to the core's
-// signature and NuGet checks, a private repository from its having neither the CodeQL nor the licence workflow, a game
+// signature and NuGet checks and from a lock file or a project file of its own, a private repository from its having neither the CodeQL nor the licence workflow, a game
 // from "Modules: all". Given earlier kits (the sync gives the kit of the project's old pin and of every release of the
 // core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
 // has left. It reads only and fails nothing. Node's own modules and git only.
@@ -33,9 +33,16 @@ const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the projec
 export function kind(p) {
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(p.manifest)?.[1] ?? "0".repeat(40);
   const o = { owner: ownerOf(p.manifest) ?? "the-owner", name: /^# (.+)$/m.exec(p.read("AGENTS.md") ?? "")?.[1]?.trim() ?? path.basename(p.root) };
-  const folder = call(p, "signatures.yml")?.with?.directory;
+  // (npm and NuGet from what the project holds, a lock file or a project file of its own, as well as from its calls to
+  // the core's checks: a project that lost such a call still shows as one that needs it)
+  const own = p.files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules"));
+  const shallowest = re => own.filter(f => re.test(f)).sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0];
+  const folderOf = f => path.posix.dirname(f);
+  const lock = shallowest(/(^|\/)package-lock\.json$/);
+  const folder = call(p, "signatures.yml")?.with?.directory ?? (lock && folderOf(lock));
   if (folder !== undefined) o.packages = String(folder).replace(/\/+$/, "") || ".";
-  if (call(p, "nuget.yml")) o.nuget = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "")?.[1]?.replace(/\/+$/, "") || ".";
+  const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/);
+  if (call(p, "nuget.yml") || built) o.nuget = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "")?.[1]?.replace(/\/+$/, "") || (built ? folderOf(built) : ".");
   if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;
   if (/^Floor: whole\. Modules: all\.$/m.test(p.manifest)) o.game = true;
   return { o, pin };
@@ -47,7 +54,8 @@ const firstCell = row => /^\|([^|]*)\|/.exec(row)?.[1]?.trim();
 const short = t => `${t.slice(0, 70)}${t.length > 70 ? "…" : ""}`;
 
 // What a file holds, as the comparison reads it: of Markdown, its tables' rows by their first cell and its prose with
-// the spacing made one; of JSON, its keys; of anything else, its lines. `has` asks whether a unit of another such file
+// the spacing made one; of a check's config (under checks/), its keys, since their values are the project's to fill;
+// of anything else, the hooks' settings included, its lines, each with its spacing and a comma after it left out. `has` asks whether a unit of another such file
 // stands in this one; `units` are this one's own, a paragraph the kit leaves to the project (FILL IN) left out.
 function readAs(to, text) {
   const t = text.replace(/\r\n/g, "\n");
@@ -57,12 +65,12 @@ function readAs(to, text) {
     const paras = t.split(/\n\s*\n/).filter(b => b.trim() && !b.includes("FILL IN")).map(b => oneSpace(pinsAsOne(b.split("\n").filter(l => !l.startsWith("|")).join("\n")))).filter(Boolean);
     return { units: [...[...rows].map(r => ({ row: r })), ...paras.map(para => ({ para }))], has: u => u.row !== undefined ? rows.has(u.row) : prose.includes(u.para) };
   }
-  if (/\.json$/.test(to)) {
+  if (/^checks\/.*\.json$/.test(to)) {
     let keys = null;
     try { keys = Object.keys(JSON.parse(t)); } catch { /* (read below as holding nothing) */ }
     return { units: (keys ?? []).map(key => ({ key })), has: u => !!keys?.includes(u.key), unread: keys === null };
   }
-  const lines = new Set(t.split("\n").map(l => pinsAsOne(l).trim()));
+  const lines = new Set(t.split("\n").map(l => pinsAsOne(l).trim().replace(/,$/, "")));
   return { units: [...lines].filter(l => l && !l.startsWith("#") && !l.includes("FILL IN")).map(line => ({ line })), has: u => lines.has(u.line) };
 }
 const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undefined ? `the paragraph "${short(u.para)}"` : u.key !== undefined ? `the key "${u.key}"` : `the line "${short(u.line)}"`;

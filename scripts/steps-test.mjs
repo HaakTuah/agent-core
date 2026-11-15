@@ -109,6 +109,15 @@ declare(game, '"AGENTS.md": its own way of starting a task, on the owner\'s word
 found = differences(project(game), fresh(project(game)));
 ok(found.length === 3 && !found.some(d => d.startsWith("AGENTS.md:")), "a file the manifest's \"Differences\" quotes is not compared", found.join("\n"));
 
+// ---- a project that lost its hooks' settings or its signature check: listed, however little of it is left ----
+const bare = kit("a-bare-npm-project", { packages: "." });
+fs.writeFileSync(path.join(bare, "package-lock.json"), "{}\n");
+fs.writeFileSync(path.join(bare, ".claude/settings.json"), '{"permissions": {}, "hooks": {}}\n');
+fs.rmSync(path.join(bare, ".github/workflows/signatures.yml"));
+found = differences(project(bare), fresh(project(bare)));
+ok(found.some(d => d.startsWith(".claude/settings.json: lacks") && d.includes("Edit(//**/.git/**)")) && found.includes(".github/workflows/signatures.yml: missing (the starter kit writes it today)"),
+  "hooks' settings emptied, and a signature check lost from an npm project, are listed (its packages read from its lock file too)", found.join("\n"));
+
 // ---- the wording an earlier kit wrote and the kit has left: listed where the project still holds it ----
 const older = path.join(tmp, "older", "setup", "template");
 fs.cpSync(path.join(root, TEMPLATES), older, { recursive: true });
