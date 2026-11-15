@@ -59,8 +59,9 @@ const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u20
 export function configured(read, skills) {
   // (each tool's name, as the list writes it, and what it is: for a hook its event, matcher and the whole hook, its type,
   // command, timeout and all, which is what the kit's hooks and the base's are compared by)
-  const tools = new Map(), ids = new Map(), shapes = new Map(), clashed = new Set(), problems = [];
+  const tools = new Map(), ids = new Map(), problems = [];
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
+  const state = { tools, problems, add, shapes: new Map(), clashed: new Set() };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -68,47 +69,60 @@ export function configured(read, skills) {
     problems.push(`${file} cannot be read as a JSON object. Mend: correct it to JSON, as the tool that reads it takes it`);
     return null;
   };
-  // (the marketplaces the project declares, each by its name with its source and file; settings.local.json's above
-  // settings.json's, as Claude Code reads them)
   const markets = new Map(), plugins = [];
   for (const file of [".claude/settings.json", ".claude/settings.local.json"]) {
     const settings = json(file);
-    const declared = settings?.extraKnownMarketplaces;
-    if (declared && typeof declared === "object" && !Array.isArray(declared))
-      for (const [name, m] of Object.entries(declared)) markets.set(name, { source: m?.source, file });
-    for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
-      for (const group of Array.isArray(groups) ? groups : []) {
-        const matcher = typeof group?.matcher === "string" && group.matcher ? ` ${group.matcher}` : "";
-        // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let
-        // two hooks share a name)
-        if (matcher.includes(": ")) problems.push(`${file}: the ${show(event)} hooks' matcher ${show(group.matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
-        for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
-          const runs = hook?.type === "command" && typeof hook.command === "string";
-          const name = `hook ${event}${matcher}: ${runs ? hook.command : JSON.stringify(hook)}`;
-          const id = canonical(["hook", event, group.matcher ?? "", hook]);
-          // (a command and a hook of another type whose text reads as that command share a name, and the list could not
-          // tell them apart; two command hooks of one command, a timeout apart, are one name for the list, each kept)
-          const kinds = shapes.get(name) ?? new Set();
-          kinds.add(runs);
-          if (kinds.size > 1 && !clashed.has(name)) { clashed.add(name); problems.push(`${file}: a command and a hook of another type share the name ${show(name.slice(5))}. Mend: give the one a command of its own, or take one out`); }
-          shapes.set(name, kinds);
-          add(name, id);
-          tools.set(name, file);
-        }
-      }
-    }
+    declaredMarkets(settings, file, markets);
+    readHooks(state, file, settings);
     for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); add(`plugin ${name}`, `plugin ${name}`); plugins.push(name); }
   }
+  const servers = json(".mcp.json")?.mcpServers ?? {};
+  for (const name of Object.keys(servers)) { tools.set(`server ${name}`, ".mcp.json"); add(`server ${name}`, `server ${name}`); }
+  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
+  return { tools, ids, problems, pins: pinsOf(plugins, markets, servers) };
+}
+
+// The marketplaces one settings file declares, each by its name with its source and file, into `markets`: read
+// settings.json then settings.local.json, so the second's stand above the first's, as Claude Code reads them.
+function declaredMarkets(settings, file, markets) {
+  const declared = settings?.extraKnownMarketplaces;
+  if (!declared || typeof declared !== "object" || Array.isArray(declared)) return;
+  for (const [name, m] of Object.entries(declared)) markets.set(name, { source: m?.source, file });
+}
+
+// The hooks one settings file configures, into configured()'s `state`.
+function readHooks(state, file, settings) {
+  for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const matcher = typeof group?.matcher === "string" && group.matcher ? ` ${group.matcher}` : "";
+      // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let
+      // two hooks share a name)
+      if (matcher.includes(": ")) state.problems.push(`${file}: the ${show(event)} hooks' matcher ${show(group.matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
+      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) addHook(state, file, event, group, matcher, hook);
+    }
+  }
+}
+function addHook(state, file, event, group, matcher, hook) {
+  const runs = hook?.type === "command" && typeof hook.command === "string";
+  const name = `hook ${event}${matcher}: ${runs ? hook.command : JSON.stringify(hook)}`;
+  const id = canonical(["hook", event, group.matcher ?? "", hook]);
+  // (a command and a hook of another type whose text reads as that command share a name, and the list could not tell
+  // them apart; two command hooks of one command, a timeout apart, are one name for the list, each kept)
+  const kinds = state.shapes.get(name) ?? new Set();
+  kinds.add(runs);
+  if (kinds.size > 1 && !state.clashed.has(name)) { state.clashed.add(name); state.problems.push(`${file}: a command and a hook of another type share the name ${show(name.slice(5))}. Mend: give the one a command of its own, or take one out`); }
+  state.shapes.set(name, kinds);
+  state.add(name, id);
+  state.tools.set(name, file);
+}
+
+// The pins of the plug-ins turned on and the tool servers, by their "kind name" keys, where their configuration gives
+// one (pluginPin() and serverPin(), below).
+function pinsOf(plugins, markets, servers) {
   const pins = new Map();
   for (const name of plugins) { const p = pluginPin(name, markets); if (p) pins.set(`plugin ${name}`, p); }
-  const servers = json(".mcp.json")?.mcpServers ?? {};
-  for (const name of Object.keys(servers)) {
-    tools.set(`server ${name}`, ".mcp.json"); add(`server ${name}`, `server ${name}`);
-    const p = serverPin(name, servers[name]);
-    if (p) pins.set(`server ${name}`, p);
-  }
-  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
-  return { tools, ids, problems, pins };
+  for (const name of Object.keys(servers)) { const p = serverPin(name, servers[name]); if (p) pins.set(`server ${name}`, p); }
+  return pins;
 }
 
 // What a plug-in's or tool server's own configuration fixes it at: { pin, where } where it names one exact version or a
@@ -151,27 +165,36 @@ function pluginPin(name, markets) {
 // (npx's own options, read before the package it runs; one it does not know here leaves the server to the review)
 const NPX_FLAGS = new Set(["-y", "--yes", "-q", "--quiet"]);
 function serverPin(name, server) {
+  const args = npxArgs(server);
+  if (!args) return null;
+  const spec = npxPackage(args);
+  if (spec === null) return null;
+  return npmPin(spec, undefined, `.mcp.json, in the arguments of ${show(name)},`, pkg => `in those arguments as "${pkg}@" and one exact version, such as ${pkg}@1.2.3`, server);
+}
+// The arguments npx is given, where a stdio server is started by npx, as on Windows through cmd /c too; else null.
+function npxArgs(server) {
   if (!server || typeof server !== "object" || (server.type ?? "stdio") !== "stdio" || typeof server.command !== "string") return null;
   const program = text => String(text).replace(/\\/gu, "/").split("/").pop().toLowerCase().replace(/\.(?:cmd|exe)$/u, "");
   let args = Array.isArray(server.args) ? server.args : [];
   let command = program(server.command);
   if (command === "cmd" && /^\/c$/iu.test(args[0] ?? "")) { command = program(args[1] ?? ""); args = args.slice(2); }
-  if (command !== "npx" || !args.every(a => typeof a === "string")) return null;
-  let spec = null, i = 0;
+  return command === "npx" && args.every(a => typeof a === "string") ? args : null;
+}
+// The package npx runs, from its arguments: the one its -p or --package names, else the first after its own options;
+// null where it is given two, or an option not read here (the review's).
+function npxPackage(args) {
+  let spec, i = 0;
   for (; i < args.length; i++) {
     const a = args[i];
     if (NPX_FLAGS.has(a)) continue;
-    if (a === "-p" || a === "--package" || a.startsWith("--package=")) {
-      if (spec !== null) return null; // (two packages: the review's)
-      spec = a.startsWith("--package=") ? a.slice(10) : args[++i];
-      continue;
-    }
+    const named = a === "-p" || a === "--package" || a.startsWith("--package=");
+    if (named && spec !== undefined) return null;
+    if (named) { spec = a.startsWith("--package=") ? a.slice(10) : args[++i]; continue; }
     if (a === "--") i++;
     else if (a.startsWith("-")) return null;
     break;
   }
-  spec ??= args[i];
-  return npmPin(spec, undefined, `.mcp.json, in the arguments of ${show(name)},`, pkg => `in those arguments as "${pkg}@" and one exact version, such as ${pkg}@1.2.3`, server);
+  return spec ?? args[i];
 }
 
 // The hooks the starter kit writes, each by what it is (configured()'s ids): the core's, listed by it. `text` is the
@@ -293,6 +316,40 @@ function linkAt(root, rev, at) {
   try { return execFileSync("git", ["ls-tree", rev, "--", at], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).startsWith("120000 "); } catch { return false; }
 }
 
+// The config as the base held it, parsed, or null where it held none as a JSON object.
+function configAtBase(root, base, file) {
+  if (!base) return null;
+  try {
+    const held = JSON.parse(textAt(root, base, path.relative(root, path.resolve(root, file)).split(path.sep).join("/")) ?? "null");
+    return held && typeof held === "object" && !Array.isArray(held) ? held : null;
+  } catch { return null; }
+}
+
+// Each pin breach into `fail` or `notes`: one the base held as it stands, the tool's whole configuration (its source or
+// package, not only its pin) and its entry both unchanged, is noted, and so is each where there is no base, as on a
+// push; in the core's own repository none may stand. A list written for the first time is held to an exact pin at once,
+// its entry being the pull request's own text, while a tool its base fetched at no fixed version is noted.
+function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes) {
+  for (const [k, problem] of pins) {
+    const entry = baseList ? baseList.versions.get(k) === list.versions.get(k) : !head.pins.get(k).pin;
+    const same = baseProject && canonical(baseProject.pins.get(k) ?? null) === canonical(head.pins.get(k)) && entry;
+    if (core || (baseProject && !same)) fail.push(problem);
+    else notes.push(`${baseProject ? "as the base held it" : "with no base to read against"}, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
+  }
+}
+
+// Each link out of the checkout into `fail`, save one the base held as it stands, into `notes`: what stood before turns
+// nothing red.
+function sortLinks(root, base, links, fail, notes) {
+  for (const at of links) {
+    let to = null;
+    try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
+    const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
+  }
+}
+
 // The whole check, from the project's root: { fail, notes }.
 export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   let config;
@@ -302,36 +359,19 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const head = readProject(root);
   const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
   let list = listed(config, file);
-  let baseConfig = null;
-  if (base) try { baseConfig = JSON.parse(textAt(root, base, path.relative(root, path.resolve(root, file)).split(path.sep).join("/")) ?? "null"); } catch { /* (none) */ }
+  const baseConfig = configAtBase(root, base, file);
   // (a list the base held is no longer missing: taking it out does not bring back the time before it was written)
   if (!list && base) {
-    if (baseConfig && typeof baseConfig === "object" && Object.hasOwn(baseConfig, "agentTools")) {
+    if (baseConfig && Object.hasOwn(baseConfig, "agentTools")) {
       return { fail: [`${file}: "agentTools" is gone, which the base held. Mend: put the list back as the base held it, changing only the entries this pull request's task names`], notes: [] };
     }
   }
   if (!list && core) list = { keys: new Set(), problems: [] };
   const { problems, unlisted, pins } = check(head, list, kit, file);
   const fail = [...head.problems, ...problems], notes = [];
-  // (a pin breach the base held as it stands, the tool's whole configuration (its source or package, not only its pin)
-  // and its entry both unchanged, is noted, and so is each where there is no base, as on a push; in the core's own
-  // repository none may stand. A list written for the first time is held to an exact pin at once, its entry being the
-  // pull request's own text, while a tool its base fetched at no fixed version is noted)
   const baseProject = base ? readProject(root, base) : null;
-  const baseList = base ? listed(baseConfig && typeof baseConfig === "object" ? baseConfig : null, file) : null;
-  for (const [k, problem] of pins) {
-    const same = baseProject && canonical(baseProject.pins.get(k) ?? null) === canonical(head.pins.get(k)) && (baseList ? baseList.versions.get(k) === list.versions.get(k) : !head.pins.get(k).pin);
-    if (core || (base && !same)) fail.push(problem);
-    else notes.push(`${base ? "as the base held it" : "with no base to read against"}, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
-  }
-  // (a link out of the checkout fails, save one the base held as it stands: what stood before turns nothing red)
-  for (const at of head.links) {
-    let to = null;
-    try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
-    const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
-    else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
-  }
+  sortPins(pins, { head, list, baseProject, baseList: base ? listed(baseConfig, file) : null, core }, fail, notes);
+  sortLinks(root, base, head.links, fail, notes);
   if (!unlisted.length) return { fail, notes };
   if (!base) {
     notes.push(`${file} holds no "agentTools" yet, so nothing fails here; not listed: ${unlisted.map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
