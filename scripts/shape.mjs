@@ -44,6 +44,7 @@ import fs from "node:fs";
 import { builtinModules } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CODE, cycles, functions, imports, resolve, tokens } from "./code-shape.mjs";
 import { started } from "./started.mjs";
 
@@ -530,7 +531,7 @@ function check(config, at, self, found, base) {
 }
 
 function main(argv) {
-  const self = path.relative(process.cwd(), process.argv[1]).replace(/\\/gu, "/");
+  const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/"); // (as a mend names it)
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const base = baseOf(), at = configAt(named, self, base);
   if (at === null) return 0;
