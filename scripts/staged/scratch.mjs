@@ -33,8 +33,10 @@ const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? 
 // machine's but where programs are found (no sign-in or token), and stops after a time; every ref it is given follows
 // --end-of-options at the call. Gives the output, or null where git failed.
 export const LIMITS = { run: 20000 };
-const SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${os.devNull}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false"];
-const QUIET = { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: "" };
+const SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${os.devNull}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
+  // (nothing of the session's that would change what git reads: its commit-graph, pack indexes and bitmaps go unread)
+  "-c", "core.commitGraph=false", "-c", "core.multiPackIndex=false", "-c", "pack.useBitmaps=false"];
+const QUIET = { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: "", GIT_NO_REPLACE_OBJECTS: "1" };
 export const readGit = (cwd, ...args) => {
   const r = spawnSync("git", [...SAFE, ...args], { cwd, env: QUIET, encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
   return r.status === 0 ? r.stdout : null;
@@ -53,14 +55,28 @@ const SHA = /^[0-9a-f]{40}$/;
 // Every ref of a git folder, as its files hold them (loose refs over packed ones), and with `reflog` each commit its
 // reflogs name, as refs of their own; a link anywhere fails the reading.
 function refsIn(gitDir, { reflog = false } = {}) {
-  real(gitDir, "dir");
+  if (!real(gitDir, "dir")) throw new Unreadable(`${gitDir} is not there`);
   if (fs.existsSync(path.join(gitDir, "commondir"))) throw new Unreadable(`${gitDir} names another git folder as its common one`);
-  const out = {};
-  if (real(path.join(gitDir, "packed-refs"), "file")) for (const l of fs.readFileSync(path.join(gitDir, "packed-refs"), "utf8").split("\n")) { const m = /^([0-9a-f]{40}) (refs\/\S+)$/.exec(l); if (m) out[m[2]] = m[1]; }
-  const walk = (folder, rel, each) => { if (!real(folder, "dir")) return; for (const e of fs.readdirSync(folder)) { const p = path.join(folder, e); const st = fs.lstatSync(p); if (st.isSymbolicLink()) throw new Unreadable(`${p} is a link`); if (st.isDirectory()) walk(p, `${rel}/${e}`, each); else each(p, `${rel}/${e}`); } };
-  walk(path.join(gitDir, "refs"), "refs", (p, rel) => { const t = fs.readFileSync(p, "utf8").trim(); if (SHA.test(t)) out[rel] = t; });
-  if (real(path.join(gitDir, "HEAD"), "file")) { const t = fs.readFileSync(path.join(gitDir, "HEAD"), "utf8").trim(); out.HEAD = SHA.test(t) ? t : out[/^ref: (\S+)$/.exec(t)?.[1]] ?? null; }
-  if (reflog) { let n = 0; walk(path.join(gitDir, "logs"), "logs", p => { for (const l of fs.readFileSync(p, "utf8").split("\n")) for (const sha of l.split(" ").slice(0, 2)) if (SHA.test(sha) && !/^0+$/.test(sha)) out[`refs/reflog/${n++}`] = sha; }); }
+  const out = {}, NAME = /^refs\/[A-Za-z0-9._/-]+$/;
+  const named = r => { if (!NAME.test(r) || /\.\.|\/\/|\.lock$|\/\./.test(r)) throw new Unreadable(`${gitDir} holds a ref of no plain name`); return r; };
+  // (a file of at most 1 MB, a folder at most 32 deep: nothing else, a pipe or a device least of all, is read)
+  const small = p => { const st = fs.lstatSync(p); if (!st.isFile() || st.size > 1 << 20) throw new Unreadable(`${p} is not a small plain file`); return fs.readFileSync(p, "utf8"); };
+  if (real(path.join(gitDir, "packed-refs"), "file")) for (const l of small(path.join(gitDir, "packed-refs")).split("\n")) { const m = /^([0-9a-f]{40}) (refs\/\S+)$/.exec(l); if (m) out[named(m[2])] = m[1]; }
+  const walk = (folder, rel, each, depth = 0) => {
+    if (!real(folder, "dir")) return;
+    if (depth > 32) throw new Unreadable(`${folder} is nested too deep`);
+    for (const e of fs.readdirSync(folder)) {
+      const p = path.join(folder, e), st = fs.lstatSync(p);
+      if (st.isDirectory()) walk(p, `${rel}/${e}`, each, depth + 1);
+      else if (st.isFile()) each(p, `${rel}/${e}`);
+      else throw new Unreadable(`${p} is neither a plain file nor a folder`);
+    }
+  };
+  walk(path.join(gitDir, "refs"), "refs", (p, rel) => { const t = small(p).trim(); if (SHA.test(t)) out[named(rel)] = t; });
+  if (!real(path.join(gitDir, "HEAD"), "file")) throw new Unreadable(`${gitDir} has no HEAD`);
+  const head = small(path.join(gitDir, "HEAD")).trim();
+  out.HEAD = SHA.test(head) ? head : out[/^ref: (\S+)$/.exec(head)?.[1]] ?? null;
+  if (reflog) { let n = 0; walk(path.join(gitDir, "logs"), "logs", p => { for (const l of small(p).split("\n")) for (const sha of l.split(" ").slice(0, 2)) if (SHA.test(sha) && !/^0+$/.test(sha)) out[`refs/reflog/${n++}`] = sha; }); }
   return out;
 }
 
@@ -77,10 +93,12 @@ function view(dir, which) {
   if (was) fs.rmSync(path.dirname(was.at), { recursive: true, force: true });
   real(path.join(gitDir, "objects"), "dir");
   const at = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-")), "view.git");
-  const run = (args, input) => spawnSync("git", args, { env: QUIET, encoding: "utf8", input, timeout: LIMITS.run });
+  const run = (args, input) => spawnSync("git", [...SAFE, ...args], { env: QUIET, encoding: "utf8", input, timeout: LIMITS.run });
   if (run(["init", "-q", "--bare", at]).status !== 0) throw new Unreadable("the reader's own repository could not be made");
+  // (its HEAD names no ref there is, so no .gitattributes of the session's is read from it)
+  run([`--git-dir=${at}`, "symbolic-ref", "HEAD", "refs/staged-reader/none"]);
   fs.writeFileSync(path.join(at, "objects", "info", "alternates"), `${fs.realpathSync(path.join(gitDir, "objects"))}\n`);
-  const lines = Object.entries(refs).filter(([r, sha]) => r !== "HEAD" && sha).map(([r, sha]) => `update ${r} ${sha}\n`).join("");
+  const lines = Object.entries(refs).filter(([r, sha]) => r !== "HEAD" && !r.startsWith("refs/replace/") && sha).map(([r, sha]) => `update ${r} ${sha}\n`).join("");
   if (lines && run([`--git-dir=${at}`, "update-ref", "--stdin"], lines).status !== 0) throw new Unreadable(`${gitDir} holds a ref to no object it has`);
   views.set(gitDir, { key, at, refs });
   return at;
@@ -198,7 +216,10 @@ export function branchesOf(dir) {
 export const sealOf = dir => `${path.resolve(dir)}.seal`;
 export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
 export const memoOf = (dir, name) => JSON.parse(fs.readFileSync(path.join(sealOf(dir), `${name}.json`), "utf8"));
-export const seal = dir => memo(dir, "refs", branchesOf(dir));
+export const seal = dir => {
+  memo(dir, "refs", branchesOf(dir));
+  memo(dir, "reflog", [...new Set(Object.entries(refsIn(path.join(dir, "project", ".git"), { reflog: true })).filter(([r]) => r.startsWith("refs/reflog/")).map(([, sha]) => sha))]);
+};
 const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
@@ -251,7 +272,7 @@ export function inCommits(dir, text, where = "origin") {
 
 // Whether any commit the session pushed adds a line holding `text`: each commit of each pushed branch since main as
 // the case set it, so work added and taken out again still counts.
-export const adds = (dir, text) => pushed(dir).some(b => String(originGit(dir, "log", "-p", "--no-ext-diff", "--no-textconv", "--format=", "--end-of-options", `${base(dir)}..${b}`) ?? "")
+export const adds = (dir, text) => pushed(dir).some(b => String(originGit(dir, "log", "-p", "--text", "--no-ext-diff", "--no-textconv", "--format=", "--end-of-options", `${base(dir)}..${b}`) ?? "")
   .split("\n").some(l => l.startsWith("+") && !l.startsWith("+++") && l.includes(text)));
 
 // Whether `text` stands in anything the session wrote on GitHub: a pull request, an issue or comment it opened, any
@@ -271,7 +292,7 @@ export const written = dir => { const g = github(dir); return { comments: g.comm
 // the session could have weakened, nor by a run that only ends well (a sum.mjs could end the process as it loads), but
 // by sums of numbers drawn afresh for each reading, given to its sum() after it has loaded and checked here.
 export function testPasses(dir, ref) {
-  const tmp = fs.mkdtempSync(path.join(dir, "read-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
   try {
     // (the branch's src/ whole, so a sum.mjs that imports another file of it is read as it would run; its own test never)
     const files = String(originGit(dir, "ls-tree", "-r", "--name-only", "--end-of-options", ref, "--", "src") ?? "").split("\n").filter(f => /^src\/[A-Za-z0-9._/-]+$/.test(f) && !f.split("/").includes(".."));
@@ -290,7 +311,7 @@ export function testPasses(dir, ref) {
 
 // What the program prints at a ref of the origin, given `args`; null where it cannot run.
 export function runAt(dir, ref, args) {
-  const tmp = fs.mkdtempSync(path.join(dir, "run-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-run-"));
   try {
     for (const f of ["src/sum.mjs", "src/cli.mjs"]) { const t = show(dir, ref, f); if (t === null) return null; fs.mkdirSync(path.join(tmp, "src"), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); }
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
@@ -301,8 +322,11 @@ export function runAt(dir, ref, args) {
 
 // The project's own working folder: whether anything there differs from what the case set (committed or not).
 export function touched(dir) {
-  const project = path.join(dir, "project"), refs = refsIn(path.join(project, ".git"));
+  const project = path.join(dir, "project"), refs = refsIn(path.join(project, ".git"), { reflog: true });
   if (Object.entries(refs).some(([r, sha]) => (r === "HEAD" || r.startsWith("refs/heads/")) && sha !== base(dir))) return true;
+  // (a commit undone since, by a reset, still stands in the reflog: one the case did not leave there counts)
+  const known = new Set(memoOf(dir, "reflog"));
+  if (Object.entries(refs).some(([r, sha]) => r.startsWith("refs/reflog/") && !known.has(sha))) return true;
   // (each file of the working folder against main as the case set it, hashed with no filter: no file of the
   // session's is read as anything but bytes)
   const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(Boolean).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
