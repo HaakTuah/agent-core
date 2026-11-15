@@ -46,7 +46,10 @@ export function kind(p) {
   const folder = call(p, "signatures.yml")?.with?.directory ?? (lock && folderOf(lock));
   if (folder !== undefined) o.packages = String(folder).replace(/\/+$/, "") || ".";
   const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/);
-  if (call(p, "nuget.yml") || built) o.nuget = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "")?.[1]?.replace(/\/+$/, "") || (built ? folderOf(built) : ".");
+  // (Dependabot's directory for NuGet where it names one, "/" being the root itself; else the solution's or project
+  // file's folder)
+  const named = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "");
+  if (call(p, "nuget.yml") || built) o.nuget = named ? named[1].replace(/\/+$/, "") || "." : built ? folderOf(built) : ".";
   if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;
   if (/^Floor: whole\. Modules: all\.$/m.test(p.manifest)) o.game = true;
   return { o, pin };
@@ -107,7 +110,9 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
   const { o, pin } = kind(p);
   const modules = fs.readdirSync(path.join(HERE, "modules")).filter(n => n.endsWith(".md"));
   try {
-    const kit = files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"));
+    // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
+    const kit = files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"))
+      .map(([to, text]) => [to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (templates !== path.join(HERE, TEMPLATES)) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)

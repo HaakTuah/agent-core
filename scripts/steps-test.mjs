@@ -163,6 +163,15 @@ found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter kit writes it today)") && project(plainProject).read("../a-game/AGENTS.md") === null,
   "a path that leads out of the project reads as missing, never as another folder's file", found.join("\n"));
 
+// ---- a NuGet project set up at its root, its project file nested; a difference declared: neither is a difference ----
+const rootNuget = kit("a-root-nuget-project", { nuget: ".", private: true });
+fs.mkdirSync(path.join(rootNuget, "src/App"), { recursive: true });
+fs.writeFileSync(path.join(rootNuget, "src/App/App.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+ok(kind(project(rootNuget)).o.nuget === ".", "a NuGet project whose Dependabot directory is the root reads as one set up at its root", kind(project(rootNuget)).o.nuget);
+declare(rootNuget, '"AGENTS.md": its own way of starting a task, on the owner\'s word.');
+found = differences(project(rootNuget), fresh(project(rootNuget)));
+ok(!found.length, "a manifest whose \"Differences\" declares something, in place of the kit's \"None.\", is no difference", found.join("\n"));
+
 // ---- the wording an earlier kit wrote and the kit has left: listed where the project still holds it ----
 const older = path.join(tmp, "older", "setup", "template");
 fs.cpSync(path.join(root, TEMPLATES), older, { recursive: true });
