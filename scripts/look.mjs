@@ -65,11 +65,11 @@ export const TITLES = {
 // issue it keeps and `unread` leaving it as it stands: the pass over the choices that are hard to undo and a sign of
 // theirs that has tripped (choices.mjs), the cleaning and the audit the dose makes due (dose.mjs), and, as their rule
 // comes, the staged cases (#235). One that says `owner`, true or false, has its issue's state label kept to it:
-// needs-owner where true, else queued; one that says `requeue` has it put back to queued where an update brings a line
-// the issue did not hold (`updating`).
+// needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
+// queued where an update brings a key the issue did not hold (`updating`).
 export const DUE = [choicesDue, signs, cleaningDue, auditIsDue];
 export const OWNERS = "needs-owner";
-export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(d.requeue ? { requeue: true } : {}) }));
+export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
 
 // The labels an issue the look keeps should carry where its state label is not the one that fits: the others as they
@@ -89,12 +89,14 @@ export const reopening = (issue, body, owner) => {
   return { body, state: "open", ...(labels ? { labels } : {}) };
 };
 
-// What updating an issue the look keeps writes: its body, and, for a reader that says `requeue`, queued in place of a
-// needs-owner a session set, where the new body holds a line of a list ("- ") the old one did not: something new for a
-// session to take up first (a second choice's sign that trips).
-export const updating = (issue, body, requeue = false) => {
-  const before = new Set(String(issue.body ?? "").split("\n"));
-  const fresh = requeue && (issue.labels ?? []).includes(OWNERS) && body.split("\n").some(l => l.startsWith("- ") && !before.has(l));
+// What updating an issue the look keeps writes: its body, and, for a reader that gives `requeue` (a line's key, null
+// for none), queued in place of a needs-owner a session set, where the new body holds a line of a list ("- ") whose key
+// the old one did not: something new for a session to take up first (a second choice's sign that trips), never a
+// number that moved.
+export const updating = (issue, body, requeue = null) => {
+  const keys = text => new Set(String(text).split("\n").filter(l => l.startsWith("- ")).map(requeue).filter(k => k !== null));
+  const before = requeue ? keys(issue.body ?? "") : new Set();
+  const fresh = !!requeue && (issue.labels ?? []).includes(OWNERS) && [...keys(body)].some(k => !before.has(k));
   const labels = fresh ? relabelled(issue.labels, false) : null;
   return { body, ...(labels ? { labels } : {}) };
 };
@@ -295,7 +297,7 @@ function main(args) {
     write("PATCH", `repos/${repo}/issues/${number}`, { state: "closed", state_reason: "completed" });
   };
   const did = [];
-  const act = (title, body, issue, unread, { closes = true, labels = LABELS, requeue = false } = {}) => {
+  const act = (title, body, issue, unread, { closes = true, labels = LABELS, requeue = null } = {}) => {
     const step = plan(body, issue, unread);
     const shown = step === "close" && !closes ? "nothing" : step;
     did.push(`${title}: ${unread ? `not read (${unread})` : shown}${issue ? ` (#${issue.number})` : ""}`);
@@ -313,7 +315,7 @@ function main(args) {
     did.push(`a second issue of the same thing: closed (#${t.number})`);
     if (!dry) try { close(t.number, "another issue of the look's holds this same thing, so this one closes."); } catch (e) { did.push(`  ${e.message}`); }
   }
-  for (const f of findings) { act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner), requeue: f.requeue === true }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
+  for (const f of findings) { act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner), requeue: f.requeue }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
   if (monthly) act(reportTitle, text(monthly, carrier), null, null);
   // the record, written last: a closed issue of its own
   const recordBody = `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n`;

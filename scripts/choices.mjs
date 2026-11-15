@@ -145,27 +145,33 @@ function measuredSigns(manifest, root) {
 // and what its session does about each.
 export function trippedBody(file, held, found, home) {
   const unknown = found.records.filter(rec => rec.unknown.length);
-  // (a few lines each, the rest counted, so the body stays far under GitHub's limit however many a file holds)
+  // (a few lines each, and three of a record's unknown conditions, the rest counted, so the body stays under 30 000
+  // characters, far under GitHub's limit of 65 536, however many a file of MOST bytes holds)
   const some = (list, line) => [...list.slice(0, LISTED).map(line), ...(list.length > LISTED ? [`- and ${list.length - LISTED} more: \`node ${home}scripts/choices.mjs\` lists them`] : [])];
   const rule = `\`${home}modules/choices.md\`, "What reopens a choice"`;
   return [...(held.length ? [`A choice's sign, written in a measure the shape check keeps, holds today in \`${file}\` (${rule}):`,
     ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${c.value} ${MEASURES[c.measure][0]}.`), ""] : []),
   ...(unknown.length ? [`A line "Trips when:" in \`${file}\` names what is no measure the look reads, so that sign is not read (${rule}; the measures: ${Object.keys(MEASURES).join(", ")}):`,
-    ...some(unknown, rec => `- ${shown(rec.name)}: ${rec.unknown.slice(0, LISTED).map(shown).join(", ")}`), ""] : []),
+    ...some(unknown, rec => `- ${shown(rec.name)}: ${rec.unknown.slice(0, 3).map(shown).join(", ")}${rec.unknown.length > 3 ? `, and ${rec.unknown.length - 3} more` : ""}`), ""] : []),
   [held.length ? "A session takes this issue: for each choice whose sign holds, it writes in a comment here a fresh record that compares the options, staying as it is among them, with the gain and what the move would cost, and labels this issue needs-owner in place of queued; no session makes the choice. Where the owner keeps it, the session that acts on the answer writes its sign anew in a pull request." : "",
     unknown.length ? "Each line that names no measure is mended in a pull request: to a measure the look reads, or taken out where the sign is none a check keeps." : "",
     `This issue closes on the look's next run once nothing above stands, and opens again as queued if something comes back. \`node ${home}scripts/choices.mjs\` reads the signs as they stand.`].filter(Boolean).join(" ")].join("\n");
 }
 
+// What a line of that issue's lists stands for, apart from the numbers read today: a choice and its condition, or a
+// choice and what names no measure; null for the count of the rest. The look compares these (look.mjs, updating), so a
+// number that moves changes nothing, and a choice the issue did not name before puts it back to queued.
+export const signKey = line => (line.startsWith("- and ") ? null : line.replace(/, and it reads .*$/u, ""));
+
 // The scheduled look's reader of the signs written in a measure (look.mjs, DUE): its issue's body null where none
 // holds and every line "Trips when:" names measures alone, so the look closes one it keeps; `unread` where the records
-// or the measures could not be read. `requeue`: a choice the issue did not name before puts it back to queued.
+// or the measures could not be read; `requeue`, the key of each line of its lists (signKey).
 export function signs({ manifest, root = "." }) {
   const s = measuredSigns(manifest, root);
   if (s.unread) return { title: TRIPPED, body: null, unread: s.unread };
   const held = s.r ? tripped(s.found, s.r) : [];
   const stands = held.length || s.found.records.some(rec => rec.unknown.length);
-  return { title: TRIPPED, body: stands ? trippedBody(s.got.file, held, s.found, s.home) : null, requeue: true };
+  return { title: TRIPPED, body: stands ? trippedBody(s.got.file, held, s.found, s.home) : null, requeue: signKey };
 }
 
 // One record as the script prints it: its name, whether it names its sign, and each condition of its line "Trips

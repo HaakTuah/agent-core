@@ -147,6 +147,9 @@ const many = parse(Array.from({ length: 5000 }, (_, i) => `## Choice: c${i}\nTri
 const long = trippedBody("docs/choices.md", tripped(many, reads), many, "core/");
 ok(long.length < 20000 && long.split("\n").filter(l => l.startsWith("- `c")).length === 2 * LISTED && /- and 4970 more: `node core\/scripts\/choices\.mjs` lists them/.test(long),
   "however many a file holds, the issue lists a few of each and counts the rest, far under GitHub's limit on a body", `${long.length}`);
+const wide = parse(Array.from({ length: 40 }, (_, i) => `## Choice: ${"n".repeat(118)}${i}\nTrips when: \`files > 1\`, ${Array.from({ length: 40 }, () => `\`${"x".repeat(118)}\``).join(", ")}\n`).join(""));
+const widest = trippedBody("docs/choices.md", tripped(wide, reads), wide, "core/");
+ok(widest.length < 30000 && /, and 37 more/.test(widest), "nor does a file of long names and long lines of what names no measure take the body past it", `${widest.length}`);
 ok(DUE.includes(signs), "the scheduled look reads the signs too");
 const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
 ok(!ownSigns.unread && ownSigns.body === null && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),

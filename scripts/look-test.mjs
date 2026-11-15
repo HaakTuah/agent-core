@@ -4,6 +4,7 @@
 //
 //   node scripts/look-test.mjs
 import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, text, updating } from "./look.mjs";
+import { parse, signKey, tripped, trippedBody } from "./choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "./state-report.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -34,12 +35,21 @@ ok(JSON.stringify(reopening({ labels: ["needs-owner", "by:look"] }, "b", false))
   && JSON.stringify(reopening({ labels: ["later", "by:look"] }, "b", false)) === JSON.stringify({ body: "b", state: "open" }),
   "an issue that comes back is a task again: reopened with queued in place of a needs-owner a session set while it stood before (a tripped sign's), or needs-owner where its reader says so; later and on-hold stay");
 const was = { body: "Signs:\n- `a`: holds\n\nWhat to do.", labels: ["needs-owner", "by:look"] };
-ok(JSON.stringify(updating(was, "Signs:\n- `a`: holds\n- `b`: holds\n\nWhat to do.", true)) === JSON.stringify({ body: "Signs:\n- `a`: holds\n- `b`: holds\n\nWhat to do.", labels: ["by:look", "queued"] })
-  && JSON.stringify(updating(was, "Signs:\n\nWhat to do, worded anew.", true)) === JSON.stringify({ body: "Signs:\n\nWhat to do, worded anew." })
-  && JSON.stringify(updating(was, "Signs:\n- `b`: holds", false)) === JSON.stringify({ body: "Signs:\n- `b`: holds" })
-  && JSON.stringify(updating({ ...was, labels: ["queued", "by:look"] }, "- `b`", true)) === JSON.stringify({ body: "- `b`" }),
-  "an update that brings a line the issue did not hold puts an issue its session handed to the owner back to queued, where its reader says requeue; any other update keeps its labels");
-ok(dueNow({}, [() => ({ title: "Four", body: "d", requeue: true })])[0].requeue === true, "a reader's requeue reaches the look");
+const asIs = line => line;
+ok(JSON.stringify(updating(was, "Signs:\n- `a`: holds\n- `b`: holds\n\nWhat to do.", asIs)) === JSON.stringify({ body: "Signs:\n- `a`: holds\n- `b`: holds\n\nWhat to do.", labels: ["by:look", "queued"] })
+  && JSON.stringify(updating(was, "Signs:\n\nWhat to do, worded anew.", asIs)) === JSON.stringify({ body: "Signs:\n\nWhat to do, worded anew." })
+  && JSON.stringify(updating(was, "Signs:\n- `b`: holds", null)) === JSON.stringify({ body: "Signs:\n- `b`: holds" })
+  && JSON.stringify(updating({ ...was, labels: ["queued", "by:look"] }, "- `b`", asIs)) === JSON.stringify({ body: "- `b`" }),
+  "an update that brings a line whose key the issue did not hold puts an issue its session handed to the owner back to queued, where its reader gives requeue; any other update keeps its labels");
+ok(dueNow({}, [() => ({ title: "Four", body: "d", requeue: asIs })])[0].requeue === asIs && !("requeue" in dueNow({}, [() => ({ title: "Five", body: "e", requeue: true })])[0]), "a reader's requeue reaches the look, a function or nothing");
+// (the measured sign's issue as the look writes it: choice one holds past 150 files, choice two past 160)
+const signed = parse("## Choice: one\nTrips when: `files > 150`\n## Choice: two\nTrips when: `files > 160`\n");
+const bodyAt = files => text(trippedBody("docs/choices.md", tripped(signed, { listed: 0, read: 1, found: { read: { files }, entries: new Map() } }), signed, "core/"), "GitHub's job");
+const handed = { body: bodyAt(151), labels: ["needs-owner", "by:look"] };
+ok(/- `one`: `files > 150`, and it reads 151/.test(handed.body) && !("labels" in updating(handed, bodyAt(152), signKey)) && !("labels" in updating(handed, bodyAt(160), signKey)),
+  "a number that moves (151 files, then 152, then 160) leaves the measured sign's issue that a session handed to the owner as it is labelled", handed.body);
+ok(JSON.stringify(updating(handed, bodyAt(161), signKey).labels) === JSON.stringify(["by:look", "queued"]),
+  "a second choice whose sign trips puts it back to queued, for its fresh record");
 
 // ---- its own issues: GitHub's job's or the owner's account's, the newest of each title ----
 const issues = [
