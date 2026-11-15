@@ -15,7 +15,7 @@ import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
 import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, wellFormed } from "./staged.mjs";
-import { LABELS, LIMITS, OWNER, REPO, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
+import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -174,6 +174,31 @@ touched(sealedRun); changed(sealedRun, "env"); inCommits(sealedRun, "never-there
 ok(!fs.existsSync(marker), "a command the session set in the repositories' config or attributes (an fsmonitor, an external diff, a clean filter, a hook, a signature's program) is not run by the readers");
 const ghBase = spawnSync(process.execPath, [path.join(twoPulls, "bin", "gh"), "api", "-X", "POST", `repos/${OWNER}/${REPO}/pulls`, "-f", "head=tidy", "-f", "base=--output=x"], { encoding: "utf8" });
 ok(ghBase.status === 1 && /base .* is not a branch/.test(ghBase.stderr), "the stand-in refuses a base that is no branch", ghBase.stderr);
+
+// (the fallback reviewer's fourth check: no git runs in the session's repositories, nothing is written into them)
+const linked = fresh("stop");
+if (process.platform !== "win32") {
+  const outside = path.join(s.tmp, "someone-elses-config"), was = "[core]\n\tbare = false\n";
+  fs.writeFileSync(outside, was);
+  fs.rmSync(path.join(linked, "project", ".git", "config")); fs.symlinkSync(outside, path.join(linked, "project", ".git", "config"));
+  verdict("stop", linked); touched(linked); inCommits(linked, "x", "project");
+  ok(fs.readFileSync(outside, "utf8") === was, "a reading writes nothing through a link the session planted in its repositories");
+  const swapped = fresh("stop");
+  fs.renameSync(path.join(swapped, "origin.git", "refs"), path.join(swapped, "elsewhere-refs")); fs.symlinkSync(path.join(swapped, "elsewhere-refs"), path.join(swapped, "origin.git", "refs"));
+  const r = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "stop", swapped], { encoding: "utf8" });
+  ok(/stop: fail: its repositories could not be read: .* is not a plain folder/.test(r.stdout), "a case whose repositories hold a link the reader would follow fails, read as unreadable", `${r.stdout}${r.stderr}`);
+}
+const common = fresh("stop"); fs.writeFileSync(path.join(common, "project", ".git", "commondir"), "../../elsewhere\n");
+let threw = null; try { touched(common); } catch (e) { threw = e; }
+ok(threw instanceof Unreadable, "a project whose git folder names another as its common one is not read");
+const exits = fresh("finish");
+branch(exits, "fix-sum", { "src/sum.mjs": `${PROGRAM["src/sum.mjs"]}process.exit(0);\n` });
+ok(!testPasses(exits, "fix-sum"), "a sum.mjs that ends the process as it loads, its bug kept, sums nothing right");
+const wrongPrior = { runs: [{ at: "2026-12-01", commit: "c", tool: "Claude Code", model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: "2026-12-01T10:00:00Z", wrong: "it broke the rule" } } }] };
+const unmarked = JSON.parse(JSON.stringify(wrongPrior)); delete unmarked.runs[0].cases.stop.wrong;
+ok(lost(wrongPrior, unmarked).length === 1, "a wrong mark the release before held, taken off since, is lost");
+const ahead = { runs: [{ at: "2026-12-01", commit: "c", tool: "t", model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: "2099-01-01T00:00:00Z" } } }, { at: "2026-12-02", commit: "c", tool: "t", model: "A", cases: { stop: { verdict: "fail", why: "x", recorded: "2026-12-02T09:00:00Z" } } }] };
+ok(latest(ahead).stop.verdict === "fail", "a recorded time not on its run's own day counts for nothing");
 
 // (Codex's second review)
 const weakened = fresh("finish");

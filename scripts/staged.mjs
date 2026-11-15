@@ -26,7 +26,7 @@ import * as noQuestion from "./staged/no-question.mjs";
 import * as oldContent from "./staged/old-content.mjs";
 import * as orderForNow from "./staged/order-for-now.mjs";
 import * as outsider from "./staged/outsider.mjs";
-import { OWNER, REPO, folderFit, memo, memoOf, seal, sealOf } from "./staged/scratch.mjs";
+import { OWNER, REPO, Unreadable, folderFit, memo, memoOf, seal, sealOf } from "./staged/scratch.mjs";
 import * as secret from "./staged/secret.mjs";
 import * as steps from "./staged/steps.mjs";
 import * as stop from "./staged/stop.mjs";
@@ -84,7 +84,8 @@ const ABOUT = "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged c
 // Each case's newest verdict: { name: { at, ...entry } }, by the time each verdict was recorded (`recorded`), or its
 // run's day where it has none.
 export function latest(record) {
-  const out = {}, when = e => String(e.recorded ?? e.at);
+  // (a recorded time counts only as an ISO time on its run's own day: a hand-written one far ahead cannot outrank)
+  const out = {}, when = e => (typeof e.recorded === "string" && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(e.recorded) && e.recorded.startsWith(String(e.at)) ? e.recorded : String(e.at));
   for (const run of record.runs) for (const [name, entry] of Object.entries(run.cases ?? {})) {
     const e = { at: run.at, ...entry };
     if (!out[name] || when(e) >= when(out[name])) out[name] = e;
@@ -135,14 +136,14 @@ export const wellFormed = record => Array.isArray(record?.runs) && record.runs.e
   && r.cases && typeof r.cases === "object" && Object.values(r.cases).every(e => e && typeof e === "object" && typeof e.verdict === "string"));
 
 // The verdicts of the record `prior` (the release before's) that `record` no longer holds as they were: the record only
-// grows, a verdict marked wrong since aside, so a failure once recorded cannot be cut away.
+// grows, a verdict marked wrong since aside (a mark once made stays), so a failure once recorded cannot be cut away.
 export function lost(prior, record) {
   const out = [];
   for (const r of prior?.runs ?? []) {
     const now = (record?.runs ?? []).find(x => x.at === r.at && x.commit === r.commit && x.tool === r.tool && x.model === r.model);
     for (const [name, e] of Object.entries(r.cases ?? {})) {
       const n = now?.cases?.[name];
-      if (!n || n.verdict !== e.verdict || n.why !== e.why || n.recorded !== e.recorded) out.push(`${name} (${r.at})`);
+      if (!n || n.verdict !== e.verdict || n.why !== e.why || n.recorded !== e.recorded || (e.wrong && n.wrong !== e.wrong)) out.push(`${name} (${r.at})`);
     }
   }
   return out;
@@ -199,7 +200,9 @@ function main(argv) {
     const c = named(get("--read")), dir = argv[argv.indexOf("--read") + 2];
     if (!c) return;
     if (!dir || !fs.existsSync(dir) || !fs.existsSync(path.join(sealOf(fs.realpathSync(dir)), "meta.json"))) return fail(`${dir ?? "(no folder)"} holds no case set by --set. Mend: give the folder the case was set in`);
-    const v = c.read(fs.realpathSync(dir));
+    // (a case whose repositories the session made unreadable, a link or another's git folder in them, fails)
+    let v;
+    try { v = c.read(fs.realpathSync(dir)); } catch (e) { if (!(e instanceof Unreadable)) throw e; v = { pass: false, why: `its repositories could not be read: ${e.message}` }; }
     console.log(`${c.name}: ${v.pass ? "pass" : "fail"}: ${v.why}`);
     if (argv.includes("--record")) {
       const record = readRecord(), at = new Date().toISOString().slice(0, 10), tool = get("--tool") ?? TOOL, model = get("--model") ?? "not said";
@@ -218,8 +221,8 @@ function main(argv) {
     if (!c) return;
     if (!why) return fail("--wrong needs why the verdict was wrong. Mend: say it after the case's name");
     // (the newest verdict as latest() orders them, by the time each was recorded)
-    const record = readRecord(), when = r => String(r.cases[c.name].recorded ?? r.at);
-    const run = record.runs.filter(r => r.cases?.[c.name]).reduce((a, r) => (!a || when(r) >= when(a) ? r : a), null);
+    const record = readRecord(), newest = latest(record)[c.name];
+    const run = newest ? record.runs.find(r => r.at === newest.at && r.cases?.[c.name] && r.cases[c.name].recorded === newest.recorded && r.cases[c.name].verdict === newest.verdict) : null;
     if (!run) return fail(`${c.name} has no recorded verdict. Mend: run it and record it first`);
     run.cases[c.name].wrong = why;
     writeRecord(record);
