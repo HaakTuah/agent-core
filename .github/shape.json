@@ -1,5 +1,12 @@
 {
   "baseline": ".github/shape-baseline.json",
   "code": ["scripts"],
-  "tests": ["scripts/*-test.mjs"]
+  "tests": ["scripts/*-test.mjs"],
+  "systems": {
+    "tools": { "domain": "tools", "paths": ["scripts/"] }
+  },
+  "suites": {
+    "suites": { "linux": 300, "win32": 880 },
+    "upgrade": { "linux": 240, "win32": 700 }
+  }
 }

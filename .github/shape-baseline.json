@@ -171,9 +171,9 @@
       "branches": 45
     },
     "function: scripts/look.mjs#main": {
-      "lines": 145,
+      "lines": 140,
       "depth": 4,
-      "branches": 85
+      "branches": 82
     },
     "function: scripts/nuget-fetch.mjs#fetchAll": {
       "lines": 110,

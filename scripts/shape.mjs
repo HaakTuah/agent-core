@@ -485,7 +485,7 @@ function write(config, at, self, numbers) {
 function baseOf() {
   const name = process.env.SHAPE_BASE || "";
   if (!name) return null;
-  if (!/^[\w./-]+$/u.test(name)) refuse(`SHAPE_BASE (${JSON.stringify(name).slice(0, 80)}) is no plain name of a commit or branch`, "set it to the pull request's base, such as origin/main");
+  if (!/^\w[\w./^~-]*$/u.test(name)) refuse(`SHAPE_BASE (${JSON.stringify(name).slice(0, 80)}) is no plain name of a commit or branch`, "set it to the pull request's base, such as origin/main");
   try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); } catch { refuse(`${name} is not a commit here`, `fetch it (git fetch origin ${name.replace(/^origin\//u, "")}), or set SHAPE_BASE to the pull request's base`); }
   return { name, show: file => tolerant(() => git(["show", `${name}:${file}`])) };
 }

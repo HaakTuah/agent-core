@@ -10,6 +10,8 @@
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
+# The suites together, and the upgrade test, are each held to a time mark (the "suites" of .github/shape.json, by
+# scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
 name: tests
 
 on:
@@ -38,6 +40,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      - name: The second the suites start at, for their time mark
+        run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: The versions check
         run: node scripts/versions-test.mjs
       - name: The licence check's lists and readers
@@ -79,6 +83,12 @@ jobs:
       - name: The measures of how code is put together
         if: ${{ !cancelled() }}
         run: node scripts/code-shape-test.mjs
+      - name: The shape check
+        if: ${{ !cancelled() }}
+        run: node scripts/shape-test.mjs
+      - name: The dose a codebase's state sets
+        if: ${{ !cancelled() }}
+        run: node scripts/dose-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() }}
         run: node scripts/stand-in-record-test.mjs
@@ -187,6 +197,8 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: The suites kept to their time mark
+        run: node scripts/shape.mjs .github/shape.json --suite suites --since "$SUITES_START"
 
   upgrade:
     strategy:
@@ -207,7 +219,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
-        run: node scripts/upgrade-test.mjs
+        run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs
 
   # (the one check the ruleset asks for by name: it passes only where the suites and the upgrade test passed on both; a
   # job that ran out of its time is cancelled, which no failing test is, so the gate says which it was)
