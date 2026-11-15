@@ -7,6 +7,8 @@
   },
   "suites": {
     "suites": { "linux": 300 },
+    "suites-projects": { "win32": 660 },
+    "suites-rest": { "win32": 540 },
     "upgrade": { "linux": 240, "win32": 700 },
     "staged": { "linux": 240, "win32": 900 }
   }

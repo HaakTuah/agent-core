@@ -90,7 +90,15 @@ if (pathPart === "user") out(user);
 if (!pathPart.startsWith(`repos/${repo}`)) fail(404, "Not Found");
 const rest = pathPart.slice(`repos/${repo}`.length).replace(/^\//, "");
 
-if (rest === "" && method === "GET") out({ full_name: repo, name: state.repo, owner: { login: state.owner }, private: state.private, visibility: state.private ? "private" : "public", has_issues: state.hasIssues, default_branch: "main", permissions: { admin: true, maintain: true, push: true, triage: true, pull: true } });
+const asRepo = () => ({ full_name: repo, name: state.repo, owner: { login: state.owner }, private: state.private, visibility: state.private ? "private" : "public", has_issues: state.hasIssues, default_branch: "main", permissions: { admin: true, maintain: true, push: true, triage: true, pull: true }, ...(state.securityAndAnalysis ? { security_and_analysis: state.securityAndAnalysis } : {}) });
+// (fields as gh sends them, "a[b][c]=v", read as the object they name)
+const nested = fields => { const o = {}; for (const [k, v] of Object.entries(fields)) { const parts = k.match(/[^[\]]+/g) ?? [k]; let at = o; for (const p of parts.slice(0, -1)) at = at[p] = at[p] && typeof at[p] === "object" ? at[p] : {}; at[parts[parts.length - 1]] = v; } return o; };
+if (rest === "" && method === "GET") out(asRepo());
+if (rest === "" && method === "PATCH") {
+  const asked = nested(body).security_and_analysis ?? {};
+  for (const k of ["secret_scanning", "secret_scanning_push_protection"]) if (asked[k]?.status) (state.securityAndAnalysis ??= {})[k] = { status: String(asked[k].status) };
+  out(asRepo());
+}
 if (rest === "rulesets" || rest === "rules/branches/main") out(state.rulesets ?? []);
 // labels
 if (rest === "labels" && method === "GET") out(page(state.labels));

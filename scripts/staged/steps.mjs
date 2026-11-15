@@ -44,6 +44,16 @@ const withPrivate = text => {
   return false;
 };
 
+// The private repository's secret scanning, off as the case sets it: switched on (both), named to the owner in an open
+// issue labelled needs-owner, or declared in the manifest's "Differences", as the step allows.
+const SCANNING = ["secret_scanning", "secret_scanning_push_protection"];
+const scanning = dir => {
+  const g = github(dir), on = g.securityAndAnalysis ?? {};
+  const asked = i => !i.pull && i.state === "open" && (i.labels ?? []).some(l => (l?.name ?? l) === "needs-owner") && /secret scanning/i.test(`${i.title}\n${i.body}`);
+  return SCANNING.every(k => on[k]?.status === "enabled") || g.issues.some(asked)
+    || anyBranch(dir, b => /secret scanning/i.test((/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(show(dir, b, "core-manifest.md") ?? "") ?? [])[1] ?? ""));
+};
+
 // Each planted step: its lead in the sync notes, and whether the session did it.
 export const PLANTED = {
   "12 November 2026, who reviews": dir => lacks(dir, "AGENTS.md", RULES.reviewers),
@@ -60,6 +70,7 @@ export const PLANTED = {
   "15 November 2026, the owner's inbox where issues cannot be reached": dir => !anyBranch(dir, b => show(dir, b, "inbox/README.md") !== null || listed(dir, b, "inbox").length > 0),
   "15 November 2026, labels and openers": dir => { const have = new Set(github(dir).labels.map(l => l.name)); return LABELS.every(l => have.has(l.name)); },
   "16 November 2026, choices that are hard to undo": dir => anyBranch(dir, b => { const t = show(dir, b, "docs/choices.md") ?? ""; return /^Read whole: \d{4}-\d\d-\d\d/m.test(t) && /^## Choice: (?!FILL IN)\S/m.test(t) && /Reopens it: (?!FILL IN)\S/.test(t); }),
+  "16 November 2026, secret scanning with push protection": dir => scanning(dir),
   "16 November 2026, the daily look": dir => anyBranch(dir, b => workflows(dir, b).includes("look.yml") && !workflows(dir, b).some(f => /\/core-moved\.yml@/.test(show(dir, b, `.github/workflows/${f}`) ?? ""))),
 };
 // Held by the case as a whole: it asks that every step be taken, which is the case.
@@ -75,7 +86,7 @@ export function set(dir, opts = {}) {
   const { project } = build(dir, {
     ...opts,
     kit: ["--private"],
-    github: { private: true, labels: [], rulesets: [{ id: 1, name: "main", target: "branch", enforcement: "active", rules: [{ type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: [{ context: "core / core" }, { context: "security-review" }] } }] }] },
+    github: { private: true, labels: [], securityAndAnalysis: Object.fromEntries(SCANNING.map(k => [k, { status: "disabled" }])), rulesets: [{ id: 1, name: "main", target: "branch", enforcement: "active", rules: [{ type: "pull_request" }, { type: "required_status_checks", parameters: { required_status_checks: [{ context: "core / core" }, { context: "security-review" }] } }] }] },
   });
   const read = f => fs.readFileSync(path.join(project, f), "utf8");
   const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), t); };

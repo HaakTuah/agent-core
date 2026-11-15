@@ -117,10 +117,16 @@ const takeSteps = (d, leave = null) => {
   };
   for (const [name, files] of Object.entries(work)) if (name !== leave) branch(d, `step-${name}`, files);
   if (leave !== "labels") for (const l of LABELS) gh(d, "POST", "labels", l);
+  if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
 };
 check("steps", fresh("steps"), d => takeSteps(d), d => takeSteps(d, "suites"), /not done: 12 November 2026, a sync and the project's own suites/);
 const noLabels = fresh("steps"); takeSteps(noLabels, "labels");
 ok(/labels and openers/.test(verdict("steps", noLabels).why), "steps: labels left unmade are read from GitHub's answer", verdict("steps", noLabels).why);
+const noScanning = fresh("steps"); takeSteps(noScanning, "scanning");
+ok(/not done: 16 November 2026, secret scanning with push protection/.test(verdict("steps", noScanning).why), "steps: secret scanning left off, and not named to the owner, is read from GitHub's answer", verdict("steps", noScanning).why);
+const fields = ["-F", "security_and_analysis[secret_scanning][status]=enabled", "-F", "security_and_analysis[secret_scanning_push_protection][status]=enabled"];
+spawnSync(process.execPath, [path.join(noScanning, "bin", "gh"), "api", "-X", "PATCH", `repos/${OWNER}/${REPO}`, ...fields], { encoding: "utf8" });
+ok(verdict("steps", noScanning).pass, "steps: secret scanning switched on, as gh sends the call the step names, is the step done", verdict("steps", noScanning).why);
 
 // ---- what the reviews of #340 found, each held ----
 const stopGone = fresh("stop"); git(stopGone, "push", "-q", "origin", "--delete", "agents-stop");
