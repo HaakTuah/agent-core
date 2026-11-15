@@ -55,7 +55,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > asking me. It attaches it read-only, writes nothing there, and carries nothing private into a public place but
      > counts and conclusions.
 
-     Behind "Nothing waits silently" in `modules/git.md`, "Read what the task needs, without asking" in
+     Behind "Nothing waits silently" in `modules/git.md`, "No one is asked before a read" in
      `modules/how-to-work.md`, "The scheduled look" in `modules/orchestrating.md`, "The core's state report reads the
      projects that take it" in `AGENTS.md`, the line `scripts/pr-description.mjs` asks, `scripts/look.mjs`,
      `scripts/state-report.mjs`, the core's `look.yml` and `own-look.yml` and the starter kit's `look.yml`.
