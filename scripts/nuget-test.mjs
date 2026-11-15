@@ -453,6 +453,19 @@ if (process.platform !== "win32") {
   ok(deps.failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)), "a file the pull request changes, which a filter its .gitattributes names would clean into the base's: it fails", JSON.stringify(deps));
   git("config", "--unset", "filter.same.clean"); for (const f of [".gitattributes", "base-copy.txt", DEPS, "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no filter");
 }
+// a file the base's own .gitattributes has git write in another encoding at checkout (git's own advice for UTF-16): as
+// the base held it, reported, so that a sync fails no project that changed nothing (#272)
+inRepo(".gitattributes", "*.props working-tree-encoding=UTF-16LE-BOM eol=crlf\n"); inRepo("Directory.Build.props", "<Project />\n"); git("add", "-A"); git("commit", "-q", "-m", "a wide checkout");
+fs.rmSync(path.join(repo, "Directory.Build.props")); git("checkout", "--", "Directory.Build.props");
+const checkedOut = fs.readFileSync(path.join(repo, "Directory.Build.props"));
+if (checkedOut[0] !== 0xff || checkedOut[1] !== 0xfe) console.log("skip a checkout in another encoding: this machine's git writes none");
+else {
+  const wideOut = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, ".gitattributes", "Directory.Build.props"], process.env, { base: "HEAD", baseConfig: null });
+  ok(!wideOut.failures.some(x => x.includes("Directory.Build.props")) && wideOut.reports.some(x => x.startsWith("Directory.Build.props is not plain UTF-8") && x.includes("held before this check read it")), "a file the base's own attributes have git check out in UTF-16, unchanged: reported, and passes", JSON.stringify(wideOut));
+  fs.writeFileSync(path.join(repo, "Directory.Build.props"), Buffer.concat([checkedOut, Buffer.from("<!---->", "utf16le")]));
+  ok(check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, ".gitattributes", "Directory.Build.props"], process.env, { base: "HEAD", baseConfig: null }).failures.some(x => x.startsWith("Directory.Build.props is not plain UTF-8")), "the same file changed by the pull request: it fails");
+}
+for (const f of [".gitattributes", "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no wide checkout");
 // a .user file not plain UTF-8, which the base held beside no project file and the pull request brings into play with
 // one: it fails, as any .user file so brought (#272)
 const WIDE_USER = "src/Wide/Wide.csproj.user";

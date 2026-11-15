@@ -488,13 +488,18 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (!then) then = importsOf([...baseTree().keys()], baseBytes).brought;
     return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
-  // (whether a file stands as the base held it, byte for byte, as MSBuild reads it, save the line endings a checkout
-  // writes for itself (core.autocrlf on Windows), which XML reads as one: never through git's own filters, which a pull
-  // request's .gitattributes could point at a file to make other bytes read as the base's)
+  // (whether a file stands as the base held it, byte for byte, as MSBuild reads it: as the base's blob, save the line
+  // endings a checkout writes for itself (core.autocrlf on Windows), which XML reads as one; or as git checks that blob
+  // out under the base's own attributes (an encoding, a filter the machine's git holds), never the pull request's, whose
+  // .gitattributes could point a filter at a file to make other bytes read as the base's)
   const lf = (bytes) => Buffer.from(bytes.toString("latin1").replace(/\r\n/gu, "\n"), "latin1");
   const same = (f, follow = true) => {
     const at = baseFile(f, follow), was = at === null ? null : bytesAt(at), here = readNow(f);
-    return was !== null && here !== null && (was.equals(here) || lf(was).equals(lf(here)));
+    if (was === null || here === null) return false;
+    if (was.equals(here) || lf(was).equals(lf(here))) return true;
+    let out;
+    try { out = execFileSync("git", [`--attr-source=${base}`, "cat-file", "--filters", `${base}:${at}`], { cwd: root, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28, timeout: 60000 }); } catch { return false; }
+    return out.equals(here) || lf(out).equals(lf(here));
   };
   for (const [f, text] of now.files) {
     const found = now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
