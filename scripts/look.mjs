@@ -16,8 +16,8 @@
 //     closes this one: a session closes it once it has found why.
 //   - What the dose makes due (dose.mjs; modules/cleaning.md): cleaning, while the codebase is not in standard, and an
 //     audit by a reader, which the look labels needs-owner in place of queued where the project is in debt and its
-//     baseline no smaller than at the last audit. What the staged cases make due joins DUE as their rule comes
-//     (#235); and the pass twice a year over the choices that are hard to undo (choices.mjs).
+//     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and the pass
+//     twice a year over the choices that are hard to undo (choices.mjs).
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again.
 // Its record is the body of one closed issue, "The scheduled look's record", which it writes on each run. A run by a
 // session (not GitHub's job) where the record shows a run less than SOON hours before does nothing more, so an
@@ -29,7 +29,8 @@
 //
 //   node core/scripts/look.mjs            the look (GITHUB_REPOSITORY and GH_TOKEN set by GitHub's job; else the
 //                                         clone's origin and gh's own sign-in)
-//   node core/scripts/look.mjs --dry      what it would open, update, reopen or close; it writes nothing
+//   node core/scripts/look.mjs --dry      what it would open, update, reopen or close; it writes nothing (inbox.mjs's
+//                                         asked() may send an empty body, which creates nothing)
 //   node core/scripts/look.mjs --now      a session's run though the record shows one less than SOON hours before
 //   node core/scripts/look.mjs --inbox    where issues cannot be reached, writes what it would open to inbox/
 import { spawnSync } from "node:child_process";
@@ -38,12 +39,13 @@ import path from "node:path";
 import { look as choicesDue } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
-import { answer, FOLDER, repoOf } from "./inbox.mjs";
+import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
+import { dueIssue as stagedCases } from "./staged.mjs";
 import { copies, monthOf, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
@@ -59,10 +61,10 @@ export const TITLES = {
   missed: "The scheduled look missed a run",
 };
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
-// issue it keeps and `unread` leaving it as it stands: the pass over the choices that are hard to undo (choices.mjs),
-// the cleaning and the audit the dose makes due (dose.mjs), and, as their rule comes, the staged cases (#235). One
+// issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
+// the choices that are hard to undo (choices.mjs); and the cleaning and the audit the dose makes due (dose.mjs). One
 // that says `owner`, true or false, has its issue's state label kept to it: needs-owner where true, else queued.
-export const DUE = [choicesDue, cleaningDue, auditIsDue];
+export const DUE = [stagedCases, choicesDue, cleaningDue, auditIsDue];
 export const OWNERS = "needs-owner";
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
@@ -187,7 +189,7 @@ function main(args) {
   else {
     let got = null, refused = false;
     try { got = JSON.parse(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
-    reach = got && typeof got === "object" && got.permissions ? answer(got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
+    reach = got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
   }
   if (!reach) { say(`The scheduled look could not ask GitHub here (gh is not installed, answers for no account, or gave no answer): nothing was looked at. Run \`node ${scripts}/look.mjs\` where gh answers.`); return 0; }
 

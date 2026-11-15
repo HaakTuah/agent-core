@@ -30,6 +30,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a change
   that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all the
   rules for room and found too little (`AGENTS.md`).
+- **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
+  (`scripts/holders.json`); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
+  A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
+  in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
+  when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
+  check reads").
 
 ## How a project takes the core
 
@@ -66,21 +72,28 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    sessions either, its merger runs `scripts/pure-sync.mjs` from a checkout of the release the sync moves to, itself a
    commit of `main` (floor rule 8; a sync to a commit that is no release is no pure sync, and any check of it is run
    from the core's `main`), and its first copy is made from a clone at a release.
+   A copy older than release-1 holds a sync script that knows no release and, run with no SHA, takes the core's
+   newest `main`: such a project syncs once with the release's full SHA (`node core/scripts/sync.mjs <its SHA>`), which
+   the core's owner names when handing the release on and `scripts/release.mjs` prints with each release, and from then
+   on its new script takes the releases by itself (#365).
 
-   **A release that brings nothing a project takes asks no sync of it** (#242; core archive 224). By default every
-   release past a project's pin is synced. Where the pin is the release just before the newest and nothing the project
-   takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes nothing, and
-   `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every file of the
-   core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does not name and
-   its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a project runs
-   names) and the core's own issue forms (`.github/ISSUE_TEMPLATE/`). In doubt it syncs: a change that cannot be read is
-   a change, and a module is taken where the list forgot it or the line says "all" or cannot be read. One release at
-   most is passed over, since the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at
-   the next release the project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays
-   whole and exact at its pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a
-   full SHA is refused. Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a
-   private repository, for a release that may bring it nothing. Held by `scripts/releases-test.mjs`,
-   `scripts/core-moved-test.mjs` and `scripts/upgrade-test.mjs`.
+   **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 227). By
+   default every release past a project's pin is synced. Where the pin is the release just before the newest and nothing
+   the project takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes
+   nothing, and `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every
+   file of the core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does
+   not name and its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a
+   project runs names), the core's own issue forms (`.github/ISSUE_TEMPLATE/`), and the core's own files that no project
+   reads, each named (#342): its queue, `QUEUE.md`, and the workflows no project can call, `own-description.yml`,
+   `own-look.yml`, `own-security-review.yml`, `release.yml`, `size.yml` and `tests.yml` under `.github/workflows/`
+   (`OWN_FILES` in `scripts/releases.mjs`). In doubt it syncs: a change that cannot be read is a change, and a module is
+   taken where the list forgot it or the line says "all" or cannot be read. One release at most is passed over, since
+   the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at the next release the
+   project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays whole and exact at its
+   pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a full SHA is refused.
+   Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a private repository, for
+   a release that may bring it nothing. Held by `scripts/releases-test.mjs`, `scripts/core-moved-test.mjs` and
+   `scripts/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
@@ -109,7 +122,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
-     the config's "agentTools" does not list, with its publisher and version: floor topic 15). A package or
+     the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
+     configuration pins where it pins one: floor topic 15). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
@@ -342,7 +356,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   (core archive 152).
 - Each repository's secret scanning with push protection (Settings, Advanced Security), where the repository has it:
   GitHub then refuses a push that holds a key of a kind it knows, before the key reaches the history, which no check
-  on a pull request can (floor rule 1).
+  on a pull request can (floor rule 1). Who switches it on stands in floor topic 9: in a public repository a session, and
+  in a private one, where it may be billed, the owner (the sync note "16 November 2026, secret scanning with push
+  protection" says how).
 - A private repository on GitHub's free plan has neither rulesets nor GitHub's secret scanning. GitHub Pro gives it
   rulesets, and so the ruleset above. Where it has no secret scanning of GitHub's, its owner may add a secret scanner
   at one pinned version, run as a tool that only runs (floor rule 10's tools' list), from a workflow of the project's
