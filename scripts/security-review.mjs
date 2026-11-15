@@ -85,7 +85,9 @@ const CHECKS = 'the fallback reviewer checks the head, posts "Security review: <
 const HIDDEN = `an open finding of Codex's is in no comment. Mend: ${CHECKS}`;
 function mendsFor(read) {
   const app = read.unread === true || (read.review !== null && typeof read.review === "object");
-  return app ? { post: CHECKS, none: "wait 5 min; then the fallback reviewer reviews, posts one" }
+  // (one begun gets about 30 minutes, one not begun about 5: point 3)
+  const begun = RUNNING.includes(read.review?.status);
+  return app ? { post: CHECKS, none: `wait ${begun ? "30 min for Codex's" : "5 min"}; then the fallback reviewer reviews, posts one` }
     : { post: 'your security reviewer checks the head, posts "Security review: <whole SHA>"', none: "your security reviewer reviews; with Codex's app, the fallback reviewer after 5 min" };
 }
 // the words Codex's app writes for a review under way; any other (completed, none, or one not known) is none running,
