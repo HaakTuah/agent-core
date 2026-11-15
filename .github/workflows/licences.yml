@@ -16,7 +16,8 @@
 # a package list of the project's own asks for is one version as SemVer writes one and, letter for letter, the version
 # its lockfile installs.
 # The third, core/scripts/agent-tools.mjs, holds floor topic 15's list of the agents' own tools against what the
-# project configures for them (read against the base, the first parent of the merge, until the list is written).
+# project configures for them (read against the base, the first parent of the merge, until the list is written), and
+# a plug-in's or tool server's listed version against the pin its configuration gives, where it gives one.
 name: licences
 
 on:
@@ -34,6 +35,11 @@ jobs:
   licences:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
+    # main, a schedule or a start by hand is its own group and is never cancelled; #388)
+    concurrency:
+      group: licences-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-${{ inputs.config }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

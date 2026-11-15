@@ -14,8 +14,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 ## Two layers
 
 - **The floor** (`floor/`): what keeps the owner from harm and loss, taken whole by every project. If a project dropped
-  a rule, could the owner be harmed or something be lost for good? Then it is floor. `security.md` holds the rules any
-  task can break, read at the start of every task; `topics.md` the rules for particular work; `threat-model.md` the
+  a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
+  `security.md`, whose opening says what it and `topics.md` hold and when each is read, and `threat-model.md`, the
   shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
@@ -30,6 +30,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a change
   that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all the
   rules for room and found too little (`AGENTS.md`).
+- **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
+  (`scripts/holders.json`); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
+  A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
+  in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
+  when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
+  check reads").
 
 ## How a project takes the core
 
@@ -66,6 +72,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    sessions either, its merger runs `scripts/pure-sync.mjs` from a checkout of the release the sync moves to, itself a
    commit of `main` (floor rule 8; a sync to a commit that is no release is no pure sync, and any check of it is run
    from the core's `main`), and its first copy is made from a clone at a release.
+   A copy older than release-1 holds a sync script that knows no release and, run with no SHA, takes the core's
+   newest `main`: such a project syncs once with the release's full SHA (`node core/scripts/sync.mjs <its SHA>`), which
+   the core's owner names when handing the release on and `scripts/release.mjs` prints with each release, and from then
+   on its new script takes the releases by itself (#365).
 
    **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 227). By
    default every release past a project's pin is synced. Where the pin is the release just before the newest and nothing
@@ -112,7 +122,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
-     the config's "agentTools" does not list, with its publisher and version: floor topic 15). A package or
+     the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
+     configuration pins where it pins one: floor topic 15). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
@@ -174,35 +185,38 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
      itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
-   - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
-     core's with the licence check's config: a restore of each project file git knows from its lock file alone
-     (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
-     config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads from
-     NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
-     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from
-     the manifest of the package the restore brought; what the restore brought that no lock file names is held to the
-     list for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named
-     in the config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
+   - **A project whose packages come from NuGet** has a `nuget.yml` of its own that calls the core's on every pull
+     request (in a private repository, as the starter kit writes it, only on one that changes a file NuGet reads by
+     name, so no other bills a job), with the licence check's config: a restore of each project file git knows from its
+     lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
+     what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
+     from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
+     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the
+     manifest of the package the restore brought; what the restore brought that no lock file names is held to the list
+     for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
+     config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
      licence a machine can read is read by hand: a tool that only runs is then recorded in the audit as
-     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
-     off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
-     It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
-     private repository calls it like any other: it needs nothing of GitHub's paid code security. Like the signature
-     check, it first looks whether the pull request changes anything NuGet reads (its workflow's header lists what),
-     and passes without a restore where it changes none; any doubt runs it. Before the restore, which runs the pull
-     request's own build files, `nuget-fetch.mjs` fetches every package the lock files name, holds each to its lock
-     file's content hash and reads its licence from it, so no build has run beside that verdict; the tools a manifest
-     of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are fetched and held the same way, each at one
-     exact version and to the list for tools that only run (what is wrong with a tool the pull request's base held,
-     never read before this release, is reported, not failed). Where the first look restored, which runs the pull
-     request's build files, that read is left out: nothing it reads changed from the base.
+     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one off
+     its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It
+     fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a private
+     repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it where a
+     job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026, the NuGet
+     check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
+     NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
+     it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
+     lock files name, holds each to its lock file's content hash and reads its licence from it, so no build has run
+     beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are
+     fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
+     with a tool the pull request's base held, never read before this release, is reported, not failed). Where the first
+     look restored, which runs the pull request's build files, that read is left out: nothing it reads changed from the
+     base.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
-     request or by a comment that opens "Security review:" from the repository's owner (the *owner's account*, where
-     that owns it), or an account the project names in its call (the input `reviewers`) (`modules/reviews.md`, point 3),
-     the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
-     one posted after it began, never a note posted before it; a review of an earlier commit than the head stands only
+     request or by a comment that opens "Security review:" from an account `modules/reviews.md`, point 3, counts (the
+     repository owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex
+     marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
+     never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running

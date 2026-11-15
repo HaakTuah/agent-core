@@ -19,7 +19,8 @@
 //   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
 //   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
-//              workflows, which need it (README.md, point 5, "A private repository")
+//              workflows, which need it (README.md, point 5, "A private repository"), and a NuGet check started only
+//              by a pull request that changes a file NuGet reads by name
 //   --game     a game: the module game-design.md with the others
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -147,10 +148,21 @@ export function fill(text, words) {
   return out;
 }
 
+// A game's own rows of its manifest: the slots modules/game-design.md uses, each left for the project to fill (#329).
+export const GAME_ROWS = [
+  ["computer players", "what the game calls its computer players, and where their logic lives"],
+  ["measured players", "the computer players the measurement plays, and where they live"],
+  ["what they are shown", "what the computer players are shown of the game, and where it is made"],
+  ["use-against-ignore measurement", "the command that plays a feature used against it ignored, and what it prints"],
+  ["where the numbers go", "where that measurement's numbers are kept"],
+  ["where rules are taught", "where a player learns the rules, such as the help screen's file"],
+];
+
 // Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
 // `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
-  const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game)." };
+  const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game).",
+    games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "" };
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     // (Dependabot's own part for each installer the project named, after the part every project has)
@@ -159,6 +171,9 @@ export function files(o, pin, moduleNames, read) {
       if (o.packages !== undefined) text += fill(read("dependabot-npm.yml.tmpl"), { ...words, npm: folder(o.packages) });
       if (o.nuget !== undefined) text += fill(read("dependabot-nuget.yml.tmpl"), { ...words, nuget: folder(o.nuget) });
     }
+    // (a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name: no other
+    // pull request bills its job; AGENTS.md, "Nothing locks a project")
+    if (to === ".github/workflows/nuget.yml" && o.private) text = text.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${fill(read("workflows/nuget-paths.yml.tmpl"), words)}`);
     return [to, text];
   });
 }
@@ -236,7 +251,7 @@ function init(argv) {
   firstBaselines(here);
 
   console.log(`The starter kit is written: ${out.length + 4} files (the last four checks/sizes.json, checks/licences.json, checks/copies-baseline.json and checks/shape-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
-  const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).trim()}` : null).filter(Boolean));
+  const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
   console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/modules/code-shape.md)`);
