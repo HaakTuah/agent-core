@@ -64,13 +64,16 @@ is any move, rule or power a player can choose to use.
   depend on which the game settles first: they share, or a seeded draw decides.
 - **Everything new belongs** (core archive 105). Every new feature feels balanced, cohesive and purposeful, and fits the
   rest of the game: it reads and changes quantities other systems use, never keeping its own beside them (core archive
-  114).
+  114), each through what the system that owns it offers (`modules/code-shape.md`, where the *computer players* are a
+  system of their own, of the domain `computer-players`).
 - **Every stage is a game** (core archive 204). A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **No stopgaps** (core archive 107). The work serves the finished game, so nothing is built for the meantime: where a
   change comes before a feature it would want, the game stays as it is until that feature comes, and the change says so.
   - A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
     work if need be.
+  - It speaks of what the game offers its players, not of how its code is rebuilt: a named bridge that a stage of a
+    large refactor leaves, with the task that removes it queued, is none (`modules/cleaning.md`).
 - **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets that neither
   reality nor its causes fix (a time, a cost, a chance) is a first guess, listed in the change and tuned by measured
   play, never just picked.

@@ -24,16 +24,19 @@ provider, `modules/other-builders.md`, though none builds here (the *other build
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md` and `modules/choices.md`.
+`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md`, `modules/choices.md`,
+`modules/code-shape.md` and `modules/cleaning.md`.
 
 Not taken, each for its reason:
 
 - `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
   player chooses to use, which are all that module governs.
 
-The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps the
-audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is
-`archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*: `README.md`; the
+The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
+those written before 12 November 2026); the *audits*: `reports/`; the *choice records*: `CHOICES.md`;
+the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
+`README.md`; the
 *large file*: past about 50 KB; the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the
 same file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
@@ -139,15 +142,15 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   A baseline is a debt, not an exemption: the project's agents work it down by tasks, at the dose the codebase's state
   sets, never by a red check, and in the core's own repository none may stand (#259). The audits and the cleaning
   share run by themselves in every project; its owner may change the dose with one line of the manifest, and is not
-  asked to (#246, #248). It does not mean that all a release brings arrives advisory or off, nor that old code is left
+  asked to (`modules/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
   alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
   waiting on its owner, for something it did not change. Held by `scripts/upgrade-test.mjs`, in
   `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
-  heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`) once #246
-  gives it the dose to read.
+  heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
+  reads it from the shape check's baseline (`scripts/dose.mjs`).
 - **A release says what it asks, step by step** (core archive 215). Whoever adds an entry to `setup/sync-notes.md`
   gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
