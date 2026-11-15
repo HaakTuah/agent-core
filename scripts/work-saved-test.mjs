@@ -41,6 +41,19 @@ r = hook("stop", project, '{"stop_hook_active": true}');
 ok(r.status === 0, "a second stop in a row goes through", `${r.status} ${r.stderr}`);
 r = hook("start", project);
 ok(r.status === 0 && /not committed/.test(r.stdout), "at a session's start it reports and stops nothing", `${r.status} ${r.stdout}`);
+// the starter kit's hooks for Kiro and Codex (modules/tools.md), run from a folder inside the project, as those tools
+// start a command where the session works, with no CLAUDE_PROJECT_DIR: each finds the project's root by git
+const kit = name => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8"));
+const kiroStop = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "Stop").action.command;
+const codex = kit("codex-hooks.json.tmpl").hooks, codexOf = event => codex[event][0].hooks[0].command;
+fs.mkdirSync(path.join(project, "sub"), { recursive: true });
+const other = (cmd, input = "{}") => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input, encoding: "utf8", cwd: path.join(project, "sub"), env: rest }); };
+r = other(kiroStop);
+ok(r.status === 2 && /not committed, such as note\.txt/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
+r = other(codexOf("Stop"), '{"stop_hook_active": true}');
+ok(r.status === 0, "Codex's stop hook lets a second stop in a row through", `${r.status} ${r.stderr}`);
+r = other(codexOf("SessionStart"));
+ok(r.status === 0 && /not committed/.test(r.stdout), "Codex's start hook reports and stops nothing", `${r.status} ${r.stdout}`);
 // with no node on the path, the start says in a line that the helper hook is off, and stops nothing
 const noNode = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => d && !["node", "node.exe"].some(n => fs.existsSync(path.join(d, n)))).join(path.delimiter);
 const pathKey = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";

@@ -4,7 +4,9 @@
 //   CLAUDE.md                 Claude Code: `@<path>`, from the root; `@AGENTS.md` pulls in all AGENTS.md names
 //   .kiro/steering/core.md    Kiro: `#[[file:<path>]]`, from the root
 //   .agents/rules/core.md     Antigravity: `@[<name>](<path>)`, from the rule's own folder
-// It fails an entry file that pulls in less than AGENTS.md names, saying the line to add. A tool that reads AGENTS.md
+// It fails an entry file that pulls in less than AGENTS.md names, saying the line to add, and one its tool would not
+// load at every session's start by its front matter (Kiro's `inclusion`, `always` where it is left out; Antigravity's
+// `trigger: always_on`). A line inside a fenced block or an HTML comment pulls in nothing. A tool that reads AGENTS.md
 // alone (Codex) has no entry file, and an entry file the project does not hold is not looked for.
 //
 // Nothing locks a project (AGENTS.md of the core): with ENTRY_BASE set to the pull request's base (as the copies
@@ -20,17 +22,29 @@ import { ENTRY_FILES } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 
 export const AGENTS = "AGENTS.md";
-// Each entry file: its tool, the paths it pulls in (each from the root), and the line that pulls in one.
+// A file's front matter (the lines between a first line "---" and the next "---"), as { key: value }, or {} where none.
+const front = text => {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/u.exec(String(text));
+  return Object.fromEntries((m?.[1] ?? "").split(/\r?\n/u).map(l => /^([A-Za-z_]+):[ \t]*(.*?)[ \t]*$/u.exec(l)).filter(Boolean).map(x => [x[1], x[2].replace(/^(["'])(.*)\1$/u, "$2")]));
+};
+// A file's text without its fenced blocks and HTML comments, which pull in nothing.
+const live = text => String(text).replace(/<!--[\s\S]*?(?:-->|$)/gu, "").replace(/^[ \t]*(```|~~~)[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gmu, "");
+
+// Each entry file: its tool, the paths it pulls in (each from the root), the line that pulls in one, and why its tool
+// would not load it at every session's start, with the mend (null where it would).
 export const ENTRY = [
-  { file: ENTRY_FILES.claude, tool: "Claude Code", line: p => `@${p}`, pulls: text => [...String(text).matchAll(/^@(\S+)\s*$/gmu)].map(m => m[1]) },
-  { file: ENTRY_FILES.kiro, tool: "Kiro", line: p => `#[[file:${p}]]`, pulls: text => [...String(text).matchAll(/#\[\[file:([^\]:]+)(?::[^\]]*)?\]\]/gu)].map(m => m[1].trim()) },
+  { file: ENTRY_FILES.claude, tool: "Claude Code", line: p => `@${p}`, pulls: text => [...live(text).matchAll(/^@(\S+)\s*$/gmu)].map(m => m[1]), off: () => null },
+  { file: ENTRY_FILES.kiro, tool: "Kiro", line: p => `#[[file:${p}]]`, pulls: text => [...live(text).matchAll(/#\[\[file:([^\]:]+)(?::[^\]]*)?\]\]/gu)].map(m => m[1].trim()),
+    off: text => { const v = front(text).inclusion; return v === undefined || v === "always" ? null : `its front matter's inclusion is ${JSON.stringify(v)}. Mend: set "inclusion: always" in its front matter`; } },
   { file: ENTRY_FILES.antigravity, tool: "Antigravity", line: p => `@[${path.posix.basename(p)}](${path.posix.relative(path.posix.dirname(ENTRY_FILES.antigravity), p)})`,
-    pulls: text => [...String(text).matchAll(/@\[[^\]\n]*\]\(([^)\s]+)\)/gu)].map(m => path.posix.join(path.posix.dirname(ENTRY_FILES.antigravity), m[1])) },
+    pulls: text => [...live(text).matchAll(/@\[[^\]\n]*\]\(([^)\s]+)\)/gu)].map(m => path.posix.join(path.posix.dirname(ENTRY_FILES.antigravity), m[1])),
+    off: text => (front(text).trigger === "always_on" ? null : `its front matter has no "trigger: always_on". Mend: open the file with the front matter ---, trigger: always_on, --- on three lines`) },
 ];
 
 const clean = p => path.posix.normalize(String(p).replace(/\\/gu, "/")).replace(/^\.\//u, "");
 
-// What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line }].
+// What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line, off }], `off`
+// why its tool would not load it at all (every file is then missing), or null.
 // `read(file)` gives a file's text, or null where it is not there.
 export function lacking(read) {
   const agents = read(AGENTS);
@@ -40,18 +54,25 @@ export function lacking(read) {
   for (const e of ENTRY) {
     const text = read(e.file);
     if (text === null) continue;
+    const off = e.off(text);
+    if (off) { out.push({ file: e.file, tool: e.tool, missing: [], line: e.line, off }); continue; }
     const pulled = new Set(e.pulls(text).map(clean));
     if (pulled.has(AGENTS) && e.file === ENTRY_FILES.claude) continue; // (Claude Code follows AGENTS.md's own @ lines)
     const missing = list.filter(p => !pulled.has(p));
-    if (missing.length) out.push({ file: e.file, tool: e.tool, missing, line: e.line });
+    if (missing.length) out.push({ file: e.file, tool: e.tool, missing, line: e.line, off: null });
   }
   return out;
 }
 
 // The failures, each a line with its mend, and the notes: what `base` (a commit, or null) already lacked is a note.
 export function verdict(head, base = null) {
-  const was = new Set((base ? lacking(base) : []).flatMap(l => l.missing.map(p => `${l.file}\0${p}`)));
+  const was = new Set((base ? lacking(base) : []).flatMap(l => [...l.missing.map(p => `${l.file}\0${p}`), ...(l.off ? [`${l.file}\0off`] : [])]));
   const fails = [], notes = [];
+  for (const l of lacking(head)) {
+    if (!l.off) continue;
+    const said = `${l.file} (${l.tool}'s entry file) is not loaded at a session's start: ${l.off}`;
+    (was.has(`${l.file}\0off`) ? notes : fails).push(said);
+  }
   for (const l of lacking(head)) for (const p of l.missing) {
     const said = `${l.file} (${l.tool}'s entry file) pulls in none of \`${p}\`, which ${AGENTS} names on an @ line, so a session of ${l.tool} would not read it at its start. Mend: add the line ${l.line(p)} to ${l.file}`;
     (was.has(`${l.file}\0${p}`) ? notes : fails).push(said);

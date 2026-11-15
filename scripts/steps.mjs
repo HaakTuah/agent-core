@@ -227,7 +227,7 @@ export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a builder of another provider to read `core/modules/other-builders.md` at the start of every task");
+      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/modules/other-builders.md` at the start of every task");
       if (/^\|\s*\*Codex's checks\*\s*\|/m.test(p.manifest)) wrong.push("the manifest's row *Codex's checks* is renamed *other builders' checks*");
       return wrong.length ? `${wrong.join("; ")}.` : null;
     },

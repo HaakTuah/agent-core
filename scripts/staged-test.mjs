@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, tools, unplaced, wellFormed } from "./staged.mjs";
+import { CASES, MONTHS, TOOL, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, toolNamed, tools, unplaced, wellFormed } from "./staged.mjs";
 import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
@@ -308,6 +308,9 @@ const dueAfter = due({ at: "2026-12-20T00:00:00Z", record: { runs: kiro }, root:
 ok(dueAfter.length === CASES.length && dueAfter.every(d => d.tool === "Kiro" && /since the release of 2026-12-15/.test(d.why)), "after a release, every case is due again for a tool that has run");
 ok(due({ at: "2026-12-04T00:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core }).every(d => !d.tool), "no case is due for a tool that has never run");
 ok(!gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "Kiro")] }).failing.some(f => f.name === "stop"), "another tool's failing verdict holds no release: it says whether that tool works with the core");
+ok(toolNamed("claude  CODE") === TOOL && toolNamed("kiro") === "Kiro" && toolNamed("Claude Code (Opus)") === null, "a tool is named case and spacing aside, and only one the core has a part for");
+ok(gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "claude code")] }).failing.some(f => f.name === "stop") && gate({ runs: [...three, inTool(run("2027-01-06", ["outsider"]), "Claude Code (Opus)")] }).failing.some(f => f.name === "outsider"),
+  "a run named otherwise than a known other tool counts as the builder's, so its failure holds a release still");
 ok(/Kiro not \(stop\)/.test(forRelease({ runs: kiro }).said) && /Claude Code passed every case/.test(forRelease({ runs: kiro }).said), "the release says each tool's standing");
 ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true }).held, "cases that held the release before go on holding it");
 const prior = { runs: three }, marked = JSON.parse(JSON.stringify(prior)); marked.runs[2].cases.secret.wrong = "misread";

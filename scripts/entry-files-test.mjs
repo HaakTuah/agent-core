@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENTRY, lacking, verdict } from "./entry-files.mjs";
 import { mended } from "./mend.mjs";
+import { ruleFiles } from "./rule-files.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
@@ -29,13 +30,24 @@ ok(l.length === 1 && l[0].file === "CLAUDE.md" && l[0].missing.join() === "core/
   "a CLAUDE.md that imports neither AGENTS.md nor each of its files lacks the one it leaves out");
 l = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n#[[file:core/modules/roles.md]]\n" }));
 ok(l.length === 1 && l[0].missing.join() === "core/floor/security.md", "a file named in passing is no @ line, and a steering file that leaves one out lacks it");
-l = lacking(reader({ "AGENTS.md": AGENTS, ".agents/rules/core.md": "@[m](core-manifest.md)\n@[s](../../core/floor/security.md)\n" }));
+l = lacking(reader({ "AGENTS.md": AGENTS, ".agents/rules/core.md": "---\ntrigger: always_on\n---\n@[m](core-manifest.md)\n@[s](../../core/floor/security.md)\n" }));
 ok(l.length === 1 && l[0].missing.join() === "core-manifest.md", "an Antigravity rule's path is read from the rule's own folder, so one written from the root lacks it");
 l = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "@core-manifest.md\n@core/floor/security.md\n" }));
 ok(l.length === 1 && l[0].missing.length === 2, "a line in another tool's form pulls in nothing");
 
+l = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": KIRO.replace("inclusion: always", "inclusion: manual"), ".agents/rules/core.md": AG.replace("always_on", "model_decision") }));
+ok(l.length === 2 && l.every(x => x.off && x.off.includes("Mend:")), "an entry file its tool would not load at every start, by its front matter, is said so, with the key to set");
+ok(lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n#[[file:core/floor/security.md]]\n" })).length === 0
+  && lacking(reader({ "AGENTS.md": AGENTS, ".agents/rules/core.md": AG.replace("---\ntrigger: always_on\n---\n", "") })).length === 1,
+  "a steering file with no front matter loads always, as Kiro's documentation says; an Antigravity rule with none does not");
+l = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n```\n#[[file:core/floor/security.md]]\n```\n<!-- #[[file:core/floor/security.md]] -->\n" }));
+ok(l.length === 1 && l[0].missing.join() === "core/floor/security.md", "a line inside a fenced block or an HTML comment pulls in nothing");
+const v0 = verdict(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": KIRO.replace("inclusion: always", "inclusion: manual") }));
+ok(v0.fails.length === 1 && v0.fails[0].includes("is not loaded at a session's start") && mended(`FAIL: ${v0.fails[0]}`), "its failure says so, with the mend");
+
 const head = reader({ "AGENTS.md": `${AGENTS}@core/modules/git.md\n`, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" });
 const base = reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" });
+
 let v = verdict(head, base);
 ok(v.fails.length === 1 && v.fails[0].includes("core/modules/git.md") && v.notes.length === 1 && v.notes[0].includes("core/floor/security.md"),
   "against a base, only what the pull request leaves out fails; what the base already lacked is noted (nothing locks a project)");
@@ -72,6 +84,11 @@ ok(kitFiles[".kiro/steering/core.md"].includes("#[[file:core/modules/kiro.md]]")
   "and each its own tool's part");
 const own = f => (fs.existsSync(path.join(root, f)) ? fs.readFileSync(path.join(root, f), "utf8") : null);
 ok(lacking(own).length === 0 && ENTRY.every(e => own(e.file) !== null), "the core's own entry files stand and pull in every file its AGENTS.md names");
+
+// the rule files the copies and pointer checks read take in the entry files and every file of a tool's folders
+const rf = ruleFiles(reader({ "SECURITY.md": "**the rule files:** `docs/t.md`;", "AGENTS.md": "", ".kiro/steering/core.md": "" }), d => (d === ".kiro/steering" ? [".kiro/steering/core.md", ".kiro/steering/api.md"] : d === ".agents/rules" ? [".agents/rules/x.md"] : []));
+ok([".kiro/steering/core.md", ".kiro/steering/api.md", ".agents/rules/x.md", "docs/t.md", "AGENTS.md"].every(f => rf.includes(f)) && new Set(rf).size === rf.length,
+  "the rule files are the entry files, every file git tracks in a tool's folders of instructions, and SECURITY.md's list, each once");
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

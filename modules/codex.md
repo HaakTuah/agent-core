@@ -28,4 +28,7 @@ owner's to accept: floor rule 18):
   entry file.
 - Handed a task: the brief as its first message, or `codex exec "<the brief>"`; for a review with no app, the fresh
   session `modules/tools.md` names under "Each tool's part".
+- Its hooks run at a session's start and at its stop, Claude Code's way (exit 2 and a reason keep it going), from a
+  repository's `.codex/hooks.json` once the owner trusts that folder in Codex: the starter kit's runs the work-saved
+  hook's copy merged into `main` at both (its documentation on hooks, read on 15 November 2026).
 - Its folder .codex, where it is the project's, is protected (floor rule 3).

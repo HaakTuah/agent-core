@@ -40,6 +40,10 @@ export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.
 export const MONTHS = 3;
 export const TOOL = "Claude Code";
+// The agent tools a run may name, each with its part in modules/ (modules/tools.md, "Each tool's part"): a run of a
+// tool that has none is not recorded. Read case and spacing aside, so "claude code" is TOOL.
+export const TOOLS = [TOOL, "Codex", "Kiro", "Antigravity"];
+export const toolNamed = name => TOOLS.find(t => t.toLowerCase() === String(name ?? "").toLowerCase().replace(/\s+/gu, " ").trim()) ?? null;
 
 export const caseOf = name => CASES.find(c => c.name === name) ?? null;
 
@@ -98,7 +102,8 @@ export function latest(record) {
 
 // Each agent tool that has run, in the order of their names: { tool, passed, open }, `open` the cases it has not passed
 // on or after the day `since` (an ISO day: the newest release's; null, any day), a verdict found wrong passing none.
-const toolOf = run => String(run.tool ?? TOOL);
+// (a run's tool: any run not of another known tool counts as TOOL's, so a name written otherwise holds a release still)
+const toolOf = run => { const t = toolNamed(run.tool ?? TOOL); return t && t !== TOOL ? t : TOOL; };
 export function tools(record, since = null, cases = CASES) {
   const names = [...new Set(record.runs.map(toolOf))].sort();
   return names.map(tool => {
@@ -276,7 +281,9 @@ function readCmd(argv, get) {
 // The verdict `v` of the case `c`, set in `dir`, written to the record as a run of its own: no verdict, nor its mark,
 // is ever written over.
 function record(c, dir, v, get) {
-  const rec = readRecord(), at = new Date().toISOString().slice(0, 10), tool = get("--tool") ?? TOOL, model = get("--model") ?? "not said";
+  const tool = toolNamed(get("--tool") ?? TOOL);
+  if (!tool) return fail(`--tool ${get("--tool")} names no agent tool the core has a part for. Mend: name one of ${TOOLS.join(", ")}; for another, write its part (modules/tools.md, "Each tool's part") and add its name to TOOLS in scripts/staged.mjs in the same pull request`);
+  const rec = readRecord(), at = new Date().toISOString().slice(0, 10), model = get("--model") ?? "not said";
   const meta = memoOf(fs.realpathSync(dir), "meta");
   if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);
   const run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} };

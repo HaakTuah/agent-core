@@ -250,7 +250,7 @@ const nRead = f => fs.readFileSync(path.join(n.dir, f), "utf8");
 ok(n.status === 0 && nRead(".github/workflows/nuget.yml").includes("config: checks/licences.json") && !/^\s*advisory:/m.test(nRead(".github/workflows/nuget.yml")) && JSON.stringify(JSON.parse(nRead("checks/licences.json")).nuget) === '{"ships":[],"tools":[]}' && nRead(".github/dependabot.yml").includes('directory: "/src"') && !fs.existsSync(path.join(n.dir, ".github/workflows/signatures.yml")) && n.out.includes("RestorePackagesWithLockFile"),
   "a project whose packages come from NuGet gets the call to the NuGet check, which fails from the first day, the config's part for its lock files, and is told to turn lock files on; a private one too, since that check needs nothing GitHub sells", n.out.slice(0, 400));
 ok(!fs.existsSync(path.join(t.dir, ".github/workflows/nuget.yml")) && JSON.parse(fs.readFileSync(path.join(t.dir, "checks/licences.json"), "utf8")).nuget === undefined, "and one that named no NuGet folder gets neither");
-ok(p.status !== 0 || !/the trusted builder/.test(read("SECURITY.md")) && !p.out.includes("who may change the protected files"), "who may change the protected files is the floor's, rule 3, and left for no project to fill in");
+ok(p.status !== 0 || /\*\*the trusted builder:\*\*\n\s+FILL IN:/.test(read("SECURITY.md")) && p.out.includes("who may change the protected files"), "who may change the protected files, where the project narrows floor rule 3, is left for the project to say, and listed with what is left");
 // the kit is read from the commit, never from the clone's working folder: an edit not yet committed reaches no project
 const edited = path.join(core, TEMPLATES, "workflows", "core.yml.tmpl");
 const before = fs.readFileSync(edited, "utf8");

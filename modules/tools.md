@@ -16,8 +16,11 @@ pulls in less than `AGENTS.md` names.
 **Hooks save time; checks are the guarantee** (core archive 231). By default no rule is held by a hook alone: what a
 tool's hook holds is also held where the tool does not matter, by a check on the pull request, a staged case or the
 daily look. Where a rule's only holder in `scripts/holders.json` is a hook, `scripts/holders.mjs` lists it in the
-core's monthly state report as held by none, until another holder is named. It does not mean a hook is taken out:
-it still saves a session the work a failing check would cost. Reason: a session of a tool with no hooks must meet the
+core's monthly state report as held by none, until another holder is named. Each hook is carried to every tool whose
+documentation gives its event, as the tool's part says, the starter kit writing it; the helper hook reads Claude
+Code's own helper tool, so it goes to no other. It does not mean a hook is taken
+out: it still saves a session the work a failing check would cost. Nor does a session review a change to a tool's own
+folder with that tool open on the branch, whose hooks would run as they stand there: it reads the diff. Reason: a session of a tool with no hooks must meet the
 same rules.
 
 **A change of tool loses nothing** (core archive 231). The state of a task is in the repository and never only in a
@@ -37,7 +40,8 @@ documentation says what it reads, not whether its model keeps the rules, and the
 `scripts/staged.mjs`, which says each tool's standing, the release's notes too, and names the cases due for each.
 
 **Each tool's part** (core archive 231): how it is handed a task, how it is asked for a review, what it cannot do that
-a rule needs, and its own folders, which floor rule 3 protects by name. A tool with no review app on the host is asked
+a rule needs, and its own folders, which floor rule 3 protects by name; the model and effort it runs at are the
+project's "Pace", or `modules/claude.md` for Claude. A tool with no review app on the host is asked
 for a review by a fresh session of it given the review's brief (`modules/reviews.md`, point 7) and told to change
 nothing; its answer is posted on the PR in a comment that opens "Code review:" or "Security review:". The parts:
 `modules/claude.md`, `modules/codex.md`, `modules/copilot.md`, `modules/kiro.md` and `modules/antigravity.md`. A project

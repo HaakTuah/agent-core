@@ -263,8 +263,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on the path; where either is
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start. The
      core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
-   - **Another tool's session** has neither hook, which are Claude Code's: it reads what `AGENTS.md` names through
-     its own entry file, and no rule rests on a hook alone (`modules/tools.md`).
+   - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
+     hook where its tool has the event (Kiro at its stop, Codex at its start and stop, from the hook files the starter
+     kit writes); no rule rests on a hook alone (`modules/tools.md`).
    - **The copy's own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`, `core/.claude/`) are this
      repository's, not the project's: its issue templates and settings are its own, written for its *owner's account*.
      A tool that loads a rule file of any folder it works in (`modules/tools.md`) finds `core/AGENTS.md` opening with
@@ -316,7 +317,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *major version checks* | the extra checks a new major version gets |
 | *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`modules/choices.md`; `scripts/choices.mjs` reads it); left out, `docs/choices.md`, which the starter kit writes |
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`modules/choices.md`); left out, none |
-| *other builders' checks* | what a builder of another provider runs before it finishes (`modules/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
+| *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`modules/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
 | *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so; left out, or a row left out, the core's default (`modules/roles.md`, "Tools are preferences") |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `modules/orchestrating.md`, "The pace is the owner's", names; left out, no pace but the default |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row; left out, that row |
@@ -409,7 +410,8 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   a task, and how it is asked for a review) and the project tells the core ("Reporting to the core"), so that the tool
   gains a part here (`modules/tools.md`). Nothing more is asked of the owner: the sessions hand over by the first way
   they find, and with none the tool at hand takes the role (`modules/roles.md`, "The builders"; core archive 169 and
-  231). What a tool that pushes its own branch may change is its sign-in's (`setup/server.md`, point 5, is one choice).
+  231). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
+  or the repository's workflows wait for an approval before they run.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`modules/work-flow.md`). It stops only that repository's agents.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.

@@ -59,8 +59,7 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
     its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
     `modules/roles.md`, "The builders", says. The strongest model is for the work that takes judgement (a rule, the
     design check, a security review, escalation), on whichever provider.
-  - It does not mean a session stands idle while the owner's allowance goes unused, nor that a pace said in person
-    outlives the session it was said to.
+  - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
 - **It asks the owner nothing** but floor rule 14's yeses (core archive 133 and 134): it does it and reports it in a

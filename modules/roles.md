@@ -28,8 +28,8 @@ where that tool is not at hand, to the next it names:
   the review) takes the next.
 - It does not mean that any tool is refused a role: a preference orders and never refuses, and a project with one tool
   runs every role with it. Nor does it mean that a session judges what it wrote (below).
-- Reason: a lock on one tool shut out an owner who had one tool, and stopped the work when one provider's usage ran
-  out.
+- Reason: where only one tool might take a role, the work stopped when that provider's usage ran out, and an owner
+  with another tool alone could fill none.
 - Held by nothing yet: which tool took a role leaves no mark a check reads.
 
 **No session reviews its own work** (core archive 231): the session that reviews a change is never the session that

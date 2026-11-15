@@ -53,6 +53,8 @@ export const FILES = [
   ["CLAUDE.md.tmpl", "CLAUDE.md"],
   ["kiro-steering.md.tmpl", ".kiro/steering/core.md"],
   ["antigravity-rule.md.tmpl", ".agents/rules/core.md"],
+  ["kiro-hook.json.tmpl", ".kiro/hooks/work-saved.json"],
+  ["codex-hooks.json.tmpl", ".codex/hooks.json"],
   ["SECURITY.md.tmpl", "SECURITY.md"],
   ["threat-model.md.tmpl", "docs/threat-model.md"],
   ["PROGRESS.md.tmpl", "docs/PROGRESS.md"],

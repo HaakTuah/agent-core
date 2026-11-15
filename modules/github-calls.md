@@ -31,5 +31,6 @@ its PR's "Readings taken":
   PR gives what they printed; the "Security review:" comment stands for the `security-review` status.
 
 It does not mean a check guarding against harm is passed over: one that cannot run stops its step, as floor rule 14
-says, and the owner is told. Reason: a project whose host lacked one part stood still where the repository could
+says, and the owner is told. A check that needs a secret of the host's or a run on the host itself (the
+personal-terms check first) has no stand-in: its PR waits unmerged until it passes there (floor rules 11 and 12). Reason: a project whose host lacked one part stood still where the repository could
 carry it. Held by nothing yet: a part out of reach leaves no mark a check reads.

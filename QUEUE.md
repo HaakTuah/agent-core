@@ -57,7 +57,6 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #204 | builder | a stop that was ignored, as the staged case `stop` shows by failing |
-| #400 | the owner, or a session of Kiro | a session of Kiro, which no session here can start (`modules/tools.md`) |
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
 | #315 | the owner | the count of its point 3, which the orchestrator posts on it before the release |
 | #163 | the owner | on hold |
