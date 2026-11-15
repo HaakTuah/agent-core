@@ -204,7 +204,7 @@ jobs:
             done < "$RUNNER_TEMP/nuget-projects"
           else failed=1; fi
           if [ "$failed" = 1 ]; then
-            echo "FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. Mend: where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it; take out a package no source named in the config serves; or correct the config's sources."
+            echo "FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. Mend: where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources."
             [ "$ADVISORY" = true ] || exit 1
             echo "Advisory: nothing fails for it yet."
           fi

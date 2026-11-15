@@ -103,7 +103,7 @@ jobs:
           if [ -n "$id" ] && [ "$(git ls-tree HEAD -- core)" = "040000 tree $id"$'\t'"core" ]; then have=$(entries . HEAD:core)
           else echo "FAIL core/ is no folder of this commit (a submodule, a file, a link or nothing). Mend: write it as a folder of files at the pin, from a clone of the core: node <the clone>/scripts/sync.mjs $PIN."; have=""; bad=1; fi
           if [ "$want" != "$have" ]; then
-            echo "FAIL core/ differs from the core at its pin, by git's object ids (below; < the core's, > core/'s). Mend: write it whole at the pin again (node core/scripts/sync.mjs $PIN); a change to the core is made in the core's own repository."
+            echo "FAIL core/ differs from the core at its pin, by git's object ids (below; < the core's, > core/'s). Mend: write it whole at the pin again, from a clone of the core (node <the clone>/scripts/sync.mjs $PIN); a change to the core is made in the core's own repository."
             diff <(printf '%s\n' "$want") <(printf '%s\n' "$have") | grep '^[<>]' | head -n 20 || true
             bad=1
           fi

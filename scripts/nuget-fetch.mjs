@@ -291,7 +291,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     }
     if (bytes && p.alsoTool && other) (p.alsoHeld ? out.reports : out.failures).push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${other} gives. Mend: take the tool from the source that gives the locked file, or name that source first${p.alsoHeld ? ` ${heldBefore}` : ""}`);
     if (!bytes && !out.failures.length) {
-      if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15). Mend: write the lock file anew from the sources the config names (dotnet restore --force-evaluate), and commit it`);
+      if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15). Mend: take it from the source that gives the locked file, named in the config's "nuget.sources"; where the new file is meant, move to a new version in a pull request of its own, never writing the lock file anew over this one`);
       else if (unread && !p.tool) out.notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);
       else if (unread) out.failures.push(`${name}: a tool held by no source this reads (a feed not of NuGet's v3 form), and no restore brings a tool. Mend: take it from a source of NuGet's v3 form`);
       else out.failures.push(`${name}: in neither NuGet's registry nor a source the config names. Mend: take it from NuGet's registry, or name its source in the config's "nuget.sources"`);

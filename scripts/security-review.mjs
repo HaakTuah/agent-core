@@ -120,7 +120,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const changed = Number.isFinite(read.changed) ? read.changed : Infinity;
   let verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits, changed, bound);
   if (running && !verdict.done && all.length > 0 && posted.length === 0) {
-    const why = "Codex's security review is running, begun after every \"Security review:\" posted. Mend: wait, or post one now";
+    const why = "Codex's security review is running, begun after every \"Security review:\" posted. Mend: wait for it";
     // (one whose head does not hold this check as the default branch does stood before it came: reported)
     verdict = bound ? { sha, done: false, why } : { sha, done: true, why: "before this check came, so not waited for: Codex's security review began after every \"Security review:\"" };
   }
@@ -128,7 +128,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (verdict.done && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
     const codexDone = review !== null && typeof review === "object" && review.status === "completed";
     if ((codexDone ? 1 : 0) + posted.length < 2) {
-      const why = `what runs by itself changed (floor rule 3). Mend: post a second "Security review:", or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
+      const why = `floor rule 3 asks two. Mend: the fallback reviewer posts the second, or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
       // a pull request whose head does not hold this check as the default branch does stood before it came: reported
       verdict = bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
     } else verdict = { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
@@ -198,7 +198,7 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits, cha
   const dependabots = pull.user?.login === DEPENDABOT && pull.user.type === "Bot" && typeof pull.head.repo?.full_name === "string" && pull.head.repo.full_name === pull.base?.repo?.full_name
     && all.length > 0 && all.every(its) && all.some((commit) => commit.sha === sha);
   if (dependabots && !(review !== null && typeof review === "object" && typeof review.status === "string")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
-  return { sha, done: false, why: "no security review has run yet. Mend: wait, or post a \"Security review:\" naming tool and commit" };
+  return { sha, done: false, why: "no security review has run yet. Mend: wait, or ask another reviewer for one" };
 }
 
 // the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the

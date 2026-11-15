@@ -57,7 +57,7 @@ const commit = (sha, ...parents) => ({ sha, parents: parents.map((p) => ({ sha: 
 const line = [commit(OLD, "8".repeat(40)), commit(HEAD, OLD)]; // OLD, then HEAD on it
 const code = [{ filename: "src/x.js", status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }];
 const had = (comments, commits = line, files = code, p = pull, rules = [], bound = true) => judge({ commits: commits.length, changed_files: files.length, ...p }, comments, commits, files, rules, bound);
-ok(is(had([]), false, "no code review of cccccc") && is(had([summary({ commit_sha: null, status: null })]), false, "ask one, or post"), "one that needs a code review and had none waits, and says how to mend it");
+ok(is(had([]), false, "no code review of cccccc") && is(had([summary({ commit_sha: null, status: null })]), false, "ask one, or another reviewer posts"), "one that needs a code review and had none waits, and says how to mend it");
 ok(is(had([summary(done)]), true, "a code review has run") && is(had([said(`Code review: of ${HEAD}`)]), true, "a code review has run") && is(had([said(`**Code review:** of ${HEAD}`, "COLLABORATOR")]), true, "a code review has run"), "Codex's completed on the head, or one posted naming the head whole, settles it");
 ok(is(had([summary({ ...done, commit_sha: OLD })]), false, "no code review") && is(had([said(`Code review: of ${OLD}`)]), false, "no code review"), "one of an earlier commit with a commit of the builder's after it does not");
 ok(is(had([said(`Code review: of ${HEAD.slice(0, 39)}`)]), false, "no code review") && is(had([said(`Code review: of ${HEAD}`, "NONE")]), false, "no code review") && is(had([said(`Security review: of ${HEAD}`)]), false, "no code review"), "nor one naming part of the SHA, by another account, or that is no code review");
