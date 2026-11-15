@@ -64,7 +64,7 @@ try {
   git("add", "package.json", ".gitignore", "test/c-test.mjs");
   const installed = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
   const strict = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
-  ok(installed.status === 0 && !installed.stdout.includes("test/c-test.mjs") && strict?.status !== "NoCoverage", "a test that imports an installed package runs in the working copies, as it does in the project", installed.stdout + installed.stderr + JSON.stringify(strict));
+  ok(installed.status === 0 && !installed.stdout.includes("test/c-test.mjs") && strict?.status !== "NoCoverage" && fs.existsSync(path.join(dir, "node_modules/limit/index.js")), "a test that imports an installed package runs in the working copies, as it does in the project, and what was installed stands after them", installed.stdout + installed.stderr + JSON.stringify(strict));
   git("rm", "-q", "-f", "--cached", "package.json", ".gitignore", "test/c-test.mjs");
   for (const f of ["package.json", ".gitignore", "test/c-test.mjs", "node_modules"]) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
   write("test/b-test.mjs", "import { big } from '../src/a.mjs';\nif (big(10)) process.exit(1);\n");

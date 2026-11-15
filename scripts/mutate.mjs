@@ -11,7 +11,8 @@
 // takes longer than LONGEST, catches nothing and is left out, and the run says so. Each fault runs in a working copy of
 // its own (a git worktree of HEAD, with the files that differ from it copied in), several side by side, so the
 // project's own files are never changed; a fault whose tests run past their time is caught (a timeout, as Stryker
-// counts it). Past the budget, the faults left are written as not run ("Pending").
+// counts it). Past the budget, the faults left are written as not run ("Pending"). What the project installed (its
+// node_modules) is shared with the working copies by a link, not copied, so a test that writes there writes to it.
 //
 //   node core/scripts/mutate.mjs --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]
 //       the faults on those lines, or with no file named every file of the config's "code" that is no test (the
@@ -123,6 +124,11 @@ function run(test, cwd, limit) {
   });
 }
 
+// The links to installed dependencies the working copies hold: each taken away, the link alone, before its copy, so
+// that removing the copy never goes into what the project installed (git on Windows reads a junction as a folder).
+const linked = [];
+const unlink = to => { try { fs.unlinkSync(to); } catch { try { fs.rmdirSync(to); } catch { /* (gone) */ } } };
+
 // A working copy of the project: a git worktree of HEAD, with the files that differ from it, staged or not, and the new
 // ones copied in, and its installed dependencies linked.
 function copyOf(dir) {
@@ -138,7 +144,7 @@ function copyOf(dir) {
   // link to them, a junction on Windows, so that a test that imports one runs there as it does in the project)
   for (const manifest of git(["ls-files", "-z", "--", ":(glob)**/package.json"]).split("\0").filter(Boolean)) {
     const installed = path.join(path.dirname(manifest), "node_modules"), to = path.join(dir, installed);
-    if (fs.existsSync(installed) && !fs.existsSync(to)) fs.symlinkSync(path.resolve(installed), to, "junction");
+    if (fs.existsSync(installed) && !fs.existsSync(to)) { fs.symlinkSync(path.resolve(installed), to, "junction"); linked.push(to); }
   }
   return dir;
 }
@@ -190,6 +196,7 @@ export function report(texts, jobs) {
 
 // The working copies taken away, as the run ends or is stopped.
 function takeAway(copies, scratch) {
+  for (const to of linked.splice(0)) unlink(to);
   for (const dir of copies.splice(0)) try { git(["worktree", "remove", "--force", dir]); } catch { /* (taken away below) */ }
   fs.rmSync(scratch, { recursive: true, force: true });
   try { git(["worktree", "prune"]); } catch { /* (nothing to prune) */ }
