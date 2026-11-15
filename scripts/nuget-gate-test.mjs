@@ -1,7 +1,8 @@
 // Checks the NuGet check's own steps (.github/workflows/nuget.yml): first "Does the pull request change what NuGet
 // reads?", then the whole job, each run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull
 // requests of a .NET project that holds one real package in its lock file: it says to restore wherever a pull request
-// changes a file it names, and, where none changed, wherever NuGet finds a lock file that no longer holds what its
+// changes a file it names (a file an Import brings in among them, as the project's copy of the core's script lists
+// them), and, where none changed, wherever NuGet finds a lock file that no longer holds what its
 // project asks for, however the project asks (in an import, two imports on a line, through a property, a link, a name
 // outside plain ASCII), or a package downloaded beside it; and not to where only other files change. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
@@ -59,6 +60,7 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   git(dir, "init", "-q", "-b", "main");
   const put = set => { for (const [f, text] of Object.entries(set)) { const at = path.join(dir, f); if (text === null) fs.rmSync(at); else { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.writeFileSync(at, text); } } };
   put({ ...START, ...start });
+  fs.cpSync(path.join(root, "scripts"), path.join(dir, "core/scripts"), { recursive: true });
   if (link) fs.symlinkSync(link[1], path.join(dir, link[0]));
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "base");
@@ -86,6 +88,8 @@ for (const [what, files, opts] of [
   ["one that changes a folder the config names as a source", { "local-packages/a.nupkg": "x" }],
   ["one that adds a tools manifest at a folder's top, which dotnet reads as one in .config/", { "dotnet-tools.json": '{ "version": 1, "isRoot": true, "tools": {} }\n' }],
   ["one that changes the calling workflow, under its own name", { ".github/workflows/restore.yml": "name: restore again\n" }, { caller: "restore.yml" }],
+  ["one that changes only a file an Import brings in", { "build/deps.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }],
+  ["one that changes only a file an imported file brings in, written with a tab and a reference", { "build/deeper .xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "build/deps.xml": '<Project>\n  <Import Project="deeper\t&#46;xml" />\n</Project>\n', "build/deeper .xml": EMPTY } }],
   ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
 ]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
 
@@ -94,7 +98,6 @@ if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
 else {
   skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
   skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
-  skips("one that changes an imported file in a way that asks for nothing new", { "build/deps.xml": "<Project>\n  <PropertyGroup>\n    <Nothing>x</Nothing>\n  </PropertyGroup>\n</Project>\n" });
   restores("one that adds a package only in a file a project file imports", { "build/deps.xml": ADDS });
   restores("one that adds it in the second of two imports on a line", { "build/two.xml": ADDS }, { start: { "src/App/App.csproj": project('  <Import Project="..\\..\\build\\deps.xml" /><Import Project="..\\..\\build\\two.xml" />\n'), "build/two.xml": EMPTY } });
   restores("one that adds it in a file a property imports", { "build/two.xml": ADDS }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY } });
@@ -138,8 +141,11 @@ if (sdk) {
   // (where the first look itself restored, the pull request's build files have run: the read before the restore is
   // left out, nothing it reads having changed from the base)
   const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
-  const built = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
+  // (a file a property brings in, which only NuGet's own word sees: an imported one the first look names by itself)
+  const built = whole({ "build/two.xml": ADDS }, { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY });
   ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out);
+  const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
+  ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out);
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }

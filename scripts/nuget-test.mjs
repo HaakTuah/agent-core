@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { REGISTRY, check, imported, lockPackages, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
+import { REGISTRY, check, importPath, imported, importsOf, lockPackages, plainText, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -191,13 +191,15 @@ put("build/Fallback.props", "<Project><PropertyGroup><RestoreAdditionalProjectFa
 ok(/build\/Fallback\.props names RestorePackagesPath or a fallback folder/.test(names(["build/Fallback.props"], {})) && /build\/Local\.targets names TreatAsLocalProperty/.test(names(["build/Local.targets"], {})), "so does a build file that names a fallback folder, or that lets a project set for itself what the restore sets for all");
 ok(/src\/App\/App\.csproj names RestorePackagesPath/.test(names(["src/App/App.csproj", L], { ships: [L] })) && /Directory\.Build\.rsp: a response file/.test(names(["Directory.Build.rsp"], {})) && /src\/msbuild\.RSP: a response file/.test(names(["src/msbuild.RSP"], {})) && names(["notes/other.rsp"], {}) === "",
   "a project file that sends its packages to another folder than the restore's fails, and so does a response file that gives every build options of its own");
-// a file an Import brings in under a name this check does not read: reported, and passes (#240)
+// a file an Import brings in that the check cannot find without the build, or that git does not know: reported, and
+// passes (#240)
 const reported = (tracked) => check({ ships: [], nuget: {} }, tmp, restore(), tracked);
 put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Condition="'$(A)' > '1'" Project='$(MSBuildThisFileDirectory)..\\shared\\more.config ' /><!-- <Import Project="old.xml" /> --><Imp<!-- -->ort Project="joined.xml" /><ImportGroup><Import Project="Sdk.props" Sdk="X" /><Import Project="$(MSBuildToolsPath)\\Microsoft.CSharp.targets" /><Import Project="../src/App/App.csproj.user" /></ImportGroup></Project>`);
 const importing = reported(["build/Deps.props"]);
-ok(importing.failures.length === 0 && importing.reports.length === 2 && importing.reports.some(x => x.includes("build/Deps.props imports deps.xml, a file this check does not read")) && importing.reports.some(x => x.includes("imports $(MSBuildThisFileDirectory)..\\shared\\more.config,")) && / 2 reported, and passing;/.test(importing.summary),
-  "an Import of a file of another name than a build file's is reported and passes; one of a build file's name, or in a comment, is not", JSON.stringify(importing));
-ok(imported(`<Project><Import Project="deps.xml; x.props" /><P><![CDATA[<!--]]></P><Import Project="hidden.xml" /><P><![CDATA[-->]]></P></Project>`).join() === "deps.xml,x.props,hidden.xml" && imported(`<?x <!-- ?><Project><Import Project="pi.xml"/></Project><?y --> ?>`).join() === "pi.xml",
+ok(importing.failures.length === 0 && importing.reports.length === 2 && importing.reports.some(x => x.includes("build/Deps.props imports deps.xml, a path outside the project, or no file of the project's that git knows")) && importing.reports.some(x => x.includes("imports $(MSBuildThisFileDirectory)..\\shared\\more.config,")) && / 2 reported, and passing;/.test(importing.summary),
+  "an Import of a file of another name than a build file's that git does not know is reported and passes; one of a build file's name, or in a comment, is not", JSON.stringify(importing));
+const projects = (text) => imported(text).map((x) => x.project).join();
+ok(projects(`<Project><Import Project="deps.xml; x.props" /><P><![CDATA[<!--]]></P><Import Project="hidden.xml" /><P><![CDATA[-->]]></P></Project>`) === "deps.xml,x.props,hidden.xml" && projects(`<?x <!-- ?><Project><Import Project="pi.xml"/></Project><?y --> ?>`) === "pi.xml",
   "each file of an Import's list is read, and neither CDATA nor a processing instruction starts a comment");
 put("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "<!--">]><Project><Import Project="deps.xml" /></Project>`);
 ok(reported(["build/Typed.props"]).reports.some(x => x.includes("build/Typed.props has a document type")), "a build file with a document type is reported, its Imports unread");
@@ -205,6 +207,47 @@ const hostile = ["<Import ", '<Import "', '<Import Project="', "<!--", "<![CDATA
 for (const text of hostile) imported(text);
 ok(imported(`<Import Project="${"a;".repeat(300000)}" />`).length === 300000, "an Import's list however long is read whole, past what a call takes as arguments");
 ok(Date.now() - started < 2000, "a pull request's build file, however long or unclosed, is read in one pass", `${Date.now() - started} ms`);
+ok(imported(`<Import Project="a.xml" Sdk="X" /><Import sdk='Y' Project='b.xml'/><Import Project="c.xml"/>`).map((x) => `${x.project}:${x.sdk}`).join() === "a.xml:true,b.xml:true,c.xml:false", "an Import that names an SDK is told apart, as MSBuild finds its file in the SDK");
+ok(importPath("build/Deps.props", "deps.xml") === "build/deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)..\\shared\\x.config") === "shared/x.config" && importPath("build/Deps.props", "$(msbuildthisfiledirectory)./a//b.xml") === "build/a/b.xml" && importPath("A.props", "deps.xml") === "deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)/deps.xml") === "build/deps.xml" && importPath("build/Deps.props", "$(MSBuildThisFileDirectory)\\\\deps.xml") === "build/deps.xml"
+  && importPath("build/Deps.props", "../../x.xml") === "" && importPath("build/Deps.props", "/etc/x.xml") === "" && importPath("build/Deps.props", "C:\\x.xml") === ""
+  && ["$(Root)x.xml", "x/$(MSBuildThisFileDirectory)y.xml", "@(Files)", "a%3Bb.xml", "*.xml", "dir/**/x.xml", "x?.xml"].every((p) => importPath("build/Deps.props", p) === null),
+  "an Import's path is read beside the file that imports it, $(MSBuildThisFileDirectory) as that file's folder, a separator after it or not; one outside the project is no file of its own, and a property, item, escape or wildcard one the check cannot know");
+// a file an Import brings in that git knows is read like a build file (#269): what it names fails, and so does what a
+// file it imports names in turn, however it is spelled; one an SDK's Import names is not looked for in the project
+put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Project="$(MSBuildThisFileDirectory)..\\shared\\more.config" /><Import Project="sdk.xml" Sdk="X" /></Project>`);
+put("build/deps.xml", `<Project><PropertyGroup><NuGetLockFilePath>elsewhere.json</NuGetLockFilePath></PropertyGroup><Import Project="Deeper.XML" /><Import Project="deps.xml" /></Project>`);
+put("build/deeper.xml", "<Project><PropertyGroup><RestoreAdditionalProjectFallbackFolders>x</RestoreAdditionalProjectFallbackFolders></PropertyGroup></Project>");
+put("shared/more.config", "<Project><PropertyGroup><TreatAsLocalProperty>RestorePackagesPath</TreatAsLocalProperty></PropertyGroup></Project>");
+put("build/sdk.xml", "<Project><PropertyGroup><NuGetLockFilePath>sdk.json</NuGetLockFilePath></PropertyGroup></Project>");
+const reading = reported(["build/Deps.props", "build/deps.xml", "build/deeper.xml", "shared/more.config", "build/sdk.xml"]);
+ok(reading.failures.length === 0 && reading.reports.length === 5 && reading.reports.some(x => x.includes("build/deps.xml, which an Import brings in, names NuGetLockFilePath") && x.includes("held before this check read it")) && reading.reports.some(x => x.includes("build/deeper.xml, which an Import brings in, names RestorePackagesPath or a fallback folder"))
+  && reading.reports.some(x => x.includes("shared/more.config, which an Import brings in, names TreatAsLocalProperty")) && reading.reports.some(x => x.includes("imports sdk.xml, a file whose path this check cannot know without the build")) && !reading.reports.some(x => x.startsWith("build/sdk.xml")),
+  "a file an Import brings in, that git knows, is read like a build file, and so are the files it brings in, however spelled; with no base to read, what it names is reported; an Import into an SDK stays reported", JSON.stringify(reading));
+// an Import's value as XML gives it to MSBuild: a tab or a line break a blank, a reference the character, and only
+// .NET's blanks trimmed from each name, never a byte-order mark (#272's security review)
+put("build/Deps.props", `<Project><Import Project="dep\ts.xml" /><Import Project="b&#46;xml;&#x63;.xml" /><Import Project="bom.xml\uFEFF" /><Import Project="more.props\uFEFF" /><Import Project="\u00A0nb.xml\u3000" /></Project>`);
+for (const [f, text] of [["build/dep s.xml", "<Project><PropertyGroup><NuGetLockFilePath>a</NuGetLockFilePath></PropertyGroup></Project>"], ...(process.platform === "win32" ? [] : [["build/dep\ts.xml", "<Project />"]]), ["build/b.xml", "<Project TreatAsLocalProperty=\"X\" />"], ["build/c.xml", "<Project><FallbackFolders /></Project>"], ["build/bom.xml", "<Project />"], ["build/bom.xml\uFEFF", "<Project><RestorePackagesPath>x</RestorePackagesPath></Project>"], ["build/more.props\uFEFF", "<Project><NuGetLockFilePath>m</NuGetLockFilePath></Project>"], ["build/nb.xml", "<Project><NuGetLockFilePath>n</NuGetLockFilePath></Project>"]]) put(f, text);
+// (Windows writes no tab in a file's name: the decoy that holds one stands only where the system allows it)
+const decoded = reported(["build/Deps.props", "build/dep s.xml", ...(process.platform === "win32" ? [] : ["build/dep\ts.xml"]), "build/b.xml", "build/c.xml", "build/bom.xml", "build/bom.xml\uFEFF", "build/more.props\uFEFF", "build/nb.xml"]);
+ok(["build/dep s.xml, which", "build/b.xml, which", "build/c.xml, which", "build/bom.xml\uFEFF, which", "build/more.props\uFEFF, which", "build/nb.xml, which"].every(x => decoded.reports.some(r => r.startsWith(x))) && decoded.reports.length === 6 && !decoded.reports.some(r => r.startsWith("build/bom.xml,")),
+  "an Import's value is read as XML gives it: a tab is a blank, a reference its character, and a byte-order mark is kept in the name, as .NET trims none", JSON.stringify(decoded));
+ok(projects(`<Import Project="a&amp;b.xml;x&lt;y&#59;z;&bogus;" />`) === "a&b.xml,x<y,z,&bogus" && importPath("A.props", "&bogus") === null, "a reference to & < > \" ' is decoded, and an entity XML does not know is one the check cannot know");
+// a file MSBuild reads by another encoding than UTF-8: neither what it names nor what it imports can be read here as
+// MSBuild reads it, so it fails where the pull request brings it, and is reported where the base held it (#272)
+const latin = Buffer.concat([Buffer.from('<?xml version="1.0" encoding="iso-8859-1"?><Project><Import Project="d'), Buffer.from([0xe9]), Buffer.from('.xml" /></Project>')]);
+const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project><RestorePackagesPath>x</RestorePackagesPath></Project>", "utf16le")]);
+ok(plainText(Buffer.from("\uFEFF<Project />")) === "<Project />" && plainText(Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Project />')) !== null && plainText(Buffer.from('<?xml version="1.0" encoding="us-ascii"?><Project />')) !== null && plainText(null) === "" && plainText(Buffer.from('<?xml version="1.0" encoding="windows-1252"?><Project />')) !== null && plainText(Buffer.from('<?xml version="1.0" encoding="ISO-8859-1"?><Project />')) !== null
+  && [latin, utf16, Buffer.from([0xfe, 0xff, 0, 0x3c]), Buffer.from("<Project>\u0000</Project>"), Buffer.from([0x3c, 0xc3, 0x28, 0x3e]), Buffer.concat([Buffer.from('<?xml version="1.0" encoding="windows-1252"?><Project a="'), Buffer.from([0x80]), Buffer.from('" />')]), Buffer.from('<?xml version="1.0" encoding=\'us-ascii\'?><P a="\u00e9" />')].every(b => plainText(b) === null),
+  "a build file is read only as plain UTF-8, a UTF-8 byte-order mark passed over, or as ASCII under an encoding that keeps it: another byte-order mark, encoding, a NUL or bytes UTF-8 does not allow is one this check cannot read as MSBuild does");
+put("build/Deps.props", latin); put("build/d\uFFFD.xml", "<Project />"); put("Odd.props", utf16);
+const encoded = reported(["build/Deps.props", "build/d\uFFFD.xml", "Odd.props"]);
+ok(encoded.reports.some(x => x.startsWith("build/Deps.props is not plain UTF-8")) && encoded.reports.some(x => x.startsWith("Odd.props is not plain UTF-8")) && !encoded.reports.some(x => x.includes("d\uFFFD.xml")) && encoded.failures.length === 0,
+  "a build file in another encoding is reported with no base to read (its Imports never followed to a decoy UTF-8 reads its name as)", JSON.stringify(encoded));
+const crowd = Array.from({ length: 2048 }, (_, i) => [..."abcdefghijk"].map((c, j) => (i >> j) & 1 ? c.toUpperCase() : c).join("") + ".xml"), crowdStart = Date.now();
+const crowded = importsOf([...crowd, ...crowd.map((_, i) => `i${i}.props`)], f => f.endsWith(".props") ? `<Project><Import Project="abcdefghijk.xml" /></Project>` : "<Project />");
+ok(crowded.brought.size === 2048 && crowded.brought.get(crowd[5]).size === 2048 && Date.now() - crowdStart < 3000, "many files that import a name git knows in many cases share one list of who imports it", `${Date.now() - crowdStart} ms`);
+put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Project="$(MSBuildThisFileDirectory)..\\shared\\more.config" /><Import Project="sdk.xml" Sdk="X" /></Project>`);
+ok(reported(["build/Deps.props", "build/deps.xml"]).reports.some(x => x.includes("build/deps.xml imports Deeper.XML, a path outside the project, or no file of the project's that git knows")), "an Import in a file brought in, of a file git does not know, is reported too");
 put("src/App/App.csproj", "<Project />");
 ok(names(["core/x/y.csproj", "core/packages.lock.json", "core/packages.y.lock.json", "README.md"], {}) === "" && /^0 NuGet packages in 0 lock files/.test(check({ ships: [], nuget: {} }, tmp, restore(), ["README.md"]).summary), "the copy of the core is not the project's, and a project with no NuGet project passes with nothing to read");
 ok(projectFiles(["src/App/App.csproj", "a b/C.FSPROJ", "core/x/y.csproj", "x.csproj.bak", "README.md", "t/T.vbproj"]).join() === "src/App/App.csproj,a b/C.FSPROJ,t/T.vbproj", "the project files it lists for the restore are the same it asks a lock file of");
@@ -331,6 +374,55 @@ if (process.platform !== "win32") {
   ok(user.failures.some(x => x.includes(`${COLON}.user names NuGetLockFilePath`)), "a .user file the base held in a root folder named \":\", whose project file only the pull request adds: it fails, the path read as a path", JSON.stringify(user));
   fs.rmSync(path.join(repo, ":"), { recursive: true }); fs.rmSync(path.join(repo, "top"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "gone");
 }
+// a file an Import brings in, which the check reads only lately (#269): as the base held it, and brought it in, what it
+// names is reported and passes; added, changed or brought into play by the pull request, it fails (core archive 207)
+const DEPS = "build/deps.xml", depsText = `<Project><PropertyGroup><NuGetLockFilePath>x.json</NuGetLockFilePath></PropertyGroup></Project>`;
+const depsCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS], process.env, { base: "HEAD", baseConfig: null });
+inRepo(DEPS, depsText); inRepo("Directory.Build.props", "<Project />"); git("add", "-A"); git("commit", "-q", "-m", "a file no Import brings in");
+inRepo("Directory.Build.props", `<Project><Import Project="build/deps.xml" /></Project>`);
+let deps = depsCheck();
+ok(deps.failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)), "a file the base held that no Import brought in, which the pull request imports: it fails, the pull request having brought it into play", JSON.stringify(deps));
+git("add", "-A"); git("commit", "-q", "-m", "imported");
+deps = depsCheck();
+const newImporter = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS, "src/Other/Other.props"], process.env, { base: "HEAD", baseConfig: null });
+inRepo("src/Other/Other.props", `<Project><Import Project="../../build/deps.xml" /></Project>`);
+ok(check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS, "src/Other/Other.props"], process.env, { base: "HEAD", baseConfig: null }).failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)) && newImporter.failures.every(x => !x.includes(DEPS)),
+  "one the base held as it stands and brought in, which the pull request imports from another file too: it fails, the pull request having brought it into play there (as a .user file beside a new project file)");
+fs.rmSync(path.join(repo, "src/Other"), { recursive: true });
+const listedImports = run("--imports");
+ok(listedImports.status === 0 && listedImports.stdout === `${DEPS}\n`, "asked for the files Imports bring in, it lists them, a line each, for the workflow's first look", listedImports.out);
+ok(!deps.failures.some(x => x.includes(DEPS)) && deps.reports.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`) && x.includes("held before this check read it")), "one the base held as it stands and brought in: reported, and passes", JSON.stringify(deps));
+inRepo(DEPS, `${depsText}\n`);
+deps = depsCheck();
+ok(deps.failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)), "the same file changed by the pull request: it fails", JSON.stringify(deps));
+// a link git knows, which an Import brings in, read through to its file at the base as it is now (a checkout that keeps
+// links): unchanged, reported; one whose file the pull request changes, failing
+if (process.platform !== "win32") {
+  fs.symlinkSync("deps.xml", path.join(repo, "build/link.xml"));
+  inRepo(DEPS, depsText); inRepo("Directory.Build.props", `<Project><Import Project="build/link.xml" /></Project>`); git("add", "-A"); git("commit", "-q", "-m", "an imported link");
+  const linked = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS, "build/link.xml"], process.env, { base: "HEAD", baseConfig: null });
+  deps = linked();
+  ok(!deps.failures.some(x => x.includes("build/link.xml")) && deps.reports.some(x => x.includes("build/link.xml, which an Import brings in, names NuGetLockFilePath") && x.includes("held before this check read it")), "an imported link the base held, leading to a file it held, both as they stand: reported, and passes", JSON.stringify(deps));
+  inRepo(DEPS, `${depsText}\n`);
+  deps = linked();
+  ok(deps.failures.some(x => x.includes("build/link.xml, which an Import brings in, names NuGetLockFilePath")), "the same link, whose file the pull request changes: it fails", JSON.stringify(deps));
+  fs.rmSync(path.join(repo, "build/link.xml"));
+}
+// (a checkout that writes its own line endings, core.autocrlf on Windows: the file stands as the base held it)
+inRepo(DEPS, `<Project>\n${depsText}\n</Project>\n`); inRepo("Directory.Build.props", `<Project><Import Project="build/deps.xml" /></Project>`); git("add", "-A"); git("commit", "-q", "-m", "lines");
+git("config", "core.autocrlf", "true"); inRepo(DEPS, `<Project>\r\n${depsText}\r\n</Project>\r\n`);
+deps = depsCheck();
+ok(!deps.failures.some(x => x.includes(DEPS)) && deps.reports.some(x => x.includes(DEPS) && x.includes("held before this check read it")), "one a checkout wrote with its own line endings stands as the base held it: reported, and passes", JSON.stringify(deps));
+git("config", "--unset", "core.autocrlf");
+fs.rmSync(path.join(repo, DEPS)); fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no imports");
+// a build file not plain UTF-8: one the pull request adds fails; as the base held it, reported (#272)
+const wide = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")]);
+const wideCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props"], process.env, { base: "HEAD", baseConfig: null });
+inRepo("Directory.Build.props", wide);
+ok(wideCheck().failures.some(x => x.startsWith("Directory.Build.props is not plain UTF-8")), "a build file in UTF-16 the pull request adds: it fails");
+git("add", "-A"); git("commit", "-q", "-m", "a wide build file");
+ok(!wideCheck().failures.some(x => x.includes("Directory.Build.props")) && wideCheck().reports.some(x => x.startsWith("Directory.Build.props is not plain UTF-8") && x.includes("held before this check read it")), "one the base held as it stands: reported, and passes");
+fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no wide file");
 // a lock file naming one version by two content hashes, one under each framework: as the base held it, reported and
 // passing; changed by the pull request, failing
 const twoLock = JSON.stringify({ version: 1, dependencies: { "net8.0": { A: entry("Direct", "1.0.0", "[1.0.0, )") }, "net9.0": { A: { ...entry("Direct", "1.0.0", "[1.0.0, )"), contentHash: "other==" } } } });
@@ -344,6 +436,44 @@ ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), 
 inRepo(L, `${twoLock}\n`);
 both = lockCheck();
 ok(both.failures.some(x => x.includes("A@1.0.0: named by two content hashes")), "the same lock file changed by the pull request: it fails", JSON.stringify(both));
+
+// a .user file saved with a UTF-8 byte-order mark, as the base held it: reported, and passes (#272)
+inRepo(USER, `\uFEFF${userText("bom")}`); git("add", "-A"); git("commit", "-q", "-m", "a .user file with a mark");
+user = userCheck();
+ok(!user.failures.some(x => x.includes(".user")) && user.reports.some(x => x.includes(`${USER} names NuGetLockFilePath`) && x.includes("held before this check read it")), "a .user file with a UTF-8 byte-order mark, as the base held it: reported, and passes", JSON.stringify(user));
+fs.rmSync(path.join(repo, USER)); git("add", "-A"); git("commit", "-q", "-m", "no .user file");
+
+// a filter the machine's git config holds (git-lfs's, on GitHub's runners), which a pull request's .gitattributes points
+// at an imported file so that its own bytes would clean into the base's: the bytes MSBuild reads are compared (#272)
+if (process.platform !== "win32") {
+  inRepo(DEPS, "<Project />\n"); inRepo("Directory.Build.props", `<Project><Import Project="build/deps.xml" /></Project>`); git("add", "-A"); git("commit", "-q", "-m", "an imported file naming nothing");
+  inRepo("base-copy.txt", "<Project />\n"); git("config", "filter.same.clean", "cat base-copy.txt");
+  inRepo(".gitattributes", "build/deps.xml filter=same\n"); inRepo(DEPS, `${depsText}\n`);
+  deps = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DEPS, ".gitattributes"], process.env, { base: "HEAD", baseConfig: null });
+  ok(deps.failures.some(x => x.includes(`${DEPS}, which an Import brings in, names NuGetLockFilePath`)), "a file the pull request changes, which a filter its .gitattributes names would clean into the base's: it fails", JSON.stringify(deps));
+  git("config", "--unset", "filter.same.clean"); for (const f of [".gitattributes", "base-copy.txt", DEPS, "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no filter");
+}
+// a file the base's own .gitattributes has git write in another encoding at checkout (git's own advice for UTF-16): as
+// the base held it, reported, so that a sync fails no project that changed nothing (#272)
+inRepo(".gitattributes", "*.props working-tree-encoding=UTF-16LE-BOM eol=crlf\n"); inRepo("Directory.Build.props", "<Project />\n"); git("add", "-A"); git("commit", "-q", "-m", "a wide checkout");
+fs.rmSync(path.join(repo, "Directory.Build.props")); git("checkout", "--", "Directory.Build.props");
+const checkedOut = fs.readFileSync(path.join(repo, "Directory.Build.props"));
+if (checkedOut[0] !== 0xff || checkedOut[1] !== 0xfe) console.log("skip a checkout in another encoding: this machine's git writes none");
+else {
+  const wideOut = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, ".gitattributes", "Directory.Build.props"], process.env, { base: "HEAD", baseConfig: null });
+  ok(!wideOut.failures.some(x => x.includes("Directory.Build.props")) && wideOut.reports.some(x => x.startsWith("Directory.Build.props is not plain UTF-8") && x.includes("held before this check read it")), "a file the base's own attributes have git check out in UTF-16, unchanged: reported, and passes", JSON.stringify(wideOut));
+  fs.writeFileSync(path.join(repo, "Directory.Build.props"), Buffer.concat([checkedOut, Buffer.from("<!---->", "utf16le")]));
+  ok(check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, ".gitattributes", "Directory.Build.props"], process.env, { base: "HEAD", baseConfig: null }).failures.some(x => x.startsWith("Directory.Build.props is not plain UTF-8")), "the same file changed by the pull request: it fails");
+}
+for (const f of [".gitattributes", "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no wide checkout");
+// a .user file not plain UTF-8, which the base held beside no project file and the pull request brings into play with
+// one: it fails, as any .user file so brought (#272)
+const WIDE_USER = "src/Wide/Wide.csproj.user";
+inRepo(WIDE_USER, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")])); git("add", "-A"); git("commit", "-q", "-m", "a wide .user file alone");
+inRepo("src/Wide/Wide.csproj", "<Project />");
+user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "src/Wide/Wide.csproj", WIDE_USER], process.env, { base: "HEAD", baseConfig: null });
+ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
+fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);
