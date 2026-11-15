@@ -28,6 +28,9 @@ ok(italicsOk(), "an italic phrase that is no slot is no slot used");
 function italicsOk() { return !has(run(manifest("all", ROWS + "\n| *big file* | x |")), "keep it lean"); }
 const wrapped = notes({ manifest: manifest("all", ROWS), readme: README, moduleTexts: { ...MODULES, "g.md": "Uses the *big\n  file*, as a wrapped line has it." }, floorTexts: FLOOR });
 ok(has(wrapped, "no row for *big file*"), "a slot whose name a module wraps over a line break is read as used", wrapped.join("\n"));
+const started = Date.now();
+notes({ manifest: manifest("all", ROWS), readme: README, moduleTexts: { ...MODULES, "g.md": `Uses the *big\n${" ".repeat(1_000_000)}` }, floorTexts: FLOOR });
+ok(Date.now() - started < 2000, `an italic left open before a long blank line is read in one pass, not tried each way (${Date.now() - started} ms)`);
 
 ok(run(manifest("all", ROWS + "\n| *big file* | `1 KB` |")).length === 0, "all modules taken, every slot they use filled or with a default: no note");
 let n = run(manifest("`a.md`, `b.md`, `g.md`", ROWS + "\n| *big file* | `1 KB` |"));
