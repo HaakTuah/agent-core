@@ -101,11 +101,23 @@ job) re-checks a head that was checked up to date. It stays: on GitHub's free pl
 so that run is the only one that catches a merge made without its checks passing or without its branch up to date
 (floor rule 12).
 
+## Runs a newer push supersedes
+
+The counts above take each run as one that ends. None did end early: no workflow of the core's cancelled a run once a
+newer push, or an update from `main`, made its commit no longer the pull request's head. At 17:25 on 15 November the
+core's own Actions held 96 runs queued or running, and 49 of them, about half, were for commits that were no longer any
+open pull request's head. Each such run goes to its end, and in a private repository it is billed. With many lanes, and
+every branch brought up to date after each merge, a run is superseded more often than it is read. #388, a bug, fixed in
+its own pull request, puts each job a pull request starts in a group of its workflow and pull request that a newer run
+cancels. A run on `main`, a schedule or a start by hand is never cancelled, and the security-review check keeps its
+order. With that, a superseded run bills only the minute it had begun, and the counts above become a ceiling.
+
 ## Filed
 
 - #373, bug, fixed in #374: the NuGet step's job on every pull request, and no way to decline it.
 - #375, enhancement: the core's pull-request checks run only once a pull request is ready.
 - #376, enhancement: the core's pull-request checks without a secret run as one job.
+- #388, bug: no run that a newer push supersedes was cancelled.
 
 Both enhancements change what every project runs, so each waits for the owner's yes. Neither is a fault against
 "Nothing locks a project": every job counted above stood before that rule, save the NuGet check's.
