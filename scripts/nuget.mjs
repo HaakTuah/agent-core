@@ -166,10 +166,13 @@ export function imported(text) {
         break;
       }
       if (j < 0) break;
-      // (only where its end tag follows: an element inside it is no property MSBuild reads)
-      if (new RegExp(`^</${tag[1].replace(/\./gu, "\\.")}\\s*>`, "iu").test(text.slice(j, j + tag[1].length + 40))) {
-        for (const x of value.split(";")) { const name = x.replace(TRIM, ""); if (name) found.push({ project: name, sdk: false, via: tag[1] }); }
-      }
+      // (its end tag, however many blanks before its ">"; anything else here is an element inside it, which MSBuild
+      // takes into its value as XML: what was read before it is followed, and the rest is one the check cannot know)
+      const close = `</${tag[1].toLowerCase()}`;
+      let k = j + close.length;
+      if (text.slice(j, k).toLowerCase() === close) while (k < text.length && " \t\r\n".includes(text[k])) k++;
+      for (const x of value.split(";")) { const name = x.replace(TRIM, ""); if (name) found.push({ project: name, sdk: false, via: tag[1] }); }
+      if (text.slice(j, j + close.length).toLowerCase() !== close || text[k] !== ">") found.push({ project: "$(an element inside it)", sdk: false, via: tag[1] });
       i = j;
       continue;
     }
