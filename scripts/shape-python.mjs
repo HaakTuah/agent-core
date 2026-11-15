@@ -305,7 +305,8 @@ function byName(files) {
   for (const f of files) {
     if (!f.endsWith(".py")) continue;
     const name = path.posix.basename(f) === "__init__.py" ? `${path.posix.basename(path.posix.dirname(f))}/__init__.py` : path.posix.basename(f);
-    named.set(name, [...(named.get(name) ?? []), f]);
+    if (!named.has(name)) named.set(name, []);
+    named.get(name).push(f);
   }
   NAMED.set(files, named);
   return named;

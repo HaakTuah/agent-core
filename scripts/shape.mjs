@@ -254,7 +254,7 @@ function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
   if (!system) ctx.unnamed.push(file);
   ctx.readers.set(file, r.reader);
-  if (!r.functions) { ctx.read.jsx++; if (!ctx.tests.has(file)) add(ctx, "lost", file, "lost"); }
+  if (!r.functions) { ctx.read.jsx++; add(ctx, "lost", file, file); }
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, r.functions);
   if (domain === "rules") ownClock(ctx, file, r);
   for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
@@ -313,7 +313,8 @@ export function groupOf(id) {
   const kind = id.slice(0, id.indexOf(": ")), key = id.slice(kind.length + 2);
   if (kind === "function") return { kind, group: key.slice(key.indexOf("#") + 1).replace(/#\d+$/u, "") };
   if (kind === "crossing" || kind === "inside") return { kind, group: key.slice(0, key.indexOf(": ")) };
-  if (kind === "cycle" || kind === "lost") return { kind, group: kind };
+  if (kind === "cycle") return { kind, group: "cycle" };
+  if (kind === "lost") return { kind, group: key }; // (a file lost covers itself alone)
   if (kind === "clock" || kind === "global") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
   return { kind, group: key.slice(key.lastIndexOf(" -> ") + 4) };
 }
@@ -633,10 +634,13 @@ function unwritten(self, base) {
   return 0;
 }
 
+// The baseline's path as the base's own config names it (a pull request that moves it is compared with the old one).
+const baselineAt = (base, at) => { const text = base.show(at); return text === null ? null : tolerant(() => parseConfig(text, base.name).baseline); };
+
 function check(config, at, self, found, base) {
   if (!fs.existsSync(notLinked(config.baseline))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
-    base: base && { name: base.name, baseline: base.show(config.baseline), config: base.show(at), standing: () => standingAt(base.name, config) } });
+    base: base && { name: base.name, baseline: base.show(baselineAt(base, at) ?? config.baseline), config: base.show(at), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${note}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(line);

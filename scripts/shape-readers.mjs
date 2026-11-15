@@ -96,11 +96,24 @@ function bindings(toks) {
     const v = toks[k].t === "punct" ? toks[k].v : null;
     if (v && "([{".includes(v)) depth++;
     else if (v && ")]}".includes(v)) depth = Math.max(0, depth - 1);
-    else if (depth === 0 && toks[k].t === "id" && ["var", "let", "const"].includes(toks[k].v)) list = true;
+    else if (depth === 0 && toks[k].t === "id" && ["var", "let", "const"].includes(toks[k].v)) { list = true; for (const n of pattern(toks, k + 1)) names.add(n); }
     else if (depth === 0 && v === ";") list = false;
     else if (list && depth === 0 && another(toks, k)) names.add(toks[k + 1].v);
   }
   return [...names];
+}
+// The names a destructuring pattern at k binds ({ a, b: c, d = f(x, y) } or [e, ...g]): each name in its braces and
+// brackets, not in a default's parentheses, that a , } ] or = follows, a key (a :) and a member (a .) aside.
+function pattern(toks, k) {
+  const names = [], open = [];
+  if (!isP(toks[k], "{") && !isP(toks[k], "[")) return names;
+  for (let j = k; j < toks.length; j++) {
+    const v = toks[j].t === "punct" ? toks[j].v : null;
+    if (v && "([{".includes(v)) open.push(v);
+    else if (v && ")]}".includes(v) && (open.pop(), open.length === 0)) return names;
+    else if (toks[j].t === "id" && !open.includes("(") && !isP(toks[j - 1], ".") && [",", "}", "]", "="].some(s => isP(toks[j + 1], s))) names.push(toks[j].v);
+  }
+  return names;
 }
 const another = (toks, k) => isP(toks[k], ",") && toks[k + 1]?.t === "id" && ["=", ",", ";"].some(v => isP(toks[k + 2], v));
 

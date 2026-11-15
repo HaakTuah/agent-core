@@ -224,15 +224,14 @@ function dotted(toks, k) {
 }
 
 // A using directive at k: { target, static, alias } where one stands there (`using N;`, `using static N.T;`, `using
-// A = N.T;`, global or not), else null: a using statement (`using (x)`, `using var x = y;`) is none.
-function directive(toks, k) {
+// A = N.T;`, global or not), else null: a using statement (`using (x)`, `using var x = y;`) is none. `semi` gives, for
+// each token, the index of the next ; (where an alias's type arguments end).
+function directive(toks, k, semi) {
   if (!isId(toks[k], "using") || isP(toks[k - 1], ".")) return null;
   const isStatic = isId(toks[k + 1], "static"), from = k + (isStatic ? 2 : 1);
   const alias = toks[from]?.t === "id" && isP(toks[from + 1], "=");
   const d = dotted(toks, alias ? from + 2 : from);
-  let end = d.end;
-  const limit = end + 64; // (a generic type's arguments, never read past)
-  if (alias && isP(toks[end], "<")) while (end < toks.length && end < limit && !isP(toks[end], ";")) end++;
+  const end = alias && isP(toks[d.end], "<") ? semi[d.end] : d.end;
   return d.name && isP(toks[end], ";") ? { target: d.name, static: isStatic, alias } : null;
 }
 
@@ -271,7 +270,9 @@ function typeAt(toks, k, frames, types) {
 // A file read: { functions (null where its code nests past NEST), usings: [{ target, static, alias }], namespaces, types, toks }.
 export function readCsharp(src) {
   const toks = csTokens(src);
-  const usings = toks.map((_, k) => directive(toks, k)).filter(Boolean);
+  const semi = new Array(toks.length + 1).fill(toks.length);
+  for (let k = toks.length - 1; k >= 0; k--) semi[k] = isP(toks[k], ";") ? k : semi[k + 1];
+  const usings = toks.map((_, k) => directive(toks, k, semi)).filter(Boolean);
   return { functions: toks.lost ? null : functions(toks, CSHARP), usings, ...declared(toks), toks };
 }
 

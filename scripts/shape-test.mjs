@@ -137,6 +137,7 @@ found = survey({
   "web/b.js": "function helper() {}\n",
   "web/c.js": "const Only = 1;\n",
   "web/d.js": "var p = f(1, 2), q = 2;\n",
+  "web/e.js": "const { r, s: t = g(1, 2), u: { w } } = window.cfg;\n",
   "web/m.js": "export const x = 1;\nconst y = 2;\n",
   "web/n.mjs": "const a = 1, b = 2;\n",
   "web/t.d.ts": "declare const A: number;\ndeclare const B: number;\n",
@@ -144,8 +145,8 @@ found = survey({
   "esm/s.js": "const p = 1;\nconst q = 2;\n",
   "web/a.test.js": "function one() {}\nfunction two() {}\n",
 }, cfg({}), new Set(["web/a.test.js"]));
-ok(same(ids(found), ["global: web/a.js: App", "global: web/a.js: helper", "global: web/b.js: helper", "global: web/d.js: p", "global: web/d.js: q"]) && same(["global: web/a.js: helper", "function: a/b.js#f#2", "cycle: x.js -> y.js", "crossing: a -> b: x.js -> y.js", "clock: z.js: Date.now"].map(fileOf), ["web/a.js", "a/b.js", "x.js", "x.js", "z.js"]) && readerOf("global: web/b.js: helper", found.readers) === "scripts",
-  "scripts that share one global space: a second name of one file (one of a list too) and a name two files declare are found; one name of its own, a module (by what it holds, its extension or its package.json), types alone and a test are not", ids(found));
+ok(same(ids(found), ["global: web/a.js: App", "global: web/a.js: helper", "global: web/b.js: helper", "global: web/d.js: p", "global: web/d.js: q", "global: web/e.js: r", "global: web/e.js: t", "global: web/e.js: w"]) && same(["global: web/a.js: helper", "function: a/b.js#f#2", "cycle: x.js -> y.js", "crossing: a -> b: x.js -> y.js", "clock: z.js: Date.now"].map(fileOf), ["web/a.js", "a/b.js", "x.js", "x.js", "z.js"]) && readerOf("global: web/b.js: helper", found.readers) === "scripts",
+  "scripts that share one global space: a second name of one file (one of a list, or of a destructuring, too) and a name two files declare are found; one name of its own, a module (by what it holds, its extension or its package.json), types alone and a test are not", ids(found));
 
 // ---- what covers an entry ----
 const M = new Map([["function: a.js#f", { lines: 100, depth: 2, branches: 3 }], ["cycle: a.js -> b.js", true], ["crossing: rules -> view: a.js -> b.js", true]]);
@@ -211,6 +212,8 @@ v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall
 ok(!v.fail.some(f => /gone or moved/.test(f[0])) && v.notes.some(n => /1 entry listed there reads otherwise now/.test(n)), "an entry listed of a file a new reader reads otherwise is said, not failed", said(v));
 v = judge({ now: csBig, baseline: JSON.stringify({ ...allReads, listed: {} }), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && /held already is not in/.test(said(v)) && !v.notes.some(n => /written before/.test(n)), "once the baseline names the reader, what it does not list fails as any other", said(v));
+v = judge({ now: { "src/a.tsx": "export const a = 1;\n", "src/b.tsx": lostJsx }, baseline: JSON.stringify({ ...allReads, listed: { "lost: src/a.tsx": true } }), base: baseOf(JSON.stringify({ ...allReads, listed: { "lost: src/a.tsx": true } }), { "src/a.tsx": lostJsx }) });
+ok(mended(said(v)) && /src\/b\.tsx/.test(said(v)) && /cannot follow/.test(said(v)), "a file lost covers itself alone: another one lost in its place fails", said(v));
 const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
 v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
@@ -322,6 +325,12 @@ git("branch", "-f", "base");
 put("src/rules/Big.cs", `namespace Game.Rules;\nclass Big {\n${csLong("Roll", 75)}}\n`);
 r = run([], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /grows? past what the baseline lists/.test(r.out), "from then on, a listed function of C# may not grow", r.out);
+git("checkout", "-q", "--", ".");
+put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
+put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /no longer names 4 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
+fs.rmSync(path.join(dir, "checks/moved.json"));
 git("checkout", "-q", "--", ".");
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)

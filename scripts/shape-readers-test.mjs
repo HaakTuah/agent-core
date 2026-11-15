@@ -59,6 +59,7 @@ ok(csTokens("var a = $\"{b}\" + $@\"{c}\";\n").filter(t => t.t === "id").map(t =
 ok(same(cs.usings.map(u => `${u.target}${u.static ? " static" : ""}${u.alias ? " alias" : ""}`), ["System", "Game.Rules.Dice static", "Newtonsoft.Json alias", "System.Collections.Generic.List alias", "Game.Debug"]) && same(cs.namespaces, ["Game.View"]) && same(cs.types, ["Game.View.Point", "Game.View.Board"]),
   "C#: its using directives, global, static and aliased, its namespace and its types are read", JSON.stringify([cs.usings, cs.namespaces, cs.types]));
 ok(readCsharp("class A { void B() { using (var x = y) { } using var z = w; using Q q = new(); } }\n").usings.length === 0, "C#: a using statement is no directive");
+ok(readCsharp(`using A = X.Y.T<${"int, ".repeat(100)}int>;\nusing B = X.Z;\n`).usings.map(u => u.target).join() === "X.Y.T,X.Z", "C#: an alias of a type with many arguments is read whole");
 const nested = readCsharp("namespace A {\n  namespace B { class C { } }\n  class D { }\n}\nnamespace E;\nrecord struct F(int x);\n");
 ok(same(nested.namespaces, ["A", "A.B", "E"]) && same(nested.types, ["A.B.C", "A.D", "E.F"]), "C#: nested namespaces are joined, a file-scoped one holds the rest of the file", JSON.stringify(nested));
 const idx = csharpIndex([["src/Rules/Dice.cs", readCsharp("namespace Game.Rules;\npublic static class Dice { }\n")], ["src/Rules/Deck.cs", readCsharp("namespace Game.Rules { class Deck { } }\n")]]);
