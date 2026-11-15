@@ -263,7 +263,7 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   }
   // a pure sync, as pure-sync.mjs proved it, needs no review where none has begun by itself (floor rule 8): one that
   // has, Codex's running, is waited for as above
-  if (pure && !(review !== null && typeof review === "object" && RUNNING.includes(review.status))) return { sha, done: true, why: "a pure sync, as pure-sync.mjs proves: no review needed (floor rule 8)" };
+  if (pure && !(review !== null && typeof review === "object" && RUNNING.includes(review.status))) return { sha, done: true, why: "a pure sync, as pure-sync.mjs proves: no review needed, none begun by itself yet (floor rule 8)" };
   if (forHead.length > 0) return { sha, done: true, why: postedWhy };
   // Dependabot's own, with no review of Codex's begun on it: the floor holds it another way (rule 17). Its own means
   // opened by it from a branch of the repository, every commit written by it and signed by GitHub, the head among them.

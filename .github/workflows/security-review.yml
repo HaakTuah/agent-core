@@ -155,7 +155,8 @@ jobs:
           # a pure sync needs no security review where none starts by itself (floor rule 8; #99): where the pull request
           # has a sync's shape (the manifest among its files, all of them whole, and none outside core/, it and the
           # workflows), the default branch's pure-sync.mjs proves it on the head, in a clone of its own that fetches the
-          # head's commits and checks out nothing, so no file of the pull request's is on disk and none runs; git sends
+          # head's commits by its SHA (never a ref GitHub moves after the push) and checks out nothing, all within the
+          # job's time so its status is always written, so no file of the pull request's is on disk and none runs; git sends
           # the token to this repository's own address alone, from this command's environment, never written to disk
           pure=
           if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
@@ -171,8 +172,8 @@ jobs:
               export GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader" \
                 "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key"
               git init -q -b pr "$d/pr" && cd "$d/pr" && git remote add origin "$SERVER/$REPO.git" \
-                && git fetch -q --no-tags --update-head-ok origin "+refs/pull/$NUMBER/head:refs/heads/pr" \
-                && [ "$(git rev-parse refs/heads/pr)" = "$head" ] && timeout 180 node "$proof" > "$d/pure.txt" 2>&1)
+                && timeout 90 git fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+                && [ "$(git rev-parse refs/heads/pr)" = "$head" ] && timeout 120 node "$proof" > "$d/pure.txt" 2>&1)
             then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
             else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
           fi
