@@ -1,7 +1,7 @@
 // The core has moved (README.md, "How a project takes the core", point 5), for a project whose orchestrator does not
 // wake every day: it compares the commit the project's core-manifest.md pins with the newest of what the project
 // follows (releases.mjs, beside this file: the newest commit of the core's main, or the core's newest release, which
-// has moved only where it is past the pin) and keeps one issue open for the owner while the project is behind, saying
+// has moved only where it is past the pin and changes something the project takes) and keeps one issue open for the owner while the project is behind, saying
 // what changed and how a session takes it; once the project holds it again, it closes that issue. It opens no pull
 // request and changes no file: a session makes the sync (sync.mjs, beside this file), since a pull request a workflow
 // opens gets no checks without a stored token. Run once a day by the core-moved workflow
@@ -15,7 +15,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
-import { fetchCore, followsOf, newestRelease, ownerOf } from "./releases.mjs";
+import { fetchCore, followsOf, newestRelease, ownerOf, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -78,7 +78,7 @@ function main(dry) {
   if (!pin) fail(`core-manifest.md has no one "Core: ${CORE} at <full commit SHA>, copied whole under core/" line`);
   const follows = followsOf(manifest);
   if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out beside one *owner's account* row");
-  let newest, moved, release = "";
+  let newest, moved, release = "", stays = false;
   if (follows === "main") {
     newest = run("git", ["ls-remote", `https://github.com/${CORE}`, "refs/heads/main"]).split(/\s/)[0];
     if (!SHA.test(newest)) fail("the core's main gave no commit");
@@ -87,9 +87,10 @@ function main(dry) {
     // (which commit is past which takes the core's history: fetched into a folder of its own, removed again)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-releases-"));
     let found, fetched = true;
-    try { fetchCore(dir); found = newestRelease(pin, dir); } catch { fetched = false; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    try { fetchCore(dir); found = newestRelease(pin, dir); stays = !!found?.moved && staysAt(pin, manifest, dir); } catch { fetched = false; } finally { fs.rmSync(dir, { recursive: true, force: true }); }
     if (!fetched) fail("the core's main and releases could not be fetched");
     ({ sha: newest, moved, name: release } = found ?? { sha: pin, moved: false, name: "" });
+    if (stays) moved = false; // (a release that changes nothing the project takes asks no sync: #242)
   }
   const repo = process.env.GITHUB_REPOSITORY;
   if (!dry && !/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) fail("GITHUB_REPOSITORY names no repository");
@@ -100,11 +101,13 @@ function main(dry) {
   console.log(follows === "main"
     ? `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
     : release
-      ? `the project holds ${pin.slice(0, 7)}, the core's newest release, ${release}, is at ${newest.slice(0, 7)}: ${what}`
+      ? `the project holds ${pin.slice(0, 7)}, the core's newest release, ${release}, is at ${newest.slice(0, 7)}${stays ? " and changes nothing the project takes" : ""}: ${what}`
       : `the project holds ${pin.slice(0, 7)}, and the core has cut no release yet: ${what}`);
   if (dry || what === "nothing") return;
   if (what === "close") {
-    run("gh", ["issue", "close", open, "--repo", repo, "--comment", "The project holds the core's newest commit again."]);
+    run("gh", ["issue", "close", open, "--repo", repo, "--comment", stays
+      ? "The core's newest release changes nothing this project takes: it stays at its pin until the next release."
+      : "The project holds the core's newest commit again."]);
     return;
   }
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-")), "body.md");
