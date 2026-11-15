@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
+import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { call as callOf, plain, project } from "./steps.mjs";
 
@@ -104,6 +105,13 @@ export function differences(p, kit, older = []) {
   return out;
 }
 
+// The shape check's baseline, at the path the project's config names for it, else where the kit writes it.
+function shapeBaseline(p) {
+  let config = null;
+  try { config = JSON.parse(p.read(shapeAt(p.manifest)) ?? "null"); } catch { /* (the kit's path, below) */ }
+  return typeof config?.baseline === "string" ? config.baseline : "checks/shape-baseline.json";
+}
+
 // What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
 // templates, what that kit would have written: a template it lacks, one this kit added since, gives that file nothing;
 // one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
@@ -118,9 +126,10 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const built = files(o, pin, modules, read);
     const gone = new Set(FILES.filter(([t]) => lacking.has(t)).map(([, to]) => to));
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
-    // (the choice records at the path the manifest names for them)
+    // (the choice records and the shape check's config at the paths the manifest names for them)
+    const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest) };
     const kit = built.filter(([to]) => !gone.has(to))
-      .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
+      .map(([to, text]) => [placed[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
@@ -130,7 +139,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     let copies = null;
     try { copies = JSON.parse(p.read("checks/copies.json") ?? "null"); } catch { /* (the kit's path, below) */ }
     const licenceAt = call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
-    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })]];
+    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]];
   } catch (e) {
     if (!older) throw e;
     return [];
