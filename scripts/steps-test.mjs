@@ -76,6 +76,17 @@ ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some
 for (const lead of some) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
 
+// ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
+const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
+const asKit = fs.readFileSync(signatures, "utf8");
+for (const form of ["on: pull_request", "on: [pull_request, push]"]) {
+  fs.writeFileSync(signatures, asKit.replace(/^on:\n  pull_request:\n/m, `${form}\n`));
+  ok(!notDone(lockProject).length, `a signature workflow with "${form}" runs on every pull request, and reads done`, report(notDone(lockProject)));
+}
+fs.writeFileSync(signatures, asKit.replace(/^on:\n  pull_request:\n/m, "on: [push]\n"));
+ok(notDone(lockProject).length === 1, "one that is not started by a pull request is reported", report(notDone(lockProject)));
+fs.writeFileSync(signatures, asKit);
+
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
