@@ -252,7 +252,74 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind floor rule 4's tools and the point of floor topic 15 on an agent's own tools, with `scripts/agent-tools.mjs`.
 
-226. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+226. **14 and 15 November 2026** (the core; in chats with a session the owner had asked to look through the core, not
+     the design session, as that session recorded them on issue #246, whose current text, its note "What this issue
+     asks to be built, in one place", sets the design out in full and says the owner agreed to it; and as the owner
+     then told the orchestrator, who passed it on word for word to the builder of these rules). Of four practices put
+     as what to bring into the core from a developer's account of rebuilding a game in isolated pieces (boundaries
+     between systems held by a check, a time mark on the tests, a port that carries what the program must do, a new
+     project begun as rules with no screen), the owner agreed, and asked:
+
+     > is there not more? Like fully isolated components? Why shouldn't we include everything. They are all best
+     > practices?
+
+     Told that each check would come with a baseline that may only shrink:
+
+     > They are not allowed to get worse, and audits should run, and major refactoring runs scheduled. The system
+     > should be self cleaning, and enforce these rules and criterias. They are there for an reason, and one earns in
+     > the long run.
+
+     Of how much of the work goes to cleaning, and how often an audit repeats:
+
+     > I think this is a matter of what state a codebase is in? So how can we make this rule flexible, but still
+     > enforceable at the level it must be? A database that is already according to standards and builds that way
+     > don't need auditing as often. Meanwhile […] codebases probably ought to devote most of our resources to it,
+     > atleast a significant chunk for some time forwards
+
+     Of the reader of an audit:
+
+     > Is the auditor aware of its mandate, and does it have clear, sensible, standardized criterias
+
+     Of a part that is rewritten, and of a project bound to one platform from its start on a tool's advice:
+
+     > what about what you said about not keeping everything the same when rewriting parts of a project?
+
+     > […] using packages that run on both as far as possible seems common sense to me. Can agent-core fix situations
+     > like these? Here it isn't a situation of rewriting framework or language, but critically evaluating modules and
+     > used packages, to stay as flexible and robust as possible. […] So this seems to me much lower stake, and should
+     > be a lower threshold to just address in an existing project? And definetly not consciously make a repo platform
+     > dependant from the start. […] I just think such architectural choices should have very good grounding.
+
+     Of isolation, to which the answer the owner agreed to was that systems work together, so what is complete is that
+     nothing reaches inside another system:
+
+     > Do we have strict standards on separation across the board? […] Does it help to name the domains that must be
+     > completely separate, so everything is in isolation? Why don't we say complete isolation? Are our rules as strict
+     > on isolation as they should be, per industry best standards
+
+     Of the code inside a file, after which the session measured three codebases and the owner agreed to a mark on how
+     often a function branches and to a report of near-copies:
+
+     > have we done an invesitgaton  on best coding practices, including inheritance and generics, to ensure the agents
+     > don't just split up and architecturally works optimally on a macro scale, but also that all of their code is
+     > optimized, readable and follow all industry best practices, and avoids falltraps like duplication, which makes
+     > maintainability a hassle?
+
+     To the orchestrator, passed on word for word to the builder of these rules:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     > (4) Audits: #245's report is not held back. Every audit after it is read by the fixed brief and seven questions
+     > in #246's current text, part E.
+
+     The issue's current text holds eight questions, the eighth added with the owner's yes on 15 November 2026. Behind
+     `modules/code-shape.md` and `modules/cleaning.md`, the line on a grown baseline in
+     `modules/review-guidelines.md`, `scripts/shape.mjs` and `scripts/dose.mjs` with its readers in `scripts/look.mjs`,
+     the count of branch points in `scripts/code-shape.mjs`, the near-copies in `scripts/copies.mjs`, the starter kit's
+     `checks/shape.json`, and the slots *shape check*, *dose* and *audits*.
+
+227. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
      session recorded it on issue #282, labelled `by:chat`; first added to #277, which had already been built and
      closed, so it stands as an issue of its own). The owner asked:
 

@@ -16,7 +16,7 @@ How:
 - At most five at a time (core archive 61), each on the cheapest model that does its part well.
 - Check every result before using it.
 
-**A brief is written as a rule is** (core archive 226; #282). Whoever hands a session or helper its work writes its
+**A brief is written as a rule is** (core archive 227; #282). Whoever hands a session or helper its work writes its
 brief: the orchestrator for each builder, a session for each helper or reviewer it starts, and whoever writes a
 template of the starter kit for the sessions that read it.
 - By default it stands alone and says four things: the role, by what it does ("you built none of this; find what is

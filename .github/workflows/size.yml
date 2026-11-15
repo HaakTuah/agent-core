@@ -5,8 +5,9 @@
 # one that uses a word true only for some of the projects that take the core, a gendered pronoun for the owner in a
 # line it adds to the dated records, or a phrase a rule may not use in a line it adds to a rule file or to a Markdown
 # template of the starter kit, read against the base, and reports the phrases that stood before it (AGENTS.md, "A rule
-# is written to one pattern"; modules/helpers.md, "A brief is written as a rule is"). This repository
-# only; no project calls it. Reads only, with no secret: the raise is read from git alone, the merge commit against its
+# is written to one pattern"; modules/helpers.md, "A brief is written as a rule is"); and the shape check on the core's
+# own scripts (scripts/shape.mjs, with .github/shape.json), which a project runs from the copies workflow. This
+# repository only; no project calls it. Reads only, with no secret: the raise is read from git alone, the merge commit against its
 # first parent, the base, and of the pull request's comments only who wrote each and how it opens is used, in a file
 # the script reads; no text of a comment reaches a command.
 name: size
@@ -52,3 +53,7 @@ jobs:
         run: node scripts/size.mjs --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json"
       - name: The floor and the modules fit any project, and a rule written uses no phrase a rule may not use
         run: node scripts/general.mjs scripts/general.json --base HEAD^1
+      - name: Nothing new in how the core's own code is put together
+        env:
+          SHAPE_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: node scripts/shape.mjs .github/shape.json

@@ -20,7 +20,6 @@ wanted").
 | #296 | builder | #235 |
 | #249 | rule builder | #235 |
 | #250 | rule builder | #249 |
-| #246 | rule builder, on Fable at high for this batch (its note of 15 November) | |
 | #330 | rule builder | #246 |
 | #253 | rule builder | #246, or built with it |
 | #275 | rule builder | #253 |

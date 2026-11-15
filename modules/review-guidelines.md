@@ -19,6 +19,8 @@ the floor. Changes only on the owner's word (core archive 56).
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
 - a size mark raised without its reason in the PR (one on what every session reads: below);
+- an entry that joins the shape check's baseline under "grown" without its reason in the PR and a fresh session's
+  word there that it found no other way (`modules/code-shape.md`, "Never worse");
 - a test weakened or skipped, or changed beyond what the task forces (core archive 36);
 - against the pillars of `modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
   pointed to.
@@ -49,7 +51,7 @@ A finding, not blocking:
   answer, save for growth a sync of the core brought.
 
 **A brief written in a pull request** (a template of the starter kit that hands work, or a brief a module, script or
-workflow holds; core archive 226): blocking where it misses one of the four things "A brief is written as a rule is"
+workflow holds; core archive 227): blocking where it misses one of the four things "A brief is written as a rule is"
 in `modules/helpers.md` names, or gives its reader a title or stakes that are not real.
 
 **A rule file changed:**
