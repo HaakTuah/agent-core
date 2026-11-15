@@ -110,9 +110,9 @@ export function copiesConfigs(p) {
   const copies = call(p, "copies.yml")?.with?.config ?? passedTo(runsOwn(p, "copies.mjs"), "copies.mjs") ?? slotted ?? KIT_CONFIGS.copies;
   return { copies, baseline: key(p, copies, "baseline") ?? KIT_CONFIGS.baseline };
 }
-// Both, each path null where its check's config cannot be read.
+// Both, each path null where its check's config cannot be read (Unread); any other error is thrown, never hidden.
 export function configs(p) {
-  const or = (read, names) => { try { return read(p); } catch { return Object.fromEntries(names.map(n => [n, null])); } };
+  const or = (read, names) => { try { return read(p); } catch (e) { if (!(e instanceof Unread)) throw e; return Object.fromEntries(names.map(n => [n, null])); } };
   return { ...or(licenceConfigs, ["licences", "audit"]), ...or(copiesConfigs, ["copies", "baseline"]) };
 }
 // The licence check's config, and the NuGet check's: its own input where the project calls it, else the licence check's.
