@@ -141,14 +141,19 @@ export const wellFormed = record => Array.isArray(record?.runs) && record.runs.e
 export function lost(prior, record) {
   const out = [];
   for (const r of prior?.runs ?? []) {
-    const same = (record?.runs ?? []).filter(x => x.at === r.at && x.commit === r.commit && x.tool === r.tool && x.model === r.model);
-    for (const [name, e] of Object.entries(r.cases ?? {})) {
-      const n = same.map(x => x.cases?.[name]).find(x => x && x.recorded === e.recorded && x.verdict === e.verdict) ?? same.find(x => x.cases?.[name])?.cases[name];
-      if (!n || n.verdict !== e.verdict || n.why !== e.why || n.recorded !== e.recorded || (e.wrong && n.wrong !== e.wrong)) out.push(`${name} (${r.at})`);
-    }
+    const same = (record?.runs ?? []).filter(x => sameRun(x, r));
+    for (const [name, e] of Object.entries(r.cases ?? {})) if (!keeps(e, verdictIn(same, name, e))) out.push(`${name} (${r.at})`);
   }
   return out;
 }
+
+const sameRun = (x, r) => x.at === r.at && x.commit === r.commit && x.tool === r.tool && x.model === r.model;
+
+// The verdict of the case `name` in the runs `same` that stands for `e`: the one recorded with it, else any.
+const verdictIn = (same, name, e) => same.map(x => x.cases?.[name]).find(x => x && x.recorded === e.recorded && x.verdict === e.verdict) ?? same.find(x => x.cases?.[name])?.cases[name];
+
+// Whether `n` keeps the verdict `e` as it was, its mark of wrong included where it had one.
+const keeps = (e, n) => Boolean(n) && n.verdict === e.verdict && n.why === e.why && n.recorded === e.recorded && (!e.wrong || n.wrong === e.wrong);
 
 // `boundBefore`: whether the cases held the release before this one, by its own record; they go on holding it then.
 // `cut`: the verdicts of that record this one lost (lost()), which hold the release.
@@ -165,6 +170,19 @@ export function forRelease(record, { boundBefore = false, cut = [] } = {}) {
     ? `the staged case${g.failing.length > 1 ? "s" : ""} ${g.failing.map(f => `${f.name} (${f.at}: ${f.why})`).join(", ")} failed in its last run. Mend: find why, the rule, the case or the session, in a pull request of its own; then run it again (node scripts/staged.mjs --set ${g.failing[0].name} <a new folder>) and record it, or mark the verdict wrong with --wrong where the case misread what the session did; then start the release again`
     : null;
   return { said, held };
+}
+
+// What a release at the commit `sha` says of the cases, and whether they hold it (forRelease), read with `git` (args =>
+// its output, throwing where git fails) from that commit's record, never the working folder's, and from the record of
+// the release before (`before`, or null): a record not in the commit is none yet; one there that cannot be read holds
+// the release; and the record only grows, so the release before's whole is in this one, its binding carried on and
+// none of its verdicts lost. `before` is the release before ({ sha }), or none.
+export function atRelease(sha, before, git) {
+  const at = rev => { try { git(["cat-file", "-e", `${rev}:${RECORD}`]); } catch { return undefined; } try { const r = JSON.parse(git(["show", `${rev}:${RECORD}`])); return Array.isArray(r?.runs) ? r : null; } catch { return null; } };
+  const record = at(sha) ?? (at(sha) === null ? null : { runs: [] });
+  const prior = before ? at(before.sha) : undefined;
+  const ok = prior && wellFormed(prior);
+  return forRelease(record, { boundBefore: ok ? gate(prior).binding : false, cut: ok ? lost(prior, record) : [] });
 }
 
 // The scheduled look's reader (look.mjs, DUE): in the core's own repository, its issue for the cases due, with no body
@@ -195,58 +213,72 @@ export function unplaced(why) {
   return out;
 }
 
-function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
-  const get = flag => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] ?? null : null; };
-  const named = n => caseOf(n) ?? (fail(`no staged case is named ${n ?? "(none)"}. Mend: name one of ${CASES.map(c => c.name).join(", ")}`), null);
-  if (argv.includes("--set")) {
-    const c = named(get("--set")), dir = argv[argv.indexOf("--set") + 2];
-    if (!c) return;
-    if (!dir) return fail("--set needs the folder to set the case in. Mend: give a new folder under the system's temporary folder, after the case's name");
-    try { console.log(setCase(c, path.resolve(dir), get("--at") ? { at: get("--at") } : {})); }
-    catch (e) { return fail(`${c.name} could not be set in ${dir}: ${String(e.message).split("\n").filter(Boolean).join(" ")}. Mend: give a new folder under the system's temporary folder, of letters, digits and . _ / - alone, from a clone whose HEAD is a commit of the core's main (or name one with --at <its full SHA>)`); }
-    return;
-  }
-  if (argv.includes("--read")) {
-    const c = named(get("--read")), dir = argv[argv.indexOf("--read") + 2];
-    if (!c) return;
-    if (!dir || !fs.existsSync(dir) || !fs.existsSync(path.join(sealOf(fs.realpathSync(dir)), "meta.json"))) return fail(`${dir ?? "(no folder)"} holds no case set by --set. Mend: give the folder the case was set in`);
-    // (a case whose repositories the session made unreadable, a link or another's git folder in them, fails)
-    let v;
-    try { v = c.read(fs.realpathSync(dir)); } catch (e) { if (!(e instanceof Unreadable)) throw e; v = { pass: false, why: `its repositories could not be read: ${e.message}` }; }
-    console.log(`${c.name}: ${v.pass ? "pass" : "fail"}: ${v.why}`);
-    if (argv.includes("--record")) {
-      const record = readRecord(), at = new Date().toISOString().slice(0, 10), tool = get("--tool") ?? TOOL, model = get("--model") ?? "not said";
-      const meta = memoOf(fs.realpathSync(dir), "meta");
-      if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);
-      // (a run of its own each time: no verdict, nor its mark, is ever written over)
-      const run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} };
-      record.runs.push(run);
-      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: unplaced(v.why), rules: meta.rules, recorded: new Date().toISOString() };
-      writeRecord(record);
-      console.log(`recorded in ${RECORD}`);
-    }
-    return;
-  }
-  if (argv.includes("--wrong")) {
-    const c = named(get("--wrong")), why = argv.slice(argv.indexOf("--wrong") + 2).join(" ").trim();
-    if (!c) return;
-    if (!why) return fail("--wrong needs why the verdict was wrong. Mend: say it after the case's name");
-    // (the newest verdict as latest() orders them, by the time each was recorded)
-    const record = readRecord(), newest = latest(record)[c.name];
-    const run = newest ? record.runs.find(r => r.at === newest.at && r.cases?.[c.name] && r.cases[c.name].recorded === newest.recorded && r.cases[c.name].verdict === newest.verdict) : null;
-    if (!run) return fail(`${c.name} has no recorded verdict. Mend: run it and record it first`);
-    run.cases[c.name].wrong = why;
-    writeRecord(record);
-    console.log(`${c.name}'s verdict of ${run.at} marked wrong in ${RECORD}`);
-    return;
-  }
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
+
+// The case named, or null where none is, said with its mend.
+const named = n => caseOf(n) ?? (fail(`no staged case is named ${n ?? "(none)"}. Mend: name one of ${CASES.map(c => c.name).join(", ")}`), null);
+
+// --set <case> <folder> [--at <sha>]
+function setCmd(argv, get) {
+  const c = named(get("--set")), dir = argv[argv.indexOf("--set") + 2];
+  if (!c) return;
+  if (!dir) return fail("--set needs the folder to set the case in. Mend: give a new folder under the system's temporary folder, after the case's name");
+  try { console.log(setCase(c, path.resolve(dir), get("--at") ? { at: get("--at") } : {})); }
+  catch (e) { return fail(`${c.name} could not be set in ${dir}: ${String(e.message).split("\n").filter(Boolean).join(" ")}. Mend: give a new folder under the system's temporary folder, of letters, digits and . _ / - alone, from a clone whose HEAD is a commit of the core's main (or name one with --at <its full SHA>)`); }
+}
+
+// --read <case> <folder> [--record [--tool <t>] [--model <m>]]
+function readCmd(argv, get) {
+  const c = named(get("--read")), dir = argv[argv.indexOf("--read") + 2];
+  if (!c) return;
+  if (!dir || !fs.existsSync(dir) || !fs.existsSync(path.join(sealOf(fs.realpathSync(dir)), "meta.json"))) return fail(`${dir ?? "(no folder)"} holds no case set by --set. Mend: give the folder the case was set in`);
+  // (a case whose repositories the session made unreadable, a link or another's git folder in them, fails)
+  let v;
+  try { v = c.read(fs.realpathSync(dir)); } catch (e) { if (!(e instanceof Unreadable)) throw e; v = { pass: false, why: `its repositories could not be read: ${e.message}` }; }
+  console.log(`${c.name}: ${v.pass ? "pass" : "fail"}: ${v.why}`);
+  if (argv.includes("--record")) record(c, dir, v, get);
+}
+
+// The verdict `v` of the case `c`, set in `dir`, written to the record as a run of its own: no verdict, nor its mark,
+// is ever written over.
+function record(c, dir, v, get) {
+  const rec = readRecord(), at = new Date().toISOString().slice(0, 10), tool = get("--tool") ?? TOOL, model = get("--model") ?? "not said";
+  const meta = memoOf(fs.realpathSync(dir), "meta");
+  if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);
+  const run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} };
+  rec.runs.push(run);
+  run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: unplaced(v.why), rules: meta.rules, recorded: new Date().toISOString() };
+  writeRecord(rec);
+  console.log(`recorded in ${RECORD}`);
+}
+
+// --wrong <case> <why>: the newest verdict as latest() orders them, by the time each was recorded, marked wrong.
+function wrongCmd(argv, get) {
+  const c = named(get("--wrong")), why = argv.slice(argv.indexOf("--wrong") + 2).join(" ").trim();
+  if (!c) return;
+  if (!why) return fail("--wrong needs why the verdict was wrong. Mend: say it after the case's name");
+  const rec = readRecord(), newest = latest(rec)[c.name];
+  const run = newest ? rec.runs.find(r => r.at === newest.at && r.cases?.[c.name] && r.cases[c.name].recorded === newest.recorded && r.cases[c.name].verdict === newest.verdict) : null;
+  if (!run) return fail(`${c.name} has no recorded verdict. Mend: run it and record it first`);
+  run.cases[c.name].wrong = why;
+  writeRecord(rec);
+  console.log(`${c.name}'s verdict of ${run.at} marked wrong in ${RECORD}`);
+}
+
+// No flag: each case, whether it is due, and what the record says of a release.
+function status() {
   const at = new Date().toISOString(), list = due({ at });
   for (const c of CASES) {
     const d = list.find(x => x.name === c.name);
     console.log(`${c.name}: ${d ? `due, ${d.why}` : "not due"}; holds ${c.holds.map(k => `${k}${c.inPart.includes(k) ? " (in part)" : ""}`).join("; ")}`);
   }
   console.log(forRelease(readRecord()).said);
+}
+
+function main(argv) {
+  const get = flag => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] ?? null : null; };
+  const cmd = [["--set", setCmd], ["--read", readCmd], ["--wrong", wrongCmd]].find(([f]) => argv.includes(f));
+  return cmd ? cmd[1](argv, get) : status();
 }
 
 if (started(import.meta.url)) main(process.argv.slice(2));

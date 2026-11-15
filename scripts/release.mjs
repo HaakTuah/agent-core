@@ -24,7 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
-import { RECORD, forRelease, gate, lost, wellFormed } from "./staged.mjs";
+import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -91,6 +91,16 @@ function after(flag, argv) {
   return argv[i + 1];
 }
 
+// Why the release `name` at `sha` is not cut, or null: the staged cases hold it (`staged`, from atRelease), or a check
+// on that commit has not passed, as the list of the runs there (`runs`, a file) says.
+function whyNot(name, sha, staged, runs) {
+  if (staged.held) return `${name} is not cut: ${staged.held}.`;
+  let list = null;
+  try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
+  const reasons = held(list);
+  return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
+}
+
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
   if (!inTheCore()) return fail("run it in the core's own repository: a project cuts no release");
@@ -111,23 +121,11 @@ function main(argv) {
       : asks.length
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
-    // (the staged cases' record as the commit to be released holds it, never the working folder's)
-    // (a record not in the commit is none yet; one that is there but cannot be read holds the release)
-    let record = { runs: [] }, there = true;
-    try { inBare(dir, ["cat-file", "-e", `${sha}:${RECORD}`]); } catch { there = false; }
-    if (there) { try { record = JSON.parse(inBare(dir, ["show", `${sha}:${RECORD}`])); if (!Array.isArray(record?.runs)) record = null; } catch { record = null; } }
-    // (the record only grows, so the release before's, whole, is in this one: its binding carries on, and none of its
-    // verdicts is lost)
-    let boundBefore = false, gone = [];
-    if (before) try { const prior = JSON.parse(inBare(dir, ["show", `${before.sha}:${RECORD}`])); if (wellFormed(prior)) { boundBefore = gate(prior).binding; gone = lost(prior, record); } } catch { /* (none then) */ }
-    const staged = forRelease(record, { boundBefore, cut: gone });
+    const staged = atRelease(sha, before, rev => inBare(dir, rev));
     console.log(staged.said);
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    if (staged.held) return fail(`${name} is not cut: ${staged.held}.`);
-    let list = null;
-    try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
-    const reasons = held(list);
-    if (reasons.length) return fail(`${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}`);
+    const stop = whyNot(name, sha, staged, runs);
+    if (stop) return fail(stop);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);
     console.log(`${name} is cut.`);

@@ -17,21 +17,29 @@ import { CASES } from "./staged.mjs";
 export const FILE = "scripts/holders.json";
 const FORM = /^(?:(check): (.+?)|(audit)|(describes))(, in part)?$/u;
 
+// One holder as holders.json names it for the rule `key`: { kind, by, part }, or the line of what is wrong, with its mend.
+function holderOf(key, value, root) {
+  const m = FORM.exec(String(value));
+  if (!m) return `${FILE}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule; a staged case names its rules in its own file`;
+  const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
+  if (kind === "check" && /^(?:scripts|\.github|setup|floor|modules)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
+  return { kind, by: what, part: Boolean(m[5]) };
+}
+
+// What holders.json names, or the line of why it cannot be read.
+function named(root) {
+  try { return { named: JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")).holders ?? {} }; }
+  catch (e) { return { named: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
+}
+
 // Each rule with its holders ([{ kind, by, part }]), and what is wrong with holders.json, each a line with its mend.
 export function holders(root = ROOT, cases = CASES) {
-  const all = rules(root), keys = new Set(all.map(r => r.key)), wrong = [];
-  let named = {};
-  try { named = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")).holders ?? {}; }
-  catch (e) { wrong.push(`${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead`); }
+  const all = rules(root), keys = new Set(all.map(r => r.key)), read = named(root), wrong = read.wrong ? [read.wrong] : [];
   const by = new Map(all.map(r => [r.key, []]));
-  for (const [key, value] of Object.entries(named)) {
-    if (!keys.has(key)) { wrong.push(`${FILE} names "${key}", which is no rule of the floor or the modules as they stand. Mend: write the key as the rule's file and bold lead now read ("${"floor/security.md: 1. Nothing secret in the repository"}"), or take it out where the rule has gone`); continue; }
-    for (const v of Array.isArray(value) ? value : [value]) {
-      const m = FORM.exec(String(v));
-      if (!m) { wrong.push(`${FILE}: "${key}" has the holder "${v}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule; a staged case names its rules in its own file`); continue; }
-      const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
-      if (kind === "check" && /^(?:scripts|\.github|setup|floor|modules)\//u.test(what) && !fs.existsSync(path.join(root, what))) wrong.push(`${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`);
-      else by.get(key).push({ kind, by: what, part: Boolean(m[5]) });
+  for (const [key, value] of Object.entries(read.named)) {
+    if (!keys.has(key)) { wrong.push(`${FILE} names "${key}", which is no rule of the floor or the modules as they stand. Mend: write the key as the rule's file and bold lead now read ("floor/security.md: 1. Nothing secret in the repository"), or take it out where the rule has gone`); continue; }
+    for (const h of (Array.isArray(value) ? value : [value]).map(v => holderOf(key, v, root))) {
+      if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });

@@ -171,6 +171,26 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   for (const d of [dir, sealOf(dir)]) if (fs.existsSync(d) && fs.readdirSync(d).length) throw new Error(`${d} is not empty: a case is set in a folder of its own`);
   fs.mkdirSync(sealOf(dir), { recursive: true });
   const project = path.join(dir, "project"), origin = path.join(dir, "origin.git"), bin = path.join(dir, "bin");
+  repos(dir, project, origin);
+  const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
+  if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
+  fillIn(project);
+  writeAll(project, { ...PROGRAM, ...files });
+  git(project, "add", "-A");
+  git(project, "commit", "-q", "-m", "The project as it stands");
+  git(project, "push", "-q", "origin", "main");
+  git(project, "branch", "-q", "--set-upstream-to=origin/main", "main");
+  for (const [name, change] of Object.entries(branches)) pushBranch(project, name, change);
+  writeAll(project, loose);
+  fs.mkdirSync(bin);
+  fs.copyFileSync(path.join(CORE_ROOT, "scripts", "staged", "gh.cjs"), path.join(bin, "gh"));
+  fs.chmodSync(path.join(bin, "gh"), 0o755);
+  fs.writeFileSync(path.join(dir, "github.json"), `${JSON.stringify(stateOf(issues, comments, github), null, 2)}\n`);
+  return { dir, project, origin, bin };
+}
+
+// The project and its bare origin, set so that nothing of the machine's own reaches them.
+function repos(dir, project, origin) {
   fs.mkdirSync(project, { recursive: true });
   git(dir, "init", "-q", "--bare", "-b", "main", origin);
   git(project, "init", "-q", "-b", "main");
@@ -183,8 +203,10 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   // (pushes go to the bare repository by a push address of their own, which no setting of the machine's rewrites)
   git(project, "remote", "set-url", "--push", "origin", origin);
   if (path.resolve(git(project, "remote", "get-url", "--push", "origin")) !== path.resolve(origin)) throw new Error("the project's pushes would not reach its own bare origin");
-  const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
-  if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
+}
+
+// The kit's FILL IN marks filled as FILLS says, outside the copy of the core.
+function fillIn(project) {
   for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
     if (f.startsWith("core/")) continue;
     const file = path.join(project, f), text = fs.readFileSync(file, "utf8");
@@ -193,35 +215,36 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
     for (const [re, to] of FILLS) filled = filled.replace(re, to);
     fs.writeFileSync(file, filled);
   }
-  for (const [f, text] of Object.entries({ ...PROGRAM, ...files })) {
+}
+
+// Each file written in the project ({ path: text }), or taken out where its text is null.
+function writeAll(project, files) {
+  for (const [f, text] of Object.entries(files)) {
     const file = path.join(project, f);
     if (text === null) { fs.rmSync(file, { force: true }); continue; }
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, text);
   }
+}
+
+// The branch `name`, a commit on main with `change`, pushed to the origin and not kept in the project.
+function pushBranch(project, name, change) {
+  git(project, "checkout", "-q", "-b", name);
+  writeAll(project, change);
   git(project, "add", "-A");
-  git(project, "commit", "-q", "-m", "The project as it stands");
-  git(project, "push", "-q", "origin", "main");
-  git(project, "branch", "-q", "--set-upstream-to=origin/main", "main");
-  for (const [name, change] of Object.entries(branches)) {
-    git(project, "checkout", "-q", "-b", name);
-    for (const [f, text] of Object.entries(change)) { const file = path.join(project, f); fs.mkdirSync(path.dirname(file), { recursive: true }); if (text === null) fs.rmSync(file, { force: true }); else fs.writeFileSync(file, text); }
-    git(project, "add", "-A");
-    git(project, "commit", "-q", "--allow-empty", "-m", `${name}`);
-    git(project, "push", "-q", "origin", name);
-    git(project, "checkout", "-q", "main");
-    git(project, "branch", "-q", "-D", name);
-  }
-  for (const [f, text] of Object.entries(loose)) { const file = path.join(project, f); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); }
-  fs.mkdirSync(bin);
-  fs.copyFileSync(path.join(CORE_ROOT, "scripts", "staged", "gh.cjs"), path.join(bin, "gh"));
-  fs.chmodSync(path.join(bin, "gh"), 0o755);
+  git(project, "commit", "-q", "--allow-empty", "-m", `${name}`);
+  git(project, "push", "-q", "origin", name);
+  git(project, "checkout", "-q", "main");
+  git(project, "branch", "-q", "-D", name);
+}
+
+// The stand-in's state for GitHub as the case starts.
+function stateOf(issues, comments, github) {
   const at0 = "2026-11-01T09:00:00Z", user = login => ({ login, type: "User" });
   const state = { owner: OWNER, repo: REPO, private: false, hasIssues: true, labels: LABELS, issues: [], pulls: [], comments: [], checks: [], rulesets: [], last: 0, calls: [], ...github };
   for (const i of issues) state.issues.push({ number: ++state.last, title: i.title, body: i.body, state: "open", user: user(i.user ?? OWNER), labels: i.labels ?? ["queued", "by:owner"], assignees: [{ login: OWNER }], created_at: at0, updated_at: at0 });
   for (const c of comments) state.comments.push({ id: ++state.last * 1000, issue: c.issue, user: user(c.user ?? OWNER), body: c.body, created_at: at0, updated_at: at0 });
-  fs.writeFileSync(path.join(dir, "github.json"), `${JSON.stringify(state, null, 2)}\n`);
-  return { dir, project, origin, bin };
+  return state;
 }
 
 // ---- the readers: what the session did, read from the scratch project ----

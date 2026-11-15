@@ -14,9 +14,10 @@
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
 //     closes this one: a session closes it once it has found why.
-//   - What else is due: the staged cases, in the core alone (staged.mjs); the pass twice a year over the choices that
-//     are hard to undo (choices.mjs); and the dose of the audits and the cleaning share, which joins DUE as its rule
-//     comes (#246).
+//   - What the dose makes due (dose.mjs; modules/cleaning.md): cleaning, while the codebase is not in standard, and an
+//     audit by a reader, which the look labels needs-owner in place of queued where the project is in debt and its
+//     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and the pass
+//     twice a year over the choices that are hard to undo (choices.mjs).
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again.
 // Its record is the body of one closed issue, "The scheduled look's record", which it writes on each run. A run by a
 // session (not GitHub's job) where the record shows a run less than SOON hours before does nothing more, so an
@@ -36,15 +37,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { look as choicesDue } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
+import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { answer, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
-import { report as holdersReport } from "./holders.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
-import { copies, monthOf, readCounts, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
+import { copies, monthOf, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
 export const BOT = "github-actions[bot]";
@@ -58,11 +59,39 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
 };
-// The readers of what else is due, each (ctx) => { title, body, unread } or null, a body of null closing the issue it
-// keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over the
-// choices that are hard to undo (choices.mjs); and, as its rule comes, the audits and the cleaning share by the dose
-// (#246).
-export const DUE = [stagedCases, choicesDue];
+// The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
+// issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
+// the choices that are hard to undo (choices.mjs); and the cleaning and the audit the dose makes due (dose.mjs). One
+// that says `owner`, true or false, has its issue's state label kept to it: needs-owner where true, else queued.
+export const DUE = [stagedCases, choicesDue, cleaningDue, auditIsDue];
+export const OWNERS = "needs-owner";
+export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner }));
+const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
+
+// The labels an issue the look keeps should carry where its state label is not the one that fits: the others as they
+// stand, and needs-owner or queued; null where they fit already, and where a session gave it another state (later,
+// on-hold), which the look leaves as it is.
+export function relabelled(labels, owner) {
+  const [want, drop] = owner ? [OWNERS, LABELS[0]] : [LABELS[0], OWNERS];
+  if (labels.includes("later") || labels.includes("on-hold")) return null;
+  return labels.includes(want) && !labels.includes(drop) ? null : [...labels.filter(l => l !== drop && l !== want), want];
+}
+
+function write(method, route, payload) {
+  const r = spawnSync("gh", ["api", "-X", method, route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24 });
+  if (r.status !== 0) throw new Error(`GitHub refused ${method} ${route.replace(/^repos\/[^/]+\/[^/]+\//, "")}`);
+  return r.stdout ? JSON.parse(r.stdout) : {};
+}
+
+// The state label of an issue the look keeps and still holds open, kept to what its reader says of the owner: what
+// was done, as lines for the look's summary.
+function relabel({ repo, issue, finding, dry }) {
+  if (typeof finding.owner !== "boolean" || !issue || finding.what === null || finding.unread) return [];
+  const labels = relabelled(issue.labels, finding.owner);
+  if (!labels) return [];
+  try { if (!dry) write("PUT", `repos/${repo}/issues/${issue.number}/labels`, { labels }); } catch (e) { return [`  ${e.message}`]; }
+  return [`${finding.title}: labelled ${finding.owner ? OWNERS : LABELS[0]} (#${issue.number})`];
+}
 
 // The time of the last run its record holds, or null.
 export const lastRun = body => /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.exec(String(body ?? ""))?.[1] ?? null;
@@ -122,7 +151,7 @@ export function mine(issues, owner) {
     if (i.pull_request || !(login === BOT || login.toLowerCase() === String(owner).toLowerCase())) continue;
     const was = by.get(i.title);
     if (was?.state === "open") twins.push(was);
-    by.set(i.title, { number: i.number, state: i.state, body: i.body ?? "", created_at: i.created_at });
+    by.set(i.title, { number: i.number, state: i.state, body: i.body ?? "", created_at: i.created_at, labels: (i.labels ?? []).map(l => l.name ?? l) });
   }
   return Object.assign(by, { twins });
 }
@@ -199,10 +228,7 @@ function main(args) {
   // a missed run
   if (last && hoursBetween(last, at) > MISSED) add(TITLES.missed, `The look before this one ran at ${last}, ${hoursBetween(last, at)} h before this run at ${at}: over ${MISSED} h. Find why and mend it, then close this issue: GitHub switches a scheduled workflow off after 60 days with no activity in the repository (\`gh workflow enable\` turns it back on, as an orchestrator's wake does), a run can fail, and an orchestrator that carries the look may not have woken.`);
   // what else is due, as each rule that sets it comes
-  for (const read of DUE) {
-    try { const due = read({ repo, manifest, at }); if (due) add(due.title, due.body, due.unread ?? null); }
-    catch { say("A reader of what else is due could not read this repository: nothing of it was looked at."); }
-  }
+  findings.push(...dueNow({ repo, manifest, at }));
 
   // the state report, once a month
   const month = monthOf(at), reportTitle = `${REPORT}, ${month}`;
@@ -217,17 +243,10 @@ function main(args) {
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: since(i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft });
-    let holders = null;
-    try { if (manifest === null) holders = holdersReport(); } catch { /* (the report says they were not read) */ }
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), previous: previous?.body ?? null, overdue, counts, holders, scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), previous: previous?.body ?? null, overdue, counts, scripts });
   }
 
   // what is done with each
-  const write = (method, route, payload) => {
-    const r = spawnSync("gh", ["api", "-X", method, route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24 });
-    if (r.status !== 0) throw new Error(`GitHub refused ${method} ${route.replace(/^repos\/[^/]+\/[^/]+\//, "")}`);
-    return r.stdout ? JSON.parse(r.stdout) : {};
-  };
   if (!reach.yes) {
     say(`Issues cannot be read and written here (${reach.why}), so what the scheduled look would open goes to \`${FOLDER}/\`, one file each${toInbox ? "" : ": a session runs `node " + scripts + "/look.mjs --inbox` and commits them in a pull request of its own"}.`);
     for (const f of findings) {
@@ -254,14 +273,14 @@ function main(args) {
     write("PATCH", `repos/${repo}/issues/${number}`, { state: "closed", state_reason: "completed" });
   };
   const did = [];
-  const act = (title, body, issue, unread, { closes = true } = {}) => {
+  const act = (title, body, issue, unread, { closes = true, labels = LABELS } = {}) => {
     const step = plan(body, issue, unread);
     const shown = step === "close" && !closes ? "nothing" : step;
     did.push(`${title}: ${unread ? `not read (${unread})` : shown}${issue ? ` (#${issue.number})` : ""}`);
     if (dry || shown === "nothing") return;
     try {
       // (an owner GitHub will not let be assigned here leaves the issue unassigned, never unopened)
-      if (shown === "open") try { write("POST", `repos/${repo}/issues`, { title, body, labels: LABELS, assignees: owner ? [owner] : [] }); } catch { write("POST", `repos/${repo}/issues`, { title, body, labels: LABELS }); }
+      if (shown === "open") try { write("POST", `repos/${repo}/issues`, { title, body, labels, assignees: owner ? [owner] : [] }); } catch { write("POST", `repos/${repo}/issues`, { title, body, labels }); }
       else if (shown === "update") write("PATCH", `repos/${repo}/issues/${issue.number}`, { body });
       else if (shown === "reopen") write("PATCH", `repos/${repo}/issues/${issue.number}`, { body, state: "open" });
       else if (shown === "close") close(issue.number, "nothing of this stands today, so this closes; it opens again if it comes back.");
@@ -272,7 +291,7 @@ function main(args) {
     did.push(`a second issue of the same thing: closed (#${t.number})`);
     if (!dry) try { close(t.number, "another issue of the look's holds this same thing, so this one closes."); } catch (e) { did.push(`  ${e.message}`); }
   }
-  for (const f of findings) act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed });
+  for (const f of findings) { act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner) }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
   if (monthly) act(reportTitle, text(monthly, carrier), null, null);
   // the record, written last: a closed issue of its own
   const recordBody = `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n`;

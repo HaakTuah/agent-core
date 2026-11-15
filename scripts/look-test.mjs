@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node scripts/look-test.mjs
-import { BOT, checksOf, idleBody, inboxFile, lastRun, mine, plan, slug, text } from "./look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, slug, text } from "./look.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "./state-report.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -18,6 +18,16 @@ ok(plan("a", null) === "open" && plan("a", open) === "nothing" && plan("b", open
   "a finding opens its issue, leaves it as it stands, updates it, or reopens the closed one: never a second");
 ok(plan(null, open) === "close" && plan(null, closed) === "nothing" && plan(null, null) === "nothing", "once nothing stands, an open issue closes, and nothing else happens");
 ok(plan(null, open, true) === "nothing" && plan("b", open, true) === "nothing", "what could not be read changes nothing: an issue is never closed on a reading that failed");
+
+// ---- what else is due, and whose it is to see ----
+const readers = [() => null, () => ({ title: "One", body: "a" }), () => ({ title: "Two", body: null, unread: "its file is no file" }), () => ({ title: "Three", body: "c", owner: true })];
+ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what: "a", unread: null }, { title: "Two", what: null, unread: "its file is no file" }, { title: "Three", what: "c", unread: null, owner: true }]),
+  "each reader of what is due gives its issue, one that has nothing to say gives none, and one says whether it is the owner's to see");
+ok(DUE.length === 4 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; Cleaning due: how the code is put together; An audit of how the code is put together is due",
+  "the look keeps an issue for the pass over the choices, for cleaning and for the audit by a reader (and, in the core alone, the staged cases)");
+ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
+  && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued" && relabelled(["later", "by:look"], true) === null && relabelled(["on-hold"], false) === null,
+  "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
 
 // ---- its own issues: GitHub's job's or the owner's account's, the newest of each title ----
 const issues = [
@@ -73,13 +83,17 @@ ok(inboxFile("Steps of a release not done", "x", "GitHub's daily job").startsWit
 
 // ---- the state report ----
 ok(before("2026-11") === "2026-10" && before("2027-01") === "2026-12", "the month before a month, across a year too");
-const core = body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], scripts: "scripts" });
+const core = body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], holders: null, scripts: "scripts" });
+ok(/^- Of \d+ rules of the floor and the modules: /m.test(body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], scripts: "scripts" })), "the core's report reads the rules by what holds them where it is given none");
 ok(/no baseline may stand/.test(core) && /Not read: `scripts\/holders\.mjs` could not read them/.test(core) && /- Nothing: no task the look keeps/.test(core) && /state-report\.mjs --projects/.test(core) && !/Counts for the core/.test(core),
   "the core's report: no baseline, the rules not guessed, nothing overdue, and the projects' part left to a session", core);
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });
 ok(proj.includes("- copies: 4 old copies in its baseline (`checks/copies-baseline.json`), 6 at the last report.") && proj.includes("- #7 Steps of a release not done: open since 2026-11-01."),
   "a project's report: its baseline against the last report's, and what is overdue", proj);
+const shaped = body({ core: true, month: "2026-12", measures: null, shape: { at: ".github/shape-baseline.json", count: 40, state: "paying down" }, previous: "- how the code is put together: 56 old breaches in its baseline", overdue: [], scripts: "scripts" });
+ok(shaped.includes("- how the code is put together: 40 old breaches in its baseline (`.github/shape-baseline.json`), 56 at the last report; the codebase is paying down.") && !/no baseline may stand/.test(shaped),
+  "the shape check's baseline is a measure of the report, with its count at the last one and the state it gives", shaped);
 ok(proj.includes(`- copy: ${"a".repeat(40)}, 3 commits behind the core's main.`) && proj.includes("- steps not done: 2.") && proj.includes("- merged in 2026-10: 4, the core's share 50% (sync 1, upkeep 1, update 0, own 2)."),
   "and its counts for the core, of the month before", proj);
 ok(body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: { pin: null, behind: null, steps: null, merged: null }, scripts: "core/scripts" }).includes("- merged in 2026-10: not read"),
