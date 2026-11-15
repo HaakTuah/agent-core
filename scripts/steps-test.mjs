@@ -230,6 +230,24 @@ fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.repla
 const halfP = project(ownDir), half = configs(halfP);
 ok(half.licences === "config/licences.json" && half.audit === "config/audit.json" && half.copies === null && half.baseline === null && fresh(halfP).some(([to]) => to === "config/licences.json") && !fresh(halfP).some(([to]) => /^(checks|config)\/copies/.test(to)),
   "a config one workflow names only when it runs leaves that check's paths unread, and the other check's read and compared", JSON.stringify(half));
+ok(differences(halfP, fresh(halfP)).some(d => d.startsWith("a config not compared: ") && d.includes("$COPIES")), "and the differences say the config they did not compare, and why");
+// (a project whose licence and NuGet checks are called with configs of their own: the "nuget" part is looked for in the
+// NuGet check's, the rest in the licence check's)
+const mixed = kit("mixed-configs", { packages: ".", nuget: "src" });
+const lic = JSON.parse(fs.readFileSync(path.join(mixed, "checks/licences.json"), "utf8"));
+const { nuget: nugetPart, ...npmPart } = lic;
+fs.mkdirSync(path.join(mixed, "config"));
+fs.writeFileSync(path.join(mixed, "config/npm.json"), JSON.stringify(npmPart, null, 2));
+fs.writeFileSync(path.join(mixed, "config/dotnet.json"), JSON.stringify({ nuget: nugetPart }, null, 2));
+fs.rmSync(path.join(mixed, "checks/licences.json"));
+for (const [wf, to] of [["licences.yml", "config/npm.json"], ["nuget.yml", "config/dotnet.json"]]) {
+  const at = path.join(mixed, ".github/workflows", wf);
+  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace("config: checks/licences.json", `config: ${to}`));
+}
+execFileSync("git", ["add", "-A"], { cwd: mixed });
+const mixedP = project(mixed), mixedFound = differences(mixedP, fresh(mixedP));
+ok(configs(mixedP).licences === "config/npm.json" && configs(mixedP).nuget === "config/dotnet.json" && !mixedFound.some(d => /^(config|checks)\//.test(d)),
+  "a licence config and a NuGet config of their own are each compared with their own part of the kit's", mixedFound.join("\n"));
 // (with only a comment naming the script before it, the old reading took the comment's next word as the config)
 fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.replace("          node core/scripts/agent-tools.mjs config/licences.json\n", ""));
 missedOwn = notDone(ownDir);

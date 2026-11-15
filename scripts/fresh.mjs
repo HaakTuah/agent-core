@@ -88,7 +88,9 @@ const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undef
 // it lacks of the kit's, and, of what an earlier kit wrote (`older`, each a kit as `kit` is), what it still holds that
 // the kit no longer writes, the wording the core has left.
 export function differences(p, kit, older = []) {
-  const out = [];
+  // (a check's config that a workflow names only when it runs is compared nowhere: said, so no comparison goes missing
+  // unsaid)
+  const out = configs(p).unread.map(why => `a config not compared: ${why}`);
   for (const [to, want] of kit) {
     if (SKIPPED.has(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
     const text = p.read(to);
@@ -140,7 +142,10 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
     const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
-    return [...kit, [slot, json(marks)], [at.licences, json(licences(o, () => false))], [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]].filter(([to]) => to !== null);
+    // (the licence config as the kit writes it, its "nuget" part in the NuGet check's own where that is another file)
+    const { nuget, ...licence } = licences(o, () => false);
+    const licenceFiles = nuget && at.nuget !== null && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
+    return [...kit, [slot, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];
