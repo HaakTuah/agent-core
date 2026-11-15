@@ -614,7 +614,8 @@ function configAt(named, self, base) {
   const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")) ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
   if (fs.existsSync(notLinked(at))) return at;
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
-  if (base?.show(at) != null) refuse(`${at} is gone, and ${base.name} holds it: no pull request takes the shape check's config out`, `take it back as ${base.name} holds it (git checkout ${base.name} -- ${at})`);
+  const was = base ? baseFiles(base, named) : null; // (where the base's own manifest places it, if this one moved it)
+  if (base?.show(at) != null || was?.config != null) refuse(`${at} is gone, and ${base.name} holds it${was.at === at ? "" : ` at ${was.at}, where its manifest names it`}: no pull request takes the shape check's config out`, `take the config back as ${base.name} holds it (git checkout ${base.name} -- ${was.at}), and the manifest's *shape check* row with it where this pull request changed it`);
   return null;
 }
 
@@ -638,9 +639,10 @@ function unwritten(self, base) {
 // compared with the old one: the config one named on the command line (the workflow's), else the one the base's
 // manifest (in the core, its AGENTS.md) names; the baseline where that config names it.
 function baseFiles(base, named) {
-  const at = named ?? where(base.show("core-manifest.md") ?? base.show("AGENTS.md"));
+  const own = where(base.show("core-manifest.md") ?? base.show("AGENTS.md"));
+  const at = named !== null && base.show(named) !== null ? named : own; // (a config newly named is compared with the old)
   const config = base.show(at), baseline = config === null ? null : tolerant(() => parseConfig(config, base.name).baseline);
-  return { config, baseline: baseline === null ? null : base.show(baseline) };
+  return { at, config, baseline: baseline === null ? null : base.show(baseline) };
 }
 
 function check(config, at, self, found, base, named) {

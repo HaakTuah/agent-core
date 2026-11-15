@@ -339,6 +339,14 @@ r = run([], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /no longer names 4 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
 for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
 git("checkout", "-q", "--", ".");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/gone.json` |\n");
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /holds it at checks\/shape\.json, where its manifest names it: no pull request takes the shape check's config out/.test(r.out), "a manifest that names a config nowhere, where the base's names one, fails: no pull request takes the config out so", r.out);
+fs.rmSync(path.join(dir, "core-manifest.md"));
+put("checks/new.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"code": [', '"marks": { "lines": 500 },\n  "code": ['));
+r = run(["checks/new.json"], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /raises or drops 1 mark/.test(r.out), "a config named anew on the command line is compared with the one the base's rules name", r.out);
+fs.rmSync(path.join(dir, "checks/new.json"));
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));
