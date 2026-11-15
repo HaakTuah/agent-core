@@ -162,7 +162,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
      request or by a comment that opens "Security review:" from the owner, a member or a collaborator
-     (`modules/reviews.md`, point 3), the second alone where Codex marks a finding of its review open, posted after it;
+     (`modules/reviews.md`, point 3), the second alone where Codex marks a finding of its review open, posted after it,
+     and, while Codex's review runs, one posted after it began, never a note posted before it;
      where the pull request changes what runs by itself beyond its pins, both, or two such comments (floor rule 3), or
      one holding what `comment-only.mjs` printed on the head.
      Where a summary of Codex's is there but its state cannot be read, a form nobody documents having changed, the

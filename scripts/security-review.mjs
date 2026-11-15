@@ -5,7 +5,11 @@
 // two things as proof: the summary Codex's own app keeps on the pull request (its login and kind are GitHub's, which no
 // one else can post under), saying its security review is completed; or a comment that opens "Security review:" from
 // the repository's owner, a member or a collaborator, which is how another reviewer's, or the fallback reviewer's, is
-// posted (modules/reviews.md, point 3). Where Codex's summary says a finding of its security review is open, the check
+// posted (modules/reviews.md, point 3). Where Codex's summary says its security review is running, only such a comment
+// posted after the summary last changed ends the wait for it (that review is waited for: core archive 206), never one
+// posted before it began, a note that none is needed among them (the summary's last change is the latest the review can
+// have begun, so a comment posted between its start and a later change of the summary is set aside too, and is posted
+// again). Where Codex's summary says a finding of its security review is open, the check
 // waits until such a comment is posted after Codex's newest security finding: the fallback reviewer's check of the fix
 // (Codex's own mark of an open finding does not clear by itself once the finding is fixed). Where the mark stands and
 // no finding of Codex's is to be found among the comments, such a comment settles it whenever it was posted.
@@ -26,8 +30,9 @@
 // alone, rule 8's one). Given no list of the files (a workflow older than this script), it asks one review, as it did
 // before it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull
 // request that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which
-// the workflow sets), which stood before the check came, it says the second is missing and never waits for it
-// (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it does not hold: what a
+// the workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so
+// it says of a review posted before Codex's running one began (AGENTS.md, "Nothing locks a project"); brought up to
+// date with main, it is held. What it does not hold: what a
 // posted review says, whether a finding is blocking, who posted each of two reviews (one login may post both), that
 // comment-only.mjs's printout is true (its code reviewer runs it again), and that a later commit which changes what
 // the review was for got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to
@@ -52,13 +57,17 @@ export const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word
 const POSTED = /^(?:\*\*)?Security review:/u;
 const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
+// the words Codex's app writes for a review under way; any other (completed, none, or one not known) is none running,
+// so that a form nobody documents can never hold a pull request for good (scripts/code-review-wait.mjs reads them too)
+export const RUNNING = ["running", "queued", "pending", "in_progress"];
 export const CONTEXT = "security-review";
 
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 const codexs = (comment) => comment.user?.login === CODEX && comment.user.type === "Bot" && typeof comment.body === "string";
 const newest = (times) => times.reduce((latest, at) => (at > latest ? at : latest), -Infinity); // -Infinity: none
 
-// what the summary Codex's app keeps says of its reviews: { state }, the whole state, or {} where there is no summary,
+// what the summary Codex's app keeps says of its reviews: { state, at }, the whole state and when the summary last
+// changed (GitHub's updated_at, as given), or {} where there is no summary,
 // and { unread: true } where a summary of Codex's is there but its state cannot be read, a form nobody documents having
 // changed (core archive 201). The app keeps one summary and edits it, so the first comment of its that opens as one is
 // read, never a later look-alike. scripts/code-review-wait.mjs reads its code review from it too.
@@ -70,14 +79,14 @@ export function codexState(comments) {
     let state;
     try { state = text === undefined ? undefined : JSON.parse(text.replaceAll("&#123;", "{").replaceAll("&#125;", "}")); } catch { state = undefined; }
     if (state === null || typeof state !== "object" || !("security_review" in state)) return { unread: true };
-    return { state };
+    return { state, at: comment.updated_at };
   }
   return {};
 }
-// of its security review: { review }, review undefined where there is none it can read, or { unread: true }
+// of its security review: { review, at }, review undefined where there is none it can read, or { unread: true }
 function codex(comments) {
   const read = codexState(comments);
-  return read.state ? { review: read.state.security_review } : read;
+  return read.state ? { review: read.state.security_review, at: read.at } : read;
 }
 // what the check says where Codex's summary is there but cannot be read: a warning beside the status, which waits or
 // passes as it would with no summary at all
@@ -88,9 +97,19 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const list = flat(comments);
-  const posted = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
+  const all = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
+  // while Codex's own runs, only a review posted after the summary last changed counts (a time that cannot be read is
+  // taken as the newest, so nothing is posted after it)
+  const running = review !== null && typeof review === "object" && RUNNING.includes(review.status);
+  const began = Date.parse(read.at) || Infinity;
+  const posted = running ? all.filter((comment) => (Date.parse(comment.created_at) || -Infinity) > began) : all;
   let verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits);
+  if (running && !verdict.done && all.length > 0 && posted.length === 0) {
+    const why = "Codex's security review is running, and every \"Security review:\" was posted before it began: wait, or post one now";
+    // (one whose head does not hold this check as the default branch does stood before it came: reported)
+    verdict = bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
+  }
   // floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted
   if (verdict.done && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
     const codexDone = review !== null && typeof review === "object" && review.status === "completed";

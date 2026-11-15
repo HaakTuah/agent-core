@@ -36,14 +36,11 @@ import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { UNREAD, WRITERS, codexState, pinsAlone, status, whole } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, status, whole } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
 const POSTED = /^(?:\*\*)?Code review:/u;
-// the words Codex's app writes for a review under way; any other (completed, none, or one not known) is none running,
-// so that a form nobody documents can never hold a pull request for good
-const RUNNING = ["running", "queued", "pending", "in_progress"];
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 
 // { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name)
