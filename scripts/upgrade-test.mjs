@@ -20,7 +20,8 @@
 // taken out, is reported, and its mend as written makes it done; and steps taken out at random are reported, exactly
 // those; then that a release changing only a test of the core's own asks no sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
-// queued, built and closed there passes every check on each pull request. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
+// queued, built and closed there passes every check on each pull request. And a copy older than the first release,
+// written by hand since no starter kit stood then, takes the release as the sync notes say (preRelease, below). It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.

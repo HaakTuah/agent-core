@@ -81,7 +81,7 @@ const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 // one after a space) left out, so that a comment naming a script is never read as running it (#364).
 const runs = w => Object.values(w.yaml?.jobs ?? {}).flatMap(job => (job?.steps ?? []).map(s => typeof s?.run === "string" ? s.run : ""))
   .join("\n").split("\n").map(l => l.replace(/(^|[ \t])#.*$/, "")).join("\n");
-const script = name => new RegExp(`(?<![\\w./-])core/scripts/${name.replace(/[.]/g, "\\.")}(?![\\w.-])`);
+const script = name => new RegExp(`(?<![\\w./-])core/scripts/${name.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}(?![\\w.-])`);
 // The project's own workflows that run a script of its copy of the core (`core/scripts/<name>`), as [file, workflow].
 export const runsOwn = (p, name) => (readable(p, text => text.includes(name)), Object.entries(p.workflows)).filter(([, w]) => script(name).test(runs(w)));
 // The first argument those workflows pass to it, quotes taken off; undefined where none passes one. One that names it
