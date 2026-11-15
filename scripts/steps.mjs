@@ -112,19 +112,20 @@ export function copiesConfigs(p) {
   const copies = call(p, "copies.yml")?.with?.config ?? passedTo(runsOwn(p, "copies.mjs"), "copies.mjs") ?? slotted ?? KIT_CONFIGS.copies;
   return { copies, baseline: key(p, copies, "baseline") ?? KIT_CONFIGS.baseline };
 }
-// The NuGet check's config: its own input where the project calls it, else the licence check's.
-const nugetOf = (p, licences) => call(p, "nuget.yml")?.with?.config ?? licences;
+// The NuGet check's config: its own input where the project calls it, read first, so that it stands where the licence
+// check's cannot be read; else the licence check's.
+const nugetOf = (p, licences) => call(p, "nuget.yml")?.with?.config ?? licences();
 // All of them, with the NuGet check's as `nuget`; each path null where its check's config cannot be read (Unread), and
 // why under `unread`, so the reader can say what it did not compare. Any other error is thrown, never hidden.
 export function configs(p) {
   const unread = [];
   const or = (read, names) => { try { return read(p); } catch (e) { if (!(e instanceof Unread)) throw e; unread.push(e.message); return Object.fromEntries(names.map(n => [n, null])); } };
   const licence = or(licenceConfigs, ["licences", "audit"]);
-  const nuget = licence.licences === null ? { nuget: null } : or(q => ({ nuget: nugetOf(q, licence.licences) }), ["nuget"]);
+  const nuget = or(q => ({ nuget: nugetOf(q, () => licence.licences) }), ["nuget"]);
   return { ...licence, ...nuget, ...or(copiesConfigs, ["copies", "baseline"]), unread };
 }
 const licenceConfig = p => licenceConfigs(p).licences;
-const nugetConfig = p => nugetOf(p, licenceConfig(p));
+const nugetConfig = p => nugetOf(p, () => licenceConfig(p));
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline

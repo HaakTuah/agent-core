@@ -248,6 +248,11 @@ execFileSync("git", ["add", "-A"], { cwd: mixed });
 const mixedP = project(mixed), mixedFound = differences(mixedP, fresh(mixedP));
 ok(configs(mixedP).licences === "config/npm.json" && configs(mixedP).nuget === "config/dotnet.json" && !mixedFound.some(d => /^(config|checks)\//.test(d)),
   "a licence config and a NuGet config of their own are each compared with their own part of the kit's", mixedFound.join("\n"));
+// (and a NuGet call that names its config outright is read where the licence config is named only when a workflow runs)
+const licencesLate = { ...mixedP, workflows: { ...mixedP.workflows, "licences.yml": { text: "licences.mjs", yaml: { jobs: { j: { steps: [{ run: 'node core/scripts/licences.mjs "$LICENCES"' }] } } } } } };
+const late = configs(licencesLate);
+ok(late.licences === null && late.nuget === "config/dotnet.json" && fresh(licencesLate).some(([to]) => to === "config/dotnet.json"),
+  "a NuGet config the NuGet call names outright is read and compared where the licence config cannot be", JSON.stringify(late));
 // (with only a comment naming the script before it, the old reading took the comment's next word as the config)
 fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.replace("          node core/scripts/agent-tools.mjs config/licences.json\n", ""));
 missedOwn = notDone(ownDir);
