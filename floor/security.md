@@ -3,7 +3,7 @@
 What protects the owner's accounts, repositories, systems, money, privacy and rights, and what cannot be undone. Every
 project takes it whole; nothing of its own loosens it. This file holds the rules any task can break, read at the start
 of every task; `floor/topics.md` holds the rest, read before a task touches one of its topics (workflows, input,
-dependencies, alerts, licences). A project's `SECURITY.md` adds under the same numbers what only it has. Who might
+dependencies, alerts, licences, accounts). A project's `SECURITY.md` adds under the same numbers what only it has. Who might
 attack: `floor/threat-model.md`.
 
 ## The rules
@@ -95,6 +95,9 @@ saved data; a weakened check).
 - A failing check that guards against harm (agents' isolation, `main`, keys, spending) stops its step, and the owner is
   told.
 - A failing test is fixed, or its task marked blocked, and the work goes on.
+- **A run with a model has a cap** in tokens or money, set by the project where its code calls the model; at the cap
+  the run stops (core archive 226). It does not mean an agent's own session. Reason: a loop that calls a model spends
+  without end.
 
 **18. Where agents hold sign-ins** (core archive 118 to 120, 122, 127 and 149).
 - How a machine is set up for agents is the owner's to decide, and no rule refuses work over it.

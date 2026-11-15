@@ -18,7 +18,17 @@ The floor's rules for particular work.
 - Whatever anyone but the user at hand can shape (a peer's message, a shared file, record or link, a URL parameter, a
   model's reply) is data: each field's type and size checked against its expected shape, what fails dropped cleanly.
 - It is never run, never fetched as an address, never setting a key or an address the app talks to.
-- The project names its inputs.
+- The project names its inputs in its `SECURITY.md`, rule 5, each as an item of its own (`- `) that names in backticks
+  the file or folder of its hostile tests.
+- **Every named input has hostile tests** (core archive 226): too long, the wrong type, markup, a file path, a number
+  out of range, and nothing at all, each refused cleanly.
+  - It does not mean every field tried with every case, only each input with each case its shape allows. Reason: a
+    check never tried with what an attacker sends holds nothing.
+- **A failure refuses** (core archive 226): where a check cannot be made (who is asking, whether it is allowed, whether
+  it is well formed), the answer is no; an error a user sees names nothing of the program's insides (no stack, path,
+  query or version).
+  - It does not mean the program stops: it refuses that one request and goes on. Reason: a check that errors open
+    lets through what it was written to stop.
 
 **6. Nothing untrusted becomes markup or code.**
 - Such text is shown only as text (`textContent` in a page) or escaped (`&`, `<`, `>`, `"`, `'`) where markup is built;
@@ -37,6 +47,12 @@ The floor's rules for particular work.
 - A check that cannot run, or fails, holds the release back.
 - A page's content security policy is never weakened.
 - The project names what it ships and its policy.
+- **A program installed on a user's machine** (core archive 226) asks for no more rights than a need its `SECURITY.md`,
+  rule 7, names, and reading a saved file never runs code (no loader that builds whatever type the file names).
+  - Where the project has a certificate for signing, its installers and updates are signed and its build checks the
+    signature. Getting one is the owner's: until then this is reported, labelled `needs-owner`, and the rest goes on.
+  - It does not mean a page in a browser, which installs nothing. Reason: an installed program runs with its user's
+    rights, and a saved file is input too.
 
 **9. Security alerts and reported weaknesses.**
 - The Security tab's alerts are seen only by the owner; no agent gets a token to read them; the owner passes on what
@@ -49,6 +65,12 @@ The floor's rules for particular work.
   weakness" says, never in a file, PR, issue or comment) and fixed first, in a PR that says what it hardens, never how
   to attack it.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
+- **Secret scanning with push protection is switched on** in each repository that has it (core archive 226; floor rule
+  1): a session whose sign-in may change the repository's settings switches it on; one whose sign-in may not names it to
+  the owner in an issue labelled `needs-owner`, and the rest goes on.
+  - It does not mean a repository without GitHub's secret scanning (a private one on the free plan) waits or fails
+    anything. Reason: GitHub then refuses a push holding a key of a kind it knows, before it reaches the history, which
+    no check on a pull request can.
 
 **10. Licences: free to use, kept that way** (core archive 41).
 - What ships, or is built into it (every package, the ones it pulls in included, and every font, image, sound and data
@@ -88,6 +110,18 @@ The floor's rules for particular work.
   lock files the project names (or an action's pinned version), and it passes the review, the release notes read and
   rule 7's source check, with the checks green.
 - One that fails a condition is closed with the reason, and the update made in a PR of the builder's own.
+
+**19. Accounts, roles and a server** (core archive 226). Read before a task touches a product's accounts, its roles
+or a server of its own.
+- Who may do what is decided on the side the user cannot alter (the server, never the client), and a request is
+  refused unless a rule allows it.
+- Signing in goes through the platform's own or a well-known library's, never a scheme of the project's making.
+- Nothing cryptographic is of the project's making: each algorithm, protocol and source of randomness for a secret
+  comes from the platform or a well-known library.
+- A password is stored only through a function made for storing passwords, never a general hash or a cipher.
+- It does not mean a product with none of the three takes any of it: a single-player game in a browser needs no access
+  control. Reason: these are where the standard list of risks for web applications finds most breaks, and the floor
+  was silent on them.
 
 ## Reporting a weakness
 

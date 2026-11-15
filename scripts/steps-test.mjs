@@ -100,6 +100,26 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
 }
 fs.writeFileSync(marksFile, marksAsKit);
 
+// ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
+const inputs = STEPS.filter(s => s.lead === "16 November 2026, hostile tests for every named input");
+const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
+const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
+fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
+ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
+ok(!rule5("   - a shared link: its parts checked against their shape,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
+  "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
+ok(!rule5("   - a shared link: its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named");
+let missedInputs = rule5("   - a shared link: checked by `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival, by `src/peer.mjs`.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "an item that names no file that is there is reported, by its words, and only it", report(missedInputs));
+missedInputs = rule5("   Each message a peer sends, its size checked.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
+fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
+ok(notDone(lockProject, inputs)[0]?.mend.includes("could not read the project"), "a SECURITY.md with no rule 5 is reported as not read, never as done");
+fs.writeFileSync(secFile, secAsKit);
+fs.rmSync(path.join(lockProject, "tests"), { recursive: true });
+
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
