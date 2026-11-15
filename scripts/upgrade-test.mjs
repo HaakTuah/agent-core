@@ -290,7 +290,7 @@ function upgrade(p, from, ownChanges, expect) {
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- It is never pushed to/.test(l)) ?? "";
   const worse = own(main1, dir => fs.appendFileSync(path.join(dir, "SECURITY.md"), `\n${copied}\n`));
   const failing = checks(p, "pull_request", worse, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
-  ok(copied && failing.length === 1 && failing[0][1].steps.some(x => /a new copy:[\s\S]*point to one place instead/.test(x.out)), `${p.name}: a pull request that adds a copy fails, and its failure says the mend`, failures(failing) || "it passed");
+  ok(copied && failing.length === 1 && failing[0][1].steps.some(x => /a new copy:[\s\S]*Mend: keep it in the one place it belongs and point there from the others/.test(x.out)), `${p.name}: a pull request that adds a copy fails, and its failure says the mend`, failures(failing) || "it passed");
   git(p.dir, "checkout", "-q", "change");
   git(p.dir, "checkout", "-q", main1, "--", "SECURITY.md");
   git(p.dir, "commit", "-q", "-m", "point to one place instead");
