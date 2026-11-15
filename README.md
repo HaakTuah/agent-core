@@ -34,8 +34,11 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
-   project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, the sync
-   script prints the entries a sync brings, and each is done in a PR of its own once the sync is merged. The core's
+   project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
+   `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
+   step not done and every difference from what the starter kit writes today (`scripts/fresh.mjs`), for the sync PR's
+   description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
+   release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
    submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The
@@ -110,7 +113,7 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    - **Only a sync PR moves those pins,** and only when the called workflow changed; `core.yml` fails a call pinned
      where it differs from the core's pin.
    - **A sync changes nothing of the project's own,** and the core tested its scripts before the sync brings them, on a
-     project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks another owner's
+     project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks a
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a

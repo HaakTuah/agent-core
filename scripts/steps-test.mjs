@@ -67,25 +67,25 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
 }
 // several at once, in a project of another kind: exactly those
-const npm = dirs["an-npm-project"];
+const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
-for (const lead of some) STAGES[lead].stage(npm);
-ok(JSON.stringify(notDone(npm).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(npm)));
-for (const lead of some) STAGES[lead].mend(npm);
-ok(!notDone(npm).length, "and their mends make every one done");
+for (const lead of some) STAGES[lead].stage(lockProject);
+ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
+for (const lead of some) STAGES[lead].mend(lockProject);
+ok(!notDone(lockProject).length, "and their mends make every one done");
 
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
-sec.stage(npm);
-ok(notDone(npm).length === 1, "a private repository with no security-review workflow is reported");
-declare(npm, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
-ok(!notDone(npm).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
-sec.mend(npm);
+sec.stage(lockProject);
+ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported");
+declare(lockProject, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
+ok(!notDone(lockProject).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
+sec.mend(lockProject);
 
 // ---- a check that cannot read the project is reported, never read as done ----
 const throwing = [{ lead: "a step", cost: COST.check, check: () => { throw new Error("cannot read it"); } }];
-ok(notDone(npm, throwing)[0]?.mend.includes("could not read the project"), "a check that throws is reported as not read, never as done");
+ok(notDone(lockProject, throwing)[0]?.mend.includes("could not read the project"), "a check that throws is reported as not read, never as done");
 
 // ---- beside a fresh start: each kind of difference is listed, and a declared file is not compared ----
 const game = dirs["a-game"];

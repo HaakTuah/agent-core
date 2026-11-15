@@ -1,5 +1,5 @@
-// Nothing the core changes locks a project that changes nothing of its own (AGENTS.md, "Nothing locks another owner's
-// project"; core archive 201): a project written by the starter kit of each of the last two releases (one that missed a
+// Nothing the core changes locks a project that changes nothing of its own (AGENTS.md, "Nothing locks a project"; core
+// archive 201 and 215): a project written by the starter kit of each of the last two releases (one that missed a
 // release jumps two), then synced to the commit under test as a release of its own, passes every check of the core
 // unchanged, and no pull request of its own starts a job there that it did not start before the sync, since each job is
 // a billed minute in a private repository. From each, two projects of another owner: one whose packages come from npm,
@@ -13,7 +13,12 @@
 // files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs them. GitHub's own services
 // (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that gives the security-review check
 // one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from the release it moves to, in
-// both projects. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
+// both projects. Each holds old content too, a breach of each kind a check reads (a long file, two folders that import
+// each other, a module its manifest's list does not name, a copy in its prose): none fails, and the copy stands in its
+// baseline. After the sync, a pull request that adds a copy fails, and the mend as the failure words it passes; every
+// step a release asks reads done (steps.mjs); each step the commit under test adds over the release started from,
+// taken out, is reported, and its mend as written makes it done; and steps taken out at random are reported, exactly
+// those. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.
@@ -26,8 +31,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
+import { STAGES } from "./steps-stage.mjs";
+import { STEPS, leads } from "./steps.mjs";
 import { evaluate, parseYaml, runWorkflow } from "./workflow-run.mjs";
 
+const STEP_LEADS = STEPS.map(s => s.lead);
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -151,7 +159,7 @@ const write = (dir, to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to))
 let runs = 0;
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
 // would run it on the commit `sha` (a pull request: the head, against `baseSha`). Each result: [file/job, result].
-function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, dry = false } = {}) {
+function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, dry = false, only = null } = {}) {
   const repository = { default_branch: "main", private: p.isPrivate, full_name: p.repo };
   const pull = { number: 1, state: "open", draft: false, title, body, base: { sha: baseSha, ref: "main" }, head: { sha, ref: "change", repo: { full_name: p.repo } }, user: { login: p.owner } };
   const github = { event_name: event, repository: p.repo, actor: p.owner, server_url: "https://github.com", run_id: "1", token: "", sha,
@@ -180,7 +188,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
   };
   const out = [];
   const wfDir = git(p.dir, "ls-tree", "--name-only", `${sha}:.github/workflows`).split("\n").filter(f => /\.ya?ml$/.test(f));
-  for (const file of wfDir) {
+  for (const file of wfDir.filter(f => !only || f === only)) {
     const wf = parseYaml(git(p.dir, "show", `${sha}:.github/workflows/${file}`));
     const on = wf.on;
     const trigger = typeof on === "string" ? (on === event ? {} : null) : Array.isArray(on) ? (on.includes(event) ? {} : null) : on?.[event] === undefined ? null : on[event] ?? {};
@@ -208,7 +216,7 @@ const started = results => results.filter(([, r]) => r.ran).map(([where]) => whe
 const ran = (results, file, step) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.steps.some(x => x.name === step && x.ran));
 const jobRan = (results, file) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.ran);
 
-function upgrade(p, ownChanges, expect) {
+function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "commit", "-q", "-m", "the starter kit");
   git(p.dir, "push", "-q", "origin", "main");
   const main0 = git(p.dir, "rev-parse", "HEAD");
@@ -276,6 +284,64 @@ function upgrade(p, ownChanges, expect) {
   const call = hook("PreToolUse", { hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Agent", tool_input: { description: "x", prompt: "y", subagent_type: "general-purpose", model: "sonnet", effort: "medium" } });
   const stop = hook("Stop", { hook_event_name: "Stop", session_id: "s1", stop_hook_active: false });
   ok(start.status === 0 && call.status === 0 && stop.status === 0 && !/"decision"\s*:\s*"block"/.test(stop.out + start.out), `${p.name}: its hooks run from main's copy and stop nothing in a clean clone`, `${start.out}\n${call.out}\n${stop.out}`);
+
+  // a change that makes something worse than it stood fails, and the mend as the failure words it passes
+  const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- It is never pushed to/.test(l)) ?? "";
+  const worse = own(main1, dir => fs.appendFileSync(path.join(dir, "SECURITY.md"), `\n${copied}\n`));
+  const failing = checks(p, "pull_request", worse, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
+  ok(copied && failing.length === 1 && failing[0][1].steps.some(x => /a new copy:[\s\S]*point to one place instead/.test(x.out)), `${p.name}: a pull request that adds a copy fails, and its failure says the mend`, failures(failing) || "it passed");
+  git(p.dir, "checkout", "-q", "change");
+  git(p.dir, "checkout", "-q", main1, "--", "SECURITY.md");
+  git(p.dir, "commit", "-q", "-m", "point to one place instead");
+  const mended = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "copies.yml" });
+  ok(mended.length && !failures(mended), `${p.name}: the mend as the failure words it, the copy taken out, passes`, failures(mended));
+
+  // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
+  git(p.dir, "checkout", "-q", "main");
+  const steps = () => node(p.dir, "core/scripts/steps.mjs");
+  const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
+  const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
+  let r = steps();
+  ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: after the sync, every step a check reads is done`, r.out);
+  const before = leads(git(theCore, "show", `${from.sha}:setup/sync-notes.md`));
+  const added = STEP_LEADS.filter(lead => !before.includes(lead) && STAGES[lead]);
+  for (const lead of added) {
+    STAGES[lead].stage(p.dir);
+    r = steps();
+    ok(JSON.stringify(reported(r.out)) === JSON.stringify([lead]), `${p.name}: "${lead}", added since ${from.tag} and taken out, is reported`, r.out);
+    STAGES[lead].mend(p.dir);
+    r = steps();
+    ok(r.out.includes("Every step a check reads is done"), `${p.name}: and its mend as written makes it done`, r.out);
+    clean();
+  }
+  if (!added.length) console.log(`note ${p.name}: no step with a check is added since ${from.tag}`);
+  const out = Object.keys(STAGES).filter(() => Math.random() < 0.5);
+  if (!out.length) out.push(Object.keys(STAGES)[0]);
+  for (const lead of out) STAGES[lead].stage(p.dir);
+  r = steps();
+  ok(JSON.stringify(reported(r.out)) === JSON.stringify(STEP_LEADS.filter(l => out.includes(l))), `${p.name}: steps taken out at random are reported, exactly those (${out.length})`, `${out.join("\n")}\n---\n${r.out}`);
+  clean();
+}
+
+// Old content, as a project holds it before a check reads it: a breach of each kind a check reads, committed with the
+// starter kit. The copy in its prose is listed in its copies baseline, written again by its own copy of the check.
+function seed(p, eol) {
+  const lines = n => Array.from({ length: n }, (_, i) => `export const v${i} = ${(i * 7919) % 10007};`).join(eol);
+  write(p.dir, "src/long.js", `${lines(2000)}${eol}`);
+  write(p.dir, "src/a/x.js", `import { y } from "../b/y.js";${eol}export const x = () => y;${eol}`);
+  write(p.dir, "src/b/y.js", `import { x } from "../a/x.js";${eol}export const y = () => x;${eol}`);
+  const manifest = path.join(p.dir, "core-manifest.md");
+  fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^(Floor: whole\. Modules: .*?)`copilot\.md`, /m, "$1"));
+  const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- Nothing secret goes in the repository/.test(l)) ?? "";
+  fs.appendFileSync(path.join(p.dir, "SECURITY.md"), `${eol}${copied}${eol}`);
+  const baseline = path.join(p.dir, "checks/copies-baseline.json");
+  const had = Object.keys(JSON.parse(fs.readFileSync(baseline, "utf8")).windows).length;
+  fs.rmSync(baseline);
+  git(p.dir, "add", "-A");
+  const first = node(p.dir, "core/scripts/copies.mjs", "checks/copies.json", "--first");
+  git(p.dir, "add", "-A");
+  ok(copied && first.status === 0 && Object.keys(JSON.parse(fs.readFileSync(baseline, "utf8")).windows).length > had && !/`copilot\.md`/.test(fs.readFileSync(manifest, "utf8").split("\n").find(l => l.startsWith("Floor:"))),
+    `${p.name}: seeded with old content of each kind a check reads; the copy is listed in its baseline`, first.out);
 }
 
 for (const tag of starts) {
@@ -291,7 +357,8 @@ for (const tag of starts) {
     write(dir, "README.md", "# An npm project\n");
     write(dir, ".gitignore", "node_modules/\n");
   } });
-  upgrade(npmProject, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
+  seed(npmProject, "\n");
+  upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
     ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
   (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
     [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
@@ -308,7 +375,8 @@ for (const tag of starts) {
   fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);
   git(dotnetProject.dir, "add", "-A");
   ok(git(dotnetProject.dir, "ls-files", "-s").split("\n").every(l => l.startsWith("100644 ")), `${dotnetProject.name}: every file it holds is 100644, as on Windows, the copy of the core's scripts too`);
-  upgrade(dotnetProject, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
+  seed(dotnetProject, "\r\n");
+  upgrade(dotnetProject, from, [["touches only its docs", dir => write(dir, "README.md", "# A .NET project\r\n\r\nMore words.\r\n")],
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);

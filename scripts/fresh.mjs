@@ -29,8 +29,8 @@ const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the projec
 export function kind(p) {
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(p.manifest)?.[1] ?? "0".repeat(40);
   const o = { owner: ownerOf(p.manifest) ?? "the-owner", name: /^# (.+)$/m.exec(p.read("AGENTS.md") ?? "")?.[1]?.trim() ?? path.basename(p.root) };
-  const npm = call(p, "signatures.yml")?.with?.directory;
-  if (npm !== undefined) o.packages = String(npm).replace(/\/+$/, "") || ".";
+  const folder = call(p, "signatures.yml")?.with?.directory;
+  if (folder !== undefined) o.packages = String(folder).replace(/\/+$/, "") || ".";
   if (call(p, "nuget.yml")) o.nuget = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "")?.[1]?.replace(/\/+$/, "") || ".";
   if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;
   if (/^Floor: whole\. Modules: all\.$/m.test(p.manifest)) o.game = true;
