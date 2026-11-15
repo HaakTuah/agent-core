@@ -34,8 +34,17 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
      the comment below gives what `comment-only.mjs` printed on the head that merges, and the session's word on each
      other file it lists; the code reviewer checks both, running it again on that head. That one review reads each
      changed comment as one a tool may take as an instruction.
-   - A session posts one, naming the tool and the commit it read, or that none is needed (the code reviewer checks
-     that), in a comment that opens "Security review:", which the `security-review` check reads.
+   - A session posts one, naming the tool and the commit it read by its whole SHA, or that none is needed, naming the
+     head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
+     check reads.
+   - **What a posted review stands for** (#99; core archive 220): by default the commit it names, and the head only
+     where nothing but updates from `main` follow that commit; after any other commit the fallback reviewer checks it
+     and posts one naming the head. It counts from the *owner's account*, and from another account only where the
+     project names it to the check (its input `reviewers`). A pure sync needs none: the check proves it with
+     `pure-sync.mjs` and waits only for a review that started by itself. It does not mean an update from `main` is
+     reviewed again (point 6), nor that the status shows who reviewed: builder and reviewer post under one login
+     (#187). Reason: a review of one commit stood for later commits no one checked, and any collaborator's comment
+     passed a pull request. Held by the `security-review` status, which waits where it is broken, required in the core.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would (core archive 22).
 5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,

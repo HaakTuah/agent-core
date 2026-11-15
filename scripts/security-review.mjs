@@ -4,52 +4,61 @@
 // always from the default branch's copy, on what GitHub's own API gives of the pull request and its comments. It takes
 // two things as proof: the summary Codex's own app keeps on the pull request (its login and kind are GitHub's, which no
 // one else can post under), saying its security review is completed; or a comment that opens "Security review:" from
-// the repository's owner, a member or a collaborator, which is how another reviewer's, or the fallback reviewer's, is
-// posted (modules/reviews.md, point 3). Where Codex's summary says its security review is running, only such a comment
-// posted after it began ends the wait for it (that review is waited for: core archive 206), never one posted before, a
-// note that none is needed among them: it began when the summary's row for it says it has run since, where that time
-// can be read and is no later than the summary's last change, and otherwise at that last change, the latest it can
-// have begun. Where a push starts it again, a review posted before that counts no longer while it runs; where Codex
-// does not start it on a push, the later commit's check stays with the reviews, as below. Where Codex's summary says a
-// finding of its security review is open, the check waits until such a comment is posted after Codex's newest security
-// finding, and after Codex's summary last changed: the fallback reviewer's check of the fix (Codex's own mark of an
-// open finding does not clear by itself once the finding is fixed). A finding given in a review's own body alone, which
-// the workflow does not fetch, is not to be found among the comments, so the summary's last change is the latest any
-// can have come; where none is found at all, the status says so. A pull request from before the check whose review
-// came before that change is told, never held (BOUND=false, below), and one with no review after the newest finding
-// found, or with none at all where none is found, waits, as before.
+// the repository's owner, or an account the project names (the workflow's input "reviewers"), with a say in the
+// repository by GitHub's own word (owner, member or collaborator), which is how another reviewer's, or the fallback
+// reviewer's, is posted (modules/reviews.md, point 3; #99). Given the pull request's commits, a review stands for the
+// head only where it saw the head, or a commit that only updates from main follow (merges whose second parent is no
+// commit of the pull request's, as GitHub's "Update branch" makes): Codex's by the commit its summary names, a posted
+// one by a commit it names by its whole SHA; any other later commit needs a posted review, or the note that none is
+// needed, naming the head, and the status says when the review it passes on saw an earlier commit than the head. Where
+// Codex's summary says its security review is running, only such a comment posted after it began ends the wait for it
+// (that review is waited for: core archive 206), never one posted before, a note that none is needed among them: it
+// began when the summary's row for it says it has run since, where that time can be read and is no later than the
+// summary's last change, and otherwise at that last change, the latest it can have begun. Where a push starts it again,
+// a review posted before that counts no longer while it runs; where Codex does not start it on a push, the later commit
+// needs a posted review naming the head, as above. Where Codex's summary says a finding of its security review is open,
+// the check waits until such a comment is posted after Codex's newest security finding, and after Codex's summary last
+// changed, naming the head: the fallback reviewer's check of the fix (Codex's own mark of an open finding does not
+// clear by itself once the finding is fixed). A finding given in a review's own body alone, which the workflow does not
+// fetch, is not to be found among the comments, so the summary's last change is the latest any can have come; where
+// none is found at all, the status says so. A pull request from before the check whose review came before that change
+// is told, never held (BOUND=false, below), and one with no review after the newest finding found, or with none at all
+// where none is found, waits, as before.
 // Dependabot's own pull request (opened by it from a branch of the repository, every commit of it written by Dependabot
 // and signed by GitHub, so that one somebody else has pushed to, or brought up to date by a merge, is its own no
 // longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
 // its status is written when the first comment that counts arrives, which is Codex's summary once the code review rule
 // 17 asks for is asked). A pull request that needs no security review and gets none by itself says so in a comment of
 // that kind, which its code reviewer checks (modules/reviews.md, point 3); the status then says a review is posted, and
-// cannot tell that note from a review. Nothing else on the pull request counts: not its description, not a comment of
-// anyone else, not a review's own text.
+// cannot tell that note from a review. A pure sync needs neither (floor rule 8): where the workflow's run of the
+// default branch's pure-sync.mjs proved the head one (PURE), it passes where no review of Codex's has begun by itself,
+// and one that has is waited for and read as on any pull request, as are floor rule 3's two asked of it never. Nothing
+// else on the pull request counts: not its description, not a comment of anyone else, not a review's own text.
 // Where the pull request changes what runs by itself (a file comment-only.mjs reads: under .github/ or .claude/, or an
 // action.yml; the copy under core/ aside, which only a sync changes), it asks floor rule 3's two security reviews:
 // Codex's and a posted one, or two posted. One is enough, as before, where each such file only moves pins (changed in
-// place, each changed line a `uses:` line whose whole SHA moved and that differs in nothing else but the note after
-// it, a version's word: an action's version, rule 17, or a sync's calls to the core's workflows), or where a posted
-// review holds what comment-only.mjs printed on the head ("checked head" and its whole SHA: comments and steps' names
-// alone, rule 8's one). Given no list of the files (a workflow older than this script), it asks one review, as it did
-// before it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull
-// request that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which
-// the workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so
-// it says of a review posted before Codex's running one began, or before its summary last changed where it marks a
-// finding open (AGENTS.md, "Nothing locks a project"); brought up to
-// date with main, it is held. What it does not hold: what a
-// posted review says, whether a finding is blocking, who posted each of two reviews (one login may post both), that
-// comment-only.mjs's printout is true (its code reviewer runs it again), and that a later commit which changes what
-// the review was for got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to
-// mark and the status to give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's
-// input, on unless turned off) the status is always a pass that says what the check would have done, so a week of pull
-// requests shows whether it is right before anything waits for it.
+// place, each changed line a `uses:` line whose whole SHA moved and that differs in nothing else but the note after it,
+// a version's word: an action's version, rule 17, or a sync's calls to the core's workflows), or where a posted review
+// holds what comment-only.mjs printed on the head ("checked head" and its whole SHA: comments and steps' names alone,
+// rule 8's one). Given no list of the files (a workflow older than this script), it asks one review, as it did before
+// it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull request
+// that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which the
+// workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so it
+// says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
+// open, and of one that names no commit the head stands on (AGENTS.md, "Nothing locks a project"); brought up to date
+// with main, it is held. What it does not hold: what a posted review says, whether a finding is blocking, who posted
+// each of two reviews (one login may post both), that comment-only.mjs's printout is true (its code reviewer runs it
+// again), and that a merge from main brought no change of its own; those stay with the builder and the reviews. It
+// prints, as JSON, the commit to mark and the status to give it, or {} for a pull request that is closed or a draft.
+// While "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check
+// would have done, so a week of pull requests shows whether it is right before anything waits for it. What the status
+// proves where every review is posted (none starts by itself, as through a plug-in): that a review was posted for the
+// head, not who made it, since builder and reviewer may post under one login, which no check here tells apart (#187).
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same>]]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
-//         the link the status carries.
+//         the link the status carries; REVIEWERS for the accounts named; PURE for the head pure-sync.mjs proved.
 import { readFileSync } from "node:fs";
 import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
@@ -145,9 +154,9 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   return warning ? { ...verdict, warning } : verdict;
 }
 
-// whose posted review counts (#99): the repository's owner's, and the accounts the project names (the workflow's input
-// "reviewers"), each by its login, as GitHub gives it and in any case, as GitHub reads one; nobody else's, a member's or
-// a collaborator's neither. One login may post the builder's work and its review alike: that this tells no one apart
+// whose posted review counts (#99): the repository's owner's, and the accounts the project names (the workflow's
+// input "reviewers"), each by its login in any case, as GitHub reads one; nobody else's, a member's or a
+// collaborator's neither. One login may post the builder's work and its review alike: that this tells no one apart
 // stays with the reviews (#187)
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$/u;
 export const reviewersOf = (text) => (typeof text === "string" ? text.split(/[\s,]+/u) : []).filter((name) => LOGIN.test(name));
