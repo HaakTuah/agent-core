@@ -63,6 +63,14 @@ ok(is(had([summary({ ...done, commit_sha: OLD })]), false, "no code review") && 
 ok(is(had([said(`Code review: of ${HEAD.slice(0, 39)}`)]), false, "no code review") && is(had([said(`Code review: of ${HEAD}`, "NONE")]), false, "no code review") && is(had([said(`Security review: of ${HEAD}`)]), false, "no code review"), "nor one naming part of the SHA, by another account, or that is no code review");
 const updated = [commit(OLD, "8".repeat(40)), commit(M, OLD, MAIN), commit(HEAD, M, "7".repeat(40))];
 ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates from main") && is(had([said(`Code review: of ${OLD}`)], updated), true, "nothing but updates"), "one of an earlier commit followed only by merges from main stands");
+// Given the merges clean-merges.mjs proved (#323), only those carry a review past them; the status names the one that
+// stops it, with its mend
+const proved = (comments, merges, commits = updated) => judge({ commits: commits.length, changed_files: 1, ...pull }, comments, commits, code, [], true, merges);
+const stopped = proved([summary({ ...done, commit_sha: OLD })], [HEAD]);
+ok(is(proved([summary({ ...done, commit_sha: OLD })], [HEAD, M]), true, "nothing but updates from main") && is(proved([said(`Code review: of ${M}`)], [HEAD]), true, "nothing but updates"), "a review stands across the merges proved the ones git makes, and a review of the merge where they stop stands too");
+ok(is(stopped, false, "no code review of ccccccc: merge eeeeeee is not the merge git makes. Mend:") && is(proved([said(`Code review: of ${OLD}`)], []), false, "merge ccccccc is not the merge git makes") && is(proved([summary({ ...done, commit_sha: OLD })], {}), false, "merge ccccccc is not")
+  && mended(`Waiting: ${stopped.why}`) && `Waiting: ${stopped.why}`.length <= 140, "one of an earlier commit with a merge not proved after it waits, naming that merge and the mend, within GitHub's 140 characters (a list that is no list proves none)");
+ok(is(proved([], []), false, "no code review of ccccccc. Mend: ask one") && is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates"), "with no review behind the merge it waits as before, and given no list of the merges proved (an older workflow) the parents alone are read, as before");
 const mixed = [commit(OLD, "8".repeat(40)), commit(F, OLD), commit(HEAD, F, MAIN)];
 const branch = [commit(OLD, "8".repeat(40)), commit(F, "6".repeat(40)), commit(HEAD, OLD, F)];
 ok(is(had([summary({ ...done, commit_sha: OLD })], mixed), false, "no code review") && is(had([summary({ ...done, commit_sha: OLD })], branch), false, "no code review") && is(had([summary({ ...done, commit_sha: OLD })], [commit(HEAD, "5".repeat(40), OLD)]), false, "no code review"), "not with a commit of the builder's among them, a merge of a branch of the pull request's own, or a merge whose first parent is not the pull request's");
