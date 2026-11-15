@@ -55,6 +55,13 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export const partsOf = id => { const [check, screen] = id.split(": "); return { check, screen }; };
 // Each id is its own group: a finding is claimed only by the entry of its own id, never one of another screen.
 const own = id => ({ kind: partsOf(id).check, group: id });
+// The entries of `want` that nothing in `pool` covers, as shape.mjs's `unclaimed` reads them, but for one thing: an entry
+// is covered only by one of its own form, a count by a count no smaller and true by true, so that a count listed as
+// true covers no count at all.
+export function uncovered(want, pool) {
+  const formless = [...want].filter(([id, n]) => pool.has(id) && (n === true) !== (pool.get(id) === true)).map(([id]) => id);
+  return [...formless, ...unclaimed(new Map([...want].filter(([id]) => !formless.includes(id))), pool, {}, own)];
+}
 
 // The config the manifest's *screen checks* row names (its first path to a .json file, in backticks), else the kit's.
 export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*screen checks\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
@@ -100,7 +107,7 @@ export function verdict({ config, at, self, found, baseline, base }) {
   // pull request has changed since is listed first, so none of it turns a later one red
   const unlisted = [...config.checks.keys()].filter(check => !baseline.checks.has(check));
   if (unlisted.length) fail.push(`FAIL: ${config.baseline} has never listed what the ${unlisted.join(", ")} ${unlisted.length === 1 ? "check finds" : "checks find"} on every screen. Mend: run the project's tool over every screen, writing "all": true, then node ${self} <found> ${at} --write, which lists what stands, and commit the baseline`);
-  for (const id of unclaimed(new Map([...found.found].filter(([id]) => baseline.checks.has(partsOf(id).check))), baseline.listed, {}, own)) {
+  for (const id of uncovered(new Map([...found.found].filter(([id]) => baseline.checks.has(partsOf(id).check))), baseline.listed)) {
     if (config.checks.get(partsOf(id).check) === "binds") fail.push(`FAIL: ${id}: new, and the check ${partsOf(id).check} binds here. Mend: ${MENDS[partsOf(id).check]}; then run the project's tool and this check again`);
     else said.push(`said ${id}: new; the check ${partsOf(id).check} reports here and fails nothing`);
   }
@@ -108,7 +115,7 @@ export function verdict({ config, at, self, found, baseline, base }) {
   if (gone.length) fail.push(`FAIL: ${config.baseline} lists ${plural(gone.length, "entry", "entries")} of a screen this run read that ${gone.length === 1 ? "is" : "are"} mended or smaller now, and the baseline lists only what stands. Mend: lower it with node ${self} <found> ${at} --write, and commit the baseline`, ...gone.map(id => `  ${id}`));
   if (base?.listed) {
     // an entry of a check the base had not listed joins freely: the check reads more, and what stood is listed
-    const joined = unclaimed(baseline.listed, base.listed, {}, own).filter(id => base.checks.has(partsOf(id).check) && !(baseline.grown[id] ?? "").trim());
+    const joined = uncovered(baseline.listed, base.listed).filter(id => base.checks.has(partsOf(id).check) && !(baseline.grown[id] ?? "").trim());
     if (joined.length) fail.push(`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} did not, and the baseline only shrinks. Mend: take each out of the baseline (git checkout ${base.name} -- ${config.baseline}, then node ${self} <found> ${at} --write) and mend the screen; only where there is no other way, give each its reason under "grown" by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...joined.map(id => `  ${id}`));
   }
   return { fail, said, listed: baseline.listed.size };

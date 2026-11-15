@@ -73,6 +73,11 @@ const whole = parseFound(JSON.stringify({ screens: ["home", "cart"], all: true, 
 const rw = rewritten({ ...base, checks: new Set(["rendered"]) }, c, whole, "s");
 ok(rw.checks.has("values") && rw.listed.has("values: cart: #0f0") && rw.listed.has("values: home: #f00 in the button") && !rw.listed.has("rendered: cart: contrast of the total"), "--write lists a newly turned-on check from a run over every screen, and lowers the rest", JSON.stringify([...rw.listed.keys()]));
 
+const widened = { listed: new Map([["values: home: #f00 in the button", true]]), grown: {}, checks: both() };
+const counted = parseFound(found(["home"], { "values: home: #f00 in the button": { count: 100 } }), "f", c);
+v = verdict({ config: c, at: "c", self: "s", found: counted, baseline: widened, base: { name: "origin/main", listed: new Map([["values: home: #f00 in the button", { count: 1 }]]), checks: both() } });
+ok(v.fail.some(l => l.includes("only shrinks")) && v.fail.some(l => l.includes("#f00 in the button: new")), "a count listed as true covers no count: it joins the baseline against the base, and the finding is new", v.fail.join("\n"));
+
 // ---- the baseline lowered ----
 const listed = new Map([["rendered: cart: contrast of the total", { count: 3 }], ["rendered: cart: gone", true], ["values: about: #0f0", true]]);
 const low = lowered(listed, f, c.checks);
