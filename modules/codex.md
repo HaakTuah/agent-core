@@ -3,8 +3,9 @@
 **On GitHub,** its login `chatgpt-codex-connector[bot]`:
 - Its code review is asked by a comment `@codex review` alone: it answers every mention of itself, even in backticks, so
   other text says "the Codex mention".
-- Its security review runs by itself (`modules/reviews.md`, point 3). It is never asked for one by a comment, which it
-  answers with a code review: a later commit's security check is the fallback reviewer's (point 3).
+- Its security review runs by itself (`modules/reviews.md`, point 3). Where its app starts it so, it is never asked
+  for one by a comment, which it answers with a code review: a later commit's security check is the fallback
+  reviewer's (point 3). Through its plug-in, below, it is asked again for one.
 - It cannot push there, so it builds nothing (core archive 169).
 
 **Through its plug-in in Claude Code** (`/codex:setup` says if it is ready; an offer of its to install Codex is the
