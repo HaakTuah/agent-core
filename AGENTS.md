@@ -153,14 +153,12 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   one action, who does what; what it does not mean, where a reader could overreach; its reason, in one line; and what
   holds it (a check, a staged case or the audit, #235), named under "What holds it" as the point above says. Kept out:
   adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of preferred
-  technologies, which date within months, and whatever a check's failure can say at the moment it matters (#254). It
-  does not mean a rule that stands is rewritten when no change touches it: the audit of the core against itself (#259)
-  brings those to it, and a rule a change touches is brought to it in that change; nor does it ask anything of a
-  project's own rules, which may be written the same way. Reason: in one evening three rules were read against what
-  the owner meant, each for want of an observable trigger or a reason. Held by `scripts/general.mjs`, which reads the
-  floor, the modules and this file for the phrases a rule may not use (`scripts/general.json`, "phrases"), reports each
-  that stands and fails one in a line a PR adds, saying what to write instead; the rest by the review guidelines ("A
-  rule file changed").
+  technologies, which date within months, and whatever a check's failure can say at the moment it matters (#254). A
+  rule that stands and no change touches is the one exception: the audit of the core against itself (#259) brings it
+  to the pattern instead. It does not mean a project's own rules are asked anything; they may be written the same way.
+  Reason: in one evening three rules were read against what the owner meant, each for want of an observable trigger or
+  a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
+  guidelines ("A rule file changed").
 - **Rules are written for any project** (core archive 150). The projects that take the core differ in what they build
   (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read
   them (anyone, the owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what
