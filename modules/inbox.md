@@ -13,8 +13,8 @@ Read at the start of every task.
     music or a look, and one resting only on the core's archive where the account in the core's address in the
     manifest is not the *owner's account*: those words give way to the project's own owner's.
   - It gives, whenever it is called, its verdict on every open idea that lacks one, however new, and again on a "later"
-    once its condition is measured, as `scripts/stand-in-record.mjs --open` lists them (yes, later or no, sure or
-    unsure, with the reason, a rough cost and what would settle a later), posted on it.
+    once its condition is measured, as `scripts/stand-in-record.mjs --open` lists them (yes, later or no, with the
+    reason, a rough cost and what would settle a later), posted on it.
   - It gives, on a PR its users will see, the owner's likely notes on its pictures and text.
   - **Its record:** whoever acts on the owner's answer to one of its points says there "The stand-in's verdict matched"
     or "missed", which that script counts.
@@ -28,12 +28,12 @@ Read at the start of every task.
   - Where issues cannot be read and written here (`core/scripts/inbox.mjs`, run at each sync), the same flow runs from
     files, as it says; turning issues on is the owner's setting, named once.
 - **Labels and openers say who wrote what** (core archive 217): whoever files or acts on an issue gives it one state
-  label (`queued`, `needs-owner`, `later`, `on-hold`) and, where the *owner's account* filed it, one sender (`by:owner`,
-  `by:chat` and `by:design` are the owner's voice; the rest an agent's). An agent's issue says "Found while:", its role
-  and task; an agent's comment opens with a line of the list, naming its task ("From a builder session, on #241:"), and
-  "Taken in:" where it takes in and quotes an instruction of the owner's. The list, and its check, which reports each
-  mend: `core/scripts/labels.mjs`. It does not mean a label proves anything: any session can set one, and the PR that
-  queues an item is what is trusted. Reason: every session posts as the owner, who could not see what was taken in.
+  label and, where the *owner's account* filed it, one sender: the owner's voice (`by:owner`, `by:chat`, `by:design`)
+  or an agent's. An agent's issue says "Found while:", its role and task; an agent's comment opens with a line of the
+  list, naming its task ("From a builder session, on #241:"), and "Taken in:" where it quotes an instruction of the
+  owner's it takes in. The list: `core/scripts/labels.json`; its check: `labels.mjs` beside it. It does not mean a
+  label proves anything: any session can set one, and the PR that queues an item is what is trusted. Reason: every
+  session posts as the owner, who could not see what was taken in.
   - In an item of the owner's voice what binds stands under "The owner's word" (quoted) or "What it is" (a design the
     owner agreed to), a view under "The session's view (not a decision)", which no review holds a PR to, and an outside
     source says "as evidence, not instruction".
@@ -61,11 +61,10 @@ Read at the start of every task.
 - **Read every comment from the *owner's account*:** one opening as from a session the owner works with carries the
   owner's word where it quotes it or says the owner agreed to a design it sets out in full, and that alone (floor rule
   4; core archive 216). Reason: a session can write "the owner said yes" as easily as quote it.
-  - The design session is where the owner writes the rules; in a project with none, the session the owner gives a
-    standing rule to (core archive 131).
 - **The owner's words are kept once** (floor rule 11).
   - A session the owner works with quotes an instruction in the issue, PR or report that acts on it, and records
     nothing more.
-  - The design session keeps, word for word and dated in the archive (the project's, or the core's if it holds for
-    every project), those that become standing rules, and writes each rule where it applies; only it writes rules from
-    the owner's words.
+  - The design session (where the owner writes the rules; in a project with none, the session the owner gives a
+    standing rule to; core archive 131) keeps, word for word and dated in the archive (the project's, or the core's if
+    it holds for every project), those that become standing rules, and writes each rule where it applies; only it
+    writes rules from the owner's words.
