@@ -41,7 +41,7 @@ each commit, and stops. Delete the branch to let them go on. It stops only that 
   owner cut. Your agents then open one pull request that moves the copy forward, merged by hand, and, each in a pull
   request of its own, the few steps the release asks, listed in the sync pull request's description with what each
   costs (`README.md`, "How a project takes the core"; `AGENTS.md`, "A release says what it asks, step by step"). You may
-  reorder or slow them.
+  reorder or slow them. A release that changes nothing your project takes asks no sync, one release at a time.
 - **The checks on every pull request:** that the copy is exact, that no personal term and no licence off the list gets
   in, that the copies and sizes are held, that the description has its headings, and the security and code reviews
   (`README.md`, point 5 of "How a project takes the core").
