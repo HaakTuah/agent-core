@@ -2,7 +2,9 @@
 # this file), with the script from its source (scripts/security-review.mjs on main). It marks each open pull
 # request's head commit with whether its security review has run, when the pull request opens, at each push and
 # whenever a review's comment arrives. This repository only; no project calls it. What it may do and what keeps it
-# safe is in that workflow's header: it reads, and writes one commit status, with no secret.
+# safe is in that workflow's header: it reads, and writes one commit status, with no secret. Not advisory here: the
+# status waits until the review has run, so that the core's ruleset can require it, the core first (#99); a project's
+# stays advisory until its owner turns that off and requires it.
 name: own-security-review
 
 on:
@@ -21,3 +23,4 @@ jobs:
     uses: ./.github/workflows/security-review.yml
     with:
       root: .
+      advisory: false
