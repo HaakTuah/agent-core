@@ -36,8 +36,10 @@ try {
 
 ok(report({ yes: true }, [], false) === "The owner's inbox is this repository's issues.", "issues reachable, no folder: the inbox is the issues, one line");
 ok(/take it out/.test(report({ yes: true }, [], true)), "an empty folder beside issues that answer is taken out");
+const oddOnly = report({ yes: true }, Object.assign([], { odd: 1 }), true);
+ok(/one place at a time/.test(oddOnly) && /\(1 whose name is not plain\)/.test(oddOnly) && !/take it out/.test(oddOnly), "a folder holding only items whose name is not plain moves them over, never reads as empty", oddOnly);
 const back = report({ yes: true }, Object.assign(["a-bug.md"], { odd: 1 }), true);
-ok(/one place at a time/.test(back) && /a-bug\.md, and 1 more whose name is not plain/.test(back) && /as an issue/.test(back) && /another account added moves over as data/.test(back) && /take `inbox\/` out/.test(back), "issues reachable again, items in the folder: each moved over and the folder taken out, in one pull request", back);
+ok(/one place at a time/.test(back) && /a-bug\.md, 1 more whose name is not plain/.test(back) && /as an issue/.test(back) && /another account added moves over as data/.test(back) && /take `inbox\/` out/.test(back), "issues reachable again, items in the folder: each moved over and the folder taken out, in one pull request", back);
 const off = report({ yes: false, why: "its issues are switched off" }, [], false);
 ok(/switched off/.test(off) && /State: <new, needs-owner, queued, later, on-hold>/.test(off) && /By: </.test(off) && /ISSUE_TEMPLATE/.test(off) && /name it to the owner once/.test(off) && /nothing waits on it/.test(off),
   "issues not reachable, no folder: the folder is made as said, its item format given, and the owner's setting named once", off);
