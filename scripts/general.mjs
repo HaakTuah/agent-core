@@ -8,11 +8,12 @@
 // (core archive 201). A line quoted with ">", the owner's own words as the archive keeps them, is not read. Without
 // --base those folders are not read, and it says so.
 // The config's second list, "phrases", is the phrases a rule may not use ("A rule is written to one pattern" in
-// AGENTS.md; core archive 214), nor a brief (modules/helpers.md, "A brief is written as a rule is"; core archive 223):
-// read in the files it names and in the Markdown files of the folders it names, a template's (.md.tmpl) included, so
-// the starter kit's templates too, it reports each one that stands there and fails one in a line a change adds to one
-// of them against --base, a line moved word for word and one quoted with ">" aside. A phrase in code marks (`clean`)
-// is named, not used, and is not read. Without --base it only reports, and says so.
+// AGENTS.md; core archive 214), nor a brief (modules/helpers.md, "A brief is written as a rule is"; core archive 223).
+// It reports each one that stands in the files it names and in the Markdown files of the folders it names, a
+// template's (.md.tmpl) included, so the starter kit's templates too. It fails one in a line a change adds against
+// --base to any file there or under those folders, save a template of another kind (a workflow's), a line moved word
+// for word and one quoted with ">" aside. A phrase in code marks (`clean`) is named, not used, and is not read. Without
+// --base it only reports, and says so.
 // This repository only, run by size.yml with the base. Reads only; git and Node's own modules.
 //
 //   node scripts/general.mjs scripts/general.json [--base <commit>]
@@ -42,7 +43,7 @@ if (!files.length) { console.log(`FAIL no file of the floor or the modules was r
 // same diff takes away elsewhere word for word is left out, a record moved and not written anew (each line taken away
 // excuses one line added, so a second copy of a moved line is read as new).
 function addedLines(where) {
-  const diff = execFileSync("git", ["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", "-U0", "--end-of-options", baseRev, "HEAD", "--", ...where], { encoding: "utf8", maxBuffer: 1 << 28 });
+  const diff = execFileSync("git", ["-c", "core.quotePath=false", "diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", "-U0", "--end-of-options", baseRev, "HEAD", "--", ...where], { encoding: "utf8", maxBuffer: 1 << 28 });
   const added = [], removed = new Map();
   let file = "", line = 0, plus = 0, minus = 0;
   for (const l of diff.split("\n")) {
@@ -53,7 +54,7 @@ function addedLines(where) {
     }
     const hunk = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(l);
     if (hunk) { minus = hunk[1] === undefined ? 1 : Number(hunk[1]); line = Number(hunk[2]); plus = hunk[3] === undefined ? 1 : Number(hunk[3]); continue; }
-    if (l.startsWith("+++ ")) file = l.slice(4).replace(/^b\//, "");
+    if (l.startsWith("+++ ")) file = l.slice(4).replace(/\t$/, "").replace(/^"?b\//, "").replace(/"$/, "");
   }
   return added.filter(a => { if (!removed.get(a.text)) return true; removed.set(a.text, removed.get(a.text) - 1); return false; });
 }
@@ -93,7 +94,7 @@ if (!ruleFiles.length) { console.log("FAIL no rule file was read for the phrases
 const fresh = new Set();
 let failedPhrases = 0, reported = 0;
 if (baseRev) {
-  for (const a of addedLines(phrasePaths).filter(a => ruleFiles.includes(a.file))) {
+  for (const a of addedLines(phrasePaths).filter(a => !/\.tmpl$/u.test(a.file) || /\.md\.tmpl$/u.test(a.file))) {
     fresh.add(`${a.file}:${a.line}`);
     for (const { hit, say } of used(a.text)) { failedPhrases++; console.log(`FAIL ${a.file}:${a.line}: "${hit[0]}" in a rule or brief this change writes. Mend: ${say}`); }
   }

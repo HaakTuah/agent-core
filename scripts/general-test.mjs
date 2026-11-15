@@ -92,6 +92,8 @@ ok(r.status === 1 && r.out.includes("not there: rules") && mended(r.out), "a fil
 const kit = { ...config, phrases: { ...config.phrases, paths: [...config.phrases.paths, "setup/template"] } };
 r = words({}, { "setup/template/AGENTS.md.tmpl": `# {{project}}\n\n${RULE}`, "setup/template/workflows/a.yml.tmpl": "# should consider\n" }, true, kit);
 ok(r.status === 1 && r.out.includes("setup/template/AGENTS.md.tmpl:3:") && !r.out.includes("a.yml.tmpl") && mended(r.out), "one in a line a change adds to a Markdown template of a folder the list names fails; a workflow's template is not read", r.out);
+r = words({}, { "modules/a b.md": `# A module\n\n${RULE}`, "modules/\u00e9.md": `# A module\n\n${RULE}`, "modules/more/c.md": `# A module\n\n${RULE}`, "setup/template/x y.md.tmpl": `# {{project}}\n\n${RULE}` }, true, kit);
+ok(r.status === 1 && ["modules/a b.md:3:", "modules/\u00e9.md:3:", "modules/more/c.md:3:", "setup/template/x y.md.tmpl:3:"].every(f => r.out.includes(`FAIL ${f}`)), "one added to a file whose name git quotes (a space, a letter beyond ASCII) or that stands in a subfolder fails too", r.out);
 const real = JSON.parse(fs.readFileSync(path.join(path.dirname(script), "general.json"), "utf8"));
 const primed = { ...kit, phrases: { ...kit.phrases, list: real.phrases.list } };
 r = words({}, { "setup/template/AGENTS.md.tmpl": "# {{project}}\n\nYou are a world-class expert in this stack.\nThe fate of the world rests on it, and I will tip you.\n" }, true, primed);
