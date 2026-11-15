@@ -142,9 +142,10 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
     const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
-    // (the licence config as the kit writes it, its "nuget" part in the NuGet check's own where that is another file)
+    // (the licence config as the kit writes it, its "nuget" part in the NuGet check's own where that is another file, or
+    // compared nowhere where the NuGet check's cannot be read)
     const { nuget, ...licence } = licences(o, () => false);
-    const licenceFiles = nuget && at.nuget !== null && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
+    const licenceFiles = nuget && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
     return [...kit, [slot, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
