@@ -240,7 +240,7 @@ ok(viaOf(`<CustomAfterMicrosoftCommonTargets Condition="'$(A)' != ''">$(MSBuildT
   "a property MSBuild's own targets import a file by is read as XML gives its text, in any case: a comment in it passed over, references decoded, CDATA that comes first as written");
 ok(viaOf(`<LanguageTargets>$(MSBuildThisFileDirectory)x<![CDATA[.xml]]></LanguageTargets>`) === "$(markup inside it)|LanguageTargets" && viaOf(`<CustomBeforeMicrosoftCommonProps>$(MSBuildThisFileDirectory)x.xml;<Inner /></CustomBeforeMicrosoftCommonProps>`) === "$(MSBuildThisFileDirectory)x.xml|CustomBeforeMicrosoftCommonProps,$(markup inside it)|CustomBeforeMicrosoftCommonProps",
   "CDATA after text, or an element inside, MSBuild takes as the markup it is written in: such a property's value is one the check cannot know, what stands before an element followed all the same");
-ok(viaOf(`<OtherPath>$(MSBuildThisFileDirectory)other.xml;plain.xml</OtherPath><OutputPath>bin/</OutputPath>`) === "", "any other property brings in nothing by its value: what it could bring in is read for what it is");
+ok(viaOf(`<OtherPath>$(MSBuildThisFileDirectory)other.xml;plain.xml</OtherPath><OutputPath>bin/</OutputPath>`) === "$(MSBuildThisFileDirectory)other.xml|OtherPath|loose", "any other property says, of a name that starts at its own file's folder, what brings that file in: what it could bring in is read for what it is");
 ok(projectRooted("\uFEFF \n<?xml version='1.0'?><!-- c --><!DOCTYPE p [<!ENTITY e 'x'>]><Project>") && projectRooted(`${" ".repeat(100000)}<project Sdk="x">`) && !projectRooted("<!DOCTYPE html><html>") && !projectRooted("<Projects>") && !projectRooted("<!-- <Project>"),
   "a file is a project where its root element is a Project, past blanks, marks, comments, processing instructions and a document type");
 ok([`<!DOCTYPE Project SYSTEM "a>b">`, `<!DOCTYPE Project PUBLIC "p" 'a>b'>`, `<!DOCTYPE Project [ <!ENTITY e "]>"> ]>`, `<!DOCTYPE Project [ <!-- ]> --> ]>`, `<!DOCTYPE Project [ <?pi ]> ?> ]>`].every((d) => projectRooted(`${d}<Project />`)) && !projectRooted(`<!DOCTYPE p "unclosed><Project />`),
@@ -259,8 +259,8 @@ put("build/Props.props", `<Project><PropertyGroup><CustomAfterMicrosoftCommonTar
 put("build/x.xml", "<Project />"); put("build/mine.xml", "<Project><PropertyGroup><NuGetLockFilePath>m</NuGetLockFilePath></PropertyGroup></Project>");
 put("build/app.ico", Buffer.from([0, 0, 1, 0, 1, 0, 0xff, 0xfe])); put("build/wide.xml", Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")]));
 const loose = reported(["build/Props.props", "build/x.xml", "build/mine.xml", "build/app.ico", "build/wide.xml"]);
-ok(loose.reports.some(x => x.startsWith("build/Props.props brings in $(markup inside it) by CustomAfterMicrosoftCommonTargets")) && loose.reports.some(x => x.startsWith("build/mine.xml names NuGetLockFilePath"))
-  && loose.reports.some(x => x.startsWith("build/wide.xml is not plain UTF-8")) && !loose.reports.some(x => x.includes("app.ico")) && !loose.reports.some(x => x.startsWith("build/x.xml")),
+ok(loose.reports.some(x => x.startsWith("build/Props.props brings in $(markup inside it) by CustomAfterMicrosoftCommonTargets")) && loose.reports.some(x => x.startsWith("build/mine.xml, which a build file brings in, names NuGetLockFilePath"))
+  && loose.reports.some(x => x.startsWith("build/wide.xml, which a build file brings in, is not plain UTF-8")) && !loose.reports.some(x => x.includes("app.ico")) && !loose.reports.some(x => x.startsWith("build/x.xml")),
   "a property's value written with CDATA after text is reported, never read as its decoy; a project any property could bring in is read for what it is, an icon passed over and a project in another encoding reported", JSON.stringify(loose));
 // (a project in any encoding .NET reads by its mark, or with a byte UTF-8 does not allow, which MSBuild reads as U+FFFD:
 // read for what it is, whatever brings it in; #283's security review)
@@ -546,6 +546,29 @@ inRepo(FIX, `<Project><Import Project="b.xml" /></Project>`); inRepo(FIXED, "<Pr
 const fixCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, FIX, FIXED], process.env, { base: "HEAD", baseConfig: null });
 ok(!fixCheck().failures.some(x => x.includes("tests/fixtures")) && fixCheck().reports.some(x => x.startsWith(`${FIXED}, which a build file brings in, names RestorePackagesPath`) && x.includes("held before this check read it")), "a file a project read by what it is imports, both as the base held them: reported, and passes", JSON.stringify(fixCheck()));
 fs.rmSync(path.join(repo, "tests"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no fixtures");
+// a project the base held, read for what it is, which the pull request brings into play by a property of the SDK's or of
+// its own: it fails, as a file a pull request brings into play does (core archive 207; #283's security review)
+const DORMANT = "build/dormant.xml";
+inRepo(DORMANT, "<Project><PropertyGroup><RestoreAdditionalProjectFallbackFolders>f</RestoreAdditionalProjectFallbackFolders></PropertyGroup></Project>"); inRepo("Directory.Build.props", "<Project />"); git("add", "-A"); git("commit", "-q", "-m", "a dormant project");
+const dormant = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", DORMANT], process.env, { base: "HEAD", baseConfig: null });
+ok(!dormant().failures.some(x => x.includes(DORMANT)), "a dormant project the base held, which nothing brings in, unchanged: it does not fail");
+const intoPlay = (prop) => { inRepo("Directory.Build.props", `<Project><PropertyGroup><${prop}>$(MSBuildThisFileDirectory)build/dormant.xml</${prop}></PropertyGroup></Project>`); return dormant().failures.some(x => x.startsWith(`${DORMANT}, which a build file brings in, names RestorePackagesPath`)); };
+ok(["AfterMicrosoftNETSdkTargets", "BeforeMicrosoftNETSdkTargets", "CustomAfterRazorSdkTargets", "MyOwnHook"].every(intoPlay), "the same project, which the pull request brings into play by a property of the SDK's or one of its own: it fails");
+for (const f of [DORMANT, "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no dormant project");
+// a config that leads to a device: failed with its reason, never read (#283's security review)
+if (process.platform !== "win32") {
+  fs.symlinkSync("/dev/zero", path.join(repo, "checks/dev.json"));
+  const devConfig = run("checks/dev.json", "--packages", restore());
+  ok(devConfig.status === 1 && /checks\/dev\.json is no file of bytes/.test(devConfig.out), "a config that leads to a device fails with its reason, and is never read", devConfig.out);
+  fs.rmSync(path.join(repo, "checks/dev.json"));
+}
+// a project of another kind's .user file (x.vcxproj.user), read for what it is, as the base held it: reported, the rule
+// for a .NET project's .user file not its (#283's security review)
+const VCX = "native/x.vcxproj.user";
+inRepo(VCX, "<Project><PropertyGroup><RestorePackagesPath>p</RestorePackagesPath></PropertyGroup></Project>"); git("add", "-A"); git("commit", "-q", "-m", "a vcxproj.user");
+const vcx = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, VCX], process.env, { base: "HEAD", baseConfig: null });
+ok(!vcx.failures.some(x => x.includes(VCX)) && vcx.reports.some(x => x.startsWith(`${VCX} names RestorePackagesPath`) && x.includes("held before this check read it")), "a project of another kind's .user file, as the base held it with no project file beside it: reported, and passes", JSON.stringify(vcx));
+fs.rmSync(path.join(repo, "native"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no vcxproj.user");
 // a submodule an Import names, as the base held it: reported, so that a sync fails no project that changed nothing (#283)
 inRepo("Directory.Build.props", `<Project><Import Project="ext/lib" Condition="false" /></Project>`); fs.mkdirSync(path.join(repo, "ext/lib"), { recursive: true });
 git("update-index", "--add", "--cacheinfo", `160000,${git("rev-parse", "HEAD").stdout.trim()},ext/lib`);

@@ -149,11 +149,17 @@ export const BY_PROPERTY = new Set(["CustomBeforeMicrosoftCommonProps", "CustomA
   "NuGetTargets", "LanguageTargets", "CodeAnalysisTargets", "ReportingServicesTargets", "MsTestToolsTargets", "MsAppxPackageTargets", "CSharpCoreTargetsPath",
   "CSharpDesignTimeTargetsPath", "CSharpTargetsPath", "VisualBasicCoreTargetsPath", "VisualBasicDesignTimeTargetsPath", "VisualBasicTargetsPath",
   "FSharpTargetsPath", "FSharpDesignTimeTargetsPath", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath", "MSBuildExtensionsPath32",
-  "MSBuildExtensionsPath64"].map((x) => x.toLowerCase()));
+  "MSBuildExtensionsPath64", "BeforeMicrosoftNETSdkTargets", "AfterMicrosoftNETSdkTargets", "AfterMicrosoftNetSdkProps", "AlternateCommonProps",
+  "CustomBeforeRazorSdkTargets", "CustomAfterRazorSdkTargets", "CustomBeforeStaticWebAssetsSdkTargets", "CustomAfterStaticWebAssetsSdkTargets",
+  "CustomBeforeBlazorWebAssemblySdkTargets", "CustomAfterBlazorWebAssemblySdkTargets", "CrossGenTargetsPath", "ILLinkTargetsPath", "ILCompilerTargetsPath",
+  "WebPublishProfileFile", "PublishProfileFullPath"].map((x) => x.toLowerCase()));
 export function imported(text) {
   const found = [], ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
-  // (a property's value on the list, a list parted by ";")
-  const pieces = (value, via) => { for (const x of value.split(";")) { const name = x.replace(TRIM, ""); if (name) found.push({ project: name, sdk: false, via }); } };
+  // (a property's value, a list parted by ";": each name of one on the list, and of any other property each that starts at
+  // its own file's folder, which says only what brings in a project read for what it is)
+  const pieces = (value, via, known) => {
+    for (const x of value.split(";")) { const name = x.replace(TRIM, ""); if (name && (known || /^\$\(MSBuildThisFileDirectory\)/iu.test(name))) found.push({ project: name, sdk: false, via, loose: !known }); }
+  };
   for (let i = text.indexOf("<"); i >= 0; i = text.indexOf("<", i)) {
     if (text.startsWith("<!--", i)) { const end = text.indexOf("-->", i + 4); if (end < 0) break; i = end + 3; continue; }
     if (text.startsWith("<![CDATA[", i)) { const end = text.indexOf("]]>", i + 9); if (end < 0) break; i = end + 3; continue; }
@@ -203,7 +209,8 @@ export function imported(text) {
     const ends = text.slice(j, k).toLowerCase() === close;
     if (ends) while (k < text.length && " \t\r\n".includes(text[k])) k++;
     const leaf = ends && text[k] === ">" && !markup, known = BY_PROPERTY.has(lower);
-    if (known && !markup) pieces(value, name);
+    if (known && !markup) pieces(value, name, true);
+    else if (leaf) pieces(value, name, false);
     // (what of a property on the list this check cannot read as MSBuild does is one it cannot know)
     if (known && !leaf) found.push({ project: "$(markup inside it)", sdk: false, via: name });
     i = j;
@@ -340,9 +347,14 @@ export function importsOf(own, read, roots = []) {
     // (a document type can name text that reads as a comment's start: its Imports are not read)
     if (/<!DOCTYPE/iu.test(text)) { typed.push(f); continue; }
     const looked = new Set();
-    for (const { project, sdk, via } of imported(text)) {
+    for (const { project, sdk, via, loose } of imported(text)) {
       if (BUILD_FILE.test(project.split(/[\\/]/u).pop())) continue;
       const at = sdk ? null : importPath(f, project, { anchored: Boolean(via) }), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
+      // (any other property only says what brings in a project already read for what it is: nothing more is read)
+      if (loose) {
+        for (const g of found) if (roots.includes(g)) { if (!brought.has(g)) brought.set(g, new Set()); brought.get(g).add(f); }
+        continue;
+      }
       if (!found.length) unread.push({ from: f, project, via, why: at === null ? "a file whose path this check cannot know without the build" : "a path outside the project, or no file of the project's that git knows" });
       const key = at?.toLowerCase();
       if (!found.length || looked.has(key)) continue;
@@ -351,6 +363,7 @@ export function importsOf(own, read, roots = []) {
       // by what it is joins the files brought in all the same)
       if (!by.has(key)) { by.set(key, new Set()); for (const g of found) { if (!files.has(g)) take(g); if (!brought.has(g)) brought.set(g, by.get(key)); } }
       by.get(key).add(f);
+      for (const g of found) if (brought.get(g) !== by.get(key)) brought.get(g).add(f);
     }
   }
   return { files, brought, unread, typed, unreadable };
@@ -679,7 +692,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
     // (a file not plain UTF-8 the check reads only lately too: as the base held it, reported)
     const held = now.brought.has(f) ? !base || (same(f) && broughtThen(f))
-      : /\.user$/iu.test(f) ? !base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, "")))
+      : /\.user$/iu.test(f) && BUILD_FILE.test(f) ? !base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, "")))
       : (now.unreadable.has(f) || byContent.has(f)) && (!base || same(f));
     const named = now.brought.has(f) ? `${f}, which a build file brings in,` : f;
     for (const what of found) (held ? reports : failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
@@ -880,6 +893,8 @@ if (started(import.meta.url)) {
     process.exit(0);
   }
   if (!configPath || !packagesDir) fail("name the config and the restore's folder: node core/scripts/nuget.mjs <config> --packages <folder> [--advisory]");
+  // (the config is read only where it is a file of bytes: a device would never end)
+  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe): make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
     const config = loadConfig(configPath), { root, tracked } = project();

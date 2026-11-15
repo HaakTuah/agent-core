@@ -21,7 +21,7 @@
 //   node core/scripts/nuget-fetch.mjs <config> --into <a folder of its own>
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
@@ -332,6 +332,8 @@ if (started(import.meta.url)) {
   const fail = (msg) => { console.error(`FAIL: ${shown(msg)}`); process.exit(1); };
   const configPath = args.find((a, i) => !a.startsWith("--") && i !== at + 1), into = at >= 0 ? args[at + 1] : undefined;
   if (!configPath || !into) fail("name the config and a folder of its own: node core/scripts/nuget-fetch.mjs <config> --into <folder>");
+  // (the config is read only where it is a file of bytes: a device would never end)
+  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe): make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
