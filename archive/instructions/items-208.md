@@ -220,5 +220,6 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > it: quote this in those pull requests.
 
      Behind "Issues are the way in" and "The *progress file* holds order only" in `modules/inbox.md`, the *progress
-     file*'s slot in `README.md`, the starter kit's template for it, `scripts/inbox.mjs`, the step "15 November 2026,
-     the progress file and the inbox" of `scripts/steps.mjs`, and the queue's own mark in `scripts/size.mjs`.
+     file*'s slot in `README.md`, the starter kit's template for it, `scripts/inbox.mjs`, the steps "15 November 2026,
+     the progress file holds order only" and "15 November 2026, the owner's inbox where issues cannot be reached" of
+     `scripts/steps.mjs`, and the queue's own mark in `scripts/size.mjs`.

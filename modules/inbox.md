@@ -30,8 +30,7 @@ Read at the start of every task.
   - Its one writer, the orchestrator or the design session, adds issues in a PR, the trust gate. Any other session
     changes only its own line, taken out in the PR that finishes it. Bugs, tests, checks of standing rules and tasks the
     scheduled look opens need no word of the owner's.
-  - Its own size mark, below the general one, is set at its first trim, the general holding till then. Reason: every
-    session reads it.
+  - Reason: every session reads it at its start. Its own size mark comes with its first trim (`core/scripts/steps.mjs`).
 - **An obvious improvement is built at once** (core archive 147), in its own PR, save where the floor needs the owner's
   yes.
 - **Other ideas are cheap to file,** a line each, at most a couple per task.
