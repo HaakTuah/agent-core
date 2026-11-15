@@ -3,6 +3,29 @@
   "audit": ".github/licences-audit.json",
   "scan": {
     "served": [],
-    "skip": ["scripts/licence-scan.mjs", "scripts/licence-commands.mjs", "scripts/licence-scan-stage.mjs", "scripts/licence-scan-test.mjs", "scripts/licence-fetch-test.mjs"]
-  }
+    "skip": [
+      "scripts/licence-scan.mjs",
+      "scripts/licence-commands.mjs",
+      "scripts/licence-scan-stage.mjs",
+      "scripts/licence-scan-test.mjs",
+      "scripts/licence-fetch-test.mjs"
+    ]
+  },
+  "agentTools": [
+    {
+      "kind": "hook",
+      "name": "SessionStart startup|resume: bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/work-saved.sh 2>/dev/null) || { echo \"Not run: the work-saved hook runs only its copy merged into main, and refs/remotes/origin/main has none. Fetch main (git fetch origin main), and it runs from the next reply on.\"; exit 0; }; bash -c \"$f\" work-saved start'",
+      "publisher": "this project"
+    },
+    {
+      "kind": "hook",
+      "name": "PreToolUse Agent|Task: bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/helper-call.mjs 2>/dev/null) || exit 0; node --input-type=module -e \"$f\"'",
+      "publisher": "this project"
+    },
+    {
+      "kind": "hook",
+      "name": "Stop: bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/work-saved.sh 2>/dev/null) || exit 0; bash -c \"$f\" work-saved stop'",
+      "publisher": "this project"
+    }
+  ]
 }
