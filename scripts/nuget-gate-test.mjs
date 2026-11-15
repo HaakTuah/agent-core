@@ -14,18 +14,14 @@
 //   node scripts/nuget-gate-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { runWorkflow } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
+import { root, scratchDir, tally } from "./scratch-core.mjs";
 
-let failed = 0, count = 0;
-const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } };
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { ok, done } = tally();
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/nuget.yml"), "utf8");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-gate-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("nuget-gate-test-");
 const home = path.join(tmp, "home");
 fs.mkdirSync(path.join(home, "AppData", "Roaming"), { recursive: true });
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|NUGET_|DOTNET_CLI_HOME$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
@@ -162,5 +158,4 @@ if (sdk) {
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check's own steps`);
-process.exitCode = failed ? 1 : 0;
+done("the NuGet check's own steps");

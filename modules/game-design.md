@@ -27,11 +27,8 @@ is any move, rule or power a player can choose to use.
 - **No rule untaught** (core archive 84 and 90).
   - Every rule a player needs is in *where rules are taught*, added or changed in the same change as the rule.
   - When a rule acts on a player, the game shows it where and when that player could know it.
-  - Nothing the game itself shows implies what is untrue (a player may still lie), so whatever it shows from the past,
-    such as a last-known position or an old report, shows its age (core archive 114).
-  - Every mistake a player makes in testing is sorted by one question (core archive 112): could a careful player, seeing
-    the same, have known better? If so it is the game's, and kept; if not, the game told it badly: a bug, fixed before
-    the next test.
+  - Whatever the game shows, a last-known position or an old report among it, and every mistake a player makes in
+    testing, are held to `modules/screens.md`, point 13 (core archive 112 and 114); a player may still lie.
 - **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule.
@@ -104,7 +101,7 @@ is any move, rule or power a player can choose to use.
   - A game whose rules changed while it was played replays exactly only from the change on.
 - **The polish lane** also takes its finds from whole games watched at top speed, on a phone and on desktop, and proves
   play unchanged by "Same seed, same game".
-- **Readable by every player** (core archive 112, 204 and 205). What the game shows tells a player at a glance what is
-  happening and what it can do, and *what they are shown* tells the *computer players* the same, as plainly and in the
-  same order, so that every player reads the game on equal terms. Nothing is told apart by colour alone, reduced motion
-  keeps whatever informs, and each thing has one name everywhere the game shows it.
+- **Readable by every player** (core archive 112, 204 and 205). *What they are shown* tells the *computer players* what
+  the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
+  general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
+  thing) are `modules/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.

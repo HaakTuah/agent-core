@@ -32,3 +32,117 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind floor topics 5, 7, 9 and 19 and floor rule 14's cap on a run with a model, with the step "16 November 2026,
      hostile tests for every named input" in `scripts/steps.mjs`.
+
+228. **14 and 15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not
+     the design session, as that session recorded it on issue #235, labelled `by:chat`, its note "What this issue asks
+     to be built, in one place" gathering what the owner agreed to). Of an audit that found 43 of 122 rules held by
+     nothing but a session reading them, and of staged cases that would test those rules on a fresh session, the
+     owner said:
+
+     > We need to address everything you identified.
+
+     and agreed to: staged cases, each a scratch project in which a fresh session is given a task where one rule is easy
+     to break, passed or failed by a script on what the session did, never on what it says of itself; advisory at
+     first, and holding a release only once they have been right for a while; eight cases so far, two of them from that
+     day's work (a builder that finishes without the owner, and a stricter check that meets old content); run under
+     each agent tool, a tool working with the core once it passes them; and every rule of the floor and the modules,
+     the old ones too, naming what holds it, one of three (a check that fails where it is broken, a staged case, or the
+     scheduled audit), a script listing those with none until they gain one or go on the owner's word, a staged case
+     the holder of last resort. Of running the cases before each release, the core's first five releases having been
+     cut within 21 hours:
+
+     > When multiple releases can in theory be daily, this might not be the best measurement.
+
+     So they run once a month, with the state report, and when a rule that has a case changes, as the owner agreed. To
+     the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "Every rule says what holds it" and "Staged cases hold what no check reads" in `AGENTS.md`,
+     `scripts/holders.json` and `scripts/holders.mjs`, `scripts/staged.mjs` and `scripts/staged/`, and the staged
+     cases' reader in `scripts/look.mjs` and gate in `scripts/release.mjs`.
+
+229. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it on issue #282, labelled `by:chat`; first added to #277, which had already been built and
+     closed, so it stands as an issue of its own). The owner asked:
+
+     > should there be any priming? Like telling builders that they are experts in what they are doing? Or that the
+     > fate of the world relies on them getting this perfectly right?
+
+     and agreed to four points, under the heading "A brief is written as a rule is (#277, built), with no priming":
+     what a session is handed says its role by what it does ("you built none of this; find what is wrong with it"), the
+     task, what done looks like and the reason; it calls the session no expert and invents no stakes, since neither
+     changes the work and a brief, like any request, may not imply what is not true; it holds for the briefs an
+     orchestrator writes for its builders, those a session writes for a helper or a reviewer, and the templates of the
+     starter kit; and it is held by the list of phrases a rule may not use, reading the brief templates too, and by a
+     point of the review guidelines on a brief written in a pull request. To the orchestrator, passed on word for word
+     to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "A brief is written as a rule is" in `modules/helpers.md`, its point under "A brief written in a pull
+     request" in `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json` as
+     `scripts/general.mjs` reads it in the starter kit's templates.
+
+230. **15 November 2026** (projects with a screen; in chats with a session the owner works with, not the design
+     session, as that session recorded them on issue #284, labelled `by:chat`, whose description it named the issue's
+     current text in a note of the same day; the description sets the design out in full, as eighteen points with what
+     holds them and what stays out, and says the owner agreed to every point; and as the owner then told the
+     orchestrator, who passed it on word for word to the builder of this module). The owner first agreed to the
+     direction, the one system, hierarchy, restraint, real content and every state, motion with a purpose and the
+     critique, as they were put to the owner, and to having more prescribed here, having asked:
+
+     > Obviously we can't tell it to have a theme, that becomes too specific, or make it mind-blowing probably won't
+     > make much of a differnece. But are there also certain artistic criterias and user experience and visual effects,
+     > we can prescribe in general terms, that will make what it outputs look less sloppy and ai, which has to be
+     > iterated on many times and more in line with the product it is actually producing and the level of quality
+     > everywhere else
+
+     The session then researched what practice holds a screen to and set out fourteen additions with what holds each;
+     the owner agreed to all fourteen as set out, and so to every point of the description, and to the change to the
+     review guidelines that the critique brings. Two of them, the sample screens of the direction and the builder's
+     three lines of intent, were the session's own and marked so when put to the owner. The owner had asked whether the
+     game module's rules for readability hold for any screen, and:
+
+     > What are we lacking from our ruleset, that we can prescribe and get superior output in our projects, without
+     > having to manually iterate and re-prompt o so many times? Mistakes and wrong calls, the models are capable of
+     > avoiding or detecting themselves, but which the processs just doesn't automatically prompt them to do?
+
+     Asked whether "mobile first" is good practice, the owner agreed to the session's answer: as an order of work it is,
+     and as a stance for every product it is not, since some products are made for a large screen; so the direction
+     names the main size, and nothing runs off the screen at any width between the named sizes. Four lines the session
+     had set out with the rest and left out of the issue's text by mistake, the owner had agreed to as well: feedback at
+     the place and the moment of the action, what a machine reads from the screen, help that changes with its feature,
+     and one whole task walked at each size. To the orchestrator, passed on word for word to the builder of this
+     module:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `modules/screens.md`, the line on a screen changed in `modules/review-guidelines.md` and the critique in
+     `modules/reviews.md`, the general forms that `modules/game-design.md` points to in "Readable by every player" and
+     "No rule untaught", `scripts/screens.mjs`, and the slots *direction*, *screen sizes*, *accessibility floor*,
+     *desktop platforms* and *screen checks*.
+
+231. **15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #256, labelled `by:chat`, its note "What this issue asks to
+     be built, in one place" gathering what the owner agreed to, and as a builder's issue, #330, set out the part of
+     it pull request #328 could not build). Of what reopens a choice, the owner agreed to part C of that note, whose
+     first point reads "**Its sign trips:** the scheduled look (#248) flags it", and asked:
+
+     > What will repoen it for us? Will there at least be suggestions if obvious optimizations or migrations are
+     > superior?
+
+     A sign written in words the look cannot read, so #330 asked, with the stand-in's sure yes, that a record may write
+     its sign as a measure a check already keeps and a threshold, which the look reads each day, never running a
+     command written in the records file. To the orchestrator, passed on word for word to the builder of this rule:
+
+     > Issues labelled `by:chat` carry my decisions; treat them as my word.
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind the line `Trips when:` of "What reopens a choice" in `modules/choices.md`, and `signs` with its measures in
+     `scripts/choices.mjs`, read by `scripts/look.mjs`.

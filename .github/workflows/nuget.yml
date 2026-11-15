@@ -5,8 +5,9 @@
 # runs the caller's own core/scripts/nuget.mjs, which holds every package in those lock files, and whatever else the
 # restore brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
 # manifest of the package the restore brought. What that script holds and does not, it says itself. A project calls
-# this (workflow_call) from a workflow of its own of the same name, on every pull request, pinned to a full commit SHA
-# ("How a project takes the core" in README.md, point 5), passing the licence check's config. It fails from a
+# this (workflow_call) from a workflow of its own of the same name, on every pull request (a private repository, as the
+# starter kit writes its call, on one that changes a file NuGet reads by name, so that no other bills a job), pinned
+# to a full commit SHA ("How a project takes the core" in README.md, point 5), passing the licence check's config. It fails from a
 # project's first day (core archive 198). With "advisory" (off unless a project turns it on) it says what it would
 # fail and passes, a restore that fails included: for a project where the check itself is at fault, while that is
 # reported to the core and mended, and never to let a package through. A restore runs the pull request's own project
@@ -60,6 +61,11 @@ jobs:
   nuget:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
+    # main, a schedule or a start by hand is its own group and is never cancelled; #388)
+    concurrency:
+      group: nuget-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-${{ inputs.config }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
