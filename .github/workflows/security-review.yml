@@ -13,8 +13,9 @@
 # review open, only such a comment settles it, posted after its newest finding where one is to be found; nothing else
 # counts (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show
 # a change to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
-# which count, and when one is enough); of a pull request whose head does not hold the check's scripts as the default
-# branch does, which stood before the check came, what the check reads more is said, never waited for. A project
+# which count, and when one is enough); of a pull request that leaves the check's scripts alone and whose head does
+# not hold them as the default branch does, which stood before the check came, what the check reads more is said,
+# never waited for. A project
 # calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
 # and on issue_comment (created and edited), so that the status follows a review the moment its comment arrives and
@@ -115,17 +116,23 @@ jobs:
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100" > "$d/findings.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
-          # whether the pull request's head holds a script of the check as this branch does: one that does not stood
-          # before the check came, and what the check reads more is said of it, never waited for (AGENTS.md, "Nothing
-          # locks a project")
+          # whether the pull request is held by what a script of the check reads more: not where it leaves the script
+          # alone and its head holds it as it stood before this branch's (it stood before the check came, and is told,
+          # never waited for: AGENTS.md, "Nothing locks a project"); always where it changes the script itself, where
+          # its list of files is cut short, or where the head's copy cannot be read for any reason but its absence
           head=$(jq -r '.head.sha // empty' "$d/pull.json")
           held() {
-            local p="$ROOT/scripts/$1"
+            local p="$ROOT/scripts/$1" theirs
             p="${p#./}"
-            [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo false; return; }
-            local theirs
-            theirs=$(gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> /dev/null || true)
-            if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
+            [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo true; return; }
+            if [ "$(jq '[.[][]] | length' "$d/files.json")" != "$(jq '.changed_files' "$d/pull.json")" ] \
+              || jq -e --arg p "$p" 'any(.[][]; .filename == $p or .previous_filename == $p)' "$d/files.json" \
+                > /dev/null
+            then echo true; return; fi
+            if theirs=$(gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
+              if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
+            elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
+            else echo true; fi
           }
           BOUND=$(held security-review.mjs) node "$ROOT/scripts/security-review.mjs" "$d/pull.json" "$d/comments.json" \
             "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"

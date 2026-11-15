@@ -25,15 +25,15 @@
 // review holds what comment-only.mjs printed on the head ("checked head" and its whole SHA: comments and steps' names
 // alone, rule 8's one). Given no list of the files (a workflow older than this script), it asks one review, as it did
 // before it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull
-// request whose head does not hold this script as the default branch does (BOUND=false, which the workflow sets),
-// which stood before the check came, it says the second is missing and never waits for it (AGENTS.md, "Nothing locks
-// a project"); brought up to date with main, it is held. What it does not hold: what a posted review says, whether a
-// finding is blocking, who posted each of two reviews (one login may post both), that comment-only.mjs's printout is
-// true (its code reviewer runs it again), and that a later commit which changes what the review was for got its
-// check; those stay with the builder and the reviews. It prints, as JSON, the commit to mark and the status to give
-// it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's input, on unless turned
-// off) the status is always a pass that says what the check would have done, so a week of pull requests shows whether
-// it is right before anything waits for it.
+// request that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which
+// the workflow sets), which stood before the check came, it says the second is missing and never waits for it
+// (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it does not hold: what a
+// posted review says, whether a finding is blocking, who posted each of two reviews (one login may post both), that
+// comment-only.mjs's printout is true (its code reviewer runs it again), and that a later commit which changes what
+// the review was for got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to
+// mark and the status to give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's
+// input, on unless turned off) the status is always a pass that says what the check would have done, so a week of pull
+// requests shows whether it is right before anything waits for it.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same>]]]

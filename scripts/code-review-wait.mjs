@@ -17,8 +17,9 @@
 // a sync's shape: the copy under core/, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
 // sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's). Given
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
-// files, 250 commits) is read as needing a review and as proving no update from main. A pull request whose head does
-// not hold this script as the default branch does (BOUND=false, which the workflow sets) stood before the check came:
+// files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
+// script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets) stood
+// before the check came:
 // its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
 // does not hold what a review says, that docs another provider built got their code review, nor that a merge from
