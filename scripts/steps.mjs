@@ -23,7 +23,7 @@ import { CORE } from "./core-address.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -93,6 +93,25 @@ function shapeWritten(p) {
   return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
 }
 
+// The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
+// `core.yml` checks on every pull request.
+const coreCall = job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/`.toLowerCase());
+export const callers = p => (readable(p, text => text.toLowerCase().includes(`${CORE}/.github/workflows/`.toLowerCase())), Object.entries(p.workflows))
+  .filter(([, w]) => { const jobs = Object.values(w.yaml?.jobs ?? {}); return jobs.length > 0 && jobs.every(coreCall); }).map(([f]) => `.github/workflows/${f}`);
+
+// Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
+// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
+function suitesOnPins(p) {
+  const pins = callers(p);
+  readable(p, text => /paths(-ignore)?\s*:/.test(text));
+  const started = Object.entries(p.workflows).filter(([f]) => !pins.includes(`.github/workflows/${f}`)).flatMap(([f, w]) => {
+    const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
+    const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
+    return by.length ? [`\`.github/workflows/${f}\` (${by.join(", ")})`] : [];
+  });
+  return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
@@ -112,7 +131,8 @@ export const STEPS = [
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
       return want && !p.manifest.split("\n").includes(want) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
-  { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, unread: "which suites a project's workflows run for which change is their own logic" },
+  { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
+    partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
   { lead: "12 November 2026, the way work is handed over", cost: COST.read, unread: "what a project's rules say of handing work over is a reading of them" },
   { lead: "12 November 2026, a feature may wait for a later stage", cost: COST.line, unread: "whether a line of the manifest's \"Differences\" says this is a reading of its words" },
   { lead: "12 November 2026, the signature check on every pull request", cost: COST.workflow,

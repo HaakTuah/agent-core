@@ -71,14 +71,17 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(missed.length === 1 && missed[0].lead === step.lead && missed[0].mend.length > 20 && missed[0].cost === step.cost, `taken out, "${step.lead}" is reported, alone, with its mend and cost`, report(missed));
   STAGES[step.lead].mend(dir);
   ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
+  STAGES[step.lead].after?.(dir);
 }
 // several at once, in a project of another kind: exactly those
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
 for (const lead of some) STAGES[lead].stage(lockProject);
 ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
-for (const lead of some) STAGES[lead].mend(lockProject);
+// (in the order steps-stage.mjs lists them, the one whose mend lists what the others write last)
+for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
+for (const lead of some) STAGES[lead].after?.(lockProject);
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
