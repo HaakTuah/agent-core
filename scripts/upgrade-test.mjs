@@ -583,10 +583,10 @@ function preRelease(name, { windows }) {
   const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}`, ownToo: true });
   ok(!failures(onSync) && onSync.some(([w, r]) => w.startsWith("checks.yml/") && r.ran), `${name}: every check passes on the sync's pull request, its own workflow's scripts from the new copy too (${started(onSync).length} jobs)`, failures(onSync));
   // its own suite skips core/** and the manifest, but the sync moves its callers' pins too: with that filter alone the
-  // suite starts on every sync (the fault, ORCH_ISSUE_SUITES); with each caller listed by its path, it does not
+  // suite starts on every sync (the fault, #379); with each caller listed by its path, it does not
   const callerFiles = Object.keys(callers).map(wf => `.github/workflows/${wf}.yml`);
   ok(started(onSync).includes("suite.yml/tests") && git(dir, "diff", "--name-only", `${main0}...${syncHead}`).split("\n").some(f => callerFiles.includes(f)),
-    `${name}: with paths-ignore of core/** and the manifest alone, the sync's moved caller pins start its own suite (the fault, ORCH_ISSUE_SUITES)`, started(onSync).join("\n"));
+    `${name}: with paths-ignore of core/** and the manifest alone, the sync's moved caller pins start its own suite (the fault, #379)`, started(onSync).join("\n"));
   git(dir, "checkout", "-q", "-B", "remedy", main0);
   write(dir, ".github/workflows/suite.yml", suite(callerFiles));
   git(dir, "commit", "-q", "-am", "its suite skips its callers of the core's workflows too");
@@ -608,7 +608,7 @@ function preRelease(name, { windows }) {
   // its NuGet packages, as the sync notes ask once it has some: a project file, its lock file, a NuGet.Config whose
   // packageSourceMapping maps every package to the registry, and a caller of the core's NuGet check. A pull request that
   // changes nothing NuGet reads is told so by the check's first look, and its fetch and restore do not run
-  // (ORCH_ISSUE_NUGET)
+  // (#380)
   if (windows) {
     git(dir, "checkout", "-q", "-B", "nuget", "main");
     write(dir, "src/App/App.csproj", lines('<Project Sdk="Microsoft.NET.Sdk">', "  <PropertyGroup>", "    <OutputType>Exe</OutputType>", `    <TargetFramework>${tfm}</TargetFramework>`,
@@ -630,7 +630,7 @@ function preRelease(name, { windows }) {
     const look = checks(p, "pull_request", docs(main2), { baseSha: main2, only: "nuget.yml" });
     const said = look.flatMap(([, r]) => r.steps).find(x => x.name === "Does the pull request change what NuGet reads?")?.out ?? "";
     if (sdk) ok(!failures(look) && /nothing to restore/.test(said) && !ran(look, "nuget.yml", "Restore each project file from its lock file alone"),
-      `${name}: with packageSourceMapping, the NuGet check's first look finds nothing to restore on a pull request that changes nothing NuGet reads, and its restore does not run (ORCH_ISSUE_NUGET)`, `${failures(look)}\n${said}`);
+      `${name}: with packageSourceMapping, the NuGet check's first look finds nothing to restore on a pull request that changes nothing NuGet reads, and its restore does not run (#380)`, `${failures(look)}\n${said}`);
     git(dir, "checkout", "-q", "main");
   }
 
