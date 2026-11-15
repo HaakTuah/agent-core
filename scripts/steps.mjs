@@ -175,13 +175,15 @@ export const callers = p => (readable(p, text => text.toLowerCase().includes(`${
 
 // Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
 // GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
+// (a file's name as the mend shows it: a control character or a backtick, which would bend a description, as "?")
+const shown = f => String(f).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029`]/gu, "?");
 function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
   const started = Object.entries(p.workflows).filter(([f]) => !pins.includes(`.github/workflows/${f}`)).flatMap(([f, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
     const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
-    return by.length ? [`\`.github/workflows/${f}\` (${by.join(", ")})`] : [];
+    return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
   });
   return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
 }

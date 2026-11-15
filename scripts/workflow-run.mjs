@@ -253,11 +253,15 @@ const outputsOf = file => {
 export function pathsLetThrough(patterns, changed) {
   // (a `?` or `+` with no character before it, and a `[` or `]` outside a whole class, is taken as itself, as is a
   // pattern that still makes no expression: it is read, never refused)
-  const re = glob => {
+  // (runs of stars made one, and a pattern of more than eight wildcards and repeats refused as too complex to read,
+  // so that no project's pattern can keep the expression backtracking; the caller reports it as not read)
+  const re = given => {
+    const glob = given.replace(/\*{3,}/g, "**").replace(/(\*\*\/)+/g, "**/");
+    if ((glob.match(/\*+|(?<!\\)[?+]/g) ?? []).length > 8) throw new Error(`a path pattern too complex to read: ${JSON.stringify(given.slice(0, 80))}`);
     const body = glob.replace(/\\.|\*\*\/|\*\*|\*|\[[^\]]+\]|[?+]|[.^${}()|\\[\]]/g, (t, at) =>
       t.length === 2 && t[0] === "\\" ? `\\${t[1]}` : t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*"
         : t.length > 2 && t.startsWith("[") ? t : (t === "?" || t === "+") ? (at === 0 || "/*".includes(glob[at - 1]) ? `\\${t}` : t) : `\\${t}`);
-    try { return new RegExp(`^${body}$`); } catch { return { test: f => f === glob }; }
+    try { return new RegExp(`^${body}$`); } catch { return { test: f => f === given }; }
   };
   const rules = patterns.map(p => (p.startsWith("!") ? [false, re(p.slice(1))] : [true, re(p)]));
   return changed.some(f => rules.reduce((let_, [keep, r]) => (r.test(f) ? keep : let_), false));

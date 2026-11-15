@@ -100,6 +100,13 @@ fs.rmSync(suiteFile);
 ok(pathsLetThrough(["+x.yml", "?y.yml", "a[b.yml", "c]d.yml", "dir/+e"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.yml"]) && pathsLetThrough(["a[b.yml"], ["a[b.yml"])
   && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir/+e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),
   "a filter's `?` or `+` with no character before it, and a lone `[` or `]`, is read as itself, never refused");
+{
+  const began = Date.now(), long = suiteBy(`    paths: ['${"*".repeat(30)}z']`), tangled = notDone(lockProject).find(m => m.lead === SUITE_LEAD)?.mend ?? "";
+  const knotted = suiteBy("    paths: ['*a+a+a+a+a+a+a+a+a+b']"), said = notDone(lockProject).find(m => m.lead === SUITE_LEAD)?.mend ?? "";
+  ok(Date.now() - began < 5000 && !long && !/could not read/.test(tangled) && knotted && /too complex to read/.test(said),
+    "a run of stars is read as one at once, and a pattern of more wildcards and repeats than eight is reported as one its check could not read, never left to backtrack", `${tangled}\n${said}`);
+  fs.rmSync(suiteFile);
+}
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
