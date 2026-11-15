@@ -5,7 +5,7 @@
 //     own, its size: when the file shrinks, the mark comes down with it), or the project's own among them total past
 //     "total" (the core's copy under core/, which the core's check holds to the core's tree, is left out: the core's
 //     own cap, scripts/size.mjs there, holds what of it every session reads, so that no sync fails a project over what
-//     the core grew, the core's AGENTS.md, "Nothing locks another owner's project"; where "total" leaves room above the
+//     the core grew, the core's AGENTS.md, "Nothing locks a project"; where "total" leaves room above the
 //     project's own files for more than half that copy, a note gives the mark to set);
 //   - when the PR changes a file past "split" (about 50 KB: Step 0, split it by meaning first), unless "past" lists it
 //     with a mark at least its size. The copy of the core (core/, changed only by a sync PR), the paths under "skip"

@@ -2,7 +2,9 @@
 // of the core to a newer commit of the core, as a sync PR carries it. It writes `core/` whole at that commit, moves the
 // manifest's "Core:" line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
-// entries it gained between the two commits). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
+// entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
+// is not done and every difference from a fresh start (steps.mjs and fresh.mjs, beside this file), for the sync PR's
+// description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar and Node's own modules
 // only; the core's address: core-address.mjs, beside this file.
 //
@@ -17,9 +19,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past, releasesIn } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -88,6 +90,22 @@ function sync(tmp) {
     : asks.length
       ? `This sync asks more of the project than the copy (core/${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or queue it in the progress file where it is large.\n${asks.join("\n")}`
       : `This sync asks nothing of the project beyond the copy (core/${NOTES}).`);
+  // Every step not done, a standing one too, and every difference from a fresh start, as the new copy reads them; for
+  // the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
+  // (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
+  const kits = path.join(tmp, "kits");
+  for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
+    const to = path.join(kits, sha);
+    fs.mkdirSync(to, { recursive: true });
+    try { execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); }
+    catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
+  }
+  console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
+  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits]]) {
+    if (!fs.existsSync(path.join("core", "scripts", script))) continue;
+    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8" });
+    console.log(`${r.stdout}${r.stderr}`.trim() || `core/scripts/${script} said nothing`);
+  }
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.

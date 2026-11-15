@@ -144,3 +144,46 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "A rule is written to one pattern" in `AGENTS.md`, its point under "A rule file changed" in
      `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json`, which `scripts/general.mjs` reads.
+
+215. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #247, labelled `by:chat`, in its text and five notes, the last
+     of which, "What this issue asks to be built, in one place", gathers them and holds where they differ). Told that
+     two of the ideas queued that day would have broken "Nothing locks another owner's project" as it stood, and that
+     only a reading caught them, the owner asked:
+
+     > Nothing of this will negatively impact […] project? Maybe a criteria that don't mention […] should be added? A
+     > rule about rules?
+
+     and agreed to widening the rule to every project, the owner's own included, to an upgrade test that holds old
+     content, to each release saying what it asks and roughly what each ask costs, and to a heading, "What it asks of a
+     project", held as "What holds it" is. Of what a project held before a check read more, the owner agreed that it is
+     reported, not failed, with one exception, a listed personal term (core archive 202). Asked how a project adjusts to
+     a new version of the core without a fault, the owner agreed that each step a release asks has a check, that every
+     sync runs them all, and said:
+
+     > A missed step must show, but be addressable by an agent, and not lead to a complete stop for […] setup. This step
+     > is of the outmost importance to get right
+
+     Where the session had read the rule as "everything new arrives advisory or off", the owner corrected it:
+
+     > I meant is nothing stops […] process, not that it only has to be advisory. It has to be advisory only of it
+     > requires and active action from […]
+
+     and agreed that what an agent can mend alone may bind, that what only the owner can do is advisory, that what stood
+     before a check came never turns it red, and that the audits and the cleaning share run by themselves in every
+     project at a dose its owner may change with one line of the manifest. Asked whether a project that took earlier
+     versions only in part gets the newest wholly, the owner agreed that every standing entry of the sync notes gets its
+     check, that an upgrade case takes steps out at random, and that the sync compares a project with a fresh start of
+     the starter kit, and said:
+
+     > Nothing in this project can be exempt or overlooked from anything just because it is grandfathered in.
+
+     So a baseline is a debt, not an exemption, and none may stand in the core's own repository. To the orchestrator,
+     passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "Nothing locks a project", "A release says what it asks, step by step" and "A pull request says what it asks
+     of a project" in `AGENTS.md`; `scripts/steps.mjs`, `scripts/fresh.mjs`, the steps the sync and the release print,
+     the cases of `scripts/upgrade-test.mjs`, and the heading `.github/workflows/own-description.yml` asks for.

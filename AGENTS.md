@@ -119,18 +119,54 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   page under Actions has the button; `.github/workflows/release.yml`; core archive 197), and the workflow cuts it only
   where every check on `main`'s newest commit has passed: the tag `release-N` on that commit, never moved or deleted
   afterwards. `node scripts/release.mjs` says what the next one would carry.
-- **Nothing locks another owner's project** (core archive 201): in a project that changes nothing of its own, a sync to
-  the release that carries a change makes no check fail, block, wait or start where it did not before, and adds no
-  billed job, since a private repository on GitHub's free plan pays a whole minute for each job and its Actions stop
-  once the month's are spent. Anything new is inside a job that already runs, advisory, or off until the project turns
-  it on. What a project held before a check read more is reported, not failed (core archive 207). The one exception, on
-  the owner's word and no other: the personal-terms check fails a listed term wherever it stands, one the project held
-  before the check read it and a name a machine's git writes into each commit included, its failure saying how the
-  session takes it out in that pull request itself (core archive 202 and 207).
-  `scripts/upgrade-test.mjs`, in `.github/workflows/tests.yml`, holds it: a project written by the starter kit of each
-  of the last two releases (npm and .NET, the .NET one as Windows holds it, its commits made under a listed name),
-  synced to the commit under test, passes every check of the core unchanged, that mend made, and starts no job it did
-  not start before.
+- **Nothing locks a project** (core archive 201, 207 and 215), in any owner's project, the core's owner's own included.
+  By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
+  what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
+  owner's account, anything paid) is advisory, reported and labelled as waiting on the owner (#244) while the rest goes
+  on. The trigger is a check the release adds or makes read more, and its actor is whoever builds that check:
+  - a pull request that makes something worse than it stood may fail, and the session mends it there; every failure
+    says its mend (#254);
+  - what stood before the check came, or before it read more, never turns it red: the check keeps a baseline, what
+    breaks it today, listed and allowed only to shrink. A sync pull request holds the copy alone, so until the list
+    is written the pull request's base counts as it, and the entry of `setup/sync-notes.md` that brings the check
+    has a step whose check reads that the list is written: no old breach goes unlisted. The one exception, on the owner's word and no other: the personal-terms check fails a listed term wherever
+    it stands, one the project held before and a name a machine's git writes into each commit included, its failure
+    saying how the session takes it out in that pull request itself (core archive 202 and 207);
+  - it adds no billed job, since a private repository on GitHub's free plan pays a whole minute for each job and its
+    Actions stop once the month's are spent.
+
+  A baseline is a debt, not an exemption: the project's agents work it down by tasks, at the dose the codebase's state
+  sets, never by a red check, and in the core's own repository none may stand (#259). The audits and the cleaning
+  share run by themselves in every project; its owner may change the dose with one line of the manifest, and is not
+  asked to (#246, #248). It does not mean that all a release brings arrives advisory or off, nor that old code is left
+  alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
+  waiting on its owner, for something it did not change. Held by `scripts/upgrade-test.mjs`, in
+  `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
+  the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
+  reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
+  it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
+  heading "What it asks of a project" below; and, for the dose, by the daily look once #248 builds it.
+- **A release says what it asks, step by step** (core archive 215). Whoever adds an entry to `setup/sync-notes.md`
+  gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
+  with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
+  is not done; or, where no check reads it, why, held by a staged case (#235). Every standing entry has one. Every sync
+  runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
+  every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
+  a task the project's agents take (`modules/orchestrating.md`; with no orchestrator, the session that syncs), a step
+  only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
+  Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
+  owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps (it stays pure), nor
+  that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
+  nothing showed that it was. Held by `scripts/steps-test.mjs`, which fails an entry with no step and a step with a
+  check that cannot be taken out and mended, and by `scripts/upgrade-test.mjs`: after the sync every step reads done,
+  each step added since the release started from, taken out, is reported and its mend as written makes it done, and
+  steps taken out at random are reported, exactly those.
+- **A pull request says what it asks of a project** (core archive 215): one that changes the floor, a module, a script,
+  the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
+  nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
+  every such change asks something of a project: "Nothing" is an answer, and most changes give it. Reason: two of the ideas
+  queued on 14 November would have broken "Nothing locks a project", and only a reading caught them. Held by
+  `.github/workflows/own-description.yml`, which fails one without it.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
