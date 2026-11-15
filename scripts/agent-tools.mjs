@@ -110,14 +110,16 @@ export function configured(read, skills) {
 
 // What a plug-in's or tool server's own configuration fixes it at: { pin, where } where it names one exact version or a
 // full commit; { loose, where, mend } where it is fetched in a form that takes a pin but names none, or a range or tag;
-// null where the configuration names nothing read here, which leaves it to the review.
+// null where the configuration names nothing read here, which leaves it to the review. Each also holds `from`, the whole
+// configuration it was read from (the marketplace's source, the server's entry), never printed: what makes a breach
+// the base held the same one, so that a tool given another source or package is no longer held.
 const npmSpec = spec => (typeof spec === "string" ? /^((?:@[^\s/@]+\/)?[^\s/@:]+)(?:@(.*))?$/u.exec(spec) : null);
-function npmPin(spec, version, where, field) {
+function npmPin(spec, version, where, field, from) {
   const parts = npmSpec(spec);
   if (!parts) return null; // (a link, a path or a git address: the review's)
   const v = parts[2] ?? version;
-  if (exact(v)) return { pin: v, where };
-  return { loose: v === undefined ? "names no version, so the newest is fetched" : `names the version ${show(v)}, which is no one exact version`, where, mend: `write it ${field(parts[1])}` };
+  if (exact(v)) return { pin: v, where, from };
+  return { from, loose: v === undefined ? "names no version, so the newest is fetched" : `names the version ${show(v)}, which is no one exact version`, where, mend: `write it ${field(parts[1])}` };
 }
 function pluginPin(name, markets) {
   const at = name.lastIndexOf("@");
@@ -126,17 +128,17 @@ function pluginPin(name, markets) {
   if (!source || typeof source !== "object") return null;
   const where = `the marketplace ${show(name.slice(at + 1))} in ${market.file}`;
   if (source.source === "github" || source.source === "git") {
-    if (COMMIT.test(source.ref ?? "")) return { pin: source.ref, where };
-    return { loose: `takes ${source.ref === undefined ? "its repository's default branch" : `the branch or tag ${show(source.ref)}`}`, where, mend: `set its "ref" to the full 40-character commit of the marketplace meant` };
+    if (COMMIT.test(source.ref ?? "")) return { pin: source.ref, where, from: source };
+    return { from: source, loose: `takes ${source.ref === undefined ? "its repository's default branch" : `the branch or tag ${show(source.ref)}`}`, where, mend: `set its "ref" to the full 40-character commit of the marketplace meant` };
   }
   if (source.source !== "settings" || !Array.isArray(source.plugins)) return null;
   const entry = source.plugins.find(p => p?.name === name.slice(0, at))?.source;
   const its = `${where}, by its entry for ${show(name.slice(0, at))},`;
   if (["github", "url", "git-subdir"].includes(entry?.source)) {
-    if (COMMIT.test(entry.sha ?? "")) return { pin: entry.sha, where: its };
-    return { loose: `names no "sha", so it takes ${entry.ref === undefined ? "the repository's default branch" : `the branch or tag ${show(entry.ref)}`}`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
+    if (COMMIT.test(entry.sha ?? "")) return { pin: entry.sha, where: its, from: source };
+    return { from: source, loose: `names no "sha", so it takes ${entry.ref === undefined ? "the repository's default branch" : `the branch or tag ${show(entry.ref)}`}`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
   }
-  if (entry?.source === "npm") return npmPin(entry.package, entry.version, its, pkg => `with its "package" as "${pkg}" and its "version" one exact version, such as 1.2.3`);
+  if (entry?.source === "npm") return npmPin(entry.package, entry.version, its, pkg => `with its "package" as "${pkg}" and its "version" one exact version, such as 1.2.3`, source);
   return null;
 }
 // (npx's own options, read before the package it runs; one it does not know here leaves the server to the review)
@@ -162,7 +164,7 @@ function serverPin(name, server) {
     break;
   }
   spec ??= args[i];
-  return npmPin(spec, undefined, `.mcp.json, in the arguments of ${show(name)},`, pkg => `in those arguments as "${pkg}@" and one exact version, such as ${pkg}@1.2.3`);
+  return npmPin(spec, undefined, `.mcp.json, in the arguments of ${show(name)},`, pkg => `in those arguments as "${pkg}@" and one exact version, such as ${pkg}@1.2.3`, server);
 }
 
 // The hooks the starter kit writes, each by what it is (configured()'s ids): the core's, listed by it. `text` is the
@@ -304,8 +306,9 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   if (!list && core) list = { keys: new Set(), problems: [] };
   const { problems, unlisted, pins } = check(head, list, kit, file);
   const fail = [...head.problems, ...problems], notes = [];
-  // (a pin breach the base held as it stands, the tool's configuration and its entry both unchanged, is noted, and so is
-  // each where there is no base, as on a push; in the core's own repository none may stand)
+  // (a pin breach the base held as it stands, the tool's whole configuration (its source or package, not only its pin)
+  // and its entry both unchanged, is noted, and so is each where there is no base, as on a push; in the core's own
+  // repository none may stand)
   const baseProject = base ? readProject(root, base) : null;
   const baseList = base ? listed(baseConfig && typeof baseConfig === "object" ? baseConfig : null, file) : null;
   for (const [k, problem] of pins) {
