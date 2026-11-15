@@ -57,10 +57,11 @@ git writes into each commit too, and its failure says how a session takes it out
 ## The settings that are yours
 
 The settings the core cannot make for you: the ruleset on `main`, the Actions setting that pins every action to a
-commit, the secret that lists the terms to keep out, the security reviewer's app, secret scanning where your plan has
-it and no session's sign-in may switch it on, how your own profile and git name appear in commits, and how the machines your agents run on are set up. Each, and
-why, stands in `README.md`, "Setting up (the owner's part)"; none of them fails a check or blocks work where you leave
-it unset. A project starting out gets the list printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
+commit, the secret that lists the terms to keep out, the security reviewer's app, secret scanning in a private
+repository, where it may be billed (a session switches it on in a public one), how your own profile and git name appear
+in commits, and how the machines your agents run on are set up. Each, and why, stands in `README.md`, "Setting up (the
+owner's part)"; none of them fails a check or blocks work where you leave it unset. A project starting out gets the list
+printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
 
 ## Telling the core something
 

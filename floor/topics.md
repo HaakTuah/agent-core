@@ -67,11 +67,11 @@ The floor's rules for particular work.
   to attack it.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
 - **Secret scanning with push protection is switched on** in each repository that has it (core archive 226; floor rule
-  1): a session whose sign-in may change the repository's settings switches it on; one whose sign-in may not names it to
-  the owner in an issue labelled `needs-owner`, and the rest goes on.
-  - It does not mean a repository without GitHub's secret scanning (a private one on the free plan) waits or fails
-    anything. Reason: GitHub then refuses a push holding a key of a kind it knows, before it reaches the history, which
-    no check on a pull request can.
+  1): in a public repository, where GitHub gives it free, a session whose sign-in may change the repository's settings
+  switches it on; otherwise the session names it to the owner in an issue labelled `needs-owner`, and the rest goes on.
+  - It does not mean a session switches on what may be billed (a private repository's, sold per committer; floor rule
+    14), nor that a repository without it waits or fails anything. Reason: GitHub then refuses a push holding a key of
+    a kind it knows, before it reaches the history, which no check on a pull request can.
 
 **10. Licences: free to use, kept that way** (core archive 41).
 - What ships, or is built into it (every package, the ones it pulls in included, and every font, image, sound and data
