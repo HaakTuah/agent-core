@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { FOLDER, answer, items, repoOf, report } from "./inbox.mjs";
 
 let failed = 0, count = 0;
@@ -59,7 +60,7 @@ if (process.platform !== "win32") {
     spawnSync("git", ["remote", "add", "origin", "https://github.com/someone/a-game"], { cwd: repo, env });
     const run = gh => { fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh
 ${gh}
-`, { mode: 0o755 }); const r = spawnSync(process.execPath, [new URL("./inbox.mjs", import.meta.url).pathname], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+`, { mode: 0o755 }); const r = spawnSync(process.execPath, [fileURLToPath(new URL("./inbox.mjs", import.meta.url))], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
     let r = run("echo 'gh: Not Found (HTTP 404)' >&2; exit 1");
     ok(r.status === 0 && /^Issues cannot be read and written here \(GitHub finds no repository someone\/a-game/.test(r.out), "GitHub's Not Found is an answer: the repository cannot be reached for this account, so the folder", r.out);
     for (const [how, said] of [["echo 'gh: API rate limit exceeded (HTTP 403)' >&2; exit 1", "a rate limit"], ["echo 'gh: Bad Gateway (HTTP 502)' >&2; exit 1", "a fault of GitHub's"], ["echo 'error connecting to api.github.com' >&2; exit 1", "no network"], ["echo '{\"has_issues\": true}'", "an answer for no account"]]) {
