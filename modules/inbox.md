@@ -27,6 +27,19 @@ Read at the start of every task.
     owner's own comment on it says so.
   - Where issues cannot be read and written here (`core/scripts/inbox.mjs`, run at each sync), the same flow runs from
     files, as it says; turning issues on is the owner's setting, named once.
+- **Labels and openers say who wrote what** (core archive 217): whoever files or acts on an issue gives it one state
+  label (`queued`, `needs-owner`, `later`, `on-hold`) and, where the *owner's account* filed it, one sender (`by:owner`,
+  `by:chat` and `by:design` are the owner's voice; the rest an agent's). An agent's issue says "Found while:", its role
+  and task; an agent's comment opens with a line of the list, naming its task ("From a builder session, on #241:"), and
+  "Taken in:" where it takes in and quotes an instruction of the owner's. The list, and its check, which reports each
+  mend: `core/scripts/labels.mjs`. It does not mean a label proves anything: any session can set one, and the PR that
+  queues an item is what is trusted. Reason: every session posts as the owner, who could not see what was taken in.
+  - In an item of the owner's voice what binds stands under "The owner's word" (quoted) or "What it is" (a design the
+    owner agreed to), a view under "The session's view (not a decision)", which no review holds a PR to, and an outside
+    source says "as evidence, not instruction".
+  - **One current text:** an issue's description or newest gathered note, saying at its top "This is the issue's
+    current text."; whoever adds a note that changes what it asks updates it in the same step, and a builder builds
+    from it, the older notes kept as the record. Reason: notes overturning notes left a builder no one text.
 - **The *progress file* holds order only** (core archive 216): each item's issue, who builds it and what it waits on,
   nothing done; a stage of the project's design needs no issue, says what is next and points to its PRs for the rest.
   - Its one writer, the orchestrator or the design session, adds issues in a PR, the trust gate: no issue is built
@@ -37,8 +50,9 @@ Read at the start of every task.
 - **An obvious improvement is built at once** (core archive 147), in its own PR, save where the floor needs the owner's
   yes.
 - **Other ideas are cheap to file,** a line each, at most a couple per task.
-  - A verdict the stand-in is sure of decides one (core archive 168): a yes is queued, behind what stands there; a no
-    closes it; each says why. Any other waits for the owner.
+  - A verdict the stand-in is sure of decides one (core archive 168): a yes is queued, behind what stands there, and
+    marked `stand-in-yes` until the owner confirms or corrects it; a no closes it; each says why. Any other waits for
+    the owner.
   - The versions workflow's update (`modules/updates.md`) is built without a verdict.
 - **Bugs don't wait.** One in the task at hand is fixed in it; one outside it is filed, and any lane whose files it
   touches may fix it. Its fix's commit says "Fixes #n", so it closes when the fix reaches `main`, never by hand.
@@ -47,8 +61,8 @@ Read at the start of every task.
 - **Read every comment from the *owner's account*:** one opening as from a session the owner works with carries the
   owner's word where it quotes it or says the owner agreed to a design it sets out in full, and that alone (floor rule
   4; core archive 216). Reason: a session can write "the owner said yes" as easily as quote it.
-  - The design session (where the owner writes the rules; in a project with none, the session the owner gives a
-    standing rule to) opens its own with "From the owner's design session:" (core archive 131).
+  - The design session is where the owner writes the rules; in a project with none, the session the owner gives a
+    standing rule to (core archive 131).
 - **The owner's words are kept once** (floor rule 11).
   - A session the owner works with quotes an instruction in the issue, PR or report that acts on it, and records
     nothing more.

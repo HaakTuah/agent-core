@@ -27,3 +27,5 @@ No closer than this: public or private; the platform it is built on; the cloud o
 
 **What you did meanwhile**
 Whether the work went on, and by which reading.
+
+Found while: for an agent, the role and the task it was on, as "fixing #241 (a builder session)"; a person leaves this line out.

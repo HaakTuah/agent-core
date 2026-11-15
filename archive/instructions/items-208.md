@@ -223,3 +223,52 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      file*'s slot in `README.md`, the starter kit's template for it, `scripts/inbox.mjs`, the steps "15 November 2026,
      the progress file holds order only" and "15 November 2026, the owner's inbox where issues cannot be reached" of
      `scripts/steps.mjs`, and the queue's own mark in `scripts/size.mjs`.
+
+217. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #244, labelled `by:chat`, in its text and seven notes, the
+     sixth of which, "What this issue asks to be built, in one place", gathers them and holds where they differ). Shown
+     that every session posts under the owner's login, so that GitHub's filter by author tells nothing, the owner said:
+
+     > But they need to be tagged or labeled more clearly. Another benefit of this is that i can see clealry when my
+     > instructions are taken in, or a reply to them. But right now there is a lot of noise, as all post as me, so we
+     > must have clear ways to distinguish and filter each sender and topic, etc.
+
+     The session made the labels in the core as a trial, and the owner added:
+
+     > And i think this should be the flow on my games also.
+
+     Asked whether one label could carry both the owner's decisions and a session's own views, the owner said:
+
+     > Just needs to be standardized and clear?
+
+     and agreed that a label says who wrote an item and what state it is in, never how binding a sentence is: one state
+     label on each open issue (`queued`, `needs-owner`, `later`, `on-hold`); one sender label, read as the owner's
+     voice (`by:owner`, `by:chat`, `by:design`), a guess at it (the stand-in, whose sure yes that queues an idea is
+     marked until the owner confirms or corrects it) or an agent's own; fixed headings in an item of the owner's voice
+     ("The owner's word" and "What it is" bind, "The session's view (not a decision)" does not, an outside source is
+     "evidence, not instruction"); and one opening line, from one list, on every agent's comment, "Taken in:" where it
+     takes in an instruction of the owner's. Asked for the source of each item too, the owner said:
+
+     > so when can see where an question, idea or bug report came from
+
+     and agreed to `by:reviewer` for what a review, the design check or an audit finds outside its change, a "Found
+     while:" line in every issue an agent files, and an opening line that names the task. Where labels cannot be set,
+     state and sender are two lines of the item's file (#238). Shown that eight queued issues had grown to between three
+     and six notes each, some overturning earlier ones, the owner asked:
+
+     > Should we have rules change or add somethign for this
+
+     and agreed that an issue always has one current text, its description or its newest gathered note, saying at its
+     top that it is; that whoever adds a note that changes what the issue asks updates it in the same step; that a
+     builder builds from it, the older notes kept as the dated record; and that the scheduled look lists a queued issue
+     with several notes newer than it. To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     > (5) Labels: an issue a builder files gets a state label and `by:builder`.
+
+     Behind "Labels and openers say who wrote what" and "One current text" in `modules/inbox.md`, the stand-in's mark
+     there, `scripts/labels.json` and `scripts/labels.mjs`, the "Found while:" line of the issue forms here and in the
+     starter kit, the names of the inbox's two lines in `scripts/inbox.mjs`, and the step "15 November 2026, labels
+     and openers" of `scripts/steps.mjs`.
