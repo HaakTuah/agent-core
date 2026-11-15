@@ -1,10 +1,13 @@
 // The project's rule files, so the list stands in one place: those floor rule 3 names (`AGENTS.md`, `CLAUDE.md`,
-// `SECURITY.md` and the core manifest, where they exist), and those its SECURITY.md adds in rule 3 (its "the rule
+// `SECURITY.md`, the core manifest, `GEMINI.md`, and the entry files the starter kit writes for Kiro and Antigravity,
+// ENTRY_FILES, which entry-files.mjs beside this file reads, where they exist), and those its SECURITY.md adds in rule 3 (its "the rule
 // files:" line, ended by ";"). The copies and pointer checks (copies.mjs, pointers.mjs) read them. Run from the
 // project's root. Node's own modules only. `read` gives a file's text, or null where it is not there: by default the
 // work tree's, and the copies check passes one that reads the base's commit, to hold the base's list.
 import fs from "node:fs";
-const FLOOR = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"];
+// Each agent tool's entry file, as the starter kit writes it (modules/tools.md, "One door in").
+export const ENTRY_FILES = { claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" };
+const FLOOR = [...new Set(["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md", "GEMINI.md", ...Object.values(ENTRY_FILES)])];
 export function ruleFiles(read = f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null)) {
   const security = read("SECURITY.md");
   if (security === null) throw new Error('the project has no SECURITY.md yet, where the checks read its rule files. Mend: write it from the starter kit\'s template (core/setup/template/SECURITY.md.tmpl), its rule 3 with the line "**the rule files:** ...;"');

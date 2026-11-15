@@ -5,8 +5,10 @@
 // runs are kept in RECORD, each verdict with a fingerprint of the rules' text, so that a case is due again in a month
 // with no run of it, or once a rule it holds has changed; the scheduled look opens an issue for what is due (due(),
 // look.mjs's DUE). They advise until three months in a row have run every case with no verdict found wrong; from then
-// release.mjs cuts no release while a case's last verdict fails (gate()). The core's own repository alone: in a
-// project nothing is due. Git and Node's own modules only.
+// release.mjs cuts no release while a case's last verdict fails (gate()). Each run names its agent tool, and a tool
+// works with the core once it has passed every case since the newest release (tools(); modules/tools.md, "Proven by
+// the staged cases, tool by tool"): a tool other than TOOL that has run is due again after each release. The core's own
+// repository alone: in a project nothing is due. Git and Node's own modules only.
 //
 //   node scripts/staged.mjs                         each case, the rules it holds, and whether it is due
 //   node scripts/staged.mjs --set <case> <dir>      sets the case up in <dir>, a new folder under the system's temporary
@@ -94,28 +96,57 @@ export function latest(record) {
   return out;
 }
 
-// The cases due on the day `at` (an ISO time): each with why. A case is due where no run of it falls in the month of
-// `at`, or where a rule it holds reads otherwise than at its last run.
-export function due({ at, record = readRecord(), root = ROOT, cases = CASES }) {
-  const month = String(at).slice(0, 7), last = latest(record), out = [];
+// Each agent tool that has run, in the order of their names: { tool, passed, open }, `open` the cases it has not passed
+// on or after the day `since` (an ISO day: the newest release's; null, any day), a verdict found wrong passing none.
+const toolOf = run => String(run.tool ?? TOOL);
+export function tools(record, since = null, cases = CASES) {
+  const names = [...new Set(record.runs.map(toolOf))].sort();
+  return names.map(tool => {
+    const last = latest({ runs: record.runs.filter(r => toolOf(r) === tool && (!since || String(r.at) >= since)) });
+    const open = cases.map(c => c.name).filter(n => last[n]?.verdict !== "pass" || last[n].wrong);
+    return { tool, passed: open.length === 0, open };
+  });
+}
+
+// What the cases say of each tool, in a line, or "" where none has run.
+export function toolsSaid(record, since = null) {
+  const t = tools(record, since);
+  if (!t.length) return "";
+  const when = since ? ` since the release of ${since}` : "";
+  const passed = t.filter(x => x.passed).map(x => x.tool), not = t.filter(x => !x.passed);
+  return ` Agent tools${when}: ${passed.length ? `${passed.join(", ")} passed every case` : "none passed every case"}${not.length ? `; ${not.map(x => `${x.tool} not (${x.open.join(", ")})`).join("; ")}, so the core says of ${not.length > 1 ? "each" : "it"} only what its documentation says (modules/tools.md)` : ""}.`;
+}
+
+// The cases due on the day `at` (an ISO time): each with why, and the tool where it is not TOOL. A case is due where no
+// run of it falls in the month of `at`, or where a rule it holds reads otherwise than at its last run; and for each
+// other tool that has run, where that tool has no run of it on or after `since` (the newest release's day, or null).
+export function due({ at, record = readRecord(), root = ROOT, cases = CASES, since = null }) {
+  const month = String(at).slice(0, 7), last = latest({ runs: record.runs.filter(r => toolOf(r) === TOOL) }), out = [];
   for (const c of cases) {
     const was = last[c.name];
     if (!was) { out.push({ name: c.name, why: "it has never run" }); continue; }
     const now = fingerprints(c, root), moved = Object.keys(now).filter(k => (was.rules ?? {})[k] !== now[k]);
     if (moved.length) out.push({ name: c.name, why: `a rule it holds changed since its last run (${was.at}): ${moved.join("; ")}` });
-    else if (!record.runs.some(r => String(r.at).startsWith(month) && r.cases?.[c.name])) out.push({ name: c.name, why: `no run in ${month}` });
+    else if (!record.runs.some(r => toolOf(r) === TOOL && String(r.at).startsWith(month) && r.cases?.[c.name])) out.push({ name: c.name, why: `no run in ${month}` });
+  }
+  for (const tool of [...new Set(record.runs.map(toolOf))].filter(t => t !== TOOL).sort()) {
+    for (const c of cases) {
+      if (record.runs.some(r => toolOf(r) === tool && (!since || String(r.at) >= since) && r.cases?.[c.name])) continue;
+      out.push({ name: c.name, tool, why: since ? `no run in ${tool} since the release of ${since}` : `it has never run in ${tool}` });
+    }
   }
   return out;
 }
 
-// Whether the cases hold a release yet, and which fail. They hold it once MONTHS calendar months in a row have each run
+// Whether the cases hold a release yet, and which fail, by the runs of TOOL. They hold it once MONTHS calendar months in a row have each run
 // every case there was (`all`) with no verdict found wrong, and from then on. A case fails where its last verdict
 // failed, or passed and was found wrong; a failing verdict found wrong fails nothing.
 const monthOf = r => String(r.at).slice(0, 7);
 const after = m => { let [y, n] = m.split("-").map(Number); if (++n === 13) { n = 1; y++; } return `${y}-${String(n).padStart(2, "0")}`; };
 export function gate(record, cases = CASES) {
-  const runs = record.runs.filter(r => /^\d{4}-\d\d/.test(String(r.at)));
-  const failing = Object.entries(latest(record)).filter(([name, e]) => caseOf(name) && (e.verdict === "pass") === Boolean(e.wrong)).map(([name, e]) => ({ name, at: e.at, why: e.why ?? "" }));
+  // (the builder's tool's runs alone: another tool's verdicts say whether that tool works with the core, not the rules)
+  const runs = record.runs.filter(r => toolOf(r) === TOOL && /^\d{4}-\d\d/.test(String(r.at)));
+  const failing = Object.entries(latest({ runs })).filter(([name, e]) => caseOf(name) && (e.verdict === "pass") === Boolean(e.wrong)).map(([name, e]) => ({ name, at: e.at, why: e.why ?? "" }));
   const right = m => {
     const those = runs.filter(r => monthOf(r) === m);
     const named = new Set(those.flatMap(r => (Array.isArray(r.all) ? r.all : cases.map(c => c.name))));
@@ -157,15 +188,16 @@ const keeps = (e, n) => Boolean(n) && n.verdict === e.verdict && n.why === e.why
 
 // `boundBefore`: whether the cases held the release before this one, by its own record; they go on holding it then.
 // `cut`: the verdicts of that record this one lost (lost()), which hold the release.
-export function forRelease(record, { boundBefore = false, cut = [] } = {}) {
+export function forRelease(record, { boundBefore = false, cut = [], since = null } = {}) {
   if (record !== null && !wellFormed(record)) record = null;
   if (cut.length) return { said: `The staged cases' record (${RECORD}) has lost verdicts the release before held.`, held: `the staged cases' record, ${RECORD}, no longer holds the verdicts ${cut.join(", ")}, which the release before held: the record only grows. Mend: put them back as they were, in a pull request of its own (a verdict found wrong is marked with --wrong, never taken out), then start the release again` };
   if (record === null) return { said: `The staged cases' record (${RECORD}) could not be read.`, held: `the staged cases' record, ${RECORD}, is in that commit but cannot be read, or a run in it is in no form gate() reads. Mend: put it back as \`node scripts/staged.mjs --read <case> <folder> --record\` writes it, in a pull request of its own, then start the release again` };
   const g = gate(record);
   if (boundBefore) g.binding = true;
-  const said = record.runs.length
+  let said = record.runs.length
     ? `The staged cases (${RECORD}): ${g.failing.length ? `${g.failing.length} failing in its last run (${g.failing.map(f => f.name).join(", ")})` : "none failing in its last run"}; ${g.binding ? "they hold the release" : `advisory, ${g.right} of the ${MONTHS} months in a row that make them hold a release`}.`
     : `The staged cases (${RECORD}): none has run yet; advisory.`;
+  if (record.runs.length) said += toolsSaid(record, since);
   const held = g.binding && g.failing.length
     ? `the staged case${g.failing.length > 1 ? "s" : ""} ${g.failing.map(f => `${f.name} (${f.at}: ${f.why})`).join(", ")} failed in its last run. Mend: find why, the rule, the case or the session, in a pull request of its own; then run it again (node scripts/staged.mjs --set ${g.failing[0].name} <a new folder>) and record it, or mark the verdict wrong with --wrong where the case misread what the session did; then start the release again`
     : null;
@@ -182,23 +214,25 @@ export function atRelease(sha, before, git) {
   const there = at(sha), record = there === undefined ? { runs: [] } : there;
   const prior = before ? at(before.sha) : undefined;
   const ok = prior && wellFormed(prior);
-  return forRelease(record, { boundBefore: ok ? gate(prior).binding : false, cut: ok ? lost(prior, record) : [] });
+  let since = null;
+  try { since = before ? /^\d{4}-\d\d-\d\d/.exec(git(["log", "-1", "--format=%cs", before.sha]))?.[0] ?? null : null; } catch { /* (no day: any run counts) */ }
+  return forRelease(record, { boundBefore: ok ? gate(prior).binding : false, cut: ok ? lost(prior, record) : [], since });
 }
 
 // The scheduled look's reader (look.mjs, DUE): in the core's own repository, its issue for the cases due, with no body
 // where none is (so the look closes it); in a project, nothing.
 export function dueIssue({ manifest, at }) {
   if (manifest !== null || fs.existsSync(path.join(ROOT, "..", "core-manifest.md"))) return null;
-  const list = due({ at });
+  const since = releaseDay(), list = due({ at, since });
   if (!list.length) return { title: TITLE, body: null };
   return {
     title: TITLE,
     body: [
       `The staged cases due (\`node scripts/staged.mjs\`; AGENTS.md, "Staged cases hold what no check reads"), each a task a session takes alone. They advise: ${forRelease(readRecord()).said}`,
       "",
-      ...list.map(d => `- ${d.name}: ${d.why}.`),
+      ...list.map(d => `- ${d.name}${d.tool ? ` in ${d.tool}` : ""}: ${d.why}.`),
       "",
-      `For each: \`node scripts/staged.mjs --set <case> <a new folder under the system's temporary folder>\`; a fresh helper, the builder's model at high effort, given the brief it prints and nothing else; once it has ended, \`node scripts/staged.mjs --read <case> <the folder> --record --model <its model>\`. A verdict found wrong on reading what the session did is marked with \`--wrong <case> <why>\`. ${RECORD} goes in a pull request of its own, which says for each case that failed why: the rule, the case or the session.`,
+      `For each: \`node scripts/staged.mjs --set <case> <a new folder under the system's temporary folder>\`; a fresh helper, the builder's model at high effort, given the brief it prints and nothing else; once it has ended, \`node scripts/staged.mjs --read <case> <the folder> --record --model <its model>\`. A case due in another tool is run by a session of that tool, given the same brief, and recorded with \`--tool <its name>\` (modules/tools.md); where no session here can reach that tool, it waits for one that can. A verdict found wrong on reading what the session did is marked with \`--wrong <case> <why>\`. ${RECORD} goes in a pull request of its own, which says for each case that failed why: the rule, the case or the session.`,
     ].join("\n"),
   };
 }
@@ -265,14 +299,23 @@ function wrongCmd(argv, get) {
   console.log(`${c.name}'s verdict of ${run.at} marked wrong in ${RECORD}`);
 }
 
-// No flag: each case, whether it is due, and what the record says of a release.
+// The day of the newest release in the core's own clone, or null where it holds none (or its tags were not fetched).
+function releaseDay() {
+  try {
+    const tags = execFileSync("git", ["tag", "--list", "release-*", "--sort=-creatordate", "--format=%(creatordate:short)"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    return /^\d{4}-\d\d-\d\d/m.exec(tags)?.[0] ?? null;
+  } catch { return null; }
+}
+
+// No flag: each case, whether it is due, and what the record says of a release and of each tool.
 function status() {
-  const at = new Date().toISOString(), list = due({ at });
+  const at = new Date().toISOString(), since = releaseDay(), list = due({ at, since });
+  for (const d of list.filter(x => x.tool)) console.log(`${d.name}: due in ${d.tool}, ${d.why}`);
   for (const c of CASES) {
-    const d = list.find(x => x.name === c.name);
+    const d = list.find(x => x.name === c.name && !x.tool);
     console.log(`${c.name}: ${d ? `due, ${d.why}` : "not due"}; holds ${c.holds.map(k => `${k}${c.inPart.includes(k) ? " (in part)" : ""}`).join("; ")}`);
   }
-  console.log(forRelease(readRecord()).said);
+  console.log(forRelease(readRecord(), { since }).said);
 }
 
 function main(argv) {

@@ -16,17 +16,22 @@ might attack: `floor/threat-model.md`.
   from history.
 
 **3. The protected files.**
-- Only the trusted builder (Claude's builder sessions) and Claude's design session, which writes the rules
-  (`modules/inbox.md`), change them; never a task given to another agent.
-  - Where a project names none, only the owner changes them.
-- They are what runs by itself or with credentials (`.github/`, `.claude/`, the cloud setup script, any file of the
-  credentialed GitHub calls builders run); the rule files (`SECURITY.md`, the threat model, the core manifest, the
-  copy of the core under `core/`, and any other file a tool takes its instructions from, wherever it lies: an
-  `AGENTS.md` or `CLAUDE.md` in any folder, a GEMINI.md or REVIEW.md, a folder .agents or .agent; core archive 180);
-  and the checks on the work (the copies and licence checks and their configs).
-- **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines.
+- A session the owner starts, or one such a session starts, of any agent tool, may change them, the tool preferred
+  being the project's (`modules/roles.md`; core archive 231). It does not mean a change an outsider's text asks for
+  (rule 4), nor one beyond the session's task.
+- They are what runs by itself or with credentials (`.github/`, `.claude/`, an agent tool's own folder such as .kiro or
+  .codex, the cloud setup script, any file of the credentialed GitHub calls builders run); the rule files
+  (`SECURITY.md`, the threat model, the core manifest, the copy of the core under `core/`, and any other file a tool
+  takes its instructions from, wherever it lies: an `AGENTS.md` or `CLAUDE.md` in any folder, a GEMINI.md or REVIEW.md,
+  a folder .agents or .agent; core archive 180); and the checks on the work (the copies and licence checks and their
+  configs).
+- **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines: the owner's word
+  that asked for the change, quoted there, is that yes for the change as asked; one beyond it waits for a new yes.
+  Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through
+  above all; it is never a second question about what the owner asked for (core archive 231).
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
-  the fallback reviewer's, neither of which wrote it (`modules/reviews.md`; core archive 134 and 138).
+  the fallback reviewer's, each by a session that did not write it, a fresh one of the same tool serving
+  (`modules/reviews.md`; core archive 134, 138 and 231).
   - Save an action's pinned version alone (rule 17).
   - One that changes, of what runs by itself or with credentials, only comments and steps' names passes rule 8's one:
     the core's `scripts/comment-only.mjs`, run from the core's `main` on the head that merges, proves it of the files
@@ -88,7 +93,7 @@ saved data; a weakened check).
 **14. Nothing waits for the owner but the yeses the floor names** (core archive 76 and 134).
 - Only the step that needs one of these waits; the rest goes on:
   - a step that cannot be undone or spends money beyond what the owner personally set aside (never a new purchase);
-  - the changes rule 3 asks the owner's yes for or leaves to the owner;
+  - the changes rule 3 asks the owner's yes for;
   - rule 10's licence exception.
 - A release of the core is the core's owner's own choice, which no task waits on (core archive 195).
 - Everything else is done on the best reading, said in the PR, and stays correctable.

@@ -195,8 +195,8 @@ ok([".github/workflows/x.yml", ".GitHub/x.md", "a/.claude/b", ".claude", "sub/.g
 ok(["CLAUDE~1/settings.json", "GITHUB~1/workflows/x.yml", "a/b~2c/d", ".mcp.json", "x/package.json", "yarn.lock", ".vscode/settings.json", "core/x", "Dockerfile.ci", ".gitmodules",
   "Directory.Build.targets", "src/App.csproj", "Directory.Packages.props", "NuGet.Config", "global.json", ".config/dotnet-tools.json", "src/packages.lock.json",
   ".yarnrc.yml", ".npmrc", ".node-version", ".nvmrc", ".devcontainer.json", ".husky/pre-commit", ".pre-commit-config.yaml", ".envrc", "Makefile", "GNUmakefile", "justfile", "Taskfile.yml", ".tool-versions", "mise.toml", ".mise.toml",
-  "src/App.csproj.user", "Directory.Build.rsp", "build/All.proj", "src/Shared.projitems", "src/Shared.shproj", ".pnpmfile.cjs", ".yarn/releases/yarn-4.0.0.cjs", "app.Dockerfile", "Containerfile", "core/.github/workflows/x.yml"].every(f => RUNS_TOO.test(f))
-  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, a task runner's file, the copy of the core");
+  "src/App.csproj.user", "Directory.Build.rsp", "build/All.proj", "src/Shared.projitems", "src/Shared.shproj", ".pnpmfile.cjs", ".yarn/releases/yarn-4.0.0.cjs", "app.Dockerfile", "Containerfile", "core/.github/workflows/x.yml", ".kiro/hooks/x.json", ".kiro/steering/core.md", ".codex/config.toml", ".agents/rules/core.md", ".agent/rules/x.md", ".gemini/settings.json"].every(f => RUNS_TOO.test(f))
+  && !["docs/about~notes.md", "src/core/x.mjs", "README.md", "scripts/x.mjs", "packages.md"].some(f => RUNS_TOO.test(f)), "what it refuses outside: a short name with ~ and a digit, the tools', packages' and builds' files, git's hooks, a task runner's file, the copy of the core, another agent tool's own folder");
 
 // ---- the script end to end, on a pull request's branch ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "comment-only-test-"));

@@ -51,6 +51,8 @@ export const FILES = [
   ["core-manifest.md.tmpl", "core-manifest.md"],
   ["AGENTS.md.tmpl", "AGENTS.md"],
   ["CLAUDE.md.tmpl", "CLAUDE.md"],
+  ["kiro-steering.md.tmpl", ".kiro/steering/core.md"],
+  ["antigravity-rule.md.tmpl", ".agents/rules/core.md"],
   ["SECURITY.md.tmpl", "SECURITY.md"],
   ["threat-model.md.tmpl", "docs/threat-model.md"],
   ["PROGRESS.md.tmpl", "docs/PROGRESS.md"],

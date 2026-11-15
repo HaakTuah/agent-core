@@ -35,13 +35,15 @@ const YAML = /\.ya?ml$/iu;
 // the two characters YAML refuses in a file (U+FFFE and U+FFFF), which would stop the whole file being read
 const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff\ufffe\uffff]/u;
 const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scalar's header, with its comment if any
-// what else runs by itself or decides what does, refused outright: Claude Code's servers; an editor's, a container's or
-// a shell's setup and git's hooks; npm's, pnpm's, yarn's and .NET's packages, tools, configs, hooks and builds (MSBuild
-// runs a project's targets, and reads by itself a project's .user file and a folder's Directory.Build.rsp) and the
-// Node or SDK they pick; a task runner's file; the copy of the core; git's own attributes and submodules; a
-// container's build; and a name with "~" and a digit, which Windows can read as another folder's short name (CLAUDE~1
-// for .claude). It is asked first: a file of the copy of the core is refused even where it is one this proof reads.
-export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|(?:[^/]*\.)?(?:Dockerfile|Containerfile)[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:(?:cs|fs|vb)?proj(?:\.user)?|projitems|shproj|props|targets)|Directory\.Build\.rsp|\.pnpmfile\.cjs)$|(?:^|\/)\.(?:vscode|devcontainer|husky|yarn\/releases)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
+// what else runs by itself or decides what does, refused outright: Claude Code's servers; another agent tool's own
+// folder (Kiro's, Codex's, Antigravity's, Gemini's: their hooks, settings and rules; core archive 231); an editor's, a
+// container's or a shell's setup and git's hooks; npm's, pnpm's, yarn's and .NET's packages, tools, configs, hooks and
+// builds (MSBuild runs a project's targets, and reads by itself a project's .user file and a folder's
+// Directory.Build.rsp) and the Node or SDK they pick; a task runner's file; the copy of the core; git's own attributes
+// and submodules; a container's build; and a name with "~" and a digit, which Windows can read as another folder's
+// short name (CLAUDE~1 for .claude). It is asked first: a file of the copy of the core is refused even where it is one
+// this proof reads.
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|(?:[^/]*\.)?(?:Dockerfile|Containerfile)[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:(?:cs|fs|vb)?proj(?:\.user)?|projitems|shproj|props|targets)|Directory\.Build\.rsp|\.pnpmfile\.cjs)$|(?:^|\/)\.(?:vscode|devcontainer|husky|yarn\/releases|kiro|codex|agents?|gemini)\/|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
 const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|lgtm|nosonar|ggignore|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string

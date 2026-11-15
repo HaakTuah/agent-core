@@ -219,6 +219,12 @@ jobs:
       - name: The core's own AGENTS.md fills each slot its modules use
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/manifest-reads.mjs --core
+      - name: The entry-files check
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/entry-files-test.mjs
+      - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/entry-files.mjs --core
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/workflows.mjs

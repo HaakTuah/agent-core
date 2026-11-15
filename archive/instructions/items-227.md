@@ -125,3 +125,67 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `modules/reviews.md`, the general forms that `modules/game-design.md` points to in "Readable by every player" and
      "No rule untaught", `scripts/screens.mjs`, and the slots *direction*, *screen sizes*, *accessibility floor*,
      *desktop platforms* and *screen checks*.
+
+231. **14 and 15 November 2026** (the core; in chats with a session the owner had asked to look through the core and
+     with sessions the owner works with, not the design session, as those sessions recorded them on issue #249,
+     labelled `by:chat`, its note "What this issue asks to be built, in one place" gathering what the owner agreed
+     to). Asking for an audit of the core with Kiro:
+
+     > Will agent-core work perfectly with kiro? Audit! I want to see if i can use this core in future work projects
+     > also.
+
+     Shown the audit:
+
+     > Our agent-core should slot in with anything, ideally. These are all areas for improvement. What about when […]
+     > runs out of claude usage, and uses antigravity instead? Everything must still work. Or if someone only uses
+     > codex.
+
+     The owner agreed to the session's six points: one door in, `AGENTS.md`, with each tool's small entry file written
+     from one list and held to it by a check; roles by what they do, not by whose tool; hooks save time and checks are
+     the guarantee, no rule held by a hook alone; a short part for each tool, its own folders protected by name; a
+     change of tool loses nothing, the state being in the repository; and a tool proven by the staged cases, tool by
+     tool, run again at each release, the core saying of it only what its documentation says until it has passed.
+     The session had proposed to keep fixed that nobody reviews their own work, and that the owner names who may
+     change the protected files:
+
+     > That locks out anyone who only has one tool at their disposal, which can still use other sessions to review it.
+
+     > And locking out i see little point in, so both of those become preferences now also.
+
+     So tools are preferences: one table of roles, the tool preferred for each and what takes it when that tool is not
+     at hand, in each project's manifest with the core's default beside it, the default preferring Claude for the
+     orchestrator, the sync and design; a preference orders and never refuses; the session that reviews a change is
+     not the one that wrote it, a fresh session of the same tool serving; and a session the owner starts, of any tool,
+     may change the protected files, guarded by what names no tool. Of why the floor asks the owner's yes:
+
+     > that rule was to prevent sessions going rogue and taking too big a mandate, not when they implement what i ask.
+     > So they shouldn't change the floor just to accommodate some other task, was the thinking.
+
+     Agreed besides: what stands in when something outside the repository cannot be reached (issues, labels, the
+     scheduled job, a review app, statuses), each named or skipped and reported, none stopping a project. Of the line
+     "Nothing stops to save usage", told it said the opposite of a pace the owner had set:
+
+     > Seems a bit strict? […] Maybe also more sensible to say the default is not to stop up to save usage, but that
+     > any preference given in repo or chat overrules this?
+
+     And of how a builder is picked:
+
+     > If I have herdr, but uses gpt there for the orchestrator, then it is the foundation and the one I want to
+     > conserve the longest, so it should be another provider than the orchestrator, or? Because even though I think
+     > if you have claude, you should always save it for the most important tasks, the orchestrator is what keeps an
+     > operation going?
+
+     The owner agreed to the pace as the owner's (the default: no session slows or stops to save usage by its own
+     choice; a pace said in person holds for now, one written in the manifest stands), to the two things saved (the
+     orchestrator's provider, which keeps the work going, and the strongest model, for the work that takes judgement),
+     and to the order a builder is picked in. To the orchestrator, passed on word for word to the builder of this
+     rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind floor rule 3 as it reads who may change the protected files, its tools' folders, the reason for the owner's
+     yes and its reviews by a session that did not write the change; `modules/roles.md`; "The pace is the owner's" in
+     `modules/orchestrating.md`; `modules/tools.md`, `modules/kiro.md`, `modules/antigravity.md` and Codex's part as a
+     project's own agent; the slots *tools* and *pace*; `scripts/entry-files.mjs`; and what stands in when GitHub's own
+     parts cannot be reached, in `modules/github-calls.md`.
