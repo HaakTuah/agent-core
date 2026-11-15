@@ -1,6 +1,6 @@
 // The starter kit (README.md, "How a project takes the core"; setup/starter-kit.md): run from a clone of the core, in
 // the root of a project that has none of these files yet, it writes what the project needs before its first task (the
-// manifest, the rule files, the hooks' settings, the configs of the copies, reading-size and licence checks, the issue
+// manifest, the rule files, the hooks' settings, the configs of the copies, shape, reading-size and licence checks, the issue
 // forms, the choice records, Dependabot's config and its calls to the core's workflows, each pinned to the commit the
 // manifest pins) and makes the first copy of the core under core/. The templates and the copy are both read from the
 // commit the manifest pins, never from the clone's working folder, so what it writes is what was reviewed. It never
@@ -56,6 +56,7 @@ export const FILES = [
   ["choices.md.tmpl", "docs/choices.md"],
   ["claude-settings.json.tmpl", ".claude/settings.json"],
   ["copies.json.tmpl", "checks/copies.json"],
+  ["shape.json.tmpl", "checks/shape.json"],
   ["licences-audit.json.tmpl", "checks/licences-audit.json"],
   ["dependabot.yml.tmpl", ".github/dependabot.yml"],
   ["issue-bug.md.tmpl", ".github/ISSUE_TEMPLATE/bug_report.md"],
@@ -73,7 +74,7 @@ export const FILES = [
   ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined],
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
-const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "core"];
+const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
 // The files every session reads at its start, as the AGENTS.md template imports them: the reading-size check's marks,
 // and of the core's own (those under core/) what the core's cap counts (size.mjs).
 export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/modules/how-to-work.md",
@@ -191,6 +192,15 @@ export function licences(o, has) {
   return { lockfiles: [at("package-lock.json")].filter(has), ...config, ignoreScriptsIn: [at(".npmrc")].filter(has) };
 }
 
+// The first baselines of the copies check and the shape check: what stands today, which each reads from the files git
+// knows of, so the kit's own are added first.
+function firstBaselines(here) {
+  for (const check of ["copies", "shape"]) {
+    execFileSync(process.execPath, [`core/scripts/${check}.mjs`, `checks/${check}.json`, "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
+    git(["add", "--", `checks/${check}-baseline.json`], here, guarded());
+  }
+}
+
 function init(argv) {
   const o = options(argv);
   const here = process.cwd();
@@ -233,16 +243,14 @@ function init(argv) {
   const marks = sizes(Object.fromEntries(READ.map(f => [f, sizeOf(path.join(here, f))])));
   write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
   write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
-  // the copies check's first baseline: the copies that stand today (it reads the files git knows of)
-  const made = [...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"];
-  git(["add", "--", ...made], here, guarded());
-  execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
-  git(["add", "--", "checks/copies-baseline.json"], here, guarded());
+  git(["add", "--", ...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"], here, guarded());
+  firstBaselines(here);
 
-  console.log(`The starter kit is written: ${out.length + 3} files (the last three checks/sizes.json, checks/licences.json and checks/copies-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
+  console.log(`The starter kit is written: ${out.length + 4} files (the last four checks/sizes.json, checks/licences.json, checks/copies-baseline.json and checks/shape-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
+  console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/modules/code-shape.md)`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");
   console.log("  where it has versions Dependabot cannot see, its versions check: the core's README, point 5");
   console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/modules/inbox.md)");
