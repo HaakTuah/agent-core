@@ -72,6 +72,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    sessions either, its merger runs `scripts/pure-sync.mjs` from a checkout of the release the sync moves to, itself a
    commit of `main` (floor rule 8; a sync to a commit that is no release is no pure sync, and any check of it is run
    from the core's `main`), and its first copy is made from a clone at a release.
+   A copy older than release-1 holds a sync script that knows no release and, run with no SHA, takes the core's
+   newest `main`: such a project syncs once with the release's full SHA (`node core/scripts/sync.mjs <its SHA>`), which
+   the core's owner names when handing the release on and `scripts/release.mjs` prints with each release, and from then
+   on its new script takes the releases by itself (#365).
 
    **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 227). By
    default every release past a project's pin is synced. Where the pin is the release just before the newest and nothing
