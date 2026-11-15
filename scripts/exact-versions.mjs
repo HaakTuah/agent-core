@@ -24,7 +24,7 @@ const own = (key) => key === "" || !`/${key}/`.includes("/node_modules/");
 // a larger one as a tag, past what a number can hold), and not ending as a packed file's name does (npm reads that as
 // a file). What is left was compared with npm's own reader on made-up texts, as the pull request that brought it says.
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/u;
-const exact = (text) => {
+export const exact = (text) => {
   if (typeof text !== "string" || text.length > 256) return false;
   const parts = SEMVER.exec(text);
   return parts !== null && parts.slice(1, 4).every((number) => number.length <= 15) && !/\.(?:tgz|tar.gz|tar)$/iu.test(text); // (npm's own pattern, any one letter between "tar" and "gz")

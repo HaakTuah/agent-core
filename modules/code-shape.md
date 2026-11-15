@@ -1,6 +1,6 @@
 # How code is put together
 
-Read when a system is designed, added or named, and when code is ported or rewritten (core archive 225). How what
+Read when a system is designed, added or named, and when code is ported or rewritten (core archive 226). How what
 already stands is brought to it: `modules/cleaning.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names

@@ -1,4 +1,4 @@
-// The shape check (modules/code-shape.md; core archive 225; #246), for every project that takes the core: how its code
+// The shape check (modules/code-shape.md; core archive 226; #246), for every project that takes the core: how its code
 // is put together may not get worse. It reads the project's JavaScript and TypeScript with the reader of the measures
 // (code-shape.mjs, beside this file) and fails what is new of:
 //   - a function past a mark ("marks": its lines, how deep its blocks nest, how often it branches), tests left out;

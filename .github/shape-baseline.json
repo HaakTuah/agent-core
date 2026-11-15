@@ -5,6 +5,16 @@
     "read": 1084
   },
   "listed": {
+    "function: scripts/agent-tools.mjs#configured": {
+      "lines": 41,
+      "depth": 5,
+      "branches": 23
+    },
+    "function: scripts/agent-tools.mjs#run": {
+      "lines": 40,
+      "depth": 2,
+      "branches": 22
+    },
     "function: scripts/code-review-wait.mjs#judgeWith": {
       "lines": 24,
       "depth": 1,
@@ -171,7 +181,7 @@
       "branches": 100
     },
     "function: scripts/licences.mjs#loadConfig": {
-      "lines": 41,
+      "lines": 42,
       "depth": 2,
       "branches": 45
     },

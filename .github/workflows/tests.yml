@@ -68,6 +68,9 @@ jobs:
       - name: The exact-versions check
         if: ${{ !cancelled() }}
         run: node scripts/exact-versions-test.mjs
+      - name: The agent-tools check
+        if: ${{ !cancelled() }}
+        run: node scripts/agent-tools-test.mjs
       - name: The helper hook
         if: ${{ !cancelled() }}
         run: node scripts/helper-call-test.mjs
@@ -197,6 +200,9 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: Every tool the core's own agents load is listed (floor topic 15)
+        if: ${{ !cancelled() }}
+        run: node scripts/agent-tools.mjs .github/licences.json --core
       - name: The suites kept to their time mark
         run: node scripts/shape.mjs .github/shape.json --suite suites --since "$SUITES_START"
 

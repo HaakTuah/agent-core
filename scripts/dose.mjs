@@ -1,4 +1,4 @@
-// The dose (modules/cleaning.md, "The state of a codebase sets the dose"; core archive 225; #246): the state a
+// The dose (modules/cleaning.md, "The state of a codebase sets the dose"; core archive 226; #246): the state a
 // codebase is in, read from the shape check's baseline (shape.mjs, beside this file), and what that state makes due.
 // The state is the share of what the check reads, its functions and its imports, that the baseline lists: in debt
 // past DEBT, in standard at STANDARD or under, paying down between; a project's owner may name it instead, in one

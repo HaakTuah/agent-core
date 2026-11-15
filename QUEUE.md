@@ -42,7 +42,6 @@ wanted").
 | #310 | rule builder | #246, #256 and #285 |
 | #311 | rule builder | #286 |
 | #325 | rule builder | #256, #305, #311 and #322 |
-| #312 | rule builder | |
 | #313 | rule builder | #312 |
 | #314 | rule builder | #313 and #304 |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |

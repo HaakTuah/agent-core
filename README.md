@@ -107,7 +107,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      of its own (the *copies check*; the licence check's with its audit of what no lockfile holds, which
      `licence-scan.mjs` holds whole, every action, fetched package, asset and copied-in code it uses, and each entry
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
-     dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7). A package or
+     dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; and
+     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
+     the config's "agentTools" does not list, with its publisher and version: floor topic 15). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
@@ -222,7 +224,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
-     what no package list holds and `core/scripts/exact-versions.mjs` for its lockfiles, and its own check holds its
+     what no package list holds, `core/scripts/exact-versions.mjs` for its lockfiles and `core/scripts/agent-tools.mjs`
+     for its agents' tools, and its own check holds its
      packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
      over them: floor rule 14), so each runs only where a change can affect it, and the core is synced once a day at

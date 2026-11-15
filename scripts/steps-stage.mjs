@@ -19,6 +19,17 @@ const PIN = "0".repeat(40);
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
 export const STAGES = {
+  "16 November 2026, an agent's own tools listed": {
+    // (a plug-in turned on and listed nowhere; the mend lists it, with its publisher and one exact version)
+    stage: dir => {
+      const file = ".claude/settings.json", settings = fs.existsSync(at(dir, file)) ? JSON.parse(read(dir, file)) : {};
+      write(dir, file, `${JSON.stringify({ ...settings, enabledPlugins: { ...settings.enabledPlugins, "staged@example-market": true } }, null, 2)}\n`);
+    },
+    mend: dir => {
+      const config = JSON.parse(read(dir, "checks/licences.json"));
+      write(dir, "checks/licences.json", `${JSON.stringify({ ...config, agentTools: [...(config.agentTools ?? []), { kind: "plugin", name: "staged@example-market", publisher: "Example Tools", version: "1.0.0" }] }, null, 2)}\n`);
+    },
+  },
   "12 November 2026, builders named by role": {
     stage: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(SLOTS, "$1| *Codex's checks* | the project's own tests |\n")),
     mend: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^\| \*Codex's checks\* \|.*\r?\n/m, "")),
@@ -42,7 +53,7 @@ export const STAGES = {
       if (!fs.existsSync(at(dir, "package-lock.json"))) write(dir, "stage-npm/package-lock.json", "{}\n");
       const core = at(dir, ".github/workflows/licences.yml");
       if (fs.existsSync(core)) { write(dir, ".stage-licences/licences.yml", fs.readFileSync(core, "utf8")); fs.rmSync(core); }
-      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n");
+      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n");
     },
     mend: dir => {
       write(dir, ".github/workflows/licences-own.yml", `${read(dir, ".github/workflows/licences-own.yml")}      - run: node core/scripts/exact-versions.mjs checks/licences.json\n`);
