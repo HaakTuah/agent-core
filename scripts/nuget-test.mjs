@@ -15,8 +15,8 @@ import { mended, unmended } from "./mend.mjs";
 // (each failure the check gives in this test, read as it prints it, for its mend; the last assertion says which did not
 // say one)
 const unsaid = [];
-const read = text => { unsaid.push(...unmended(text)); return text; };
-const check = (...args) => { const result = checked(...args); read(result.failures.map(f => `FAIL: ${f}`).join("\n")); return result; };
+const heard = text => { unsaid.push(...unmended(text)); return text; };
+const check = (...args) => { const result = checked(...args); heard(result.failures.map(f => `FAIL: ${f}`).join("\n")); return result; };
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -370,7 +370,7 @@ inRepo("checks/audit.json", JSON.stringify({ entries: [] }));
 inRepo("checks/licences.json", JSON.stringify({ ships: [], audit: "checks/audit.json", nuget: { ships: [L] } }));
 const git = (...args) => spawnSync("git", args, { cwd: repo, env, encoding: "utf8" });
 git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "a project");
-const run = (...args) => { const r = spawnSync(process.execPath, [path.join(repo, "core/scripts/nuget.mjs"), ...args], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: read(r.stdout + r.stderr), stdout: r.stdout }; };
+const run = (...args) => { const r = spawnSync(process.execPath, [path.join(repo, "core/scripts/nuget.mjs"), ...args], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: heard(r.stdout + r.stderr), stdout: r.stdout }; };
 const left = restore("Copy.Left@4.0.0"), json = restore("Newtonsoft.Json@13.0.3");
 const strict = run("checks/licences.json", "--packages", left), advisory = run("checks/licences.json", "--packages", left, "--advisory");
 ok(strict.status === 1 && /^FAIL: Copy\.Left@4\.0\.0/m.test(strict.out) && mended(strict.out) && /1 failing/.test(strict.out), "run in a project, it fails where a package is off its list, saying its mend", strict.out);
