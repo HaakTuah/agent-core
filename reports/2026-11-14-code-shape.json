@@ -1,0 +1,1239 @@
+{
+  "files": {
+    "code": 76,
+    "other": {}
+  },
+  "imports": {
+    "total": 353,
+    "crossingAFolder": 0,
+    "intoTheRepository": 110,
+    "external": {
+      "node:fs": 59,
+      "node:child_process": 51,
+      "node:path": 49,
+      "node:url": 39,
+      "node:os": 35,
+      "node:crypto": 5,
+      "node:zlib": 2,
+      "node:module": 1,
+      "spdx-expression-parse": 1,
+      "@xmldom/xmldom": 1
+    },
+    "unresolved": [],
+    "foldersBothWays": []
+  },
+  "cycles": {
+    "files": [],
+    "folders": [],
+    "filesWithTypes": []
+  },
+  "hubs": [
+    {
+      "file": "scripts/started.mjs",
+      "importedBy": 20,
+      "names": [
+        "started"
+      ]
+    },
+    {
+      "file": "scripts/core-address.mjs",
+      "importedBy": 18,
+      "names": [
+        "CORE",
+        "CORE_SOURCE",
+        "OWNER"
+      ]
+    },
+    {
+      "file": "scripts/releases.mjs",
+      "importedBy": 8,
+      "names": [
+        "NOTES",
+        "RELEASE",
+        "asksBetween",
+        "elsewhere",
+        "fetchCore",
+        "followsOf",
+        "inBare",
+        "namedReleases",
+        "newestRelease",
+        "ownerOf",
+        "past",
+        "plainEnv",
+        "releasesIn"
+      ]
+    },
+    {
+      "file": "scripts/licences.mjs",
+      "importedBy": 6,
+      "names": [
+        "MOVED_OFF",
+        "actionLists",
+        "baseOf",
+        "check",
+        "configAt",
+        "licenceOk",
+        "loadConfig",
+        "lockInstalled",
+        "lockPathOk",
+        "lockRead",
+        "movedOff",
+        "policy",
+        "registryName",
+        "registryOverrides",
+        "registryVersion",
+        "scriptsOff",
+        "textAt",
+        "workspacesIn"
+      ]
+    },
+    {
+      "file": "scripts/workflow-run.mjs",
+      "importedBy": 5,
+      "names": [
+        "evaluate",
+        "parseYaml",
+        "runWorkflow"
+      ]
+    },
+    {
+      "file": "scripts/file-size.mjs",
+      "importedBy": 4,
+      "names": [
+        "counted",
+        "sizeOf"
+      ]
+    },
+    {
+      "file": "scripts/licence-yes.mjs",
+      "importedBy": 4,
+      "names": [
+        "acceptedList",
+        "readable",
+        "yesFaults"
+      ]
+    },
+    {
+      "file": "scripts/nuget.mjs",
+      "importedBy": 4,
+      "names": [
+        "REGISTRY",
+        "check",
+        "heldBefore",
+        "lockPackages",
+        "manifestLicence",
+        "nugetConfig",
+        "projectFiles",
+        "sourcesOf",
+        "twoHashes",
+        "unmarked"
+      ]
+    },
+    {
+      "file": "scripts/scratch-core.mjs",
+      "importedBy": 4,
+      "names": [
+        "checkoutStandIn",
+        "scratch",
+        "scratchEnv"
+      ]
+    },
+    {
+      "file": "scripts/copy-tree.mjs",
+      "importedBy": 3,
+      "names": [
+        "copyTree",
+        "coreIsFolder",
+        "entries"
+      ]
+    },
+    {
+      "file": "scripts/core-cost.mjs",
+      "importedBy": 3,
+      "names": [
+        "REPO",
+        "classify",
+        "dayOf",
+        "defaultRef",
+        "median",
+        "priced",
+        "print",
+        "reading",
+        "readings",
+        "sessionOf",
+        "table",
+        "weekOf"
+      ]
+    },
+    {
+      "file": "scripts/rule-files.mjs",
+      "importedBy": 3,
+      "names": [
+        "ruleFiles"
+      ]
+    },
+    {
+      "file": "scripts/security-review.mjs",
+      "importedBy": 3,
+      "names": [
+        "CONTEXT",
+        "UNREAD",
+        "WRITERS",
+        "codexState",
+        "judge",
+        "status"
+      ]
+    },
+    {
+      "file": "scripts/helper-call.mjs",
+      "importedBy": 2,
+      "names": [
+        "COMMAND",
+        "defines",
+        "firstTry",
+        "refusal"
+      ]
+    },
+    {
+      "file": "scripts/init.mjs",
+      "importedBy": 2,
+      "names": [
+        "FILES",
+        "READ",
+        "TEMPLATES",
+        "files",
+        "fill",
+        "filtered",
+        "licences",
+        "linked",
+        "modules",
+        "named",
+        "options",
+        "sizes"
+      ]
+    },
+    {
+      "file": "scripts/licence-scan-stage.mjs",
+      "importedBy": 2,
+      "names": [
+        "LOCK",
+        "append",
+        "done",
+        "entry",
+        "handAudited",
+        "json",
+        "ok",
+        "run",
+        "write"
+      ]
+    },
+    {
+      "file": "scripts/nuget-fetch.mjs",
+      "importedBy": 2,
+      "names": [
+        "cut",
+        "fetchAll",
+        "fileAddress",
+        "named",
+        "nuspecOf",
+        "toolsOf"
+      ]
+    },
+    {
+      "file": "scripts/session-cost.mjs",
+      "importedBy": 2,
+      "names": [
+        "cost",
+        "keep",
+        "keptIn",
+        "line",
+        "records",
+        "tallyOf"
+      ]
+    }
+  ],
+  "globals": {
+    "scripts": 0,
+    "names": 0,
+    "inMoreThanOne": []
+  },
+  "functions": {
+    "count": 551,
+    "lines": {
+      "median": 4,
+      "p90": 21,
+      "max": 183
+    },
+    "over50Lines": 17,
+    "over100Lines": 2,
+    "depth4OrMore": 5,
+    "longest": [
+      {
+        "file": "scripts/nuget.mjs",
+        "name": "check",
+        "line": 314,
+        "lines": 183,
+        "depth": 3
+      },
+      {
+        "file": "scripts/licence-commands.mjs",
+        "name": "fetched",
+        "line": 113,
+        "lines": 106,
+        "depth": 4
+      },
+      {
+        "file": "scripts/licences.mjs",
+        "name": "check",
+        "line": 382,
+        "lines": 99,
+        "depth": 3
+      },
+      {
+        "file": "scripts/nuget-fetch.mjs",
+        "name": "fetchAll",
+        "line": 219,
+        "lines": 97,
+        "depth": 3
+      },
+      {
+        "file": "scripts/licence-scan.mjs",
+        "name": "scan",
+        "line": 125,
+        "lines": 96,
+        "depth": 4
+      },
+      {
+        "file": "scripts/comment-only.mjs",
+        "name": "readYaml",
+        "line": 109,
+        "lines": 70,
+        "depth": 3
+      },
+      {
+        "file": "scripts/upgrade-test.mjs",
+        "name": "upgrade",
+        "line": 214,
+        "lines": 69,
+        "depth": 1
+      },
+      {
+        "file": "scripts/nuget.mjs",
+        "name": "manifestLicence",
+        "line": 233,
+        "lines": 67,
+        "depth": 3
+      },
+      {
+        "file": "scripts/workflow-run.mjs",
+        "name": "runWorkflow",
+        "line": 249,
+        "lines": 67,
+        "depth": 3
+      },
+      {
+        "file": "scripts/code-shape.mjs",
+        "name": "tokens",
+        "line": 55,
+        "lines": 66,
+        "depth": 4
+      },
+      {
+        "file": "scripts/workflow-run.mjs",
+        "name": "parseYaml",
+        "line": 45,
+        "lines": 66,
+        "depth": 0
+      },
+      {
+        "file": "scripts/workflow-run.mjs",
+        "name": "evaluate",
+        "line": 126,
+        "lines": 65,
+        "depth": 2
+      },
+      {
+        "file": "scripts/sync.mjs",
+        "name": "sync",
+        "line": 30,
+        "lines": 62,
+        "depth": 3
+      },
+      {
+        "file": "scripts/core-cost.mjs",
+        "name": "main",
+        "line": 129,
+        "lines": 59,
+        "depth": 3
+      },
+      {
+        "file": "scripts/init.mjs",
+        "name": "init",
+        "line": 182,
+        "lines": 59,
+        "depth": 2
+      },
+      {
+        "file": "scripts/licence-installed.mjs",
+        "name": "check",
+        "line": 103,
+        "lines": 58,
+        "depth": 2
+      },
+      {
+        "file": "scripts/code-shape.mjs",
+        "name": "measure",
+        "line": 344,
+        "lines": 56,
+        "depth": 3
+      },
+      {
+        "file": "scripts/copies.mjs",
+        "name": "find",
+        "line": 71,
+        "lines": 50,
+        "depth": 3
+      },
+      {
+        "file": "scripts/upgrade-test.mjs",
+        "name": "checks",
+        "line": 157,
+        "lines": 50,
+        "depth": 3
+      },
+      {
+        "file": "scripts/nuget.mjs",
+        "name": "judge",
+        "line": 441,
+        "lines": 47,
+        "depth": 3
+      }
+    ],
+    "deepest": [
+      {
+        "file": "scripts/licence-commands.mjs",
+        "name": "fetched",
+        "line": 113,
+        "lines": 106,
+        "depth": 4
+      },
+      {
+        "file": "scripts/licence-scan.mjs",
+        "name": "scan",
+        "line": 125,
+        "lines": 96,
+        "depth": 4
+      },
+      {
+        "file": "scripts/code-shape.mjs",
+        "name": "tokens",
+        "line": 55,
+        "lines": 66,
+        "depth": 4
+      },
+      {
+        "file": "scripts/comment-only.mjs",
+        "name": "node",
+        "line": 50,
+        "lines": 45,
+        "depth": 4
+      },
+      {
+        "file": "scripts/exact-versions.mjs",
+        "name": "check",
+        "line": 65,
+        "lines": 35,
+        "depth": 4
+      },
+      {
+        "file": "scripts/nuget.mjs",
+        "name": "check",
+        "line": 314,
+        "lines": 183,
+        "depth": 3
+      },
+      {
+        "file": "scripts/licences.mjs",
+        "name": "check",
+        "line": 382,
+        "lines": 99,
+        "depth": 3
+      },
+      {
+        "file": "scripts/nuget-fetch.mjs",
+        "name": "fetchAll",
+        "line": 219,
+        "lines": 97,
+        "depth": 3
+      },
+      {
+        "file": "scripts/comment-only.mjs",
+        "name": "readYaml",
+        "line": 109,
+        "lines": 70,
+        "depth": 3
+      },
+      {
+        "file": "scripts/nuget.mjs",
+        "name": "manifestLicence",
+        "line": 233,
+        "lines": 67,
+        "depth": 3
+      },
+      {
+        "file": "scripts/workflow-run.mjs",
+        "name": "runWorkflow",
+        "line": 249,
+        "lines": 67,
+        "depth": 3
+      },
+      {
+        "file": "scripts/sync.mjs",
+        "name": "sync",
+        "line": 30,
+        "lines": 62,
+        "depth": 3
+      },
+      {
+        "file": "scripts/core-cost.mjs",
+        "name": "main",
+        "line": 129,
+        "lines": 59,
+        "depth": 3
+      },
+      {
+        "file": "scripts/code-shape.mjs",
+        "name": "measure",
+        "line": 344,
+        "lines": 56,
+        "depth": 3
+      },
+      {
+        "file": "scripts/copies.mjs",
+        "name": "find",
+        "line": 71,
+        "lines": 50,
+        "depth": 3
+      },
+      {
+        "file": "scripts/upgrade-test.mjs",
+        "name": "checks",
+        "line": 157,
+        "lines": 50,
+        "depth": 3
+      },
+      {
+        "file": "scripts/nuget.mjs",
+        "name": "judge",
+        "line": 441,
+        "lines": 47,
+        "depth": 3
+      },
+      {
+        "file": "scripts/workflow-run.mjs",
+        "name": "runJob",
+        "line": 273,
+        "lines": 42,
+        "depth": 3
+      },
+      {
+        "file": "scripts/code-shape.mjs",
+        "name": "main",
+        "line": 424,
+        "lines": 39,
+        "depth": 3
+      },
+      {
+        "file": "scripts/licence-installed.mjs",
+        "name": "leftOut",
+        "line": 60,
+        "lines": 37,
+        "depth": 3
+      }
+    ]
+  },
+  "changedTogether": {
+    "commits": 500,
+    "pairs": [
+      {
+        "files": [
+          "scripts/licence-fetch-test.mjs",
+          "scripts/licence-scan.mjs"
+        ],
+        "together": 26,
+        "share": 0.74
+      },
+      {
+        "files": [
+          "scripts/licence-commands.mjs",
+          "scripts/licence-fetch-test.mjs"
+        ],
+        "together": 20,
+        "share": 0.91
+      },
+      {
+        "files": [
+          "scripts/nuget-test.mjs",
+          "scripts/nuget.mjs"
+        ],
+        "together": 19,
+        "share": 0.95
+      },
+      {
+        "files": [
+          "scripts/licence-fetch-test.mjs",
+          "scripts/licence-scan-test.mjs"
+        ],
+        "together": 19,
+        "share": 0.63
+      },
+      {
+        "files": [
+          "scripts/licence-scan-test.mjs",
+          "scripts/licence-scan.mjs"
+        ],
+        "together": 17,
+        "share": 0.57
+      },
+      {
+        "files": [
+          "scripts/licence-commands.mjs",
+          "scripts/licence-scan-test.mjs"
+        ],
+        "together": 14,
+        "share": 0.64
+      },
+      {
+        "files": [
+          "scripts/nuget-fetch-test.mjs",
+          "scripts/nuget-fetch.mjs"
+        ],
+        "together": 11,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/licences-test.mjs",
+          "scripts/licences.mjs"
+        ],
+        "together": 9,
+        "share": 0.82
+      },
+      {
+        "files": [
+          "scripts/init-dotnet-test.mjs",
+          "scripts/nuget.mjs"
+        ],
+        "together": 9,
+        "share": 0.64
+      },
+      {
+        "files": [
+          "scripts/licence-commands.mjs",
+          "scripts/licence-scan.mjs"
+        ],
+        "together": 9,
+        "share": 0.41
+      },
+      {
+        "files": [
+          "scripts/licence-scan-test.mjs",
+          "scripts/licences.mjs"
+        ],
+        "together": 9,
+        "share": 0.41
+      },
+      {
+        "files": [
+          "scripts/versions-test.mjs",
+          "scripts/versions.mjs"
+        ],
+        "together": 8,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/init-test.mjs",
+          "scripts/init.mjs"
+        ],
+        "together": 8,
+        "share": 0.8
+      },
+      {
+        "files": [
+          "scripts/nuget-fetch-test.mjs",
+          "scripts/nuget.mjs"
+        ],
+        "together": 8,
+        "share": 0.73
+      },
+      {
+        "files": [
+          "scripts/nuget-fetch.mjs",
+          "scripts/nuget.mjs"
+        ],
+        "together": 8,
+        "share": 0.73
+      },
+      {
+        "files": [
+          "scripts/init-dotnet-test.mjs",
+          "scripts/nuget-test.mjs"
+        ],
+        "together": 8,
+        "share": 0.57
+      },
+      {
+        "files": [
+          "scripts/comment-only-test.mjs",
+          "scripts/comment-only.mjs"
+        ],
+        "together": 7,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/exact-versions-test.mjs",
+          "scripts/exact-versions.mjs"
+        ],
+        "together": 7,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/security-review-test.mjs",
+          "scripts/security-review.mjs"
+        ],
+        "together": 7,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/licences.mjs",
+          "scripts/nuget.mjs"
+        ],
+        "together": 7,
+        "share": 0.32
+      },
+      {
+        "files": [
+          "scripts/core-cost-test.mjs",
+          "scripts/core-cost.mjs"
+        ],
+        "together": 6,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/licence-installed-test.mjs",
+          "scripts/licence-installed.mjs"
+        ],
+        "together": 6,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/licences.d.mts",
+          "scripts/licences.mjs"
+        ],
+        "together": 6,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/helper-call-test.mjs",
+          "scripts/helper-call.mjs"
+        ],
+        "together": 6,
+        "share": 0.86
+      },
+      {
+        "files": [
+          "scripts/release.mjs",
+          "scripts/releases-test.mjs"
+        ],
+        "together": 5,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/stand-in-record-test.mjs",
+          "scripts/stand-in-record.mjs"
+        ],
+        "together": 5,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/workflows-test.mjs",
+          "scripts/workflows.mjs"
+        ],
+        "together": 5,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/licence-scan-test.mjs",
+          "scripts/licences.d.mts"
+        ],
+        "together": 5,
+        "share": 0.83
+      },
+      {
+        "files": [
+          "scripts/init-test.mjs",
+          "scripts/reading-size.mjs"
+        ],
+        "together": 5,
+        "share": 0.5
+      },
+      {
+        "files": [
+          "scripts/licences-test.mjs",
+          "scripts/nuget-fetch-test.mjs"
+        ],
+        "together": 5,
+        "share": 0.45
+      },
+      {
+        "files": [
+          "scripts/licences-test.mjs",
+          "scripts/nuget-fetch.mjs"
+        ],
+        "together": 5,
+        "share": 0.45
+      },
+      {
+        "files": [
+          "scripts/licences.mjs",
+          "scripts/nuget-fetch-test.mjs"
+        ],
+        "together": 5,
+        "share": 0.45
+      },
+      {
+        "files": [
+          "scripts/licences.mjs",
+          "scripts/nuget-fetch.mjs"
+        ],
+        "together": 5,
+        "share": 0.45
+      },
+      {
+        "files": [
+          "scripts/init-dotnet-test.mjs",
+          "scripts/init-test.mjs"
+        ],
+        "together": 5,
+        "share": 0.38
+      },
+      {
+        "files": [
+          "scripts/copy-tree-test.mjs",
+          "scripts/copy-tree.mjs"
+        ],
+        "together": 4,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/copy-tree-test.mjs",
+          "scripts/pure-sync.mjs"
+        ],
+        "together": 4,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/copy-tree.mjs",
+          "scripts/pure-sync.mjs"
+        ],
+        "together": 4,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/licence-yes.mjs",
+          "scripts/licences.mjs"
+        ],
+        "together": 4,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/size-test.mjs",
+          "scripts/size.mjs"
+        ],
+        "together": 4,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/nuget-gate-test.mjs",
+          "scripts/workflow-run.mjs"
+        ],
+        "together": 4,
+        "share": 0.8
+      },
+      {
+        "files": [
+          "scripts/core-moved-test.mjs",
+          "scripts/core-moved.mjs"
+        ],
+        "together": 4,
+        "share": 0.67
+      },
+      {
+        "files": [
+          "scripts/init.mjs",
+          "scripts/reading-size.mjs"
+        ],
+        "together": 4,
+        "share": 0.4
+      },
+      {
+        "files": [
+          "scripts/licences-test.mjs",
+          "scripts/nuget.mjs"
+        ],
+        "together": 4,
+        "share": 0.36
+      },
+      {
+        "files": [
+          "scripts/pure-sync.mjs",
+          "scripts/sync.mjs"
+        ],
+        "together": 4,
+        "share": 0.31
+      },
+      {
+        "files": [
+          "scripts/code-review-wait-test.mjs",
+          "scripts/code-review-wait.mjs"
+        ],
+        "together": 3,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/general-test.mjs",
+          "scripts/general.mjs"
+        ],
+        "together": 3,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/pointers-test.mjs",
+          "scripts/pointers.mjs"
+        ],
+        "together": 3,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/pr-description-test.mjs",
+          "scripts/pr-description.mjs"
+        ],
+        "together": 3,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/release.mjs",
+          "scripts/releases.mjs"
+        ],
+        "together": 3,
+        "share": 1
+      },
+      {
+        "files": [
+          "scripts/releases-test.mjs",
+          "scripts/releases.mjs"
+        ],
+        "together": 3,
+        "share": 1
+      }
+    ],
+    "mostChanged": [
+      {
+        "file": "scripts/licence-fetch-test.mjs",
+        "changes": 39
+      },
+      {
+        "file": "scripts/licence-scan.mjs",
+        "changes": 35
+      },
+      {
+        "file": "scripts/licence-scan-test.mjs",
+        "changes": 30
+      },
+      {
+        "file": "scripts/nuget.mjs",
+        "changes": 27
+      },
+      {
+        "file": "scripts/licence-commands.mjs",
+        "changes": 22
+      },
+      {
+        "file": "scripts/licences.mjs",
+        "changes": 22
+      },
+      {
+        "file": "scripts/nuget-test.mjs",
+        "changes": 20
+      },
+      {
+        "file": "scripts/size.mjs",
+        "changes": 19
+      },
+      {
+        "file": "scripts/personal-terms-test.mjs",
+        "changes": 16
+      },
+      {
+        "file": "scripts/sync.mjs",
+        "changes": 15
+      },
+      {
+        "file": "scripts/init-dotnet-test.mjs",
+        "changes": 14
+      },
+      {
+        "file": "scripts/init-test.mjs",
+        "changes": 13
+      },
+      {
+        "file": "scripts/pure-sync.mjs",
+        "changes": 13
+      },
+      {
+        "file": "scripts/licences-test.mjs",
+        "changes": 11
+      },
+      {
+        "file": "scripts/nuget-fetch-test.mjs",
+        "changes": 11
+      },
+      {
+        "file": "scripts/nuget-fetch.mjs",
+        "changes": 11
+      },
+      {
+        "file": "scripts/init.mjs",
+        "changes": 10
+      },
+      {
+        "file": "scripts/reading-size.mjs",
+        "changes": 10
+      },
+      {
+        "file": "scripts/security-review.mjs",
+        "changes": 10
+      },
+      {
+        "file": "scripts/versions.mjs",
+        "changes": 10
+      }
+    ]
+  },
+  "suites": [
+    {
+      "command": "node scripts/versions-test.mjs",
+      "seconds": 0.4,
+      "passed": true
+    },
+    {
+      "command": "node scripts/licences-test.mjs",
+      "seconds": 0.2,
+      "passed": true
+    },
+    {
+      "command": "node scripts/licence-scan-test.mjs",
+      "seconds": 3.6,
+      "passed": true
+    },
+    {
+      "command": "node scripts/licence-fetch-test.mjs",
+      "seconds": 4.5,
+      "passed": true
+    },
+    {
+      "command": "node scripts/licence-installed-test.mjs",
+      "seconds": 0.3,
+      "passed": true
+    },
+    {
+      "command": "node scripts/nuget-test.mjs",
+      "seconds": 1.2,
+      "passed": true
+    },
+    {
+      "command": "node scripts/nuget-fetch-test.mjs",
+      "seconds": 1.5,
+      "passed": true
+    },
+    {
+      "command": "node scripts/readers-test.mjs",
+      "seconds": 3.4,
+      "passed": true
+    },
+    {
+      "command": "node scripts/exact-versions-test.mjs",
+      "seconds": 0.1,
+      "passed": true
+    },
+    {
+      "command": "node scripts/helper-call-test.mjs",
+      "seconds": 1.2,
+      "passed": true
+    },
+    {
+      "command": "node scripts/work-saved-test.mjs",
+      "seconds": 12.8,
+      "passed": true
+    },
+    {
+      "command": "node scripts/session-cost-test.mjs",
+      "seconds": 0.4,
+      "passed": true
+    },
+    {
+      "command": "node scripts/core-cost-test.mjs",
+      "seconds": 0,
+      "passed": true
+    },
+    {
+      "command": "node scripts/code-shape-test.mjs",
+      "seconds": 0.4,
+      "passed": true
+    },
+    {
+      "command": "node scripts/stand-in-record-test.mjs",
+      "seconds": 0.1,
+      "passed": true
+    },
+    {
+      "command": "node scripts/stalled-test.mjs",
+      "seconds": 0,
+      "passed": true
+    },
+    {
+      "command": "node scripts/pr-description-test.mjs",
+      "seconds": 0,
+      "passed": true
+    },
+    {
+      "command": "node scripts/security-review-test.mjs",
+      "seconds": 0.5,
+      "passed": true
+    },
+    {
+      "command": "node scripts/code-review-wait-test.mjs",
+      "seconds": 0.2,
+      "passed": true
+    },
+    {
+      "command": "node scripts/workflows-test.mjs",
+      "seconds": 0,
+      "passed": true
+    },
+    {
+      "command": "node scripts/core-moved-test.mjs",
+      "seconds": 0.6,
+      "passed": true
+    },
+    {
+      "command": "node scripts/releases-test.mjs",
+      "seconds": 1.4,
+      "passed": true
+    },
+    {
+      "command": "node scripts/core-address-test.mjs",
+      "seconds": 0,
+      "passed": true
+    },
+    {
+      "command": "node scripts/copy-tree-test.mjs",
+      "seconds": 0.6,
+      "passed": true
+    },
+    {
+      "command": "node scripts/core-yml-test.mjs",
+      "seconds": 4.4,
+      "passed": true
+    },
+    {
+      "command": "node scripts/pure-sync-test.mjs",
+      "seconds": 11.2,
+      "passed": true
+    },
+    {
+      "command": "node scripts/comment-only-test.mjs",
+      "seconds": 3.3,
+      "passed": true
+    },
+    {
+      "command": "node scripts/started-test.mjs",
+      "seconds": 0.2,
+      "passed": true
+    },
+    {
+      "command": "node scripts/init-test.mjs",
+      "seconds": 3.5,
+      "passed": true
+    },
+    {
+      "command": "node scripts/init-dotnet-test.mjs",
+      "seconds": 2.1,
+      "passed": true
+    },
+    {
+      "command": "node scripts/nuget-gate-test.mjs",
+      "seconds": 0.7,
+      "passed": true
+    },
+    {
+      "command": "node scripts/personal-terms-test.mjs",
+      "seconds": 8.1,
+      "passed": true
+    },
+    {
+      "command": "node scripts/general-test.mjs",
+      "seconds": 0.9,
+      "passed": true
+    },
+    {
+      "command": "node scripts/size-test.mjs",
+      "seconds": 0.7,
+      "passed": true
+    },
+    {
+      "command": "node scripts/pointers-test.mjs",
+      "seconds": 0.7,
+      "passed": true
+    },
+    {
+      "command": "node scripts/pointers.mjs --core",
+      "seconds": 0.1,
+      "passed": true
+    },
+    {
+      "command": "node scripts/workflows.mjs",
+      "seconds": 0,
+      "passed": true
+    },
+    {
+      "command": "node scripts/licences.mjs .github/licences.json",
+      "seconds": 0.3,
+      "passed": true
+    },
+    {
+      "command": "node scripts/upgrade-test.mjs",
+      "seconds": 33.7,
+      "passed": true
+    }
+  ]
+}

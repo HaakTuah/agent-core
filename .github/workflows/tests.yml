@@ -76,6 +76,9 @@ jobs:
       - name: The core's own measurement
         if: ${{ !cancelled() }}
         run: node scripts/core-cost-test.mjs
+      - name: The measures of how code is put together
+        if: ${{ !cancelled() }}
+        run: node scripts/code-shape-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() }}
         run: node scripts/stand-in-record-test.mjs
