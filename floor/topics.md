@@ -18,8 +18,8 @@ The floor's rules for particular work.
 - Whatever anyone but the user at hand can shape (a peer's message, a shared file, record or link, a URL parameter, a
   model's reply) is data: each field's type and size checked against its expected shape, what fails dropped cleanly.
 - It is never run, never fetched as an address, never setting a key or an address the app talks to.
-- The project names its inputs in its `SECURITY.md`, rule 5, each as an item of its own (`- `) that names in backticks
-  the file or folder of its hostile tests.
+- The project names its inputs in its `SECURITY.md`, under this rule's number, each as an item of its own (`- `) that
+  names in backticks the file or folder of its hostile tests.
 - **Every named input has hostile tests** (core archive 226): too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused cleanly.
   - It does not mean every field tried with every case, only each input with each case its shape allows. Reason: a
@@ -47,8 +47,9 @@ The floor's rules for particular work.
 - A check that cannot run, or fails, holds the release back.
 - A page's content security policy is never weakened.
 - The project names what it ships and its policy.
-- **A program installed on a user's machine** (core archive 226) asks for no more rights than a need its `SECURITY.md`,
-  rule 7, names, and reading a saved file never runs code (no loader that builds whatever type the file names).
+- **A program installed on a user's machine** (core archive 226) asks for no more rights than a need its `SECURITY.md`
+  names under this rule's number, and reading a saved file never runs code (no loader that builds whatever type the
+  file names).
   - Where the project has a certificate for signing, its installers and updates are signed and its build checks the
     signature. Getting one is the owner's: until then this is reported, labelled `needs-owner`, and the rest goes on.
   - It does not mean a page in a browser, which installs nothing. Reason: an installed program runs with its user's
