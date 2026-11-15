@@ -29,10 +29,10 @@ export function acceptedList(list = [], key, named, shape, { entries = false, sa
       && typeof a.ships === "boolean" && (a.notice === undefined || typeof a.notice === "string")
     : entries && only(a, ["entry", "version", "licence", "ships", "yes"]) && text(a.entry) && (a.version === undefined || text(a.version))
       && text(a.licence) && typeof a.ships === "boolean");
-  if (!Array.isArray(list) || !list.every(whole)) throw new Error(`the config's "${key}" is not a list of { "package": "${shape}", "licence": ..., "ships": true or false, "yes": ..., and "notice" where it ships }${entries ? ', or { "entry": an audit entry\'s name, its "version" where it has one, "licence": ..., "ships": ..., "yes": ... }' : ""}`);
+  if (!Array.isArray(list) || !list.every(whole)) throw new Error(`the config's "${key}" is not in the form it reads. Mend: write it as a list of { "package": "${shape}", "licence": ..., "ships": true or false, "yes": ..., and "notice" where it ships }${entries ? ', or { "entry": an audit entry\'s name, its "version" where it has one, "licence": ..., "ships": ..., "yes": ... }' : ""}`);
   const names = list.map((a) => (a.package !== undefined ? `package ${same(a.package)}` : `entry ${a.entry}${a.version === undefined ? "" : `, version ${a.version}`}`));
   const again = names.filter((n, i) => names.indexOf(n) !== i);
-  if (again.length) throw new Error(`the config's "${key}" names one twice: ${[...new Set(again)].join(", ")}`);
+  if (again.length) throw new Error(`the config's "${key}" names one twice: ${[...new Set(again)].join(", ")}. Mend: keep one yes for each`);
   return list;
 }
 
@@ -74,11 +74,11 @@ export function yesFaults(name, a, shipped, others, lists, where) {
   const said = others.filter((l) => l !== undefined && l !== null).map((l) => (typeof l === "string" ? l : JSON.stringify(l)));
   const never = [a.licence, ...said].filter((l) => lists.never.test(l));
   const faults = [];
-  if (never.length) faults.push(`${name}: accepted, and under ${never[0]}, terms floor rule 10 never allows`);
+  if (never.length) faults.push(`${name}: accepted, and under ${never[0]}, terms floor rule 10 never allows. Mend: take that yes out and replace the package; no yes takes these terms in`);
   const other = said.find((l) => l.trim() !== String(a.licence).trim() && readable(l, ids));
-  if (other !== undefined) faults.push(`${name}: accepted under ${a.licence}, and recorded as under ${other}: another licence is another yes`);
-  if (!readable(a.licence, ids)) faults.push(`${name}: accepted under "${a.licence}", which no machine can read: name it by an SPDX id this check knows, or as LicenseRef-<a name for it>, as LicenseRef-Vendor-EULA for one that was bought`);
-  if (shipped && a.ships !== true) faults.push(`${name}: accepted as a tool that only runs ("ships": false), and it is held as what ships: a yes for a tool is no yes for what ships (floor rule 10)`);
-  if (where && shipped && !a.notice?.trim()) faults.push(`${name}: it ships, so its notice ships too (floor rule 10): its "notice" in ${where}`);
+  if (other !== undefined) faults.push(`${name}: accepted under ${a.licence}, and recorded as under ${other}, and another licence is another yes. Mend: replace it, or file an issue asking the owner's yes under ${other}`);
+  if (!readable(a.licence, ids)) faults.push(`${name}: accepted under "${a.licence}", which no machine can read. Mend: name it by an SPDX id this check knows, or as LicenseRef-<a name for it>, as LicenseRef-Vendor-EULA for one that was bought`);
+  if (shipped && a.ships !== true) faults.push(`${name}: accepted as a tool that only runs ("ships": false), and it is held as what ships: and a yes for a tool is no yes for what ships (floor rule 10). Mend: replace it, or file an issue asking the owner's yes for it as what ships`);
+  if (where && shipped && !a.notice?.trim()) faults.push(`${name}: it ships, so its notice ships too (floor rule 10). Mend: give its yes in ${where} its "notice"`);
   return faults;
 }

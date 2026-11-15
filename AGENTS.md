@@ -169,6 +169,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   every such change asks something of a project: "Nothing" is an answer, and most changes give it. Reason: two of the ideas
   queued on 14 November would have broken "Nothing locks a project", and only a reading caught them. Held by
   `.github/workflows/own-description.yml`, which fails one without it.
+- **A check that fails says the mend** (core archive 219; #254). Every check of the core, a script under `scripts/` or
+  a workflow's own step that fails a pull request, fails with a line that says what is wrong and where, then "Mend:"
+  and what a session does about it, in words it acts on with no rule file open (the form: `scripts/mend.mjs`). Where
+  the mend is a step only the owner can take (a yes floor rule 14 names), it says so, and the session's part is the
+  issue it files for it. Whoever writes or changes a check writes each failure so, and its test runs it where it fails
+  and reads the mend. It does not mean that a project's own checks are asked anything, nor a test's own assertions,
+  which are no check. Reason: a session that met a failing check had to find the rule behind it before it could act,
+  and on 14 November one stopped at a draft for want of a rule that said what came next. Held by
+  `scripts/mend-test.mjs`, in `.github/workflows/tests.yml`: each script a workflow names, and each workflow with a
+  step that fails by itself, is a check with its test, or is listed with why it fails no pull request, and each
+  check's test reads its failures with `mended()`.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
   design session checks it against the core and answers it there, and a change follows only on the owner's word.
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,

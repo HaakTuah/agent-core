@@ -71,15 +71,15 @@ if (started(import.meta.url)) {
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
   const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
   let failed = links.size;
-  for (const file of links) console.log(`FAIL ${file}: a link, not a file: the check reads the project's own text only`);
+  for (const file of links) console.log(`FAIL ${file}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
   for (const file of files) {
     if (links.has(file)) continue;
     const text = fs.readFileSync(file, "utf8"), found = lines(text);
-    if (!readable(text)) { failed++; console.log(`FAIL ${file}: not UTF-8 text, so it cannot be searched: save it as UTF-8`); }
+    if (!readable(text)) { failed++; console.log(`FAIL ${file}: not UTF-8 text, so it cannot be searched. Mend: save it as UTF-8`); }
     failed += found.length;
-    for (const line of found.slice(0, 5)) console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets: never (floor rule 2)`);
-    if (found.length > 5) console.log(`FAIL ${file}: and on ${found.length - 5} more lines`);
+    for (const line of found.slice(0, 5)) console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
+    if (found.length > 5) console.log(`FAIL ${file}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
-  console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} against floor rule 2`);
+  console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} against floor rule 2${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);
 }

@@ -10,6 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600).replace(/\n/g, "\n     ")}`}`); } };
@@ -43,9 +44,9 @@ function words(start, change, base = true, json = config) {
 const OLD = "1. **1 November** (a game). The owner said, and he meant it:\n\n   > Fine.\n";
 
 let r = words({}, { "modules/b.md": "# A module\n\nFor every game.\n" });
-ok(r.status === 1 && r.out.includes("modules/b.md:3"), "a word that fits only some projects fails in a module, by file and line", r.out);
+ok(r.status === 1 && r.out.includes("modules/b.md:3") && /fits only some projects\. Mend: say /.test(r.out) && mended(r.out), "a word that fits only some projects fails in a module, by file and line", r.out);
 r = words({ "archive/items.md": OLD }, { "archive/items.md": `${OLD}\n2. **2 November**. Asked, he said yes.\n` });
-ok(r.status === 1 && r.out.includes("archive/items.md:5:") && !r.out.includes("archive/items.md:1:"), "a pronoun for the owner in a line a change adds to the archive fails, by its line; the older line in the same file does not", r.out);
+ok(r.status === 1 && r.out.includes("archive/items.md:5:") && !r.out.includes("archive/items.md:1:") && mended(r.out), "a pronoun for the owner in a line a change adds to the archive fails, by its line; the older line in the same file does not", r.out);
 r = words({}, { "reports/2026-11-13-x.md": "# A report\n\nThe owner read it, and his answer was yes.\n" });
 ok(r.status === 1 && r.out.includes("reports/2026-11-13-x.md:3"), "so does one in a new report", r.out);
 r = words({ "archive/items.md": OLD }, { "archive/items.md": `${OLD}\n2. **2 November**. Asked, the owner said:\n\n   > She can have it, he said.\n` });
@@ -62,14 +63,14 @@ r = words({ "archive/old.md": `${OLD}\n2. **2 November**. Then he asked again.\n
 ok(r.status === 1 && /reports\/new\.md:2: "he"/.test(r.out), "a moved line added a second time is new text: each line taken away excuses one", r.out);
 const bad = spawnSync(process.execPath, [script, "general.json", "--base", "--ext-diff"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 const none = spawnSync(process.execPath, [script, "general.json", "--base", "no-such-commit"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
-ok(bad.status === 1 && none.status === 1 && /--base needs a commit/.test(bad.stdout + none.stdout), "a --base that is an option, or no commit, is refused", `${bad.stdout}${bad.stderr}${none.stdout}`);
+ok(bad.status === 1 && none.status === 1 && /--base needs a commit/.test(bad.stdout + none.stdout) && mended(bad.stdout) && mended(none.stdout), "a --base that is an option, or no commit, is refused", `${bad.stdout}${bad.stderr}${none.stdout}`);
 r = words({}, { "modules/b.md": "# A module\n\nAsked, he said yes.\n" });
 ok(r.status === 1, "in the floor and the modules the pronoun fails wherever it stands, as before", r.out);
 
 // the phrases a rule may not use
 const RULE = "- The builder should consider a test.\n";
 r = words({}, { "modules/b.md": `# A module\n\n${RULE}` });
-ok(r.status === 1 && r.out.includes("modules/b.md:3:") && r.out.includes("in a rule this change writes"), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
+ok(r.status === 1 && r.out.includes("modules/b.md:3:") && r.out.includes("in a rule this change writes. Mend: name who does what") && mended(r.out), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
 r = words({}, { "AGENTS.md": `# Here\n\n${RULE}` });
 ok(r.status === 1 && r.out.includes("AGENTS.md:3:"), "and in a line a change adds to a rule file the list names", r.out);
 r = words({ "modules/b.md": `# A module\n\n${RULE}` }, { "floor/a.md": "# The floor\n\nNothing here.\n" });
@@ -81,9 +82,9 @@ ok(r.status === 0 && !r.out.includes("modules/b.md:"), "one in a line quoting th
 r = words({}, { "modules/b.md": `# A module\n\n${RULE}` }, false);
 ok(r.status === 0 && r.out.includes("only reported") && r.out.includes("modules/b.md:3:"), "without a base each is only reported, and it says so", r.out);
 r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["floor"], list: [] } });
-ok(r.status === 1 && r.out.includes("list of phrases a rule may not use is empty"), "an empty list of phrases fails: it would pass anything", r.out);
+ok(r.status === 1 && r.out.includes("list of phrases a rule may not use is empty") && mended(r.out), "an empty list of phrases fails: it would pass anything", r.out);
 r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["rules"], list: config.phrases.list } });
-ok(r.status === 1 && r.out.includes("not there: rules"), "a file or folder of the list that is not there fails", r.out);
+ok(r.status === 1 && r.out.includes("not there: rules") && mended(r.out), "a file or folder of the list that is not there fails", r.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the words check`);
 process.exitCode = failed ? 1 : 0;

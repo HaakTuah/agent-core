@@ -99,7 +99,7 @@ export function coreGaps({ agents, readme, moduleTexts, floorTexts }) {
   if (error) return [error];
   const lines = String(agents).split(/\r?\n/u);
   const at = lines.findIndex(l => l.startsWith("The slots here:"));
-  if (at < 0) return [`AGENTS.md has no paragraph "The slots here:", which fills the slots the modules use`];
+  if (at < 0) return [`AGENTS.md has no paragraph "The slots here:", which fills the slots the modules use. Mend: write it back, in "The core this repository takes", naming each slot the modules use`];
   const end = lines.findIndex((l, i) => i > at && l.trim() === "");
   const filled = new Set(italics(lines.slice(at, end < 0 ? lines.length : end).join(" ")));
   const used = new Map();
@@ -109,7 +109,7 @@ export function coreGaps({ agents, readme, moduleTexts, floorTexts }) {
   const out = [];
   for (const [slot, files] of [...used].sort(([a], [b]) => a.localeCompare(b))) {
     if (filled.has(slot) || slots.get(slot).fallback) continue;
-    out.push(`AGENTS.md, "The slots here": no *${slot}*, which ${list(files)} use${files.length === 1 ? "s" : ""}; add "the *${slot}*: <${slots.get(slot).what.replace(/\|/gu, "/")}>" to that paragraph`);
+    out.push(`AGENTS.md, "The slots here": no *${slot}*, which ${list(files)} use${files.length === 1 ? "s" : ""}. Mend: add "the *${slot}*: <${slots.get(slot).what.replace(/\|/gu, "/")}>" to that paragraph`);
   }
   return out;
 }
@@ -137,7 +137,7 @@ function main() {
     console.log(found.length ? `note ${found.length} lines of the manifest to add; nothing fails over them (AGENTS.md of the core, "Nothing locks a project")` : "ok   the manifest takes or leaves out each module, and fills each slot they use");
   } catch (e) {
     // (a project that cannot be read this way is told so, never failed over it)
-    if (core) { console.error(`FAIL: ${e.message}`); return 1; }
+    if (core) { console.error(`FAIL: the core's AGENTS.md, README.md, modules/ or floor/ could not be read (${String(e.message).replace(/[\u0000-\u001f\u007f]/gu, " ")}). Mend: run it from a clone of the core, where they stand`); return 1; }
     console.log(`note the manifest could not be read against the modules and the slots (${e.message})`);
   }
   return 0;

@@ -238,7 +238,7 @@ function upgrade(p, from, ownChanges, expect) {
     // its machine writes a listed name into every commit: the personal-terms check alone fails, saying how to mend it,
     // and the session mends it in the pull request itself, as the failure says (core archive 202)
     const failed = onSync.filter(([, r]) => !r.passed);
-    ok(failed.length === 1 && failed[0][0].startsWith("personal-terms.yml/") && failed[0][1].steps.some(x => /To mend it, on the machine that made them/.test(x.out)),
+    ok(failed.length === 1 && failed[0][0].startsWith("personal-terms.yml/") && failed[0][1].steps.some(x => /Mend: on the machine that made them/.test(x.out)),
       `${p.name}: on the sync's pull request, its commit carrying a listed name, only the personal-terms check fails, and it says how to mend it`, failures(onSync));
     named.set(p.dir, { GIT_AUTHOR_NAME: p.owner, GIT_AUTHOR_EMAIL: `${p.owner}@users.noreply.github.com`, GIT_COMMITTER_NAME: p.owner, GIT_COMMITTER_EMAIL: `${p.owner}@users.noreply.github.com` });
     git(p.dir, "rebase", "-q", "--exec", "git commit --amend --no-edit --reset-author", "origin/main");
@@ -290,7 +290,7 @@ function upgrade(p, from, ownChanges, expect) {
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- It is never pushed to/.test(l)) ?? "";
   const worse = own(main1, dir => fs.appendFileSync(path.join(dir, "SECURITY.md"), `\n${copied}\n`));
   const failing = checks(p, "pull_request", worse, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
-  ok(copied && failing.length === 1 && failing[0][1].steps.some(x => /a new copy:[\s\S]*point to one place instead/.test(x.out)), `${p.name}: a pull request that adds a copy fails, and its failure says the mend`, failures(failing) || "it passed");
+  ok(copied && failing.length === 1 && failing[0][1].steps.some(x => /a new copy:[\s\S]*Mend: keep it in the one place it belongs and point there from the others/.test(x.out)), `${p.name}: a pull request that adds a copy fails, and its failure says the mend`, failures(failing) || "it passed");
   git(p.dir, "checkout", "-q", "change");
   git(p.dir, "checkout", "-q", main1, "--", "SECURITY.md");
   git(p.dir, "commit", "-q", "-m", "point to one place instead");

@@ -61,14 +61,14 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
-    return { sha, done: false, why: `Codex's code review of ${short} is still running` };
+    return { sha, done: false, why: `Codex's code review of ${short} is still running. Mend: wait for it` };
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules))) return { sha, done: true, why: "no code review is running" };
   const seen = new Set(posted);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string") seen.add(review.commit_sha);
   // (a review stands for the head where only updates from main follow it, as security-review.mjs reads them)
   if ([...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
-  const why = `no code review of ${short}: ask one, or post "Code review:" naming its whole SHA (modules/reviews.md)`;
+  const why = `no code review of ${short}. Mend: ask one, or another reviewer posts "Code review:" naming its whole SHA`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }

@@ -102,12 +102,12 @@ const shown = (value) => (value === undefined ? "none" : JSON.stringify(value).r
  *  { failures, summary }; `system` is the one the install ran on. */
 export function check(dir, system = thisSystem()) {
   const [name, second] = ["npm-shrinkwrap.json", "package-lock.json"].filter((f) => existsSync(join(dir, f)));
-  if (!name) throw new Error("no npm-shrinkwrap.json or package-lock.json in the folder");
+  if (!name) throw new Error("no npm-shrinkwrap.json or package-lock.json in the folder. Mend: name the folder that holds the lock file, as the signatures workflow's \"directory\"");
   // (an install reads the shrinkwrap file of the two, and the licence check the one its config names: only one may stand)
-  if (second) throw new Error("both npm-shrinkwrap.json and package-lock.json stand in the folder: keep one");
+  if (second) throw new Error("both npm-shrinkwrap.json and package-lock.json stand in the folder. Mend: delete one, keeping the file the project installs from");
   let lock;
-  try { lock = JSON.parse(readFileSync(join(dir, name), "utf8")); } catch { throw new Error(`cannot read ${name} as JSON`); }
-  if (!lock || typeof lock.packages !== "object" || !lock.packages || Array.isArray(lock.packages)) throw new Error(`${name} has no "packages" (npm's lockfile version 2 or 3)`);
+  try { lock = JSON.parse(readFileSync(join(dir, name), "utf8")); } catch { throw new Error(`cannot read ${name} as JSON. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`); }
+  if (!lock || typeof lock.packages !== "object" || !lock.packages || Array.isArray(lock.packages)) throw new Error(`${name} has no "packages" (npm's lockfile version 2 or 3). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only, with npm 7 or later`);
   const failures = [];
   // (every entry is written as npm writes one, or the lock file fails before anything is left out or read: lockPathOk,
   // in licences.mjs)
@@ -120,21 +120,21 @@ export function check(dir, system = thisSystem()) {
   // (the entries the licence check reads, by its own reading: every installed package, a link's folder among them,
   // but a workspace, the project's own)
   for (const { path, at, entry } of lockRead(lock.packages, workspacesIn(pkg, "package.json"))) {
-    if (at === null) { failures.push(`${shown(path)}: a link to a folder ${name} holds no entry for, so what it says of itself cannot be read`); continue; }
+    if (at === null) { failures.push(`${shown(path)}: a link to a folder ${name} holds no entry for, so what it says of itself cannot be read. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`); continue; }
     const file = join(dir, at, "package.json");
     if (!existsSync(file)) {
       // (only what an install leaves out for the system's sake: leftOut, above)
       if (mayLack.has(path)) absent++;
-      else failures.push(`${shown(path)}: not installed, and no optional package of another system or of one alone, so what it says of itself cannot be read: install from the lock file first (npm ci)`);
+      else failures.push(`${shown(path)}: not installed, and no optional package of another system or of one alone, so what it says of itself cannot be read. Mend: install from the lock file first (npm ci), then run the check`);
       continue;
     }
     let own;
     // (read as npm reads one: a byte-order mark before it is no part of it)
     try { const text = readFileSync(file, "utf8"); own = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text); } catch { own = null; }
-    if (!own || typeof own !== "object" || Array.isArray(own)) { failures.push(`${shown(path)}: its package.json cannot be read as JSON`); continue; }
+    if (!own || typeof own !== "object" || Array.isArray(own)) { failures.push(`${shown(path)}: its package.json cannot be read as JSON. Mend: install from the lock file again (npm ci); where it still cannot be read, replace the package`); continue; }
     read++;
-    if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${shown(path)}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}`);
-    if (plainVersion(own.version) !== plainVersion(entry.version)) failures.push(`${shown(path)}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}`);
+    if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${shown(path)}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only, which takes each licence from the package itself`);
+    if (plainVersion(own.version) !== plainVersion(entry.version)) failures.push(`${shown(path)}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`);
   }
   // (and nothing the install put in place that the lock file does not name, as a package bundled in another's tarball
   // and left out of the lock file would be, read by no check: every package folder under each node_modules folder of
@@ -148,7 +148,7 @@ export function check(dir, system = thisSystem()) {
       for (const [named, d] of found) {
         if (!d.isDirectory() && !d.isSymbolicLink()) continue;
         const at = `${folder}/${named}`;
-        if (!Object.hasOwn(lock.packages, at)) { failures.push(`${shown(at)}: installed, and ${name} holds no entry for it, so no check reads its licence: a package bundled in another's and left out of the lock file`); continue; }
+        if (!Object.hasOwn(lock.packages, at)) { failures.push(`${shown(at)}: installed, and ${name} holds no entry for it, so no check reads its licence: a package bundled in another's and left out of the lock file. Mend: replace the package that bundles it, or ask its makers to name what it bundles`); continue; }
         if (d.isDirectory()) unnamed(`${at}/node_modules`);
       }
     }
