@@ -69,8 +69,11 @@ const fails = (r, what, ...says) => ok(r.status === 1 && mended(r.out) && says.e
 // ---- the kit's own hooks are the core's ----
 const kitGroups = JSON.parse(KIT).hooks;
 const kitIds = kitHooks().map(id => JSON.parse(id));
-ok(JSON.stringify(kitIds.map(([, event, matcher, [type]]) => [event, matcher, type])) === JSON.stringify([["SessionStart", "startup|resume", "command"], ["PreToolUse", "Agent|Task", "command"], ["Stop", "", "command"]]) && kitIds[2][3][1] === kitGroups.Stop[0].hooks[0].command,
-  "the starter kit's hooks are read by event, matcher, type and command", JSON.stringify(kitIds));
+ok(JSON.stringify(kitIds.map(([, event, matcher, hook]) => [event, matcher, hook.type])) === JSON.stringify([["SessionStart", "startup|resume", "command"], ["PreToolUse", "Agent|Task", "command"], ["Stop", "", "command"]]) && JSON.stringify(kitIds[2][3]) === JSON.stringify(kitGroups.Stop[0].hooks[0]),
+  "the starter kit's hooks are read by event, matcher and the whole hook", JSON.stringify(kitIds));
+const slower = JSON.parse(KIT);
+slower.hooks.Stop[0].hooks[0].timeout = 600;
+fails(run(project({ ".claude/settings.json": JSON.stringify(slower), "checks/licences.json": { lockfiles: [], agentTools: [] } })), "a kit's command with another timeout is not the kit's hook", 'the hook "Stop: ');
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");

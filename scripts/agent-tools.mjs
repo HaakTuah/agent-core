@@ -13,7 +13,7 @@
 // it is not, and fails, save one the base held as it stands. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
 // another provider's settings, where a plug-in's marketplace or a tool server's command points, and whether the version
 // listed is the one run, are the review's. A hook the starter kit writes counts as the core's only where it is the kit's
-// hook, of the same event, matcher, type and command, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
+// hook, of the same event and matcher and the same in every field, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
 // changes them asks in its sync note that a project whose list is written lists the hooks it kept.
 //
 // Nothing locks a project (AGENTS.md): until the config holds "agentTools", a pull request's base counts as the list,
@@ -42,8 +42,8 @@ const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u20
 // met reading them. `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
 // that hold a SKILL.md.
 export function configured(read, skills) {
-  // (each tool's name, as the list writes it, and what it is: for a hook its event, matcher, type and command, or its
-  // whole text where it runs no command, which is what the kit's hooks and the base's are compared by)
+  // (each tool's name, as the list writes it, and what it is: for a hook its event, matcher and the whole hook, its type,
+  // command, timeout and all, which is what the kit's hooks and the base's are compared by)
   const tools = new Map(), ids = new Map(), problems = [];
   const json = file => {
     const text = read(file);
@@ -63,7 +63,7 @@ export function configured(read, skills) {
         for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
           const runs = hook?.type === "command" && typeof hook.command === "string";
           const name = `hook ${event}${matcher}: ${runs ? hook.command : JSON.stringify(hook)}`;
-          const id = JSON.stringify(["hook", event, group.matcher ?? "", runs ? ["command", hook.command] : ["other", hook]]);
+          const id = JSON.stringify(["hook", event, group.matcher ?? "", hook]);
           // (two hooks of one name that are not the same hook, as a command and a text that reads the same: neither is
           // told apart from the other in the list)
           if (ids.has(name) && ids.get(name) !== id) problems.push(`${file}: two of the ${show(event)} hooks share the name ${show(name.slice(5))} and are not the same hook. Mend: give the one a command of its own, or take one out`);
