@@ -9,7 +9,8 @@
 // only; the core's address: core-address.mjs, beside this file.
 //
 //   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main, or its newest
-//                                           release where it follows the releases (releases.mjs, beside this file)
+//                                           release where it follows the releases (releases.mjs, beside this file),
+//                                           unless that release changes nothing the project takes (staysAt there)
 //   node core/scripts/sync.mjs <full SHA>   to that commit of the core's main, whatever the project follows
 //
 // The first copy: a project with its manifest written and no core/ yet runs this file from a clone of the core's main
@@ -21,7 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past, releasesIn } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -48,6 +49,7 @@ function sync(tmp) {
       const newest = newestRelease(old, tmp);
       if (!newest) { console.log("the core has cut no release yet: nothing to sync (a full SHA takes a commit of its main)"); return; }
       if (!newest.moved) { console.log(`core/ is at or past the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}): nothing to sync`); return; }
+      if (staysAt(old, text, tmp)) { console.log(`the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}), changes nothing this project takes since ${old.slice(0, 7)}, the release before it: core/ stays there, nothing to sync until the next release (README.md, point 1; a full SHA takes it all the same)`); return; }
       pin = newest.sha; release = ` (${newest.name})`;
     }
   }

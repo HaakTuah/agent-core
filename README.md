@@ -57,14 +57,29 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
    the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
-   this README or a script says the core has moved, it has moved only when such a release is cut; a full SHA still takes
-   any commit of `main`, but such a sync is no pure sync there: it is reviewed like any PR (core archive 201). Why: a
-   pure sync brings scripts, hooks and workflows that no review in the project reads (floor rule 8), so what another
-   owner's project runs was reviewed in the core alone, and its owner takes only what the core's owner chose to hand on.
-   So that nothing of the core's newer than a release runs in such a project's sessions either, its merger runs
-   `scripts/pure-sync.mjs` from a checkout of the release the sync moves to, itself a commit of `main` (floor rule 8; a
-   sync to a commit that is no release is no pure sync, and any check of it is run from the core's `main`), and its
-   first copy is made from a clone at a release.
+   this README or a script says the core has moved, it has moved only when such a release is cut and asks a sync of the
+   project (below); a full SHA still takes any commit of `main`, but such a sync is no pure sync there: it is reviewed
+   like any PR (core archive 201). Why: a pure sync brings scripts, hooks and workflows that no review in the project
+   reads (floor rule 8), so what another owner's project runs was reviewed in the core alone, and its owner takes only
+   what the core's owner chose to hand on. So that nothing of the core's newer than a release runs in such a project's
+   sessions either, its merger runs `scripts/pure-sync.mjs` from a checkout of the release the sync moves to, itself a
+   commit of `main` (floor rule 8; a sync to a commit that is no release is no pure sync, and any check of it is run
+   from the core's `main`), and its first copy is made from a clone at a release.
+
+   **A release that brings nothing a project takes asks no sync of it** (#242; core archive 224). By default every
+   release past a project's pin is synced. Where the pin is the release just before the newest and nothing the project
+   takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes nothing, and
+   `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every file of the
+   core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does not name and
+   its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a project runs
+   names) and the core's own issue forms (`.github/ISSUE_TEMPLATE/`). In doubt it syncs: a change that cannot be read is
+   a change, and a module is taken where the list forgot it or the line says "all" or cannot be read. One release at
+   most is passed over, since the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at
+   the next release the project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays
+   whole and exact at its pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a
+   full SHA is refused. Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a
+   private repository, for a release that may bring it nothing. Held by `scripts/releases-test.mjs`,
+   `scripts/core-moved-test.mjs` and `scripts/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
@@ -116,8 +131,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      the core's workflows; `versions.yml` has none yet).
    - **A project whose orchestrator does not wake every day** also has a `look.yml` of its own, as its template has it
      (a daily schedule or a start by hand, and one job that may read the repository, its pull requests, checks and
-     statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while this repository's `main`
-     is past the project's pin (`core/scripts/core-moved.mjs`), then runs the scheduled look
+     statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while the core has
+     moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `modules/orchestrating.md`), and opens no pull request, since one a workflow opens gets
      no checks. A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
      reading no pull request, check or status with that job's token, until it moves to the template's. A session

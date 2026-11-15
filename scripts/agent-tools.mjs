@@ -1,4 +1,4 @@
-// The agent-tools check (floor topic 15, "An agent's own tools are code with its sign-ins"; core archive 224): every
+// The agent-tools check (floor topic 15, "An agent's own tools are code with its sign-ins"; core archive 225): every
 // plug-in, tool server, skill and hook a project configures for its agents is listed under "agentTools" in its licence
 // check's config, each entry { "kind", "name", "publisher", "version" }: kind one of plugin, server, skill, hook; a
 // publisher named; a version that is one exact version (as SemVer writes one) or a full 40-character commit, which a
