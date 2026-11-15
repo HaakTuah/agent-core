@@ -27,6 +27,8 @@ const issues = [
   { number: 5, title: "Pull requests that stand idle", state: "open", body: "y", user: { login: BOT }, pull_request: {} },
 ];
 const kept = mine(issues, "theowner");
+const twin = mine([{ number: 11, title: "A", state: "open", body: "", user: { login: BOT } }, { number: 12, title: "A", state: "open", body: "", user: { login: BOT } }, { number: 10, title: "A", state: "closed", body: "", user: { login: BOT } }], "o");
+ok(twin.get("A").number === 12 && twin.twins.map(t => t.number).join() === "11", "where two runs at once opened the same issue twice, the newest is kept and the older one still open is a twin to close");
 ok(kept.get("Labels and openers to mend")?.number === 9 && !kept.has("Pull requests that stand idle"),
   "its own are the job's and the owner's account's (any case), the newest of a title; another account's, and a pull request, are not", JSON.stringify([...kept]));
 
@@ -38,6 +40,8 @@ ok(lastRun("x\n\nLast run: 2026-11-16T05:41:02Z (GitHub's daily job).\n") === "2
 const run = (status, conclusion) => ({ status, conclusion });
 ok(checksOf([]) === "none" && checksOf([run("completed", "success"), run("completed", "skipped"), run("completed", "neutral")]) === "green",
   "no run is none; runs that all ended well are green");
+ok(checksOf([run("completed", "success")], { state: "pending", total_count: 2 }) === "waiting" && checksOf([], { state: "failure", total_count: 1 }) === "red" && checksOf([run("completed", "success")], { state: "pending", total_count: 0 }) === "green" && checksOf([], { state: "success", total_count: 1 }) === "green",
+  "the commit's statuses count beside its check runs: a review's status still pending is waiting, one failed is red; none set changes nothing");
 ok(checksOf([run("completed", "success"), run("in_progress", null)]) === "waiting" && checksOf([run("in_progress", null), run("completed", "failure")]) === "red" && checksOf([run("completed", "timed_out")]) === "red",
   "one still running is waiting; one that failed or timed out is red, whatever else runs");
 

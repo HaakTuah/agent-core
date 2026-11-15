@@ -105,12 +105,12 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
      permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
    - **A project whose orchestrator does not wake every day** also has a `look.yml` of its own, as its template has it
-     (a daily schedule or a start by hand, and one job that may read the repository, its pull requests and checks, and
-     write issues), calling the core's `look.yml`: it keeps one issue open for the owner while this repository's `main`
+     (a daily schedule or a start by hand, and one job that may read the repository, its pull requests, checks and
+     statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while this repository's `main`
      is past the project's pin (`core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `modules/orchestrating.md`), and opens no pull request, since one a workflow opens gets
      no checks. A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
-     reading no pull request or check with that job's token, until it moves to the template's. A session
+     reading no pull request, check or status with that job's token, until it moves to the template's. A session
      of the trusted builder's (floor rule 3) started with no orchestrator asks the same at its start
      (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
      `modules/work-flow.md`), so that issue is the backstop for the days no session starts.

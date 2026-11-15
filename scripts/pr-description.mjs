@@ -10,9 +10,9 @@
 // own PRs are not asked (the workflow leaves them out by their author).
 // It asks too the line that says what it waits on ("Nothing waits silently" in modules/git.md; core archive 218), in one
 // of the forms waitsOn reads, as the scheduled look reads it (look.mjs, beside this file), of a pull request opened
-// (PR_CREATED) on or after the day the copy on its base (BASE_SHA) gained it: of the commits since WAITS_SINCE that
-// changed this file there, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY), the oldest of the run of
-// newest ones whose file holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
+// (PR_CREATED) on or after WAITS_SINCE and the day the copy on its base (BASE_SHA) gained it: of the commits that
+// changed this file there, newest first, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY), the
+// oldest of the run of newest ones whose file holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
 // own pull request), nothing is asked, so a pull request that stood before the line came is never turned red by it.
 // Reads only: the description comes in PR_BODY, never on the command line; gh and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
@@ -38,7 +38,7 @@ export function waitsOn(body) {
   return { said, kind: FORMS.find(([, form]) => form.test(said))?.[0] ?? null };
 }
 
-// The day the copy gained the line, from the commits since WAITS_SINCE that changed it on the base, newest first
+// The day the copy gained the line, from the commits that changed it on the base, newest first
 // ([{ sha, date }]), and `holds`, whether the file at a commit holds it: the date of the oldest of the newest run that
 // holds it; null where the newest does not, or there is none.
 export function gainedAt(commits, holds) {
@@ -86,7 +86,7 @@ if (started(import.meta.url)) {
     const gh = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error("no answer"); return r.stdout; };
     let gained = null;
     try {
-      const commits = JSON.parse(gh(`repos/${repo}/commits?path=${file}&sha=${base}&since=${WAITS_SINCE}&per_page=100`)).map(c => ({ sha: c.sha, date: c.commit?.committer?.date }));
+      const commits = JSON.parse(gh(`repos/${repo}/commits?path=${file}&sha=${base}&per_page=100`)).map(c => ({ sha: c.sha, date: c.commit?.committer?.date })).filter(c => /^[0-9a-f]{40}$/.test(c.sha));
       gained = gainedAt(commits, sha => Buffer.from(JSON.parse(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8").includes("export const WAITS_SINCE"));
     } catch { gained = null; }
     if (gained && created >= String(gained)) mend = waitsMend(process.env.PR_BODY);

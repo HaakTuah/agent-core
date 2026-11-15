@@ -2,7 +2,7 @@
 # projects run from their copy (scripts/look.mjs), here from its source, once a day, with its monthly state report.
 # This repository only; no project calls it. Nothing is checked out but the default branch, and no text of a pull
 # request or an issue reaches a command: the script reads them through gh's answers alone. It may write issues, and
-# read pull requests and checks; nothing else.
+# read pull requests, checks and statuses; nothing else.
 name: own-look
 
 on:
@@ -22,6 +22,7 @@ jobs:
       issues: write
       pull-requests: read
       checks: read
+      statuses: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

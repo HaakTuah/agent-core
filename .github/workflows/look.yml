@@ -4,11 +4,12 @@
 # state report; modules/orchestrating.md, "The scheduled look"). One job, so a project gains no billed minute over the
 # core-moved job it ran before. A project calls it (workflow_call) from a daily schedule of its own (it runs on a
 # schedule or when started by hand, and on no other event), pinned to a full commit SHA, from a job that grants
-# `contents: read`, `issues: write`, `pull-requests: read` and `checks: read`, as the starter kit's look.yml has it
+# `contents: read`, `issues: write`, `pull-requests: read`, `checks: read` and `statuses: read`, as the starter kit's
+# look.yml has it
 # (core/setup/template/workflows/look.yml.tmpl). It runs the project's own scripts on the core's one exact Node; Node's
 # own modules only, no package installed. Nothing is checked out but the calling repository's default branch, and no
 # text of a pull request or an issue reaches a command: the scripts read them through gh's answers alone. It may write
-# issues, and read pull requests and checks; nothing else.
+# issues, and read pull requests, checks and statuses; nothing else.
 name: look
 
 on:
@@ -29,6 +30,7 @@ jobs:
       issues: write
       pull-requests: read
       checks: read
+      statuses: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

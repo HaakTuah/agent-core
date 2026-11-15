@@ -64,12 +64,14 @@ export const lastRun = body => /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.e
 // Hours from one time to another, as a number with one decimal.
 const hoursBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 360000) / 10;
 
-// A pull request's checks, from its head commit's check runs as GitHub gives them: green where every one ended well,
-// red where one failed, waiting while one runs, none where there are none.
-export function checksOf(runs) {
-  if (!runs.length) return "none";
-  if (runs.some(r => ["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"].includes(r.conclusion))) return "red";
-  if (runs.some(r => r.status !== "completed")) return "waiting";
+// A pull request's checks, from its head commit's check runs and its combined commit status (the reviews' statuses,
+// security-review and code-review among them) as GitHub gives them: green where every one ended well, red where one
+// failed, waiting while one runs or a status is pending, none where there are none.
+export function checksOf(runs, status = null) {
+  const states = status && status.total_count > 0 ? [status.state] : [];
+  if (!runs.length && !states.length) return "none";
+  if (runs.some(r => ["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"].includes(r.conclusion)) || states.some(s => s === "failure" || s === "error")) return "red";
+  if (runs.some(r => r.status !== "completed") || states.includes("pending")) return "waiting";
   return "green";
 }
 
@@ -105,15 +107,18 @@ export function plan(finding, issue, unread = false) {
 }
 
 // The issues the look keeps, from those labelled by:look: opened by GitHub's job or by the owner's account (a session's
-// run), the newest of each title.
+// run), the newest of each title; and in `twins`, the older ones of a title still open, which two runs at once (GitHub's
+// job and an orchestrator's) can leave, for the look to close.
 export function mine(issues, owner) {
-  const by = new Map();
+  const by = new Map(), twins = [];
   for (const i of [...issues].sort((a, b) => a.number - b.number)) {
     const login = String(i.user?.login ?? "");
     if (i.pull_request || !(login === BOT || login.toLowerCase() === String(owner).toLowerCase())) continue;
+    const was = by.get(i.title);
+    if (was?.state === "open") twins.push(was);
     by.set(i.title, { number: i.number, state: i.state, body: i.body ?? "", created_at: i.created_at });
   }
-  return by;
+  return Object.assign(by, { twins });
 }
 
 // An issue's text as the look writes it: what it is, then where it was found and its attribution line.
@@ -167,12 +172,12 @@ function main(args) {
     const api = (route, jq) => ghApi(route, "--jq", jq);
     const lanes = stalled(openPulls(repo, api), Date.now(), HOURS);
     for (const l of lanes) {
-      try { l.checks = checksOf(pagesOf(`repos/${repo}/commits/${l.sha}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? []))); }
-      catch { l.checks = "not read (the token may not read checks)"; }
+      try { l.checks = checksOf(pagesOf(`repos/${repo}/commits/${l.sha}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? [])), JSON.parse(ghApi(`repos/${repo}/commits/${l.sha}/status`))); }
+      catch { l.checks = "not read (the token may not read checks and statuses)"; }
     }
     add(TITLES.idle, lanes.length ? idleBody(lanes, HOURS) : null);
   } catch {
-    add(TITLES.idle, null, `the open pull requests could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`pull-requests: read\` and \`checks: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
+    add(TITLES.idle, null, `the open pull requests could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`pull-requests: read\`, \`checks: read\` and \`statuses: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
   }
   // steps of a release not done, in a project
   let stepsLeft = null;
@@ -193,9 +198,15 @@ function main(args) {
   // the state report, once a month
   const month = monthOf(at), reportTitle = `${REPORT}, ${month}`;
   let monthly = null;
-  if (reach.yes && !kept.has(reportTitle)) {
+  // (in the inbox, a month's report is written once: while no commit has held its file)
+  const reportFile = path.join(FOLDER, slug(reportTitle));
+  const written = !reach.yes && spawnSync("git", ["log", "--all", "--format=%H", "-1", "--", reportFile], { encoding: "utf8" }).stdout.trim() !== "";
+  if (reach.yes ? !kept.has(reportTitle) : !written && !fs.existsSync(reportFile)) {
     const previous = [...kept.entries()].filter(([t]) => t.startsWith(`${REPORT}, `) && t < reportTitle).sort(([a], [b]) => a.localeCompare(b)).at(-1)?.[1] ?? null;
-    const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24).map(([t, i]) => ({ number: i.number, title: t, since: i.created_at }));
+    // (open since its last reopening, where the look reopened it: a task that came back is not one that stood)
+    const since = i => { try { return pagesOf(`repos/${repo}/issues/${i.number}/events`).filter(e => e.event === "reopened").map(e => e.created_at).sort().at(-1) ?? i.created_at; } catch { return i.created_at; } };
+    const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
+      .map(([t, i]) => ({ number: i.number, title: t, since: since(i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft });
     monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), previous: previous?.body ?? null, overdue, counts, scripts });
   }
@@ -219,6 +230,12 @@ function main(args) {
       say(`- ${f.title}: ${file}${toInbox && !dry ? " written" : ""}.`);
       if (toInbox && !dry) { fs.mkdirSync(FOLDER, { recursive: true }); fs.writeFileSync(file, content); } else if (!toInbox) say(content);
     }
+    if (monthly) {
+      say(`- ${reportTitle}: ${reportFile}${toInbox && !dry ? " written" : ""}.`);
+      const content = inboxFile(reportTitle, monthly, carrier);
+      if (toInbox && !dry) { fs.mkdirSync(FOLDER, { recursive: true }); fs.writeFileSync(reportFile, content); } else if (!toInbox) say(content);
+    }
+    say("Its record is kept in an issue, so here no run is recorded and none is said missed: the session that runs it on its wake is the record.");
     return 0;
   }
   const close = (number, why) => {
@@ -239,6 +256,11 @@ function main(args) {
       else if (shown === "close") close(issue.number, "nothing of this stands today, so this closes; it opens again if it comes back.");
     } catch (e) { did.push(`  ${e.message}`); }
   };
+  // (an older twin of an issue it keeps, left by two runs at once, is closed: never a second issue for the same thing)
+  for (const t of kept.twins ?? []) {
+    did.push(`a second issue of the same thing: closed (#${t.number})`);
+    if (!dry) try { close(t.number, "another issue of the look's holds this same thing, so this one closes."); } catch (e) { did.push(`  ${e.message}`); }
+  }
   for (const f of findings) act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed });
   if (monthly) act(reportTitle, text(monthly, carrier), null, null);
   // the record, written last: a closed issue of its own
