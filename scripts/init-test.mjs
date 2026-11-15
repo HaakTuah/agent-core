@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
-import { FILES, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
+import { FILES, GAME_ROWS, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
 import { mended } from "./mend.mjs";
 
@@ -223,6 +223,17 @@ if (p.status === 0) {
 }
 const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game");
 ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/licences.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(q.dir, "checks/licences.json")), "a private project without npm gets no call to CodeQL, the licence workflow or the signature check, and still its licence config", q.out.slice(0, 400));
+// (every kind the program writes: the core's manifest check, run in the project, gives no note on its first day, #329)
+for (const [what, r] of [["an npm project", p], ["a private game", q]]) {
+  if (r.status !== 0) continue;
+  const m = spawnSync(process.execPath, ["core/scripts/manifest-reads.mjs"], { cwd: r.dir, env, encoding: "utf8" });
+  ok(m.status === 0 && m.stdout.startsWith("ok ") && !m.stdout.includes("note "), `${what}: the core's manifest check, run in it, gives no note`, m.stdout.slice(0, 600));
+}
+if (q.status === 0) {
+  const qManifest = fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8"), left = q.out.split("\n");
+  ok(GAME_ROWS.every(([slot, what]) => qManifest.includes(`\n| *${slot}* | FILL IN: ${what} |\n`) && left.some(l => /^  core-manifest\.md:[0-9]+: /.test(l) && l.endsWith(`: ${what}`))),
+    "a game's manifest has a row for each slot game-design.md uses, each left to fill and named, without its table's bar, in what is left", q.out.slice(0, 1500));
+}
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");

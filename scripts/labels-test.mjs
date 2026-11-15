@@ -1,7 +1,7 @@
 // Tests of the labels and openers (labels.mjs): the list's shape, an agent's attribution line, a comment's opening line,
 // the "Found while:" line, a view's heading, the labels to make, what the check reports of each kind and of none; and,
-// on Linux and macOS, the script itself where gh gives no answer, which reports that and fails nothing. Node's own
-// modules and git.
+// on Linux and macOS, the script itself where gh gives no answer, which reports that and fails nothing, and the day it
+// reads from in a full clone, a shallow one and where git cannot start. Node's own modules and git.
 //
 //   node scripts/labels-test.mjs
 import { spawnSync } from "node:child_process";
@@ -118,6 +118,33 @@ if (process.platform !== "win32") {
     ok(m.status === 0 && /could not be read here/.test(m.stdout), "--make where gh gives no answer makes nothing and fails nothing", `${m.stdout}${m.stderr}`);
     const bad = spawnSync(process.execPath, [script, "--since", "soon"], { cwd: repo, env, encoding: "utf8" });
     ok(bad.status === 1 && /--since needs a date/.test(bad.stderr), "a wrong option fails, saying what it takes");
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+// The day the rule came for the copy here (sinceHere): from git's history, in a shallow clone and with no git at all.
+if (process.platform !== "win32") {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "labels-since-"));
+  try {
+    const full = path.join(tmp, "full"), env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+    const git = (cwd, date, ...a) => spawnSync("git", a, { cwd, env: { ...env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }, encoding: "utf8" });
+    fs.mkdirSync(full);
+    git(full, "", "init", "-q", "-b", "main");
+    const commit = (date, file) => { fs.mkdirSync(path.dirname(path.join(full, file)), { recursive: true }); fs.writeFileSync(path.join(full, file), date); git(full, date, "add", "-A"); git(full, date, "commit", "-q", "-m", date); };
+    commit("2027-01-05T08:00:00Z", "a.txt");
+    commit("2027-01-20T09:00:00Z", "b.txt");
+    commit("2027-02-01T09:00:00Z", "core/scripts/labels.mjs");
+    commit("2027-04-01T09:00:00Z", "c.txt");
+    const since = (cwd, extra = {}) => spawnSync(process.execPath, ["--input-type=module", "-e", `import { sinceHere } from ${JSON.stringify(new URL("./labels.mjs", import.meta.url).href)}; console.log(sinceHere());`], { cwd, env: { ...env, ...extra }, encoding: "utf8" }).stdout.trim();
+    ok(since(full) === "2027-02-01T09:00:00Z", "from the day git's history shows the copy gained the check", since(full));
+    const deep = path.join(tmp, "deep"), shallow = path.join(tmp, "shallow");
+    git(tmp, "", "clone", "-q", "--depth", "3", `file://${full}`, deep);
+    git(tmp, "", "clone", "-q", "--depth", "1", `file://${full}`, shallow);
+    ok(since(deep) === "2027-02-01T09:00:00Z", "a shallow clone whose history holds the add reads it", since(deep));
+    ok(since(shallow) === SINCE, "a shallow clone that shows the file only on its boundary commit reads the rule's own day, never a later one", since(shallow));
+    const noGit = path.join(tmp, "no-git");
+    fs.mkdirSync(noGit);
+    fs.symlinkSync(process.execPath, path.join(noGit, "node"));
+    ok(since(full, { PATH: noGit }) === SINCE, "where git cannot start, the rule's own day", since(full, { PATH: noGit }));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
