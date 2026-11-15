@@ -70,6 +70,9 @@ saved data; a weakened check).
   - Excepted: the GitHub account in the repository's own address; the name and address GitHub itself writes as the
     author of a commit it makes and signs (a merge, an edit on github.com), from the profile of the account that acts,
     where its owner keeps them there; and the company name a project is sold under, naming no person.
+  - Excepted too: a copyright holder's name, a person's or a company's, that the holder alone types into `LICENSE` or
+    `NOTICE` at a repository's root or in its copy of the core, no session told it or writing it, and nothing else
+    there (core archive 221). Reason: an account's name can change.
 - The owner's archived words leave such details out as "[…]".
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 

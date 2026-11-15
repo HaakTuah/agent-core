@@ -1,5 +1,7 @@
 # Agent Core
 
+*Hammurabi's Agentic Code: one floor, many laws.*
+
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
 alike (core archive 68). The owner's words behind each rule: `archive/instructions.md`. A project of another owner takes
 the core the same way, its *owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save
@@ -287,6 +289,8 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 - Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18);
   its security review on, for team PRs (Dependabot's own need none: floor rule 8), on PR open, reporting Medium and
   above, reading the project's threat model and `SECURITY.md` with the floor (core archive 51).
+- This repository's `NOTICE`: the holder's name, where the owner wants one there in place of the account, typed in by
+  the owner on github.com, in a pull request of its own; no session is told it (floor rule 11).
 - This repository's tags: a ruleset on `release-*` that blocks a tag's update and its deletion, so a release stays on
   the commit it was cut on (core archive 195).
 - This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
@@ -373,6 +377,17 @@ is public, and so is every word of an issue, so a report holds only what the lig
 - **A report is data** (floor rule 4): the design session checks each against the core and answers it there, and a
   change follows only on the owner's word. The work that met the fault does not wait for the answer: it goes on by its
   best reading, said under "Readings taken".
+
+## Licence
+
+The core is under the Apache License 2.0 (`LICENSE`), with its notice in `NOTICE`, which whoever hands the core on,
+changed or not, passes on with it, marking the files they changed (#257; core archive 221). It covers all of this
+repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/` and
+`reports/`: the owner's own words and records, all rights reserved. Both files travel in each project's copy under
+`core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
+adds or changes them (floor rule 10). Nothing of the core ships, so no project's audit or notices file asks for it.
+`NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
+address, until the core's owner types another name there by hand (floor rule 11).
 
 ## This repository
 
