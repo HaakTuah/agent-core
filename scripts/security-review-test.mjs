@@ -28,6 +28,7 @@ const said = (body, assoc = "OWNER", at = "2026-11-12T11:00:00Z") => ({ user: { 
 // a finding of Codex's security review, as its app posts one on a line of the change
 const finding = (at, who = { login: "chatgpt-codex-connector[bot]", type: "Bot" }) => ({ user: who, author_association: "NONE", created_at: at, path: "a.js", line: 3, body: "<!-- codex-security-review-finding:v1 -->\n\n### Codex Security Review\n\nA finding." });
 const open = { ...done, has_any_findings: true, has_unresolved_findings: true };
+const NOT_FOUND = "not among the comments: post a \"Security review:\" now";
 const is = (verdict, isDone, words) => verdict?.sha === HEAD && verdict.done === isDone && verdict.why.includes(words);
 
 // Two summaries Codex's app really posted on this repository's pull requests, byte for byte as GitHub's API gives them
@@ -38,7 +39,7 @@ const REAL_FINDING = "<!-- codex-pull-request-review-summary -->\n<!-- codex-rev
 const real = (body, at = "2026-11-14T01:13:56Z") => ({ user: { login: "chatgpt-codex-connector[bot]", type: "Bot" }, author_association: "NONE", updated_at: at, body });
 ok(is(judge(pull, [real(REAL_CLEAN)]), true, "has run (on be5f096)") && judge(pull, [real(REAL_CLEAN)]).warning === undefined, "a real summary of Codex's, its security review completed with no finding, is read as one: no warning");
 ok(is(judge(pull, [real(brace(REAL_CLEAN))]), true, "has run (on be5f096)") && judge(pull, [real(brace(REAL_CLEAN))]).warning === undefined, "and the same with each brace written as an entity, as a delivery may show it");
-ok(is(judge(pull, [real(REAL_FINDING)]), false, "no review posted after it") && judge(pull, [real(REAL_FINDING)]).warning === undefined, "a real summary with a finding marked open is read as one too");
+ok(is(judge(pull, [real(REAL_FINDING)]), false, NOT_FOUND) && judge(pull, [real(REAL_FINDING)]).warning === undefined, "a real summary with a finding marked open is read as one too");
 // a summary of Codex's whose state cannot be read: a warning beside a verdict that is what it would be with no summary
 for (const [what, body] of [
   ["a state line of another version", REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2")],
@@ -96,14 +97,32 @@ ok(old.done === true && old.why.startsWith("before this check came, so not waite
 ok([true, false].every((a) => status(judge(pull, [summary(running), early]), a).description.endsWith("post one now") && status(old, a).description.endsWith("\"Security review:\"")), "the status says it whole, within GitHub's 140 characters, before the check came too");
 
 // A finding of Codex's security review marked open: only a review posted after its newest finding settles it.
-ok(is(judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), false, "no review posted after it") && is(judge(pull, [summary(open)]), false, "no review posted after it"), "a finding marked open and no review posted: it waits");
+ok(is(judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), false, "no review posted after it") && is(judge(pull, [summary(open)]), false, NOT_FOUND), "a finding marked open and no review posted: it waits");
 ok(is(judge(pull, [summary(open), said("Security review: the second reviewer's", "OWNER", "2026-11-12T10:00:00Z")], [finding("2026-11-12T10:30:00Z")]), false, "no review posted after it"), "a review posted before the finding does not settle it");
 ok(is(judge(pull, [summary(open), said("Security review: the fix checked, nothing left", "OWNER", "2026-11-12T11:00:00Z")], [[finding("2026-11-12T10:30:00Z")]]), true, "a review is posted after its newest finding"), "a review posted after the finding settles it");
 ok(is(judge(pull, [summary(open), said("Security review: the first fix checked", "OWNER", "2026-11-12T11:00:00Z")], [finding("2026-11-12T10:30:00Z"), finding("2026-11-12T11:30:00Z")]), false, "no review posted after it") && is(judge(pull, [summary(open), said("Security review: the first fix checked", "OWNER", "2026-11-12T11:00:00Z"), finding("2026-11-12T11:30:00Z")], []), false, "no review posted after it"), "a newer finding, among the review comments or the plain ones, asks for a newer review");
 ok(is(judge(pull, [summary(open), said("Security review: fine", "NONE", "2026-11-12T11:00:00Z")], [finding("2026-11-12T10:30:00Z")]), false, "no review posted after it") && is(judge(pull, [summary(open), { ...said("Security review: fine"), created_at: "soon" }], [finding("2026-11-12T10:30:00Z")]), false, "no review posted after it"), "nor does anyone else's comment settle it, or one with no time to it");
 ok(is(judge(pull, [summary(open), said("Security review: the fix checked", "OWNER", "2026-11-12T11:00:00Z")], [finding("2026-11-12T12:00:00Z", { login: "someone", type: "User" }), { ...finding("2026-11-12T12:00:00Z"), body: "A P1.\n<!-- codex-code-review-finding:v1 -->" }, null, "x"]), true, "its open finding is not among the comments"), "a look-alike finding from another account, and a finding of the code review, ask for nothing");
 ok(is(judge(pull, [summary(open), said("Security review: the fix checked")], [{ ...finding("x"), created_at: null }]), false, "no review posted after it"), "a finding with no time to it is taken as the newest");
-ok(is(judge(pull, [summary(open), said("Security review: the fix checked")]), true, "its open finding is not among the comments"), "marked open with no finding to be found: a posted review settles it, and the status says no finding was found");
+ok(is(judge(pull, [summary(open), said("Security review: the fix checked")]), true, "its open finding is not among the comments, and a review is posted after it"), "marked open with no finding to be found: a review posted after Codex's summary last changed settles it, and the status says no finding was found");
+// #251: the finding not to be found (one in a review's own body, say), a review posted before Codex's summary last
+// changed, the latest the finding can have come, settles nothing, whoever posted it
+const late = summary(open, "2026-11-12T12:00:00Z");
+ok(is(judge(pull, [late, said("Security review: the fix checked")]), false, NOT_FOUND) && is(judge(pull, [summary(open, "2026-11-12T11:00:00Z"), said("Security review: same second")]), false, NOT_FOUND), "a review posted before the summary last changed, or in the same second, does not settle a finding not to be found: it waits, saying the mend");
+ok(is(judge(pull, [late, said("Security review: before"), said("Security review: the fix checked", "MEMBER", "2026-11-12T12:30:00Z")]), true, "a review is posted after it"), "one posted after the summary last changed does, whatever was posted before");
+ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...late, updated_at: at }, said("Security review: x")]), false, NOT_FOUND)) && is(judge(pull, [summary(open), { ...said("Security review: x"), created_at: "soon" }]), false, NOT_FOUND), "a summary, or a review, with no time that can be read: nothing counts as posted after it");
+// #293: a finding found, and a newer one given in a review's own body alone: a review posted after the one found but
+// before Codex's summary last changed settles nothing either
+const SINCE = "but its summary changed since: post a \"Security review:\" now";
+ok(is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T11:00:00Z")], [finding("2026-11-12T10:30:00Z")]), false, SINCE) && is(judge(pull, [summary(open, "2026-11-12T11:00:00Z"), said("Security review: same second")], [finding("2026-11-12T10:30:00Z")]), false, SINCE), "a review after the finding found but before the summary last changed, or in the same second, does not settle the mark: it waits, saying the mend");
+ok(is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T12:30:00Z")], [finding("2026-11-12T10:30:00Z")]), true, "after its newest finding") && is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T12:30:00Z")], [finding("2026-11-12T13:00:00Z")]), false, "no review posted after it"), "one after both settles it; one after the summary's change but before a finding found does not");
+ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...late, updated_at: at }, said("Security review: x", "OWNER", "2026-11-12T12:30:00Z")], [finding("2026-11-12T10:30:00Z")]), false, SINCE)), "a summary with no time that can be read: nothing counts as posted after it");
+const after = judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T11:00:00Z")], [finding("2026-11-12T10:30:00Z")], [], undefined, false);
+ok(after.done === true && after.why.startsWith("before this check came, so not waited for: Codex's summary changed after the review") && is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T10:00:00Z")], [finding("2026-11-12T10:30:00Z")], [], undefined, false), false, "no review posted after it"), "a pull request from before the check is told of the summary's change, never held; one with no review after the finding found waits, as it did before");
+ok([true, false].every((a) => status(judge(pull, [late, said("Security review: x")], [finding("2026-11-12T10:30:00Z")]), a).description.endsWith(SINCE) && status(after, a).description.endsWith("its newest finding")), "the status says it whole, within GitHub's 140 characters, before the check came too");
+const unfound = judge(pull, [late, said("Security review: the fix checked")], [], [], undefined, false);
+ok(unfound.done === true && unfound.why.startsWith("before this check came, so not waited for: Codex's open security finding is not among the comments") && is(judge(pull, [late], [], [], undefined, false), false, NOT_FOUND), "a pull request from before the check is told the finding is not found and no review after it, never held; with no review posted at all it waits, as it did before");
+ok([true, false].every((a) => status(judge(pull, [late, said("Security review: x")]), a).description.endsWith("post a \"Security review:\" now") && status(unfound, a).description.endsWith("nor a review after it")), "the status says it whole, within GitHub's 140 characters, before the check came too");
 
 // Dependabot's own pull request.
 const bump = { ...pull, user: { login: "dependabot[bot]", type: "Bot" }, head: { sha: HEAD, repo: { full_name: "o/r" } }, base: { repo: { full_name: "o/r" } } };
