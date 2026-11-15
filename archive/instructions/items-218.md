@@ -331,33 +331,3 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind the core's own files named in "A release that brings nothing a project takes asks no sync of it" in
      `README.md`, "How a project takes the core", point 1, and `OWN_FILES` in `scripts/releases.mjs`.
-
-228. **14 and 15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not
-     the design session, as that session recorded it on issue #235, labelled `by:chat`, its note "What this issue asks
-     to be built, in one place" gathering what the owner agreed to). Of an audit that found 43 of 122 rules held by
-     nothing but a session reading them, and of staged cases that would test those rules on a fresh session, the
-     owner said:
-
-     > We need to address everything you identified.
-
-     and agreed to: staged cases, each a scratch project in which a fresh session is given a task where one rule is easy
-     to break, passed or failed by a script on what the session did, never on what it says of itself; advisory at
-     first, and holding a release only once they have been right for a while; eight cases so far, two of them from that
-     day's work (a builder that finishes without the owner, and a stricter check that meets old content); run under
-     each agent tool, a tool working with the core once it passes them; and every rule of the floor and the modules,
-     the old ones too, naming what holds it, one of three (a check that fails where it is broken, a staged case, or the
-     scheduled audit), a script listing those with none until they gain one or go on the owner's word, a staged case
-     the holder of last resort. Of running the cases before each release, the core's first five releases having been
-     cut within 21 hours:
-
-     > When multiple releases can in theory be daily, this might not be the best measurement.
-
-     So they run once a month, with the state report, and when a rule that has a case changes, as the owner agreed. To
-     the orchestrator, passed on word for word to the builder of this rule:
-
-     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
-     > it: quote this in those pull requests.
-
-     Behind "Every rule says what holds it" and "Staged cases hold what no check reads" in `AGENTS.md`,
-     `scripts/holders.json` and `scripts/holders.mjs`, `scripts/staged.mjs` and `scripts/staged/`, and the staged
-     cases' reader in `scripts/look.mjs` and gate in `scripts/release.mjs`.
