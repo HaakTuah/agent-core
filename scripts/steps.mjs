@@ -58,13 +58,14 @@ export function project(root) {
 // A workflow the core's reader cannot read (workflow-run.mjs reads the forms the core's own workflows use): a check that
 // would read it throws, naming it, so the step is reported as not read, never as done or as missing.
 export class Unread extends Error {}
+// (`mentions` says, from a workflow's text, whether the check would read it)
 const readable = (p, mentions) => {
-  const unread = Object.entries(p.workflows).filter(([, w]) => !w.yaml && mentions.test(w.text ?? "")).map(([f]) => `.github/workflows/${f}`);
+  const unread = Object.entries(p.workflows).filter(([, w]) => !w.yaml && mentions(w.text ?? "")).map(([f]) => `.github/workflows/${f}`);
   if (unread.length) throw new Unread(`the core's reader cannot read ${unread.join(", ")}, in a form it does not know`);
 };
 
 // A project's calls to a workflow of the core's, by the workflow's name: each its job (uses and with); and the first.
-export const calls = (p, name) => (readable(p, new RegExp(`/\\.github/workflows/${name.replace(/\./g, "\\.")}@`, "i")), Object.values(p.workflows))
+export const calls = (p, name) => (readable(p, text => text.toLowerCase().includes(`/.github/workflows/${name}@`.toLowerCase())), Object.values(p.workflows))
   .flatMap(({ yaml }) => Object.values(yaml?.jobs ?? {}))
   .filter(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/${name}@`.toLowerCase()));
 export const call = (p, name) => calls(p, name)[0] ?? null;
@@ -99,7 +100,7 @@ export const STEPS = [
     check: p => {
       const file = p.workflows["signatures.yml"];
       if (!file) return null;
-      readable({ workflows: { "signatures.yml": file } }, /./);
+      readable({ workflows: { "signatures.yml": file } }, () => true);
       const pr = file.yaml?.on?.pull_request;
       if (!file.yaml || pr === undefined) return "`.github/workflows/signatures.yml` runs on every pull request (`on: pull_request:`), as `core/setup/template/workflows/signatures.yml.tmpl` has it.";
       return pr && (pr.paths || pr["paths-ignore"]) ? "`.github/workflows/signatures.yml` has no `paths:` or `paths-ignore:` under `pull_request:`: the core's workflow looks itself whether a package file changed." : null;
@@ -110,7 +111,7 @@ export const STEPS = [
     check: p => {
       if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith("core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
-      readable(p, /licences\.mjs/);
+      readable(p, text => text.includes("licences.mjs"));
       const own = Object.entries(p.workflows).filter(([, w]) => /core\/scripts\/licences\.mjs/.test(w.text ?? ""));
       return own.length && !own.some(([, w]) => /core\/scripts\/exact-versions\.mjs/.test(w.text ?? ""))
         ? `The workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/exact-versions.mjs <its config>\` beside it, as the core's \`licences.yml\` does.` : null;
@@ -154,7 +155,7 @@ export const STEPS = [
     check: p => {
       // (a command, at a line's start or after ; & | or (, that is a file under core/scripts/ by its path alone)
       const bare = /(?:^|[;&|(])\s*(?:\.\/)?core\/scripts\/[\w.-]+/m;
-      readable(p, /core\/scripts\//);
+      readable(p, text => text.includes("core/scripts/"));
       const by = Object.entries(p.workflows).filter(([, w]) => Object.values(w.yaml?.jobs ?? {}).some(job => (job?.steps ?? [])
         .some(s => typeof s?.run === "string" && bare.test(s.run.split("\n").filter(l => !/^\s*#/.test(l)).join("\n")))));
       return by.length ? `No workflow runs a file under \`core/scripts/\` by its path alone: start it with \`bash\` (a .sh) or \`node\` (a .mjs). In: ${by.map(([f]) => `.github/workflows/${f}`).join(", ")}.` : null;
