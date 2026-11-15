@@ -23,8 +23,8 @@ ok(plan(null, open, true) === "nothing" && plan("b", open, true) === "nothing", 
 const readers = [() => null, () => ({ title: "One", body: "a" }), () => ({ title: "Two", body: null, unread: "its file is no file" }), () => ({ title: "Three", body: "c", owner: true })];
 ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what: "a", unread: null }, { title: "Two", what: null, unread: "its file is no file" }, { title: "Three", what: "c", unread: null, owner: true }]),
   "each reader of what is due gives its issue, one that has nothing to say gives none, and one says whether it is the owner's to see");
-ok(DUE.length === 3 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; Cleaning due: how the code is put together; An audit of how the code is put together is due",
-  "the look keeps an issue for the pass over the choices, for cleaning and for the audit by a reader");
+ok(DUE.length === 4 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; Cleaning due: how the code is put together; An audit of how the code is put together is due",
+  "the look keeps an issue for the pass over the choices, for cleaning and for the audit by a reader (and, in the core alone, the staged cases)");
 ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
   && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued" && relabelled(["later", "by:look"], true) === null && relabelled(["on-hold"], false) === null,
   "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
@@ -83,8 +83,9 @@ ok(inboxFile("Steps of a release not done", "x", "GitHub's daily job").startsWit
 
 // ---- the state report ----
 ok(before("2026-11") === "2026-10" && before("2027-01") === "2026-12", "the month before a month, across a year too");
-const core = body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], scripts: "scripts" });
-ok(/no baseline may stand/.test(core) && /Not counted: no script counts them yet/.test(core) && /- Nothing: no task the look keeps/.test(core) && /state-report\.mjs --projects/.test(core) && !/Counts for the core/.test(core),
+const core = body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], holders: null, scripts: "scripts" });
+ok(/^- Of \d+ rules of the floor and the modules: /m.test(body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], scripts: "scripts" })), "the core's report reads the rules by what holds them where it is given none");
+ok(/no baseline may stand/.test(core) && /Not read: `scripts\/holders\.mjs` could not read them/.test(core) && /- Nothing: no task the look keeps/.test(core) && /state-report\.mjs --projects/.test(core) && !/Counts for the core/.test(core),
   "the core's report: no baseline, the rules not guessed, nothing overdue, and the projects' part left to a session", core);
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });
