@@ -96,7 +96,7 @@ saved data; a weakened check).
   told.
 - A failing test is fixed, or its task marked blocked, and the work goes on.
 - **A run with a model has a cap** in tokens or money, set by the project where its code calls the model; at the cap
-  the run stops (core archive 226). It does not mean an agent's own session. Reason: a loop that calls a model spends
+  the run stops (core archive 227). It does not mean an agent's own session. Reason: a loop that calls a model spends
   without end.
 
 **18. Where agents hold sign-ins** (core archive 118 to 120, 122, 127 and 149).

@@ -47,6 +47,7 @@ function kit(name, o) {
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
+  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), "{\n  \"listed\": {}\n}\n");
   return dir;
 }
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
@@ -123,14 +124,14 @@ ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its
 fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
 ok(notDone(lockProject, inputs)[0]?.mend.includes("could not read the project"), "a SECURITY.md with no rule 5 is reported as not read, never as done");
 fs.writeFileSync(secFile, secAsKit);
-fs.rmSync(path.join(lockProject, "tests"), { recursive: true });
-fs.rmSync(path.join(lockProject, "src"), { recursive: true });
+// (only what this block wrote goes: an earlier stage's mend may have written its own tests there)
+for (const f of ["tests/hostile/link.test.mjs", "src/peer.mjs"]) fs.rmSync(path.join(lockProject, f));
 
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
 sec.stage(lockProject);
-ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported");
+ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported", report(notDone(lockProject)));
 declare(lockProject, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
 ok(!notDone(lockProject).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
 sec.mend(lockProject);

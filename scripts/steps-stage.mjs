@@ -1,7 +1,9 @@
 // For the tests alone (steps-test.mjs and upgrade-test.mjs, beside this file): for each step steps.mjs reads with a
 // check, how a project that missed it holds it (`stage`, written into the project at `dir`) and its mend as the step
 // words it (`mend`), so that a test can take a step out of a synced project, see the sync report exactly that, and
-// see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. Node's own modules.
+// see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. One marked
+// `asked` is a step a project that changed nothing of its own still has to do once a sync brings it (a check's own
+// list to write): upgrade-test.mjs sees it reported after the sync, alone, and done by its mend. Node's own modules.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -114,6 +116,15 @@ export const STAGES = {
       write(dir, "docs/PROGRESS.md", read(dir, "docs/PROGRESS.md").replace(/\n## Done\n[\s\S]*$/, "\n"));
       const m = JSON.parse(read(dir, "checks/sizes.json"));
       write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, read: { ...m.read, "docs/PROGRESS.md": Math.min(m.each - 1, fs.statSync(at(dir, "docs/PROGRESS.md")).size + 1024) } }, null, 2)}\n`);
+    },
+  },
+  "16 November 2026, how code is put together": {
+    asked: true,
+    stage: dir => { for (const f of ["checks/shape.json", "checks/shape-baseline.json"]) fs.rmSync(at(dir, f), { force: true }); },
+    // (as the step words it: the config as the starter kit writes it, then its first baseline)
+    mend: dir => {
+      write(dir, "checks/shape.json", read(dir, "core/setup/template/shape.json.tmpl"));
+      spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
 };

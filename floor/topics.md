@@ -20,14 +20,14 @@ The floor's rules for particular work.
 - It is never run, never fetched as an address, never setting a key or an address the app talks to.
 - The project names its inputs in its `SECURITY.md`, under this rule's number, each as an item of its own (`- `) that
   names, after the words "hostile tests:", the file or folder that holds them, in backticks.
-- **Every named input has hostile tests** (core archive 226): too long, the wrong type, markup, a file path, a number
+- **Every named input has hostile tests** (core archive 227): too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused with nothing of it used. Whoever adds an input, or changes the code
   that reads one, writes its tests in that pull request; an input named without them is a task of its own, which the
   sync's step "16 November 2026, hostile tests for every named input" reports.
   - It does not mean every field tried with every case, only each input with each case its shape allows, nor that a
     pull request waits on tests an input lacked before it. Reason: a check never tried with what an attacker sends
     holds nothing.
-- **A failure refuses** (core archive 226): where a check cannot be made (who is asking, whether it is allowed, whether
+- **A failure refuses** (core archive 227): where a check cannot be made (who is asking, whether it is allowed, whether
   it is well formed), the answer is no; an error a user sees names nothing of the program's insides (no stack, path,
   query or version).
   - It does not mean the program stops: it refuses that one request and goes on. Reason: a check that errors open
@@ -50,7 +50,7 @@ The floor's rules for particular work.
 - A check that cannot run, or fails, holds the release back.
 - A page's content security policy is never weakened.
 - The project names what it ships and its policy.
-- **A program installed on a user's machine** (core archive 226) asks for no more rights than a need its `SECURITY.md`
+- **A program installed on a user's machine** (core archive 227) asks for no more rights than a need its `SECURITY.md`
   names under this rule's number, and reading a saved file never runs code (no loader that builds whatever type the
   file names).
   - Where the project has a certificate for signing, its installers and updates are signed and its build checks the
@@ -70,7 +70,7 @@ The floor's rules for particular work.
   weakness" says, never in a file, PR, issue or comment) and fixed first, in a PR that says what it hardens, never how
   to attack it.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
-- **Secret scanning with push protection is switched on** in each repository that has it (core archive 226; floor rule
+- **Secret scanning with push protection is switched on** in each repository that has it (core archive 227; floor rule
   1): at the sync that brings this, and when a repository is made, in a public repository, where GitHub gives it free, a
   session whose sign-in may change the repository's settings switches it on; otherwise it files an issue for the owner,
   labelled `needs-owner`, naming the setting, and nothing waits on it.
@@ -117,7 +117,7 @@ The floor's rules for particular work.
   rule 7's source check, with the checks green.
 - One that fails a condition is closed with the reason, and the update made in a PR of the builder's own.
 
-**19. Accounts, roles and a server** (core archive 226). Read before a task touches a product's accounts, its roles
+**19. Accounts, roles and a server** (core archive 227). Read before a task touches a product's accounts, its roles
 or a server of its own; whoever writes or changes code that touches them keeps what follows, in that pull request.
 - Who may do what is decided on the side the user cannot alter (never in code or data the user's own device holds),
   and a request is refused unless a rule allows it.
