@@ -21,7 +21,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md` and `updates.md`; and, for games only, `game-design.md`.
+  `orchestrating.md`, `github-calls.md`, `updates.md` and `choices.md`; and, for games only, `game-design.md`.
 - **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
   stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
   every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
@@ -262,6 +262,8 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *planning design* | what planning design plans |
 | *hard work* | what counts as the hard work |
 | *major version checks* | the extra checks a new major version gets |
+| *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`modules/choices.md`; `scripts/choices.mjs` reads it); left out, `docs/choices.md`, which the starter kit writes |
+| *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`modules/choices.md`); left out, none |
 | *other builders' checks* | what a builder of another provider runs before it finishes (`modules/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
 | *other builders* | which other providers' tools build here, in order, and for each one the core has no part for, how it is handed a task; left out, Codex first, then the others as the project's rules list them (`modules/roles.md`, "The builders") |
 | *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, how each one the core has no part for is asked (it has Codex's and Copilot's, `modules/`), and which of its findings block where it marks none so; left out, the core's own: first a reviewer that cannot build here, then another builder's, last Claude's (`modules/roles.md`) |
@@ -399,4 +401,4 @@ address, until the core's owner types another name there by hand (floor rule 11)
 ## This repository
 
 How it takes its own core, and how changes are made here: `AGENTS.md`; the order of its own work: `QUEUE.md`; its
-security: `SECURITY.md`.
+choices that are hard to undo: `CHOICES.md`; its security: `SECURITY.md`.

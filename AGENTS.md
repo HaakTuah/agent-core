@@ -24,7 +24,7 @@ provider, `modules/other-builders.md`, though none builds here (the *other build
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/github-calls.md`, `modules/orchestrating.md` and `modules/updates.md`.
+`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md` and `modules/choices.md`.
 
 Not taken, each for its reason:
 
@@ -32,7 +32,7 @@ Not taken, each for its reason:
   player chooses to use, which are all that module governs.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
-the audits and the reports written before 12 November 2026); the archive is `archive/instructions.md`, cited "(core
+the audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is `archive/instructions.md`, cited "(core
 archive N)"; the *settling references* and the *descriptions*: `README.md`; the *large file*: past about 50 KB; the
 *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, and all that add to what
 every session reads at its start, whose cap they share, in the queue's order; the *design-checked PRs*: those that add

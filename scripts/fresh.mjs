@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { KIT as CHOICES, where } from "./choices.mjs";
 import { TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -111,8 +112,9 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
   const modules = fs.readdirSync(path.join(HERE, "modules")).filter(n => n.endsWith(".md"));
   try {
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
+    // (the choice records at the path the manifest names for them)
     const kit = files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"))
-      .map(([to, text]) => [to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
+      .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (templates !== path.join(HERE, TEMPLATES)) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
