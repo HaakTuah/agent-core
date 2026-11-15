@@ -292,11 +292,14 @@ export function csharpPackages(texts) {
   const ships = new Set(), declared = new Set();
   for (const [file, text] of Object.entries(texts)) {
     if (path.posix.extname(file) !== ".csproj") continue;
-    for (const m of text.matchAll(/<PackageReference\b([^>]*?)(\/>|>([\s\S]*?)<\/PackageReference>)/gu)) {
-      const id = /\b(?:Include|Update)\s*=\s*"([^"]+)"/u.exec(m[1])?.[1];
-      if (!id) continue;
+    // (each reference read up to the next, by indexOf alone, so that no file makes the reading slower than its length)
+    for (const part of text.split("<PackageReference").slice(1)) {
+      const end = part.indexOf(">"), attributes = end < 0 ? part : part.slice(0, end);
+      const body = attributes.endsWith("/") ? "" : part.slice(end + 1, Math.max(0, part.indexOf("</PackageReference>")));
+      const id = /\b(?:Include|Update)\s*=\s*"([^"]+)"/u.exec(attributes)?.[1];
+      if (!id || !/^\s/u.test(part)) continue;
       declared.add(id);
-      if (!/PrivateAssets\s*=\s*"all"/iu.test(m[1]) && !/<PrivateAssets>\s*all\s*<\/PrivateAssets>/iu.test(m[3] ?? "")) ships.add(id);
+      if (!/PrivateAssets\s*=\s*"all"/iu.test(attributes) && !/<PrivateAssets>\s*all\s*<\/PrivateAssets>/iu.test(body)) ships.add(id);
     }
   }
   return { ships, declared };

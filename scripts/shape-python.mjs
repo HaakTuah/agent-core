@@ -280,8 +280,23 @@ function moduleAt(parts, from, files) {
 // Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one.
 function bySuffix(parts, files) {
   const p = parts.join("/"), ends = [`${p}.py`, `${p}/__init__.py`];
-  const found = [...files].filter(f => ends.some(e => f === e || f.endsWith(`/${e}`)));
+  const found = ends.flatMap(e => (byName(files).get(path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e)) ?? []).filter(f => f === e || f.endsWith(`/${e}`)));
   return found.length === 1 ? found[0] : null;
+}
+
+// The project's Python files by their name (a package's __init__.py by its folder's: "pkg/__init__.py"), made once
+// for each set of files.
+const NAMED = new WeakMap();
+function byName(files) {
+  if (NAMED.has(files)) return NAMED.get(files);
+  const named = new Map();
+  for (const f of files) {
+    if (!f.endsWith(".py")) continue;
+    const name = path.posix.basename(f) === "__init__.py" ? `${path.posix.basename(path.posix.dirname(f))}/__init__.py` : path.posix.basename(f);
+    named.set(name, [...(named.get(name) ?? []), f]);
+  }
+  NAMED.set(files, named);
+  return named;
 }
 
 // A relative import's files: each name that is a module of its own, else the module it names.
