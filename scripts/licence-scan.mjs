@@ -137,44 +137,44 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const covering = (f) => entries.filter((e) => covers(e, f));
   const need = (name, where, version) => {
     const named = entries.filter((e) => e.name === name && e.kind !== "own");
-    if (!named.length) fail(`${name} (${where}) is not in ${auditPath}`);
-    else if (version && !named.some((e) => e.version === version)) fail(`${name}@${version} (${where}) is audited at ${named.map((e) => e.version ?? "no version").join(", ")}: audit the new version, and what it pulls in`);
+    if (!named.length) fail(`${name} (${where}) is not in ${auditPath}. Mend: add an entry for it there, with its name, exact version, licence and "ships"`);
+    else if (version && !named.some((e) => e.version === version)) fail(`${name}@${version} (${where}) is audited at ${named.map((e) => e.version ?? "no version").join(", ")}. Mend: audit the new version, and what it pulls in, in ${auditPath}`);
   };
   const needFile = (f, what, { own = true } = {}) => {
     const by = covering(f).filter((e) => own || e.kind !== "own");
-    if (!by.length) fail(`${f} (${what}) is not in ${auditPath}${own ? "" : ", by an entry not the owner's own"}`);
-    else if (served(f) && !by.every((e) => e.ships === true)) fail(`${f} (${what}) reaches users, so every entry covering it ships`);
+    if (!by.length) fail(`${f} (${what}) is not in ${auditPath}${own ? "" : ", by an entry not the owner's own"}. Mend: name ${f} in the "files" of the entry that audits it`);
+    else if (served(f) && !by.every((e) => e.ships === true)) fail(`${f} (${what}) reaches users, so every entry covering it ships. Mend: set "ships": true on each entry whose "files" covers it`);
   };
   const byHand = (f) => covering(f).some((e) => e.kind !== "own");
   const fetches = (text, f, literal = false) => {
     for (const line of commands(text, JS.test(f) || WEB.test(f), literal)) {
       const { specs, unreadable, packs } = fetched(String(line), line.atCommand === true, literal || line.literal === true);
       const where = `${f}, ${line.trim().replaceAll("\u0000", " ").slice(0, 120)}`;
-      if (unreadable) fail(`${where}: ${unreadable}, which cannot be audited (fetch it as npx -p <name>@<exact version>)`);
+      if (unreadable) fail(`${where}: ${unreadable}, which cannot be audited. Mend: fetch it as npx -p <name>@<exact version>`);
       for (const spec of specs) {
         const exact = EXACT.exec(spec);
         if (exact) need(exact[1], where, exact[2]);
-        else if (!(packs && byHand(f))) fail(`${where}: ${spec} cannot be audited (only name@exact.version${packs ? `, unless an entry's "files" names ${f}` : ""})`);
+        else if (!(packs && byHand(f))) fail(`${where}: ${spec} cannot be audited. Mend: write it as name@exact.version${packs ? `, or name ${f} in the "files" of the entry that audits it` : ""}`);
       }
     }
-    if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there`);
-    if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read`);
+    if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there. Mend: take that setting out`);
+    if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read. Mend: take that setting out`);
     const other = byHand(f) ? undefined : otherFetch(text);
-    if (other) fail(`${f}: ${other.trim()} fetches what no entry's "files" says (name ${f} in the entry that audits it)`);
+    if (other) fail(`${f}: ${other.trim()} fetches what no entry's "files" says. Mend: name ${f} in the "files" of the entry that audits it`);
   };
 
-  for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file (a folder ends in "/")`);
+  for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) {
-    if (e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p))) { fail(`${auditPath}: ${e.name}: "files" is not a list of paths`); continue; }
-    if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text`);
-    if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version`);
-    for (const p of e.files ?? []) if (!tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file`);
+    if (e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p))) { fail(`${auditPath}: ${e.name}: "files" is not a list of paths. Mend: write it as a list of paths from the project's root`); continue; }
+    if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text. Mend: write the version in quotes`);
+    if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version. Mend: list each file, no folder, and take "version" out`);
+    for (const p of e.files ?? []) if (!tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file. Mend: correct the path, or take it out`);
     const shipped = files.find((f) => served(f) && covers(e, f));
-    if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships`);
+    if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
   }
   const locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) {
-    if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences`);
+    if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
     const text = binary.has(f) ? "" : readFileSync(join(root, f), "utf8");
     // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
     // scan cannot read; with none, as shell)
@@ -199,18 +199,18 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
       let json;
       try { json = JSON.parse(text); } catch {
         // (a config with comments, as jsconfig.json and the like may hold: read whole, but a package.json must parse)
-        if (posix.basename(f) === "package.json") fail(`${f} cannot be read as JSON, so the commands in it cannot be scanned`);
+        if (posix.basename(f) === "package.json") fail(`${f} cannot be read as JSON, so the commands in it cannot be scanned. Mend: correct it to JSON`);
         else fetches(text.split(/\r?\n/u).map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
       }
       if (json !== undefined) {
         for (const line of commandLines(json)) fetches(String(line), f, line.literal === true);
         const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
         if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
-          fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences`);
+          fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile (npm install --package-lock-only) and name it in the config's "lockfiles"`);
       }
     } else if (other) {
-      if (!byHand(f)) fail(`${f} is in a language the scan cannot read: name it in the "files" of the entries of what it uses`);
-      else if (served(f) && !covering(f).every((e) => e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so every entry covering it ships`);
+      if (!byHand(f)) fail(`${f} is in a language the scan cannot read. Mend: name it in the "files" of the entries of what it uses`);
+      else if (served(f) && !covering(f).every((e) => e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so every entry covering it ships. Mend: set "ships": true on each entry whose "files" covers it`);
     }
     // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
     if (!binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });

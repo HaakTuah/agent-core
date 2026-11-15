@@ -30,7 +30,7 @@ const CHECKS = {
   "scripts/pointers.mjs": "scripts/pointers-test.mjs",
   "scripts/reading-size.mjs": "scripts/init-test.mjs",
   "scripts/workflows.mjs": "scripts/workflows-test.mjs",
-  "scripts/licences.mjs": "scripts/licences-test.mjs",
+  "scripts/licences.mjs": "scripts/licence-scan-test.mjs",
   "scripts/exact-versions.mjs": "scripts/exact-versions-test.mjs",
   "scripts/licence-installed.mjs": "scripts/licence-installed-test.mjs",
   "scripts/nuget.mjs": "scripts/nuget-test.mjs",
