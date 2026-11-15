@@ -10,8 +10,9 @@
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, or an account the caller names (the input "reviewers"),
 # which is how the fallback reviewer's or another reviewer's is posted (modules/reviews.md, point 3); a review of an
-# earlier commit than the head only where updates from main alone follow it, so that any other later commit needs such
-# a comment naming the head by its whole SHA; while Codex's own is running, only such a comment posted after it began,
+# earlier commit than the head only where updates from main alone follow it, each the merge git makes of its parents
+# (scripts/clean-merges.mjs proves which, #323), so that any other later commit needs such a comment naming the head,
+# or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after it began,
 # as Codex's summary shows; where Codex marks a finding of its security review open, only such a comment settles it,
 # posted after Codex's summary last changed and, where one is to be found, after its newest finding; nothing else
 # counts. A pure sync needs none where no review starts by itself (floor rule 8): the job runs the default branch's
@@ -49,9 +50,10 @@
 # collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token
 # could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
 # summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
-# status, nothing more. The proof of a pure sync fetches the head's commits into a clone of its own and checks out
-# nothing, so no file of the pull request's is written to disk or run; git is given the token for this repository's
-# own address alone, in that command's environment, and nothing writes it to disk. A posted review that is later
+# status, nothing more. The proofs of a pure sync and of the merges from main fetch the head's commits into a clone of
+# their own and check out nothing, so no file of the pull request's is written to disk or run (git's merge of two
+# commits writes only the trees it makes, into that clone); git is given the token for this repository's own address
+# alone, in the fetch's and pure-sync.mjs's environment, and nothing writes it to disk. A posted review that is later
 # edited away or deleted is seen at the next push, not at once.
 name: security-review
 
@@ -103,7 +105,7 @@ jobs:
       group: security-review-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -152,33 +154,59 @@ jobs:
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
-          # a pure sync needs no security review where none starts by itself (floor rule 8; #99): where the pull request
-          # has a sync's shape (the manifest among its files, all of them whole, and none outside core/, it and the
-          # workflows), the default branch's pure-sync.mjs proves it on the head, in a clone of its own that fetches the
-          # head's commits by its SHA (never a ref GitHub moves after the push) and checks out nothing, all within the
-          # job's time so its status is always written, so no file of the pull request's is on disk and none runs; git sends
-          # the token to this repository's own address alone, from this command's environment, never written to disk
-          pure=
+          # the head's commits, in a clone of its own that fetches them by the head's SHA (never a ref GitHub moves after
+          # the push) and checks out nothing, all within the job's time so its status is always written, so no file of
+          # the pull request's is on disk and none runs; git sends the token to this repository's own address alone,
+          # from each command's environment, never written to disk. Fetched for two proofs alone: where the pull
+          # request has a sync's shape (the manifest among its files, all of them whole, and none outside core/, it and
+          # the workflows), and where its head is an update from main (a merge whose second parent is no commit of the
+          # pull request's)
+          shape= merge= cloned= pure=
           if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
             && [ "$(jq '[.[][]] | length' "$d/files.json")" = "$(jq '.changed_files' "$d/pull.json")" ] \
             && jq -e 'any(.[][]; .filename == "core-manifest.md") and all(.[][]; .filename == "core-manifest.md"
               or (.filename | startswith("core/")) or (.filename | test("^\\.github/workflows/[^/]+\\.ya?ml$")))' \
               "$d/files.json" > /dev/null
-          then
-            proof="$PWD/$ROOT/scripts/pure-sync.mjs"
+          then shape=1; fi
+          if [ -f "$ROOT/scripts/clean-merges.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
+            && jq -e --arg h "$head" '[.[][]] as $c | [$c[].sha] as $s | any($c[]; .sha == $h
+              and (.parents | length) == 2 and (.parents[1].sha as $p | any($s[]; . == $p) | not))' \
+              "$d/commits.json" > /dev/null
+          then merge=1; fi
+          if [ -n "$shape$merge" ]; then
             key=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
             echo "::add-mask::$key"
-            if (n=${GIT_CONFIG_COUNT:-0}
-              export GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader" \
-                "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key"
-              git init -q -b pr "$d/pr" && cd "$d/pr" && git remote add origin "$SERVER/$REPO.git" \
-                && timeout 90 git fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
-                && [ "$(git rev-parse refs/heads/pr)" = "$head" ] && timeout 120 node "$proof" > "$d/pure.txt" 2>&1)
+            n=${GIT_CONFIG_COUNT:-0}
+            auth=("GIT_CONFIG_COUNT=$((n + 1))" "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader"
+              "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key")
+            if git init -q -b pr "$d/pr" && git -C "$d/pr" remote add origin "$SERVER/$REPO.git" \
+              && env "${auth[@]}" timeout 90 git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+              && [ "$(git -C "$d/pr" rev-parse refs/heads/pr)" = "$head" ]
+            then cloned=1; fi
+          fi
+          # a pure sync needs no security review where none starts by itself (floor rule 8; #99): the default branch's
+          # pure-sync.mjs proves it on the head, in that clone
+          if [ -n "$shape" ]; then
+            proof="$PWD/$ROOT/scripts/pure-sync.mjs"
+            if [ -n "$cloned" ] && (cd "$d/pr" && env "${auth[@]}" timeout 120 node "$proof" > "$d/pure.txt" 2>&1)
             then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
             else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
           fi
+          # an update from main stands for nothing reviewed before it unless it is the merge git makes of its parents
+          # (#323): the default branch's clean-merges.mjs proves which are, in that clone, with no token; where it
+          # cannot, none is, and a review of the head is asked (a default branch whose core is older has no such
+          # script, and its scripts read the parents alone, as before)
+          merges=()
+          if [ -f "$ROOT/scripts/clean-merges.mjs" ]; then echo '[]' > "$d/merges.json"; merges=("$d/merges.json"); fi
+          if [ -n "$merge" ]; then
+            proof="$PWD/$ROOT/scripts/clean-merges.mjs"
+            if [ -n "$cloned" ] && (cd "$d/pr" && timeout 60 node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
+              && jq -e 'type == "array"' "$d/proved.json" > /dev/null
+            then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
+            else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
+          fi
           BOUND=$(held security-review.mjs) PURE="$pure" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
-            "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"
+            "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
             echo "The pull request is closed or a draft: nothing to say."
@@ -193,7 +221,7 @@ jobs:
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
             if BOUND=$(held code-review-wait.mjs) node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
-              "$d/comments.json" "$d/commits.json" "$d/files.json" > "$d/code.json" \
+              "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
             else echo "::warning::the code-review status could not be written: scripts/code-review-wait.mjs or its post failed"; fi

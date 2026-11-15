@@ -175,8 +175,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      that owns it), or an account the project names in its call (the input `reviewers`) (`modules/reviews.md`, point 3),
      the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
      one posted after it began, never a note posted before it; a review of an earlier commit than the head stands only
-     where updates from `main` alone follow it, and the status says so, any other later commit needing such a comment
-     naming the head by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
+     where updates from `main` alone follow it, each the merge git makes of its parents (the check running
+     `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
+     comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
      `pure-sync.mjs` on its head; where the pull request changes what runs by itself beyond its pins, both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
@@ -191,7 +192,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
      it finishes or a comment that opens "Code review:" from the owner, a member or a collaborator names that commit by
      its whole SHA (`modules/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
-     nor a sync's shape) has had none on its head, or on a commit only updates from `main` follow; it advises as the
+     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; it advises as the
      first does. It runs a short job at each push and each such comment, a dozen or so a pull request, which a private
      repository pays for: there the job is skipped, and so not billed, unless the project turns it on (the input
      `private`) or has turned advisory off, since a ruleset may then wait for it.

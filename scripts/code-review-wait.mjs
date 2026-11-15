@@ -10,7 +10,9 @@
 // Given the pull request's commits and files, it also waits while a pull request that needs a code review
 // (modules/reviews.md, "Which") has had none: neither Codex's code review completed nor such a comment names the head
 // commit, or one that only updates from `main` follow (merges whose second parent is no commit of the pull request's,
-// as GitHub's "Update branch" makes; floor rule 8: nothing is reviewed twice). None is needed where every changed file
+// as GitHub's "Update branch" makes; floor rule 8: nothing is reviewed twice), and, given the merges
+// scripts/clean-merges.mjs proved, only through merges whose tree is the one git makes of their parents (#323), the
+// status naming the one where that stops it. None is needed where every changed file
 // is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
 // CLAUDE.local.md too, the copy under core/, .github/, .claude/, .agents/ and .agent/, and those the project's
 // SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
@@ -22,37 +24,39 @@
 // before the check came:
 // its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
-// does not hold what a review says, that docs another provider built got their code review, nor that a merge from
-// `main` brought no change of its own: those stay with the builder and the reviews. It prints, as JSON, the commit to
+// does not hold what a review says, that docs another provider built got their code review, nor, given no list of the
+// merges proved (a workflow older than this script), that a merge from `main` brought no change of its own: those stay
+// with the builder and the reviews. It prints, as JSON, the commit to
 // mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
 // "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check would
 // have done, as the security-review status's.
 //
 // Usage:  node scripts/code-review-wait.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
-//           [<its commits, the same> <its files, the same>]
+//           [<its commits, the same> <its files, the same> [<the merges clean-merges.mjs proved>]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
 //         the link the status carries.
 import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, standsFrom, status, whole } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
 const POSTED = /^(?:\*\*)?Code review:/u;
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 
-// { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name)
-export function judge(pull, comments, commits, files, rules = [], bound = true) {
+// { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name);
+// merges: the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran (#323)
+export function judge(pull, comments, commits, files, rules = [], bound = true, merges = undefined) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const read = codexState(flat(comments));
-  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound);
+  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges);
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
-function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
+function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges) {
   const short = sha.slice(0, 7);
   // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
   // commit must not stand for this one
@@ -67,8 +71,12 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
   const seen = new Set(posted);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string") seen.add(review.commit_sha);
   // (a review stands for the head where only updates from main follow it, as security-review.mjs reads them)
-  if ([...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
-  const why = `no code review of ${short}. Mend: ask one, or another reviewer posts "Code review:" naming its whole SHA`;
+  if ([...standsFrom(pull, flat(commits), sha, merges)].some((at) => seen.has(at))) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
+  // (where a merge from main that git would not make stops it, the status names that merge: #323)
+  const cut = unproved(pull, flat(commits), sha, merges);
+  const why = cut !== undefined && [...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))
+    ? `no code review of ${short}: merge ${cut.slice(0, 7)} is not the merge git makes. Mend: post "Code review:" naming the head's whole SHA`
+    : `no code review of ${short}. Mend: ask one, or another reviewer posts "Code review:" naming its whole SHA`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
@@ -90,15 +98,15 @@ function needs(pull, files, rules) {
   return !(sync && files.some((file) => file.filename === "core-manifest.md"));
 }
 if (started(import.meta.url)) {
-  const [pullFile, commentsFile, commitsFile, filesFile] = process.argv.slice(2);
+  const [pullFile, commentsFile, commitsFile, filesFile, mergesFile] = process.argv.slice(2);
   if (!pullFile || !commentsFile) {
-    console.error("usage: node scripts/code-review-wait.mjs <the pull request, as JSON> <its comments, as JSON> [<its commits, as JSON> <its files, as JSON>]");
+    console.error("usage: node scripts/code-review-wait.mjs <the pull request, as JSON> <its comments, as JSON> [<its commits, as JSON> <its files, as JSON> [<the merges clean-merges.mjs proved, as JSON>]]");
     process.exit(2);
   }
   const read = (file) => JSON.parse(readFileSync(file, "utf8"));
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
   try { rules = ruleFiles(); } catch { rules = []; }
-  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false");
+  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false", mergesFile ? read(mergesFile) : undefined);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

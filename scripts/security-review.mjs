@@ -10,7 +10,10 @@
 // head only where it saw the head, or a commit that only updates from main follow (merges whose second parent is no
 // commit of the pull request's, as GitHub's "Update branch" makes): Codex's by the commit its summary names, a posted
 // one by a commit it names by its whole SHA; any other later commit needs a posted review, or the note that none is
-// needed, naming the head, and the status says when the review it passes on saw an earlier commit than the head. Where
+// needed, naming the head, and the status says when the review it passes on saw an earlier commit than the head. Given
+// too the merges scripts/clean-merges.mjs proved, the tree of each the merge git makes of its two parents (#323), an
+// update from main is only such a merge: one whose tree carries a change of its own, or that git cannot make without
+// a conflict, needs a review naming it or a later commit, and the status names it. Where
 // Codex's summary says its security review is running, only such a comment posted after it began ends the wait for it
 // (that review is waited for: core archive 206), never one posted before, a note that none is needed among them: it
 // began when the summary's row for it says it has run since, where that time can be read and is no later than the
@@ -48,8 +51,9 @@
 // open, and of one that names no commit the head stands on, and it counts a member's or collaborator's review that it
 // does not name, saying so (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it
 // does not hold: what a posted review says, whether a finding is blocking, who posted each of two reviews (one login
-// may post both), that comment-only.mjs's printout is true (its code reviewer runs it again), and that a merge from
-// main brought no change of its own; those stay with the builder and the reviews. It prints, as JSON, the commit to
+// may post both), that comment-only.mjs's printout is true (its code reviewer runs it again), and, given no list of the
+// merges proved (a workflow older than this script), that a merge from main brought no change of its own; those stay
+// with the builder and the reviews. It prints, as JSON, the commit to
 // mark and the status to give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's
 // input, on unless turned off) the status is always a pass that says what the check would have done, until the
 // project's owner turns that off (#99). What the status proves where every review is posted (none starts by itself, as
@@ -57,7 +61,7 @@
 // one login, which no check here tells apart (#187).
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
-//           [<its review comments, the same> [<its commits, the same> [<its files, the same>]]]
+//           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; PURE for the head pure-sync.mjs proved.
 import { readFileSync } from "node:fs";
@@ -116,7 +120,7 @@ export const UNREAD = "Codex's summary is on the pull request, but its state can
 
 // { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name). more:
 // { reviewers, the accounts besides the repository's owner whose posted review counts; pure, whether pure-sync.mjs
-// proved the head a pure sync }
+// proved the head a pure sync; merges, the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran }
 export function judge(pull, comments, reviewComments, commits, files, bound = true, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
@@ -138,10 +142,12 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const changed = Number.isFinite(read.changed) ? read.changed : Infinity;
   // the commits a review stands for the head from: the head, and each reached from it through updates from main alone
   // (given no list of the commits, a workflow older than this script, any review stands for it, as before)
-  const chain = commits === undefined ? undefined : standsFrom(pull, flat(commits), sha);
+  const chain = commits === undefined ? undefined : standsFrom(pull, flat(commits), sha, more.merges);
   const stand = (at) => chain === undefined || chain.has(at);
   const forHead = chain === undefined ? posted : posted.filter((comment) => named(comment.body).some((at) => chain.has(at)));
-  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true });
+  // the merge from main where the chain stops for want of proof (#323): a review of it, or of a later commit, stands
+  const cut = chain === undefined ? undefined : unproved(pull, flat(commits), sha, more.merges);
+  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true, cut });
   if (running && !verdict.done && all.length > 0 && posted.length === 0) {
     const why = "Codex's security review is running, begun after every \"Security review:\" posted. Mend: wait for it";
     // (one whose head does not hold this check as the default branch does stood before it came: reported)
@@ -175,20 +181,31 @@ function counted(pull, reviewers) {
 export const named = (body) => (typeof body === "string" ? body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? [] : []).map((at) => at.toLowerCase());
 // the commits a review of which stands for the head (#99): the head, and each reached from it by first parents through
 // merges whose second parent is no commit of the pull request's (updates from main, as GitHub's "Update branch" makes:
-// nothing is reviewed twice, floor rule 8). A list GitHub cut short (250 commits) proves no update from main: the head
-// alone then. scripts/code-review-wait.mjs reads it too.
-export function standsFrom(pull, commits, head) {
+// nothing is reviewed twice, floor rule 8). Given the merges proved (clean-merges.mjs: each one's tree the merge git
+// makes of its parents, #323), it goes past those alone, and a review of the merge where it stops, which saw that
+// merge's own tree, still stands. A list GitHub cut short (250 commits) proves no update from main: the head alone then.
+// scripts/code-review-wait.mjs and scripts/clean-merges.mjs read it too.
+export function standsFrom(pull, commits, head, merges) {
   const chain = new Set([head]);
   if (!Number.isInteger(pull.commits) || commits.length < pull.commits) return chain;
+  const proved = merges === undefined ? undefined : new Set(Array.isArray(merges) ? merges : []);
   const by = new Map(commits.filter((commit) => typeof commit.sha === "string").map((commit) => [commit.sha, commit]));
   for (let at = head; chain.size <= by.size;) {
     const parents = by.get(at)?.parents;
     if (!Array.isArray(parents) || parents.length !== 2 || typeof parents[0]?.sha !== "string" || typeof parents[1]?.sha !== "string" || by.has(parents[1].sha)) break;
+    if (proved !== undefined && !proved.has(at)) break;
     at = parents[0].sha;
     if (chain.has(at)) break;
     chain.add(at);
   }
   return chain;
+}
+// the update from main where the chain stops for want of proof (#323), or undefined where nothing stops it so: the
+// last commit the chain reaches, where without the proof it reaches further
+export function unproved(pull, commits, head, merges) {
+  if (merges === undefined) return undefined;
+  const chain = standsFrom(pull, commits, head, merges);
+  return standsFrom(pull, commits, head).size > chain.size ? [...chain].at(-1) : undefined;
 }
 
 // whether GitHub gave every file the pull request changes (it gives at most 3000): a list cut short is read as one
@@ -218,8 +235,10 @@ export function pinsAlone(file, pinned = USES) {
 // whether a posted review holds what comment-only.mjs printed on this head: comments and steps' names alone
 const ALONE = /^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/mu;
 export const commentsAlone = (body, sha) => typeof body === "string" && ALONE.test(body) && new RegExp(`^\\s*checked head ${sha}(?![0-9a-f])`, "mu").test(body);
-function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, reviewComments, commits, changed, bound, pure }) {
+function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, reviewComments, commits, changed, bound, pure, cut }) {
   const short = sha.slice(0, 7);
+  // what a review of an earlier commit wants, where a merge from main after it is not the one git makes (#323)
+  const notGits = cut === undefined ? "" : `; merge ${cut.slice(0, 7)} is not the merge git makes`;
   // what waits, or, on a pull request whose head does not hold this check as the default branch does, which stood
   // before it came, is told and never held
   const hold = (why, told = why) => (bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${told}` });
@@ -234,7 +253,9 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
       // review names the head, or a commit only such updates follow (a pure sync needs none, its review waited for)
       if (pure || !bind || (at !== undefined && stand(at))) return { sha, done: true, why: `Codex's security review has run${on}` };
       if (forHead.length > 0) return { sha, done: true, why: `${postedWhy}; Codex's saw ${at === undefined ? "a commit not named" : `${at.slice(0, 7)}, earlier`}` };
-      return hold(`Codex's review saw ${at === undefined ? "no commit it names" : at.slice(0, 7)}, not the head ${short}. Mend: post a "Security review:" naming the head's whole SHA`, `Codex's review saw ${at === undefined ? "no commit it names" : at.slice(0, 7)}, not the head ${short}`);
+      const saw = at === undefined ? "no commit it names" : at.slice(0, 7);
+      if (cut !== undefined && at !== undefined && standsFrom(pull, flat(commits), sha).has(at)) return hold(`Codex's review saw ${saw}${notGits}. Mend: post a "Security review:" naming the head's whole SHA`, `Codex's review saw ${saw}${notGits}`);
+      return hold(`Codex's review saw ${saw}, not the head ${short}. Mend: post a "Security review:" naming the head's whole SHA`, `Codex's review saw ${saw}, not the head ${short}`);
     }
     // a finding of it is marked open: only a review posted after its newest finding, and its summary's last change,
     // settles it, and one that names the head (or a commit only updates from main follow)
@@ -272,6 +293,9 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   const dependabots = pull.user?.login === DEPENDABOT && pull.user.type === "Bot" && typeof pull.head.repo?.full_name === "string" && pull.head.repo.full_name === pull.base?.repo?.full_name
     && all.length > 0 && all.every(its) && all.some((commit) => commit.sha === sha);
   if (dependabots && !(review !== null && typeof review === "object" && typeof review.status === "string")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
+  // (one naming a commit that only a merge from main git would not make follows: that merge named, #323)
+  const loose = cut === undefined ? undefined : standsFrom(pull, all, sha);
+  if (cut !== undefined && posted.some((comment) => named(comment.body).some((at) => loose.has(at)))) return hold(`a security review saw an earlier commit${notGits}. Mend: post one naming the head's whole SHA`, `a security review saw an earlier commit${notGits}`);
   if (posted.length > 0) return hold(`a security review is posted, but names not the head ${short}. Mend: post one naming the head's whole SHA`, `a security review is posted, but names not the head ${short}`);
   return { sha, done: false, why: "no security review has run yet. Mend: wait, or ask another reviewer for one" };
 }
@@ -286,15 +310,16 @@ export function status(verdict, advisory, url, context = CONTEXT) {
 }
 
 if (started(import.meta.url)) {
-  const [pullFile, commentsFile, reviewCommentsFile, commitsFile, filesFile] = process.argv.slice(2);
+  const [pullFile, commentsFile, reviewCommentsFile, commitsFile, filesFile, mergesFile] = process.argv.slice(2);
   if (!pullFile || !commentsFile) {
-    console.error("usage: node scripts/security-review.mjs <the pull request, as JSON> <its comments, as JSON> [<its review comments, as JSON> [<its commits, as JSON> [<its files, as JSON>]]]");
+    console.error("usage: node scripts/security-review.mjs <the pull request, as JSON> <its comments, as JSON> [<its review comments, as JSON> [<its commits, as JSON> [<its files, as JSON> [<the merges clean-merges.mjs proved, as JSON>]]]]");
     process.exit(2);
   }
   const read = (file) => JSON.parse(readFileSync(file, "utf8"));
   // (PURE: the head's whole SHA, where pure-sync.mjs, run by the workflow from the default branch's copy, proved it)
   const pull = read(pullFile);
   const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, process.env.BOUND !== "false",
-    { reviewers: reviewersOf(process.env.REVIEWERS), pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha });
+    { reviewers: reviewersOf(process.env.REVIEWERS), pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
+      merges: mergesFile ? read(mergesFile) : undefined });
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }
