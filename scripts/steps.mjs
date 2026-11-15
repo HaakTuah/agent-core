@@ -120,7 +120,8 @@ export function configs(p) {
   const unread = [];
   const or = (read, names) => { try { return read(p); } catch (e) { if (!(e instanceof Unread)) throw e; unread.push(e.message); return Object.fromEntries(names.map(n => [n, null])); } };
   const licence = or(licenceConfigs, ["licences", "audit"]);
-  return { ...licence, nuget: licence.licences === null ? null : nugetOf(p, licence.licences), ...or(copiesConfigs, ["copies", "baseline"]), unread };
+  const nuget = licence.licences === null ? { nuget: null } : or(q => ({ nuget: nugetOf(q, licence.licences) }), ["nuget"]);
+  return { ...licence, ...nuget, ...or(copiesConfigs, ["copies", "baseline"]), unread };
 }
 const licenceConfig = p => licenceConfigs(p).licences;
 const nugetConfig = p => nugetOf(p, licenceConfig(p));

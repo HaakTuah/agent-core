@@ -90,7 +90,7 @@ const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undef
 export function differences(p, kit, older = []) {
   // (a check's config that a workflow names only when it runs is compared nowhere: said, so no comparison goes missing
   // unsaid)
-  const out = configs(p).unread.map(why => `a config not compared: ${why}`);
+  const out = configs(p).unread.map(why => `a config not compared: ${plain(why, p.root)}`);
   for (const [to, want] of kit) {
     if (SKIPPED.has(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
     const text = p.read(to);
