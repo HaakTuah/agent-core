@@ -229,7 +229,9 @@ const summary = lines => { if (process.env.GITHUB_STEP_SUMMARY) tolerant(() => f
 const listed = specs => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs]).split("\0").filter(f => f && !tolerant(() => fs.lstatSync(f).isSymbolicLink())) : []);
 
 // The project as the check reads it: its tool, its config, its code (each file of the config's "code" in a language
-// the core knows by its ending, JavaScript's, TypeScript's or another's, that is no test) and the baseline's path.
+// the core knows by its ending, JavaScript's, TypeScript's or another's, that is no test) and the baseline's path. A
+// change "touches" the code or the tests where it changes a file of either ending or a test file, never the baseline
+// or a report beside them.
 function project() {
   const { text, home } = rulesHere(), tool = toolOf(text);
   const configAt = where(text);
@@ -250,7 +252,8 @@ function onPullRequest(p, base) {
     console.log(`Reported only, and not measured: ${e.message}`);
   }
   const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
-  const touched = changed.size > 0 || git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).trim() !== "";
+  const tests = new Set([...listed(p.config.tests), ...deleted]), ending = f => [...CODE, ...OTHER].includes(path.posix.extname(f));
+  const touched = git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && (ending(f) || tests.has(f)));
   const gone = baseline ? moved(baseline.listed, f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null)) : new Map();
   const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);

@@ -109,7 +109,19 @@ try {
   sh("add", "-A");
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && !r.stderr.includes("src/a.js:1") && r.stderr.includes("src/Game.cs:1"), "a listed fault whose line the change rewrote passes; a file in another language the tool reports is held too", r.stdout + r.stderr);
-  sh("checkout", "--", "src/a.js"); sh("rm", "-q", "-f", "--cached", "src/Game.cs"); fs.rmSync(path.join(dir, "src/Game.cs"));
+  sh("reset", "-q", "--hard"); sh("clean", "-qfd", "--", "src");
+  // (a starter kit's config reads the whole project as code: an audit's pull request that changes only the config,
+  // the baseline and its report still changes no code or test)
+  sh("checkout", "-q", "main"); sh("checkout", "-q", "-b", "audit");
+  write("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: [".", ":!core/"], tests: ["test"] }));
+  write("docs/audits/2026-12-01.md", "the audit's report\n");
+  r = run(["--whole"]);
+  const audit = run([], { STRENGTH_BASE: "main" });
+  ok(r.status === 0 && audit.status === 0 && !audit.stderr.includes("FAIL"), "where the config reads the whole project, the audit's pull request (its config, baseline and report alone) takes in what its whole run found", r.stdout + r.stderr + audit.stdout + audit.stderr);
+  write("src/a.js", "export const a = x => x === 1;\nexport const b = y => y === 2;\nexport const d = 4;\n");
+  const coded = run([], { STRENGTH_BASE: "main" });
+  ok(coded.status === 1 && coded.stderr.includes("where the base did not"), "and one that also changes a file of code does not", coded.stdout + coded.stderr);
+  sh("checkout", "-q", "-f", "next"); fs.rmSync(path.join(dir, "docs"), { recursive: true });
   r = run(["--lower", "src/a.js"], { STATUS: "Pending" });
   ok(r.status === 1 && mended(r.stderr) && JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed && Object.keys(JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed).length === 1, "a cleaning task's run that left faults not run lowers nothing, and says the mend", r.stdout + r.stderr);
   r = run(["--lower", "src/a.js"], { STATUS: "Killed" });

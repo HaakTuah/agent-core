@@ -41,7 +41,7 @@ import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
 
 export const CODE = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"];
-export const OTHER = [".cs", ".py", ".go", ".rs", ".java", ".kt", ".swift", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
+export const OTHER = [".cs", ".fs", ".vb", ".py", ".go", ".rs", ".java", ".kt", ".scala", ".swift", ".dart", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
 const REGEX_AFTER = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
 const CONTROL = new Set(["if", "for", "while", "switch", "catch", "with"]);
 const CONTROL_BARE = new Set(["else", "try", "finally", "do"]);
