@@ -36,9 +36,10 @@ The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the
 those written before 12 November 2026); the *audits*: `reports/`; the *choice records*: `CHOICES.md`;
 the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
-`README.md`; the
-*large file*: past about 50 KB; the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the
-same file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
+`README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
+`tests.yml`, its baseline worked down (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
+that change the same file, and all that add to what every session reads at its start, whose cap they share, in the
+queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *size marks*: the cap of
 `scripts/size.mjs`, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of

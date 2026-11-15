@@ -143,6 +143,19 @@ if (p.status === 0) {
   ok(shaped.status === 1 && /1 function passes a mark/.test(shaped.stderr) && mended(shaped.stderr), "a function past a mark fails the shape check in a project the kit wrote, from its first day", `${shaped.stdout}${shaped.stderr}`);
   git(p.dir, "rm", "-rqf", "--cached", "src");
   for (const f of ["src", "checks/near.json", "checks/near-baseline.json"]) fs.rmSync(path.join(p.dir, f), { recursive: true, force: true });
+  // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
+  // copy added fails, and its mend names the path a session types there, with no "core/" before it)
+  const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
+  const how = path.join(core, "modules/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
+  fs.appendFileSync(how, `\n${fs.readFileSync(path.join(core, "floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
+  const ownCopy = run(core, "scripts/copies.mjs", ".github/copies.json");
+  fs.writeFileSync(how, howWas);
+  fs.rmSync(path.join(core, ".github/copies-baseline.json"));
+  const ownNone = run(core, "scripts/copies.mjs", ".github/copies.json");
+  git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
+  ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*modules\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
+    && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
+    "the core's own copies check passes on the core, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;
