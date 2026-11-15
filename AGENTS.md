@@ -35,6 +35,7 @@ Not taken, each for its reason:
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026); the *audits*: `reports/`; the *choice records*: `CHOICES.md`;
 the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
 the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline worked down (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines

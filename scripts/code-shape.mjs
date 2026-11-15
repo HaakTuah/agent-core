@@ -51,15 +51,16 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const BULK = 30; // a commit that touches more of the measured files than this is a move or a sweep, not a sign
 const OPEN = { ")": "(", "]": "[", "}": "{" };
 
-// The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line }. Comments and white space are
-// dropped; a template literal is a "str" token for each run of its text, with the code of each ${ } between them.
+// The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line, at }, `at` where it starts in the
+// text (for a template's runs, where the run ends). Comments and white space are dropped; a template literal is a
+// "str" token for each run of its text, with the code of each ${ } between them.
 export function tokens(src) {
   const out = [], stack = []; // stack: for each open ${ }, how many { are open inside it
   const parens = []; // for each open (, whether it opens an if, for, while or with's condition
   let i = src.startsWith("#!") ? src.indexOf("\n") : 0, line = 1, prev = null;
   if (i < 0) return out;
   const n = src.length;
-  const push = (t, v, l = line) => { prev = { t, v, line: l }; out.push(prev); };
+  const push = (t, v, l = line) => { prev = { t, v, line: l, at: i }; out.push(prev); };
   const lines = (a, b) => { for (let k = a; k < b; k++) if (src[k] === "\n") line++; };
   // a / starts a regular expression where no value stands before it: at the start, after an operator, a keyword, or the
   // ) that closes a condition (`if (x) /a/.test(y)`)
