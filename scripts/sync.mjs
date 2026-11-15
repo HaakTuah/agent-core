@@ -107,7 +107,8 @@ function sync(tmp) {
     // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)
     const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
     const said = String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL:")).join("\n");
-    console.log(`${r.stdout ?? ""}${said}`.trim() || (r.status === 0 ? `core/scripts/${script} said nothing` : ""));
+    const text = `${r.stdout ?? ""}${said}`.trim() || (r.status === 0 ? `core/scripts/${script} said nothing` : "");
+    if (text) console.log(text);
     if (r.error?.code === "ETIMEDOUT") console.log(`core/scripts/${script} was stopped after ten minutes: run it again by itself`);
     else if (r.status !== 0 && !said) console.log(`core/scripts/${script} failed: run it again by itself to see why`);
   }

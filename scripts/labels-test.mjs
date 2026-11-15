@@ -39,7 +39,7 @@ ok(strayViews("**The session's view (not a decision)**\nA builder may weigh it."
   "a heading that names a view is the fixed one; a view named in a sentence is not a heading");
 
 const t0 = Date.now(), long = `# a${" ".repeat(65000)}#${" ".repeat(65000)}x`;
-strayViews(long); strayViews(`**${" ".repeat(65000)}`); found("\n".repeat(65000)); opens(`The stand-in's verdict${" \t".repeat(32000)}x`); byAgent(`${"_ ".repeat(40000)}\n`.repeat(2));
+strayViews(long); strayViews(`**${" ".repeat(65000)}`); found("\n".repeat(65000)); opens(`The stand-in's verdict${" \t".repeat(32000)}x`); opens(`The stand-in's verdict${"*".repeat(65000)}x`); byAgent(`${"_ ".repeat(40000)}\n`.repeat(2));
 ok(Date.now() - t0 < 2000, "a body of any shape, the longest GitHub keeps, is read in time in step with its length", `${Date.now() - t0} ms`);
 
 const have = [{ name: "Queued", color: "0e8a16", description: LIST.state.queued.description }, { name: "later", color: "000000", description: LIST.state.later.description },

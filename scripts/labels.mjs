@@ -125,9 +125,13 @@ function main(args) {
   const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
   const at = args.indexOf("--since"), by = args.indexOf("--owner"), make = args.includes("--make");
   // (the day the copy gained this file, as git's history here holds it: the core's own path, or a project's copy)
-  // (a shallow clone shows its oldest commit adding every file, so there the rule's own day holds)
-  const shallow = spawnSync("git", ["rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).stdout.trim() !== "false";
-  const added = shallow ? "" : spawnSync("git", ["log", "--diff-filter=A", "--format=%cI", "--", "core/scripts/labels.mjs", "scripts/labels.mjs"], { encoding: "utf8" }).stdout;
+  // (a shallow clone shows its oldest commits adding every file: an add found on one of them is not read, so there the
+  // rule's own day holds)
+  const out = (...a) => String(spawnSync("git", a, { encoding: "utf8" }).stdout ?? "").trim();
+  let bounds = "";
+  try { bounds = fs.readFileSync(out("rev-parse", "--git-path", "shallow"), "utf8"); } catch { /* (not shallow) */ }
+  const added = out("log", "--diff-filter=A", "--format=%H %cI", "--", "core/scripts/labels.mjs", "scripts/labels.mjs").split("\n")
+    .filter(l => l && !bounds.includes(l.split(" ")[0])).map(l => l.split(" ")[1]).join("\n");
   const since = at >= 0 ? args[at + 1] : cameOn(added);
   if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return fail("--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z");
   if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return fail("--owner needs the owner's account after it");
