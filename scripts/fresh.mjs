@@ -11,9 +11,13 @@
 // the file's path ("AGENTS.md"), so that file is not compared, or a task the project's agents take. The kind is read
 // from the project: its owner and name from the manifest and AGENTS.md, npm and NuGet from its calls to the core's
 // signature and NuGet checks, a private repository from its having neither the CodeQL nor the licence workflow, a game
-// from "Modules: all". It reads only and fails nothing. Node's own modules and git only.
+// from "Modules: all". Given earlier kits (the sync gives the kit of the project's old pin and of every release of the
+// core's), it lists too what the project still holds of theirs that the kit no longer writes: the wording the core
+// has left. It reads only and fails nothing. Node's own modules and git only.
 //
-//   node core/scripts/fresh.mjs          from a project's root: the differences, or that there are none
+//   node core/scripts/fresh.mjs                   from a project's root: the differences, or that there are none
+//   node core/scripts/fresh.mjs --older <dir>     and, of each folder under <dir> that holds an earlier copy's
+//                                                 setup/template/, what the project still holds that the kit left
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,45 +43,63 @@ export function kind(p) {
 
 const oneSpace = t => t.replace(/\s+/g, " ").trim();
 const pinsAsOne = t => t.replace(/@[0-9a-f]{40}(\s*#\s*v?[\w.-]+)?/g, "@<pin>");
-const blocks = t => t.replace(/\r\n/g, "\n").split(/\n\s*\n/).map(b => b.trim()).filter(b => b && !b.includes("FILL IN"));
 const firstCell = row => /^\|([^|]*)\|/.exec(row)?.[1]?.trim();
+const short = t => `${t.slice(0, 70)}${t.length > 70 ? "…" : ""}`;
 
-// The differences between what the kit writes, `kit` ([path, text]), and the project `p`: each a line to print.
-export function differences(p, kit) {
+// What a file holds, as the comparison reads it: of Markdown, its tables' rows by their first cell and its prose with
+// the spacing made one; of JSON, its keys; of anything else, its lines. `has` asks whether a unit of another such file
+// stands in this one; `units` are this one's own, a paragraph the kit leaves to the project (FILL IN) left out.
+function readAs(to, text) {
+  const t = text.replace(/\r\n/g, "\n");
+  if (/\.md$/.test(to)) {
+    const rows = new Set(t.split("\n").filter(l => l.startsWith("|") && !/^\|[\s|:-]+\|$/.test(l)).map(firstCell));
+    const prose = oneSpace(pinsAsOne(t.split("\n").filter(l => !l.startsWith("|")).join("\n")));
+    const paras = t.split(/\n\s*\n/).filter(b => b.trim() && !b.includes("FILL IN")).map(b => oneSpace(pinsAsOne(b.split("\n").filter(l => !l.startsWith("|")).join("\n")))).filter(Boolean);
+    return { units: [...[...rows].map(r => ({ row: r })), ...paras.map(para => ({ para }))], has: u => u.row !== undefined ? rows.has(u.row) : prose.includes(u.para) };
+  }
+  if (/\.json$/.test(to)) {
+    let keys = null;
+    try { keys = Object.keys(JSON.parse(t)); } catch { /* (read below as holding nothing) */ }
+    return { units: (keys ?? []).map(key => ({ key })), has: u => !!keys?.includes(u.key), unread: keys === null };
+  }
+  const lines = new Set(t.split("\n").map(l => pinsAsOne(l).trim()));
+  return { units: [...lines].filter(l => l && !l.startsWith("#") && !l.includes("FILL IN")).map(line => ({ line })), has: u => lines.has(u.line) };
+}
+const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undefined ? `the paragraph "${short(u.para)}"` : u.key !== undefined ? `the key "${u.key}"` : `the line "${short(u.line)}"`;
+
+// The differences between what the kit writes, `kit` ([path, text]), and the project `p`, each a line to print: what
+// it lacks of the kit's, and, of what an earlier kit wrote (`older`, each a kit as `kit` is), what it still holds that
+// the kit no longer writes, the wording the core has left.
+export function differences(p, kit, older = []) {
   const out = [];
   for (const [to, want] of kit) {
     if (SKIPPED.has(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
-    const have = p.read(to);
-    if (have === null) { out.push(`${to}: missing (the starter kit writes it today)`); continue; }
-    const lacks = [];
-    if (/\.md$/.test(to)) {
-      const rows = new Set(have.split("\n").filter(l => l.startsWith("|")).map(firstCell));
-      const prose = oneSpace(pinsAsOne(have.split("\n").filter(l => !l.startsWith("|")).join("\n")));
-      for (const b of blocks(want)) {
-        const tableRows = b.split("\n").filter(l => l.startsWith("|"));
-        for (const r of tableRows) if (!/^\|[\s|:-]+\|$/.test(r) && !rows.has(firstCell(r))) lacks.push(`the row "${firstCell(r)}"`);
-        const rest = b.split("\n").filter(l => !l.startsWith("|")).join("\n");
-        if (rest.trim() && !prose.includes(oneSpace(pinsAsOne(rest)))) lacks.push(`the paragraph "${oneSpace(rest).slice(0, 70)}${oneSpace(rest).length > 70 ? "…" : ""}"`);
-      }
-    } else if (/\.json$/.test(to)) {
-      let had = null;
-      try { had = JSON.parse(have); } catch { lacks.push("its content as JSON"); }
-      if (had) for (const key of Object.keys(JSON.parse(want))) if (!(key in had)) lacks.push(`the key "${key}"`);
-    } else {
-      const lines = new Set(have.split("\n").map(l => pinsAsOne(l).trim()));
-      for (const l of want.split("\n").map(l => pinsAsOne(l).trim()).filter(l => l && !l.startsWith("#") && !l.includes("FILL IN")))
-        if (!lines.has(l)) lacks.push(`the line "${l.slice(0, 70)}"`);
-    }
+    const text = p.read(to);
+    if (text === null) { out.push(`${to}: missing (the starter kit writes it today)`); continue; }
+    const have = readAs(to, text), now = readAs(to, want);
+    if (have.unread) { out.push(`${to}: its content cannot be read as JSON`); continue; }
+    const lacks = now.units.filter(u => !have.has(u)).map(named);
+    const seen = new Set();
+    const left = older.flatMap(k => k.filter(([f]) => f === to).flatMap(([, then]) => readAs(to, then).units))
+      .filter(u => !now.has(u) && have.has(u) && !seen.has(named(u)) && seen.add(named(u))).map(u => `${named(u)}, which the starter kit no longer writes`);
     if (lacks.length) out.push(`${to}: lacks ${lacks.join("; ")}`);
+    if (left.length) out.push(`${to}: still holds ${left.join("; ")}`);
   }
   return out;
 }
 
-// What the kit of this copy would write for the project at `root`.
-export function fresh(p) {
+// What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
+// templates, what that kit would have written (a template it lacks, or one whose words this kit no longer fills,
+// gives that kit nothing).
+export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
   const { o, pin } = kind(p);
   const modules = fs.readdirSync(path.join(HERE, "modules")).filter(n => n.endsWith(".md"));
-  return files(o, pin, modules, name => fs.readFileSync(path.join(HERE, TEMPLATES, name), "utf8"));
+  try {
+    return files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"));
+  } catch (e) {
+    if (templates === path.join(HERE, TEMPLATES)) throw e;
+    return [];
+  }
 }
 
 export function report(found) {
@@ -90,7 +112,9 @@ export function report(found) {
 if (started(import.meta.url)) {
   try {
     const p = project(process.cwd());
-    console.log(report(differences(p, fresh(p))));
+    const at = process.argv.indexOf("--older");
+    const older = at < 0 ? [] : fs.readdirSync(process.argv[at + 1]).map(d => fresh(p, path.join(process.argv[at + 1], d, TEMPLATES)));
+    console.log(report(differences(p, fresh(p), older)));
   } catch (e) {
     console.error(`FAIL: the project could not be compared (${e.message}): run it from the project's root, a git repository`);
     process.exitCode = 1;

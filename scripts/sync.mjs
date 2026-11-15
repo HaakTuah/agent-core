@@ -21,7 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past, releasesIn } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -92,10 +92,18 @@ function sync(tmp) {
       : `This sync asks nothing of the project beyond the copy (core/${NOTES}).`);
   // Every step not done, a standing one too, and every difference from a fresh start, as the new copy reads them; for
   // the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
+  // (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
+  const kits = path.join(tmp, "kits");
+  for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
+    const to = path.join(kits, sha);
+    fs.mkdirSync(to, { recursive: true });
+    try { execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); }
+    catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
+  }
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
-  for (const script of ["steps.mjs", "fresh.mjs"]) {
+  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits]]) {
     if (!fs.existsSync(path.join("core", "scripts", script))) continue;
-    const r = spawnSync(process.execPath, [path.join("core", "scripts", script)], { encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8" });
     console.log(`${r.stdout}${r.stderr}`.trim() || `core/scripts/${script} said nothing`);
   }
 }

@@ -107,5 +107,23 @@ declare(game, '"AGENTS.md": its own way of starting a task, on the owner\'s word
 found = differences(project(game), fresh(project(game)));
 ok(found.length === 3 && !found.some(d => d.startsWith("AGENTS.md:")), "a file the manifest's \"Differences\" quotes is not compared", found.join("\n"));
 
+// ---- the wording an earlier kit wrote and the kit has left: listed where the project still holds it ----
+const older = path.join(tmp, "older", "setup", "template");
+fs.cpSync(path.join(root, TEMPLATES), older, { recursive: true });
+const LEFT = "Every builder reads the old way of starting a task, which the core has since left.";
+fs.writeFileSync(path.join(older, "AGENTS.md.tmpl"), fs.readFileSync(path.join(older, "AGENTS.md.tmpl"), "utf8").replace("## Commands", `${LEFT}\n\n## Commands`));
+fs.writeFileSync(path.join(older, "core-manifest.md.tmpl"), fs.readFileSync(path.join(older, "core-manifest.md.tmpl"), "utf8").replace("| *large file* |", "| *old slot* | gone |\n| *large file* |"));
+const another = kit("another-npm-project", { packages: "." });
+const npmAgents = path.join(another, "AGENTS.md");
+const p0 = project(another), olderKit = fresh(p0, older);
+ok(olderKit.length > 0 && !differences(p0, fresh(p0), [olderKit]).length, "an earlier kit whose wording the project does not hold adds no difference");
+fs.writeFileSync(npmAgents, fs.readFileSync(npmAgents, "utf8").replace("## Commands", `${LEFT}\n\n## Commands`));
+fs.writeFileSync(path.join(another, "core-manifest.md"), fs.readFileSync(path.join(another, "core-manifest.md"), "utf8").replace("| *large file* |", "| *old slot* | gone |\n| *large file* |"));
+const p1 = project(another);
+found = differences(p1, fresh(p1), [olderKit, olderKit]);
+ok(found.length === 2 && found.some(d => d.startsWith("AGENTS.md: still holds the paragraph \"Every builder reads") && d.includes("no longer writes")) && found.some(d => d.startsWith("core-manifest.md: still holds the row \"*old slot*\"")),
+  "a paragraph and a row an earlier kit wrote that the kit no longer writes, still held, are listed once each", found.join("\n"));
+ok(!fresh(p1, path.join(tmp, "nowhere")).length, "an earlier copy with no starter kit gives no kit to compare");
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
 process.exitCode = failed ? 1 : 0;
