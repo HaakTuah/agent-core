@@ -612,12 +612,18 @@ function baseOf() {
 // AGENTS.md), else the kit's; null where the project has none yet.
 function configAt(named, self, base) {
   const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")) ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
-  if (fs.existsSync(notLinked(at))) return at;
+  if (fs.existsSync(notLinked(at))) return aFile(at);
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
   const was = base ? baseFiles(base, named) : null; // (where the base's own manifest places it, if this one moved it)
-  if (base?.show(at) != null || was?.config != null) refuse(`${at} is gone, and ${base.name} holds it${was.at === at ? "" : ` at ${was.at}, where its manifest names it`}: no pull request takes the shape check's config out`, `take the config back as ${base.name} holds it (git checkout ${base.name} -- ${was.at}), and the manifest's *shape check* row with it where this pull request changed it`);
+  const held = base?.show(at) != null ? at : was?.config != null ? was.at : null;
+  if (held !== null) refuse(`${at} is gone, and ${base.name} holds it${held === at ? "" : ` at ${held}, where its manifest names it`}: no pull request takes the shape check's config out`, `take the config back as ${base.name} holds it (git checkout ${base.name} -- ${held}), and the manifest's *shape check* row with it where this pull request changed it`);
   return null;
 }
+
+const aFile = at => {
+  if (!fs.statSync(at).isFile()) refuse(`${at}, where the shape check's config is named, is no file`, "name the config's own file in the manifest's *shape check* row, or move what stands at that path out of its way");
+  return at;
+};
 
 // A project that has not written its config yet: held to the starter kit's own, with the pull request's base as its
 // baseline, so that from the sync that brings the check nothing gets worse and nothing that stood before fails.
