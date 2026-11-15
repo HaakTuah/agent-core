@@ -65,8 +65,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    first copy is made from a clone at a release.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
-   itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and the list is read against
-   `core/modules/` then.
+   itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
+   step of the copies workflow, reads the list against `core/modules/` on every pull request: a module the list
+   neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
+   with the line to add, and never fail.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file read at the start of every task, each on a line
    of its own (Claude Code imports them through `CLAUDE.md`; any other tool reads them because `AGENTS.md` says to),
    and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
@@ -91,7 +93,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
-   - **With the copies check,** `pointers.mjs` and `reading-size.mjs`, the pointer check and the reading-size check,
+   - **With the copies check,** `manifest-reads.mjs`, the manifest check, which reports and never fails, `pointers.mjs`
+     and `reading-size.mjs`, the pointer check and the reading-size check,
      the second with marks of its own (the *size marks*), whose total counts the project's own files alone (the core's
      copy is held to the core's own cap), and `workflows.mjs`, which needs no config and fails a workflow that names
      `pull_request_target` (floor rule 2).
@@ -230,6 +233,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 Where projects differ only in a name, a path or an example, the core leaves a **slot**, in italics (*progress file*),
 and each manifest says what fills it. A task is a project's unit of work; the main lane is its queue.
+A slot whose description says "left out" has a default and needs no row; every other slot a module the project takes
+uses needs one (`scripts/manifest-reads.mjs` says which).
 
 | Slot | What the project fills in |
 | --- | --- |
@@ -263,6 +268,7 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 Core: HaakTuah/agent-core at <full commit SHA>, copied whole under core/ (never edited here).
 Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.
 Floor: whole. Modules: <all, or the list of those taken>.
+Not taken: <where it is a list: each module left out as `name.md` (its reason), one line>.
 
 ## Names
 <the project's names for the core's words, one line each>
