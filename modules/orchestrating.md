@@ -21,7 +21,7 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
 - **Hand over at once:** start the next session as soon as a task merges. One session per task, continued for its review
   fixes while its context is under an hour old and small; otherwise a fresh one (core archive 10).
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can
-  (core archive 185): once its task merged, or it stopped with its work pushed and its note in the *progress file* (for
+  (core archive 185): once its task merged, or it stopped with its work pushed and its note in its PR's description (for
   usage too: a fresh builder picks up from the branch), its last message read and nothing scheduled bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.

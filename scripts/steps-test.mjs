@@ -90,12 +90,13 @@ fs.writeFileSync(signatures, asKit.replace(/^on:\n  pull_request:\n/m, "on: [pus
 ok(notDone(lockProject).length === 1, "one that is not started by a pull request is reported", report(notDone(lockProject)));
 fs.writeFileSync(signatures, asKit);
 
-// ---- a size marks file the reading-size check cannot read: the step is reported as not read, never as done ----
+// ---- a size marks file the reading-size check cannot read: each step that reads it is reported as not read, never as done ----
 const marksFile = path.join(lockProject, "checks/sizes.json"), marksAsKit = fs.readFileSync(marksFile, "utf8");
 for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wrong shape"], ["\nFAIL: x\n", "no JSON, a line of which reads as a verdict"]]) {
   fs.writeFileSync(marksFile, broken);
   const missed = notDone(lockProject);
-  ok(missed.length === 1 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end"), `size marks of ${what} are reported as not read`, report(missed));
+  ok(missed.length === 2 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end")
+    && missed[1].lead.startsWith("15 November 2026, the progress file") && missed[1].mend.includes("could not read the project"), `size marks of ${what} are reported as not read, by both steps that read them`, report(missed));
 }
 fs.writeFileSync(marksFile, marksAsKit);
 
