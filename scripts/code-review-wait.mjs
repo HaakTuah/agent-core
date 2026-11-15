@@ -61,7 +61,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
-    return { sha, done: false, why: `Codex's code review of ${short} is still running` };
+    return { sha, done: false, why: `Codex's code review of ${short} is still running. Mend: wait, or post "Code review:" naming its whole SHA` };
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules))) return { sha, done: true, why: "no code review is running" };
   const seen = new Set(posted);
@@ -69,7 +69,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
   // (a list of commits GitHub cut short, at 250, proves no update from main: only a review of the head stands then)
   const all = flat(commits);
   if (Number.isInteger(pull.commits) && all.length >= pull.commits ? stands(all, sha, seen) : seen.has(sha)) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
-  const why = `no code review of ${short}: ask one, or post "Code review:" naming its whole SHA (modules/reviews.md)`;
+  const why = `no code review of ${short}. Mend: ask one, or post "Code review:" naming its whole SHA`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }

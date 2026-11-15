@@ -50,7 +50,7 @@ export function heldAt(commits, created, holds) {
 export function waitsMend(body) {
   const w = waitsOn(body);
   if (w?.kind) return null;
-  return `${w ? `its line "${WAITS} ${w.said}" is in none of the forms` : `the description has no line "${WAITS}"`}: end it with one, above its closing lines, of these: "${WAITS} nothing", "${WAITS} a review", "${WAITS} checks", "${WAITS} #<the item it waits on>", or "${WAITS} the owner: <the question, in one sentence>?", with the label needs-owner on the pull request; edit it whenever what it waits on changes`;
+  return `${w ? `its line "${WAITS} ${w.said}" is in none of the forms` : `the description has no line "${WAITS}"`}. Mend: end it with one, above its closing lines, of these: "${WAITS} nothing", "${WAITS} a review", "${WAITS} checks", "${WAITS} #<the item it waits on>", or "${WAITS} the owner: <the question, in one sentence>?", with the label needs-owner on the pull request; edit it whenever what it waits on changes`;
 }
 
 export const PARTS = ["What the owner can try", "Readings taken"];
@@ -75,8 +75,8 @@ export function missing(body, parts = PARTS) {
 if (started(import.meta.url)) {
   const parts = asked(process.argv[2]);
   const absent = missing(process.env.PR_BODY, parts);
-  for (const part of absent) console.log(`FAIL the description has no heading "${part}": add "## ${part}" with what belongs under it ("None" where there is nothing; where a report in a file holds it, that file)`);
-  console.log(`${absent.length ? "FAIL" : "ok  "} the description's parts: ${absent.length} of ${parts.length} missing`);
+  for (const part of absent) console.log(`FAIL the description has no heading "${part}". Mend: add "## ${part}" with what belongs under it ("None" where there is nothing; where a report in a file holds it, that file), and run the check again`);
+  console.log(`${absent.length ? "FAIL" : "ok  "} the description's parts: ${absent.length} of ${parts.length} missing${absent.length ? ". Mend: add each heading above as it says" : ""}`);
   // (asked only of a pull request opened since the copy on its base gained the line)
   const created = String(process.env.PR_CREATED ?? ""), base = String(process.env.BASE_SHA ?? ""), repo = String(process.env.GITHUB_REPOSITORY ?? "");
   let mend = null;

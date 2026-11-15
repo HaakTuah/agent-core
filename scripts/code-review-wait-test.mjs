@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { mended } from "./mend.mjs";
 import { UNREAD } from "./security-review.mjs";
 import { CONTEXT, judge } from "./code-review-wait.mjs";
 
@@ -101,10 +102,10 @@ try {
   const advisory = run(pull, [[summary(running)]]);
   ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.context === "code-review" && advisory.status.description.startsWith("Advisory: would wait, Codex's code review"), "run with no word on it, it is advisory and names its status");
   const strict = run(pull, [[summary(running)]], { ADVISORY: "false", RUN_URL: "https://github.com/o/r/actions/runs/9" });
-  ok(strict.status.state === "pending" && strict.status.target_url.endsWith("/runs/9") && run(pull, [[summary(running), said(`Code review: of ${HEAD}`)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review finishes or another's is posted");
+  ok(strict.status.state === "pending" && mended(strict.status.description) && strict.status.description.length < 140 && strict.status.target_url.endsWith("/runs/9") && run(pull, [[summary(running), said(`Code review: of ${HEAD}`)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review finishes or another's is posted");
   const counts = { ...pull, commits: 2, changed_files: 1 };
   const none = run(counts, [], { ADVISORY: "false" }, [line], [code]);
-  ok(none.status.state === "pending" && none.status.description.startsWith("Waiting: no code review of") && run(counts, [[summary(done)]], { ADVISORY: "false" }, [line], [code]).status.state === "success"
+  ok(none.status.state === "pending" && none.status.description.startsWith("Waiting: no code review of") && mended(none.status.description) && run(counts, [[summary(done)]], { ADVISORY: "false" }, [line], [code]).status.state === "success"
     && run(counts, [], { ADVISORY: "false", BOUND: "false" }, [line], [code]).status.state === "success", "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check, it waits not");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;

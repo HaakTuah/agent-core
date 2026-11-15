@@ -2,6 +2,9 @@
 // with its words. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/pr-description-test.mjs
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { mended } from "./mend.mjs";
 import { asked, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 
 let failed = 0;
@@ -40,4 +43,9 @@ ok(heldAt(cs, "2026-11-17T12:00:00Z", s => s !== "a") === false && heldAt(cs, "2
 const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
 ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time");
+// run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
+const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("./pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
+const none = run("The change, and nothing else.");
+ok(none.status === 1 && /has no heading "Readings taken"\. Mend: add "## Readings taken"/.test(none.stdout) && mended(none.stdout) && run(whole).status === 0, "run, a description without its headings fails, each failure saying its mend, and one with them passes");
+ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`), "so does the line's own failure, as the script prints it");
 process.exit(failed ? 1 : 0);

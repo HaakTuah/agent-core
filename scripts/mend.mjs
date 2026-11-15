@@ -1,13 +1,14 @@
 // What a failure of a check of the core says (AGENTS.md, "A check that fails says the mend"; core archive 219; #254):
 // each is a line of the check's output that starts "FAIL" (after the workflow command that opens it, "::error::" or
-// one like it, where one does), says what is wrong and where, then "Mend: " and what a session does about it, in words
-// it acts on with no rule file open. Lines after a failure that do not start "FAIL" are its details (the files, the
-// lines), read with it. Each check's own test reads its failures here (scripts/mend-test.mjs holds that it does).
-// Node's own modules only.
+// one like it, where one does), or, of a check that marks a pull request with a status that waits, the status's
+// description, which starts "Waiting: ". It says what is wrong and where, then "Mend: " and what a session does about
+// it, in words it acts on with no rule file open. Lines after a failure that do not start so are its details (the
+// files, the lines), read with it. Each check's own test reads its failures here (scripts/mend-test.mjs holds that it
+// does). Node's own modules only.
 //
 //   import { mended, unmended } from "./mend.mjs";
 export const MEND = "Mend: ";
-const FAILURE = /^(?:::[a-z]+(?: [^:\r\n]*)?::)?FAIL\b/u;
+const FAILURE = /^(?:::[a-z]+(?: [^:\r\n]*)?::)?(?:FAIL\b|Waiting: )/u;
 // a mend of at least two words after the marker, so that "Mend: " alone, or one word, is none
 const SAID = /Mend: \S+\s+\S/u;
 
