@@ -2,7 +2,7 @@
 # (scripts/pr-description.mjs), here from its source, with the line that says what a pull request opened since it came
 # waits on (PR_CREATED, read against the base's history through the read-only token). A description put right is checked again by itself (the type
 # "edited"). A pull request that changes the floor or the modules is asked for one heading more, "What holds it"
-# (AGENTS.md, "A new rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
+# (AGENTS.md, "Every rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
 # setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (AGENTS.md, "Nothing locks a
 # project"): whether it does is read from git alone, the merge commit against its first parent, the base, and nothing
 # of the pull request's own text reaches that step's script. This repository only;
