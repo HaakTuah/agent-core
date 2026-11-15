@@ -5,8 +5,8 @@
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
 //   - "unread": no check reads it exactly, and the step says why; a staged case holds it (#235).
-// A step only the project's owner can do says so ("owner"): it is advisory, labelled as waiting on the owner, and the
-// rest goes on. A step the project leaves undone on purpose is declared in its manifest's "Differences", on its owner's
+// A step only the project's owner can do says so ("owner"): it is advisory, labelled `needs-owner` (labels.json, beside
+// this file), and the rest goes on. A step the project leaves undone on purpose is declared in its manifest's "Differences", on its owner's
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.
 // The sync runs this from the copy it has just written (sync.mjs, beside this file), so a sync reports every step
 // not done, a standing one too, and never fails over one: nothing waits on a step, and running it twice changes
@@ -206,6 +206,7 @@ export const STEPS = [
       return `Trim \`${file}\` once, in a pull request of its own: each finished entry leaves it (its pull request and issue keep it), each entry says only what is next and points to its pull requests for what was done, and each line of a queued issue holds its issue, who builds it and what it waits on, nothing more (\`core/modules/inbox.md\`, "The *progress file* holds order only"). Then give it a mark of its own under "read" in \`${marksAt}\`: a number of bytes the project chooses, below "each" (${marks.each}) and at least its size after the trim.`;
     } },
   { lead: "15 November 2026, the owner's inbox where issues cannot be reached", cost: COST.read, unread: "whether issues can be read and written here is GitHub's answer, not a file's: `core/scripts/inbox.mjs` asks it, and each sync runs it from the next one on" },
+  { lead: "15 November 2026, labels and openers", cost: COST.read, unread: "whether the labels stand and the issues and comments carry them is GitHub's answer, not a file's: `core/scripts/labels.mjs` asks it and says each mend, and each sync runs it from the next one on; the issue forms' \"Found while:\" line is a difference `core/scripts/fresh.mjs` lists" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -123,8 +123,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Nothing locks a project** (core archive 201, 207 and 215), in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
   what an agent can mend alone may bind, and what only the owner can do (a yes the floor names, a setting on the
-  owner's account, anything paid) is advisory, reported and labelled as waiting on the owner (#244) while the rest goes
-  on. The trigger is a check the release adds or makes read more, and its actor is whoever builds that check:
+  owner's account, anything paid) is advisory, reported and labelled `needs-owner` (`scripts/labels.json`) while the
+  rest goes on. The trigger is a check the release adds or makes read more, and its actor is whoever builds that check:
   - a pull request that makes something worse than it stood may fail, and the session mends it there; every failure
     says its mend (#254);
   - what stood before the check came, or before it read more, never turns it red: the check keeps a baseline, what

@@ -233,6 +233,7 @@ function init(argv) {
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");
   console.log("  where it has versions Dependabot cannot see, its versions check: the core's README, point 5");
+  console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/modules/inbox.md)");
   if (o.nuget !== undefined) console.log("  its NuGet packages: lock files turned on (RestorePackagesWithLockFile in its project files or Directory.Build.props) and committed, and each packages.lock.json named in checks/licences.json under \"nuget\", as one whose packages ship or one of tools that only run");
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
   console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);

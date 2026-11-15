@@ -3,8 +3,8 @@
 // manifest's "Core:" line to it, and moves each call to a core workflow whose workflow changed (as `core.yml` checks),
 // listing those calls, and prints what the sync asks of the project beyond the copy (the core's setup/sync-notes.md, the
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
-// is not done, every difference from a fresh start and where the owner's inbox is (steps.mjs, fresh.mjs and inbox.mjs,
-// beside this file), for the sync PR's description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
+// is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack
+// (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
 // which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar and Node's own modules
 // only; the core's address: core-address.mjs, beside this file.
 //
@@ -90,8 +90,8 @@ function sync(tmp) {
     : asks.length
       ? `This sync asks more of the project than the copy (core/${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.\n${asks.join("\n")}`
       : `This sync asks nothing of the project beyond the copy (core/${NOTES}).`);
-  // Every step not done, a standing one too, every difference from a fresh start, and where the owner's inbox is, as the
-  // new copy reads them; for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
+  // Every step not done, a standing one too, every difference from a fresh start, where the owner's inbox is and what its
+  // labels and openers lack, as the new copy reads them; for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
   // (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
   const kits = path.join(tmp, "kits");
   for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
@@ -101,10 +101,16 @@ function sync(tmp) {
     catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
   }
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
-  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"]]) {
+  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"]]) {
     if (!fs.existsSync(path.join("core", "scripts", script))) continue;
-    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8" });
-    console.log(`${r.stdout}${r.stderr}`.trim() || `core/scripts/${script} said nothing`);
+    // (each given ten minutes, so that none can hold the sync. Of what it writes to stderr only its own "FAIL:" lines are
+    // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)
+    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+    const said = String(r.stderr ?? "").split("\n").filter(l => l.startsWith("FAIL:")).join("\n");
+    const text = `${r.stdout ?? ""}${said}`.trim() || (r.status === 0 ? `core/scripts/${script} said nothing` : "");
+    if (text) console.log(text);
+    if (r.error?.code === "ETIMEDOUT") console.log(`core/scripts/${script} was stopped after ten minutes: run it again by itself`);
+    else if (r.status !== 0 && !said) console.log(`core/scripts/${script} failed: run it again by itself to see why`);
   }
 }
 

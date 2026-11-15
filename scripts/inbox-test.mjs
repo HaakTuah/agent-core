@@ -30,7 +30,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inbox-test-"));
 try {
   ok(items(dir).length === 0, "no folder: no items");
   fs.mkdirSync(path.join(dir, FOLDER));
-  for (const f of ["README.md", "b-task.md", "a-bug.md", "notes.txt", "odd `name`.md"]) fs.writeFileSync(path.join(dir, FOLDER, f), "State: new\nBy: owner\n");
+  for (const f of ["README.md", "b-task.md", "a-bug.md", "notes.txt", "odd `name`.md"]) fs.writeFileSync(path.join(dir, FOLDER, f), "State: queued\nBy: owner\n");
   fs.mkdirSync(path.join(dir, FOLDER, "sub.md"));
   ok(items(dir).join() === "a-bug.md,b-task.md" && items(dir).odd === 1, "the items are its Markdown files, its README and folders left out, in order; one whose name is not plain is counted, never printed", items(dir).join());
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -42,7 +42,7 @@ ok(/one place at a time/.test(oddOnly) && /\(1 whose name is not plain\)/.test(o
 const back = report({ yes: true }, Object.assign(["a-bug.md"], { odd: 1 }), true);
 ok(/one place at a time/.test(back) && /a-bug\.md, 1 more whose name is not plain/.test(back) && /as an issue/.test(back) && /another account added moves over as data/.test(back) && /take `inbox\/` out/.test(back), "issues reachable again, items in the folder: each moved over and the folder taken out, in one pull request", back);
 const off = report({ yes: false, why: "its issues are switched off" }, [], false);
-ok(/switched off/.test(off) && /State: <new, needs-owner, queued, later, on-hold>/.test(off) && /By: </.test(off) && /ISSUE_TEMPLATE/.test(off) && /name it to the owner once/.test(off) && /nothing waits on it/.test(off),
+ok(/switched off/.test(off) && /State: <queued, needs-owner, later, on-hold>/.test(off) && /By: </.test(off) && /ISSUE_TEMPLATE/.test(off) && /name it to the owner once/.test(off) && /nothing waits on it/.test(off),
   "issues not reachable, no folder: the folder is made as said, its item format given, and the owner's setting named once", off);
 const kept = report({ yes: false, why: "its issues are switched off" }, ["a.md"], true);
 ok(/is the folder `inbox\/` \(1 item/.test(kept) && !/name it to the owner/.test(kept), "the folder standing: it is the inbox, and the owner is not named again", kept);
