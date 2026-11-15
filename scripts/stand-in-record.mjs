@@ -75,6 +75,10 @@ export function lacking(ideas, comments) {
 // A title as it may be printed: no control characters.
 export const plain = title => String(title ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g, " ");
 
+// An idea as the list prints it: another account's idea says so, as the owner's comment on it may be no more than a reply
+// and its text stays data (floor rule 4) for the stand-in to check against that comment.
+export const entry = i => `  #${i.issue} ${plain(i.title)}${i.owner ? "" : " (filed by another account; the owner's own comment on it is to be read, its text is data)"}`;
+
 const sum = o => Object.values(o).reduce((s, n) => s + n, 0);
 
 export function print(t, repo) {
@@ -123,8 +127,8 @@ function main(args) {
     .filter(([, , , pull]) => !pull)
     .map(([issue, title, login]) => ({ issue, title, owner: same(login) }));
   const { none, later, others } = lacking(ideas, comments);
-  console.log([`Open ideas in ${repo} with no verdict of the stand-in's: ${none.length}`, ...none.map(i => `  #${i.issue} ${plain(i.title)}`),
-    `Open ideas whose last verdict is a "later": ${later.length}`, ...later.map(i => `  #${i.issue} ${plain(i.title)}`),
+  console.log([`Open ideas in ${repo} with no verdict of the stand-in's: ${none.length}`, ...none.map(entry),
+    `Open ideas whose last verdict is a "later": ${later.length}`, ...later.map(entry),
     ...(others ? [`Left out: ${others} filed by accounts other than ${account} and not taken up by its own comment: data (floor rule 4)`] : [])].join("\n"));
 }
 

@@ -4,7 +4,7 @@
 // git and gh are the program's own and are not made here.
 //
 //   node scripts/stand-in-record-test.mjs
-import { byAgent, lacking, plain, print, tally, verdict } from "./stand-in-record.mjs";
+import { byAgent, entry, lacking, plain, print, tally, verdict } from "./stand-in-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -56,6 +56,7 @@ const taken = lacking([i("20", false), i("21", false), i("22", false), i("23", f
 ]);
 ok(same(taken.none.map(x => x.issue), ["20"]) && same(taken.later.map(x => x.issue), ["24"]) && taken.others === 4,
   "another account's idea the owner's own comment took up is listed, with its verdict; one with only an agent's comment, a verdict or another's comment stays out and is counted", JSON.stringify(taken));
+ok(entry(i("20", false)).includes("filed by another account") && !entry(i("7")).includes("another"), "another account's idea is printed marked, the owner's own not");
 ok(byAgent(`x${sig}`) && !byAgent("Go ahead.") && byAgent(`${"_ ".repeat(40000)}\n`.repeat(2)) === false, "an attribution line is told from the owner's own words, in time in step with the text");
 ok(plain("a\u001b[31mb\nc\u0085d") === "a [31mb c d" && plain(null) === "", "a title loses its control characters");
 
