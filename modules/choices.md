@@ -3,11 +3,10 @@
 Read before a session makes a choice that is hard to undo or advises the owner on one, and by the reader of a pass
 over the recorded choices (core archive 222).
 
-A choice is hard to undo where undoing it means rewriting or moving much of what stands: a language, an engine or
-framework, where data is kept, how the code is put together, a large dependency, a tool the work will lean on, and the
-platforms the code builds and tests on, apart from those the product ships for. Its record stands once, in the *choice
-records*, under a heading `## Choice: ` and what was chosen; `core/scripts/choices.mjs` lists them and says when their
-pass is due.
+A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
+kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
+and tests on, apart from those the product ships for. Its record stands once, in the *choice records*, under a heading
+`## Choice: ` and what was chosen; `core/scripts/choices.mjs` lists them and says when their pass is due.
 
 - **A choice that is hard to undo gets a record.** By default a choice is made on the best reading and noted in a line
   of the *report*, as any reading is. One that is hard to undo gets a record before it stands, written by the session
@@ -25,9 +24,9 @@ pass is due.
   - **the pick,** what it was chosen for, and, on a line that opens `Reopens it:`, the measurable sign that would
     reopen it.
 
-  It does not mean a record for a choice a pull request can reverse, nor that what is common is wrong: how well agents
-  write a language is a criterion like any other, once named and weighed. Nothing here ever asks for a rewrite, and
-  nothing waits for the owner beyond what floor rule 14 names: the record is how the reading is taken, not a question.
+  It does not mean that what is common is wrong: how well agents write a language is a criterion like any other, once
+  named and weighed. Nothing here ever asks for a rewrite, and nothing waits for the owner beyond what floor rule 14
+  names: the record is how the reading is taken, not a question.
   Reason: fresh sessions advise what is most common, and both of the owner's first projects paid for an early choice,
   one with a rewrite into another language.
 - **The choices a project already made are recorded too.** At its first audit (in a project that stood before this
@@ -39,8 +38,8 @@ pass is due.
   that anything changes in the code: it is a record of what stands. Reason: a choice never written down cannot show
   when it stops paying off.
 - **What reopens a choice.** A recorded choice stands until one of two triggers:
-  - **its sign trips:** whoever sees it trip, in a trial, an audit or a measure the scheduled look reports
-    (`modules/orchestrating.md`), files the suggestion below;
+  - **its sign trips:** the session that runs the trial, the audit or the measure in which it shows tripped files the
+    suggestion below (#330 asks that the scheduled look read a sign written in a measure a check keeps);
   - **the pass twice a year:** the scheduled look keeps an issue open once the day on the records' line `Read whole:`
     is 182 days old, and a fresh reader goes through every record, reads its sign, and asks whether an option plainly
     better exists now (a new version, a tool that did not exist, a need that has gone), reading what it needs, on the
@@ -55,8 +54,8 @@ pass is due.
   shows the stack cannot meet it, its builder opens a choice record. It does not mean that another language being
   faster in general is a reason by itself. The record:
   - shows first where the time or the memory goes, since most slowness is in the algorithm;
-  - takes a part, never the whole: the other language goes behind a declared boundary, as any system does, and the
-    rest of the code keeps its language;
+  - takes a part, never the whole: the other language goes behind a declared boundary (#246), as any system does, and
+    the rest of the code keeps its language;
   - counts the whole cost: the second toolchain, the build step, tests and checks in two languages, and how well
     agents write it;
   - rests on a benchmark of the heavy path, not the feature built twice: no one fits a part into the old stack first
@@ -64,8 +63,8 @@ pass is due.
 
   Once a second language and its toolchain are in a project, a later part in it is an ordinary choice, noted in a line.
   Where the core's dependency checks cannot read the new toolchain's packages, they are built first, as a check for a
-  rule that already stands. Reason: the owner wants the heavy parts written where they run well, not first fitted into
-  a stack that cannot carry them.
+  rule that already stands (#278). Reason: the owner wants the heavy parts written where they run well, not first
+  fitted into a stack that cannot carry them.
 - **A split between languages is decided at the start where it can be.** Where a new project's aims name a need in
   numbers, its first record weighs a second language beside the common one, and if it takes one, writes the line
   between them: which kind of code goes where, by criteria someone can observe ("runs inside the simulation loop",

@@ -1,9 +1,7 @@
 # The core's choices that are hard to undo
 
-The core's *choice records* (`AGENTS.md`, "The slots here"; what a record holds and what reopens one:
-`modules/choices.md`). Each stood before the rule came and is recorded as it stands: no rewrite is asked. A sign that
-trips, or a plainly better option found at the pass twice a year, becomes an issue for the owner, labelled
-`needs-owner`; no session makes that choice. `node scripts/choices.mjs` lists them.
+The core's *choice records* (`AGENTS.md`, "The slots here"; `modules/choices.md`), each recorded as it stood when the
+rule came.
 
 Read whole: 2026-11-15
 

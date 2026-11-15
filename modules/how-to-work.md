@@ -11,8 +11,8 @@ and 57).
 - **A question from the owner is a question:** answer it; act on it when the owner says so (core archive 25).
 - **Match effort to the task** (core archive 25): the cheapest approach that does it well; docs, small fixes and
   config in one pass.
-- **A choice that is hard to undo gets a record** (a language, a framework, where data is kept, the platforms the code
-  builds on): `modules/choices.md`, read before one is made or advised.
+- **A choice that one pull request cannot reverse gets a record:** `modules/choices.md`, read before one is made or
+  advised.
 - **A need is stated in numbers where there is one:** whoever writes a task for a feature whose users will feel its
   speed, size or memory writes that need as a number. It does not mean a number made up where users feel none.
   Reason: a need nobody wrote down never shows a miss.

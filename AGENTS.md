@@ -31,16 +31,16 @@ Not taken, each for its reason:
 - `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
   player chooses to use, which are all that module governs.
 
-The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
-the audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is `archive/instructions.md`, cited "(core
-archive N)"; the *settling references* and the *descriptions*: `README.md`; the *large file*: past about 50 KB; the
-*owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, and all that add to what
-every session reads at its start, whose cap they share, in the queue's order; the *design-checked PRs*: those that add
-or change a rule of the floor or the modules; the *review reference*: the line's issue, with the owner's words quoted
-on it; the *hard work*: a new or changed rule; the *size marks*: the cap of `scripts/size.mjs`, and its own mark for
-`QUEUE.md`, with no split mark; the *major version checks*: the suites of `.github/workflows/tests.yml`; *planning
-design*: none; the *other builders*: none, every file here being protected (`SECURITY.md`), so there are no *other
-builders' checks*.
+The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps the
+audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is
+`archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*: `README.md`; the
+*large file*: past about 50 KB; the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the
+same file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
+*design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
+issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *size marks*: the cap of
+`scripts/size.mjs`, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of
+`.github/workflows/tests.yml`; *planning design*: none; the *other builders*: none, every file here being protected
+(`SECURITY.md`), so there are no *other builders' checks*.
 
 ## The queue
 
