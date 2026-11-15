@@ -14,8 +14,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 ## Two layers
 
 - **The floor** (`floor/`): what keeps the owner from harm and loss, taken whole by every project. If a project dropped
-  a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files, `security.md`,
-  `topics.md` and `threat-model.md`, each say at their top what they hold and when they are read.
+  a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
+  `security.md`, whose opening says what it and `topics.md` hold and when each is read, and `threat-model.md`, the
+  shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
@@ -190,8 +191,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
      request or by a comment that opens "Security review:" from an account `modules/reviews.md`, point 3, counts (the
-     owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
-     one posted after it began, never a note posted before it; a review of an earlier commit than the head stands only
+     repository owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex
+     marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
+     never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
