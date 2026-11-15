@@ -163,6 +163,9 @@ jobs:
       - name: The core takes each of its own modules, or its AGENTS.md gives its reason
         if: ${{ !cancelled() }}
         run: node scripts/own-modules.mjs
+      - name: Each check's failure says its mend, and each check's test reads it
+        if: ${{ !cancelled() }}
+        run: node scripts/mend-test.mjs
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() }}
         run: node scripts/workflows.mjs

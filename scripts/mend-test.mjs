@@ -52,6 +52,7 @@ const NOT_CHECKS = {
   "scripts/versions.mjs": "runs on a schedule, and opens issues",
   "scripts/release.mjs": "cuts a release, started by hand on main",
   "scripts/site-publish.sh": "publishes a preview of a pull request's site",
+  "scripts/sync.mjs": "named in core.yml's mends, as what a session runs to mend the copy",
   ".github/workflows/preview.yml": "publishes a preview of a pull request's site",
   ".github/workflows/release.yml": "cuts a release, started by hand on main",
 };
@@ -76,9 +77,9 @@ for (const [name, why] of Object.entries(NOT_CHECKS)) ok(fs.existsSync(path.join
 for (const [check, test] of Object.entries(CHECKS)) {
   let text = "";
   try { text = fs.readFileSync(path.join(root, test), "utf8"); } catch { /* read as missing below */ }
-  ok(fs.existsSync(path.join(root, check)) && /from "\.\/mend\.mjs"/u.test(text) && /\bmended\(/u.test(text),
-    `${check}: its test, ${test}, reads its failures for their mend${text ? "" : " (no such test)"}`
-    + (/\bmended\(/u.test(text) ? "" : `. Mend: in ${test}, run the check where it fails and ask mended() of scripts/mend.mjs of its output`));
+  const reads = /from "\.\/mend\.mjs"/u.test(text) && /\bmended\(/u.test(text);
+  ok(fs.existsSync(path.join(root, check)) && reads, `${check}: its test, ${test}, reads its failures for their mend${reads ? ""
+    : `${text ? "" : " (no such test)"}. Mend: in ${test}, run the check where it fails and ask mended() of scripts/mend.mjs of its output`}`);
 }
 
 console.log(`${count - failed} of ${count} passed`);
