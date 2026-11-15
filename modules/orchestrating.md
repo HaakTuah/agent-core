@@ -21,9 +21,9 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
 - **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
   and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
-  the steps of a release not done, the labels and openers to mend, a run of its own missed, and what the dose of the
-  audits and the cleaning share and the staged cases make due, as their rules come (#246, #235); once a month, the
-  state report (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit
+  the steps of a release not done, the labels and openers to mend, a run of its own missed, the cleaning and each
+  audit the codebase's state makes due (`modules/cleaning.md`), and what the staged cases make due, as their rule
+  comes (#235); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit
   writes it) and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
@@ -39,7 +39,10 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   usage too: a fresh builder picks up from the branch), its last message read and nothing scheduled bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
-- **A lane for every independent entry** (core archive 11).
+- **A lane for every independent entry** (core archive 11). Where the look's cleaning issue stands, cleaning gets
+  the share of the lanes the codebase's state gives it (`modules/cleaning.md`): most while it is in debt, a quarter
+  while it is paying down. It does not mean that an entry the owner asked for is held back for it: the share is a
+  target the look shows, and no check holds it. Reason: a share nobody hands out is never got.
 - **A stalled lane** (core archive 133 and 200), found on every wake by `scripts/stalled.mjs`, never by a session's word
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
   (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
