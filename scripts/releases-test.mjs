@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
-import { OWN, costed, held, inTheCore, next } from "./release.mjs";
+import { OWN, costed, held, inTheCore, next, older } from "./release.mjs";
 import { STEPS } from "./steps.mjs";
 import { NOTES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
 
@@ -160,6 +160,8 @@ ok(held(list()).join() === "no check has passed on it yet" && held(list(run("siz
 ok(held(list(run("release", "completed", "failure", OWN), run("tests", "completed", "success"))).length === 0 && held(list(run("release", "in_progress", null, OWN))).join() === "no check has passed on it yet", "the release workflow's own runs, an earlier try that failed too, are no check of the commit");
 ok(held({ total_count: 3, workflow_runs: [run("tests", "completed", "success")] }).join().includes("3 runs stand on it and 1 were read"), "a list read only in part holds it");
 ok([null, undefined, {}, [], "text", { workflow_runs: [] }, { total_count: "1", workflow_runs: [run("tests", "completed", "success")] }, { total_count: 1, workflow_runs: {} }].every(l => held(l).join() === "the list of the checks on it could not be read"), "so does a list in any other form");
+const handed = older("release-7", "b".repeat(40));
+ok(handed.includes(`node core/scripts/sync.mjs ${"b".repeat(40)}`) && handed.includes("older than release-1") && handed.includes("release-7"), "each release says how a copy older than release-1 takes it: once, with the release's full SHA (#365)", handed);
 // (asked of the script itself, in this repository: each stops before anything is fetched or pushed)
 const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("./release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha> and --runs <file>|needs a value/.test(r.stderr) && !r.stdout; };
 ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at"), "a cut asked for without the commit it is for, or without the checks on it, is refused before anything is fetched");

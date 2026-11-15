@@ -4,10 +4,11 @@
 // is what the core's owner hands on to another owner's project, on purpose. Run in the core's own repository alone: in
 // a project's copy it refuses, since a project cuts no release. Without --cut it says what the release would be and
 // what it would ask of a project (the sync notes it carries, each with roughly what it costs a project where it is not
-// done yet: steps.mjs, beside this file), and cuts nothing. The owner tags nothing by hand: the
-// release workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands
-// it the commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has
-// moved on from that commit, or where a check on it has not passed. Git and Node's own modules only.
+// done yet: steps.mjs, beside this file) and how a copy older than release-1 takes it, and cuts nothing; with --cut it
+// says the same. The owner tags nothing by hand: the release workflow (.github/workflows/release.yml) runs the cut,
+// started by a session on the owner's word, and hands it the commit it was started on and GitHub's list of the checks
+// that ran there; the cut is refused where main has moved on from that commit, or where a check on it has not passed.
+// Git and Node's own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file>
@@ -48,6 +49,10 @@ export const costed = entry => {
   const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
   return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps.mjs"}.`;
 };
+
+// What the core's owner tells a project whose copy is older than release-1 when handing a release on (#365): its own
+// sync script knows no release and, run with no SHA, takes the core's newest main, so it syncs once with this SHA.
+export const older = (name, sha) => `A project whose copy is older than release-1 syncs to ${name} once with its full SHA, \`node core/scripts/sync.mjs ${sha}\`: its own sync script, run with none, takes the core's main (setup/sync-notes.md, at its top).`;
 
 // This repository's own release workflow: its runs on a commit are no check of that commit.
 export const OWN = ".github/workflows/release.yml";
@@ -108,6 +113,7 @@ function main(argv) {
       : asks.length
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
+    console.log(older(name, sha));
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
     let list = null;
     try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
