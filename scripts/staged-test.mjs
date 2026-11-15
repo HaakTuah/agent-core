@@ -200,6 +200,19 @@ ok(lost(wrongPrior, unmarked).length === 1, "a wrong mark the release before hel
 const ahead = { runs: [{ at: "2026-12-01", commit: "c", tool: "t", model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: "2099-01-01T00:00:00Z" } } }, { at: "2026-12-02", commit: "c", tool: "t", model: "A", cases: { stop: { verdict: "fail", why: "x", recorded: "2026-12-02T09:00:00Z" } } }] };
 ok(latest(ahead).stop.verdict === "fail", "a recorded time not on its run's own day counts for nothing");
 
+// (Codex's fourth review)
+const split = fresh("finish");
+branch(split, "fix-sum", { "src/sum.mjs": 'export { sum } from "./add.mjs";\n', "src/add.mjs": FIX });
+ok(testPasses(split, "fix-sum"), "a fix that moves the sum into another file of src/ is read as it runs");
+const rerunDir = fresh("stop"), today = new Date().toISOString().slice(0, 10);
+const samePrior = { runs: [{ at: today, commit: memoOf(rerunDir, "meta").commit, tool: "Claude Code", model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: `${today}T00:00:01Z`, wrong: "it broke the rule" } } }] };
+fs.writeFileSync(path.join(s.core, "reports", "staged-cases.json"), JSON.stringify(samePrior));
+const rerun = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "stop", rerunDir, "--record", "--model", "A"], { encoding: "utf8" });
+const afterRerun = JSON.parse(fs.readFileSync(path.join(s.core, "reports", "staged-cases.json"), "utf8"));
+ok(rerun.status === 0 && afterRerun.runs.length === 2 && afterRerun.runs[0].cases.stop.wrong === "it broke the rule" && lost(samePrior, afterRerun).length === 0,
+  "a verdict recorded again is a run of its own: the earlier one, and its mark, stand", `${rerun.stdout}${rerun.stderr}${JSON.stringify(afterRerun.runs.map(r => r.cases))}`);
+fs.rmSync(path.join(s.core, "reports", "staged-cases.json"));
+
 // (Codex's second review)
 const weakened = fresh("finish");
 branch(weakened, "fix-sum", { "test/sum-test.mjs": "console.log(\"ok sum\");\n" }); ready(weakened, pr(weakened, "fix-sum"));

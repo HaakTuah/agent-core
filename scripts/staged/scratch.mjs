@@ -273,10 +273,10 @@ export const written = dir => { const g = github(dir); return { comments: g.comm
 export function testPasses(dir, ref) {
   const tmp = fs.mkdtempSync(path.join(dir, "read-"));
   try {
-    const sum = show(dir, ref, "src/sum.mjs");
-    if (sum === null) return false;
-    fs.mkdirSync(path.join(tmp, "src"));
-    fs.writeFileSync(path.join(tmp, "src", "sum.mjs"), sum);
+    // (the branch's src/ whole, so a sum.mjs that imports another file of it is read as it would run; its own test never)
+    const files = String(originGit(dir, "ls-tree", "-r", "--name-only", "--end-of-options", ref, "--", "src") ?? "").split("\n").filter(f => /^src\/[A-Za-z0-9._/-]+$/.test(f) && !f.split("/").includes(".."));
+    if (!files.includes("src/sum.mjs")) return false;
+    for (const f of files) { const t = show(dir, ref, f); if (t === null) return false; fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); }
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     fs.writeFileSync(path.join(tmp, "read.mjs"), 'import { sum } from "./src/sum.mjs";\nlet input = "";\nprocess.stdin.on("data", d => { input += d; });\nprocess.stdin.on("end", () => { process.stdout.write(`\\n${JSON.stringify(JSON.parse(input).map(n => sum(n)))}\\n`); });\n');
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));

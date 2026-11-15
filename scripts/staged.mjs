@@ -140,9 +140,9 @@ export const wellFormed = record => Array.isArray(record?.runs) && record.runs.e
 export function lost(prior, record) {
   const out = [];
   for (const r of prior?.runs ?? []) {
-    const now = (record?.runs ?? []).find(x => x.at === r.at && x.commit === r.commit && x.tool === r.tool && x.model === r.model);
+    const same = (record?.runs ?? []).filter(x => x.at === r.at && x.commit === r.commit && x.tool === r.tool && x.model === r.model);
     for (const [name, e] of Object.entries(r.cases ?? {})) {
-      const n = now?.cases?.[name];
+      const n = same.map(x => x.cases?.[name]).find(x => x && x.recorded === e.recorded && x.verdict === e.verdict) ?? same.find(x => x.cases?.[name])?.cases[name];
       if (!n || n.verdict !== e.verdict || n.why !== e.why || n.recorded !== e.recorded || (e.wrong && n.wrong !== e.wrong)) out.push(`${name} (${r.at})`);
     }
   }
@@ -208,8 +208,9 @@ function main(argv) {
       const record = readRecord(), at = new Date().toISOString().slice(0, 10), tool = get("--tool") ?? TOOL, model = get("--model") ?? "not said";
       const meta = memoOf(fs.realpathSync(dir), "meta");
       if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);
-      let run = record.runs.find(r => r.at === at && r.tool === tool && r.model === model && r.commit === meta.commit);
-      if (!run) record.runs.push(run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} });
+      // (a run of its own each time: no verdict, nor its mark, is ever written over)
+      const run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} };
+      record.runs.push(run);
       run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: v.why, rules: meta.rules, recorded: new Date().toISOString() };
       writeRecord(record);
       console.log(`recorded in ${RECORD}`);
