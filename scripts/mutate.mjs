@@ -107,14 +107,19 @@ export function testsOf(file, tests) {
   return Object.keys(tests).filter(t => named.test(tests[t])).sort((x, y) => Number(own(y)) - Number(own(x)) || x.localeCompare(y));
 }
 
+// The tests running now, each stopped with what it started where the run is stopped (`stopAll`).
+const live = new Set();
+const stopAll = () => { for (const stop of live) stop(); };
+
 // One run of a test file in a working copy: "passed", "failed" or "timeout", and how long it took, in seconds.
 function run(test, cwd, limit) {
   return new Promise(done => {
     // (in a group of its own off Windows, so that a test past its time is stopped with what it started)
     const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test], { cwd, stdio: "ignore", detached: group });
     const stop = () => { try { if (group) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* (it ended) */ } };
-    const timer = setTimeout(() => { stop(); done({ result: "timeout", took: limit }); }, limit * 1000);
-    child.on("exit", code => { clearTimeout(timer); done({ result: code === 0 ? "passed" : "failed", took: (Date.now() - start) / 1000 }); });
+    live.add(stop);
+    const timer = setTimeout(() => { stop(); live.delete(stop); done({ result: "timeout", took: limit }); }, limit * 1000);
+    child.on("exit", code => { clearTimeout(timer); live.delete(stop); done({ result: code === 0 ? "passed" : "failed", took: (Date.now() - start) / 1000 }); });
   });
 }
 
@@ -197,7 +202,7 @@ async function main(argv) {
   const code = Object.keys(texts).filter(f => !tests.has(f) && !f.endsWith("package.json"));
   const wanted = wantedOf(named, code), testTexts = Object.fromEntries([...tests].filter(t => t in texts).map(t => [t, texts[t]]));
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "mutate-")), copies = [];
-  const stop = () => { takeAway(copies, scratch); process.exit(130); };
+  const stop = () => { stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
     const jobs = [...wanted].flatMap(([file, lines]) => faults(texts[file], lines).map(f => ({ ...f, file, text: texts[file], tests: testsOf(file, testTexts) })));

@@ -251,7 +251,7 @@ function onPullRequest(p, base) {
   }
   const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
   const touched = changed.size > 0 || git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).trim() !== "";
-  const gone = baseline ? moved(baseline.listed, f => tolerant(() => fs.readFileSync(unlinked(f), "utf8"))) : new Map();
+  const gone = baseline ? moved(baseline.listed, f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null)) : new Map();
   const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
