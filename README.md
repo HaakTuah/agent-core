@@ -21,7 +21,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md` and `choices.md`; and, for games only, `game-design.md`.
+  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; and, for
+  games only, `game-design.md`.
 - **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
   stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
   every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
@@ -98,8 +99,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    `SECURITY.md` and `core-manifest.md` (its threat model among them), each path in backticks, the list ended by `;` (a
    file a tool takes its instructions from, such as an `AGENTS.md` in a subfolder, is a rule file without being listed,
    and a project keeps none it does not mean to have: floor rule 3), as `core/scripts/rule-files.mjs` reads them, and
-   among the checks on the work the configs of its copies, licence and reading-size checks. Its threat model adds to the
-   floor's.
+   among the checks on the work the configs of its copies, shape, licence and reading-size checks. Its threat model
+   adds to the floor's.
 5. **The shared scripts and workflows,** run from its `core/` copy. A new project gets its part of all this from the
    starter kit (`setup/starter-kit.md`; core archive 195); what each part is:
    - **The hooks:** `work-saved.sh` as its work-saved hook and `helper-call.mjs` as its hook on the Agent tool (it
@@ -121,6 +122,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      the second with marks of its own (the *size marks*), whose total counts the project's own files alone (the core's
      copy is held to the core's own cap), and `workflows.mjs`, which needs no config and fails a workflow that names
      `pull_request_target` (floor rule 2).
+   - **The shape check,** in the same job: `shape.mjs`, with a config of the project's own (the *shape check*: its
+     systems, its marks and its suites' time marks) and a baseline of what stood before it, which only shrinks
+     (`modules/code-shape.md`, which says too how the check holds a project before its config is written). From its
+     baseline `dose.mjs` reads the state the codebase is in, and the scheduled look keeps the cleaning and the audits
+     that state makes due (`modules/cleaning.md`).
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
@@ -278,6 +284,9 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
 | *copies check* | the check that fails a new copy, and its config for `scripts/copies.mjs` |
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` |
+| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`modules/code-shape.md`); left out, `checks/shape.json`, which the starter kit writes |
+| *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`modules/cleaning.md`; `scripts/dose.mjs` reads it); left out, the state read from the shape check's baseline |
+| *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`modules/cleaning.md`); left out, `docs/audits/` |
 | *large file* | how large a file is before it is never read whole |
 | *one at a time* | what never runs as parallel lanes |
 | *design-checked PRs* | which PRs get the design check |

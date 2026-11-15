@@ -1,7 +1,7 @@
 // The measures of how a codebase is put together (#245): the audit's numbers kept as a script, so the next audit is a
 // run and not a study. It reads the JavaScript and TypeScript files git holds and prints a summary; with --json it
-// writes every number, the lists a baseline would hold among them. It measures and fails nothing: what is held, and
-// how, is the module's that follows the audit (#246). Node's own modules and git only.
+// writes every number. It measures and fails nothing: what is held of it, and how, is the shape check's (shape.mjs,
+// beside this file, which reads with this file's reader; modules/code-shape.md). Node's own modules and git only.
 //
 // What it gives, of the files it reads:
 //   - imports: how many, how many cross a folder, those of code that lead to no file, and the pairs of folders that
@@ -12,8 +12,9 @@
 //   - hubs: the files most others import, and the names each gives them;
 //   - shared global names: in a file with no import, export or require, what its top level declares, and the names
 //     more than one such file declares;
-//   - functions: how many lines each spans and how deep its blocks nest (if, for, while, switch, catch, else, try, do;
-//     a function within it is measured on its own);
+//   - functions: how many lines each spans, how deep its blocks nest (if, for, while, switch, catch, else, try, do; a
+//     function within it is measured on its own) and how often it branches: each if, loop (for, while), case and
+//     catch, and each and (&&), or (||, ??) and choice (? :) within a line;
 //   - which files change together in the history (commits that touch more than 30 of them, such as a move, are left
 //     out, and so is every merge);
 //   - with --suite, how long each named suite takes when it runs alone, and whether it passed.
@@ -202,14 +203,42 @@ export function globals(toks) {
   return [...names];
 }
 
-// The functions of a file: [{ name, line, lines, depth }], lines from the line of its body's { to that of its }, depth
-// the deepest its control blocks nest inside it.
+// Whether the token at k is a point where the code branches, by its tokens alone: an if, a loop (for, while; a do's
+// while is its one), a case, a catch; an and (&&), an or (||, ??), each counted at its first sign, with or without the
+// = of an assignment; and a choice (a ? that neither chains, `a?.b`, nor marks a name as optional in TypeScript, which
+// a `:`, `)`, `,`, `;`, `=`, `]` or `}` follows).
+const NOT_A_CHOICE = new Set([":", ")", ",", ";", "=", "]", "}"]);
+const BRANCH_WORD = {
+  if: next => isP(next, "("),
+  while: next => isP(next, "("),
+  for: next => isP(next, "(") || isId(next, "await"),
+  catch: next => isP(next, "(") || isP(next, "{"),
+  case: next => !isP(next, ":"), // (not a key named case)
+};
+function branchSign(tok, prev, next) {
+  if (tok.v === "&" || tok.v === "|") return isP(next, tok.v) && !isP(prev, tok.v);
+  if (tok.v !== "?" || isP(prev, "?")) return false; // (the second sign of ?? is counted at its first)
+  if (isP(next, "?")) return true;
+  if (isP(next, ".")) return false; // a?.b (the . of a number is the number's own token)
+  return !!next && !(next.t === "punct" && NOT_A_CHOICE.has(next.v));
+}
+export function branchesAt(toks, k) {
+  const tok = toks[k];
+  if (tok.t === "punct") return branchSign(tok, toks[k - 1], toks[k + 1]);
+  return tok.t === "id" && Object.hasOwn(BRANCH_WORD, tok.v) && notMember(toks, k) && BRANCH_WORD[tok.v](toks[k + 1]);
+}
+const countBranch = (toks, k, block) => { if (block?.fn && branchesAt(toks, k)) block.fn.branches++; };
+
+// The functions of a file: [{ name, line, lines, depth, branches }], lines from the line of its body's { to that of its
+// }, depth the deepest its control blocks nest inside it, branches how often it branches (branchesAt), a function
+// within it counted on its own.
 export function functions(toks) {
   const found = [], stack = [];
   const openAt = new Map();
   const top = () => { for (let s = stack.length - 1; s >= 0; s--) if (stack[s].v === "{") return stack[s]; return null; };
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
+    countBranch(toks, k, top());
     if (tok.t !== "punct") continue;
     if (tok.v === "(" || tok.v === "[") stack.push({ v: tok.v, k });
     else if (tok.v === "{") {
@@ -217,7 +246,7 @@ export function functions(toks) {
       const parent = top();
       const entry = { v: "{", k, kind, fn: parent?.fn ?? null, cd: kind === "function" ? 0 : parent?.cd ?? 0 };
       if (kind === "function") {
-        entry.fn = { name: functionName(toks, k, openAt), line: tok.line, lines: 1, depth: 0 };
+        entry.fn = { name: functionName(toks, k, openAt), line: tok.line, lines: 1, depth: 0, branches: 0 };
         found.push(entry.fn);
       } else if (kind === "control") {
         entry.cd++;
@@ -392,10 +421,16 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
     cycles: { files: cycles(fileGraph), folders: cycles(folderGraph), filesWithTypes: cycles(withTypes) },
     hubs: hubs.filter(h => h.importedBy > 1),
     globals: { scripts: scripts.length, names: scripts.reduce((s, x) => s + x.names.length, 0), inMoreThanOne: [...declared].filter(([, f]) => f.length > 1).map(([name, f]) => ({ name, files: f.sort() })).sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name)) },
-    functions: { count: fns.length, lines: { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 }, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length, depth4OrMore: fns.filter(f => f.depth >= 4).length, longest: byLength.slice(0, 20), deepest: byDepth.filter(f => f.depth > 0).slice(0, 20) },
+    functions: { count: fns.length, lines: { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 }, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length, depth4OrMore: fns.filter(f => f.depth >= 4).length, ...branching(fns), longest: byLength.slice(0, 20), deepest: byDepth.filter(f => f.depth > 0).slice(0, 20) },
     changedTogether: changedTogether(commits, new Set(code)),
     suites,
   };
+}
+
+// How the functions branch: how many do so more than 15 and more than 30 times, and the twenty that branch most.
+function branching(fns) {
+  const most = fns.filter(f => f.branches > 0).sort((a, b) => b.branches - a.branches || a.file.localeCompare(b.file) || a.line - b.line);
+  return { over15Branches: fns.filter(f => f.branches > 15).length, over30Branches: fns.filter(f => f.branches > 30).length, mostBranching: most.slice(0, 20) };
 }
 
 // The pairs of files changed in the same commits, most often first: how often, and what share of the rarer one's
@@ -471,8 +506,8 @@ function print(m) {
   say(`hubs (imported by most): ${m.hubs.slice(0, 5).map(h => `${h.file} (${h.importedBy})`).join(", ") || "none"}`);
   say(`files with no import: ${m.globals.scripts}, declaring ${m.globals.names} global names, ${m.globals.inMoreThanOne.length} of them in more than one file`);
   const f = m.functions;
-  say(`functions: ${f.count}; lines median ${f.lines.median}, 90th percentile ${f.lines.p90}, longest ${f.lines.max}; over 50 lines ${f.over50Lines}, over 100 ${f.over100Lines}; nesting 4 deep or more ${f.depth4OrMore}`);
-  for (const x of f.longest.slice(0, 5)) say(`  ${x.file}:${x.line} ${x.name}, ${x.lines} lines, ${x.depth} deep`);
+  say(`functions: ${f.count}; lines median ${f.lines.median}, 90th percentile ${f.lines.p90}, longest ${f.lines.max}; over 50 lines ${f.over50Lines}, over 100 ${f.over100Lines}; nesting 4 deep or more ${f.depth4OrMore}; branching more than 15 times ${f.over15Branches}, more than 30 ${f.over30Branches}`);
+  for (const x of f.longest.slice(0, 5)) say(`  ${x.file}:${x.line} ${x.name}, ${x.lines} lines, ${x.depth} deep, ${x.branches} branch points`);
   const t = m.changedTogether;
   say(`changed together (${t.commits} commits): ${t.pairs.slice(0, 5).map(p => `${p.files.join(" + ")} ${p.together}x`).join("; ") || "no pair 3 times"}`);
   for (const s of m.suites) say(`suite: ${s.command}: ${s.seconds} s, ${s.passed ? "passed" : "FAILED"}`);
