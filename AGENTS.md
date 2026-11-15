@@ -177,8 +177,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   many of the owner's answers they matched (core archive 199); the numbers go into that review's report, beside the
   last ones'. Where the
   core's share grew and the project's own work did not, the review says why, or what of the core goes for it.
-- **The core's state report reads the projects that take it** (core archive 218): each month a session where gh
-  answers for the owner's account adds to the core's report what `node scripts/state-report.mjs --projects` prints:
+- **The core's state report reads the projects that take it** (core archive 218): each month the session that takes
+  the core's state report, where gh answers for the owner's account, adds to it what `node scripts/state-report.mjs --projects` prints:
   the counts of each project whose manifest names this core and that is the owner's, or whose owner gave the core's
   owner access, or whose manifest's row *shares its counts* says `yes`, found each time and listed nowhere by hand. A
   private project is not named, nor one of another owner's ("a project of another owner"), and of either only counts and

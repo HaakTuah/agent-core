@@ -8,13 +8,19 @@
 // the project's report is a file of its own, with where that file is, so the check never guesses whether something
 // was. It holds that the parts are there, not that they are true or whole: that stays with the reviews. Dependabot's
 // own PRs are not asked (the workflow leaves them out by their author).
-// It asks too, of a pull request opened from WAITS_SINCE on (PR_CREATED, its time of opening; none given, none asked),
-// the line that says what it waits on ("Nothing waits silently" in modules/git.md; core archive 218), in one of the
-// forms waitsOn reads, as the scheduled look reads it (look.mjs, beside this file). Reads only: the description comes in PR_BODY,
-// never on the command line; Node's own modules. Run by the description workflow (.github/workflows/pr-description.yml).
+// It asks too the line that says what it waits on ("Nothing waits silently" in modules/git.md; core archive 218), in one
+// of the forms waitsOn reads, as the scheduled look reads it (look.mjs, beside this file), of a pull request opened
+// (PR_CREATED) on or after the day the copy on its base (BASE_SHA) gained it: of the commits since WAITS_SINCE that
+// changed this file there, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY), the oldest of the run of
+// newest ones whose file holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
+// own pull request), nothing is asked, so a pull request that stood before the line came is never turned red by it.
+// Reads only: the description comes in PR_BODY, never on the command line; gh and Node's own modules. Run by the
+// description workflow (.github/workflows/pr-description.yml).
 //
 //   PR_BODY="$(...)" PR_CREATED="..." node core/scripts/pr-description.mjs ["Part one|Part two"]
 //   PR_BODY="$(...)" node core/scripts/pr-description.mjs "+Part three"     the two, and that one as well
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
@@ -30,6 +36,15 @@ export function waitsOn(body) {
   if (line === undefined) return null;
   const said = line.slice(WAITS.length).trim();
   return { said, kind: FORMS.find(([, form]) => form.test(said))?.[0] ?? null };
+}
+
+// The day the copy gained the line, from the commits since WAITS_SINCE that changed it on the base, newest first
+// ([{ sha, date }]), and `holds`, whether the file at a commit holds it: the date of the oldest of the newest run that
+// holds it; null where the newest does not, or there is none.
+export function gainedAt(commits, holds) {
+  let at = null;
+  for (const c of commits) { if (!holds(c.sha)) break; at = c.date; }
+  return at;
 }
 
 // The mend where a description asked for the line lacks it or words it in none of the forms; null where it is right.
@@ -63,9 +78,20 @@ if (started(import.meta.url)) {
   const absent = missing(process.env.PR_BODY, parts);
   for (const part of absent) console.log(`FAIL the description has no heading "${part}": add "## ${part}" with what belongs under it ("None" where there is nothing; where a report in a file holds it, that file)`);
   console.log(`${absent.length ? "FAIL" : "ok  "} the description's parts: ${absent.length} of ${parts.length} missing`);
-  // (asked only of a pull request opened since the line came: one that stood before it is never turned red by it)
-  const created = String(process.env.PR_CREATED ?? "");
-  const mend = /^\d{4}-\d\d-\d\dT/.test(created) && created >= WAITS_SINCE ? waitsMend(process.env.PR_BODY) : null;
+  // (asked only of a pull request opened since the copy on its base gained the line)
+  const created = String(process.env.PR_CREATED ?? ""), base = String(process.env.BASE_SHA ?? ""), repo = String(process.env.GITHUB_REPOSITORY ?? "");
+  let mend = null;
+  if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(created) && created >= WAITS_SINCE && /^[0-9a-f]{40}$/.test(base) && /^[\w-]+\/[\w.-]+$/.test(repo) && !/\/\.+$/.test(repo)) {
+    const file = fs.existsSync("core/scripts/pr-description.mjs") ? "core/scripts/pr-description.mjs" : "scripts/pr-description.mjs";
+    const gh = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error("no answer"); return r.stdout; };
+    let gained = null;
+    try {
+      const commits = JSON.parse(gh(`repos/${repo}/commits?path=${file}&sha=${base}&since=${WAITS_SINCE}&per_page=100`)).map(c => ({ sha: c.sha, date: c.commit?.committer?.date }));
+      gained = gainedAt(commits, sha => Buffer.from(JSON.parse(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8").includes("export const WAITS_SINCE"));
+    } catch { gained = null; }
+    if (gained && created >= String(gained)) mend = waitsMend(process.env.PR_BODY);
+    else console.log(`ok   the line "${WAITS}" is not asked here: ${gained ? "the pull request was opened before the copy on its base gained it" : "the day the copy on its base gained it could not be read, or it has not"}`);
+  }
   if (mend) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mend ? 1 : 0);
 }

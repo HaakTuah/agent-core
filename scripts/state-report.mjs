@@ -130,7 +130,7 @@ function projects(named) {
   const gh = ghApi;
   const account = gh("user", "--jq", ".login").trim();
   const found = new Map();
-  if (named.length) for (const name of named) { const r = JSON.parse(gh(`repos/${name}`)); found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: !r.permissions?.push && String(r.owner?.login).toLowerCase() !== account.toLowerCase() }); }
+  if (named.length) for (const name of named) { const r = JSON.parse(gh(`repos/${name}`)); found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: !r.private && !r.permissions?.push && String(r.owner?.login).toLowerCase() !== account.toLowerCase() }); }
   else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: false });
   if (!named.length) try {
     const hits = JSON.parse(gh("-X", "GET", "search/code", "-f", 'q="shares its counts" filename:core-manifest.md'));

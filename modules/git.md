@@ -9,7 +9,7 @@ Read at the start of every task. The calls from a cloud session: `modules/github
   prints one: never worked out by hand (core archive 164).
 - **Nothing waits silently** (core archive 218): above that line stands one that says what the PR waits on, `Waits on:`
   `nothing`, `a review`, `checks`, `#<n>` or `the owner: <the question, in one sentence>?`, with the label
-  `needs-owner` on the PR for the owner; its builder edits it whenever that changes. It does not mean a PR waits on the owner for
+  `needs-owner` on the PR where it is the owner; its builder edits it whenever that changes. It does not mean a PR waits on the owner for
   more than floor rule 14 names. Reason: a finished draft stood still and no one was shown it.
 - **Push after every commit,** even before the PR opens (a draft if not ready) (core archive 6 and 15).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
