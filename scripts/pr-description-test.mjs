@@ -2,7 +2,7 @@
 // with its words. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/pr-description-test.mjs
-import { asked, gainedAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { asked, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -33,8 +33,10 @@ ok(waitsOn("Waits on: the owner: a?\r\nWaits on: nothing").kind === "nothing" &&
 ok(waitsMend("Waits on: nothing") === null && /has no line "Waits on:"/.test(waitsMend("x")) && /"Waits on: soon" is in none of the forms/.test(waitsMend("Waits on: soon")) && /needs-owner/.test(waitsMend("")),
   "the mend names what is missing or wrong, and the forms, with the label for the owner");
 const cs = [{ sha: "c", date: "2026-11-20T00:00:00Z" }, { sha: "b", date: "2026-11-18T00:00:00Z" }, { sha: "a", date: "2026-11-17T00:00:00Z" }];
-ok(gainedAt(cs, s => s !== "a") === "2026-11-18T00:00:00Z" && gainedAt(cs, () => true) === "2026-11-17T00:00:00Z" && gainedAt(cs, s => s === "a") === null && gainedAt([], () => true) === null,
-  "the day the copy gained the line is the oldest of the newest commits that hold it; none where the newest does not, or none changed it");
+const read = [];
+ok(heldAt(cs, "2026-11-19T00:00:00Z", s => (read.push(s), s !== "a")) === true && read.join() === "b", "the line is asked where the copy's newest commit from before the pull request opened holds it, one file read");
+ok(heldAt(cs, "2026-11-17T12:00:00Z", s => s !== "a") === false && heldAt(cs, "2026-11-01T00:00:00Z", () => true) === false && heldAt([], "2026-11-19T00:00:00Z", () => true) === false,
+  "not where that commit's copy lacks it, where the copy changed only after the pull request opened, or where nothing changed it");
 const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
 ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time");

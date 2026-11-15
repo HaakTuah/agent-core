@@ -10,9 +10,9 @@
 // own PRs are not asked (the workflow leaves them out by their author).
 // It asks too the line that says what it waits on ("Nothing waits silently" in modules/git.md; core archive 218), in one
 // of the forms waitsOn reads, as the scheduled look reads it (look.mjs, beside this file), of a pull request opened
-// (PR_CREATED) on or after WAITS_SINCE and the day the copy on its base (BASE_SHA) gained it: of the commits that
-// changed this file there, newest first, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY), the
-// oldest of the run of newest ones whose file holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
+// (PR_CREATED) on or after WAITS_SINCE where the copy on its base (BASE_SHA) already held it then: the newest commit
+// from before then that changed this file there, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY),
+// holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
 // own pull request), nothing is asked, so a pull request that stood before the line came is never turned red by it.
 // Reads only: the description comes in PR_BODY, never on the command line; gh and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
@@ -38,13 +38,12 @@ export function waitsOn(body) {
   return { said, kind: FORMS.find(([, form]) => form.test(said))?.[0] ?? null };
 }
 
-// The day the copy gained the line, from the commits that changed it on the base, newest first
-// ([{ sha, date }]), and `holds`, whether the file at a commit holds it: the date of the oldest of the newest run that
-// holds it; null where the newest does not, or there is none.
-export function gainedAt(commits, holds) {
-  let at = null;
-  for (const c of commits) { if (!holds(c.sha)) break; at = c.date; }
-  return at;
+// Whether the copy on the base held the line when the pull request opened at `created`: of the commits that changed
+// it there, newest first ([{ sha, date }]), the newest from before then, and `holds`, whether the file at a commit holds
+// the line. One file is read, however many syncs have changed it, so a run spends two of the repository's calls.
+export function heldAt(commits, created, holds) {
+  const then = commits.find(c => String(c.date) <= created);
+  return then ? holds(then.sha) : false;
 }
 
 // The mend where a description asked for the line lacks it or words it in none of the forms; null where it is right.
@@ -84,13 +83,13 @@ if (started(import.meta.url)) {
   if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(created) && created >= WAITS_SINCE && /^[0-9a-f]{40}$/.test(base) && /^[\w-]+\/[\w.-]+$/.test(repo) && !/\/\.+$/.test(repo)) {
     const file = fs.existsSync("core/scripts/pr-description.mjs") ? "core/scripts/pr-description.mjs" : "scripts/pr-description.mjs";
     const gh = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error("no answer"); return r.stdout; };
-    let gained = null;
+    let held = null;
     try {
       const commits = JSON.parse(gh(`repos/${repo}/commits?path=${file}&sha=${base}&per_page=100`)).map(c => ({ sha: c.sha, date: c.commit?.committer?.date })).filter(c => /^[0-9a-f]{40}$/.test(c.sha));
-      gained = gainedAt(commits, sha => Buffer.from(JSON.parse(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8").includes("export const WAITS_SINCE"));
-    } catch { gained = null; }
-    if (gained && created >= String(gained)) mend = waitsMend(process.env.PR_BODY);
-    else console.log(`ok   the line "${WAITS}" is not asked here: ${gained ? "the pull request was opened before the copy on its base gained it" : "the day the copy on its base gained it could not be read, or it has not"}`);
+      held = heldAt(commits, created, sha => Buffer.from(JSON.parse(gh(`repos/${repo}/contents/${file}?ref=${sha}`)).content ?? "", "base64").toString("utf8").includes("export const WAITS_SINCE"));
+    } catch { held = null; }
+    if (held) mend = waitsMend(process.env.PR_BODY);
+    else console.log(`ok   the line "${WAITS}" is not asked here: ${held === false ? "the copy on its base did not hold it when the pull request opened" : "whether the copy on its base held it could not be read"}`);
   }
   if (mend) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mend ? 1 : 0);
