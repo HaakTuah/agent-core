@@ -1,9 +1,9 @@
 // Tests the screen checks' baseline (screens.mjs, beside this file): the config and the findings it refuses, what is
-// new against the baseline and what a listed entry covers, a check that reports against one that binds, the baseline
-// lowered only on the screens run, and whole runs in a scratch repository: no config, the first baseline, a new
-// finding failing with its mend, an entry that joins the baseline against the base, a base that is no commit, a
-// baseline moved, a config taken out, and a path outside the project. Each failure is read for its
-// mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// new against the baseline and what a listed entry covers, a check that reports against one that binds, each check's
+// own mend, an entry mended but still listed, the baseline lowered only on the screens run, and whole runs in a
+// scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that joins the
+// baseline against the base, a base that is no commit, a baseline moved, a config taken out, and a path outside the
+// project. Each failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/screens-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -54,6 +54,12 @@ v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: {
 ok(v.fail[0]?.includes("only shrinks") && v.fail[1] === "  values: home: #f00 in the button" && mended(v.fail.join("\n")), "an entry that joins the baseline against the base fails, with its mend", v.fail.join("\n"));
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...joined, grown: { "values: home: #f00 in the button": "the button's red is the brand's, which the direction keeps" } }, base: { name: "origin/main", listed: base.listed } });
 ok(v.fail.length === 0, "one given its reason under \"grown\" joins");
+
+const stale = { listed: new Map([["values: home: #f00 in the button", true], ["values: cart: #0f0", true]]), grown: {} };
+v = verdict({ config: c, at: "c", self: "s", found: parseFound(found(["home"], {}), "f", c), baseline: stale });
+ok(v.fail[0]?.includes("--write") && v.fail.includes("  values: home: #f00 in the button") && !v.fail.includes("  values: cart: #0f0") && mended(v.fail.join("\n")), "a listed entry of a binding check that a run of its screen no longer finds fails until --write lowers the baseline; one of a screen not run stays", v.fail.join("\n"));
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: base });
+ok(v.fail[0]?.includes("from the one system the direction names"), "a new finding's mend is its check's own, which a session acts on with no rule file open", v.fail[0]);
 
 // ---- the baseline lowered ----
 const listed = new Map([["rendered: cart: contrast of the total", { count: 3 }], ["rendered: cart: gone", true], ["values: about: #0f0", true]]);

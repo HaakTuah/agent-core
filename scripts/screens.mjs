@@ -3,10 +3,12 @@
 // script holds that against the check's baseline, in the shape check's form (shape.mjs, beside this file; its
 // `unclaimed`), so nothing gets worse. A finding no listed entry covers is new: one of a check the config marks
 // "binds" fails, saying its mend, and one of a check that "reports" is said and fails nothing ("Nothing locks a
-// project" in the core's AGENTS.md). A listed entry may shrink and may not grow. A run covers only the screens a pull
-// request changes, so an entry of a screen not run is never read as gone. Against the pull request's base
-// (SCREENS_BASE, set by the project's workflow) an entry may join the baseline only with its reason under "grown", as
-// in the shape check's (modules/code-shape.md, "Never worse").
+// project" in the core's AGENTS.md), each with its check's own mend (MENDS). A listed entry may shrink and may not
+// grow, and one of a binding check that a run of its screen no longer finds fails until --write lowers the baseline;
+// a run covers only the screens a pull request changes, so an entry of a screen not run is never read as gone.
+// Against the pull request's base (SCREENS_BASE, set by the project's workflow) an entry may join the baseline only
+// with its reason under "grown", as in the shape check's (modules/code-shape.md, "Never worse"), and the config the
+// base holds may not be taken out.
 //
 // The config (left out: the one the manifest's *screen checks* row names, in backticks, else checks/screens.json; with
 // none, every check is off and nothing is read): { "baseline": "<path>", "checks": { "<check>": "reports" | "binds" } },
@@ -25,7 +27,15 @@ import { fileURLToPath } from "node:url";
 import { notLinked, parseBaseline, unclaimed } from "./shape.mjs";
 import { started } from "./started.mjs";
 
-export const CHECKS = ["values", "rendered", "pictures", "timing", "console"];
+// Each check of the module's, with what a session does about a new finding of it (#254).
+export const MENDS = {
+  values: "take the value from the one system the direction names (its scales of type and spacing, colours by role, corner and motion values), or, where none fits, add one there and use it",
+  rendered: "bring what the finding names within the floor: contrast of 4.5:1 for text and 3:1 for large text and controls, targets of at least 24 pixels (44 where touch is the main input), body text of at least 16 pixels, lines of 45 to 75 characters, nothing wider than the screen at any width between the screen sizes",
+  pictures: "build the state the finding names, or take its picture at the size it names; where the picture differs from its baseline on purpose, take the baseline picture again in this pull request and say why",
+  timing: "make what the finding names answer within a tenth of a second, show work going on past a second and progress past ten, keep the layout from jumping while it loads, or bring the load within its limit",
+  console: "mend the error, the failing request or the font or picture that does not load, which the finding names",
+};
+export const CHECKS = Object.keys(MENDS);
 export const KIT = "checks/screens.json";
 const MODES = ["reports", "binds"];
 
@@ -78,9 +88,11 @@ export function parseFound(text, at, config) {
 export function verdict({ config, at, self, found, baseline, base }) {
   const fail = [], said = [];
   for (const id of unclaimed(found.found, baseline.listed, {}, own)) {
-    if (config.checks.get(partsOf(id).check) === "binds") fail.push(`FAIL: ${id}: new, and the check ${partsOf(id).check} binds here. Mend: mend the screen as core/modules/screens.md says of it, then run the project's tool and this check again`);
+    if (config.checks.get(partsOf(id).check) === "binds") fail.push(`FAIL: ${id}: new, and the check ${partsOf(id).check} binds here. Mend: ${MENDS[partsOf(id).check]}; then run the project's tool and this check again`);
     else said.push(`said ${id}: new; the check ${partsOf(id).check} reports here and fails nothing`);
   }
+  const gone = [...baseline.listed].filter(([id, n]) => config.checks.get(partsOf(id).check) === "binds" && JSON.stringify(lowered(new Map([[id, n]]), found).get(id)) !== JSON.stringify(n)).map(([id]) => id);
+  if (gone.length) fail.push(`FAIL: ${config.baseline} lists ${plural(gone.length, "entry", "entries")} of a screen this run read that ${gone.length === 1 ? "is" : "are"} mended or smaller now, and the baseline lists only what stands. Mend: lower it with node ${self} <found> ${at} --write, and commit the baseline`, ...gone.map(id => `  ${id}`));
   if (base?.listed) {
     const joined = unclaimed(baseline.listed, base.listed, {}, own).filter(id => !(baseline.grown[id] ?? "").trim());
     if (joined.length) fail.push(`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} did not, and the baseline only shrinks. Mend: take each out of the baseline (git checkout ${base.name} -- ${config.baseline}, then node ${self} <found> ${at} --write) and mend the screen; only where there is no other way, give each its reason under "grown" by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...joined.map(id => `  ${id}`));
@@ -127,9 +139,10 @@ function baseOf() {
 // What the base's baseline listed, read where the base's own config put it: null only where the base had no config
 // (the pull request turns the checks on, and writes the first baseline); an empty list where its baseline is gone.
 function baseListed(base, at) {
-  const text = base.show(at);
-  if (text === null) return null;
-  const was = tolerant(() => parseConfig(text, `${base.name}:${at}`));
+  const held = [at, where(base.show("core-manifest.md")), KIT].find(file => base.show(file) !== null);
+  if (held === undefined) return null;
+  const text = base.show(held);
+  const was = tolerant(() => parseConfig(text, `${base.name}:${held}`));
   const listed = was && tolerant(() => parseBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, "").listed);
   return listed ?? new Map();
 }
