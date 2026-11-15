@@ -93,11 +93,11 @@ export function checkoutStandIn(env, tmp) {
   };
 }
 
-/** The stand-in for GitHub's API, for a test that runs a workflow calling gh (clean-merges-test.mjs,
- *  pure-sync-test.mjs): a `gh` first on the PATH that answers a GET from the JSON file `ghData` (a route's pattern to
- *  its answer; none found: gh's own "Not Found"), and logs each call with -X, its route and what it was sent, to
- *  `ghLog`; and the project's address, https://github.com/someone/project, rewritten to the repository `origin`. It
- *  gives `env`, the environment to run the workflow in, with the paths of the two files. */
+/** The stand-in for GitHub's API, for a test that runs a workflow calling gh
+ *  (clean-merges-test.mjs, pure-sync-test.mjs): a `gh` first on the PATH that answers a GET from the JSON file
+ *  `ghData` (a route's pattern to its answer; none found: gh's own "Not Found"), and logs each call with -X, its route
+ *  and what it was sent, to `ghLog`; and the project's address, https://github.com/someone/project, rewritten to the
+ *  repository `origin`. It gives `env`, the environment to run the workflow in, with the paths of the two files. */
 export function ghStandIn(env, tmp, origin) {
   const stubs = path.join(tmp, "bin"), ghData = path.join(tmp, "gh-data.json"), ghLog = path.join(tmp, "gh-log");
   fs.mkdirSync(stubs);
