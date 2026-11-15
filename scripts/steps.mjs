@@ -236,17 +236,14 @@ export const STEPS = [
       return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
     } },
   { lead: "16 November 2026, hostile tests for every named input", cost: COST.read,
-    // (rule 5 of the project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: "None", or the starter kit's
-    // "FILL IN", names no input; else each input is an item whose backticks after "hostile tests" name a file or folder
-    // of the project)
+    // (rule 5 of the project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: each input
+    // is an item whose backticks after "hostile tests" name a file or folder of the project)
     check: p => {
       const text = p.read("SECURITY.md");
       const lines = text?.split("\n") ?? [], at = lines.findIndex(l => /^5\.\s/.test(l));
       if (at < 0) throw new Unread("no SECURITY.md with a rule 5 to read");
       const end = lines.findIndex((l, i) => i > at && /^(\d+\.\s|#)/.test(l));
       const block = [lines[at].replace(/^5\.\s*(\*\*[^*]*\*\*)?:?/, ""), ...lines.slice(at + 1, end < 0 ? undefined : end)];
-      const said = block.join("\n").trim();
-      if (/FILL IN/.test(said) || /^None\b/i.test(said)) return null;
       // (an item is a list line at the block's outermost depth, with the lines under it indented deeper: its wrapped
       // text and the items nested in it)
       const items = [];
@@ -256,6 +253,9 @@ export const STEPS = [
         if (item && (depth === null || indent <= depth)) { depth = indent; items.push(l); }
         else if (items.length && l.trim() && indent > depth) items[items.length - 1] += `\n${l}`;
       }
+      // ("None", or the starter kit's "FILL IN", reads done only while rule 5 lists no input: once one is listed, each is
+      // read, and an item whose tests are still "FILL IN" names none)
+      if (!items.length && (/FILL IN/.test(block.join("\n")) || /^None\b/i.test(block.join("\n").trim()))) return null;
       const there = f => { const n = f.replace(/^\.\//, "").replace(/\/+$/, ""); return !!n && p.files.some(x => x === n || x.startsWith(`${n}/`)); };
       // (only a path named after the words "hostile tests" counts: one the item names for what checks the input does not)
       const tests = l => [...(/hostile\s+tests\b([\s\S]*)/i.exec(l)?.[1] ?? "").matchAll(/`([^`]+)`/g)].map(m => m[1]);
