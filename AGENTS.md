@@ -31,6 +31,8 @@ Not taken, each for its reason:
 
 - `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
   player chooses to use, which are all that module governs.
+- `modules/screens.md`: the core has no screen; no one uses it through one, so none of its points, its critique or its
+  checks has anything to act on here, and `scripts/screens.mjs` is held by its test alone.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:

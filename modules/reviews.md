@@ -7,6 +7,7 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
 - Every PR that changes the project, its tests, tools, config or a rule file also gets its code review.
   - Docs alone get no code review unless another provider built them.
 - The *design-checked PRs* also get the design check, and a PR its users will see the stand-in's notes.
+- A PR that changes a screen also gets the critique (`modules/screens.md`, point 18).
 
 1. **Ask** the code reviewer (`modules/roles.md`) as its part (`modules/codex.md`, `modules/copilot.md`) or the project
    says.

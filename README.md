@@ -21,8 +21,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; and, for
-  games only, `game-design.md`.
+  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
+  project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
 - **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
   stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
   every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
@@ -137,6 +137,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      (`modules/code-shape.md`, which says too how the check holds a project before its config is written). From its
      baseline `dose.mjs` reads the state the codebase is in, and the scheduled look keeps the cleaning and the audits
      that state makes due (`modules/cleaning.md`).
+   - **The screen checks,** where a project with a screen turns one on: `screens.mjs`, run by the project's own
+     workflow after its own tool, which holds what that tool found against a baseline in the shape check's form, which
+     only shrinks (the *screen checks*; `modules/screens.md`, "What holds it"). The core runs it nowhere by itself.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
@@ -313,6 +316,11 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *other builders* | which other providers' tools build here, in order, and for each one the core has no part for, how it is handed a task; left out, Codex first, then the others as the project's rules list them (`modules/roles.md`, "The builders") |
 | *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, how each one the core has no part for is asked (it has Codex's and Copilot's, `modules/`), and which of its findings block where it marks none so; left out, the core's own: first a reviewer that cannot build here, then another builder's, last Claude's (`modules/roles.md`) |
 | *security reviewer* | who gives a PR its security review (floor rule 8) and how it is asked; left out, Codex, of what its own provider built too: the code review of that work is another provider's, and floor rule 3's two reviews stand (`modules/reviews.md`, point 3) |
+| *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`modules/screens.md`, points 1 and 2); left out, `docs/direction.md`, written before its first screen |
+| *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`modules/screens.md`); left out, 360, 768 and 1280 wide |
+| *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`modules/screens.md`, point 9); left out, the module's own |
+| *desktop platforms* | the desktop platforms a program of the project's is made for (`modules/screens.md`, point 15); left out, none |
+| *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`modules/screens.md`, "What holds it"); left out, `checks/screens.json` where it stands, and otherwise every check off |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
 
 ## The manifest's format

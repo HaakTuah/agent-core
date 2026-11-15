@@ -56,6 +56,14 @@
     "modules/reviews.md: Security": "check: scripts/security-review.mjs, in part",
     "modules/reviews.md: What a posted review stands for": "check: scripts/security-review.mjs",
     "modules/roles.md: The orchestrator": "describes",
+    "modules/screens.md: One system": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: Real content and every state": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: Motion with a purpose": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: Speed and waiting": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: Every control has its states": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: An accessibility floor, in numbers": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: Each size it is used at": "check: scripts/screens.mjs, in part",
+    "modules/screens.md: What stays out": "describes",
     "modules/updates.md: The newest stable version, unless there is a reason": [
       "check: scripts/versions.mjs, in part",
       "check: scripts/security-review.mjs, in part"
