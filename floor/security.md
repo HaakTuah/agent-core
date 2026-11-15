@@ -20,10 +20,10 @@ attack: `floor/threat-model.md`.
   (`modules/inbox.md`), change them; never a task given to another agent.
   - Where a project names none, only the owner changes them.
 - They are what runs by itself or with credentials (`.github/`, `.claude/`, the cloud setup script, any file of the
-  credentialed GitHub calls builders run); the rule files (`AGENTS.md`, `CLAUDE.md`, `SECURITY.md`, the threat model,
-  the core manifest, the copy of the core under `core/`, and any other file a tool takes its instructions from,
-  wherever it lies: an `AGENTS.md` or `CLAUDE.md` in any folder, a GEMINI.md or REVIEW.md, a folder .agents or
-  .agent; core archive 180); and the checks on the work (the copies and licence checks and their configs).
+  credentialed GitHub calls builders run); the rule files (`SECURITY.md`, the threat model, the core manifest, the
+  copy of the core under `core/`, and any other file a tool takes its instructions from, wherever it lies: an
+  `AGENTS.md` or `CLAUDE.md` in any folder, a GEMINI.md or REVIEW.md, a folder .agents or .agent; core archive 180);
+  and the checks on the work (the copies and licence checks and their configs).
 - **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines.
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
   the fallback reviewer's, neither of which wrote it (`modules/reviews.md`; core archive 134 and 138).
@@ -77,13 +77,13 @@ saved data; a weakened check).
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 
 **12. `main` is the owner's.**
-- It is never pushed to, never force-pushed, and changes only by a merged pull request, brought up to date with `main`
-  and its checks passed (core archive 113): what its users get is built from it.
+- It is never pushed to, and changes only by a merged pull request, brought up to date with `main` and its checks
+  passed (core archive 113): what its users get is built from it.
 
 **13. Each project's files stay in its own repository,** never written into another's (core archive 4).
 
 **14. Nothing waits for the owner but the yeses the floor names** (core archive 76 and 134).
-- These yeses alone wait, and only the step that needs one; the rest goes on:
+- Only the step that needs one of these waits; the rest goes on:
   - a step that cannot be undone or spends money beyond what the owner personally set aside (never a new purchase);
   - the changes rule 3 asks the owner's yes for or leaves to the owner;
   - rule 10's licence exception.
