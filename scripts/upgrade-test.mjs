@@ -346,7 +346,7 @@ function inboxCase(p) {
   let r = inbox(p, off);
   ok(r.status === 0 && /^Issues cannot be read and written here \(its issues are switched off\), so the owner's inbox is the folder `inbox\/`/.test(r.out) && /name it to the owner once/.test(r.out),
     `${p.name}: where its issues answer as switched off, the inbox is the folder, and the owner is to be told once`, r.out);
-  const item = "State: new\nBy: owner\n\n**What it is**\nA word more in the README.\n\n**Why it matters**\nIt says what the project is.\n";
+  const item = "State:\nBy: owner\n\n**What it is**\nA word more in the README.\n\n**Why it matters**\nIt says what the project is.\n";
   const progress = "docs/PROGRESS.md", line = "1. `inbox/a-word-more.md`, a builder's; it waits on nothing.";
   const merged = (what, change) => {
     git(p.dir, "checkout", "-q", "-B", "change", "main");
@@ -368,7 +368,7 @@ function inboxCase(p) {
   r = inbox(p, off);
   ok(/^The owner's inbox is the folder `inbox\/` \(1 item/.test(r.out) && !/name it to the owner/.test(r.out), `${p.name}: once the folder stands, it is the inbox, and the owner's setting is not named again`, r.out);
   merged("queues it", dir => {
-    write(dir, "inbox/a-word-more.md", item.replace("State: new", "State: queued"));
+    write(dir, "inbox/a-word-more.md", item.replace("State:\n", "State: queued\n"));
     write(dir, progress, fs.readFileSync(path.join(dir, progress), "utf8").replace(/^1\. FILL IN:.*$/m, line));
   });
   merged("builds it and closes it", dir => {

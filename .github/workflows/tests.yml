@@ -103,6 +103,9 @@ jobs:
       - name: Where the owner's inbox is, issues or the folder
         if: ${{ !cancelled() }}
         run: node scripts/inbox-test.mjs
+      - name: The labels and openers, and their check
+        if: ${{ !cancelled() }}
+        run: node scripts/labels-test.mjs
       - name: The core's releases, what a project follows, and cutting one
         if: ${{ !cancelled() }}
         run: node scripts/releases-test.mjs

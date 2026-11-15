@@ -24,3 +24,5 @@ The file and section, if there is one. The commit of the core your project holds
 
 **The kind of project**
 No closer than this: public or private; the platform it is built on; the cloud or the owner's own computer.
+
+Found while: for an agent, the role and the task it was on, as "fixing #241 (a builder session)"; a person leaves this line out.

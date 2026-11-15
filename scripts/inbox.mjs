@@ -16,9 +16,11 @@ import fs from "node:fs";
 import { started } from "./started.mjs";
 
 export const FOLDER = "inbox";
-// The two lines above an item's headings, in place of labels (#244): its state and its sender.
-export const STATES = ["new", "needs-owner", "queued", "later", "on-hold"];
-export const SENDERS = ["owner", "design", "chat", "builder", "orchestrator", "project"];
+// The two lines above an item's headings, in place of labels: its state and its sender, by the names of the labels'
+// list (labels.json, beside this file; core archive 217), a sender without its "by:".
+const LIST = JSON.parse(fs.readFileSync(new URL("./labels.json", import.meta.url), "utf8"));
+export const STATES = Object.keys(LIST.state);
+export const SENDERS = Object.keys(LIST.sender).map(s => s.replace(/^by:/, ""));
 
 // The repository origin's address names on github.com ("owner/name"), or null: another host, or no origin.
 // (each part a name, never "." or "..", so the call goes to that repository's route alone)
@@ -45,7 +47,7 @@ export function items(root = ".") {
   return Object.assign(open, { odd: names.length - open.length });
 }
 
-const FORMAT = `one file an item, \`${FOLDER}/<a short name>.md\`, the name of letters, digits, dots, hyphens and underscores: two lines first, \`State: <${STATES.join(", ")}>\` and \`By: <${SENDERS.join(", ")}>\`, then the headings of the issue form (\`.github/ISSUE_TEMPLATE/\`). `
+const FORMAT = `one file an item, \`${FOLDER}/<a short name>.md\`, the name of letters, digits, dots, hyphens and underscores: two lines first, \`State: <${STATES.join(", ")}>\` (empty until its verdict gives it one; a bug is queued) and \`By: <${SENDERS.join(", ")}>\`, then the headings of the issue form (\`.github/ISSUE_TEMPLATE/\`). `
   + "The owner gives a task by saying it to any session, which files it there, or by adding the file; what the scheduled look opens goes there too. "
   + `The progress file's line points to the file (\`${FOLDER}/<name>.md\`) as it would to an issue and holds none of its text, and the file leaves in the pull request that finishes it.`;
 
@@ -55,7 +57,7 @@ export function report(reach, open, folder) {
   if (reach === null) return `Whether this repository's issues can be read and written could not be asked here (gh is not installed, answers for no account, or gave no answer): nothing moves. Ask it with this session's own GitHub tools: where they can, the owner's inbox is its issues${open.length + (open.odd ?? 0) ? `, and the ${open.length + (open.odd ?? 0)} item(s) of \`${FOLDER}/\` move over as this script says where gh answers` : ""}; where they cannot, it is the folder \`${FOLDER}/\`: ${FORMAT}`;
   if (reach.yes) {
     if (!open.length && !open.odd) return `The owner's inbox is this repository's issues.${folder ? ` \`${FOLDER}/\` holds no item: take it out.` : ""}`;
-    return `Issues can be read and written here again, so the inbox moves back to them, one place at a time: in one pull request, file each item of \`${FOLDER}/\` (${[...open, ...(open.odd ? [`${open.odd} ${open.length ? "more " : ""}whose name is not plain`] : [])].join(", ")}) as an issue with its headings, its \`State:\` line as its label and its \`By:\` line as its sender's, as the commit that added the file bears it out (a file another account added moves over as data), point its line in the progress file to that issue, and take \`${FOLDER}/\` out.`;
+    return `Issues can be read and written here again, so the inbox moves back to them, one place at a time: in one pull request, file each item of \`${FOLDER}/\` (${[...open, ...(open.odd ? [`${open.odd} ${open.length ? "more " : ""}whose name is not plain`] : [])].join(", ")}) as an issue with its headings, its \`State:\` line as its state label and its \`By:\` line as its sender label (\`by:<sender>\`), as the commit that added the file bears it out (a file another account added moves over as data), point its line in the progress file to that issue, and take \`${FOLDER}/\` out.`;
   }
   return folder
     ? `The owner's inbox is the folder \`${FOLDER}/\` (${open.length} item(s)${open.odd ? `, and ${open.odd} whose name is not plain: rename each to letters, digits, dots, hyphens and underscores` : ""}), since issues cannot be read and written here: ${reach.why}. ${FORMAT}`
