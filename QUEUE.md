@@ -19,30 +19,43 @@ wanted").
 | #296 | builder | |
 | #249 | rule builder | |
 | #250 | rule builder | #249 |
-| #253 | rule builder | #246, or built with it |
+| #253 | rule builder | |
 | #275 | rule builder | #253 |
 | #321 | rule builder | #275, or built with it |
 | #285 | rule builder | #249 |
-| #286 | rule builder | #284 |
+| #286 | rule builder | |
 | #299 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
 | #304 | rule builder, on Fable at high for this batch (its note of 15 November) | #249 |
-| #305 | rule builder | #282 and #304 |
+| #305 | rule builder | #304 |
 | #322 | rule builder | #304 and #305 |
 | #306 | rule builder | #304 |
 | #307 | rule builder | |
 | #308 | rule builder | #253 and #304 |
 | #309 | rule builder | #304 |
-| #318 | rule builder | #246 and #304 |
-| #310 | rule builder | #246, #256 and #285 |
+| #318 | rule builder | #304 |
+| #310 | rule builder | #256 and #285 |
 | #311 | rule builder | #286 |
 | #325 | rule builder | #256, #305, #311 and #322 |
-| #313 | rule builder | #359, the core's own inputs: its rules merged in #360 |
-| #314 | rule builder | #313 and #304 |
-| #350 | builder | #235 |
-| #354 | builder | #246 |
-| #355 | builder | #246 |
+| #359 | rule builder | |
+| #314 | rule builder | #304 |
+| #375 | rule builder | |
+| #376 | rule builder | #375, which changes the same files |
+| #361 | rule builder, points 1 and 2 only | |
+| #350 | builder | |
+| #354 | builder | |
+| #355 | builder | |
+| #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
+| #337 | builder | |
+| #357 | builder | |
+| #362 | builder | |
+| #370 | builder | |
+| #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
+| #386 | builder | #362, which changes the same file |
+| #393 | builder | |
+| #394 | builder | |
+| #390 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
