@@ -171,30 +171,30 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
-     request or by a comment that opens "Security review:" from the *owner's account*, or an account the project names
-     in its call (the input `reviewers`) (`modules/reviews.md`, point 3), the second alone where Codex marks a finding
-     of its review open, posted after it, and, while Codex's review runs, one posted after it began, never a note
-     posted before it; a review of an earlier commit than the head stands only where updates from `main` alone follow
-     it, and the status says so, any other later commit needing such a comment naming the head by its whole SHA;
-     a pure sync passes with none where no review starts by itself, the check running `pure-sync.mjs` on its head;
-     where the pull request changes what runs by itself beyond its pins, both, or two such comments (floor rule 3), or
-     one holding what `comment-only.mjs` printed on the head.
-     Where a summary of Codex's is there but its state cannot be read, a form nobody documents having changed, the
-     status says so, the run warns, and the check waits or passes as it would with no summary (a summary whose first
-     line itself changed is not known as one, and counts as none); its tests keep real summaries as GitHub's API gives
-     them. It is advisory until the project's owner turns that off (the input `advisory`) and requires the status in
-     the project's ruleset, as the core's own does (#99): until then the status always passes and says what the check
-     would have done. Where every review is posted (none starts by itself, as through a plug-in), the *owner's
-     account*'s counts with nothing to set, and the status proves that a review was posted for the head, not who made
-     it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor rule 17);
-     one that needs no security review and gets none by itself (floor rule 8) says so in such a comment. Beside it, in the same job, the status `code-review` waits while
-     Codex's code review runs on the head commit, until it finishes or a comment that opens "Code review:" from the
-     owner, a member or a collaborator names that commit by its whole SHA (`modules/reviews.md`, point 2), and while a
-     pull request that needs a code review (not docs alone, nor a sync's shape) has had none on its head, or on a
-     commit only updates from `main` follow; it advises as the first does. It runs a short job at each push and each such
-     comment, a dozen or so a pull request, which a private repository pays for: there the job is skipped, and so not
-     billed, unless the project turns it on (the input `private`) or has turned advisory off, since a ruleset may then
-     wait for it.
+     request or by a comment that opens "Security review:" from the repository's owner (the *owner's account*, where
+     that owns it), or an account the project names in its call (the input `reviewers`) (`modules/reviews.md`, point 3),
+     the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
+     one posted after it began, never a note posted before it; a review of an earlier commit than the head stands only
+     where updates from `main` alone follow it, and the status says so, any other later commit needing such a comment
+     naming the head by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
+     `pure-sync.mjs` on its head; where the pull request changes what runs by itself beyond its pins, both, or two such
+     comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
+     there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
+     the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as
+     one, and counts as none); its tests keep real summaries as GitHub's API gives them. It is advisory until the
+     project's owner turns that off (the input `advisory`) and requires the status in the project's ruleset, as the
+     core's own waits, to be required once its ruleset names it (#320): until then the status always passes and says
+     what the check would have done. Where every review is posted (none starts by itself, as through a plug-in), the
+     *owner's account*'s counts with nothing to set, and the status proves that a review was posted for the head, not
+     who made it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor
+     rule 17); one that needs no security review and gets none by itself (floor rule 8) says so in such a comment.
+     Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
+     it finishes or a comment that opens "Code review:" from the owner, a member or a collaborator names that commit by
+     its whole SHA (`modules/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
+     nor a sync's shape) has had none on its head, or on a commit only updates from `main` follow; it advises as the
+     first does. It runs a short job at each push and each such comment, a dozen or so a pull request, which a private
+     repository pays for: there the job is skipped, and so not billed, unless the project turns it on (the input
+     `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds and `core/scripts/exact-versions.mjs` for its lockfiles, and its own check holds its

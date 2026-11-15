@@ -89,14 +89,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > And haven't we had enough pull requests to evaluate now?
 
-     and agreed that the check proves a pure sync itself, which then needs no review unless one started by itself;
-     that a review of an earlier commit stands only where nothing but updates from `main` follow it, any other later
-     commit needing a posted review that names the head by its whole SHA, and that the status says when the review saw
-     an earlier commit; that a posted review counts from the *owner's account* by default, and from another account
-     only where the project names it, and only after what it settles; and that the status is required in the core
-     first, then in the owner's own projects once the count is made there, and elsewhere only where that project's
-     owner makes it so. Told those answers, the owner asked of a project of another owner, built on that owner's own
-     computer:
+     and agreed that the check proves a pure sync itself, which then needs no review unless one started by itself; that
+     a review of an earlier commit stands only where nothing but updates from `main` follow it, any other later commit
+     needing a posted review that names the head by its whole SHA, or the note that none is needed, and that the status
+     says when the review saw an earlier commit; that a posted review counts from the *owner's account* by default, and
+     from another account only where the project names it, and only after what it settles; and that the status is
+     required in the core first, then in the owner's own projects once the count is made there, and elsewhere only where
+     that project's owner makes it so. Told those answers, the owner asked of a project of another owner, built on that
+     owner's own computer:
 
      > 3. But what about […]? […] does the reviews through the plug-in? Our system is not cloud and gihub only.
 

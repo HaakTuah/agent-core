@@ -51,7 +51,7 @@
 // again), and that a merge from main brought no change of its own; those stay with the builder and the reviews. It
 // prints, as JSON, the commit to mark and the status to give it, or {} for a pull request that is closed or a draft.
 // While "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check
-// would have done, so a week of pull requests shows whether it is right before anything waits for it. What the status
+// would have done, until the project's owner turns that off (#99). What the status
 // proves where every review is posted (none starts by itself, as through a plug-in): that a review was posted for the
 // head, not who made it, since builder and reviewer may post under one login, which no check here tells apart (#187).
 //
