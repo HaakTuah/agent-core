@@ -23,7 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIT as CHOICES, where } from "./choices.mjs";
-import { TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { call as callOf, plain, project } from "./steps.mjs";
@@ -105,17 +105,23 @@ export function differences(p, kit, older = []) {
 }
 
 // What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
-// templates, what that kit would have written (a template it lacks, or one whose words this kit no longer fills,
-// gives that kit nothing).
+// templates, what that kit would have written: a template it lacks, one this kit added since, gives that file nothing;
+// one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
 export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
   const { o, pin } = kind(p);
   const modules = fs.readdirSync(path.join(HERE, "modules")).filter(n => n.endsWith(".md"));
+  const older = templates !== path.join(HERE, TEMPLATES);
   try {
+    if (older && !fs.existsSync(templates)) return [];
+    const lacking = new Set();
+    const read = name => { try { return fs.readFileSync(path.join(templates, name), "utf8"); } catch (e) { if (!older) throw e; lacking.add(name); return ""; } };
+    const built = files(o, pin, modules, read);
+    const gone = new Set(FILES.filter(([t]) => lacking.has(t)).map(([, to]) => to));
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
     // (the choice records at the path the manifest names for them)
-    const kit = files(o, pin, modules, name => fs.readFileSync(path.join(templates, name), "utf8"))
+    const kit = built.filter(([to]) => !gone.has(to))
       .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
-    if (templates !== path.join(HERE, TEMPLATES)) return kit;
+    if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
     const { skip, past, ...marks } = sizes({});
@@ -126,7 +132,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const licenceAt = call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
     return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })]];
   } catch (e) {
-    if (templates === path.join(HERE, TEMPLATES)) throw e;
+    if (!older) throw e;
     return [];
   }
 }
