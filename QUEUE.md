@@ -13,10 +13,9 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #247 | rule builder | |
 | #238 | rule builder | |
 | #244 | rule builder | |
-| #248 | rule builder | #244 and #247 |
+| #248 | rule builder | #244 |
 | #254 | rule builder | its second point: #234 and #235 |
 | #99 | rule builder | |
 | #170 | builder | |
@@ -27,14 +26,14 @@ wanted").
 | #234 | builder | |
 | #256 | rule builder | its staged case: #235 |
 | #242 | rule builder | |
-| #157 | builder | #247 |
-| #252 | rule builder | #247 |
-| #235 | rule builder | #247 |
-| #249 | rule builder | #247 and #235 |
+| #157 | builder | |
+| #252 | rule builder | |
+| #235 | rule builder | |
+| #249 | rule builder | #235 |
 | #250 | rule builder | #249 |
 | #185 | builder | |
-| #246 | rule builder | #247 and #245's report |
-| #253 | rule builder | #247, #246 and #245's report |
+| #246 | rule builder | #245's report |
+| #253 | rule builder | #246 and #245's report |
 | #275 | rule builder | #253 |
 | #259 | a builder that built none of the batch | every line above it |
 
