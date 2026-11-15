@@ -249,7 +249,7 @@ function wrappedOnce(ctx) {
 // is the set of the files that are tests: read for their imports, not held to the marks.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(f => CODE.includes(path.posix.extname(f))).sort();
-  const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
+  const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
   const ctx = { config, tests, files: new Set(Object.keys(texts)), ...manifests(texts), entries: new Map(), graph: new Map(), usedBy: new Map(), read };
   for (const file of code) oneFile(ctx, file, texts[file]);
   onCycles(ctx);
@@ -347,12 +347,12 @@ export function standingAt(commit, config) {
 }
 
 // The config the manifest's *shape check* row names (its first path to a .json file, in backticks), else the kit's.
-export const where = manifest => /\*shape check\*[^\n`]*`[^`\n]*?([\w./-]+\.json)`/u.exec(String(manifest ?? ""))?.[1] ?? KIT;
+export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
 
 // ---- the verdict ----
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const UNIT = { lines: "lines", depth: "deep", branches: "branch points", count: "times" };
+const UNIT = { lines: "lines", depth: "deep", branches: "branch points", count: "in all" };
 const show = (id, n) => `${id.slice(id.indexOf(": ") + 2)}${n === true ? "" : `${n.line ? ` (line ${n.line})` : ""}: ${NUMBERS.filter(k => k in n).map(k => `${n[k]} ${UNIT[k]}`).join(", ")}`}`;
 const some = (ids, entries) => ids.slice(0, 20).map(id => `  ${show(id, entries.get(id) ?? true)}`).concat(ids.length > 20 ? [`  and ${ids.length - 20} more`] : []);
 
@@ -415,7 +415,7 @@ function notesOf(read) {
   if (read.jsx) notes.push(`${plural(read.jsx, "file holds", "files hold")} JSX, whose functions the reader cannot tell: their imports are held, their functions not`);
   if (read.nowhere) notes.push(`${plural(read.nowhere, "import leads", "imports lead")} nowhere the check can tell (no file, no package the project declares, no alias the config names): not held`);
   if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone`);
-  if (read.noEntrance) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
+  if (read.noEntrance && read.systems > 1) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
   return notes;
 }
 
