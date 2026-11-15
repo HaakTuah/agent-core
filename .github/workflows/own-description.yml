@@ -36,6 +36,7 @@ jobs:
       - name: The description has its parts, and where the rules change, what holds the change and what it asks
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_CREATED: ${{ github.event.pull_request.created_at }}
         run: |
           # (a diff that cannot be read counts as a change: each heading is asked for, never waived)
           parts=""

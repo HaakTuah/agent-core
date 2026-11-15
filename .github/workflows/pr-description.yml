@@ -1,6 +1,7 @@
 # The description check ("Each PR has the headings" in modules/git.md), for every project that takes the core: it fails
 # a pull request whose description lacks a heading for one of its parts, "What the owner can try" and "Readings taken",
-# or the parts the project names. A draft is not asked (it claims a lane and says little), nor Dependabot's own PRs
+# or the parts the project names, and one opened since the line came whose description does not end saying what it
+# waits on ("Nothing waits silently" in the core's modules/git.md). A draft is not asked (it claims a lane and says little), nor Dependabot's own PRs
 # (floor rule 17). A project calls it (workflow_call) from a workflow of its own of the same name, on pull_request
 # with the types opened, edited, reopened, synchronize and ready_for_review, so that a description put right is checked
 # again by itself, pinned to a full commit SHA ("How a project takes the core" in README.md, point 5). It runs the
@@ -40,5 +41,6 @@ jobs:
       - name: The description has its parts
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_CREATED: ${{ github.event.pull_request.created_at }}
           PARTS: ${{ inputs.parts }}
         run: node core/scripts/pr-description.mjs "$PARTS"
