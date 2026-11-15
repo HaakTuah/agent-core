@@ -17,8 +17,9 @@
 # it fails, since the diff names it. It reads no file whose content is binary (a NUL byte, as git tells it:
 # `git grep -I`, a diff's "Binary files differ"), pictures included, whatever a .gitattributes says, which the check
 # never reads. It prints only where a term was found (file and line, a file whose name holds a term by its line alone,
-# or the commit), never the term. Of all it reads, it leaves unread only the random id of a link to a Claude Code
-# session (https://claude.ai/code/session_01 and 22 characters of base58, a whole link, a blank, the line's end or a
+# or the commit), never the term. Of all it reads, it leaves unread only LICENSE and NOTICE while they keep the shape
+# described below, at the root and in core/, which floor rule 11 lets hold a copyright holder's name (#257), and the
+# random id of a link to a Claude Code session (https://claude.ai/code/session_01 and 22 characters of base58, a whole link, a blank, the line's end or a
 # mark of punctuation after it), which a
 # tool writes at the end of every builder's commit message and description: such a run of characters holds a short term
 # by chance and is no one's personal information, while the rest of the link and of its line is read (#261). Each failure says how the session takes the term out, one the project held before the
@@ -76,10 +77,45 @@ jobs:
           # range is of those letters and digits alone, in any locale)
           link='s#(^|[[:space:](<["`])(https://claude\.ai/code/session_01)[1-9A-HJ-NP-Za-km-z]{22}([[:space:].,;:!?)>"`/*]|$)#\1\2\3#g'
           unlinked() { LC_ALL=C sed -E -e "$link" -e "$link"; }
+          # (the files floor rule 11 lets hold a copyright holder's name, LICENSE and NOTICE at the root and in a
+          # project's copy of the core, each left unread where it is of its shape, read from git, a file and no link: a
+          # licence file is, once each copyright line is taken as one word and every run of blanks as one, a licence's
+          # standard text, known by its SHA-256 (the Apache License 2.0, the core's own, as personal-terms-test.mjs
+          # proves; another joins on a project's report), or its copyright lines alone; a notice file is a work's name
+          # on one line, no term in it, and its copyright lines, nothing more; one to three copyright lines in either,
+          # each of one line's shape: a year, then at most a hundred characters of holder, none of them @, / or :, so
+          # no address; so only the copyright lines go unread)
+          free='[^@/:[:cntrl:]]{1,100}'
+          held="^Copyright( \\([cC]\\)| ©)? ([0-9]{4}([-,] ?[0-9]{4})*|\\[yyyy\\]|\\[year\\]|<year>|YEAR),? $free\$"
+          known=" 3b95290255fb1e607a13999c5f76a81c6877ef3d092c01eb18ef72ee2ddc2dc4 "
+          exempt="LICENSE NOTICE core/LICENSE core/NOTICE"
+          shaped() { # (a revision and a path: whether that file is of its shape there)
+            local text flat
+            case $(git ls-tree --format='%(objectmode)' "$1" -- "$2" 2> /dev/null) in 100644 | 100755) ;; *) return 1 ;; esac
+            # (text alone, UTF-8 with no control character but a tab or a line's end, counted by bytes, so that no grep
+            # below drops a line it would take for binary, a NUL however late included)
+            git cat-file blob "$1:$2" | iconv -f UTF-8 -t UTF-8 > /dev/null 2>&1 || return 1
+            [ "$(git cat-file blob "$1:$2" | LC_ALL=C tr -d '\t\r\n\040-\176\200-\377' | wc -c | tr -d ' ')" = 0 ] || return 1
+            text=$(git cat-file blob "$1:$2" | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep -v '^$') || return 1
+            case $(printf '%s\n' "$text" | grep -c '^Copyright[[:space:]]') in 1 | 2 | 3) ;; *) return 1 ;; esac
+            if printf '%s\n' "$text" | grep '^Copyright[[:space:]]' | LC_ALL=C.UTF-8 grep -q -v -E "$held"; then return 1; fi
+            if [ "${2##*/}" = NOTICE ]; then
+              [ "$(printf '%s\n' "$text" | grep -c -v '^Copyright[[:space:]]')" = 1 ] \
+                && printf '%s\n' "$text" | head -n 1 | grep -v '^Copyright[[:space:]]' | LC_ALL=C.UTF-8 grep -q -x -E "$free" \
+                && ! printf '%s\n' "$text" | head -n 1 | grep -q -i -F -f "$list"
+              return
+            fi
+            flat=$(printf '%s\n' "$text" | sed -E 's/^Copyright[[:space:]].*/Copyright/' | tr -s '[:space:]' ' ' | sed -E 's/^ //; s/ $//')
+            printf '%s\n' "$flat" | grep -q -x -E 'Copyright( Copyright)*' \
+              || case $known in *" $(printf '%s' "$flat" | sha256sum | cut -c1-64) "*) ;; *) return 1 ;; esac
+          }
+          # (those of them of their shape as the pull request would merge, by pathspecs that leave each out)
+          unread() { for p in $exempt; do if shaped "$1" "$p"; then printf ':(top,exclude,literal)%s\n' "$p"; fi; done; }
+          mapfile -t skip < <(unread HEAD)
           # (git with no attributes at all, read from the empty tree, so a .gitattributes of the pull request's own
           # cannot have a file of text taken for binary and left unread; git older than 2.40 fails the check)
           empty=$(git hash-object -t tree /dev/null); g() { git --attr-source="$empty" "$@"; }
-          rc=0; g -c core.quotePath=false grep -I -z -n -i -F -f "$list" -- . > "$RUNNER_TEMP/hits" || rc=$?
+          rc=0; g -c core.quotePath=false grep -I -z -n -i -F -f "$list" -- . "${skip[@]}" > "$RUNNER_TEMP/hits" || rc=$?
           if [ "$rc" -gt 1 ]; then echo "FAIL git could not read the files. Mend: run the check where git is 2.40 or later."; found=1; fi
           # (each hit as git gives it: the file's name and the line's number each ended by a NUL, the line by a newline;
           # one is dropped only where grep finds a term in the line and none once a session's id is out, so a hit grep
@@ -93,7 +129,7 @@ jobs:
             case $line in '' | *[!0-9]*) line='?' ;; esac; printf '%s:%s\n' "$name" "$line"
           done < "$RUNNER_TEMP/hits")
           if [ -n "$hits" ]; then
-            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included."
+            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included. LICENSE and NOTICE, at the root or in core/, go unread only while they hold a known licence's standard text, or a work's name, and copyright lines alone (floor rule 11): bring one named here back to that."
             # (the names between GitHub's own marks that stop its runner reading workflow commands, under a token of
             # this run's alone, so that no name is read as one)
             token=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); echo "::stop-commands::$token"
@@ -151,7 +187,9 @@ jobs:
               # than 2.40, fails the check rather than read nothing)
               parents=$(($(git rev-list --parents -n 1 "$c" | wc -w) - 1))
               if [ "$parents" -gt 2 ]; then how=--cc plus="^[+]{$parents}"; else how=--remerge-diff plus='^[+]'; fi
-              if ! patch=$(g show --format= --patch "$how" --no-ext-diff --no-textconv --no-color "$c"); then
+              # (save in LICENSE or NOTICE where the commit leaves it of its shape)
+              mapfile -t own < <(unread "$c")
+              if ! patch=$(g show --format= --patch "$how" --no-ext-diff --no-textconv --no-color "$c" -- . "${own[@]}"); then
                 echo "FAIL git could not show what $short adds. Mend: run the check where git is 2.40 or later."; found=1
               # (each line read without its own marks of an added line, and no more of it, so a link can start it; a line
               # that is not UTF-8 read too, never taken for binary and left out)

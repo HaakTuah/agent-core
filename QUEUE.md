@@ -14,7 +14,6 @@ wanted").
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #254 | rule builder | its second point: #235 |
-| #257 | rule builder | |
 | #256 | rule builder | its staged case: #235 |
 | #242 | rule builder | |
 | #252 | rule builder | |
