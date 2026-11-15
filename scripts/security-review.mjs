@@ -78,8 +78,8 @@ const POSTED = /^(?:\*\*)?Security review:/u;
 export const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
 // who posts the review a waiting status asks for, and when, the actor first, since a commit status shows only a short
-// description (#395; modules/reviews.md, point 3). Where Codex's app starts the review by itself (its summary is on
-// the pull request, read or not), the fallback reviewer, after its own check of the newest commit, never Codex asked by
+// description (#395; modules/reviews.md, point 3). Where Codex's app starts the review by itself (its summary holds
+// a security review, or cannot be read), the fallback reviewer, after its own check of the newest commit, never Codex asked by
 // a comment, which it answers with a code review; elsewhere, the security reviewer the project uses, asked again.
 const CHECKS = 'the fallback reviewer checks the head, posts "Security review: <whole SHA>"';
 const HIDDEN = `an open finding of Codex's is in no comment. Mend: ${CHECKS}`;
