@@ -6,6 +6,7 @@
 // names the rules it holds (staged/, staged.mjs). Node's own modules only.
 //
 //   import { rules, ruleKey } from "./rules.mjs";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -63,6 +64,16 @@ export function rules(root = ROOT, { agents = false } = {}) {
     for (const f of fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort()) out.push(...rulesOf(`${folder}/${f}`, fs.readFileSync(path.join(dir, f), "utf8")));
   }
   return out;
+}
+
+// The same rules as they stand in a commit of the git repository at `root`, read from git and never from its working
+// folder: what a staged case set from that commit gave its session.
+export function rulesAt(root, commit, { agents = false } = {}) {
+  const git = (...a) => execFileSync("git", ["-C", root, ...a], { encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "pipe"] });
+  const files = git("ls-tree", "-r", "--name-only", "--end-of-options", commit, "--", ...FOLDERS).split("\n")
+    .filter(f => /^(?:floor|modules)\/[^/]+\.md$/u.test(f)).sort();
+  if (agents && git("ls-tree", "--name-only", "--end-of-options", commit, "--", "AGENTS.md").trim()) files.unshift("AGENTS.md");
+  return files.flatMap(f => rulesOf(f, git("show", `${commit}:${f}`)));
 }
 
 // A short fingerprint of a rule's text, which changes when any word of it does: what a staged case's run records, so

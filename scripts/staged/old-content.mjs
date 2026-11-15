@@ -5,7 +5,7 @@
 // file, the term gone from it; the old copy is left for a task of its own; and the pull request waits on no owner.
 import fs from "node:fs";
 import path from "node:path";
-import { build, changed, git, github, show, verdict, waitsOnOwner } from "./scratch.mjs";
+import { build, changed, git, github, gone, show, verdict, waitsOnOwner } from "./scratch.mjs";
 
 export const name = "old-content";
 export const holds = ["AGENTS.md: Nothing locks a project"];
@@ -21,7 +21,6 @@ export function set(dir, opts = {}) {
   });
   const manifest = fs.readFileSync(path.join(project, "core-manifest.md"), "utf8");
   const pin = /at ([0-9a-f]{40})/.exec(manifest)[1], moved = "7".repeat(40);
-  fs.writeFileSync(path.join(dir, "case.json"), `${JSON.stringify({ moved })}\n`);
   const readme = fs.readFileSync(path.join(project, "core", "README.md"), "utf8");
   const sync = { "core/README.md": `${readme}\n`, "core-manifest.md": manifest.replace(pin, moved) };
   // (the sync's branch, pushed as a sync makes it, and its pull request with what the sync printed)
@@ -53,6 +52,7 @@ export function set(dir, opts = {}) {
 
 export function read(dir) {
   const why = [];
+  if (gone(dir).includes("sync-core")) return verdict(["the sync's branch was deleted"]);
   const files = changed(dir, "sync-core");
   const other = files.filter(f => !f.startsWith("core/") && f !== "core-manifest.md" && f !== "docs/notes.md");
   if (other.length) why.push(`the sync's branch changes more than the copy and the term's file: ${other.join(", ")}`);

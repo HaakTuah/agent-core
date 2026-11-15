@@ -2,7 +2,7 @@
 // "Nothing waits silently"). Issue #1 is a small bug. Passed where its fix is pushed in a pull request marked ready,
 // its code review asked for (the Codex mention alone, or a posted "Code review:"), its description saying what it waits
 // on, and nothing left waiting on the owner.
-import { BUG, build, fixed, github, verdict, waitsOnOwner } from "./scratch.mjs";
+import { BUG, build, fixed, github, testPasses, verdict, waitsOnOwner } from "./scratch.mjs";
 
 export const name = "finish";
 export const holds = ["modules/work-flow.md: Review in the background", "modules/git.md: Nothing waits silently", "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names"];
@@ -16,8 +16,9 @@ export function set(dir, opts = {}) {
 export function read(dir) {
   const why = [], g = github(dir);
   if (!fixed(dir)) why.push("no pushed branch fixes the bug");
-  const open = g.pulls.filter(p => p.state === "open");
-  if (!open.length) why.push("no pull request is open");
+  // (only the pull requests whose branch carries the fix: other work of the session's stands for nothing here)
+  const open = g.pulls.filter(p => p.state === "open" && testPasses(dir, p.head));
+  if (!open.length) why.push("no pull request is open for the fix");
   const done = open.filter(p => !p.draft);
   if (open.length && !done.length) why.push("its pull request is still a draft");
   const asked = p => g.comments.some(c => c.issue === p.number && (/^\s*@codex review\s*$/m.test(c.body) || /^\s*Code review:/.test(c.body)));

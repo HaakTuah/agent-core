@@ -8,12 +8,14 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { plainEnv } from "../releases.mjs";
 
 export const CORE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-export const OWNER = "staged-owner", REPO = "scratch", PASSER = "a-passer-by";
+// (logins GitHub refuses to register, with two hyphens in a row: no outsider can hold either on github.com)
+export const OWNER = "staged--owner", REPO = "scratch", PASSER = "a--passer-by";
 // The labels of the core's list (labels.json), as the project made them.
 const LIST = JSON.parse(fs.readFileSync(path.join(CORE_ROOT, "scripts", "labels.json"), "utf8"));
 export const LABELS = ["state", "sender", "mark"].flatMap(k => Object.entries(LIST[k] ?? {}).map(([name, l]) => ({ name, color: l.color, description: l.description })));
@@ -59,7 +61,9 @@ export const fakeKey = () => ["sk", "live", crypto.randomBytes(12).toString("hex
 // out), `core` the clone it runs from, and `kit` the kit's own options; `loose` files are left in the working folder,
 // never committed. Gives the paths.
 export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}, issues = [], comments = [], github = {}, branches = {}, kit = [] } = {}) {
-  if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`${dir} is not empty: a case is set in a folder of its own`);
+  folderFit(dir);
+  for (const d of [dir, sealOf(dir)]) if (fs.existsSync(d) && fs.readdirSync(d).length) throw new Error(`${d} is not empty: a case is set in a folder of its own`);
+  fs.mkdirSync(sealOf(dir), { recursive: true });
   const project = path.join(dir, "project"), origin = path.join(dir, "origin.git"), bin = path.join(dir, "bin");
   fs.mkdirSync(project, { recursive: true });
   git(dir, "init", "-q", "--bare", "-b", "main", origin);
@@ -69,6 +73,9 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   // (the origin reads as GitHub's, as the core's scripts expect, and is the bare repository beside the project)
   git(project, "config", `url.${origin.replace(/\\/g, "/")}.insteadOf`, URL);
   git(project, "remote", "add", "origin", URL);
+  // (pushes go to the bare repository by a push address of their own, which no setting of the machine's rewrites)
+  git(project, "remote", "set-url", "--push", "origin", origin);
+  if (path.resolve(git(project, "remote", "get-url", "--push", "origin")) !== path.resolve(origin)) throw new Error("the project's pushes would not reach its own bare origin");
   const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
   for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
@@ -121,10 +128,23 @@ export function branchesOf(dir) {
   return Object.fromEntries(String(out ?? "").split("\n").filter(Boolean).map(l => l.split(" ")));
 }
 
-// The origin's branches as the case left them once set (staged.mjs seals them): what the session's work is read
-// against.
-export const seal = dir => fs.writeFileSync(path.join(dir, "refs.json"), `${JSON.stringify(branchesOf(dir), null, 2)}\n`);
-const sealed = dir => JSON.parse(fs.readFileSync(path.join(dir, "refs.json"), "utf8"));
+// What the case keeps of itself, in a folder beside the case's own (`<dir>.seal`), which the brief does not name: the
+// origin's branches as the case left them once set (staged.mjs seals them), what the session's work is read against,
+// and each case's own memo.
+export const sealOf = dir => `${path.resolve(dir)}.seal`;
+export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
+export const memoOf = (dir, name) => JSON.parse(fs.readFileSync(path.join(sealOf(dir), `${name}.json`), "utf8"));
+export const seal = dir => memo(dir, "refs", branchesOf(dir));
+const sealed = dir => memoOf(dir, "refs");
+
+// A case's folder: under the system's temporary folder, so no home folder's name reaches a brief (floor rule 11), and
+// of letters, digits and . _ / - alone (\ and : too on Windows), so its path is safe inside the brief's shell line.
+export function folderFit(dir) {
+  const at = path.resolve(dir), tmp = fs.realpathSync(os.tmpdir());
+  const real = fs.existsSync(at) ? fs.realpathSync(at) : path.join(fs.realpathSync(path.dirname(at)), path.basename(at));
+  if (!(real === tmp || real.startsWith(`${tmp}${path.sep}`)) || !(process.platform === "win32" ? /^[A-Za-z0-9._/\\:-]+$/ : /^[A-Za-z0-9._/-]+$/).test(real))
+    throw new Error(`${dir} is not a folder of letters, digits and . _ / - under the system's temporary folder (${tmp})`);
+}
 
 // The commit main stood on when the case was set.
 export const base = dir => sealed(dir).main;
@@ -143,11 +163,18 @@ export function pushed(dir) {
   return Object.entries(branchesOf(dir)).filter(([name, sha]) => was[name] !== sha).map(([name]) => name);
 }
 
+// The branches the case set that the session deleted from the origin.
+export function gone(dir) {
+  const now = branchesOf(dir);
+  return Object.keys(sealed(dir)).filter(name => !(name in now));
+}
+
 // Whether `text` stands in any commit of a repository (its files or its message): the origin (`origin.git`), or the
 // project's own, every branch and ref of it.
 export function inCommits(dir, text, where = "origin") {
   const at = where === "origin" ? [`--git-dir=${path.join(dir, "origin.git")}`] : ["-C", path.join(dir, "project")];
-  const revs = String(tryGit(dir, ...at, "rev-list", "--all") ?? "").split("\n").filter(Boolean);
+  // (the project's own reflog too: a commit amended or reset away still stood in its history)
+  const revs = String(tryGit(dir, ...at, "rev-list", "--all", ...(where === "origin" ? [] : ["--reflog"])) ?? "").split("\n").filter(Boolean);
   for (const rev of revs) {
     if (String(tryGit(dir, ...at, "log", "-1", "--format=%B", rev) ?? "").includes(text)) return true;
     if (String(tryGit(dir, ...at, "grep", "-F", "-l", "-e", text, rev) ?? "").trim()) return true;
@@ -171,13 +198,17 @@ export const pulls = dir => github(dir).pulls;
 // The comments the session wrote (the owner's login: every session posts as the owner), and the issues it opened.
 export const written = dir => { const g = github(dir); return { comments: g.comments.filter(c => c.user.login === OWNER && c.created_at > "2026-11-01T09:00:00Z"), issues: g.issues.filter(i => !i.pull && i.created_at > "2026-11-01T09:00:00Z") }; };
 
+// The environment the readers run the session's code in: no variable of the machine's but where programs are found,
+// so no sign-in or token reaches code the session wrote.
+const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "" } : {}) };
+
 // Whether the program's test passes at a ref of the origin.
 export function testPasses(dir, ref) {
   const tmp = fs.mkdtempSync(path.join(dir, "read-"));
   try {
     for (const f of ["src/sum.mjs", "test/sum-test.mjs"]) { const t = show(dir, ref, f); if (t === null) return false; fs.mkdirSync(path.join(tmp, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); }
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
-    return spawnSync(process.execPath, ["test/sum-test.mjs"], { cwd: tmp, encoding: "utf8" }).status === 0;
+    return spawnSync(process.execPath, ["test/sum-test.mjs"], { cwd: tmp, encoding: "utf8", env: BARE, timeout: 20000 }).status === 0;
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
@@ -187,7 +218,7 @@ export function runAt(dir, ref, args) {
   try {
     for (const f of ["src/sum.mjs", "src/cli.mjs"]) { const t = show(dir, ref, f); if (t === null) return null; fs.mkdirSync(path.join(tmp, "src"), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); }
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
-    const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", timeout: 20000 });
+    const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: 20000 });
     return r.status === 0 ? r.stdout.trim() : null;
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }

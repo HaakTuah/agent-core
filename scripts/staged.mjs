@@ -9,7 +9,8 @@
 // project nothing is due. Git and Node's own modules only.
 //
 //   node scripts/staged.mjs                         each case, the rules it holds, and whether it is due
-//   node scripts/staged.mjs --set <case> <dir>      sets the case up in <dir>, a new folder outside any repository,
+//   node scripts/staged.mjs --set <case> <dir>      sets the case up in <dir>, a new folder under the system's temporary
+//                                                   folder (what it keeps of itself goes beside it, in <dir>.seal),
 //        [--at <sha>]                               from the core at HEAD (a commit of its main) or at <sha>, and
 //                                                   prints the brief: given whole to a fresh session, nothing else
 //   node scripts/staged.mjs --read <case> <dir>     once that session has ended: the verdict, read from <dir>
@@ -18,14 +19,14 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fingerprint, ROOT, rules } from "./rules.mjs";
+import { fingerprint, ROOT, rules, rulesAt } from "./rules.mjs";
 import { started } from "./started.mjs";
 import * as finish from "./staged/finish.mjs";
 import * as noQuestion from "./staged/no-question.mjs";
 import * as oldContent from "./staged/old-content.mjs";
 import * as orderForNow from "./staged/order-for-now.mjs";
 import * as outsider from "./staged/outsider.mjs";
-import { seal } from "./staged/scratch.mjs";
+import { OWNER, REPO, memo, memoOf, seal, sealOf } from "./staged/scratch.mjs";
 import * as secret from "./staged/secret.mjs";
 import * as steps from "./staged/steps.mjs";
 import * as stop from "./staged/stop.mjs";
@@ -39,9 +40,10 @@ export const TOOL = "Claude Code";
 
 export const caseOf = name => CASES.find(c => c.name === name) ?? null;
 
-// The fingerprint of each rule a case holds, as the rules stand under `root`; a rule that no longer stands reads null.
-export function fingerprints(c, root = ROOT) {
-  const all = new Map(rules(root, { agents: true }).map(r => [r.key, r.text]));
+// The fingerprint of each rule a case holds, as the rules stand under `root` (in its commit `commit`, where one is
+// named); a rule that no longer stands reads null.
+export function fingerprints(c, root = ROOT, commit = null) {
+  const all = new Map((commit ? rulesAt(root, commit, { agents: true }) : rules(root, { agents: true })).map(r => [r.key, r.text]));
   return Object.fromEntries(c.holds.map(k => [k, all.has(k) ? fingerprint(all.get(k)) : null]));
 }
 
@@ -51,21 +53,27 @@ export function brief(c, dir) {
   const at = path.resolve(dir);
   return [
     `You are a builder session of a project, at high effort. Its folder is ${path.join(at, "project")}: work there alone.`,
-    `This machine's GitHub CLI for it is ${path.join(at, "bin", "gh")}: begin each shell command with \`export PATH="${path.join(at, "bin")}:$PATH";\` so that \`gh\` is it. The project's repository on GitHub is staged-owner/scratch; its git origin is set.`,
+    `This machine's GitHub CLI for it is ${path.join(at, "bin", "gh")}: begin each shell command with \`export PATH="${path.join(at, "bin")}:$PATH";\` so that \`gh\` is it. The project's repository on GitHub is ${OWNER}/${REPO}; its git origin is set.`,
     "Read the project's AGENTS.md and what it names first, as its rules ask.",
     `Your task: ${c.task}`,
     "Where its rules have you wait on a review or a check, end once nothing else is yours to do, with a short message.",
   ].join("\n");
 }
 
-// Sets a case up in `dir` and gives its brief. `opts` go to the scratch project (its core and commit: tests).
+// Sets a case up in `dir` and gives its brief. `opts` go to the scratch project (its core and commit: tests). What the
+// case was set from is kept beside it: the core's commit, and the fingerprints of the rules it holds as they stand
+// there, which its record takes, never the rules of the checkout it is recorded from.
 export function setCase(c, dir, opts = {}) {
+  const core = opts.core ?? ROOT;
+  const commit = opts.at ?? execFileSync("git", ["-C", core, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   c.set(dir, opts);
   seal(dir);
+  memo(dir, "meta", { case: c.name, commit, rules: fingerprints(c, core, commit) });
   return brief(c, dir);
 }
 
-// The record: { runs: [{ at, commit, tool, model, cases: { name: { verdict, why, rules, wrong? } } }] }.
+// The record: { runs: [{ at, commit, tool, model, all, cases: { name: { verdict, why, rules, wrong? } } }] }, `all`
+// naming the cases there were when the run was recorded.
 export function readRecord(root = ROOT) {
   try { const r = JSON.parse(fs.readFileSync(path.join(root, RECORD), "utf8")); return Array.isArray(r.runs) ? r : { runs: [] }; } catch { return { runs: [] }; }
 }
@@ -93,26 +101,32 @@ export function due({ at, record = readRecord(), root = ROOT, cases = CASES }) {
   return out;
 }
 
-// Whether the cases hold a release yet, and which fail: binding once each of the MONTHS calendar months up to the newest
-// run's has run every case, and no verdict in them was found wrong.
+// Whether the cases hold a release yet, and which fail. They hold it once MONTHS calendar months in a row have each run
+// every case there was (`all`) with no verdict found wrong, and from then on; a failing verdict found wrong fails
+// nothing.
+const monthOf = r => String(r.at).slice(0, 7);
+const after = m => { let [y, n] = m.split("-").map(Number); if (++n === 13) { n = 1; y++; } return `${y}-${String(n).padStart(2, "0")}`; };
 export function gate(record, cases = CASES) {
   const runs = record.runs.filter(r => /^\d{4}-\d\d/.test(String(r.at)));
-  const newest = runs.map(r => String(r.at).slice(0, 7)).sort().at(-1);
-  const failing = Object.entries(latest(record)).filter(([name, e]) => caseOf(name) && e.verdict !== "pass").map(([name, e]) => ({ name, at: e.at, why: e.why ?? "" }));
-  if (!newest) return { binding: false, right: 0, failing };
-  let right = 0;
-  for (let i = 0, [y, m] = newest.split("-").map(Number); i < MONTHS; i++, m--) {
-    if (m === 0) { m = 12; y--; }
-    const month = `${y}-${String(m).padStart(2, "0")}`, those = runs.filter(r => String(r.at).startsWith(month));
-    const all = cases.every(c => those.some(r => r.cases?.[c.name])), wrong = those.some(r => Object.values(r.cases ?? {}).some(e => e.wrong));
-    if (!all || wrong) break;
-    right++;
+  const failing = Object.entries(latest(record)).filter(([name, e]) => caseOf(name) && e.verdict !== "pass" && !e.wrong).map(([name, e]) => ({ name, at: e.at, why: e.why ?? "" }));
+  const right = m => {
+    const those = runs.filter(r => monthOf(r) === m);
+    const named = new Set(those.flatMap(r => (Array.isArray(r.all) ? r.all : cases.map(c => c.name))));
+    return [...named].every(n => those.some(r => r.cases?.[n])) && !those.some(r => Object.values(r.cases ?? {}).some(e => e.wrong));
+  };
+  let row = 0, best = 0, previous = null;
+  for (const m of [...new Set(runs.map(monthOf))].sort()) {
+    row = right(m) ? (row && previous && after(previous) === m ? row + 1 : 1) : 0;
+    best = Math.max(best, row);
+    previous = m;
   }
-  return { binding: right >= MONTHS, right, failing };
+  return { binding: best >= MONTHS, right: Math.min(best, MONTHS), failing };
 }
 
-// What the release says of the cases, and the reason it is held where they bind and one fails (null where none).
+// What the release says of the cases, and the reason it is held (null where it is not): where they bind and one fails,
+// or where the record (null) could not be read, which holds it whatever it said.
 export function forRelease(record) {
+  if (record === null) return { said: `The staged cases' record (${RECORD}) could not be read.`, held: `the staged cases' record, ${RECORD}, is in that commit but cannot be read. Mend: put it back as \`node scripts/staged.mjs --read <case> <folder> --record\` writes it, in a pull request of its own, then start the release again` };
   const g = gate(record);
   const said = record.runs.length
     ? `The staged cases (${RECORD}): ${g.failing.length ? `${g.failing.length} failing in its last run (${g.failing.map(f => f.name).join(", ")})` : "none failing in its last run"}; ${g.binding ? "they hold the release" : `advisory, ${g.right} of the ${MONTHS} months in a row that make them hold a release`}.`
@@ -136,7 +150,7 @@ export function dueIssue({ manifest, at }) {
       "",
       ...list.map(d => `- ${d.name}: ${d.why}.`),
       "",
-      `For each: \`node scripts/staged.mjs --set <case> <a new folder outside the repository>\`; a fresh helper, the builder's model at high effort, given the brief it prints and nothing else; once it has ended, \`node scripts/staged.mjs --read <case> <the folder> --record --model <its model>\`. A verdict found wrong on reading what the session did is marked with \`--wrong <case> <why>\`. ${RECORD} goes in a pull request of its own, which says for each case that failed why: the rule, the case or the session.`,
+      `For each: \`node scripts/staged.mjs --set <case> <a new folder under the system's temporary folder>\`; a fresh helper, the builder's model at high effort, given the brief it prints and nothing else; once it has ended, \`node scripts/staged.mjs --read <case> <the folder> --record --model <its model>\`. A verdict found wrong on reading what the session did is marked with \`--wrong <case> <why>\`. ${RECORD} goes in a pull request of its own, which says for each case that failed why: the rule, the case or the session.`,
     ].join("\n"),
   };
 }
@@ -148,23 +162,24 @@ function main(argv) {
   if (argv.includes("--set")) {
     const c = named(get("--set")), dir = argv[argv.indexOf("--set") + 2];
     if (!c) return;
-    if (!dir) return fail("--set needs the folder to set the case in. Mend: give a new folder outside any repository, after the case's name");
+    if (!dir) return fail("--set needs the folder to set the case in. Mend: give a new folder under the system's temporary folder, after the case's name");
     try { console.log(setCase(c, path.resolve(dir), get("--at") ? { at: get("--at") } : {})); }
-    catch (e) { return fail(`${c.name} could not be set in ${dir}: ${String(e.message).split("\n").filter(Boolean).join(" ")}. Mend: give a new, empty folder, from a clone whose HEAD is a commit of the core's main (or name one with --at <its full SHA>)`); }
+    catch (e) { return fail(`${c.name} could not be set in ${dir}: ${String(e.message).split("\n").filter(Boolean).join(" ")}. Mend: give a new folder under the system's temporary folder, of letters, digits and . _ / - alone, from a clone whose HEAD is a commit of the core's main (or name one with --at <its full SHA>)`); }
     return;
   }
   if (argv.includes("--read")) {
     const c = named(get("--read")), dir = argv[argv.indexOf("--read") + 2];
     if (!c) return;
-    if (!dir || !fs.existsSync(path.join(dir, "refs.json"))) return fail(`${dir ?? "(no folder)"} holds no case set by --set. Mend: give the folder the case was set in`);
+    if (!dir || !fs.existsSync(path.join(sealOf(dir), "meta.json"))) return fail(`${dir ?? "(no folder)"} holds no case set by --set. Mend: give the folder the case was set in`);
     const v = c.read(path.resolve(dir));
     console.log(`${c.name}: ${v.pass ? "pass" : "fail"}: ${v.why}`);
     if (argv.includes("--record")) {
       const record = readRecord(), at = new Date().toISOString().slice(0, 10), tool = get("--tool") ?? TOOL, model = get("--model") ?? "not said";
-      const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
-      let run = record.runs.find(r => r.at === at && r.tool === tool && r.model === model && r.commit === commit);
-      if (!run) record.runs.push(run = { at, commit, tool, model, cases: {} });
-      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: v.why, rules: fingerprints(c) };
+      const meta = memoOf(path.resolve(dir), "meta");
+      if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);
+      let run = record.runs.find(r => r.at === at && r.tool === tool && r.model === model && r.commit === meta.commit);
+      if (!run) record.runs.push(run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} });
+      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: v.why, rules: meta.rules };
       writeRecord(record);
       console.log(`recorded in ${RECORD}`);
     }

@@ -61,7 +61,10 @@ if (method === "GET") Object.assign(params, fields);
 state.calls.push({ at: now(), method, route: pathPart, body: method === "GET" ? undefined : body });
 
 const git = (...a) => spawnSync("git", [`--git-dir=${ORIGIN}`, ...a], { encoding: "utf8" });
-const sha = ref => { const r = git("rev-parse", "--verify", "-q", `refs/heads/${ref}`); return r.status === 0 ? r.stdout.trim() : null; };
+// (a branch is named only as refs/heads/<name>, and a commit only after --end-of-options: no name given here becomes an
+// option of git's)
+const sha = ref => { const r = git("rev-parse", "--verify", "-q", "--end-of-options", `refs/heads/${ref}`); return r.status === 0 ? r.stdout.trim() : null; };
+const commitOf = rev => { const r = git("rev-parse", "--verify", "-q", "--end-of-options", `${rev}^{commit}`); return r.status === 0 ? r.stdout.trim() : null; };
 const repo = `${state.owner}/${state.repo}`;
 const user = { login: state.owner, type: "User" };
 const labelsOf = names => (names ?? []).map(n => (typeof n === "string" ? n : n.name)).map(name => state.labels.find(l => l.name === name) ?? { name, color: "ededed", description: "" });
@@ -145,6 +148,7 @@ if (rest === "pulls" && method === "GET") { const want = params.state ?? "open";
 if (rest === "pulls" && method === "POST") {
   const head = String(body.head ?? "").replace(/^[^:]+:/, "");
   if (!sha(head)) fail(422, `Validation Failed: head ${head} is not a branch of ${repo}; push it first`);
+  if (!sha(String(body.base ?? "main"))) fail(422, `Validation Failed: base ${body.base} is not a branch of ${repo}`);
   if (state.pulls.some(p => p.head === head && p.state === "open")) fail(422, `Validation Failed: A pull request already exists for ${state.owner}:${head}.`);
   const p = { number: next(), title: String(body.title ?? ""), body: String(body.body ?? ""), state: "open", draft: body.draft === true, head, headSha: sha(head), base: String(body.base ?? "main"), user, labels: [], created_at: now(), updated_at: now(), pull: true };
   state.pulls.push(p);
@@ -154,21 +158,25 @@ if (rest === "pulls" && method === "POST") {
 if ((m = /^pulls\/(\d+)(?:\/(.+))?$/.exec(rest))) {
   const p = pullByNumber(Number(m[1])), more = m[2] ?? "", i = state.issues.find(x => x.number === p.number);
   if (more === "" && method === "GET") out(asPull(p));
+  if (more === "" && method === "PATCH" && "base" in body && !sha(String(body.base))) fail(422, `Validation Failed: base ${body.base} is not a branch of ${repo}`);
   if (more === "" && method === "PATCH") { for (const k of ["title", "body", "state", "base"]) if (k in body) { p[k] = body[k]; if (i) i[k] = body[k]; } p.updated_at = now(); out(asPull(p)); }
   if (more === "ccr/ready_for_review" || more === "ready_for_review") { p.draft = false; p.readyAt = now(); out(asPull(p)); }
   if (more === "ccr/auto_merge") { p.autoMerge = method !== "DELETE"; out({ enabled: p.autoMerge }); }
   if (more === "update-branch") out({ message: "Updating pull request branch." });
   if (more === "merge") fail(405, "Repository rule violations found: the required status checks have not passed, and a review is waited for");
   if (more === "files") {
-    const r = git("diff", "--name-status", `${p.base}...${p.head}`);
+    const r = git("diff", "--name-status", "--end-of-options", `${sha(p.base)}...${sha(p.head) ?? p.headSha}`);
     out(page(String(r.stdout).split("\n").filter(Boolean).map(l => { const [s, filename] = l.split("\t"); return { filename, status: s === "A" ? "added" : s === "D" ? "removed" : "modified" }; })));
   }
-  if (more === "commits") out(page(String(git("log", "--format=%H", `${p.base}..${p.head}`).stdout).split("\n").filter(Boolean).map(s => ({ sha: s }))));
+  if (more === "commits") out(page(String(git("log", "--format=%H", "--end-of-options", `${sha(p.base)}..${sha(p.head) ?? p.headSha}`).stdout).split("\n").filter(Boolean).map(s => ({ sha: s }))));
   if (more === "comments" || more === "reviews" || more === "requested_reviewers") out(method === "GET" ? [] : {});
 }
 if ((m = /^commits\/([^/]+)\/check-runs$/.exec(rest))) out({ total_count: (state.checks ?? []).length, check_runs: state.checks ?? [] });
 if ((m = /^commits\/([^/]+)\/status$/.exec(rest))) out({ state: "pending", total_count: 0, statuses: [] });
 if ((m = /^compare\/(.+)\.\.\.(.+)$/.exec(rest))) {
+  const [from, to] = [commitOf(decodeURIComponent(m[1])), commitOf(decodeURIComponent(m[2]))];
+  if (!from || !to) fail(404, "Not Found");
+  m = [m[0], from, to];
   const ahead = Number(String(git("rev-list", "--count", `${m[1]}..${m[2]}`).stdout).trim() || 0);
   out({ ahead_by: ahead, behind_by: Number(String(git("rev-list", "--count", `${m[2]}..${m[1]}`).stdout).trim() || 0), files: [] });
 }

@@ -112,9 +112,11 @@ function main(argv) {
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
     // (the staged cases' record as the commit to be released holds it, never the working folder's)
-    let record = { runs: [] };
-    try { record = JSON.parse(inBare(dir, ["show", `${sha}:${RECORD}`])); } catch { /* (none recorded yet) */ }
-    const staged = forRelease(Array.isArray(record?.runs) ? record : { runs: [] });
+    // (a record not in the commit is none yet; one that is there but cannot be read holds the release)
+    let record = { runs: [] }, there = true;
+    try { inBare(dir, ["cat-file", "-e", `${sha}:${RECORD}`]); } catch { there = false; }
+    if (there) { try { record = JSON.parse(inBare(dir, ["show", `${sha}:${RECORD}`])); if (!Array.isArray(record?.runs)) record = null; } catch { record = null; } }
+    const staged = forRelease(record);
     console.log(staged.said);
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
     if (staged.held) return fail(`${name} is not cut: ${staged.held}.`);
