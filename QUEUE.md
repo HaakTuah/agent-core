@@ -21,7 +21,6 @@ wanted").
 | #249 | rule builder | #235 |
 | #250 | rule builder | #249 |
 | #330 | rule builder | #246 |
-| #253 | rule builder | #246, or built with it |
 | #275 | rule builder | #253 |
 | #321 | rule builder | #275, or built with it |
 | #282 | rule builder | |

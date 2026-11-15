@@ -23,6 +23,7 @@ import { CORE } from "./core-address.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
+import { toolOf } from "./strength.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,6 +81,18 @@ const progressOf = manifest => slot(manifest, "progress file", "docs/PROGRESS.md
 const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 // The licence check's config a project names (its NuGet check's input, else the starter kit's path).
 const licenceConfig = p => call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
+
+// Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the
+// strength check (core/modules/code-shape.md, "How strong the tests are is measured on the lines a pull request
+// changes").
+function strengthNamed(p) {
+  const tool = toolOf(p.manifest);
+  const row = "Add to the manifest's slots the row `| *mutation tool* | `<command>` |`, the command that runs the project's mutation tool (a tool of development only) on `{lines}` and writes its report in the mutation-testing-elements schema to `{report}`; or `| *mutation tool* | `none`: <why> |`, where no such tool exists for its language";
+  if (!tool) return `${row}. Until then the measure does not run, and nothing fails for it.`;
+  if (tool.none !== undefined) return tool.none ? null : `The manifest's row *mutation tool* says \`none\` with no reason: add the reason after it (\`none\`: <why>).`;
+  if (Object.values(p.workflows).some(w => /core\/scripts\/strength\.mjs/u.test(w.text ?? ""))) return null;
+  return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
+}
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
@@ -251,6 +264,8 @@ export const STEPS = [
     } },
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
     partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
+  { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
+    partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

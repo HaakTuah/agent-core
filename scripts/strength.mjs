@@ -22,6 +22,8 @@
 //   node core/scripts/strength.mjs           on a pull request, STRENGTH_BASE set to the branch it merges into
 //                                            (origin/main): the lines it changes; with no base, nothing to measure
 //   node core/scripts/strength.mjs --whole   the whole run, which writes the baseline: the first, or the new one
+//   node core/scripts/strength.mjs --lower <file>[,<file>...]   a cleaning task's run: the tool on those files whole,
+//                                            and their entries lowered to what still survives; nothing joins
 // Run from the project's root, as a step of the job that runs its tests. git and Node's own modules.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -234,13 +236,34 @@ function whole(p) {
   return 0;
 }
 
+// A cleaning task's run: the tool on the files named, and the baseline's entries of those files lowered to what
+// survives now. Nothing joins, and an entry of another file stays as it was.
+function lower(p, named) {
+  const files = named.split(",").filter(Boolean);
+  const outside = files.find(f => !p.code.includes(f));
+  if (outside !== undefined) refuse(`${outside} is no file of the code the shape check's config reads`, "name files of its \"code\" that are no tests, joined by commas");
+  const old = baselineFrom(tolerant(() => fs.readFileSync(p.at, "utf8")), p.at);
+  if (!old) refuse(`there is no baseline at ${p.at} to lower`, "write it first with the audit's whole run (--whole)");
+  const now = new Map();
+  for (const f of faultsOf(runTool(p.tool.command, files.join(",")), null).filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
+  const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `));
+  const listed = Object.fromEntries([...old.listed].map(([id, n]) => [id, ours(id) ? Math.min(n.count ?? 0, now.get(id) ?? 0) : n.count ?? 0]).filter(([, c]) => c > 0).map(([id, c]) => [id, { count: c }]));
+  const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => id in listed));
+  fs.writeFileSync(p.at, `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);
+  console.log(`${p.at} lists ${Object.keys(listed).length} faults that survive, against ${old.listed.size} before.`);
+  return 0;
+}
+
 function main(argv) {
-  if (argv.length > 1 || (argv[0] && argv[0] !== "--whole")) refuse(`the check does not know ${argv.join(" ")}`, "run it with no option on a pull request, or with --whole for the audit's whole run");
+  const [option, files] = argv;
+  const known = (option === "--whole" && argv.length === 1) || (option === "--lower" && argv.length === 2) || !argv.length;
+  if (!known) refuse(`the check does not know ${argv.join(" ")}`, "run it with no option on a pull request, with --whole for the audit's whole run, or with --lower <file>[,<file>...] in a cleaning task");
   const p = project();
   if (!p.tool) { console.log(`The project names no mutation tool: its manifest has no row ${ROW}. The measure waits for that step (${p.home}setup/sync-notes.md, "how strong the tests are").`); return 0; }
   if (p.tool.none !== undefined) { console.log(`The measure is left out: the project names no mutation tool${p.tool.none ? ` (${p.tool.none})` : ""}.`); return 0; }
   if (!p.config) { console.log("The measure waits for the shape check's config, whose \"code\" and \"tests\" it reads."); return 0; }
-  if (argv[0] === "--whole") return whole(p);
+  if (option === "--whole") return whole(p);
+  if (option === "--lower") return lower(p, files);
   const base = process.env.STRENGTH_BASE || "";
   if (!base) { console.log("No base (STRENGTH_BASE): no pull request's lines to measure."); return 0; }
   if (!/^\w[\w./^~-]*$/u.test(base) || tolerant(() => git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`])) === null) refuse(`STRENGTH_BASE (${JSON.stringify(base).slice(0, 80)}) is no commit here`, "set it to the pull request's base, such as origin/main, and fetch it first");

@@ -2,7 +2,7 @@
 // changes and how the tool is told them, a fault's id, a report read and refused, the counts, what the baseline claims
 // and what may join it, and whole runs in a scratch repository with a tool of its own: reported only before the
 // baseline, a survivor failed with its mend once it stands, one listed passing, a tool that cannot run, `none`, and
-// the whole run writing the baseline. Run by the core's tests workflow (.github/workflows/tests.yml).
+// the whole run writing the baseline, and a cleaning task's run lowering it. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/strength-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -19,7 +19,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const SCRIPT = fileURLToPath(new URL("./strength.mjs", import.meta.url));
 
 // ---- the row, the baseline's place, the lines ----
-ok(same(toolOf("| *mutation tool* | `npx stryker run --mutate {lines}` |"), { command: ["npx", "stryker", "run", "--mutate", "{lines}"] }) && same(toolOf("| *mutation tool* | `none`: no tool reads GDScript |"), { none: "no tool reads GDScript" }) && toolOf("| *dose* | `in debt` |") === null && toolOf("| *mutation tool* | soon |") === null,
+ok(same(toolOf("| *mutation tool* | `mutator run --mutate {lines}` |"), { command: ["mutator", "run", "--mutate", "{lines}"] }) && same(toolOf("| *mutation tool* | `none`: no tool reads GDScript |"), { none: "no tool reads GDScript" }) && toolOf("| *dose* | `in debt` |") === null && toolOf("| *mutation tool* | soon |") === null,
   "the row names the tool's command, or none with its reason; a project with no row, or a row with nothing in backticks, has none named");
 ok(baselineOf({ baseline: "checks/shape-baseline.json" }) === "checks/strength-baseline.json" && baselineOf({ baseline: ".github/shape-baseline.json" }) === ".github/strength-baseline.json", "the baseline stands beside the shape check's");
 ok(linesArg(new Map([["a.js", new Set([3, 1, 2, 7])], ["b.js", new Set([5])]])) === "a.js:1-3,a.js:7-7,b.js:5-5", "the lines are told as runs, <file>:<first>-<last>, joined by commas");
@@ -72,7 +72,7 @@ try {
   write("src/a.js", "export const a = x => x === 1;\n");
   write("test/a.test.js", "import { a } from '../src/a.js';\n");
   // (the scratch tool: a report of one fault that survives on each line it is told, in the schema's form)
-  write("tool.mjs", "import fs from 'node:fs';\nconst [lines, out] = process.argv.slice(2);\nconst files = {};\nfor (const part of lines.split(',')) { const [file, r] = part.split(':'); const first = Number((r ?? '1-1').split('-')[0]); files[file] ??= { source: fs.readFileSync(file, 'utf8'), mutants: [] }; files[file].mutants.push({ id: String(first), mutatorName: 'EqualityOperator', replacement: '!==', status: 'Survived', location: { start: { line: first, column: 26 }, end: { line: first, column: 29 } } }); }\nfs.writeFileSync(out, JSON.stringify({ schemaVersion: '1', files }));\n");
+  write("tool.mjs", "import fs from 'node:fs';\nconst [lines, out] = process.argv.slice(2);\nconst files = {};\nfor (const part of lines.split(',')) { const [file, r] = part.split(':'); const first = Number((r ?? '1-1').split('-')[0]); files[file] ??= { source: fs.readFileSync(file, 'utf8'), mutants: [] }; files[file].mutants.push({ id: String(first), mutatorName: 'EqualityOperator', replacement: '!==', status: process.env.STATUS || 'Survived', location: { start: { line: first, column: 26 }, end: { line: first, column: 29 } } }); }\nfs.writeFileSync(out, JSON.stringify({ schemaVersion: '1', files }));\n");
   write("core-manifest.md", MANIFEST("`node tool.mjs {lines} {report}`"));
   sh("add", "-A"); sh("commit", "-q", "-m", "base");
   sh("checkout", "-q", "-b", "change");
@@ -88,6 +88,11 @@ try {
   sh("commit", "-qam", "another");
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && mended(r.stdout + r.stderr) && r.stderr.includes("src/a.js:3"), "once the baseline stands, a survivor on a changed line it does not list fails, with its mend", r.stdout + r.stderr);
+  r = run(["--lower", "src/a.js"], { STATUS: "Killed" });
+  const lowered = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
+  const refused = run(["--lower", "test/a.test.js"]);
+  ok(r.status === 0 && Object.keys(lowered.listed).length === 0 && lowered.whole?.commit === written.whole.commit && refused.status === 1 && mended(refused.stderr), "a cleaning task's run lowers the file's entries to what survives, keeping the whole run's record; a file outside the code is refused", r.stdout + r.stderr + refused.stderr);
+  sh("checkout", "--", "checks/strength-baseline.json");
   write("core-manifest.md", MANIFEST("`node missing-tool.mjs {lines} {report}`"));
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && mended(r.stdout + r.stderr), "once it stands, a tool that cannot run fails, saying the mend", r.stdout + r.stderr);

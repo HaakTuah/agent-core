@@ -44,6 +44,7 @@ const CHECKS = {
   "scripts/own-modules.mjs": "scripts/own-modules-test.mjs",
   "scripts/manifest-reads.mjs": "scripts/manifest-reads-test.mjs",
   "scripts/shape.mjs": "scripts/shape-test.mjs",
+  "scripts/strength.mjs": "scripts/strength-test.mjs",
   ".github/workflows/core.yml": "scripts/core-yml-test.mjs",
   ".github/workflows/nuget.yml": "scripts/nuget-gate-test.mjs",
   ".github/workflows/personal-terms.yml": "scripts/personal-terms-test.mjs",

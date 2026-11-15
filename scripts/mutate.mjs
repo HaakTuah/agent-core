@@ -49,14 +49,20 @@ const aValue = tok => !!tok && (VALUE.has(tok.t) || (tok.t === "id" && !["return
 // The operator that starts at a punctuation token, and what it becomes: [text, replacement, name] or null. One that is
 // part of a longer operator (<<=, >>>, =>, ++, -=) is none.
 function operatorAt(src, k, toks) {
-  const at = toks[k].at, c = src[at], after = src[at + 1] ?? "", before = src[at - 1] ?? "";
-  if ("<>=!&|".includes(before)) return null;
+  const at = toks[k].at;
+  if ("<>=!&|".includes(src[at - 1] ?? "")) return null;
   const long = Object.keys(OPERATORS).find(op => src.startsWith(op, at) && !"<>=&|".includes(src[at + op.length] ?? ""));
   if (long) return [long, OPERATORS[long], NAMES[long] ?? "EqualityOperator"];
+  return shortAt(src, at, aValue(toks[k - 1]));
+}
+
+// A one-character operator at `at`: a comparison, a ! that negates, or a + or - between two values.
+function shortAt(src, at, afterValue) {
+  const c = src[at], after = src[at + 1] ?? "";
   if (c in SINGLE && !"<>=".includes(after)) return [c, SINGLE[c], "EqualityOperator"];
   if (c === "!" && after !== "=") return ["!", "", "BooleanLiteral"];
-  if ((c === "+" || c === "-") && !"+-=".includes(after) && !"+-".includes(before) && aValue(toks[k - 1])) return [c, c === "+" ? "-" : "+", "ArithmeticOperator"];
-  return null;
+  const sign = (c === "+" || c === "-") && !"+-=".includes(after) && !"+-".includes(src[at - 1] ?? "");
+  return sign && afterValue ? [c, c === "+" ? "-" : "+", "ArithmeticOperator"] : null;
 }
 
 // The faults a file's text can take on the lines wanted (a function of a line number; all where none is given):
