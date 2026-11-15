@@ -22,9 +22,11 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
 - **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
   and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
   the steps of a release not done, the labels and openers to mend, a run of its own missed, the cleaning and each
-  audit the codebase's state makes due (`modules/cleaning.md`), and what the staged cases make due, as their rule
-  comes (#235); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit
-  writes it) and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
+  audit the codebase's state makes due (`modules/cleaning.md`), the pass over the choices that are hard to undo and a
+  sign of theirs written in a measure that holds (`modules/choices.md`), and what the staged cases make due, as their
+  rule comes (#235); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the project's
+  daily job (`look.yml`, as the starter kit writes it) and the orchestrator's wake; where issues cannot be reached,
+  its files go to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script

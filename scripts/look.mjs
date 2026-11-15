@@ -17,7 +17,8 @@
 //   - What the dose makes due (dose.mjs; modules/cleaning.md): cleaning, while the codebase is not in standard, and an
 //     audit by a reader, which the look labels needs-owner in place of queued where the project is in debt and its
 //     baseline no smaller than at the last audit. What the staged cases make due joins DUE as their rule comes
-//     (#235); and the pass twice a year over the choices that are hard to undo (choices.mjs).
+//     (#235); and of the choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign
+//     written in a measure the shape check keeps, while it holds.
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again.
 // Its record is the body of one closed issue, "The scheduled look's record", which it writes on each run. A run by a
 // session (not GitHub's job) where the record shows a run less than SOON hours before does nothing more, so an
@@ -35,7 +36,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { look as choicesDue } from "./choices.mjs";
+import { look as choicesDue, signs } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { answer, FOLDER, repoOf } from "./inbox.mjs";
@@ -59,10 +60,11 @@ export const TITLES = {
   missed: "The scheduled look missed a run",
 };
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
-// issue it keeps and `unread` leaving it as it stands: the pass over the choices that are hard to undo (choices.mjs),
-// the cleaning and the audit the dose makes due (dose.mjs), and, as their rule comes, the staged cases (#235). One
-// that says `owner`, true or false, has its issue's state label kept to it: needs-owner where true, else queued.
-export const DUE = [choicesDue, cleaningDue, auditIsDue];
+// issue it keeps and `unread` leaving it as it stands: the pass over the choices that are hard to undo and a sign of
+// theirs that has tripped (choices.mjs), the cleaning and the audit the dose makes due (dose.mjs), and, as their rule
+// comes, the staged cases (#235). One that says `owner`, true or false, has its issue's state label kept to it:
+// needs-owner where true, else queued.
+export const DUE = [choicesDue, signs, cleaningDue, auditIsDue];
 export const OWNERS = "needs-owner";
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
