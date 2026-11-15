@@ -45,15 +45,16 @@
 // that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which the
 // workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so it
 // says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
-// open, and of one that names no commit the head stands on, and it counts a member's or collaborator's review that
-// it does not name, saying so (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it does not hold: what a posted review says, whether a finding is blocking, who posted
-// each of two reviews (one login may post both), that comment-only.mjs's printout is true (its code reviewer runs it
-// again), and that a merge from main brought no change of its own; those stay with the builder and the reviews. It
-// prints, as JSON, the commit to mark and the status to give it, or {} for a pull request that is closed or a draft.
-// While "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check
-// would have done, until the project's owner turns that off (#99). What the status
-// proves where every review is posted (none starts by itself, as through a plug-in): that a review was posted for the
-// head, not who made it, since builder and reviewer may post under one login, which no check here tells apart (#187).
+// open, and of one that names no commit the head stands on, and it counts a member's or collaborator's review that it
+// does not name, saying so (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it
+// does not hold: what a posted review says, whether a finding is blocking, who posted each of two reviews (one login
+// may post both), that comment-only.mjs's printout is true (its code reviewer runs it again), and that a merge from
+// main brought no change of its own; those stay with the builder and the reviews. It prints, as JSON, the commit to
+// mark and the status to give it, or {} for a pull request that is closed or a draft. While "advisory" (the workflow's
+// input, on unless turned off) the status is always a pass that says what the check would have done, until the
+// project's owner turns that off (#99). What the status proves where every review is posted (none starts by itself, as
+// through a plug-in): that a review was posted for the head, not who made it, since builder and reviewer may post under
+// one login, which no check here tells apart (#187).
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same>]]]
