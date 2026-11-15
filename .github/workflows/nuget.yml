@@ -25,17 +25,17 @@
 # It first looks whether the pull request changes anything NuGet reads, so that a private repository pays for no
 # restore a pull request cannot have changed, while the check still reports on every pull request (core archive 201).
 # Two looks: git's own diff against the base, as the signature check looks, for a project file, a lock file, a .props,
-# .targets, Directory.Build or response file, a .user file beside a project file, packages.config, a NuGet.Config, a
-# global.json, .NET's tools manifest, a package file, the licence check's config and its audit, a folder the config
-# names as a source, the core's Node version and the calling workflow; and, where none changed, NuGet's own word that
-# every lock file still holds what its project asks for, however it asks (an import, a property, any file a build
-# reads), from a restore against an empty source that downloads nothing. It passes without a restore only where both
-# say so. Any doubt runs it: no base, a base that cannot be fetched, a config that cannot be read, a listed file that
-# is a link, an error of the restore's other than a locked package not found, or a package downloaded beside a lock
-# file, save the SDK's own reference packs (Microsoft.NETCore.App.Ref, Microsoft.WindowsDesktop.App.Ref and
-# Microsoft.AspNetCore.App.Ref), which it adds by itself. What the second look leaves to the next change of a lock
-# file: a source that a build file adds, from which a package of the same content hash would come, since every
-# package's bytes are its lock file's.
+# .targets, Directory.Build or response file, a .user file beside a project file, any file an Import in one brings in
+# (core/scripts/nuget.mjs --imports), packages.config, a NuGet.Config, a global.json, .NET's tools manifest, a package
+# file, the licence check's config and its audit, a folder the config names as a source, the core's Node version and
+# the calling workflow; and, where none changed, NuGet's own word that every lock file still holds what its project
+# asks for, however it asks (an import, a property, any file a build reads), from a restore against an empty source
+# that downloads nothing. It passes without a restore only where both say so. Any doubt runs it: no base, a base that
+# cannot be fetched, a config or Imports that cannot be read, a listed file that is a link, an error of the restore's
+# other than a locked package not found, or a package downloaded beside a lock file, save the SDK's own reference
+# packs (Microsoft.NETCore.App.Ref, Microsoft.WindowsDesktop.App.Ref and Microsoft.AspNetCore.App.Ref), which it adds
+# by itself. What the second look leaves to the next change of a lock file: a source that a build file adds, from
+# which a package of the same content hash would come, since every package's bytes are its lock file's.
 name: nuget
 
 on:
@@ -63,6 +63,10 @@ jobs:
         with:
           persist-credentials: false # nothing after the checkout needs the token
           fetch-depth: 2 # the merge commit and its parents: the base the next step diffs from
+      # (before the first look, which asks the script what files the project's Imports bring in)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
       - name: Does the pull request change what NuGet reads?
         id: what
         env:
@@ -130,7 +134,12 @@ jobs:
             while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$extra" # (jq on Windows ends lines with CR)
             caller=${CALLER#"$GITHUB_REPOSITORY"/}; caller=${caller%%@*}
             [ -n "$caller" ] && [ "$caller" != "$CALLER" ] && paths+=(":(literal)$caller")
-            if { git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$BASE"; } \
+            # (each file an Import brings in under another name than a build file's, which the script reads as one: a
+            # change to it alone is one NuGet reads)
+            imports=ok
+            brought=$(node core/scripts/nuget.mjs --imports) || imports=
+            while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$brought"
+            if [ -n "$imports" ] && { git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$BASE"; } \
               && changed=$(git diff --no-renames --name-only "$BASE" HEAD -- "${paths[@]}") \
               && listed=$(git ls-files -s -- "${paths[@]}"); then
               if [ -n "$changed" ]; then
@@ -148,10 +157,6 @@ jobs:
             fi
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: steps.what.outputs.run != 'false' # anything but a plain no checks
-        with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
       - name: Every locked package and tool, fetched before the restore and held to its list
         # (anything but a plain no checks, and only before any build of the pull request's has run in this job)
         if: steps.what.outputs.run != 'false' && steps.what.outputs.built != 'true'
