@@ -39,6 +39,9 @@ const tfm = `net${sdk ? version.stdout.trim().split(".")[0] : "9"}.0`;
 const project = (imports = '  <Import Project="..\\..\\build\\deps.xml" />\n') => `<Project Sdk="Microsoft.NET.Sdk">\n${imports}  <PropertyGroup>\n    <OutputType>Exe</OutputType>\n    <TargetFramework>${tfm}</TargetFramework>\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\n  </PropertyGroup>\n  <ItemGroup>\n    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />\n  </ItemGroup>\n</Project>\n`;
 const LOCK = `${JSON.stringify({ version: 1, dependencies: { [tfm]: { "Newtonsoft.Json": { type: "Direct", requested: "[13.0.3, )", resolved: "13.0.3", contentHash: "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==" } } } }, null, 2)}\n`;
 const EMPTY = "<Project>\n</Project>\n";
+// (a build file that asks for a package only where a text file it reads says so: what the first look's listing cannot
+// name, since only a build's own evaluation reads it, and NuGet's own word sees)
+const FLAGGED = "<Project>\n  <PropertyGroup>\n    <Flag>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)build/flag.txt').Trim())</Flag>\n  </PropertyGroup>\n  <ItemGroup Condition=\"'$(Flag)' == 'yes'\">\n    <PackageReference Include=\"Serilog\" Version=\"4.0.0\" />\n  </ItemGroup>\n</Project>\n";
 const ADDS = '<Project>\n  <ItemGroup>\n    <PackageReference Include="Serilog" Version="4.0.0" />\n  </ItemGroup>\n</Project>\n';
 const START = {
   "README.md": "# A project\n",
@@ -90,6 +93,7 @@ for (const [what, files, opts] of [
   ["one that changes the calling workflow, under its own name", { ".github/workflows/restore.yml": "name: restore again\n" }, { caller: "restore.yml" }],
   ["one that changes only a file an Import brings in", { "build/deps.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }],
   ["one that changes only a file an imported file brings in, written with a tab and a reference", { "build/deeper .xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "build/deps.xml": '<Project>\n  <Import Project="deeper\t&#46;xml" />\n</Project>\n', "build/deeper .xml": EMPTY } }],
+  ["one that changes only a file a property MSBuild's targets import names", { "build/after.xml": "<Project>\n  <!-- a note -->\n</Project>\n" }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/after.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/after.xml": EMPTY } }],
   ["a pull request with no base to read it against", { "README.md": "# More\n" }, { base: false }],
 ]) { const r = restores(what, files, opts); if (what !== "a pull request with no base to read it against") ok(r.out.includes("Changed:"), `${what}: named by the first look`, r.out); }
 
@@ -100,7 +104,7 @@ else {
   skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
   restores("one that adds a package only in a file a project file imports", { "build/deps.xml": ADDS });
   restores("one that adds it in the second of two imports on a line", { "build/two.xml": ADDS }, { start: { "src/App/App.csproj": project('  <Import Project="..\\..\\build\\deps.xml" /><Import Project="..\\..\\build\\two.xml" />\n'), "build/two.xml": EMPTY } });
-  restores("one that adds it in a file a property imports", { "build/two.xml": ADDS }, { start: { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY } });
+  restores("one that asks for a package by a text file a build file reads, which no listing can name", { "build/flag.txt": "yes\n" }, { start: { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" } });
   restores("one that adds it in an imported file whose name is not plain ASCII", { "build/Ünï.xml": ADDS }, { start: { "build/deps.xml": '<Project>\n  <Import Project="Ünï.xml" />\n</Project>\n', "build/Ünï.xml": EMPTY } });
   restores("one that adds a package in an import, where the project's record of its restore lies outside the checkout", { "build/deps.xml": '<Project>\n  <ItemGroup>\n    <PackageDownload Include="Newtonsoft.Json" Version="[12.0.1]" />\n  </ItemGroup>\n</Project>\n' },
     { start: { "Directory.Build.props": `<Project>\n  <PropertyGroup>\n    <BaseIntermediateOutputPath>${path.join(tmp, "elsewhere", String(n + 1)).replace(/\\/g, "/")}/</BaseIntermediateOutputPath>\n  </PropertyGroup>\n</Project>\n` } });
@@ -141,8 +145,9 @@ if (sdk) {
   // (where the first look itself restored, the pull request's build files have run: the read before the restore is
   // left out, nothing it reads having changed from the base)
   const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
-  // (a file a property brings in, which only NuGet's own word sees: an imported one the first look names by itself)
-  const built = whole({ "build/two.xml": ADDS }, { "Directory.Build.props": "<Project>\n  <PropertyGroup>\n    <CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)build/two.xml</CustomAfterMicrosoftCommonTargets>\n  </PropertyGroup>\n</Project>\n", "build/two.xml": EMPTY });
+  // (a text file a build file reads, which only NuGet's own word sees: any project file, whatever brings it in, the first
+  // look names by itself)
+  const built = whole({ "build/flag.txt": "yes\n" }, { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" });
   ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out);
   const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
   ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out);

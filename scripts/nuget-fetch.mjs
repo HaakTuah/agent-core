@@ -21,12 +21,12 @@
 //   node core/scripts/nuget-fetch.mjs <config> --into <a folder of its own>
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
-import { REGISTRY, heldBefore, lockPackages, nugetConfig, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
+import { NOT_A_FILE, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
@@ -227,9 +227,20 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
   // it already named are reported; one a pull request lists for the first time is not held)
   let listedThen = [];
   try { if (baseConfig) listedThen = [...nugetConfig(baseConfig).ships, ...nugetConfig(baseConfig).tools]; } catch { /* (none listed) */ }
-  const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === readFileSync(join(root, f), "utf8"));
+  // (a lock file or a tools manifest is read only where it is a file of bytes: a device would never end)
+  const texts = new Map();
+  const textOf = (f) => {
+    if (!texts.has(f)) {
+      const bytes = readProject(root, f);
+      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe): this check reads none: make it a file`);
+      texts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
+    }
+    return texts.get(f);
+  };
+  const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === textOf(f));
   for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
-    const read = lockPackages(readFileSync(join(root, f), "utf8"), f);
+    if (textOf(f) === null) continue;
+    const read = lockPackages(textOf(f), f);
     failures.push(...read.failures);
     if (asBase(f)) reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
@@ -242,7 +253,9 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     }
   }
   for (const f of tracked.filter((t) => !t.startsWith("core/") && isTools(t))) {
-    const text = readFileSync(join(root, f), "utf8"), read = toolsOf(text, f), before = toolsAt(root, base, f);
+    const text = textOf(f);
+    if (text === null) continue;
+    const read = toolsOf(text, f), before = toolsAt(root, base, f);
     // (a tool the base held at that version, or a manifest it held as it stands, was never read before this release:
     // what is wrong with it is reported; with no base to read it against, so is everything)
     const same = before === null || (sameSources && textAt(root, base, f) === text);
@@ -319,6 +332,8 @@ if (started(import.meta.url)) {
   const fail = (msg) => { console.error(`FAIL: ${shown(msg)}`); process.exit(1); };
   const configPath = args.find((a, i) => !a.startsWith("--") && i !== at + 1), into = at >= 0 ? args[at + 1] : undefined;
   if (!configPath || !into) fail("name the config and a folder of its own: node core/scripts/nuget-fetch.mjs <config> --into <folder>");
+  // (the config is read only where it is a file of bytes: a device would never end)
+  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe): make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();

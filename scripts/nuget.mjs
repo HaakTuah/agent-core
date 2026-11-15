@@ -5,14 +5,18 @@
 // own manifest (its .nuspec) in the folder a restore from those lock files filled, so a package's licence is read
 // from the package NuGet checked, never from a second place. It holds:
 //   - that every project file git knows (.csproj, .fsproj, .vbproj) has its lock file beside it, and that every lock
-//     file is named in the config as one whose packages ship or as one of tools that only run, so no project's
-//     packages go unread. A lock file under another name (packages.<project>.lock.json, which NuGet takes before the
-//     plain one, or a NuGetLockFilePath a project or build file names, or a file an Import in one brings in; the
-//     workflow's restore also sets that property empty for every project, wherever it was set) fails, and so do the
-//     older packages.config, which has none, and a response file that gives every build options this check cannot
-//     read (Directory.Build.rsp). So does a build file, or a file an Import brings in, that is not plain UTF-8, which
-//     MSBuild reads by an encoding of its own. A file an Import brings in, or one not plain UTF-8, read only lately, is
-//     reported where the base held it as it stands, and brought it in by the same Imports (core archive 207);
+//     file is named in the config as one whose packages ship or as one of tools that only run, so no project's packages
+//     go unread. A lock file under another name (packages.<project>.lock.json, which NuGet takes before the plain one,
+//     or a NuGetLockFilePath a project or build file names, or a file an Import in one brings in, or a property
+//     MSBuild's own targets import a file by (CustomAfterMicrosoftCommonTargets and the like, BY_PROPERTY), or any file
+//     of the project's whose root element is a Project, whatever brings it in (a publish profile); the workflow's
+//     restore also sets that property empty for every project, wherever it was set) fails, and so do the older
+//     packages.config, which has none, and a response file that gives every build options this check cannot read
+//     (Directory.Build.rsp). So does a build file, or a file so brought in, that is not plain UTF-8, which MSBuild
+//     reads by an encoding of its own, or that leads to no file of bytes (a link to a device, a submodule; a lock file
+//     or a tools manifest that does fails as well, and is never read). A file so brought in, or one not plain UTF-8 or
+//     no file, read only lately, is reported where the base held it as it stands, and brought it in by the same files
+//     (core archive 207);
 //   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
@@ -44,9 +48,10 @@
 // where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
 // project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
 // restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
-// names goes unseen, and such a folder stands in the pull request for the reviews to see); what a file an Import
-// brings in sets where the check cannot know which file it is without the build (a property, a wildcard, an SDK's), or
-// where git does not know it (each such Import is reported, and passes); whether the owner said what "accepted"
+// names goes unseen, and such a folder stands in the pull request for the reviews to see); what a file an Import or
+// such a property brings in sets where the check cannot know which file it is without the build (a property, a
+// wildcard, an SDK's, a property's value that does not start at its own file's folder), or where git does not know it
+// (each such Import or property is reported, and passes); whether the owner said what "accepted"
 // quotes, which the reviews hold, the config being a protected file; a project of another kind than the three above;
 // a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which no restore brings, save
 // before the restore (--fetched, below); and what no lock file names at all (a tool a script installs, a font, an
@@ -69,7 +74,9 @@
 //                                               and of the tools a manifest of dotnet's names, read from files no pull
 //                                               request's build has run beside (core archive 201)
 //   node core/scripts/nuget.mjs --projects     the project files git knows, a line each: what the workflow restores
-//   node core/scripts/nuget.mjs --imports      the files of another name than a build file's that an Import brings in,
+//   node core/scripts/nuget.mjs --imports      the files of another name than a build file's that an Import, or a
+//                                               property MSBuild's own targets import a file by, brings in, and
+//                                               every file of the project's whose root element is a Project,
 //                                               a line each: what the workflow's first look adds to what it diffs
 //   node core/scripts/nuget.mjs <config> --sources   where the workflow's restore takes packages from, a line each,
 //                                                    a folder by its whole path
@@ -81,7 +88,7 @@
 // --advisory it says what it would fail and passes, for a project where the check itself is at fault, while that is
 // mended.
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
@@ -105,9 +112,11 @@ const OTHER_LOCK = /^packages\..+\.lock\.json$/iu; // NuGet takes packages.<proj
 const BUILD_FILE = /\.(?:cs|fs|vb)proj(?:\.user)?$|\.props$|\.targets$/iu;
 /**
  * The files a build file's Imports bring in, as each Import's Project names them (a list parted by ";", as MSBuild
- * reads one), each with whether its Import names an SDK, which MSBuild then finds the file in: [{ project, sdk }],
+ * reads one), each with whether its Import names an SDK, which MSBuild then finds the file in; and those a property
+ * MSBuild's own targets import a file by names (BY_PROPERTY), with that property's name: [{ project, sdk, via }],
  * read in one pass from tag to tag: a comment, CDATA or a processing instruction is passed over whole, and a tag's
- * attributes are read only within it, so no text, however long or unclosed, is read more than once.
+ * attributes, or a property's text, are read only within it, so no text, however long or unclosed, is read more than
+ * once.
  */
 // (an attribute's value as XML gives it to MSBuild: a line break or a tab is a blank, and a reference to a character
 // is that character, so a ";" written as one parts a list; an entity XML does not know stays as written, and MSBuild
@@ -119,19 +128,92 @@ const xmlValue = (value) => value.replace(/\r\n?|[\t\n]/gu, " ").replace(/&(?:#(
 });
 // (the blanks .NET trims from each name of a list, as MSBuild does: a byte-order mark is no blank there)
 const TRIM = /^[\p{Zs}\p{Zl}\p{Zp}\t-\r\u0085]+|[\p{Zs}\p{Zl}\p{Zp}\t-\r\u0085]+$/gu;
+// (a property's text as XML gives it to MSBuild: a line break written CR LF is one, a reference to a character is that
+// character; tabs and line breaks stay, and MSBuild trims each name of the list it is read as)
+const xmlText = (text) => text.replace(/\r\n?/gu, "\n").replace(/&(?:#([0-9]{1,7})|#x([0-9A-Fa-f]{1,6})|(amp|lt|gt|quot|apos));/gu, (whole, dec, hex, name) => {
+  if (name) return { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" }[name];
+  const code = dec ? Number(dec) : parseInt(hex, 16);
+  return code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+});
+// the properties MSBuild's own targets and props import a file by, or the folder it imports files from, the project's
+// own Directory.Build and Directory.Packages files among them: a file one names is brought in as an Import's is, and one
+// whose value this check cannot know is reported (their names in any case, as MSBuild reads a property's). What any
+// other property brings in is read by what it is (projectFilesByContent).
+export const BY_PROPERTY = new Set(["CustomBeforeMicrosoftCommonProps", "CustomAfterMicrosoftCommonProps", "CustomBeforeMicrosoftCommonTargets",
+  "CustomAfterMicrosoftCommonTargets", "CustomBeforeMicrosoftCommonCrossTargetingTargets", "CustomAfterMicrosoftCommonCrossTargetingTargets",
+  "CustomBeforeMicrosoftCSharpTargets", "CustomAfterMicrosoftCSharpTargets", "CustomBeforeMicrosoftVisualBasicTargets", "CustomAfterMicrosoftVisualBasicTargets",
+  "CustomBeforeMicrosoftFSharpTargets", "CustomAfterMicrosoftFSharpTargets", "CustomBeforeDirectoryBuildProps", "CustomAfterDirectoryBuildProps",
+  "CustomBeforeDirectoryBuildTargets", "CustomAfterDirectoryBuildTargets", "DirectoryBuildPropsPath", "DirectoryBuildTargetsPath",
+  "DirectoryPackagesPropsPath", "DirectorySolutionPropsPath", "DirectorySolutionTargetsPath", "_DirectoryBuildPropsFile", "_DirectoryBuildPropsBasePath",
+  "_DirectoryBuildTargetsFile", "_DirectoryBuildTargetsBasePath", "_DirectoryPackagesPropsFile", "_DirectoryPackagesPropsBasePath", "NuGetRestoreTargets",
+  "NuGetTargets", "LanguageTargets", "CodeAnalysisTargets", "ReportingServicesTargets", "MsTestToolsTargets", "MsAppxPackageTargets", "CSharpCoreTargetsPath",
+  "CSharpDesignTimeTargetsPath", "CSharpTargetsPath", "VisualBasicCoreTargetsPath", "VisualBasicDesignTimeTargetsPath", "VisualBasicTargetsPath",
+  "FSharpTargetsPath", "FSharpDesignTimeTargetsPath", "MSBuildUserExtensionsPath", "MSBuildExtensionsPath", "MSBuildExtensionsPath32",
+  "MSBuildExtensionsPath64", "BeforeMicrosoftNETSdkTargets", "AfterMicrosoftNETSdkTargets", "AfterMicrosoftNetSdkProps", "AlternateCommonProps",
+  "CustomBeforeRazorSdkTargets", "CustomAfterRazorSdkTargets", "CustomBeforeStaticWebAssetsSdkTargets", "CustomAfterStaticWebAssetsSdkTargets",
+  "CustomBeforeBlazorWebAssemblySdkTargets", "CustomAfterBlazorWebAssemblySdkTargets", "CrossGenTargetsPath", "ILLinkTargetsPath", "ILCompilerTargetsPath",
+  "WebPublishProfileFile", "PublishProfileFullPath"].map((x) => x.toLowerCase()));
 export function imported(text) {
   const found = [], ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
+  // (a property's value, a list parted by ";": each name of one on the list, and of any other property each that starts at
+  // its own file's folder, which says only what brings in a project read for what it is)
+  const pieces = (value, via, known) => {
+    for (const x of value.split(";")) { const name = x.replace(TRIM, ""); if (name && (known || /^\$\(MSBuildThisFileDirectory\)/iu.test(name))) found.push({ project: name, sdk: false, via, loose: !known }); }
+  };
   for (let i = text.indexOf("<"); i >= 0; i = text.indexOf("<", i)) {
     if (text.startsWith("<!--", i)) { const end = text.indexOf("-->", i + 4); if (end < 0) break; i = end + 3; continue; }
     if (text.startsWith("<![CDATA[", i)) { const end = text.indexOf("]]>", i + 9); if (end < 0) break; i = end + 3; continue; }
     if (text.startsWith("<?", i)) { const end = text.indexOf("?>", i + 2); if (end < 0) break; i = end + 2; continue; }
-    if (!/^<Import(?![A-Za-z0-9_.:-])/iu.test(text.slice(i, i + 8))) { i++; continue; }
-    let end = i + 7, quote = "";
+    const tag = /^<([A-Za-z_][A-Za-z0-9_.-]{0,99})(?![A-Za-z0-9_.:-])/u.exec(text.slice(i, i + 102));
+    if (!tag) { i++; continue; }
+    let end = i + tag[0].length, quote = "";
     for (; end < text.length && (quote || text[end] !== ">"); end++) if (quote ? text[end] === quote : text[end] === '"' || text[end] === "'") quote = quote ? "" : text[end];
     if (end >= text.length) break;
-    const attributes = [...text.slice(i + 7, end).matchAll(ATTRIBUTE)], sdk = attributes.some((a) => a[1].toLowerCase() === "sdk");
-    for (const a of attributes) if (a[1].toLowerCase() === "project") for (const x of xmlValue(a[2] ?? a[3]).split(";")) { const name = x.replace(TRIM, ""); if (name) found.push({ project: name, sdk }); }
+    const name = tag[1], lower = name.toLowerCase();
+    if (lower === "import") {
+      const attributes = [...text.slice(i + tag[0].length, end).matchAll(ATTRIBUTE)], sdk = attributes.some((a) => a[1].toLowerCase() === "sdk");
+      for (const a of attributes) if (a[1].toLowerCase() === "project") for (const x of xmlValue(a[2] ?? a[3]).split(";")) { const n = x.replace(TRIM, ""); if (n) found.push({ project: n, sdk }); }
+      i = end + 1;
+      continue;
+    }
     i = end + 1;
+    if (text[end - 1] === "/") continue;
+    // (the element's text up to its next tag: a comment in it is no text, CDATA is text as written; MSBuild reads the
+    // text as XML gives it where CDATA, if any, comes first, and otherwise takes it as the markup it is written in, which
+    // this check does not read)
+    let value = "", j = i, blank = true, cdataFirst = false, markup = false;
+    for (;;) {
+      const lt = text.indexOf("<", j);
+      if (lt < 0) { j = -1; break; }
+      const part = xmlText(text.slice(j, lt));
+      value += part;
+      if (/[^ \t\r\n]/u.test(part)) blank = false;
+      if (text.startsWith("<!--", lt)) { const close = text.indexOf("-->", lt + 4); if (close < 0) { j = -1; break; } j = close + 3; continue; }
+      if (text.startsWith("<![CDATA[", lt)) {
+        const close = text.indexOf("]]>", lt + 9);
+        if (close < 0) { j = -1; break; }
+        if (blank) cdataFirst = true; else if (!cdataFirst) markup = true;
+        blank = false;
+        value += text.slice(lt + 9, close);
+        j = close + 3;
+        continue;
+      }
+      j = lt;
+      break;
+    }
+    if (j < 0) break;
+    // (its end tag, however many blanks before its ">"; anything else here is an element inside it, which MSBuild takes
+    // into its value as markup)
+    const close = `</${lower}`;
+    let k = j + close.length;
+    const ends = text.slice(j, k).toLowerCase() === close;
+    if (ends) while (k < text.length && " \t\r\n".includes(text[k])) k++;
+    const leaf = ends && text[k] === ">" && !markup, known = BY_PROPERTY.has(lower);
+    if (known && !markup) pieces(value, name, true);
+    else if (leaf) pieces(value, name, false);
+    // (what of a property on the list this check cannot read as MSBuild does is one it cannot know)
+    if (known && !leaf) found.push({ project: "$(markup inside it)", sdk: false, via: name });
+    i = j;
   }
   return found;
 }
@@ -139,9 +221,12 @@ export function imported(text) {
  *  relative one: "" for a path outside the project, null for one this cannot know without the build (a property other
  *  than $(MSBuildThisFileDirectory) at its start, which is `from`'s own folder, an item, an escape, an entity or a
  *  wildcard). */
-export function importPath(from, project) {
+export function importPath(from, project, { anchored = false } = {}) {
   // (the property ends in a separator, so one more after it is the same folder, never the top of a drive)
   const here = /^\$\(MSBuildThisFileDirectory\)/iu.exec(project);
+  // (a property's value MSBuild's own targets import from their own folder, never `from`'s: only one that starts at
+  // `from`'s own folder is known here)
+  if (anchored && !here) return /^(?:[\\/]|[A-Za-z]:)/u.test(project) ? "" : null;
   let p = project.slice(here ? here[0].length : 0).replace(/\\/gu, "/");
   if (here) p = p.replace(/^\/+/u, "");
   if (/[$@%&*?]/u.test(p)) return null;
@@ -172,32 +257,113 @@ export function plainText(bytes) {
  * null where it is not there), and every file of another name that an Import in one of them, or in a file one brings in, brings in where git
  * knows it, its name's case aside, as MSBuild on Windows finds it: { files: each such file's path to its text,
  * brought: each file an Import brought in, to the files whose Imports bring it in, unread: each Import this cannot
- * follow, typed: the files with a document type, unreadable: those not plain UTF-8 (plainText), whose Imports are not
+ * follow, typed: the files with a document type, unreadable: those not plain UTF-8 (plainText), or no file at all
+ * (NOT_A_FILE), to which of the two they are, whose Imports are not
  * read either }. A build file git knows is read as one,
  * whoever imports it. Each file is read once, and each place an Import leads to looked up once from each file.
  */
-export function importsOf(own, read) {
-  const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [], unreadable = new Set();
+// (a file's text by its byte-order mark, as .NET's StreamReader reads one, bytes UTF-8 does not allow as U+FFFD: only to
+// know what the file is, never to read what it names)
+function markedText(b) {
+  const utf32 = (x, little) => { const out = []; for (let i = 0; i + 3 < x.length; i += 4) { const c = little ? x.readUInt32LE(i) : x.readUInt32BE(i); out.push(c <= 0x10ffff && (c < 0xd800 || c > 0xdfff) ? String.fromCodePoint(c) : "\uFFFD"); } return out.join(""); };
+  if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return new TextDecoder("utf-8").decode(b.subarray(3));
+  if (b[0] === 0xff && b[1] === 0xfe && b[2] === 0 && b[3] === 0) return utf32(b.subarray(4), true);
+  if (b[0] === 0 && b[1] === 0 && b[2] === 0xfe && b[3] === 0xff) return utf32(b.subarray(4), false);
+  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b.subarray(2));
+  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b.subarray(2));
+  return new TextDecoder("utf-8").decode(b);
+}
+/** Whether a file's text is an MSBuild project, its root element a Project, past blanks, byte-order marks, comments,
+ *  processing instructions and a document type, in one pass. */
+export function projectRooted(text) {
+  for (let i = 0; ;) {
+    while (i < text.length && " \t\r\n\uFEFF".includes(text[i])) i++;
+    if (text.startsWith("<?", i)) { const end = text.indexOf("?>", i + 2); if (end < 0) return false; i = end + 2; continue; }
+    if (text.startsWith("<!--", i)) { const end = text.indexOf("-->", i + 4); if (end < 0) return false; i = end + 3; continue; }
+    if (/^<!DOCTYPE/iu.test(text.slice(i, i + 9))) {
+      // (a document type up to its own ">", past quoted strings, and an internal subset up to its "]", past quoted
+      // strings, comments and processing instructions, any of which may hold ">" or "]")
+      let j = i + 9, subset = false;
+      for (; j < text.length; j++) {
+        const c = text[j];
+        if (c === '"' || c === "'") { const end = text.indexOf(c, j + 1); if (end < 0) return false; j = end; continue; }
+        if (subset && text.startsWith("<!--", j)) { const end = text.indexOf("-->", j + 4); if (end < 0) return false; j = end + 2; continue; }
+        if (subset && text.startsWith("<?", j)) { const end = text.indexOf("?>", j + 2); if (end < 0) return false; j = end + 1; continue; }
+        if (c === "[" && !subset) subset = true;
+        else if (c === "]" && subset) subset = false;
+        else if (c === ">" && !subset) break;
+      }
+      if (j >= text.length) return false;
+      i = j + 1;
+      continue;
+    }
+    return /^<Project(?![A-Za-z0-9_.:-])/iu.test(text.slice(i, i + 9));
+  }
+}
+/**
+ * The files among `own` of another name than a build file's whose root element is a Project, in whatever encoding a
+ * byte-order mark gives: what MSBuild could import by any property of a project's own (a publish profile, a file an
+ * SDK's targets import by a property this check does not list), read as a build file is. A file is opened only where
+ * it is a file of bytes, and read whole only where its first character past blanks is "<".
+ */
+export function projectFilesByContent(root, own) {
+  const out = [];
+  for (const f of own) {
+    if (BUILD_FILE.test(f)) continue;
+    let fd = null;
+    try {
+      const at = join(root, f), st = statSync(at);
+      if (!st.isFile() || st.size === 0) continue;
+      fd = openSync(at, "r");
+      const head = Buffer.alloc(Math.min(st.size, 4096));
+      readSync(fd, head, 0, head.length, 0);
+      const start = markedText(head).replace(/^[ \t\r\n\uFEFF]+/u, "");
+      if (start === "" ? st.size <= head.length : !start.startsWith("<")) continue;
+      if (projectRooted(markedText(readFileSync(at)))) out.push(f);
+    } catch { /* (a file that cannot be read is no project) */ } finally { if (fd !== null) closeSync(fd); }
+  }
+  return out;
+}
+// what a reader gives for a path git knows that leads to no file of bytes (a link to a device, a folder or a pipe), which
+// is never read: a device can be endless, and a pipe never ends
+export const NOT_A_FILE = Symbol("not a file");
+/** The bytes of the project's file at `f`, NOT_A_FILE where it leads to none, or null where it is not there. */
+export function readProject(root, f) {
+  try { if (!statSync(join(root, f)).isFile()) return NOT_A_FILE; return readFileSync(join(root, f)); } catch { return null; }
+}
+export function importsOf(own, read, roots = []) {
+  const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [], unreadable = new Map();
   // (the files that bring in each place, one list for all the names git knows there in any case)
   const by = new Map();
-  const take = (f) => { const text = plainText(read(f)); if (text === null) unreadable.add(f); files.set(f, text ?? ""); };
+  const take = (f) => {
+    const bytes = read(f), text = bytes === NOT_A_FILE ? null : plainText(bytes);
+    if (text === null) unreadable.set(f, bytes === NOT_A_FILE ? "not a file" : "not plain UTF-8");
+    files.set(f, text ?? "");
+  };
   for (const f of own) { const k = f.toLowerCase(); if (byName.has(k)) byName.get(k).push(f); else byName.set(k, [f]); }
-  for (const f of own.filter((x) => BUILD_FILE.test(x))) take(f);
+  for (const f of [...own.filter((x) => BUILD_FILE.test(x)), ...roots]) if (!files.has(f)) take(f);
   for (const [f, text] of files) {
     if (unreadable.has(f)) continue;
     // (a document type can name text that reads as a comment's start: its Imports are not read)
     if (/<!DOCTYPE/iu.test(text)) { typed.push(f); continue; }
     const looked = new Set();
-    for (const { project, sdk } of imported(text)) {
+    for (const { project, sdk, via, loose } of imported(text)) {
       if (BUILD_FILE.test(project.split(/[\\/]/u).pop())) continue;
-      const at = sdk ? null : importPath(f, project), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
-      if (!found.length) unread.push({ from: f, project, why: at === null ? "a file whose path this check cannot know without the build" : "a path outside the project, or no file of the project's that git knows" });
+      const at = sdk ? null : importPath(f, project, { anchored: Boolean(via) }), found = at ? byName.get(at.toLowerCase()) ?? [] : [];
+      // (any other property only says what brings in a project already read for what it is: nothing more is read)
+      if (loose) {
+        for (const g of found) if (roots.includes(g)) { if (!brought.has(g)) brought.set(g, new Set()); brought.get(g).add(f); }
+        continue;
+      }
+      if (!found.length) unread.push({ from: f, project, via, why: at === null ? "a file whose path this check cannot know without the build" : "a path outside the project, or no file of the project's that git knows" });
       const key = at?.toLowerCase();
       if (!found.length || looked.has(key)) continue;
       looked.add(key);
-      // (the names git knows in every case are taken once, by the first file that imports them)
-      if (!by.has(key)) { by.set(key, new Set()); for (const g of found) if (!files.has(g)) { brought.set(g, by.get(key)); take(g); } }
+      // (the names git knows in every case are taken once, by the first file that brings them in; a file read already
+      // by what it is joins the files brought in all the same)
+      if (!by.has(key)) { by.set(key, new Set()); for (const g of found) { if (!files.has(g)) take(g); if (!brought.has(g)) brought.set(g, by.get(key)); } }
       by.get(key).add(f);
+      for (const g of found) if (brought.get(g) !== by.get(key)) brought.get(g).add(f);
     }
   }
   return { files, brought, unread, typed, unreadable };
@@ -454,10 +620,11 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // a pull request adds, changes or brings into play with an Import of its own fails, as does what a build file names)
   const bytesNow = new Map();
   const readNow = (f) => {
-    if (!bytesNow.has(f)) { let b = null; try { b = readFileSync(join(root, f)); } catch { /* (a file git knows and the folder lacks holds nothing) */ } bytesNow.set(f, b); }
+    if (!bytesNow.has(f)) bytesNow.set(f, readProject(root, f));
     return bytesNow.get(f);
   };
-  const now = importsOf(own, readNow);
+  const byContent = new Set(projectFilesByContent(root, own));
+  const now = importsOf(own, readNow, [...byContent]);
   // (the base's files as MSBuild reads them: a link git knows is read through to the file it leads to, as a checkout
   // that keeps links reads it now; one that leads out of the project, or to no file the base held, holds nothing)
   let tree = null, then = null;
@@ -466,7 +633,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       let entries = "";
       try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
       tree = new Map();
-      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000) blob [0-9a-f]+\t(.*)$/su.exec(e); if (m && !m[2].startsWith("core/")) tree.set(m[2], { mode: m[1] }); }
+      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith("core/")) tree.set(m[3], { mode: m[1], id: m[2] }); }
     }
     return tree;
   };
@@ -475,7 +642,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   const baseFile = (file, follow = true) => {
     for (let f = file, hops = 0; hops < 40; hops++) {
       const entry = baseTree().get(f);
-      if (!entry || entry.mode !== "120000") return entry ? f : null;
+      if (!entry || entry.mode === "160000") return null;
+      if (entry.mode !== "120000") return f;
       const to = follow ? bytesAt(f)?.toString("utf8") : null;
       if (!to || to.startsWith("/") || /^[A-Za-z]:/u.test(to)) return null;
       f = posix.normalize(posix.join(posix.dirname(f), to));
@@ -485,7 +653,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   };
   const baseBytes = (file) => { const f = baseFile(file); return f === null ? null : bytesAt(f); };
   const broughtThen = (f) => {
-    if (!then) then = importsOf([...baseTree().keys()], baseBytes).brought;
+    // (the base's own projects read by what they are: each of today's that the base held as a project too)
+    if (!then) then = importsOf([...baseTree().keys()], baseBytes, [...byContent].filter((g) => { const b = baseTree().has(g) ? baseBytes(g) : null; return b !== null && projectRooted(markedText(b)); })).brought;
     return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
   // (whether a file stands as the base held it, byte for byte, as MSBuild reads it: as the base's blob, save the line
@@ -494,7 +663,17 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // .gitattributes could point a filter at a file to make other bytes read as the base's)
   const lf = (bytes) => Buffer.from(bytes.toString("latin1").replace(/\r\n/gu, "\n"), "latin1");
   const same = (f, follow = true) => {
-    const at = baseFile(f, follow), was = at === null ? null : bytesAt(at), here = readNow(f);
+    const here = readNow(f);
+    // (a path to no file of bytes, a link or a submodule, stands as the base held it where git holds the same entry at
+    // it as the base did)
+    if (here === NOT_A_FILE) {
+      const was = baseTree().get(f);
+      if (!was) return false;
+      let entry = "";
+      try { entry = execFileSync("git", ["--literal-pathspecs", "ls-files", "-s", "-z", "--", f], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return false; }
+      return entry.split("\0").some((e) => e.endsWith(`\t${f}`) && e.startsWith(`${was.mode} ${was.id} `));
+    }
+    const at = baseFile(f, follow), was = at === null ? null : bytesAt(at);
     if (was === null || here === null) return false;
     if (was.equals(here) || lf(was).equals(lf(here))) return true;
     let out;
@@ -502,7 +681,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     return out.equals(here) || lf(out).equals(lf(here));
   };
   for (const [f, text] of now.files) {
-    const found = now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
+    const found = now.unreadable.get(f) === "not a file" ? ["is no file of bytes (a link to a device, a folder or a pipe): this check reads none, so what MSBuild would make of it is unseen: make it a file, or remove it"]
+      : now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
       /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read",
       /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read",
       /TreatAsLocalProperty/iu.test(text) && "names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them",
@@ -512,13 +692,13 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     // what it names is reported; one a pull request brings into play with a project file of its own is not held)
     // (a file not plain UTF-8 the check reads only lately too: as the base held it, reported)
     const held = now.brought.has(f) ? !base || (same(f) && broughtThen(f))
-      : /\.user$/iu.test(f) ? !base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, "")))
-      : now.unreadable.has(f) && (!base || same(f));
-    const named = now.brought.has(f) ? `${f}, which an Import brings in,` : f;
+      : /\.user$/iu.test(f) && BUILD_FILE.test(f) ? !base || (same(f, false) && fileAt(root, base, f.replace(/\.user$/iu, "")))
+      : (now.unreadable.has(f) || byContent.has(f)) && (!base || same(f));
+    const named = now.brought.has(f) ? `${f}, which a build file brings in,` : f;
     for (const what of found) (held ? reports : failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
   }
   for (const f of now.typed) reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
-  for (const { from, project, why } of now.unread) reports.push(`${from} imports ${project}, ${why}: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
+  for (const { from, project, via, why } of now.unread) reports.push(`${from} ${via ? `brings in ${project} by ${via}` : `imports ${project}`}, ${why}: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
   for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
   // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
   // one git knows, and none is a link that leads elsewhere)
@@ -548,8 +728,20 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   // (a lock file as the base held it, and listed by the base's config, so this check read it there: two content hashes
   // it already named are reported; one a pull request lists for the first time is not held)
   const asBase = (f, text) => !base || (listedThen.includes(f) && textAt(root, base, f) === text);
+  // (a lock file or a tools manifest is read only where it is a file of bytes: a device would never end)
+  const lockTexts = new Map();
+  const textOf = (f) => {
+    if (!lockTexts.has(f)) {
+      const bytes = readProject(root, f);
+      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe): this check reads none: make it a file`);
+      lockTexts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
+    }
+    return lockTexts.get(f);
+  };
   for (const f of listed.filter((l) => locks.has(l))) {
-    const text = readFileSync(join(root, f), "utf8"), read = lockPackages(text, f);
+    const text = textOf(f);
+    if (text === null) continue;
+    const read = lockPackages(text, f);
     failures.push(...read.failures);
     if (asBase(f, text)) reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
@@ -557,7 +749,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       // (the entry kept is the one kept before this was said, so the file read is the one read then)
       if (was && was.contentHash !== p.contentHash) {
         const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
-        if (asBase(f, text) && asBase(was.lock, readFileSync(join(root, was.lock), "utf8"))) reports.push(`${x} ${heldBefore}`); else failures.push(x);
+        if (asBase(f, text) && asBase(was.lock, textOf(was.lock))) reports.push(`${x} ${heldBefore}`); else failures.push(x);
       }
       if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
     }
@@ -568,7 +760,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   const toolsRead = new Set();
   for (const f of own.filter((t) => posix.basename(t).toLowerCase() === "dotnet-tools.json")) {
     let manifest = {};
-    const text = readFileSync(join(root, f), "utf8");
+    const text = textOf(f);
+    if (text === null) continue;
     try { manifest = JSON.parse(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
     if (!fetched) {
       for (const [id, entry] of Object.entries(manifest?.tools ?? {})) if (typeof entry?.version === "string") toolsRead.add(key(id, entry.version));
@@ -590,7 +783,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   }
   let entries = [];
   if (config.audit) {
-    entries = JSON.parse(readFileSync(join(root, config.audit), "utf8")).entries;
+    const bytes = readProject(root, config.audit);
+    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe): make it a file`);
+    entries = JSON.parse(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries;
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list`);
   }
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)
@@ -679,7 +874,10 @@ if (started(import.meta.url)) {
   }
   if (args.includes("--imports")) {
     let files;
-    try { const { root, tracked } = project(); files = [...importsOf(tracked.filter((f) => !f.startsWith("core/")), (f) => { try { return readFileSync(join(root, f)); } catch { return null; } }).brought.keys()]; } catch (e) { fail(e.message); }
+    try {
+      const { root, tracked } = project(), own = tracked.filter((f) => !f.startsWith("core/")), byContent = projectFilesByContent(root, own);
+      files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
+    } catch (e) { fail(e.message); }
     const odd = files.filter((f) => shown(f) !== f);
     if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}`);
     for (const f of files) console.log(f);
@@ -695,6 +893,8 @@ if (started(import.meta.url)) {
     process.exit(0);
   }
   if (!configPath || !packagesDir) fail("name the config and the restore's folder: node core/scripts/nuget.mjs <config> --packages <folder> [--advisory]");
+  // (the config is read only where it is a file of bytes: a device would never end)
+  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe): make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
     const config = loadConfig(configPath), { root, tracked } = project();
