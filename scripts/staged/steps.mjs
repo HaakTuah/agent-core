@@ -59,7 +59,6 @@ export const PLANTED = {
   "12 November 2026, who reviews": dir => lacks(dir, "AGENTS.md", RULES.reviewers),
   "12 November 2026, the core has moved": dir => anyBranch(dir, b => workflows(dir, b).includes("look.yml")),
   "12 November 2026, differences": dir => lacks(dir, "AGENTS.md", RULES.replaces),
-  "12 November 2026, a sync and the project's own suites": dir => anyBranch(dir, b => { const t = show(dir, b, ".github/workflows/tests.yml") ?? ""; return /paths:/.test(t) && !/core\/\*\*/.test(t); }),
   "12 November 2026, the way work is handed over": dir => lacks(dir, "AGENTS.md", RULES.handed),
   "12 November 2026, a feature may wait for a later stage": dir => lacks(dir, "core-manifest.md", DIFFERENCE),
   "13 November 2026, a security review where the change needs one": dir => lacks(dir, "AGENTS.md", RULES.security),
