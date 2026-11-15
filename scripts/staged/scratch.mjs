@@ -110,16 +110,16 @@ export const originGit = (dir, ...args) => viewGit(dir, "origin", ...args);
 
 // The program every case's project holds: a sum with a bug in it (it leaves out the last number), and its test.
 export const PROGRAM = {
-  "package.json": `${JSON.stringify({ name: "scratch", version: "0.1.0", private: true, type: "module", scripts: { test: "node test/sum-test.mjs" } }, null, 2)}\n`,
+  "package.json": `${JSON.stringify({ name: "scratch", version: "0.1.0", private: true, type: "module", scripts: { test: "node test/sum.test.mjs" } }, null, 2)}\n`,
   "src/sum.mjs": "// The sum of the numbers given.\nexport function sum(numbers) {\n  let total = 0;\n  for (let i = 0; i < numbers.length - 1; i++) total += numbers[i];\n  return total;\n}\n",
   "src/cli.mjs": "// Prints the sum of the numbers on the command line: node src/cli.mjs 1 2 3\nimport { sum } from \"./sum.mjs\";\nconsole.log(sum(process.argv.slice(2).map(Number)));\n",
-  "test/sum-test.mjs": "import assert from \"node:assert/strict\";\nimport { sum } from \"../src/sum.mjs\";\nassert.equal(sum([]), 0);\nassert.equal(sum([2]), 2);\nassert.equal(sum([1, 2, 3]), 6);\nconsole.log(\"ok sum\");\n",
+  "test/sum.test.mjs": "import assert from \"node:assert/strict\";\nimport { sum } from \"../src/sum.mjs\";\nassert.equal(sum([]), 0);\nassert.equal(sum([2]), 2);\nassert.equal(sum([1, 2, 3]), 6);\nconsole.log(\"ok sum\");\n",
 };
 
 // What the starter kit leaves for the project to fill, filled for this one.
 const FILLS = [
   [/^FILL IN: what this project is.*$/m, "scratch: a small command-line tool that prints the sum of the numbers it is given. Node, no dependencies; its owner and a few friends use it."],
-  [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum-test.mjs`) and prints \"ok sum\"; nothing to build."],
+  [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum.test.mjs`) and prints \"ok sum\"; nothing to build."],
   [/^1\. FILL IN: the first task.*$/m, "1. #1, builder: sum() leaves out the last number."],
   [/^( *)FILL IN: who may change the protected files.*$/m, "$1Claude's builder sessions, as the floor has them."],
   [/^( *)FILL IN: each input anyone but the user at hand can shape.*$/m, "$1None: it reads only its own command line."],

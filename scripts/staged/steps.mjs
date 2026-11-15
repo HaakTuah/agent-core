@@ -89,7 +89,7 @@ export function set(dir, opts = {}) {
   fs.rmSync(path.join(project, ".github", "workflows", "look.yml"), { force: true });
   fs.rmSync(path.join(project, "docs", "choices.md"), { force: true });
   write(".github/workflows/core-moved.yml", `name: core-moved\n\non:\n  schedule:\n    - cron: '41 5 * * *'\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\njobs:\n  core-moved:\n    permissions:\n      contents: read\n      issues: write\n    uses: ${CORE}/.github/workflows/core-moved.yml@${pin}\n`);
-  write(".github/workflows/tests.yml", "name: tests\n\non:\n  pull_request:\n    paths: ['src/**', 'test/**', 'package.json', 'core/**']\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - run: node test/sum-test.mjs\n");
+  write(".github/workflows/tests.yml", "name: tests\n\non:\n  pull_request:\n    paths: ['src/**', 'test/**', 'package.json', 'core/**']\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - run: node test/sum.test.mjs\n");
   git(project, "add", "-A");
   git(project, "commit", "-q", "-m", "The project's own setup");
   git(project, "push", "-q", "origin", "main");
