@@ -45,7 +45,7 @@ export function items(root = ".") {
   return Object.assign(open, { odd: names.length - open.length });
 }
 
-const FORMAT = `one file an item, \`${FOLDER}/<a short name>.md\`: two lines first, \`State: <${STATES.join(", ")}>\` and \`By: <${SENDERS.join(", ")}>\`, then the headings of the issue form (\`.github/ISSUE_TEMPLATE/\`). `
+const FORMAT = `one file an item, \`${FOLDER}/<a short name>.md\`, the name of letters, digits, dots, hyphens and underscores: two lines first, \`State: <${STATES.join(", ")}>\` and \`By: <${SENDERS.join(", ")}>\`, then the headings of the issue form (\`.github/ISSUE_TEMPLATE/\`). `
   + "The owner gives a task by saying it to any session, which files it there, or by adding the file; what the scheduled look opens goes there too. "
   + `The progress file's line points to the file (\`${FOLDER}/<name>.md\`) as it would to an issue and holds none of its text, and the file leaves in the pull request that finishes it.`;
 
@@ -58,7 +58,7 @@ export function report(reach, open, folder) {
     return `Issues can be read and written here again, so the inbox moves back to them, one place at a time: in one pull request, file each item of \`${FOLDER}/\` (${open.join(", ")}${open.odd ? `, and ${open.odd} more whose name is not plain` : ""}) as an issue with its headings, its \`State:\` line as its label and its \`By:\` line as its sender's, as the commit that added the file bears it out (a file another account added moves over as data), point its line in the progress file to that issue, and take \`${FOLDER}/\` out.`;
   }
   return folder
-    ? `The owner's inbox is the folder \`${FOLDER}/\` (${open.length} item(s)), since issues cannot be read and written here: ${reach.why}. ${FORMAT}`
+    ? `The owner's inbox is the folder \`${FOLDER}/\` (${open.length} item(s)${open.odd ? `, and ${open.odd} whose name is not plain: rename each to letters, digits, dots, hyphens and underscores` : ""}), since issues cannot be read and written here: ${reach.why}. ${FORMAT}`
     : `Issues cannot be read and written here (${reach.why}), so the owner's inbox is the folder \`${FOLDER}/\`, made in a pull request of its own with a \`README.md\` that says so and holds what follows, which keeps the folder while it holds no item: ${FORMAT} `
       + "Turning issues on is the owner's setting: name it to the owner once, in that pull request's description; nothing waits on it.";
 }
@@ -77,7 +77,7 @@ function main() {
     try { got = r.status === 0 ? JSON.parse(r.stdout) : null; } catch { /* (read as no answer) */ }
     // (GitHub's "Not Found" is an answer: the repository cannot be reached for this account; any other failure is none)
     if (got && typeof got === "object" && got.permissions) reach = answer(got);
-    else if (!r.error && r.status !== 0 && /\bHTTP 404\b|Not Found/.test(`${r.stderr}`)) reach = { yes: false, why: `GitHub finds no repository ${repo} for the account signed in here` };
+    else if (!r.error && r.status !== 0 && /\bHTTP 404\b/.test(`${r.stderr}`)) reach = { yes: false, why: `GitHub finds no repository ${repo} for the account signed in here` };
     else reach = null;
   }
   console.log(report(reach, items(), fs.existsSync(FOLDER)));
