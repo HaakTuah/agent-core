@@ -4,8 +4,8 @@
 // copies, which are removed over time and never added to. A listed window gone or in fewer places fails too, so the
 // baseline only shrinks. A copy may move (cut from one place, pasted in another), since its places do not grow: moving
 // is how a fact reaches its better home. Against the base the config holds too: the baseline stays at the base's path,
-// and every file the base's config read is read still, as the same kind, so the check never reads less (#348); a path
-// may be added. Node's own modules only, so the check needs no install. It runs from the
+// and every file the base's config, and the base's SECURITY.md where it is asked, would read in the tree as it stands is
+// read still, as the same kind (#348); a path may be added. (A file moved out of what any spec reads is not counted.) Node's own modules only, so the check needs no install. It runs from the
 // project's root, whatever the directory it is started from.
 //
 //   node core/scripts/copies.mjs <config>            the check
@@ -140,7 +140,11 @@ function find(files, units, size, joiner, minChars) {
 }
 
 // An empty list checks nothing: git ls-files would list every file.
-const ls = specs => specs.length ? execFileSync("git", ["ls-files", "-z", "--", ...specs], { encoding: "utf8" }).split("\0").filter(Boolean) : [];
+const ls = specs => {
+  if (!specs.length) return [];
+  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
+  catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${String(e.stderr || e.message).trim().split(/\r?\n/u)[0]}. Mend: write each in the config as a plain git pathspec, a path or a glob, with ":!" before one to leave it out`); }
+};
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
@@ -171,8 +175,9 @@ if (from) {
   try { git(["rev-parse", "--verify", `${from}^{commit}`]); } catch { console.error(`FAIL: COPIES_BASE ${from} is not a commit here. Mend: fetch it (git fetch origin ${from}) before the check runs`); process.exit(1); }
   // The config is held to the base's too, so that the check never reads less than it did there: the baseline stays
   // where the base keeps it (one moved would be held to nothing), and every file the base's config read is read still,
-  // as code or prose as it was (one left out would let its copies be dropped from the baseline). A config the base
-  // does not hold is the check's first on that branch, held to nothing. Any widening passes.
+  // as code or prose as it was, of the files the tree holds now (one left out would let its copies be dropped from the
+  // baseline). A config the base does not hold is the check's first on that branch, held to nothing. Any widening
+  // passes.
   let was = null;
   try { was = JSON.parse(git(["show", `${from}:${CONFIG_AT}`])); } catch { /* no config on that branch yet */ }
   if (was && typeof was === "object" && !Array.isArray(was)) {
@@ -180,7 +185,10 @@ if (from) {
     if (was.baseline !== BASELINE) fail(`${CONFIG_AT} moves the baseline from ${was.baseline} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
     const specs = v => Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : [];
     const lost = (kind, before, now) => { const keep = new Set(ls(now)); return ls(before).filter(f => !keep.has(f)).map(f => `${f} (${kind})`); };
-    const less = lost("code", specs(was.code), CODE_SPECS).concat(lost("prose", specs(was.prose).concat(was.proseFromSecurity === true ? security() : []), proseSpecs));
+    // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
+    let wasRules = [];
+    if (was.proseFromSecurity === true) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }); } catch { /* the base read none */ }
+    const less = lost("code", specs(was.code), CODE_SPECS).concat(lost("prose", specs(was.prose).concat(wasRules), proseSpecs));
     if (less.length) fail(`${CONFIG_AT} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
   }
   let there = true;

@@ -124,6 +124,19 @@ if (p.status === 0) {
   undo();
   ok(copy.status === 1 && /a new copy: .*\. Mend: keep it in the one place/.test(copy.stderr) && mended(copy.stderr) && noConfig.status === 1 && mended(noConfig.stderr),
     "a copy the project adds fails the copies check, as does a config it cannot read, each saying its mend", `${copy.stderr}${noConfig.stderr}`);
+  // (against the base, a rule file taken off SECURITY.md's list is held to the base's list, and a pathspec git cannot
+  // read fails with its mend, not git's own error)
+  const secAt = path.join(p.dir, "SECURITY.md"), secWas = fs.readFileSync(secAt, "utf8");
+  fs.writeFileSync(secAt, secWas.replace("**the rule files:** `docs/threat-model.md`;", "**the rule files:** `AGENTS.md`;"));
+  const offList = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env: { ...env, COPIES_BASE: "HEAD" }, encoding: "utf8" });
+  fs.writeFileSync(secAt, secWas);
+  const cfgP = path.join(p.dir, "checks/copies.json"), cfgPWas = fs.readFileSync(cfgP, "utf8");
+  fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), code: [":(bogus)x"] }));
+  const badSpec = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
+  fs.writeFileSync(cfgP, cfgPWas);
+  ok(secWas.includes("**the rule files:** `docs/threat-model.md`;") && offList.status === 1 && /files fewer than HEAD's config read: docs\/threat-model\.md \(prose\)/u.test(offList.stderr) && mended(offList.stderr)
+    && badSpec.status === 1 && /git cannot read the pathspecs :\(bogus\)x: .*\. Mend: write each in the config as a plain git pathspec/u.test(badSpec.stderr) && mended(badSpec.stderr),
+    "against the base, a rule file taken off SECURITY.md's list fails, and a pathspec git cannot read fails, each saying its mend", `${offList.stderr}${badSpec.stderr}`);
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
