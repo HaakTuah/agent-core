@@ -68,9 +68,10 @@ The floor's rules for particular work.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
 - **Secret scanning with push protection is switched on** in each repository that has it (core archive 226; floor rule
   1): in a public repository, where GitHub gives it free, a session whose sign-in may change the repository's settings
-  switches it on; otherwise the session names it to the owner in an issue labelled `needs-owner`, and the rest goes on.
-  - It does not mean a session switches on what may be billed (a private repository's, sold per committer; floor rule
-    14), nor that a repository without it waits or fails anything. Reason: GitHub then refuses a push holding a key of
+  switches it on; otherwise it files an issue for the owner, labelled `needs-owner`, naming the setting, and nothing
+  waits on it.
+  - Not meant: a session switching on what may be billed (a private repository's, sold per committer; floor rule 14),
+    or a repository without it waiting or failing anything. Reason: GitHub then refuses a push holding a key of
     a kind it knows, before it reaches the history, which no check on a pull request can.
 
 **10. Licences: free to use, kept that way** (core archive 41).
@@ -120,8 +121,8 @@ or a server of its own.
 - Nothing cryptographic is of the project's making: each algorithm, protocol and source of randomness for a secret
   comes from the platform or a well-known library.
 - A password is stored only through a function made for storing passwords, never a general hash or a cipher.
-- It does not mean a product with none of the three takes any of it: a single-player game in a browser needs no access
-  control. Reason: these are where the standard list of risks for web applications finds most breaks, and the floor
+- It does not mean a product with none of the three takes any of it: a page that runs alone in a browser, with no
+  sign-in and no server, needs no access control. Reason: these are where the standard list of risks for web applications finds most breaks, and the floor
   was silent on them.
 
 ## Reporting a weakness
