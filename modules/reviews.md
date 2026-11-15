@@ -59,5 +59,6 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
    update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
    - After three rounds, what is still open goes to escalation (`modules/roles.md`); a PR it cannot settle stays
      unmerged.
-7. **The fallback reviewer's brief:** the diff, the task's text, the *review reference*, the review guidelines (the
-   core's and the project's) and the project's `SECURITY.md` and threat model with the floor, and nothing else.
+7. **The fallback reviewer's brief,** written as `modules/helpers.md` says, hands it the diff, the task's text, the
+   *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
+   model with the floor, and nothing else.

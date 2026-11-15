@@ -2,8 +2,9 @@
 
 Read by the orchestrator (`modules/roles.md`) when it starts.
 
-- **It builds nothing itself** (core archive 27): every lane goes to a builder session of its own, with its own brief,
-  another provider's first (`modules/roles.md`), at the builder's model and effort.
+- **It builds nothing itself** (core archive 27): every lane goes to a builder session of its own, with its own brief
+  (`modules/helpers.md`, "A brief is written as a rule is"), another provider's first (`modules/roles.md`), at the
+  builder's model and effort.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn (core archive 200), on the owner's computer
