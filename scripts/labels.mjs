@@ -121,18 +121,50 @@ export const report = (found, repo) => found.length
     ...found.map(f => `- ${f.what}: ${f.items.join(", ")}.`)].join("\n")
   : `The labels and openers in ${repo}: every label of the list stands, each open issue has its state and sender, and each agent's item and comment since the rule came opens as the list says.`;
 
-function main(args) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
-  const at = args.indexOf("--since"), by = args.indexOf("--owner"), make = args.includes("--make");
-  // (the day the copy gained this file, as git's history here holds it: the core's own path, or a project's copy)
-  // (a shallow clone shows its oldest commits adding every file: an add found on one of them is not read, so there the
-  // rule's own day holds)
+// The day the rule came for the copy here, as git's history holds it: the day the copy gained this file (the core's own
+// path, or a project's copy), never before SINCE. A shallow clone shows its oldest commits adding every file: an add
+// found on one of them is not read, so there the rule's own day holds.
+export function sinceHere() {
   const out = (...a) => String(spawnSync("git", a, { encoding: "utf8" }).stdout ?? "").trim();
   let bounds = "";
   try { bounds = fs.readFileSync(out("rev-parse", "--git-path", "shallow"), "utf8"); } catch { /* (not shallow) */ }
-  const added = out("log", "--diff-filter=A", "--format=%H %cI", "--", "core/scripts/labels.mjs", "scripts/labels.mjs").split("\n")
-    .filter(l => l && !bounds.includes(l.split(" ")[0])).map(l => l.split(" ")[1]).join("\n");
-  const since = at >= 0 ? args[at + 1] : cameOn(added);
+  return cameOn(out("log", "--diff-filter=A", "--format=%H %cI", "--", "core/scripts/labels.mjs", "scripts/labels.mjs").split("\n")
+    .filter(l => l && !bounds.includes(l.split(" ")[0])).map(l => l.split(" ")[1]).join("\n"));
+}
+
+// gh's api, as this check calls it: the output, or an Error with gh's words where it fails.
+export const ghApi = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 28 }); if (r.status !== 0) throw new Error(`${r.stderr ?? r.error}`.trim()); return r.stdout; };
+
+// Every row of a list GitHub gives page by page, through `gh` (ghApi's form).
+export function pagesOf(route, gh = ghApi) {
+  const rows = [];
+  for (let page = 1; page <= 500; page++) {
+    const got = JSON.parse(gh(`${route}${route.includes("?") ? "&" : "?"}per_page=100&page=${page}`) || "[]");
+    if (!Array.isArray(got)) throw new Error(`GitHub gave no list for ${route}`);
+    rows.push(...got);
+    if (got.length < 100) break;
+  }
+  return rows;
+}
+
+// What the check reads of `repo` through `gh` (ghApi's form), page by page, since a cloud session's gh cannot follow
+// pages by itself: the repository's labels (`have`), its open issues, the comments since `since` on its open issues and
+// pull requests, and every comment of each queued or marked issue (`notes`). Also read by the scheduled look (look.mjs).
+export function gather(repo, since, gh = ghApi) {
+  const pages = route => pagesOf(route, gh);
+  const have = pages(`repos/${repo}/labels`);
+  const open = pages(`repos/${repo}/issues?state=open`);
+  const issues = open.filter(i => !i.pull_request);
+  const numbers = new Set(open.map(i => i.number));
+  const comments = pages(`repos/${repo}/issues/comments?since=${since}`).map(c => ({ ...c, issue: Number(String(c.issue_url).split("/").at(-1)) })).filter(c => numbers.has(c.issue));
+  const notes = new Map(issues.filter(i => (i.labels ?? []).some(l => l.name === "queued" || l.name === "stand-in-yes")).map(i => [i.number, pages(`repos/${repo}/issues/${i.number}/comments`)]));
+  return { have, issues, comments, notes };
+}
+
+function main(args) {
+  const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
+  const at = args.indexOf("--since"), by = args.indexOf("--owner"), make = args.includes("--make");
+  const since = at >= 0 ? args[at + 1] : sinceHere();
   if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return fail("--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z");
   if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return fail("--owner needs the owner's account after it");
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
@@ -142,39 +174,22 @@ function main(args) {
   let manifest = "";
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core itself, or no manifest yet) */ }
   const owner = by >= 0 ? args[by + 1] : ownerOf(manifest) ?? repo.split("/")[0];
-  const gh = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 28 }); if (r.status !== 0) throw new Error(`${r.stderr ?? r.error}`.trim()); return r.stdout; };
-  // (page by page: a cloud session's gh cannot follow pages by itself)
-  const pages = route => {
-    const rows = [];
-    for (let page = 1; page <= 500; page++) {
-      const got = JSON.parse(gh(`${route}${route.includes("?") ? "&" : "?"}per_page=100&page=${page}`) || "[]");
-      if (!Array.isArray(got)) throw new Error(`GitHub gave no list for ${route}`);
-      rows.push(...got);
-      if (got.length < 100) break;
-    }
-    return rows;
-  };
   try {
-    const have = pages(`repos/${repo}/labels`);
     if (make) {
+      const have = pagesOf(`repos/${repo}/labels`);
       const todo = toMake(have);
       // (a label set anew is named with what it was before it is set, so a project that used the name otherwise can
       // restore it, even where a later call fails)
       const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
       for (const l of todo) {
         if (l.how === "set") console.log(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
-        if (l.how === "make") gh("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
-        else gh("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+        if (l.how === "make") ghApi("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+        else ghApi("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
       }
       console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
       return 0;
     }
-    const open = pages(`repos/${repo}/issues?state=open`);
-    const issues = open.filter(i => !i.pull_request);
-    const numbers = new Set(open.map(i => i.number));
-    const comments = pages(`repos/${repo}/issues/comments?since=${since}`).map(c => ({ ...c, issue: Number(String(c.issue_url).split("/").at(-1)) })).filter(c => numbers.has(c.issue));
-    const notes = new Map(issues.filter(i => (i.labels ?? []).some(l => l.name === "queued" || l.name === "stand-in-yes")).map(i => [i.number, pages(`repos/${repo}/issues/${i.number}/comments`)]));
-    console.log(report(check({ issues, comments, notes, owner, have, since }), repo));
+    console.log(report(check({ ...gather(repo, since), owner, since }), repo));
   } catch (e) {
     // (gh's own words are not printed: they may name a path of the machine, and this goes into a sync PR's description)
     if (/\bHTTP 410\b/.test(String(e.message))) { console.log(`The labels and openers in ${repo} were not read: its issues are switched off, so the inbox's files carry state and sender as two lines (core/scripts/inbox.mjs).`); return 0; }

@@ -88,6 +88,9 @@ jobs:
       - name: The stalled lanes
         if: ${{ !cancelled() }}
         run: node scripts/stalled-test.mjs
+      - name: The scheduled look and its state report
+        if: ${{ !cancelled() }}
+        run: node scripts/look-test.mjs
       - name: The description check
         if: ${{ !cancelled() }}
         run: node scripts/pr-description-test.mjs

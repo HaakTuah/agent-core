@@ -1,0 +1,38 @@
+# The scheduled look on this repository itself (AGENTS.md, "The core abides by its own rules"): the same script the
+# projects run from their copy (scripts/look.mjs), here from its source, once a day, with its monthly state report.
+# This repository only; no project calls it. Nothing is checked out but the default branch, and no text of a pull
+# request or an issue reaches a command: the script reads them through gh's answers alone. It may write issues, and
+# read pull requests, checks and statuses; nothing else.
+name: own-look
+
+on:
+  schedule:
+    - cron: '17 4 * * *' # (04:17 UTC, every day)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  own-look:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      checks: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }} # main's own state, whatever branch a manual start names
+          persist-credentials: false # gh below takes its token from GH_TOKEN, nothing from the checkout
+          fetch-depth: 0 # the day labels.mjs came, which the labels' check reads from git's history
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version # the one exact Node ("Node" in the core's modules/updates.md)
+      - name: The scheduled look
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/look.mjs
