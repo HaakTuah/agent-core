@@ -31,7 +31,8 @@
 # file, the licence check's config and its audit, a folder the config names as a source, the core's Node version and the
 # calling workflow; and, where none changed, NuGet's own word that every lock file still holds what its project asks
 # for, however it asks (an import, a property, any file a build reads), from a restore against an empty source that
-# downloads nothing. It passes without a restore only where both say so. Any doubt runs it: no base, a base that cannot
+# downloads nothing, under a NuGet config of its own, so that a project's mapping of packages to sources has no say
+# there. It passes without a restore only where both say so. Any doubt runs it: no base, a base that cannot
 # be fetched, a config or Imports that cannot be read, a listed file that is a link, an error of the restore's other
 # than a locked package not found, or a package downloaded beside a lock file, save the SDK's own reference packs
 # (Microsoft.NETCore.App.Ref, Microsoft.WindowsDesktop.App.Ref and Microsoft.AspNetCore.App.Ref), which it adds by
@@ -95,17 +96,22 @@ jobs:
           # package of the project's, and the same for every project on the runner's SDK)
           PACKS='Microsoft\.(NETCore|WindowsDesktop|AspNetCore)\.App\.Ref'
           holds() {
-            local empty stamp project out codes id projects locks records
+            local empty config stamp project out codes id projects locks records
             # (from here the pull request's build files have run in this job: the licence read before the restore is
             # left out, since nothing it reads changed from the base)
             echo "built=true" >> "$GITHUB_OUTPUT"
             empty=$(mktemp -d) stamp=$(mktemp)
+            # (a NuGet config of its own and nothing else, so that no NuGet.Config of the project's has a say: one that
+            # maps packages to their sources maps none to the empty source, and NuGet would name that, not a package
+            # not found; #380)
+            config="$empty.config"
+            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<configuration />' > "$config"
             mapfile -d '' -t projects < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/*.csproj' \
               ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(exclude)core/**')
             mapfile -d '' -t locks < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/packages.lock.json' \
               ':(glob,icase)**/packages.*.lock.json' ':(exclude)core/**')
             for project in "${projects[@]}"; do
-              out=$(dotnet restore --locked-mode --source "$empty" "-p:RestorePackagesPath=$NUGET_PACKAGES" \
+              out=$(dotnet restore --locked-mode --configfile "$config" --source "$empty" "-p:RestorePackagesPath=$NUGET_PACKAGES" \
                 -p:NuGetLockFilePath= "./$project" < /dev/null 2>&1) && continue
               codes=$(printf '%s\n' "$out" | grep -oE 'error [A-Z]+[0-9]+' | sort -u)
               [ -n "$codes" ] || { echo "$project: the restore failed with no error NuGet names"; return 1; }
