@@ -4,6 +4,7 @@
 //
 //   node scripts/core-cost-test.mjs
 import { EVERY, REPO, classify, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "./core-cost.mjs";
+import { CORE } from "./core-address.mjs";
 import { line } from "./session-cost.mjs";
 
 let failed = 0, count = 0;
@@ -15,7 +16,7 @@ ok(classify("x", ["core-manifest.md", ".github/workflows/core.yml"], rules) === 
 ok(classify("x", ["core/a.md", "AGENTS.md"], rules) === "upkeep" && classify("x", [".claude/settings.json", ".github/dependabot.yml", "docs/threat-model.md"], rules) === "upkeep", "the copy with a rule file, or settings, Dependabot's config and a rule file: upkeep");
 ok(classify("x", ["core/a.md", "src/game.js"], rules) === "own" && classify("x", ["docs/design.md"], rules) === "own" && classify("x", ["corerules.md"], rules) === "own" && classify("x", [".github-notes.md"], rules) === "own", "anything of the project's own makes it the project's own work, and a name that only begins like a folder's is not in it");
 ok(classify("dependabot/npm_and_yarn/tools/x-1.2.3", ["tools/package-lock.json"], rules) === "update" && classify("x/dependabot/y", ["tools/package-lock.json"], rules) === "own", "a branch of Dependabot's own is an update");
-ok(rulesFor("HaakTuah/agent-core", () => { throw new Error("read"); }) === EVERY && classify("x", ["scripts/a.mjs", "modules/b.md"], EVERY) === "upkeep" && classify("x", ["scripts/a.mjs"], EVERY, true) === "upkeep"
+ok(rulesFor(CORE, () => { throw new Error("read"); }) === EVERY && classify("x", ["scripts/a.mjs", "modules/b.md"], EVERY) === "upkeep" && classify("x", ["scripts/a.mjs"], EVERY, true) === "upkeep"
   && rulesFor("some-one/x", () => rules) === rules, "in the core's own repository every file is a rule file, and nowhere else is the list read from its own SECURITY.md");
 ok(classify("x", [], rules) === "own", "a merge that changed nothing is not counted as the core's");
 ok(classify("dependabot/npm_and_yarn/x-1.2.3", ["tools/package-lock.json"], rules, false) === "own" && classify("dependabot/x", ["core/a.md", "core-manifest.md"], rules, false) === "sync", "a fork's branch of that name is no update of Dependabot's: it counts by what it changed");
