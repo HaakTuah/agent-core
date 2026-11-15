@@ -107,38 +107,69 @@ export function lowered(listed, found) {
   return out;
 }
 
-// The base a pull request merges into, as SCREENS_BASE names it: { name, listed (its baseline's, or null) }, or null.
-function baseOf(file) {
+// A path of the project's own, relative and inside it, read through no link (floor rule 13), or refused with its mend.
+const inside = (file, what) => {
+  if (path.isAbsolute(file) || file.split(/[\\/]/u).includes("..")) refuse(`${what} ${file} is not inside the project`, `give a path relative to the project's root with no "..": the check reads nothing outside it`);
+  return notLinked(file);
+};
+
+// The base a pull request merges into, as SCREENS_BASE names it: { name, show: file => its text there or null }, or
+// null where none is named.
+function baseOf() {
   const name = process.env.SCREENS_BASE || "";
   if (!name) return null;
   if (!/^\w[\w./^~-]*$/u.test(name)) refuse(`SCREENS_BASE (${JSON.stringify(name).slice(0, 80)}) is no plain name of a commit or branch`, "set it to the pull request's base, such as origin/main");
-  const text = tolerant(() => execFileSync("git", ["-c", "core.fsmonitor=false", "show", `${name}:${file}`], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }));
-  return { name, listed: text === null ? null : tolerant(() => parseBaseline(text, `${name}:${file}`, "").listed) };
+  const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] });
+  try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); } catch { refuse(`${name} is not a commit here`, `fetch it (git fetch origin ${name.replace(/^origin\//u, "")}), or set SCREENS_BASE to the pull request's base`); }
+  return { name, show: file => tolerant(() => git(["show", `${name}:${file}`])) };
+}
+
+// What the base's baseline listed, read where the base's own config put it: null only where the base had no config
+// (the pull request turns the checks on, and writes the first baseline); an empty list where its baseline is gone.
+function baseListed(base, at) {
+  const text = base.show(at);
+  if (text === null) return null;
+  const was = tolerant(() => parseConfig(text, `${base.name}:${at}`));
+  const listed = was && tolerant(() => parseBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, "").listed);
+  return listed ?? new Map();
+}
+
+function first(config, at, self, found) {
+  if (fs.existsSync(inside(config.baseline, "the baseline"))) refuse(`${config.baseline} stands already`, `lower it with node ${self} <found> ${at} --write instead`);
+  fs.mkdirSync(path.dirname(config.baseline), { recursive: true });
+  fs.writeFileSync(inside(config.baseline, "the baseline"), written(found.found, {}));
+  console.log(`${config.baseline}: ${plural(found.found.size, "entry", "entries")} listed, the first baseline`);
+  return 0;
 }
 
 function run(config, at, self, found, command) {
-  const has = fs.existsSync(notLinked(config.baseline));
+  if (command === "--first") return first(config, at, self, found);
+  if (!fs.existsSync(inside(config.baseline, "the baseline"))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} <found> ${at} --first, and commit it`);
   const restore = `take it back as the base holds it, or write it again with node ${self} <found> ${at} --first, in a pull request the reviews read`;
-  if (command === "--first") {
-    if (has) refuse(`${config.baseline} stands already`, `lower it with node ${self} <found> ${at} --write instead`);
-    fs.writeFileSync(config.baseline, written(found.found, {}));
-    return console.log(`${config.baseline}: ${plural(found.found.size, "entry", "entries")} listed, the first baseline`), 0;
-  }
-  if (!has) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} <found> ${at} --first, and commit it`);
   const baseline = parseBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, restore);
   if (command === "--write") {
     const kept = lowered(baseline.listed, found);
     fs.writeFileSync(config.baseline, written(kept, baseline.grown));
     return console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} listed, ${baseline.listed.size} before`), 0;
   }
-  const base = baseOf(config.baseline);
-  const v = verdict({ config, at, self, found, baseline, base });
+  const b = baseOf(), listed = b && baseListed(b, at);
+  const v = verdict({ config, at, self, found, baseline, base: b && { name: b.name, listed } });
   for (const line of v.said) console.log(line);
   if (found.off) console.log(`note ${plural(found.off, "finding")} of checks the config leaves off, not read`);
-  if (!base) console.log("note no base to compare with (set SCREENS_BASE to the branch the work started from), so the baseline was not checked for what joined it");
+  if (!b) console.log("note no base to compare with (set SCREENS_BASE to the branch the work started from), so the baseline was not checked for what joined it");
+  else if (listed === null) console.log(`note ${b.name} had no config at ${at}: this pull request turns the checks on, and its baseline is the first`);
   for (const line of v.fail) console.error(line);
   if (v.fail.length) return 1;
   console.log(`ok   nothing new that binds on ${plural(found.screens.size, "screen")}; ${plural(v.listed, "old finding")} listed in ${config.baseline}`);
+  return 0;
+}
+
+// Where no config stands: every check is off, unless the base held one, which no pull request takes out.
+function off(at, named) {
+  if (named) refuse(`there is no config at ${at}`, `write it as core/modules/screens.md, "What holds it", says, or run with no config named`);
+  const b = baseOf();
+  if (b?.show(at) != null) refuse(`${at} is gone, and ${b.name} holds it: no pull request takes the screen checks' config out`, `take it back as ${b.name} holds it (git checkout ${b.name} -- ${at})`);
+  console.log(`ok   no screen check is on here (${at} does not stand): each is off until the project names it`);
   return 0;
 }
 
@@ -148,12 +179,9 @@ function main(argv) {
   const args = command ? argv.slice(0, -1) : argv;
   if (args.length < 1 || args.length > 2 || args.some(a => a.startsWith("--"))) refuse(`the check does not know ${argv.join(" ") || "a run with no file of findings"}`, `run node ${self} <found> [<config>] [--first | --write]`);
   const at = args[1] ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
-  if (!fs.existsSync(notLinked(at))) {
-    if (args[1]) refuse(`there is no config at ${at}`, `write it as core/modules/screens.md, "What holds it", says, or run with no config named`);
-    return console.log(`ok   no screen check is on here (${at} does not stand): each is off until the project names it`), 0;
-  }
+  if (!fs.existsSync(inside(at, "the config"))) return off(at, args[1]);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
-  if (!fs.existsSync(args[0])) refuse(`there is no file of findings at ${args[0]}`, "run the project's tool first, which writes it");
+  if (!fs.existsSync(inside(args[0], "the file of findings"))) refuse(`there is no file of findings at ${args[0]}`, "run the project's tool first, which writes it inside the project");
   return run(config, at, self, parseFound(fs.readFileSync(args[0], "utf8"), args[0], config), command);
 }
 

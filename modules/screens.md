@@ -56,7 +56,8 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
 8. **Every control has its states** (focus that can be seen, pressed, disabled), and can be reached by touch and by
    keyboard where the platform has them. By keyboard: every task can be done without a pointer, the Tab key moves in
    the order of the eye, focus starts on the likeliest action and never on a destructive one, and the platform's
-   standard shortcuts are kept. Reason: a control with no visible focus or no way by keyboard leaves users out and hides
+   standard shortcuts are kept. It does not mean a touch target on a device with no touch, or a pointer's way to what
+   the keyboard alone reaches. Reason: a control with no visible focus or no way by keyboard leaves users out and hides
    where they are. Held by the rendered check for targets, the pictures for the states and the walk by the Tab key.
 9. **An accessibility floor, in numbers:** contrast of 4.5:1 for text, and 3:1 for large text and for controls; a
    target of at least 24 pixels, and 44 where touch is the main input; body text of at least 16 pixels, which scales;
@@ -104,7 +105,10 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     reduced motion on, with the picture script the *screen checks* name, or, where they name none, with the tool it has
     and the same list. The list is the script's, never the builder's own choice of what to look at. At each size it also
     walks one whole task from start to finish, never one screen alone. It reads the pictures, mends what it sees, and
-    says in the pull request what it saw and mended. Reason: a builder that reads only the diff sends the owner
+    says in the pull request what it saw and mended. It does not mean a picture of a screen the change does not touch,
+    nor that a pull request waits where its session cannot render the screen at all (a desktop window of another
+    platform): it says so and why, and files an issue for the tool, labelled `needs-owner` where only the owner can
+    provide it, and the critique reads what there is. Reason: a builder that reads only the diff sends the owner
     mistakes it could see for itself. Held by the pictures, a missing one failing where that check is on, and the
     critique, which has the pictures or finds them missing.
 

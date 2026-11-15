@@ -27,9 +27,8 @@ is any move, rule or power a player can choose to use.
 - **No rule untaught** (core archive 84 and 90).
   - Every rule a player needs is in *where rules are taught*, added or changed in the same change as the rule.
   - When a rule acts on a player, the game shows it where and when that player could know it.
-  - What the game shows is true, its past shows its age (a last-known position, an old report), and a player's mistake
-    is sorted by what a careful player could have known, as `modules/screens.md` says of any screen (point 13; core
-    archive 112 and 114); a player may still lie.
+  - Whatever the game shows, a last-known position or an old report among it, and every mistake a player makes in
+    testing, are held to `modules/screens.md`, point 13 (core archive 112 and 114); a player may still lie.
 - **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule.

@@ -1,7 +1,8 @@
 // Tests the screen checks' baseline (screens.mjs, beside this file): the config and the findings it refuses, what is
 // new against the baseline and what a listed entry covers, a check that reports against one that binds, the baseline
 // lowered only on the screens run, and whole runs in a scratch repository: no config, the first baseline, a new
-// finding failing with its mend, and an entry that joins the baseline against the base. Each failure is read for its
+// finding failing with its mend, an entry that joins the baseline against the base, a base that is no commit, a
+// baseline moved, a config taken out, and a path outside the project. Each failure is read for its
 // mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/screens-test.mjs
@@ -72,6 +73,11 @@ try {
   fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
   r = run(["found.json"]);
   ok(r.code === 1 && mended(r.out), "a config with no baseline fails, with its mend", r.out);
+  fs.writeFileSync(path.join(dir, "checks/screens.json"), JSON.stringify({ baseline: "checks/screens/baseline.json", checks: { values: "binds" } }));
+  r = run(["found.json", "--first"]);
+  ok(r.code === 0 && fs.existsSync(path.join(dir, "checks/screens/baseline.json")), "--first makes the baseline's folder where it is missing", r.out);
+  fs.rmSync(path.join(dir, "checks/screens"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
   r = run(["found.json", "--first"]);
   ok(r.code === 0 && fs.existsSync(path.join(dir, "checks/screens-baseline.json")), "--first writes the first baseline", r.out);
   r = run(["found.json"]);
@@ -83,6 +89,18 @@ try {
   fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
   r = run(["found.json"], { SCREENS_BASE: "main" });
   ok(r.code === 1 && mended(r.out) && r.out.includes("only shrinks"), "a finding put in the baseline by hand fails against the base, with its mend", r.out);
+  r = run(["found.json"], { SCREENS_BASE: "origin/nowhere" });
+  ok(r.code === 1 && mended(r.out) && r.out.includes("is not a commit"), "a base that is no commit here fails, with its mend, never skipping the comparison", r.out);
+  fs.renameSync(path.join(dir, "checks/screens-baseline.json"), path.join(dir, "checks/moved.json"));
+  fs.writeFileSync(path.join(dir, "checks/screens.json"), JSON.stringify({ baseline: "checks/moved.json", checks: { values: "binds" } }));
+  r = run(["found.json"], { SCREENS_BASE: "main" });
+  ok(r.code === 1 && r.out.includes("only shrinks"), "a baseline moved to a new path is still read against the base's own", r.out);
+  fs.rmSync(path.join(dir, "checks/screens.json"));
+  r = run(["found.json"], { SCREENS_BASE: "main" });
+  ok(r.code === 1 && mended(r.out) && r.out.includes("is gone"), "a config the base holds may not be taken out, with its mend", r.out);
+  fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
+  r = run(["../found.json"]);
+  ok(r.code === 1 && mended(r.out) && r.out.includes("not inside the project"), "a config or file of findings outside the project is refused, with its mend", r.out);
   r = run(["found.json", "--bogus"]);
   ok(r.code === 1 && mended(r.out), "an unknown argument fails, with its mend", r.out);
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
