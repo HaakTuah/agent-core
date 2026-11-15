@@ -218,10 +218,17 @@ export const STEPS = [
       let config = null;
       try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
       const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
-      const wrong = [...head.problems, ...toolsCheck(head.tools, list, kitHooks(), file).problems];
-      return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, or take out what nobody meant to configure: ${wrong.join("; ")}` : null;
-    },
-    partly: "that the licence check runs the agent-tools check is held where the project calls the core's `licences.yml`" },
+      const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...toolsCheck(head.tools, list, kitHooks(), file).problems];
+      // (the core's licences.yml runs the check itself; a project that runs the licence script from a workflow of its
+      // own runs it beside it, as of exact versions)
+      let own = [];
+      if (!calls(p, "licences.yml").length) {
+        readable(p, text => text.includes("licences.mjs"));
+        own = Object.entries(p.workflows).filter(([, w]) => /core\/scripts\/licences\.mjs/.test(w.text ?? ""));
+      }
+      if (own.length && !own.some(([, w]) => /core\/scripts\/agent-tools\.mjs/.test(w.text ?? ""))) wrong.push(`the workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/agent-tools.mjs <its config>\` beside it, as the core's \`licences.yml\` does`);
+      return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
+    } },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

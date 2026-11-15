@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed } from "./agent-tools.mjs";
 import { mended } from "./mend.mjs";
+import { STEPS, notDone } from "./steps.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./agent-tools.mjs", import.meta.url));
 const KIT = fs.readFileSync(fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url)), "utf8");
@@ -91,16 +92,39 @@ fails(run(project({ ...listing({ kind: "extension", name: "x", publisher: "y", v
 fails(run(project({ "checks/licences.json": { lockfiles: [], agentTools: {} } })), "a list that is no list fails", '"agentTools" is no list');
 fails(run(project({ ".mcp.json": "{ not json" })), "a tool's settings that are no JSON fail", ".mcp.json cannot be read as a JSON object");
 fails(run(project({ "checks/licences.json": "{" })), "a config that is no JSON fails", "checks/licences.json cannot be read");
-const linkedSettings = project({ ...listing() });
-fs.rmSync(path.join(linkedSettings, ".claude/settings.json"));
-fs.writeFileSync(path.join(linkedSettings, "elsewhere.json"), KIT);
-fs.symlinkSync("../elsewhere.json", path.join(linkedSettings, ".claude/settings.json"));
-fails(run(linkedSettings), "a settings file that is a link fails, never followed out of the checkout", '".claude/settings.json" is a link');
-const linkedSkills = project({ ...listing() });
-fs.mkdirSync(path.join(linkedSkills, "outside/notes"), { recursive: true });
-fs.writeFileSync(path.join(linkedSkills, "outside/notes/SKILL.md"), "x");
-fs.symlinkSync("../outside", path.join(linkedSkills, ".claude/skills"));
-fails(run(linkedSkills), "and so does a skills folder that is a link", '".claude/skills" is a link');
+// links: one inside the checkout is followed, as the tool that reads it follows it; one that leads out is not
+const inside = project({ ...listing() });
+fs.mkdirSync(path.join(inside, "shared/notes"), { recursive: true });
+fs.writeFileSync(path.join(inside, "shared/notes/SKILL.md"), "x");
+fs.mkdirSync(path.join(inside, ".claude/skills"), { recursive: true });
+fs.symlinkSync("../../shared/notes", path.join(inside, ".claude/skills/notes"));
+fails(run(inside), "a skill linked from inside the checkout is read, so it fails unlisted", 'the skill "notes"');
+const away = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-"));
+made.push(away);
+fs.writeFileSync(path.join(away, "settings.json"), withPlugins({ "helper@example-market": true }));
+const out = project({ ...listing() });
+fs.rmSync(path.join(out, ".claude/settings.json"));
+fs.symlinkSync(path.join(away, "settings.json"), path.join(out, ".claude/settings.json"));
+fails(run(out), "a settings file linked from outside the checkout fails, never followed", '".claude/settings.json" is a link that leads out of the checkout');
+const outSkills = project({ ...listing() });
+fs.symlinkSync(away, path.join(outSkills, ".claude/skills"));
+fails(run(outSkills), "and so does a skills folder linked from outside", '".claude/skills" is a link that leads out');
+// what stood before turns nothing red: a skill linked inside the checkout, or a link out of it, the base held
+const linkedBase = project();
+fs.mkdirSync(path.join(linkedBase, "shared/notes"), { recursive: true });
+fs.writeFileSync(path.join(linkedBase, "shared/notes/SKILL.md"), "x");
+fs.mkdirSync(path.join(linkedBase, ".claude/skills"), { recursive: true });
+fs.symlinkSync("../../shared/notes", path.join(linkedBase, ".claude/skills/notes"));
+fs.symlinkSync(path.join(away, "settings.json"), path.join(linkedBase, ".mcp.json"));
+git(linkedBase, "add", "-A"); git(linkedBase, "commit", "-q", "-m", "links");
+const kept = run(pr(linkedBase, { "README.md": "a change of its own\n" }));
+ok(kept.status === 0 && /note .*"\.mcp\.json" is a link .*as the base held it/.test(kept.out) && /not listed, as the base held them: the skill "notes"/.test(kept.out), "a skill linked inside the checkout and a link out of it, both held by the base, are noted and fail nothing", kept.out);
+const skillsDirBase = project();
+fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
+fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
+fs.symlinkSync("../shared/skills", path.join(skillsDirBase, ".claude/skills"));
+git(skillsDirBase, "add", "-A"); git(skillsDirBase, "commit", "-q", "-m", "a linked skills folder");
+passes(run(pr(skillsDirBase, { "README.md": "a change of its own\n" })), "and so is a skills folder linked inside the checkout, read at the base through its link");
 if (process.platform !== "win32") {
   const odd = run(project({ ".claude/skills/x\n::warning::injected/SKILL.md": "x", ...listing() }));
   ok(odd.status === 1 && !/^::warning::/m.test(odd.out) && mended(odd.out), "a skill folder's name with a line break in it prints on the failure's own line, so it writes no workflow command", odd.out);
@@ -116,6 +140,14 @@ newKit.hooks.Stop[0].hooks[0].command = "a newer stop";
 pr(synced, { "core/setup/template/claude-settings.json.tmpl": JSON.stringify(newKit, null, 2) });
 const fromCopy = spawnSync(process.execPath, ["core/scripts/agent-tools.mjs", "checks/licences.json"], { cwd: synced, encoding: "utf8" });
 ok(fromCopy.status === 0 && !/FAIL/.test(fromCopy.stdout + fromCopy.stderr), "a sync that changes the kit's hooks fails no project whose hooks the base's kit wrote", fromCopy.stdout + fromCopy.stderr);
+// the sync note's step: a list written, and the check run where the project runs the licence script itself
+const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
+const ownRun = "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n";
+ok(step.length === 1 && !notDone(project({ ...listing() }), step).length, "the step reads done in a project that configures only the kit's hooks");
+const noRun = notDone(project({ ".github/workflows/licences-own.yml": ownRun }), step);
+ok(noRun.length === 1 && noRun[0].mend.includes("runs `node core/scripts/agent-tools.mjs <its config>` beside it"), "and not done where a workflow of the project's own runs the licence script without the agent-tools check", JSON.stringify(noRun));
+ok(!notDone(project({ ".github/workflows/licences-own.yml": `${ownRun}      - run: node core/scripts/agent-tools.mjs checks/licences.json\n` }), step).length, "and done once that workflow runs it beside it");
+ok(notDone(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }) }), step)[0]?.mend.includes('the plug-in "helper@example-market"'), "and not done where a tool is configured and the list is not written");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 
 // ---- with no list yet: the pull request's base counts as it (nothing locks a project) ----

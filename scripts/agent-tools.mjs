@@ -9,8 +9,8 @@
 // What it reads as configured, in the files committed at the project's root: `.claude/settings.json` and, where it is
 // committed, `.claude/settings.local.json`, each hook by its event, matcher and command ("Stop: bash -c '...'") and
 // each plug-in their "enabledPlugins" turn on ("name@marketplace"); `.mcp.json`, each tool server of its "mcpServers";
-// and `.claude/skills/`, each folder holding a SKILL.md. A link among them, which would be read outside the checkout,
-// fails. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
+// and `.claude/skills/`, each folder holding a SKILL.md. A link inside the checkout is followed; one that leads out of
+// it is not, and fails, save one the base held as it stands. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
 // another provider's settings, where a plug-in's marketplace or a tool server's command points, and whether the version
 // listed is the one run, are the review's. A hook the starter kit writes counts as the core's only where its command is
 // the kit's, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
@@ -110,32 +110,46 @@ export function check(tools, list, kit, file) {
   return { problems, unlisted: list ? [] : unlisted };
 }
 
-// The project at `root`, at its working tree or at a commit `rev`. In the working tree a link on the way to a file is
-// not followed: it is a problem, since it would be read outside the checkout.
+// The project at `root`, at its working tree or at a commit `rev`: configured()'s answer, and `links`, each link on the
+// way to a file that leads out of the checkout, which is not followed (a link inside it is, at a commit as in the tree).
 export function readProject(root, rev = null) {
-  const links = [];
-  const linked = f => {
+  const links = [], top = fs.realpathSync(root);
+  const outside = f => {
     const parts = f.split("/");
     for (let i = 1; i <= parts.length; i++) {
       const at = parts.slice(0, i).join("/");
-      try { if (fs.lstatSync(path.join(root, at)).isSymbolicLink()) { if (!links.includes(at)) links.push(at); return true; } } catch { return false; }
+      let link = false;
+      try { link = fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; }
+      if (!link) continue;
+      let real = null;
+      try { real = fs.realpathSync(path.join(root, at)); } catch { /* (a link to nothing: read as leading out) */ }
+      const rel = real === null ? ".." : path.relative(top, real);
+      if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) { if (!links.includes(at)) links.push(at); return true; }
     }
     return false;
   };
-  const read = rev ? f => textAt(root, rev, f) : f => { if (linked(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+  const read = rev ? f => textAt(root, rev, f) : f => { if (outside(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+  // (at a commit: each entry under the folder, a link to a folder inside the repository followed once, as the tree has it)
+  const entries = (dir, hops = 0) => {
+    let out = "";
+    try { out = execFileSync("git", ["ls-tree", "-r", rev, "--", dir], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { /* (none) */ }
+    const list = out.split("\n").filter(Boolean).map(l => { const [meta, f] = l.split("\t"); return { link: meta.startsWith("120000 "), f }; });
+    if (hops < 2 && list.length === 1 && list[0].f === dir && list[0].link) {
+      const to = path.posix.normalize(path.posix.join(path.posix.dirname(dir), textAt(root, rev, dir) ?? ""));
+      return to.startsWith("..") || path.posix.isAbsolute(to) ? [] : entries(to, hops + 1).map(e => ({ ...e, f: `${dir}${e.f.slice(to.length)}` }));
+    }
+    return list;
+  };
   const skills = () => {
     if (rev) {
-      let out = "";
-      try { out = execFileSync("git", ["ls-tree", "-r", "--name-only", rev, "--", ".claude/skills"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { /* (none) */ }
-      return out.split("\n").map(f => /^\.claude\/skills\/([^/]+)\/SKILL\.md$/u.exec(f)?.[1]).filter(Boolean);
+      const names = entries(".claude/skills").map(({ link, f }) => (/^\.claude\/skills\/([^/]+)\/SKILL\.md$/u.exec(f) ?? (link ? /^\.claude\/skills\/([^/]+)$/u.exec(f) : null))?.[1]);
+      return [...new Set(names.filter(Boolean))];
     }
-    if (linked(".claude/skills")) return [];
+    if (outside(".claude/skills")) return [];
     const dir = path.join(root, ".claude/skills");
-    try { return fs.readdirSync(dir).filter(n => !linked(`.claude/skills/${n}`) && fs.existsSync(path.join(dir, n, "SKILL.md")) && !linked(`.claude/skills/${n}/SKILL.md`)); } catch { return []; }
+    try { return fs.readdirSync(dir).filter(n => !outside(`.claude/skills/${n}/SKILL.md`) && fs.existsSync(path.join(dir, n, "SKILL.md"))); } catch { return []; }
   };
-  const out = configured(read, skills);
-  for (const at of links) out.problems.push(`${show(at)} is a link, which would be read outside the checkout. Mend: replace it with the file or folder itself, committed in the project`);
-  return out;
+  return { ...configured(read, skills), links };
 }
 
 // The whole check, from the project's root: { fail, notes }.
@@ -150,6 +164,14 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   if (!list && core) list = { keys: new Set(), problems: [] };
   const { problems, unlisted } = check(head.tools, list, kit, file);
   const fail = [...head.problems, ...problems], notes = [];
+  // (a link out of the checkout fails, save one the base held as it stands: what stood before turns nothing red)
+  for (const at of head.links) {
+    let to = null;
+    try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
+    const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
+    if (base && to !== null && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
+  }
   if (!unlisted.length) return { fail, notes };
   if (!base) {
     notes.push(`${file} holds no "agentTools" yet, so nothing fails here; not listed: ${unlisted.map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
