@@ -104,8 +104,8 @@ so that run is the only one that catches a merge made without its checks passing
 ## Filed
 
 - #373, bug, fixed in #374: the NuGet step's job on every pull request, and no way to decline it.
-- An enhancement: the core's pull-request checks run only once a pull request is ready.
-- An enhancement: the core's pull-request checks without a secret run as one job.
+- #375, enhancement: the core's pull-request checks run only once a pull request is ready.
+- #376, enhancement: the core's pull-request checks without a secret run as one job.
 
 Both enhancements change what every project runs, so each waits for the owner's yes. Neither is a fault against
 "Nothing locks a project": every job counted above stood before that rule, save the NuGet check's.
