@@ -41,12 +41,15 @@ export const REVIEWS = [
 ];
 export const KINDS = ["own", "upkeep", "sync", "update"];
 
+// A comment's text as its lines, each carriage return taken out (the web editor ends a line with one before the line feed).
+const lines = body => String(body ?? "").replaceAll("\r", "").split("\n");
+
 // Which posted review a comment is, from its first line unquoted: security, code, design, or none-needed (a note that
 // no security review is needed), or null where it is none.
 export function postedKind(body) {
-  const first = String(body ?? "").split("\n").find(l => l.trim()) ?? "";
+  const first = lines(body).find(l => l.trim()) ?? "";
   if (/^\s*>/.test(first)) return null;
-  const m = /^\s*(?:\*\*)?(Security review|Code review|Design check):\s*(.*)$/u.exec(first);
+  const m = /^\s*(?:\*\*)?(Security review|Code review|Design check):\s*(.*)$/su.exec(first); // (s: a line separator left in the line still matches, so the pattern never goes back over the spaces)
   if (!m) return null;
   if (m[1] === "Design check") return "design";
   if (m[1] === "Code review") return "code";
@@ -57,7 +60,7 @@ export function postedKind(body) {
 // none declares it or they disagree.
 function declared(body, count, none) {
   const seen = new Set();
-  for (const raw of String(body ?? "").split("\n")) {
+  for (const raw of lines(body)) {
     const line = raw.replaceAll("**", "").trim();
     const n = count.exec(line);
     if (n) seen.add(Number(n[1]));
@@ -126,7 +129,7 @@ export function tally(pulls) {
 export const secondFound = pulls => pulls.filter(p => p.reviews.codexSecurity.blocked === "no" && p.reviews.postedSecurity.blocked === "yes").map(p => p.number);
 
 // The pull request a bug names as the one that brought it in ("Brought in by: #N" on a line of its own), or null.
-export const broughtBy = body => { const all = [...String(body ?? "").matchAll(/^Brought in by: #(\d{1,9})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
+export const broughtBy = body => { const all = [...lines(body).join("\n").matchAll(/^Brought in by: #(\d{1,9})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
 
 // The bugs, given as { number, at, login, body } with the owner's comments on any issue as { issue, at, login, body }:
 // how many the owner's account filed, which of them are tied to a merged pull request (the newest "Brought in by" of the

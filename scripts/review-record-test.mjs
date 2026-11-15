@@ -24,6 +24,11 @@ ok(postedKind("Security review: the fallback reviewer's.") === "security" && pos
   && postedKind("Code review: of 42b5") === "code" && postedKind("\n\nDesign check: 31bb") === "design" && postedKind("**Code review:** x") === "code"
   && postedKind("Security review: none needed for 1..2 (modules/reviews.md)") === "none-needed" && postedKind("**Security review:** none needed for this change.") === "none-needed" && postedKind("**Security review: none needed**") === "none-needed" && postedKind("Leanness check: a fresh session") === null,
   "a posted review is told by its first line; a note that none is needed, and a leanness check, are none");
+ok(postedKind("Security review: x\r\nBlocking findings: 1.") === "security" && blockingOf("Security review: x\r\nBlocking findings: 1.\r\nOther findings: 2.\r\n") === 1 && otherOf("Code review: x\r\nOther findings: 2.\r\n") === 2
+  && broughtBy("What.\r\nBrought in by: #12\r\n") === 12 && postedKind("Code review:\r\n") === "code",
+  "a comment written in the web editor, its lines ending in a carriage return, reads as any other");
+const slow = Date.now(); postedKind(`Security review:${" ".repeat(65536)}a\r`);
+ok(Date.now() - slow < 200, "a long first line of spaces and a carriage return reads at once", `${Date.now() - slow} ms`);
 ok(postedKind("> Security review: quoted\n\nThanks.") === null && postedKind("Thanks.\nSecurity review: not first") === null && postedKind(null) === null, "a quoted first line, a later line and no text are no review");
 ok(blockingOf("Security review: x\n\n**Blocking findings: 0.**\n- a") === 0 && blockingOf("Security review: x\nBlocking findings: 2.") === 2
   && blockingOf("Security review: x\nNo blocking finding.") === 0 && blockingOf("Security review: x\n**Nothing blocks.**") === 0
