@@ -2,60 +2,98 @@
 
 The count that `#243` asks for, before anything is moved: for each rule a session reads at its start, how often each
 role cites it, read as the count of 13 November (`reports/2026-11-13-discipline-rules-counted.md`) read every rule, and
-for each rule whether a check already holds it whole. It changes no rule. Built by a routine-lane builder, not the
-design session.
+for each rule whether a check already holds it whole. It changes no rule. The core's half was built by a routine-lane
+builder; the two projects' half, the verdicts and the readings again by a builder on Opus, from the counts two read-only
+sessions took inside the projects. Neither is the design session.
 
 ## The answer
 
-**This count is half taken, and moves nothing.** It covers the core's own pull requests, which are not the population
-the 13 November count read: the two projects' pull requests were out of this session's reach (a request to read one of
-them was refused, and the other came with git reads only, no pull requests). So the counts below stand for the core, and
-two roles, the stand-in and the orchestrator, have almost no text here at all (4 and 2 threads). The by-role count of
-the projects' pull requests is left, as "What is left" says, and the verdicts follow it, not this.
+**No rule of the start reading is a candidate to leave it: all 58 stay, and the count ends in "leave it", as the issue
+said it might.** It covers the core's 201 pull requests and the projects' 704 (snakes) and 878 (amarna).
 
-What the core's own half shows:
-
-- **No rule is a candidate to move on this half alone.** Of the 58 rules of the start reading, 16 are cited by no
-  builder and 7 by no role (`H4`, `H5`, `H13`, `I7`, `W2`, `G1`, `O1`); each of the 16 was read again below, and none
-  is moved. A zero here is weaker than in the projects, since the core has no screen, no game and no sync of its own.
-- **The two parts the issue guessed at stay a question.** The stand-in's duties (`I2`) are cited by builders in 18
-  pull requests, but as the stand-in's verdict, not its duties, and the polish lane (`W4`) can have no cite in a
-  repository with no screen. Whether a routine builder, an orchestrator or a reviewer ever needs either text is
-  what the projects' count will say.
-- **A check holds the start reading little.** By the 13 November audit (`reports/2026-11-13-what-holds-each-rule.md`)
-  two rules of it are held whole: floor rule 12 (the ruleset on `main`, where the plan has rulesets) and the headings
-  of "Each PR has the two headings" (`scripts/pr-description.mjs`; the cost line it does not read). Nineteen more are
-  held in part, mostly by a check on a part of the rule, so a failure can name only that part. The ways to say a rule at
-  the moment it matters (#254) therefore reach few of these rules whole.
+- **Every role reads the same start reading,** so a rule leaves it for every role at once, and one that builders cite
+  stays whatever another role does. Builders (main, design, routine) are nearly every session; a candidate is a rule
+  that no builder cites. Six are, in all three populations: `H2`, `H14`, `I1`, `C5` (each cited by a reviewer in the
+  core, one to three times) and `I7`, `G1` (cited by no role at all). Each was read again below, and none moves.
+- **The two parts the issue guessed at are in use, by the role it guessed would not need them.** The stand-in (`I2`)
+  is cited by main-lane builders in 18, 23 and 22 pull requests (core, snakes, amarna), by routine builders in amarna in
+  all 5 that name it, and by the stand-in itself in 4, 6 and 10 threads. The polish lane (`W4`) is cited by main-lane
+  builders in 17 and 2 of the projects' pull requests, by routine builders in amarna in 2 of 8, and by the stand-in in 2
+  and 3; the core, with no screen, cannot cite it.
+- **The roles the core's half could hardly see.** Routine builders: 3, 4 and 21 pull requests, read from the first
+  line; those in amarna cite 11 rules (`F3`, `F8`, `F8s`, `F18`, `H10`, `I2`, `W3`, `W4`, `W7`, `G3`, `G5`), those in
+  snakes none. The stand-in: 20 threads over the three, citing 11 rules (`F1`, `F3`, `F8`, `F14`, `H12`, `I2`, `I3`,
+  `I9`, `W3`, `W4`, `C1`). The orchestrator: no text of it in either project matched (2 threads in snakes, none in
+  amarna), so nothing can be said of it, and it already reads its own module when needed. Reviewers cite the floor most
+  (the fallback reviewer: `F3` in 14 and 15 of the projects' pull requests, `F8` in 24 and 23, `F18` in 10 and 8).
+- **A check holds whole only floor rule 12 and half of `G2`.** By the 13 November audit
+  (`reports/2026-11-13-what-holds-each-rule.md`), floor rule 12 is held by the ruleset on `main` where the plan has
+  rulesets, and the floor is read whole; `G2`'s headings are held by `scripts/pr-description.mjs`, its cost line (`G3`)
+  by none. So no rule is a candidate to leave on that ground (the issue's comment of 14 November, point 2). A failure
+  that says its rule at the moment it matters (#254) helps the 19 rules held in part, and moves none.
+- **For #256,** which waits on where this count says a rule is read: a choice that is hard to undo comes rarely, and
+  the rules here that apply rarely (`I7`, `H14`, `C5`) are cited rarely or never; the one-line pointers of the start
+  reading (`G5`, to `modules/updates.md`; `C6`, to "The builders") are cited by builders in all three, though their
+  patterns count the subject as much as the pointer. The count fits a one-line pointer at the start and the rule in a
+  module read when needed; it does not show the rule would then be read, as the 13 November count warned of a move.
+  That reading is #256's builder's to take.
 
 ## How it was counted
 
-Every pull request of this repository as GitHub held it on 14 November 2026 (202, one of them Dependabot's and left out),
-with every issue comment and review comment on them (1,451), and the 117 comments on issues that are not pull requests,
-read only for the stand-in and the orchestrator. For each of the 58 rules, a pattern of its own words, its number or its
-usual phrases (listed at the end, so the projects' count reads the same). Two numbers for a rule and a role, as
-"cited / named", counted in pull requests (issues, for the last two roles):
+Three populations, read by the same patterns (listed at the end) and the same roles:
+
+- **The core:** every pull request of this repository as GitHub held it on 14 November 2026 (202, one of them
+  Dependabot's and left out), with every issue comment and review comment on them (1,451), and the 117 comments on
+  issues that are not pull requests, read only for the stand-in and the orchestrator.
+- **snakes** (`barkstreet-snakes`): 704 pull requests (2 of Dependabot's left out), 1,835 comments on them, and 65
+  comments on 42 issues.
+- **amarna** (`amarna-letters`): 878 pull requests (10 of Dependabot's left out), 2,189 issue comments and 873 review
+  comments on them, and 105 comments on issues.
+
+The projects' counts were taken by two read-only sessions that the orchestrator started inside each project on the
+owner's word, which wrote nothing there and sent counts and rule names only; this session did not read the projects. A
+first attempt that day (#268) reached neither project's threads: one attach was refused, and the other came with git
+reads only, which hold no pull request's description or comments.
+
+For each of the 58 rules, two numbers for a rule and a role, as "cited / named", counted in pull requests (issues, for
+the last two roles):
 
 - **cited:** the rule's pattern shows in a "Readings taken" section or in a comment of that role;
 - **named:** it shows anywhere in the role's text, a pull request's whole description included.
 
-**Roles are not marked in this repository's text:** every agent here posts under the owner's login, so a role is read
-from the text, which is rough.
+**Roles are not marked in the text:** every agent posts under the owner's login, so a role is read from the text,
+which is rough.
 
-- *Main*: a pull request's description (not the next two) and the builder's comments on it, 164 pull requests.
-- *Design*: a description or comment that opens as from the owner's design session, 37.
-- *Routine*: a first line that says Sonnet built it, or a routine lane, 3.
-- *Codex*: its findings (its "no issues" receipts and summaries left out, being the same text each time), 58 pull requests.
-- *Fallback*: a session's comment that opens "Code review:", "Security review:", "Leanness check:" or as the fallback
-  reviewer, 72 pull requests.
-- *Stand-in* and *orchestrator*: a comment on an issue that opens naming one, 4 and 2. A request to a reviewer
-  ("@codex review") is left out of every role.
+- *Main*: a pull request's description (not the next two) and the builder's comments on it: 164 pull requests in the
+  core; in amarna, 840 descriptions and 505 comments.
+- *Design*: a description or comment that opens as from the owner's design session (in snakes, also an answer relayed
+  from the design chat): 37, 21 and 27.
+- *Routine*: a first line that says Sonnet built it, or a routine lane: 3, 4 and 21. In snakes 19 more say it in their
+  second to sixth line and count as main; in amarna it is read from descriptions only, the builder's comments on such a
+  pull request counting as main.
+- *Codex*: its findings (its "no issues" receipts, summaries and boilerplate left out): 58 pull requests, 59, and 437
+  findings on 121.
+- *Fallback*: a session's comment whose first line opens "Code review:", "Security review:", "Leanness check:",
+  "Design check" or as the fallback reviewer: 72, 25 and 27 pull requests. The projects' numbers are lower because
+  Codex reviews most there.
+- *Stand-in* and *orchestrator*: a comment on an issue that opens naming one: 4 and 2, 6 and 2, 10 and 0. In snakes the
+  orchestrator's 2 threads match no pattern; in amarna 66 descriptions mention it, but this role is read in issues
+  only.
+
+Left out of every role: a request to a reviewer ("@codex review": 270 in snakes, 539 in amarna), and in snakes the
+comments of `github-actions[bot]` (638) and `github-advanced-security[bot]` (4).
+
+**What the projects' sessions did not read,** so that a number there is a floor, not a full count: the bodies of
+reviews (`pulls/N/reviews`) in both, and in amarna the 126 issues' own text. **Older amarna pull requests have no
+"Readings taken"** (268 of 878 do; older ones used a heading of questions for the owner), so its main-lane "cited" is
+low. A "Readings taken" section runs from its heading, or its inline line, to the next heading, rule line or (inline)
+blank line.
 
 A zero is a reason to read again, never proof that a rule is dead, as on 13 November, and a pattern such as "lane" or
 "split" counts a subject, not a rule invoked. A rule about how a session acts is kept without a word far more often than
 it is cited.
 
-## The count, rule by rule
+## The core's count, rule by rule
 
 "Held by" is the 13 November audit's reading, or this report's own where marked \* (the audit did not list the rule).
 
@@ -127,60 +165,126 @@ it is cited.
 | **`other-builders.md`** | | | | | | | | |
 | The tests you are given are the contract | review | 0/0 | 0/0 | 0/0 | 0/0 | 0/0 | 0/0 | 0/0 |
 
+## The projects' count, rule by rule
+
+Each cell is "snakes · amarna", each count "cited / named" as above. The ids are the patterns', in the order of the
+core's table. The orchestrator's column is left out: it is 0 / 0 in every row of both projects. "Read again" sends to
+the next section.
+
+| Rule | Main | Design | Routine | Codex | Fallback | Stand-in | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **`floor/security.md`** | | | | | | | |
+| `F1` nothing secret | 2/4 · 3/11 | 0/1 · 0/0 | 0/0 · 0/0 | 0/0 · 3/3 | 2/2 · 0/0 | 1/1 · 0/0 | Stays: the floor; builders cite it in both projects |
+| `F3` protected files | 10/55 · 13/56 | 3/6 · 6/7 | 0/1 · 1/1 | 0/0 · 1/1 | 14/14 · 15/15 | 1/1 · 0/0 | Stays: the floor |
+| `F3y` owner's yes | 4/31 · 6/29 | 7/8 · 6/7 | 0/0 · 0/0 | 0/0 · 0/0 | 1/1 · 1/1 | 0/0 · 0/0 | Stays: the floor |
+| `F4` outsiders' text | 4/17 · 2/14 | 6/6 · 5/5 | 0/1 · 0/0 | 0/0 · 0/0 | 3/3 · 2/2 | 0/0 · 0/0 | Stays: the floor |
+| `F4w` owner's word word for word | 6/78 · 3/71 | 7/9 · 4/7 | 0/0 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: the floor |
+| `F8` reviews / security review | 29/135 · 29/151 | 0/4 · 5/6 | 0/1 · 2/4 | 8/8 · 19/19 | 24/24 · 23/23 | 1/1 · 0/0 | Stays: the floor |
+| `F8s` pure sync | 14/55 · 11/56 | 0/0 · 0/0 | 0/0 · 1/2 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: the floor |
+| `F8t` reviewed twice | 2/2 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: the floor |
+| `F8o` owner's computer | 2/5 · 2/9 | 0/0 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 1/1 | 0/0 · 0/0 | Stays: the floor; builders cite it in both projects |
+| `F8d` test data | 0/2 · 1/8 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: the floor; a builder cites it once |
+| `F11` nothing personal | 0/9 · 2/16 | 0/1 · 0/0 | 0/0 · 0/0 | 0/0 · 2/2 | 3/3 · 3/3 | 0/0 · 0/0 | Stays: the floor |
+| `F12` main | 1/2 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: the floor, held whole by a setting where the plan has rulesets |
+| `F13` own repository | 0/4 · 1/5 | 0/1 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: the floor |
+| `F14` nothing waits | 2/10 · 3/11 | 1/1 · 1/3 | 0/1 · 0/1 | 1/1 · 0/0 | 0/0 · 0/0 | 2/2 · 0/0 | Stays: the floor |
+| `F18` sign-ins | 2/5 · 1/4 | 0/0 · 0/0 | 0/0 · 1/2 | 1/1 · 0/0 | 10/10 · 8/8 | 0/0 · 0/0 | Stays: the floor |
+| **`how-to-work.md`** | | | | | | | |
+| `H1` work never waits | 0/4 · 0/5 | 0/1 · 0/2 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in the core |
+| `H2` question | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `H3` effort | 5/30 · 0/19 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it |
+| `H4` read little | 1/8 · 1/11 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in both projects |
+| `H5` edit in place | 1/1 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in both projects |
+| `H6` don't loop | 5/12 · 2/5 | 0/0 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `H7` one fact | 8/13 · 9/12 | 0/0 · 0/0 | 0/0 · 0/0 | 1/1 · 3/3 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `H8` no description untrue | 6/8 · 1/5 | 0/0 · 0/0 | 0/0 · 0/0 | 4/4 · 4/4 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `H9` lean | 5/11 · 4/16 | 0/1 · 0/1 | 0/0 · 0/1 | 0/0 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `H10` split | 25/134 · 25/109 | 0/0 · 1/2 | 0/0 · 3/8 | 2/2 · 9/9 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `H11` principles | 11/14 · 1/2 | 0/0 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `H12` project's rules | 0/5 · 1/8 | 0/0 · 0/0 | 0/0 · 0/0 | 1/1 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it |
+| `H13` smallest setup | 3/8 · 0/2 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in one project |
+| `H14` rule files brief | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| **`inbox.md`** | | | | | | | |
+| `I1` nothing to owner | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `I2` stand-in | 23/78 · 22/168 | 2/4 · 0/0 | 0/0 · 5/5 | 4/4 · 24/24 | 2/2 · 0/0 | 6/6 · 10/10 | Stays: every builder role cites it; read again |
+| `I3` inbox issues | 3/15 · 5/27 | 0/2 · 0/3 | 0/2 · 0/1 | 1/1 · 8/8 | 0/0 · 0/0 | 5/5 · 0/0 | Stays: builders cite it in all three |
+| `I4` obvious improvement | 0/1 · 0/2 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in the core |
+| `I5` ideas cheap | 0/1 · 1/7 | 0/0 · 0/1 | 0/0 · 0/0 | 1/1 · 0/0 | 0/0 · 1/1 | 0/0 · 0/0 | Stays: builders cite it |
+| `I6` bugs | 2/2 · 2/2 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `I7` core itself | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `I8` owner's comments | 1/5 · 1/4 | 0/0 · 1/1 | 0/1 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `I9` words kept once | 3/20 · 6/122 | 3/8 · 3/12 | 0/2 · 0/0 | 0/0 · 0/0 | 0/0 · 1/1 | 0/0 · 5/5 | Stays: builders cite it in all three |
+| **`work-flow.md`** | | | | | | | |
+| `W1` review in background | 2/3 · 1/2 | 2/7 · 0/4 | 0/0 · 0/1 | 0/0 · 1/1 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `W2` next task | 1/12 · 0/11 | 0/0 · 0/0 | 0/0 · 0/1 | 0/0 · 0/0 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: a builder cites it once; read again |
+| `W3` lanes | 55/233 · 34/269 | 4/9 · 5/13 | 0/3 · 6/19 | 4/4 · 1/1 | 0/0 · 0/0 | 3/3 · 6/6 | Stays: builders cite it in all three |
+| `W4` polish lane | 17/83 · 2/84 | 0/3 · 0/7 | 0/1 · 2/8 | 2/2 · 0/0 | 0/0 · 0/0 | 2/2 · 3/3 | Stays: main and routine builders cite it; read again |
+| `W5` stop switch | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `W6` stop when merged | 4/96 · 4/73 | 1/1 · 1/1 | 0/0 · 0/0 | 5/5 · 2/2 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `W7` core moved; sync | 11/36 · 9/31 | 0/1 · 1/2 | 0/2 · 1/2 | 0/0 · 0/0 | 0/0 · 1/1 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `W8` clean up | 0/33 · 3/15 | 0/0 · 0/0 | 0/0 · 0/0 | 1/1 · 0/0 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in one project |
+| **`git.md`** | | | | | | | |
+| `G1` work from main | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `G2` two headings | 0/91 · 0/77 | 0/6 · 0/9 | 0/3 · 0/19 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `G3` cost line | 0/2 · 0/3 | 0/0 · 0/0 | 0/0 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it |
+| `G4` push after commit | 1/6 · 0/9 | 0/2 · 0/1 | 0/0 · 0/0 | 1/1 · 0/0 | 3/3 · 2/2 | 0/0 · 0/0 | Stays: builders cite it |
+| `G5` updates | 4/33 · 5/41 | 1/4 · 1/2 | 0/1 · 2/2 | 0/0 · 0/0 | 5/5 · 4/4 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| **`claude.md`** | | | | | | | |
+| `C1` models table | 1/12 · 1/10 | 0/2 · 0/1 | 0/1 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| `C2` model and effort | 1/4 · 0/3 | 0/1 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it |
+| `C3` family names | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: a builder cites it in the core |
+| `C4` Fable's usage | 26/43 · 30/46 | 0/1 · 1/1 | 0/1 · 0/0 | 0/0 · 0/0 | 1/1 · 0/0 | 0/0 · 0/0 | Stays: in steady use in all three |
+| `C5` who to call | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: read again |
+| `C6` other providers | 1/12 · 2/16 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 1/1 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: builders cite it in all three |
+| **`other-builders.md`** | | | | | | | |
+| `O1` tests contract | 1/1 · 0/1 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | 0/0 · 0/0 | Stays: a builder cites it once; read again |
+
 ## The rules read again
 
-Each rule no builder cites, with the reading that follows from the table, the 13 November report and the audit. None is
-moved; a move waits for the projects' count.
+Each rule that no builder cites in some population, or that the issue named, with the reading that follows from the
+three counts, the 13 November report and the audit. None is moved.
 
 | Rule | Read again |
 | --- | --- |
-| `F1`, `F8o`, `F8d` (the floor) | Cited by the fallback reviewer (9, 2 and 4 pull requests), by no builder: a builder is bound by them and a reviewer checks them. The floor stays whole in every reading. |
-| `H2`, `I1`, `C5`, `H14` | Cited by a reviewer once to three times, by no builder. Each states how a session acts, which shows in no description. `H14` is why a rule file stays short. |
-| `H4`, `H5`, `H13` | Cited by no one. `H4` and `H13` are the owner's own (core archive 17 and 12) and `H5` is three words; a move saves almost nothing and a rule read at no start is read nowhere. |
-| `W2` | Never cited (0 here, 0 / 1 and 0 / 0 on 13 November). One line; "no lane is stacked on another's" is said nowhere else. |
-| `W8`, `G1` | `W8` is cited by the fallback reviewer twice. `G1` repeats floor rule 12 and the ruleset, and its one part that nothing else says is that the builder merges its own PR. |
-| `I7` | Cannot be counted here: the core is the repository it names, so its builders never need to file anywhere else. In use in the projects on 13 November (7 / 35 and 8 / 35). |
-| `W4` (polish lane) | No cite in a repository with no screen: the count says nothing of it. |
-| `I2` (the stand-in) | Cited by main-lane builders in 18 pull requests, as the stand-in's verdict, which the builder reads as data; the duties text (what it searches, what it is always unsure of, its record) is the stand-in's. First candidate for the next count, to be read again with the stand-in's own role. |
-| `O1` (the tests you are given are the contract) | Cited by no role; it is for a builder of another provider, and none builds here (every file here is protected). The projects' count is the only one that can say whether a session of a Claude builder ever needs it. |
+| `F1`, `F8o`, `F8d` (the floor) | Cited by no builder in the core, but by builders in the projects (2 and 3, 2 and 2, 0 and 1 pull requests) and by the fallback reviewer. The floor is read whole in every reading. |
+| `H2`, `I1`, `C5` | Cited by no builder in any of the three; by a reviewer in the core, once to three times. Each states how a session acts, which shows in no description: `H2` where the owner asks in person, not in a pull request; `I1` is the frame of the inbox, whose break would be a question put to the owner, and none is counted; `C5` decides which helper a session starts, and the hook holds the half a machine can (model and effort on the call). Every builder needs each at its start, so a move would take them from the role that keeps them. |
+| `H14` | Cited by no builder in any of the three. The one rule here whose need is narrow: whoever writes a rule file. But any builder may change one in a project, and the rule is one line (about 150 bytes); a move saves almost nothing and leaves that builder without it. |
+| `I7` | Cited by no role by this pattern, in any of the three; the 13 November count, by its own pattern, found it cited in both projects (7 / 35 and 8 / 35). A zero of the pattern, not of the rule. |
+| `G1` | Cited by no role anywhere: every counted pull request follows it, so it is never in doubt. Most of it is said again by floor rule 12 and point 1 of `modules/work-flow.md` (the builder merges its own); whether to fold it into them is a question of leanness, not of this count. |
+| `G2` | Never cited in the projects, as its headings show in each description (named in 91 and 77): `scripts/pr-description.mjs` holds the headings and names them when it fails. Its cost line (`G3`) no check holds, so the line stays at the start. |
+| `W2` | Cited once (snakes). One line; "no lane is stacked on another's" is said nowhere else. |
+| `W5` | Cited by no builder in the projects: the stop switch came late (core archive 201), and most of their pull requests are older. `work-saved.sh` reports it at the start. |
+| `H1`, `H13`, `W8`, `C3`, `I4`, `H4`, `H5` | Each cited by builders in one or two of the three, never in all. Cited, so not candidates; `H4` and `H13` are the owner's own (core archive 17 and 12). |
+| `I2` (the stand-in) | Cited by main-lane builders in all three (18, 23, 22) and by routine builders in amarna (5 of 5): builders read it, as the stand-in's verdict and its record ("matched" or "missed"), which bind the builder who acts on a point. Its duties (what the stand-in searches, what it is always unsure of) are the stand-in's own, but a cite does not tell which part was read. Moving the duties into the stand-in's brief would save well under 1 KB; no count here backs it, and it is not proposed. |
+| `W4` (the polish lane) | Cited by main-lane builders in both projects (17 and 2), by routine builders in amarna (2 of 8) and by the stand-in (2 and 3). In use where there is a screen; the core has none. |
+| `O1` (the tests you are given are the contract) | Cited once (snakes). It binds a builder of another provider, whose pull requests these roles do not set apart. |
 
-## What is left
+## What the count leaves open
 
-1. **The count of the two projects' pull requests, by the same patterns and roles** (those below), run by a session
-   that has them in reach, with their roles read from the text as here. Until it is in, nothing moves (#243 asks that).
-   Read with this table, it gives each rule by role over the core, the first project and the second.
-2. For every rule that no role of the projects cites either, a second reading as on 13 November.
-3. The stand-in and the orchestrator: where this count has 4 and 2 threads, the projects have the verdicts and the
-   orchestrator's own pull requests.
-
-### What a read-only attempt reached (14 November 2026, later the same day)
-
-The owner then allowed sessions to read the two projects for #243 and #245, read only. A session tried; the count of
-the projects' pull requests is still not taken, and the line stays in the queue.
-
-- **The first project: not reached.** The request to attach it for reading was denied by the session's permission
-  classifier, and was not retried or gone around.
-- **The second project: git reads only.** It is public, and the session's git proxy served its history and its
-  `refs/pull/*` (707 refs). No pull request's description, comment or review is in git, and the pull request API is
-  outside what a git-only read covers, so there is no "Readings taken" section or reviewer comment to count by role.
-  What git holds: 2,899 commits, 1,032 of them merges of pull requests, and one commit message that names a "Readings
-  taken" section. A count over commit messages is a different population (every commit is the builder's; no reviewer,
-  stand-in or orchestrator text is in it), so none was taken, since a table from it would read as the by-role count
-  and would not be one.
-- **What would finish it:** a session whose attach for reading reaches the pull requests' threads (the API, not git
-  alone), or the owner's word to attach with the access that reads them. Nothing is written in either project.
+1. **Nothing moves, and #243 closes.** Its own test found no candidate: every rule that no builder cites was read again
+   and stays.
+2. **The orchestrator is not measured.** No text of it in either project matched; its own pull requests and
+   transcripts would be needed, and it reads its own module when needed already, so this is worth taking only if a
+   move for it is ever proposed.
+3. **The reviewers' numbers are a floor:** the bodies of reviews were read in neither project.
+4. **The routine role is thin:** 28 pull requests over the three, read from the first line.
+5. **A cite does not say which part of a rule was read,** which `I2` alone would need to settle.
 
 ## Readings taken
 
-- **Unsure: the count is closed as half taken, with #243 still open.** The issue asks for the count as 13 November read
-  it, which was the two projects' pull requests; those were out of this session's reach, so the line stays in the queue,
-  and #256 waits as it did. The other reading, to close the issue on the core's own half, would let a rule move on a
-  population that cannot show a screen, a game or a sync.
-- **Unsure: the roles are read from text.** Nothing in a pull request marks one, as every agent posts under the owner's
-  login. A pull request whose description says nothing of its builder is counted as a main-lane one.
+- **Unsure: a candidate is a rule no builder cites.** The issue's test is a rule "a role reads at every start and
+  never cites". Every role reads the same start reading, so a rule moved out leaves every role's at once; a rule that
+  builders cite stays whatever another role does.
+- **Unsure: the roles are read from text, and differently in each project.** Nothing marks a role, as every agent posts
+  under the owner's login; each project's session read its own text as the method notes above say, and a pull request
+  whose description says nothing of its builder counts as a main-lane one.
+- **Unsure: the projects are named by their short names, as this repository's archive and reports already hold them,**
+  and once each by the repository's own name, which the owner's words quoted in #268 hold. Nothing else of either
+  project is here: counts and rule names only.
 - **Unsure: the "held whole" count is the audit's.** Where the audit did not list a rule (`work-flow.md`), the label with
   a \* is this report's reading.
-- The patterns are the rule's own words and are listed below so the next count reads the same; this report keeps no script.
+- The patterns are the rule's own words and are listed below so a later count reads the same; this report keeps no
+  script.
 
 ## The patterns
 
