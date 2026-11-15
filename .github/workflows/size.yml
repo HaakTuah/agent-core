@@ -19,6 +19,11 @@ on:
 permissions:
   contents: read
 
+# (a superseded pull request's run gives way, as tests.yml says; #388)
+concurrency:
+  group: size-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   size:
     runs-on: ubuntu-latest

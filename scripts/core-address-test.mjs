@@ -13,7 +13,9 @@ import { CORE, CORE_SOURCE, OWNER } from "./core-address.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = f => fs.readFileSync(path.join(root, f), "utf8");
-const list = dir => fs.readdirSync(path.join(root, dir)).sort().map(f => `${dir}/${f}`);
+// (every file under a folder, its own folders' too: scripts/staged/ is read as scripts/ is)
+const list = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+  .flatMap(e => (e.isDirectory() ? list(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}`); } };
 const account = OWNER.toLowerCase();

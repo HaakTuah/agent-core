@@ -13,12 +13,11 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #254 | rule builder | its second point: #235 |
-| #256 | rule builder | its staged case: #235 |
+| #254 | rule builder | |
+| #256 | rule builder | |
 | #252 | rule builder | |
-| #235 | rule builder | |
-| #296 | builder | #235 |
-| #249 | rule builder | #235 |
+| #296 | builder | |
+| #249 | rule builder | |
 | #250 | rule builder | #249 |
 | #330 | rule builder | #246 |
 | #253 | rule builder | #246, or built with it |
@@ -26,23 +25,23 @@ wanted").
 | #321 | rule builder | #275, or built with it |
 | #282 | rule builder | |
 | #284 | rule builder | #246 |
-| #285 | rule builder | #235 and #249 |
+| #285 | rule builder | #249 |
 | #286 | rule builder | #284 |
 | #299 | rule builder | |
 | #302 | rule builder | |
-| #303 | rule builder | #235 and #302 |
+| #303 | rule builder | #302 |
 | #304 | rule builder, on Fable at high for this batch (its note of 15 November) | #249 |
 | #305 | rule builder | #282 and #304 |
 | #322 | rule builder | #304 and #305 |
 | #306 | rule builder | #304 |
-| #307 | rule builder | #235 |
+| #307 | rule builder | |
 | #308 | rule builder | #253 and #304 |
 | #309 | rule builder | #304 |
 | #318 | rule builder | #246 and #304 |
 | #310 | rule builder | #246, #256 and #285 |
 | #311 | rule builder | #286 |
 | #325 | rule builder | #256, #305, #311 and #322 |
-| #313 | rule builder | #312 |
+| #313 | rule builder | #359, the core's own inputs: its rules merged in #360 |
 | #314 | rule builder | #313 and #304 |
 | #350 | builder | #235 |
 | #352 | builder | |
@@ -61,7 +60,7 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #204 | builder | a stop that was ignored |
+| #204 | builder | a stop that was ignored, as the staged case `stop` shows by failing |
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
 | #315 | the owner | the count of its point 3, which the orchestrator posts on it before the release |
 | #163 | the owner | on hold |
