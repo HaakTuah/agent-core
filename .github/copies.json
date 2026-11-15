@@ -1,6 +1,6 @@
 {
   "baseline": ".github/copies-baseline.json",
   "code": ["scripts/*.mjs", "scripts/*.sh", ".github/workflows/*.yml"],
-  "prose": ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "README.md", "floor/*.md", "modules/*.md", "setup/*.md"],
+  "prose": ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "README.md", "floor/*.md", "modules/*.md", "setup/*.md", ":!setup/sync-notes.md"],
   "proseFromSecurity": false
 }
