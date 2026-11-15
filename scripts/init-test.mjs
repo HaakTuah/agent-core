@@ -135,7 +135,7 @@ if (p.status === 0) {
   const badSpec = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
   fs.writeFileSync(cfgP, cfgPWas);
   ok(secWas.includes("**the rule files:** `docs/threat-model.md`;") && offList.status === 1 && /files fewer than HEAD's config read: docs\/threat-model\.md \(prose\)/u.test(offList.stderr) && mended(offList.stderr)
-    && badSpec.status === 1 && /git cannot read the pathspecs :\(bogus\)x: .*\. Mend: write each in the config as a plain git pathspec/u.test(badSpec.stderr) && mended(badSpec.stderr),
+    && badSpec.status === 1 && /git cannot read the pathspecs :\(bogus\)x: .*\. Mend: write each as a plain git pathspec, .* in the config's "code" or "prose"/u.test(badSpec.stderr) && mended(badSpec.stderr),
     "against the base, a rule file taken off SECURITY.md's list fails, and a pathspec git cannot read fails, each saying its mend", `${offList.stderr}${badSpec.stderr}`);
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)

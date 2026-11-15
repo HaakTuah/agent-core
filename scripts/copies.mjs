@@ -143,7 +143,7 @@ function find(files, units, size, joiner, minChars) {
 const ls = specs => {
   if (!specs.length) return [];
   try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
-  catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${String(e.stderr || e.message).trim().split(/\r?\n/u)[0]}. Mend: write each in the config as a plain git pathspec, a path or a glob, with ":!" before one to leave it out`); }
+  catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${String(e.stderr || e.message).trim().split(/\r?\n/u)[0]}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
 };
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
 const found = runs.flatMap(r => r.copies);
