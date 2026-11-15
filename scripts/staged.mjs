@@ -179,7 +179,7 @@ export function forRelease(record, { boundBefore = false, cut = [] } = {}) {
 // none of its verdicts lost. `before` is the release before ({ sha }), or none.
 export function atRelease(sha, before, git) {
   const at = rev => { try { git(["cat-file", "-e", `${rev}:${RECORD}`]); } catch { return undefined; } try { const r = JSON.parse(git(["show", `${rev}:${RECORD}`])); return Array.isArray(r?.runs) ? r : null; } catch { return null; } };
-  const record = at(sha) ?? (at(sha) === null ? null : { runs: [] });
+  const there = at(sha), record = there === undefined ? { runs: [] } : there;
   const prior = before ? at(before.sha) : undefined;
   const ok = prior && wellFormed(prior);
   return forRelease(record, { boundBefore: ok ? gate(prior).binding : false, cut: ok ? lost(prior, record) : [] });
