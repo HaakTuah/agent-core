@@ -1,9 +1,9 @@
 // Tests of the core-moved check (core-moved.mjs): what it decides, what it reads from a manifest, what it takes for its
-// own issue, and, with a git and a gh of the test's own first on the path, each call it makes. Node's own modules, and
-// jq, which runs the expression gh is handed.
+// own issue, and, with a git and a gh of the test's own first on the path, each call it makes. Node's own modules, git,
+// and jq, which runs the expression gh is handed.
 //
 //   node scripts/core-moved-test.mjs
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -13,8 +13,9 @@ import { ISSUES, TITLE, body, openIssue, pinOf, plan } from "./core-moved.mjs";
 import { ownerOf } from "./releases.mjs";
 
 let failed = 0, count = 0;
-const ok = (cond, what) => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}`); } };
+const ok = (cond, what, detail = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${detail && `\n     ${detail}`}`); } };
 const A = "a".repeat(40), B = "b".repeat(40);
+const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout?.trim() ?? "git";
 // (the scratch project follows the core's main unless a test says otherwise: what a project follows is releases-test.mjs's)
 const manifest = (pin, owner = "| *owner's account* | `someone` |", follows = "| *follows* | `main` |") =>
   `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\n\n| Slot | Here |\n| --- | --- |\n${owner}\n${follows}\n`;
@@ -46,12 +47,15 @@ ok(jq.status === 0 && jq.stdout.trim().split("\n").length === 2 && openIssue(jq.
 
 // The program whole, in a scratch project, with a git and a gh that answer as told and write down what they were asked.
 const script = fileURLToPath(new URL("./core-moved.mjs", import.meta.url));
-function program(pin, newest, issues, args = [], follows = undefined) {
+// (`core`: a scratch core, whose address the stand-in git puts in place of the core's and then runs git itself)
+function program(pin, newest, issues, args = [], follows = undefined, core = "", extra = "") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-test-"));
   const bin = path.join(dir, "bin"), log = path.join(dir, "calls");
   fs.mkdirSync(bin);
-  fs.writeFileSync(path.join(dir, "core-manifest.md"), manifest(pin, undefined, follows));
-  fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\nprintf 'git %s\\n' "$*" >> "${log}"\nprintf '%s\\trefs/heads/main\\n' "${newest}"\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, "core-manifest.md"), manifest(pin, undefined, follows) + extra);
+  fs.writeFileSync(path.join(bin, "git"), core
+    ? `#!/bin/sh\nprintf 'git %s\\n' "$*" >> "${log}"\nfor a; do shift; [ "$a" = "https://github.com/${CORE}" ] && a="${core}"; set -- "$@" "$a"; done\nexec "${realGit}" "$@"\n`
+    : `#!/bin/sh\nprintf 'git %s\\n' "$*" >> "${log}"\nprintf '%s\\trefs/heads/main\\n' "${newest}"\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(dir, "issues"), issues);
   fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> "${log}"\n[ "$1" = api ] && cat "${path.join(dir, "issues")}"\nexit 0\n`, { mode: 0o755 });
   const r = spawnSync(process.execPath, [script, ...args], {
@@ -91,6 +95,21 @@ else {
   ok(r.status === 0 && r.out.includes("no release yet"), "with no row, another owner's project follows the releases");
   r = program(A, B, "", [], "| *follows* | whatever |");
   ok(r.status === 1 && r.calls === "", "a row that says neither fails before anything is asked");
+  // A release that changes nothing the project takes asks no sync of it (#242; the cases themselves: releases-test.mjs).
+  const core = fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-core-"));
+  const g = (...a) => execFileSync(realGit, a, { cwd: core, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } }).trim();
+  const release = (file, text, tag) => { fs.mkdirSync(path.dirname(path.join(core, file)), { recursive: true }); fs.writeFileSync(path.join(core, file), text); g("add", "-A"); g("commit", "-q", "-m", tag); g("tag", tag); return g("rev-parse", "HEAD"); };
+  g("init", "-q", "-b", "main");
+  const r1 = release("modules/a.md", "a", "release-1");
+  release("modules/b.md", "b", "release-2");
+  const takes = list => `\nFloor: whole. Modules: ${list}.\n`;
+  r = program(r1, "", line(12, BOT, TITLE), [], "| *follows* | `releases` |", core, takes("`a.md`"));
+  ok(r.status === 0 && r.out.includes("release-2, is at") && r.out.includes("changes nothing the project takes: close") && /gh issue close 12 .*changes nothing this project takes/.test(r.calls), "a release that changes nothing the project takes closes the issue, saying why", r.out);
+  r = program(r1, "", "", [], "| *follows* | `releases` |", core, takes("`a.md`"));
+  ok(r.status === 0 && r.out.endsWith("changes nothing the project takes: nothing\n") && !/gh issue/.test(r.calls), "and opens none");
+  r = program(r1, "", "", [], "| *follows* | `releases` |", core, takes("all"));
+  ok(r.status === 0 && r.out.endsWith(": open\n") && /gh issue create/.test(r.calls), "where the project takes what it changed, the issue is opened", r.out);
+  fs.rmSync(core, { recursive: true, force: true });
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core-moved check`);

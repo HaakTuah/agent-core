@@ -3,10 +3,12 @@
 // this file). A project follows either the core's main or its releases: what its manifest's *follows* row says, and
 // with no such row, main where its *owner's account* is the account the core is under, the releases where its owner is
 // another, who then takes only what the core's owner chose to hand on. The sync and the core-moved check (sync.mjs,
-// core-moved.mjs) ask here what a project follows and which release is the newest. Every function reads; none writes
-// but fetchCore, into the empty folder it is given. Git and Node's own modules only.
+// core-moved.mjs) ask here what a project follows, which release is the newest, and whether it asks a sync of the
+// project at all (staysAt). Every function reads; none writes but fetchCore, into the empty folder it is given. Git and
+// Node's own modules only.
 import { execFileSync } from "node:child_process";
 import { CORE, OWNER } from "./core-address.mjs";
+import { modulesOf } from "./manifest-reads.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 // a release's name: the word and a whole number above zero, written without leading zeros
@@ -90,4 +92,32 @@ export function asksBetween(old, pin, dir) {
     return git(["diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", old, pin, "--", NOTES], dir)
       .split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
   } catch { return null; }
+}
+
+// What never matters to a project (#242; README.md, point 1): a list exact and short, never a guess. A module its
+// manifest's "Modules:" line does not name (all of them matter where it says "all" or cannot be read), a test of the
+// core's own scripts and the core's own issue forms. Every other file of the core is something the project takes.
+export function matters(file, manifest) {
+  if (/^scripts\/[^/]+-test\.mjs$/.test(file) || file.startsWith(".github/ISSUE_TEMPLATE/")) return false;
+  const module = /^modules\/([^/]+\.md)$/.exec(file)?.[1];
+  const { taken } = modulesOf(manifest);
+  return !(module && taken instanceof Set && !taken.has(module));
+}
+
+// What of what the project takes changed from `old` to `pin` (each file, a removed or renamed one by both its names),
+// or null where the change cannot be read: never an all-clear.
+export function takenBetween(old, pin, manifest, dir) {
+  let files;
+  try { files = inBare(dir, ["diff", "--name-only", "--no-renames", "-z", old, pin]).split("\0").filter(Boolean); } catch { return null; }
+  return files.filter(f => matters(f, manifest));
+}
+
+// Whether a project that follows the releases stays at its pin, the newest release asking no sync of it (#242): its pin
+// is the release just before the newest, and nothing it takes changed between the two. One release at most is passed
+// over: the upgrade test proves a sync from each of the last two (upgrade-test.mjs), so a project that stayed syncs at
+// the next release, whatever that one changes. In doubt it syncs.
+export function staysAt(pin, manifest, dir) {
+  const [newest, before] = releasesIn(dir);
+  if (!newest || before?.sha !== pin || newest.sha === pin) return false;
+  return takenBetween(pin, newest.sha, manifest, dir)?.length === 0;
 }

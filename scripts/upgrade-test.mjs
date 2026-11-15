@@ -18,7 +18,8 @@
 // baseline. After the sync, a pull request that adds a copy fails, and the mend as the failure words it passes; every
 // step a release asks reads done (steps.mjs); each step the commit under test adds over the release started from,
 // taken out, is reported, and its mend as written makes it done; and steps taken out at random are reported, exactly
-// those. Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
+// those; then that a release changing only a test of the core's own asks no sync, and the next one syncs all the same.
+// Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
 // queued, built and closed there passes every check on each pull request. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
@@ -409,6 +410,7 @@ function seed(p, eol) {
     `${p.name}: seeded with old content of each kind a check reads; the copy is listed in its baseline`, first.out);
 }
 
+let synced = null; // (the npm project of the newest release started from, once synced)
 for (const tag of starts) {
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
@@ -423,6 +425,7 @@ for (const tag of starts) {
     write(dir, ".gitignore", "node_modules/\n");
   } });
   seed(npmProject, "\n");
+  synced = npmProject;
   upgrade(npmProject, from, [["touches only its docs", dir => write(dir, "README.md", "# An npm project\n\nMore words.\n")],
     ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
   (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
@@ -446,6 +449,29 @@ for (const tag of starts) {
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
 
+}
+
+// A release that brings nothing a project takes asks no sync of it (#242): with the copy it has just taken, the project
+// stays at the release that carries the change while the next one changes only a test of the core's own scripts, and
+// syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
+if (synced) {
+  const p = synced;
+  let n = Math.max(number(carrying), ...releases.map(number));
+  const testOnly = () => {
+    fs.appendFileSync(path.join(theCore, "scripts", "upgrade-test.mjs"), "\n");
+    git(theCore, "add", "-A");
+    git(theCore, "commit", "-q", "-m", "a test of the core's own, alone");
+    git(theCore, "tag", `release-${++n}`);
+    return git(theCore, "rev-parse", "HEAD");
+  };
+  testOnly();
+  git(p.dir, "checkout", "-q", "-B", "stays", "main");
+  const was = git(p.dir, "status", "--porcelain"), manifest = () => fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8");
+  let s = node(p.dir, "core/scripts/sync.mjs");
+  ok(s.status === 0 && /changes nothing this project takes/.test(s.out) && git(p.dir, "status", "--porcelain") === was && manifest().includes(head), `${p.name}: a release that changes only a test of the core's own scripts asks no sync of it, and changes nothing`, s.out);
+  const third = testOnly();
+  s = node(p.dir, "core/scripts/sync.mjs");
+  ok(s.status === 0 && s.out.includes(`release-${n}`) && manifest().includes(third), `${p.name}: at the next release it syncs all the same, two releases on`, s.out);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: a project of each of the last two releases, synced to this commit, passes every check unchanged`);

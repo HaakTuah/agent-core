@@ -1,6 +1,6 @@
 // Tests of the core's releases (releases.mjs) and of cutting one (release.mjs): what a project follows, which tags are
-// releases, which is the newest and whether it is past a pin, what a sync between two commits asks, and what the next
-// release would be. In a scratch repository that stands in for the core, fetched as the scripts fetch the core; on
+// releases, which is the newest and whether it is past a pin, what a sync between two commits asks, whether a release
+// asks a sync of a project at all, and what the next release would be. In a scratch repository that stands in for the core, fetched as the scripts fetch the core; on
 // Linux and on Windows. Git and Node's own modules only.
 //
 //   node scripts/releases-test.mjs
@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
 import { OWN, costed, held, inTheCore, next } from "./release.mjs";
 import { STEPS } from "./steps.mjs";
-import { NOTES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, namedReleases, newestRelease, ownerOf, past, releasesIn } from "./releases.mjs";
+import { NOTES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -101,6 +101,43 @@ const tip = git(core, "rev-parse", "main");
 let moved = "";
 try { next(dir, c4); } catch (e) { moved = e.message; }
 ok(next(dir, tip).sha === tip && moved.includes("main has moved on"), "asked for one commit, the cut is refused where main's newest commit is another");
+
+// a release that brings nothing a project takes asks no sync of it (#242)
+const taking = list => `# Core manifest\n\nFloor: whole. Modules: ${list}.\n`;
+const onlyA = taking("`how-to-work.md`, `modules/a.md`");
+ok(!matters("scripts/x-test.mjs", onlyA) && !matters(".github/ISSUE_TEMPLATE/f.md", onlyA) && !matters("modules/b.md", onlyA), "what never matters: a test of the core's own scripts, its own issue forms, a module the manifest does not name");
+ok(["modules/a.md", "modules/how-to-work.md", "scripts/x.mjs", "scripts/x-test-data.json", "scripts/sub/y-test.mjs", "floor/security.md", NOTES, ".github/workflows/core.yml", "README.md", "QUEUE.md", "archive/instructions.md"].every(f => matters(f, onlyA)), "everything else matters: a module it names, a script, the floor, the notes, a workflow, the rest of the copy");
+ok(matters("modules/b.md", taking("all")) && matters("modules/b.md", "# Core manifest\n") && matters("modules/b.md", taking("<the list>")), "every module matters where the manifest takes all, or its list cannot be read");
+const other = path.join(tmp, "other");
+fs.mkdirSync(other);
+git(other, "init", "-q", "-b", "main");
+const change = (files, tag) => {
+  for (const [f, text] of Object.entries(files)) {
+    const at = path.join(other, f);
+    if (text === null) fs.rmSync(at); else { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.writeFileSync(at, text); }
+  }
+  git(other, "add", "-A");
+  git(other, "commit", "-q", "-m", tag);
+  git(other, "tag", tag);
+  return git(other, "rev-parse", "HEAD");
+};
+const r1 = change({ "modules/a.md": "a", "modules/b.md": "b", "scripts/x.mjs": "x", "scripts/x-test.mjs": "t", ".github/ISSUE_TEMPLATE/f.md": "f", [NOTES]: head }, "release-1");
+const r2 = change({ "modules/b.md": "b2", "scripts/x-test.mjs": "t2", ".github/ISSUE_TEMPLATE/f.md": "f2" }, "release-2");
+const otherDir = () => { const d = fs.mkdtempSync(path.join(tmp, "other-")); fetchCore(d, other); return d; };
+dir = otherDir();
+ok(takenBetween(r1, r2, onlyA, dir).length === 0 && staysAt(r1, onlyA, dir), "a release that changes only what never matters asks no sync of a project at the release before it");
+ok(takenBetween(r1, r2, taking("`a.md`, `b.md`"), dir).join() === "modules/b.md" && !staysAt(r1, taking("`a.md`, `b.md`"), dir) && !staysAt(r1, taking("all"), dir), "one that changes a module the project takes asks it");
+ok(!staysAt(r2, onlyA, dir) && !staysAt("f".repeat(40), onlyA, dir), "a project at the newest release, or at no release, stays at nothing: there is nothing to pass over");
+ok(takenBetween("f".repeat(40), r2, onlyA, dir) === null && takenBetween(r1, "f".repeat(40), onlyA, dir) === null, "a change that cannot be read is no all-clear");
+const r3 = change({ "scripts/x-test.mjs": "t3" }, "release-3");
+dir = otherDir();
+ok(!staysAt(r1, onlyA, dir) && staysAt(r2, onlyA, dir), "one release is passed over at most: a project that stayed syncs at the next, which the upgrade test proves from either of the last two");
+const r4 = change({ "modules/b.md": null, "modules/c.md": "b2" }, "release-4");
+dir = otherDir();
+ok(takenBetween(r3, r4, taking("`b.md`"), dir).join() === "modules/b.md" && takenBetween(r3, r4, taking("`c.md`"), dir).join() === "modules/c.md", "a module moved matters by either name: a project that names the old one or the new one is asked");
+change({ [NOTES]: `${head}- **New.** Done when new.\n` }, "release-5");
+dir = otherDir();
+ok(!staysAt(r4, onlyA, dir), "a release whose notes ask something new asks a sync");
 
 // the checks on the commit a release would stand on
 const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
