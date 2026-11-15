@@ -107,6 +107,47 @@ const legit = pure();
 ok(legit.status === 0 && legit.out.includes(`sha=${LEGIT}`), "the sync as the script makes it is pure, and the proof names the head it read", legit.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 
+// the security-review check proves the sync pure itself, as GitHub runs its workflow on the sync's pull request (#99):
+// the default branch's pure-sync.mjs, in a clone of the head that checks nothing out, the token sent to the project's
+// own address alone; GitHub's API is a stand-in that gives the pull request and logs the status it is given
+const stubs = path.join(tmp, "bin"), ghData = path.join(tmp, "gh-data.json"), ghLog = path.join(tmp, "gh-log");
+fs.mkdirSync(stubs);
+fs.writeFileSync(path.join(stubs, "gh"), `#!/usr/bin/env node
+const fs = require("fs");
+const a = process.argv.slice(2), data = JSON.parse(fs.readFileSync(process.env.GH_DATA, "utf8"));
+const route = a.find((x, i) => i > 0 && !x.startsWith("-") && !["-X", "--input", "--jq"].includes(a[i - 1]));
+if (a.includes("-X")) { fs.appendFileSync(process.env.GH_LOG, route + " " + fs.readFileSync(0, "utf8") + "\\n"); process.exit(0); }
+const found = Object.entries(data).find(([pattern]) => new RegExp(pattern).test(route));
+if (!found) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }
+console.log(JSON.stringify(a.includes("--slurp") ? [found[1]] : found[1]));
+`, { mode: 0o755 });
+const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+const n = Number(env.GIT_CONFIG_COUNT);
+const reviewEnv = { ...env, [PATHKEY]: `${stubs}${path.delimiter}${env[PATHKEY]}`, GH_DATA: ghData, GH_LOG: ghLog,
+  GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(origin)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: "https://github.com/someone/project.git" };
+const reviewCheck = () => {
+  const sha = git(p, "rev-parse", "HEAD");
+  git(p, "push", "-q", "-f", "origin", `${sha}:refs/pull/1/head`);
+  const files = git(p, "diff", "--name-only", base, sha).split("\n").filter(Boolean).map(filename => ({ filename }));
+  const repo = { full_name: "someone/project" };
+  const pull = { number: 1, state: "open", draft: false, changed_files: files.length, commits: 1, head: { sha, repo }, base: { sha: base, repo: { ...repo, owner: { login: "someone" } } }, user: { login: "someone" } };
+  fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [], "pulls/1/comments": [], "pulls/1/commits": [{ sha, parents: [{ sha: base }] }], "pulls/1/files": files }));
+  fs.writeFileSync(ghLog, "");
+  const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
+    event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false } } };
+  const [job] = runWorkflow(read(theCore, ".github/workflows/security-review.yml"), { github, base: reviewEnv, temp: tmp, inputs: { advisory: false },
+    workspace: () => { const ws = fs.mkdtempSync(path.join(tmp, "ws-")); git(ws, "clone", "-q", origin, "."); return ws; },
+    uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
+  return { passed: job.passed, out: job.steps.map(x => x.out).join(""), posted: fs.readFileSync(ghLog, "utf8") };
+};
+const proved = reviewCheck();
+ok(proved.passed && proved.out.includes("A pure sync, as pure-sync.mjs proves") && /"state": *"success"/.test(proved.posted) && proved.posted.includes("a pure sync, as pure-sync.mjs proves"), "the security-review check runs the proof itself: the sync passes with no review and no note", proved.out + proved.posted);
+write(p, "core/README.md", `${read(p, "core/README.md")}more\n`);
+git(p, "commit", "-q", "-am", "core/ edited");
+const unproved = reviewCheck();
+ok(unproved.passed && unproved.out.includes("Not proved a pure sync") && /"state": *"pending"/.test(unproved.posted) && unproved.posted.includes("no security review has run yet"), "  and one that edits core/ is not proved pure: it waits for its security review", unproved.out + unproved.posted);
+git(p, "reset", "-q", "--hard", LEGIT);
+
 // each way a sync branch can be made to carry more: refused, and where it lies under core/, failed by core.yml too
 let canLink = true;
 try { fs.symlinkSync("nowhere", path.join(tmp, "probe")); } catch { canLink = false; }

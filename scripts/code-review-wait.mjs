@@ -36,7 +36,7 @@ import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, status, whole } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, standsFrom, status, whole } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -66,9 +66,8 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules))) return { sha, done: true, why: "no code review is running" };
   const seen = new Set(posted);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string") seen.add(review.commit_sha);
-  // (a list of commits GitHub cut short, at 250, proves no update from main: only a review of the head stands then)
-  const all = flat(commits);
-  if (Number.isInteger(pull.commits) && all.length >= pull.commits ? stands(all, sha, seen) : seen.has(sha)) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
+  // (a review stands for the head where only updates from main follow it, as security-review.mjs reads them)
+  if ([...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
   const why = `no code review of ${short}: ask one, or post "Code review:" naming its whole SHA (modules/reviews.md)`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
@@ -90,19 +89,6 @@ function needs(pull, files, rules) {
     || (/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.filename) && pinsAlone(file)));
   return !(sync && files.some((file) => file.filename === "core-manifest.md"));
 }
-// whether a reviewed commit stands for the head: the head itself, or reached from it by first parents through merges
-// whose second parent is no commit of the pull request's (updates from main, which nothing reviews twice)
-function stands(commits, head, seen) {
-  const by = new Map(commits.filter((commit) => typeof commit.sha === "string").map((commit) => [commit.sha, commit]));
-  for (let at = head, step = 0; step <= by.size; step++) {
-    if (seen.has(at)) return true;
-    const parents = by.get(at)?.parents;
-    if (!Array.isArray(parents) || parents.length !== 2 || by.has(parents[1]?.sha)) return false;
-    at = parents[0]?.sha;
-  }
-  return false;
-}
-
 if (started(import.meta.url)) {
   const [pullFile, commentsFile, commitsFile, filesFile] = process.argv.slice(2);
   if (!pullFile || !commentsFile) {

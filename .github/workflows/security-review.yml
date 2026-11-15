@@ -64,6 +64,11 @@ on:
         required: false
         type: boolean
         default: false
+      reviewers:
+        description: The accounts, besides the repository's owner, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -105,6 +110,8 @@ jobs:
           NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           ROOT: ${{ inputs.root }}
           ADVISORY: ${{ inputs.advisory }}
+          REVIEWERS: ${{ inputs.reviewers }}
+          SERVER: ${{ github.server_url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -136,8 +143,32 @@ jobs:
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
-          BOUND=$(held security-review.mjs) node "$ROOT/scripts/security-review.mjs" "$d/pull.json" "$d/comments.json" \
-            "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"
+          # a pure sync needs no security review where none starts by itself (floor rule 8; #99): where the pull request
+          # has a sync's shape (the manifest among its files, all of them whole, and none outside core/, it and the
+          # workflows), the default branch's pure-sync.mjs proves it on the head, in a clone of its own that fetches the
+          # head's commits and checks out nothing, so no file of the pull request's is on disk and none runs; git sends
+          # the token to this repository's own address alone, from this command's environment, never written to disk
+          pure=
+          if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
+            && [ "$(jq '[.[][]] | length' "$d/files.json")" = "$(jq '.changed_files' "$d/pull.json")" ] \
+            && jq -e 'any(.[][]; .filename == "core-manifest.md") and all(.[][]; .filename == "core-manifest.md"
+              or (.filename | startswith("core/")) or (.filename | test("^\\.github/workflows/[^/]+\\.ya?ml$")))' \
+              "$d/files.json" > /dev/null
+          then
+            proof="$PWD/$ROOT/scripts/pure-sync.mjs"
+            key=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+            echo "::add-mask::$key"
+            if (n=${GIT_CONFIG_COUNT:-0}
+              export GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader" \
+                "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key"
+              git init -q -b pr "$d/pr" && cd "$d/pr" && git remote add origin "$SERVER/$REPO.git" \
+                && git fetch -q --no-tags --update-head-ok origin "+refs/pull/$NUMBER/head:refs/heads/pr" \
+                && [ "$(git rev-parse refs/heads/pr)" = "$head" ] && timeout 180 node "$proof" > "$d/pure.txt" 2>&1)
+            then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
+            else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
+          fi
+          BOUND=$(held security-review.mjs) PURE="$pure" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+            "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
             echo "The pull request is closed or a draft: nothing to say."

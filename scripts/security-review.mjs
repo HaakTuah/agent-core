@@ -104,12 +104,15 @@ function codex(comments) {
 // passes as it would with no summary at all
 export const UNREAD = "Codex's summary is on the pull request, but its state cannot be read: its form may have changed, and scripts/security-review.mjs must learn it";
 
-// { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name)
-export function judge(pull, comments, reviewComments, commits, files, bound = true) {
+// { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name). more:
+// { reviewers, the accounts besides the repository's owner whose posted review counts; pure, whether pure-sync.mjs
+// proved the head a pure sync }
+export function judge(pull, comments, reviewComments, commits, files, bound = true, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const list = flat(comments);
-  const all = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
+  const whose = counted(pull, more.reviewers);
+  const all = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user?.login));
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
   // while Codex's own runs, only a review posted after it began counts (a time that cannot be read is taken as the
   // newest, so nothing is posted after it)
@@ -118,14 +121,20 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const posted = running ? all.filter((comment) => (Date.parse(comment.created_at) || -Infinity) > began) : all;
   // (a summary's last change that cannot be read is taken as the newest, as above)
   const changed = Number.isFinite(read.changed) ? read.changed : Infinity;
-  let verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits, changed, bound);
+  // the commits a review stands for the head from: the head, and each reached from it through updates from main alone
+  // (given no list of the commits, a workflow older than this script, any review stands for it, as before)
+  const chain = commits === undefined ? undefined : standsFrom(pull, flat(commits), sha);
+  const stand = (at) => chain === undefined || chain.has(at);
+  const forHead = chain === undefined ? posted : posted.filter((comment) => named(comment.body).some((at) => chain.has(at)));
+  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true });
   if (running && !verdict.done && all.length > 0 && posted.length === 0) {
     const why = "Codex's security review is running, begun after every \"Security review:\" posted: wait, or post one now";
     // (one whose head does not hold this check as the default branch does stood before it came: reported)
     verdict = bound ? { sha, done: false, why } : { sha, done: true, why: "before this check came, so not waited for: Codex's security review began after every \"Security review:\"" };
   }
-  // floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted
-  if (verdict.done && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
+  // floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted (a
+  // pure sync needs neither: floor rule 8)
+  if (verdict.done && more.pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
     const codexDone = review !== null && typeof review === "object" && review.status === "completed";
     if ((codexDone ? 1 : 0) + posted.length < 2) {
       const why = `what runs by itself changed: post a second "Security review:" (floor rule 3), or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
@@ -134,6 +143,36 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
     } else verdict = { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
   }
   return warning ? { ...verdict, warning } : verdict;
+}
+
+// whose posted review counts (#99): the repository's owner's, and the accounts the project names (the workflow's input
+// "reviewers"), each by its login, as GitHub gives it and in any case, as GitHub reads one; nobody else's, a member's or
+// a collaborator's neither. One login may post the builder's work and its review alike: that this tells no one apart
+// stays with the reviews (#187)
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$/u;
+export const reviewersOf = (text) => (typeof text === "string" ? text.split(/[\s,]+/u) : []).filter((name) => LOGIN.test(name));
+function counted(pull, reviewers) {
+  const names = new Set([pull.base?.repo?.owner?.login, ...(Array.isArray(reviewers) ? reviewers : [])].filter((name) => typeof name === "string" && LOGIN.test(name)).map((name) => name.toLowerCase()));
+  return (login) => typeof login === "string" && names.has(login.toLowerCase());
+}
+// the commits a comment names by their whole SHA, all forty characters (a shorter one can be made to match another)
+export const named = (body) => (typeof body === "string" ? body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? [] : []).map((at) => at.toLowerCase());
+// the commits a review of which stands for the head (#99): the head, and each reached from it by first parents through
+// merges whose second parent is no commit of the pull request's (updates from main, as GitHub's "Update branch" makes:
+// nothing is reviewed twice, floor rule 8). A list GitHub cut short (250 commits) proves no update from main: the head
+// alone then. scripts/code-review-wait.mjs reads it too.
+export function standsFrom(pull, commits, head) {
+  const chain = new Set([head]);
+  if (!Number.isInteger(pull.commits) || commits.length < pull.commits) return chain;
+  const by = new Map(commits.filter((commit) => typeof commit.sha === "string").map((commit) => [commit.sha, commit]));
+  for (let at = head; chain.size <= by.size;) {
+    const parents = by.get(at)?.parents;
+    if (!Array.isArray(parents) || parents.length !== 2 || typeof parents[0]?.sha !== "string" || typeof parents[1]?.sha !== "string" || by.has(parents[1].sha)) break;
+    at = parents[0].sha;
+    if (chain.has(at)) break;
+    chain.add(at);
+  }
+  return chain;
 }
 
 // whether GitHub gave every file the pull request changes (it gives at most 3000): a list cut short is read as one
@@ -163,34 +202,54 @@ export function pinsAlone(file, pinned = USES) {
 // whether a posted review holds what comment-only.mjs printed on this head: comments and steps' names alone
 const ALONE = /^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/mu;
 export const commentsAlone = (body, sha) => typeof body === "string" && ALONE.test(body) && new RegExp(`^\\s*checked head ${sha}(?![0-9a-f])`, "mu").test(body);
-function judgeWith(sha, list, posted, review, pull, reviewComments, commits, changed, bound) {
+function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, reviewComments, commits, changed, bound, pure }) {
+  const short = sha.slice(0, 7);
+  // what waits, or, on a pull request whose head does not hold this check as the default branch does, which stood
+  // before it came, is told and never held
+  const hold = (why, told = why) => (bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${told}` });
+  // a posted review that names an earlier commit than the head, which nothing but updates from main follow, says so
+  const ofHead = forHead.some((comment) => named(comment.body).includes(sha));
+  const postedWhy = bind && forHead.length > 0 && !ofHead ? "a security review is posted on an earlier commit, only updates from main since" : "a security review is posted on the pull request";
   if (review !== null && typeof review === "object" && review.status === "completed") {
-    const on = typeof review.commit_sha === "string" && SHA.test(review.commit_sha) ? ` (on ${review.commit_sha.slice(0, 7)})` : "";
-    if (review.has_unresolved_findings !== true) return { sha, done: true, why: `Codex's security review has run${on}` };
+    const at = typeof review.commit_sha === "string" && SHA.test(review.commit_sha) ? review.commit_sha : undefined;
+    const on = at === undefined ? "" : at === sha ? ` (on ${short})` : ` (on ${at.slice(0, 7)}, earlier than the head ${short}${bind && stand(at) ? ", only updates from main since" : ""})`;
+    if (review.has_unresolved_findings !== true) {
+      // a review of an earlier commit stands only where nothing but updates from main follow it; otherwise a posted
+      // review names the head, or a commit only such updates follow (a pure sync needs none, its review waited for)
+      if (pure || !bind || (at !== undefined && stand(at))) return { sha, done: true, why: `Codex's security review has run${on}` };
+      if (forHead.length > 0) return { sha, done: true, why: `${postedWhy}; Codex's saw ${at === undefined ? "a commit not named" : `${at.slice(0, 7)}, earlier`}` };
+      return hold(`Codex's review saw ${at === undefined ? "no commit it names" : at.slice(0, 7)}, not the head ${short}. Mend: post a "Security review:" naming the head's whole SHA`, `Codex's review saw ${at === undefined ? "no commit it names" : at.slice(0, 7)}, not the head ${short}`);
+    }
     // a finding of it is marked open: only a review posted after its newest finding, and its summary's last change,
-    // settles it
+    // settles it, and one that names the head (or a commit only updates from main follow)
     const found = newest([...list, ...flat(reviewComments)].filter((comment) => codexs(comment) && FINDING.test(comment.body)).map((comment) => Date.parse(comment.created_at) || Infinity));
-    const last = newest(posted.map((comment) => Date.parse(comment.created_at) || -Infinity));
+    const last = newest(forHead.map((comment) => Date.parse(comment.created_at) || -Infinity));
+    const ever = newest(posted.map((comment) => Date.parse(comment.created_at) || -Infinity));
     if (found !== -Infinity) {
-      if (last <= found) return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
+      if (last <= found) {
+        // (one whose review followed the finding but names no commit the head stands on, from before the check: told)
+        if (!bound && ever > found) return hold("", `a review follows Codex's newest security finding, but names not the head ${short}`);
+        return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
+      }
       // after the newest found, but a newer one may be given in a review's own body alone, which is not fetched: the
       // review settles the mark only if posted after Codex's summary last changed too, the latest that one can have
       // come (#293)
       if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted after its newest finding` };
-      // (one whose head does not hold this check as the default branch does stood before it came, when this settled it:
-      // reported)
-      if (bound) return { sha, done: false, why: "a review follows Codex's newest security finding, but its summary changed since: post a \"Security review:\" now" };
-      return { sha, done: true, why: "before this check came, so not waited for: Codex's summary changed after the review that followed its newest finding" };
+      return hold("a review follows Codex's newest security finding, but its summary changed since: post a \"Security review:\" now", "Codex's summary changed after the review that followed its newest finding");
     }
     // none is to be found among the comments (one in a review's own body, say): only a review posted after Codex's
     // summary last changed settles it, the latest the finding can have come (#251)
     if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}; its open finding is not among the comments, and a review is posted after it` };
     // (one whose head does not hold this check as the default branch does stood before it came: reported, where a
     // review is posted, which settled it before; with none posted it waited before, and waits still)
-    if (bound || last === -Infinity) return { sha, done: false, why: "Codex marks a security finding open, not among the comments: post a \"Security review:\" now" };
-    return { sha, done: true, why: "before this check came, so not waited for: Codex's open security finding is not among the comments, nor a review after it" };
+    if (ever === -Infinity) return { sha, done: false, why: "Codex marks a security finding open, not among the comments: post a \"Security review:\" now" };
+    return hold("Codex marks a security finding open, not among the comments: post a \"Security review:\" now", "Codex's open security finding is not among the comments, nor a review after it");
   }
-  if (posted.length > 0) return { sha, done: true, why: "a security review is posted on the pull request" };
+  // a pure sync, as pure-sync.mjs proved it, needs no review where none has begun by itself (floor rule 8): one that
+  // has, Codex's running, is waited for as above
+  if (pure && !(review !== null && typeof review === "object" && RUNNING.includes(review.status))) return { sha, done: true, why: "a pure sync, as pure-sync.mjs proves: no review needed (floor rule 8)" };
+  if (forHead.length > 0) return { sha, done: true, why: postedWhy };
+  if (posted.length > 0) return hold(`a security review is posted, but names not the head ${short}. Mend: post one naming the head's whole SHA`, `a security review is posted, but names not the head ${short}`);
   // Dependabot's own, with no review of Codex's begun on it: the floor holds it another way (rule 17). Its own means
   // opened by it from a branch of the repository, every commit written by it and signed by GitHub, the head among them.
   const all = flat(commits);
@@ -217,6 +276,9 @@ if (started(import.meta.url)) {
     process.exit(2);
   }
   const read = (file) => JSON.parse(readFileSync(file, "utf8"));
-  const verdict = judge(read(pullFile), read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : [], filesFile ? read(filesFile) : undefined, process.env.BOUND !== "false");
+  // (PURE: the head's whole SHA, where pure-sync.mjs, run by the workflow from the default branch's copy, proved it)
+  const pull = read(pullFile);
+  const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, process.env.BOUND !== "false",
+    { reviewers: reviewersOf(process.env.REVIEWERS), pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha });
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }
