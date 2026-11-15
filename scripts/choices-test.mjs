@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DAYS, KIT, MEASURES, MOST, TITLE, TRIPPED, due, look, parse, records, report, signs, tripped, where } from "./choices.mjs";
+import { DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, due, look, parse, records, report, signs, tripped, trippedBody, where } from "./choices.mjs";
 import { DUE } from "./look.mjs";
 
 let failed = 0, count = 0;
@@ -33,7 +33,7 @@ ok(found.read === "2026-11-15" && found.open === 0, "the day of the last pass is
 ok(parse("## Choice: a\nReopens it:\n").records[0].sign === false, "an empty sign names none");
 ok(parse("Read whole: FILL IN: today\n## Choice: a\nReopens it: FILL IN: the sign\n").open === 2 && parse("Read whole: soon\n").read === null && parse("Read whole: 2026-13-45\n").read === null,
   "a line still to fill in is counted, and a day that is no day is none");
-ok(parse("## Choice: a\u0007b\n").records[0].name === "a b", "a name is printed with no control characters");
+ok(parse("## Choice: a\u0007b\n").records[0].name === "a b" && parse("## Choice: a\u202eb\u200bc\n").records[0].name === "a b c", "a name is printed with no control characters, nor any that reorder or hide text");
 const kitText = fs.readFileSync(path.join(here, "..", "setup", "template", "choices.md.tmpl"), "utf8");
 ok(parse(kitText).records.length === 0 && parse(kitText).open > 0 && due(parse(kitText), at("2030-01-01")) === null,
   "the starter kit's file, its record still to fill in, holds no record yet, so no pass is due in a new project");
@@ -134,6 +134,10 @@ ok(signs({ manifest: "", root: measuredProject }).body === null && /the shape ch
 putIn("docs/choices.md", "## Choice: a\n- Reopens it: x.\n");
 ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "records that name no measure are not read against the shape check at all");
 fs.rmSync(measuredProject, { recursive: true, force: true });
+const many = parse(Array.from({ length: 5000 }, (_, i) => `## Choice: c${i}\nTrips when: \`files > 1\`, \`nothing > 1\`\n`).join(""));
+const long = trippedBody("docs/choices.md", tripped(many, reads), many, "core/");
+ok(long.length < 20000 && long.split("\n").filter(l => l.startsWith("- `c")).length === 2 * LISTED && /- and 4970 more: `node core\/scripts\/choices\.mjs` lists them/.test(long),
+  "however many a file holds, the issue lists a few of each and counts the rest, far under GitHub's limit on a body", `${long.length}`);
 ok(DUE.includes(signs), "the scheduled look reads the signs too");
 const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
 ok(!ownSigns.unread && ownSigns.body === null && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),

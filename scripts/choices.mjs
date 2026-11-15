@@ -31,7 +31,8 @@ export function where(rules) {
   return /^[\w][\w.-]*(\/[\w][\w.-]*)*$/u.test(named) ? named : null;
 }
 
-const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/gu, " ").trim().slice(0, 120);
+// (control characters, and those that reorder or hide text, so a name reads as its bytes)
+const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/gu, " ").trim().slice(0, 120);
 
 // The measures a line "Trips when:" may name, each [what it counts, how it is read from the dose's reading]: numbers
 // the shape check reads on every run (shape.mjs, survey()), never a command.
@@ -119,6 +120,8 @@ export function look({ manifest, at, root = "." }) {
 }
 
 export const TRIPPED = "A choice's sign has tripped";
+// The most conditions, and records naming no measure, its issue lists one by one.
+export const LISTED = 30;
 
 // Each condition of the records that holds today, with the number read: [{ name, measure, op, limit, value }].
 export const tripped = (found, r) => found.records.flatMap(rec => rec.conditions.map(c => ({ name: rec.name, ...c, value: MEASURES[c.measure][1](r) })))
@@ -139,9 +142,11 @@ function measuredSigns(manifest, root) {
 // The issue of a tripped sign's text: each condition that holds, what names no measure, and what its session does.
 export function trippedBody(file, held, found, home) {
   const unknown = found.records.filter(rec => rec.unknown.length);
+  // (a few lines each, the rest counted, so the body stays far under GitHub's limit however many a file holds)
+  const some = (list, line) => [...list.slice(0, LISTED).map(line), ...(list.length > LISTED ? [`- and ${list.length - LISTED} more: \`node ${home}scripts/choices.mjs\` lists them`] : [])];
   return [`A choice's sign, written in a measure the shape check keeps, holds today in \`${file}\` (\`${home}modules/choices.md\`, "What reopens a choice"):`,
-    ...held.map(c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${c.value} ${MEASURES[c.measure][0]}.`),
-    ...(unknown.length ? ["", `What names no measure the look reads, on a line "Trips when:" (the measures: ${Object.keys(MEASURES).join(", ")}):`, ...unknown.map(rec => `- ${shown(rec.name)}: ${rec.unknown.map(shown).join(", ")}`)] : []), "",
+    ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${c.value} ${MEASURES[c.measure][0]}.`),
+    ...(unknown.length ? ["", `What names no measure the look reads, on a line "Trips when:" (the measures: ${Object.keys(MEASURES).join(", ")}):`, ...some(unknown, rec => `- ${shown(rec.name)}: ${rec.unknown.slice(0, LISTED).map(shown).join(", ")}`)] : []), "",
     `A session takes this issue: for each choice above, it writes in a comment here a fresh record that compares the options, staying as it is among them, with the gain and what the move would cost, and labels this issue needs-owner in place of queued; no session makes the choice. Where the owner keeps it, its record's sign is written anew in a pull request, and this issue closes on the look's next run. \`node ${home}scripts/choices.mjs\` reads the signs as they stand.`].join("\n");
 }
 
