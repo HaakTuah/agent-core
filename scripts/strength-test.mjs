@@ -112,16 +112,18 @@ try {
   sh("reset", "-q", "--hard"); sh("clean", "-qfd", "--", "src");
   // (a starter kit's config reads the whole project as code: an audit's pull request that changes only the config,
   // the baseline and its report still changes no code or test)
-  sh("checkout", "-q", "main"); sh("checkout", "-q", "-b", "audit");
+  sh("checkout", "-q", "main"); sh("checkout", "-q", "-b", "kit");
   write("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: [".", ":!core/"], tests: ["test"] }));
+  sh("commit", "-qam", "the kit's config"); sh("checkout", "-q", "-b", "audit");
   write("docs/audits/2026-12-01.md", "the audit's report\n");
   r = run(["--whole"]);
-  const audit = run([], { STRENGTH_BASE: "main" });
-  ok(r.status === 0 && audit.status === 0 && !audit.stderr.includes("FAIL"), "where the config reads the whole project, the audit's pull request (its config, baseline and report alone) takes in what its whole run found", r.stdout + r.stderr + audit.stdout + audit.stderr);
-  write("src/a.js", "export const a = x => x === 1;\nexport const b = y => y === 2;\nexport const d = 4;\n");
-  const coded = run([], { STRENGTH_BASE: "main" });
-  ok(coded.status === 1 && coded.stderr.includes("where the base did not"), "and one that also changes a file of code does not", coded.stdout + coded.stderr);
-  sh("checkout", "-q", "-f", "next"); fs.rmSync(path.join(dir, "docs"), { recursive: true });
+  const audit = run([], { STRENGTH_BASE: "kit" });
+  ok(r.status === 0 && audit.status === 0 && !audit.stderr.includes("FAIL"), "where the config reads the whole project, the audit's pull request (its baseline and report alone) takes in what its whole run found", r.stdout + r.stderr + audit.stdout + audit.stderr);
+  write("data/levels.json", "{}\n");
+  sh("add", "data/levels.json");
+  const data = run([], { STRENGTH_BASE: "kit" });
+  ok(data.status === 1 && data.stderr.includes("where the base did not"), "and one that also changes a file the code reads, data too, does not", data.stdout + data.stderr);
+  sh("checkout", "-q", "-f", "next"); for (const f of ["docs", "data"]) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
   r = run(["--lower", "src/a.js"], { STATUS: "Pending" });
   ok(r.status === 1 && mended(r.stderr) && JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed && Object.keys(JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed).length === 1, "a cleaning task's run that left faults not run lowers nothing, and says the mend", r.stdout + r.stderr);
   r = run(["--lower", "src/a.js"], { STATUS: "Killed" });

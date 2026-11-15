@@ -230,8 +230,8 @@ const listed = specs => (specs.length ? git(["ls-files", "-z", "--cached", "--ot
 
 // The project as the check reads it: its tool, its config, its code (each file of the config's "code" in a language
 // the core knows by its ending, JavaScript's, TypeScript's or another's, that is no test) and the baseline's path. A
-// change "touches" the code or the tests where it changes a file of either ending or a test file, never the baseline
-// or a report beside them.
+// change "touches" the code or the tests where it changes any file their pathspecs read (data the code reads too),
+// but the two baselines and a text in Markdown, such as an audit's report.
 function project() {
   const { text, home } = rulesHere(), tool = toolOf(text);
   const configAt = where(text);
@@ -252,8 +252,8 @@ function onPullRequest(p, base) {
     console.log(`Reported only, and not measured: ${e.message}`);
   }
   const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
-  const tests = new Set([...listed(p.config.tests), ...deleted]), ending = f => [...CODE, ...OTHER].includes(path.posix.extname(f));
-  const touched = git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && (ending(f) || tests.has(f)));
+  const record = new Set([p.at, p.config.baseline]);
+  const touched = git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && !record.has(f) && path.posix.extname(f) !== ".md");
   const gone = baseline ? moved(baseline.listed, f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null)) : new Map();
   const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
