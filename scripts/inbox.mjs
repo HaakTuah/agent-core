@@ -1,13 +1,15 @@
 // Where the owner's inbox is (modules/inbox.md, "Issues are the way in"; core archive 216): the project's issues, where
 // they can be read and written here, else the folder inbox/ in the repository, the same flow run from files. Asked of
 // GitHub's API through gh, for the repository origin's address names: issues switched on, and the account gh is signed
-// in as may write them (triage or more). Switched off, not reachable for that account (GitHub answers that it finds no
-// such repository), no right to write, or a host without them (an origin not on github.com, or none) all count as no.
+// in as may write them (triage or more), or, for an app's token such as GitHub's job's, GitHub takes a write of them
+// from it (asked()). Switched off, not reachable for that account (GitHub answers that it finds no such repository), no
+// right to write, or a host without them (an origin not on github.com, or none) all count as no.
 // Only an answer decides: where gh is not installed, answers for no account, or gives no answer at all (no network, a
 // rate limit, a fault of GitHub's), nothing is asked, so that a passing fault never moves the inbox, and it says what to
 // ask with the session's own GitHub tools. It prints where the inbox is and, where the place must change,
 // the mend, worded so a session acts on it with no rule file open; one place at a time, the open files are moved over
-// once issues can be reached. It reads only and fails nothing (exit 0), save where it is not run from a repository's root.
+// once issues can be reached. It reads only (asked()'s writes of an empty body create nothing) and fails nothing (exit
+// 0), save where it is not run from a repository's root.
 // Run at each sync (sync.mjs, beside this file) and on the scheduled look. Git, gh and Node's own modules.
 //
 //   node core/scripts/inbox.mjs          from a project's root: where the owner's inbox is, and any mend
@@ -34,7 +36,36 @@ export function answer(repo) {
   if (!repo || typeof repo !== "object") return { yes: false, why: "GitHub gave no answer for the repository" };
   if (repo.has_issues !== true) return { yes: false, why: "its issues are switched off" };
   const p = repo.permissions ?? {};
-  if (!(p.admin || p.maintain || p.push || p.triage)) return { yes: false, why: "the account signed in here may not write its issues" };
+  if (!(p.admin || p.maintain || p.push || p.triage)) return { yes: false, why: "the account signed in here may not write its issues (a GitHub job's token may where its workflow's `permissions:` grants `issues: write`)" };
+  return { yes: true, why: "" };
+}
+
+// What gh made of a POST (`status`, its exit; `err`, what it wrote to stderr) as an answer to whether the token may write
+// there: "yes" for HTTP 422 (the right is there, the empty body refused) or a success, "no" for HTTP 403 or 404 that is no
+// rate limit (GitHub refuses the token), null for anything else (no answer).
+export const tried = (status, err = "") => status === 0 || /\bHTTP 422\b/.test(err) ? "yes"
+  : Number.isInteger(status) && /\bHTTP 40[34]\b/.test(err) && !/rate limit/i.test(err) ? "no" : null;
+
+// A POST of an empty body to `route`, through gh: { status, err } as tried() reads them.
+export const postEmpty = route => {
+  const r = spawnSync("gh", ["api", "-X", "POST", route, "--input", "-"], { input: "{}", encoding: "utf8" });
+  return { status: r.error ? null : r.status, err: `${r.stderr ?? ""}` };
+};
+
+// answer(), and where it reads no right to write though issues are on, GitHub asked once more (#338): the `permissions`
+// GitHub gives are a signed-in user's role, and an app's token (GitHub's job's own) has no user, so they read no write
+// whatever the job grants. `post` then sends an empty body to create a label and an issue, which creates nothing: GitHub
+// refuses a token without the right before it reads the body, and answers one with it that the body is not valid. Both
+// answered so: yes (the label too, since a reader may open an issue but never make a label); either refused: answer()'s
+// no; anything else: null, no answer, so a passing fault never moves the inbox. `repo`: "owner/name".
+export function asked(repo, got, post = postEmpty) {
+  const first = answer(got);
+  if (first.yes || got?.has_issues !== true) return first;
+  for (const route of ["labels", "issues"]) {
+    const { status, err } = post(`repos/${repo}/${route}`) ?? {};
+    const said = tried(status, err);
+    if (said !== "yes") return said === "no" ? first : null;
+  }
   return { yes: true, why: "" };
 }
 
@@ -78,7 +109,7 @@ function main() {
     let got = null;
     try { got = r.status === 0 ? JSON.parse(r.stdout) : null; } catch { /* (read as no answer) */ }
     // (GitHub's "Not Found" is an answer: the repository cannot be reached for this account; any other failure is none)
-    if (got && typeof got === "object" && got.permissions) reach = answer(got);
+    if (got && typeof got === "object" && got.permissions) reach = asked(repo, got);
     else if (!r.error && r.status !== 0 && /\bHTTP 404\b/.test(`${r.stderr}`)) reach = { yes: false, why: `GitHub finds no repository ${repo} for the account signed in here` };
     else reach = null;
   }
