@@ -18,6 +18,7 @@
 //   node scripts/staged.mjs --wrong <case> <why>    marks the case's last recorded verdict as found wrong, and why
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fingerprint, ROOT, rules, rulesAt } from "./rules.mjs";
 import { started } from "./started.mjs";
@@ -184,6 +185,16 @@ export function dueIssue({ manifest, at }) {
   };
 }
 
+// A verdict's reason as the record keeps it: the machine's temporary and home folders named by placeholder, so no
+// account's path reaches a committed file (floor rule 11).
+export function unplaced(why) {
+  let out = String(why);
+  for (const [at, as] of [[os.tmpdir(), "<temp>"], [os.homedir(), "<home>"]]) {
+    for (const p of new Set([at, (() => { try { return fs.realpathSync(at); } catch { return at; } })()])) if (p && p.length > 1) out = out.split(p).join(as);
+  }
+  return out;
+}
+
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
   const get = flag => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] ?? null : null; };
@@ -211,7 +222,7 @@ function main(argv) {
       // (a run of its own each time: no verdict, nor its mark, is ever written over)
       const run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} };
       record.runs.push(run);
-      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: v.why, rules: meta.rules, recorded: new Date().toISOString() };
+      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: unplaced(v.why), rules: meta.rules, recorded: new Date().toISOString() };
       writeRecord(record);
       console.log(`recorded in ${RECORD}`);
     }

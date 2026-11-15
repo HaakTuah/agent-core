@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, wellFormed } from "./staged.mjs";
+import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, unplaced, wellFormed } from "./staged.mjs";
 import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
@@ -223,6 +223,9 @@ if (process.platform !== "win32") {
   let oddRead = null; try { branchesOf(odd); } catch (e) { oddRead = e; }
   ok(oddRead instanceof Unreadable, "a ref of no plain name (a line's end in it) makes the repository unreadable");
 }
+
+// (the fallback reviewer's review of d8e0275)
+ok(!unplaced(`${path.join(os.tmpdir(), "x")} and ${path.join(os.homedir(), "y")} are gone`).includes(os.tmpdir()) && unplaced("a ref of no plain name") === "a ref of no plain name", "a verdict's reason is recorded with the temporary and home folders as placeholders");
 
 // (Codex's fifth review)
 const onlyNamed = fresh("no-question");

@@ -29,28 +29,37 @@ const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? 
 // The readers' git. The readers never run git in the session's repositories, whose config, attributes, hooks and
 // links the session could have written: they read the refs and reflogs there as plain files, refusing a link, and
 // read the objects through a repository of their own, made afresh in the temporary folder and pointed at the session's
-// objects (view). Each call also turns off what runs a command, writes no index, runs with no variable of the
+// objects (view). Each call also points git's hooks, templates and user config at nothing (quiet), turns off what
+// else runs a command, writes no index, runs with no variable of the
 // machine's but where programs are found (no sign-in or token), and stops after a time; every ref it is given follows
 // --end-of-options at the call. Gives the output, or null where git failed.
 export const LIMITS = { run: 20000 };
-// (the readers' own empty folder and empty config, made once in a folder of their own, the same on every platform:
-// git for Windows reads no hooks folder or config file at its device name for "nothing")
+// Where git is told to find no hooks, no templates and no config of the user's. On Linux and macOS, the null device,
+// which nothing can write into. Git for Windows takes no hooks folder or config file at that device's name, so there
+// an empty folder and an empty file of the readers' own are made once, under a name no one can guess, and checked
+// before every use to be still empty: code of the session's that the readers run could otherwise plant a hook there
+// (a failed check makes the reading fail, as Unreadable).
 let quietFolder = null;
 const quiet = () => {
+  if (process.platform !== "win32") return { hooks: os.devNull, config: os.devNull, templates: "" };
   if (!quietFolder) {
-    quietFolder = fs.mkdtempSync(path.join(os.tmpdir(), "staged-quiet-"));
-    fs.mkdirSync(path.join(quietFolder, "no-hooks"));
-    fs.writeFileSync(path.join(quietFolder, "no-config"), "");
-    process.on("exit", () => fs.rmSync(quietFolder, { recursive: true, force: true }));
+    const made = fs.mkdtempSync(path.join(os.tmpdir(), "staged-quiet-"));
+    process.on("exit", () => fs.rmSync(made, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(made, "no-hooks"));
+    fs.writeFileSync(path.join(made, "no-config"), "");
+    quietFolder = made;
   }
-  return quietFolder;
+  const hooks = path.join(quietFolder, "no-hooks"), config = path.join(quietFolder, "no-config");
+  const h = fs.lstatSync(hooks), c = fs.lstatSync(config);
+  if (!h.isDirectory() || fs.readdirSync(hooks).length || !c.isFile() || c.size) throw new Unreadable(`the readers' own empty folder was written into while the case was read`);
+  return { hooks, config, templates: hooks };
 };
-const SAFE_ = () => ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${path.join(quiet(), "no-hooks")}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
+const SAFE_ = () => ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${quiet().hooks}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
   // (nothing of the session's that would change what git reads: its commit-graph, pack indexes and bitmaps go unread)
   "-c", "core.commitGraph=false", "-c", "core.multiPackIndex=false", "-c", "pack.useBitmaps=false",
   // (and no .gitattributes of any tree's: attributes are read from git's empty tree alone)
   "-c", "attr.tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904"];
-const QUIET_ = () => ({ ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: path.join(quiet(), "no-config"), GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: path.join(quiet(), "no-hooks"), GIT_NO_REPLACE_OBJECTS: "1" });
+const QUIET_ = () => ({ ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: quiet().config, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: quiet().templates, GIT_NO_REPLACE_OBJECTS: "1" });
 export const readGit = (cwd, ...args) => {
   const r = spawnSync("git", [...SAFE_(), ...args], { cwd, env: QUIET_(), encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
   return r.status === 0 ? r.stdout : null;
@@ -109,8 +118,8 @@ function view(dir, which) {
   const at = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-")), "view.git");
   const run = (args, input) => spawnSync("git", [...SAFE_(), ...args], { env: QUIET_(), encoding: "utf8", input, timeout: LIMITS.run });
   const made = run(["init", "-q", "--bare", at]);
-  if (made.status !== 0) throw new Unreadable(`the reader's own repository could not be made (git: ${String(made.stderr ?? made.error ?? "").trim().slice(0, 300)})`);
-  // (its HEAD names a ref the reader never writes; attributes come from the empty tree in any case, SAFE's attr.tree)
+  if (made.status !== 0) throw new Unreadable(`the reader's own repository could not be made (git: ${String(made.stderr || made.error || "no answer").trim().slice(0, 300)})`);
+  // (its HEAD names a ref the reader never writes; attributes come from the empty tree in any case, SAFE_'s attr.tree)
   run([`--git-dir=${at}`, "symbolic-ref", "HEAD", "refs/staged-reader/none"]);
   fs.writeFileSync(path.join(at, "objects", "info", "alternates"), `${fs.realpathSync(path.join(gitDir, "objects")).replace(/\\/g, "/")}\n`);
   const lines = Object.entries(refs).filter(([r, sha]) => r !== "HEAD" && !r.startsWith("refs/replace/") && sha).map(([r, sha]) => `update ${r} ${sha}\n`).join("");
