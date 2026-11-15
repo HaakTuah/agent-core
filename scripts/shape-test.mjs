@@ -149,12 +149,8 @@ v = judge({ now: { "src/rules/a.js": "export const a = 1;\n", "src/old.js": "exp
 ok(mended(said(v)) && v.fail.length === 1 && /1 new file of code lies in no system/.test(said(v)) && v.fail[0].slice(1).join() === "  src/new.js", "once a system is named, a file of code the pull request adds that lies in none fails; one the base held does not", said(v));
 v = judge({ now: { "src/new.js": "export const n = 1;\n" }, baseline: listed([]), base: baseOf(listed([]), {}) });
 ok(v.fail.length === 0, "where no system is named yet, none does");
-const wide = { "src/a.js": long("tall", 100), "lib/b.js": long("hidden", 70) }, narrow = config({}), wider = JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src", "lib"] });
-const less = then => ({ ...baseOf(listed([f100]), then, wider), under: () => ({ now: { texts: wide, tests: new Set() }, then: { texts: then, tests: new Set() } }) });
-v = judge({ now: { "src/a.js": long("tall", 100) }, conf: parseConfig(narrow), baseline: listed([f100]), base: less({ "src/a.js": long("tall", 100) }) });
-ok(mended(said(v)) && v.fail.length === 1 && /1 breach that origin\/main's config finds new is not read by the config as this change leaves it/.test(said(v)) && /lib\/b\.js#hidden/.test(said(v)), "a config changed to read less fails where the base's config finds a new breach in what it no longer reads", said(v));
-v = judge({ now: { "src/a.js": long("tall", 100) }, conf: parseConfig(narrow), baseline: listed([f100]), base: less(wide) });
-ok(v.fail.length === 0, "and passes where what it no longer reads holds nothing new");
+v = judge({ now: { "src/rules/a.js": "import '../view/b.js';\n", "src/view/b.js": "export const b = 1;\n" }, conf: cfg(two({ uses: ["view"] }, {})), baseline: listed([]), base: baseOf(listed([]), { "src/view/b.js": "export const b = 1;\n" }, config(two({}, {}))) });
+ok(v.fail.length === 0, "a use declared in the config with its first import passes: declaring is how a dependency is allowed, and the reviews read the config's change", said(v));
 ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read: 90 }, listed: {} }), "b.json", "").audited.listed === 3, "a baseline keeps the day and the counts of its last audit");
 
 // ---- whole runs, in a scratch repository ----

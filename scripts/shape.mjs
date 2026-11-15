@@ -15,9 +15,10 @@
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
 // config reads that branch's code (the check reads more: a system named, a mark lowered, the first baseline), or
 // where the baseline gives its reason under "grown", as a raised mark's is given, which the reviews read
-// (modules/review-guidelines.md, "What blocks"). A config changed to read less (its code, tests, systems, platform or
-// aliases) fails where the base's config finds a breach new in what it no longer reads, and neither the config nor the
-// baseline is read or written through a link. An entry that is gone is taken out with --write, which lowers the
+// (modules/review-guidelines.md, "What blocks"). Neither the config nor the baseline is read or written through a
+// link. What a change to the config itself makes the check read (a use declared, a folder left out) no rule here
+// judges, since none could without guessing what was meant: the config is a protected file, and the reviews read
+// its change (floor rule 3). An entry that is gone is taken out with --write, which lowers the
 // numbers that fell too, and a pull request that leaves one standing fails, so the baseline lists the debt as it is,
 // and what was mended cannot come back. It never guesses: an import that
 // leads nowhere it can tell, a file that holds JSX (whose functions its reader cannot tell) and a file in another
@@ -444,24 +445,12 @@ function againstBase({ config, at, baseline, base, found }) {
   let joined = unclaimed(baseline.listed, was ?? new Map(), config.marks);
   if (joined.length) joined = unclaimed(new Map(joined.map(id => [id, baseline.listed.get(id)])), base.stood(), config.marks).filter(id => !said(baseline.grown, id));
   if (joined.length) fail.push([`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} neither listed nor held, and the baseline only shrinks. Mend: take each out of the baseline and mend the code as the check then says; only where there is no other way, give each its reason under "grown" in the baseline, by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...some(joined, baseline.listed)]);
-  fail.push(...readsLess({ config, old, base, current: found.entries }));
   // (once a system is named, a file of code the base did not hold lies in one)
   const loose = Object.keys(config.systems).length ? found.unnamed.filter(f => !(f in base.standing().texts)) : [];
   if (loose.length) fail.push([`FAIL: ${plural(loose.length, "new file", "new files")} of code ${loose.length === 1 ? "lies" : "lie"} in no system. Mend: put each under the "paths" of the system it belongs to in ${at}, or name its system there, with its paths, the systems it uses and its entrance`, ...loose.slice(0, 20).map(f => `  ${f}`)]);
   const unsaid = (old ? raised(config, old) : []).filter(id => !said(baseline.grown, id));
   if (unsaid.length) fail.push([`FAIL: ${at} raises or drops ${plural(unsaid.length, "mark")} against ${base.name}. Mend: first make the code or the suite fit its mark; only where it cannot, give the raise its reason under "grown" in ${config.baseline}, by the id below, and in the pull request, with a fresh session's word there that it found no other way`, ...unsaid.map(id => `  ${id}`)]);
   return fail;
-}
-
-// Where the config changed against the base's: what the base's config, with this one's marks, finds new in the code
-// as it stands, and this config no longer reads. A config may not be made to read less so that a breach passes.
-function readsLess({ config, old, base, current }) {
-  const parts = c => JSON.stringify([c.code, c.tests, c.systems, c.platform, c.aliases]);
-  if (!old || !base.under || parts(old) === parts(config)) return [];
-  const { now, then } = base.under({ ...old, marks: config.marks });
-  const entries = at => new Map([...survey(at.texts, { ...old, marks: config.marks }, at.tests).entries].map(([id, e]) => [id, e.n]));
-  const found = entries(now), hidden = unclaimed(found, entries(then), config.marks).filter(id => !current.has(id));
-  return hidden.length ? [[`FAIL: ${plural(hidden.length, "breach", "breaches")} that ${base.name}'s config finds new ${hidden.length === 1 ? "is" : "are"} not read by the config as this change leaves it. Mend: mend each as the base's config asks, or take back the part of the config's change that reads less (its "code", "tests", "systems", "platform" or "aliases")`, ...some(hidden, found)]] : [];
 }
 
 // What the check read and does not hold, each said, never failed.
@@ -476,7 +465,7 @@ function notesOf(read) {
 
 // The check's verdict on a project: { fail: [[line, ...details]], notes, listed, read }. `base`, where the pull
 // request's base is known: { name, baseline (its text there, or null), config (its text there, or null), standing: ()
-// => the base's files as `config` reads them, under: c => the files now and at the base as a config `c` reads them }.
+// => the base's files as `config` reads them }.
 export function verdict({ config, at, self, found, baselineText, base }) {
   const restore = base ? `take it back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write` : `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`;
   const baseline = parseBaseline(baselineText, config.baseline, restore);
@@ -577,7 +566,7 @@ function unwritten(self, base) {
 function check(config, at, self, found, base) {
   if (!fs.existsSync(notLinked(config.baseline))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
-    base: base && { name: base.name, baseline: base.show(config.baseline), config: base.show(at), standing: () => standingAt(base.name, config), under: c => ({ now: standing(c), then: standingAt(base.name, c) }) } });
+    base: base && { name: base.name, baseline: base.show(config.baseline), config: base.show(at), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${note}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(line);
