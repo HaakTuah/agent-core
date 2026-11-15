@@ -88,7 +88,7 @@ const p = project("a-project", "--owner", "someone-else", "--npm", "tools");
 const has = f => fs.existsSync(path.join(p.dir, f)), read = f => fs.readFileSync(path.join(p.dir, f), "utf8");
 ok(p.status === 0 && p.out.includes("The starter kit is written") && p.out.includes("FILL IN"), "it writes a project and says what is left", p.out.slice(0, 600));
 if (p.status === 0) {
-  ok(FILES.every(([, to, when]) => has(to) === (!when || !!when({ packages: "tools" }))) && has("checks/sizes.json") && has("checks/licences.json") && has("checks/copies-baseline.json") && has("core/floor/security.md") && !has("core/reports"), "every file its options ask for is there and no other of the kit's, with the copy of the core, without what the core keeps to itself");
+  ok(FILES.every(([, to, when]) => has(to) === (!when || !!when({ packages: "tools" }))) && has("checks/sizes.json") && has("checks/licences.json") && has("checks/copies-baseline.json") && has("checks/shape-baseline.json") && has("core/floor/security.md") && !has("core/reports"), "every file its options ask for is there and no other of the kit's, with the copy of the core, without what the core keeps to itself");
   const manifest = read("core-manifest.md");
   ok(new RegExp(`^Core: ${CORE_SOURCE} at ${pin}, copied whole under core/`, "m").test(manifest) && /^\| \*owner's account\* \| `someone-else` \|$/m.test(manifest), "the manifest pins the commit and names the owner's account, as core.yml reads them");
   ok(read("AGENTS.md").startsWith("# a-project\n") && read(".github/workflows/signatures.yml").includes('directory: "tools"') && read(".github/dependabot.yml").includes('directory: "/tools"') && read(".github/ISSUE_TEMPLATE/bug_report.md").includes("assignees: someone-else"), "the project's name is its folder's, and the npm folder and the owner are where they belong");
@@ -99,6 +99,7 @@ if (p.status === 0) {
     ["the pointer check", "core/scripts/pointers.mjs"],
     ["the workflow check", "core/scripts/workflows.mjs"],
     ["the copies check", "core/scripts/copies.mjs", "checks/copies.json"],
+    ["the shape check", "core/scripts/shape.mjs"],
     ["the licence check", "core/scripts/licences.mjs", "checks/licences.json"],
     ["the reading-size check", "core/scripts/reading-size.mjs", "checks/sizes.json"],
   ]) {
@@ -146,6 +147,24 @@ if (p.status === 0) {
   ok(secWas.includes("**the rule files:** `docs/threat-model.md`;") && offList.status === 1 && /files fewer than HEAD's config read: docs\/threat-model\.md \(prose\)/u.test(offList.stderr) && mended(offList.stderr)
     && badSpec.status === 1 && /git cannot read the pathspecs :\(bogus\)x: .*\. Mend: write each as a plain git pathspec, .* in the config's "code" or "prose"/u.test(badSpec.stderr) && mended(badSpec.stderr),
     "against the base, a rule file taken off SECURITY.md's list fails, and a pathspec git cannot read fails, each saying its mend", `${offList.stderr}${badSpec.stderr}`);
+  // (code that matches other code once names and numbers are set aside is reported by the copies check, and fails
+  // nothing; a function past a mark, which the kit's own shape config reads from the first day, fails with its mend)
+  const twin = (a, b) => [`export function ${a}(seed, ${b}) {`, `  const ${a}Start = ${b}.first(seed) + 1;`, `  let ${a}Total = ${a}Start * 2;`, `  if (${a}Total > ${b}.limit) ${a}Total = ${b}.limit - 3;`, `  for (const ${a}Item of ${b}.items) ${a}Total += ${a}Item.weight;`,
+    `  const ${a}Mean = ${a}Total / (${b}.items.length || 1);`, `  const ${a}Label = ${b}.name + ": " + String(${a}Mean);`, `  ${b}.record(${a}Label, ${a}Mean, 7);`, `  while (${a}Total > 100) ${a}Total -= ${b}.step;`, `  return [${a}Start, ${a}Total, ${a}Mean];`, "}", ""].join("\n");
+  fs.mkdirSync(path.join(p.dir, "src"));
+  fs.writeFileSync(path.join(p.dir, "src/one.js"), twin("left", "table"));
+  fs.writeFileSync(path.join(p.dir, "src/two.js"), twin("right", "sheet"));
+  fs.writeFileSync(path.join(p.dir, "checks/near.json"), JSON.stringify({ baseline: "checks/near-baseline.json", code: ["src"], prose: [] }));
+  git(p.dir, "add", "src");
+  spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/near.json", "--first"], { cwd: p.dir, env, encoding: "utf8" });
+  const near = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/near.json"], { cwd: p.dir, env, encoding: "utf8" });
+  ok(near.status === 0 && /note 1 run of code matches another once names and numbers are set aside/.test(near.stdout) && /^  src\/one\.js:1-10 and src\/two\.js:1-10$/m.test(near.stdout) && /no new copies \(0 old ones/.test(near.stdout),
+    "code that matches other code once names and numbers are set aside is reported, and fails nothing", `${near.stdout}${near.stderr}`);
+  fs.writeFileSync(path.join(p.dir, "src/long.js"), `export function long(a) {\n${"  a++;\n".repeat(70)}}\n`);
+  const shaped = spawnSync(process.execPath, ["core/scripts/shape.mjs"], { cwd: p.dir, env: { ...env, SHAPE_BASE: "HEAD" }, encoding: "utf8" });
+  ok(shaped.status === 1 && /1 function passes a mark/.test(shaped.stderr) && mended(shaped.stderr), "a function past a mark fails the shape check in a project the kit wrote, from its first day", `${shaped.stdout}${shaped.stderr}`);
+  git(p.dir, "rm", "-rqf", "--cached", "src");
+  for (const f of ["src", "checks/near.json", "checks/near-baseline.json"]) fs.rmSync(path.join(p.dir, f), { recursive: true, force: true });
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
