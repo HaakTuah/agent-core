@@ -137,6 +137,30 @@ if (p.status === 0) {
   ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*modules\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
     "the core's own copies check passes on the core, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
+  // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
+  // this one does not, fails with its mend, and the mend as worded passes; a config widened passes)
+  const cfgAt = path.join(core, ".github/copies.json"), cfgWas = fs.readFileSync(cfgAt, "utf8");
+  const againstBase = change => {
+    fs.writeFileSync(cfgAt, JSON.stringify(change(JSON.parse(cfgWas))));
+    const r = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "main" }, encoding: "utf8" });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  const same = againstBase(c => c);
+  fs.copyFileSync(path.join(core, ".github/copies-baseline.json"), path.join(core, ".github/moved.json"));
+  const moved = againstBase(c => ({ ...c, baseline: ".github/moved.json" }));
+  fs.rmSync(path.join(core, ".github/moved.json"));
+  const narrowed = againstBase(c => ({ ...c, prose: c.prose.filter(p => p !== "CLAUDE.md") }));
+  const narrowedCode = againstBase(c => ({ ...c, code: c.code.filter(p => p !== ".github/workflows/*.yml"), prose: [...c.prose, ".github/workflows/*.yml"] }));
+  const widened = againstBase(c => ({ ...c, prose: [...c.prose, ".node-version"] }));
+  git(core, "checkout", "-q", "main", "--", ".github/copies.json");
+  const mendedRun = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "main" }, encoding: "utf8" });
+  const back = /Mend: take the config back as main holds it \(git checkout main -- \.github\/copies\.json\)/u;
+  ok(same.status === 0 && widened.status === 0
+    && moved.status === 1 && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(moved.out) && back.test(moved.out) && mended(moved.out)
+    && narrowed.status === 1 && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(narrowed.out) && back.test(narrowed.out) && mended(narrowed.out)
+    && narrowedCode.status === 1 && /\.github\/workflows\/[^ ]+\.yml \(code\)/u.test(narrowedCode.out) && mended(narrowedCode.out)
+    && mendedRun.status === 0,
+    "against the base, a baseline moved or a file left out of the config fails, saying its mend, and the mend passes; a config widened passes", `${same.out}${moved.out}${narrowed.out}${narrowedCode.out}${widened.out}${mendedRun.stdout}${mendedRun.stderr}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;

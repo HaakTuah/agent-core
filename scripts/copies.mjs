@@ -3,7 +3,9 @@
 // places, unless the baseline lists every window of it (a run of lines or words) in as many places, as one of the old
 // copies, which are removed over time and never added to. A listed window gone or in fewer places fails too, so the
 // baseline only shrinks. A copy may move (cut from one place, pasted in another), since its places do not grow: moving
-// is how a fact reaches its better home. Node's own modules only, so the check needs no install. It runs from the
+// is how a fact reaches its better home. Against the base the config holds too: the baseline stays at the base's path,
+// and every file the base's config read is read still, as the same kind, so the check never reads less (#348); a path
+// may be added. Node's own modules only, so the check needs no install. It runs from the
 // project's root, whatever the directory it is started from.
 //
 //   node core/scripts/copies.mjs <config>            the check
@@ -15,6 +17,7 @@
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
 // to add the project's rule files: those floor rule 3 names and those its SECURITY.md adds (rule-files.mjs, beside it).
 import fs from "node:fs";
+import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -37,6 +40,10 @@ const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
 if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
+// (the config's path from the root, as git names it at the base: git says it, as it says the root, so no spelling of a
+// path can differ)
+let CONFIG_AT;
+try { CONFIG_AT = git(["ls-files", "--full-name", "--error-unmatch", "--", configPath]).split(/\r?\n/u)[0]; } catch { CONFIG_AT = path.relative(ROOT, path.resolve(configPath)).split(path.sep).join("/"); }
 let config;
 try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
@@ -54,9 +61,9 @@ if (typeof config.baseline !== "string" || !config.baseline) fail(`the config na
 if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
-let fromSecurity = [];
-if (config.proseFromSecurity) try { fromSecurity = ruleFiles(); } catch (e) { fail(e.message); }
-const proseSpecs = PROSE_SPECS.concat(fromSecurity);
+let fromSecurity = null;
+const security = () => { if (!fromSecurity) try { fromSecurity = ruleFiles(); } catch (e) { fail(e.message); } return fromSecurity; };
+const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity ? security() : []);
 if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check. Mend: list the code in "code" and the prose in "prose", as git pathspecs, or set "proseFromSecurity" to true');
 const LINES = 8, MIN_CHARS = 240, WORDS = 12;
 const hash = s => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
@@ -162,6 +169,20 @@ counted(base.windows, BASELINE);
 const from = process.env.COPIES_BASE;
 if (from) {
   try { git(["rev-parse", "--verify", `${from}^{commit}`]); } catch { console.error(`FAIL: COPIES_BASE ${from} is not a commit here. Mend: fetch it (git fetch origin ${from}) before the check runs`); process.exit(1); }
+  // The config is held to the base's too, so that the check never reads less than it did there: the baseline stays
+  // where the base keeps it (one moved would be held to nothing), and every file the base's config read is read still,
+  // as code or prose as it was (one left out would let its copies be dropped from the baseline). A config the base
+  // does not hold is the check's first on that branch, held to nothing. Any widening passes.
+  let was = null;
+  try { was = JSON.parse(git(["show", `${from}:${CONFIG_AT}`])); } catch { /* no config on that branch yet */ }
+  if (was && typeof was === "object" && !Array.isArray(was)) {
+    const back = `Mend: take the config back as ${from} holds it (git checkout ${from} -- ${CONFIG_AT}), then widen it if need be: a path may be added, never taken out`;
+    if (was.baseline !== BASELINE) fail(`${CONFIG_AT} moves the baseline from ${was.baseline} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
+    const specs = v => Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : [];
+    const lost = (kind, before, now) => { const keep = new Set(ls(now)); return ls(before).filter(f => !keep.has(f)).map(f => `${f} (${kind})`); };
+    const less = lost("code", specs(was.code), CODE_SPECS).concat(lost("prose", specs(was.prose).concat(was.proseFromSecurity === true ? security() : []), proseSpecs));
+    if (less.length) fail(`${CONFIG_AT} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
+  }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
   const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
