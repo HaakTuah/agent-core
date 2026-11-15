@@ -81,6 +81,37 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "A check that fails says the mend" in `AGENTS.md`, `scripts/mend.mjs` and `scripts/mend-test.mjs`, and the
      failures of every check of the core.
 
+220. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #99 in two notes, gathered in a third, "What is left of this
+     issue to build, in one place", which holds where they differ). Told that every pull request merged here since the
+     `security-review` status went live had a security review, the status's only misses a lag of seconds, and that 43
+     of 79 had been reviewed on an earlier commit than the one that merged, the owner asked:
+
+     > And haven't we had enough pull requests to evaluate now?
+
+     and agreed that the check proves a pure sync itself, which then needs no review unless one started by itself; that
+     a review of an earlier commit stands only where nothing but updates from `main` follow it, any other later commit
+     needing a posted review that names the head by its whole SHA, or the note that none is needed, and that the status
+     says when the review saw an earlier commit; that a posted review counts from the *owner's account* by default, and
+     from another account only where the project names it, and only after what it settles; and that the status is
+     required in the core first, then in the owner's own projects once the count is made there, and elsewhere only where
+     that project's owner makes it so. Told those answers, the owner asked of a project of another owner, built on that
+     owner's own computer:
+
+     > 3. But what about […]? […] does the reviews through the plug-in? Our system is not cloud and gihub only.
+
+     So where no review starts by itself, every security review is a posted comment from that project's *owner's
+     account*, counted with nothing to set; a pure sync passes by the proof alone; in a private repository the job
+     stays skipped unless its owner turns it on; and what the status proves there is that a review was posted for the
+     head, not who made it, since builder and reviewer post under one login. To the orchestrator, passed on word for
+     word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "What a posted review stands for" in `modules/reviews.md`, `scripts/security-review.mjs`, the core's
+     `security-review.yml` and `own-security-review.yml`.
+
 221. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
      design session, as that session recorded it on issue #257, labelled `by:chat`, its last note there gathering what
      the owner agreed to). The owner asked:

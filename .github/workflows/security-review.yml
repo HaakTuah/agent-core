@@ -8,11 +8,14 @@
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
 # summary rewrites it, so that no project starts a job for it it did not start before).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
-# that opens "Security review:" from the repository's owner, a member or a collaborator, which is how the fallback
-# reviewer's or another reviewer's is posted (modules/reviews.md, point 3); while Codex's own is running, only such a
-# comment posted after it began, as Codex's summary shows; where Codex marks a finding of its security review open, only
-# such a comment settles it, posted after Codex's summary last changed and, where one is to be found, after its newest
-# finding; nothing else counts
+# that opens "Security review:" from the repository's owner, or an account the caller names (the input "reviewers"),
+# which is how the fallback reviewer's or another reviewer's is posted (modules/reviews.md, point 3); a review of an
+# earlier commit than the head only where updates from main alone follow it, so that any other later commit needs such
+# a comment naming the head by its whole SHA; while Codex's own is running, only such a comment posted after it began,
+# as Codex's summary shows; where Codex marks a finding of its security review open, only such a comment settles it,
+# posted after Codex's summary last changed and, where one is to be found, after its newest finding; nothing else
+# counts. A pure sync needs none where no review starts by itself (floor rule 8): the job runs the default branch's
+# scripts/pure-sync.mjs on the head itself, and one it proves passes with no review and no note
 # (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change
 # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
 # which count, and when one is enough); of a pull request that leaves the check's scripts alone and whose head does
@@ -25,11 +28,14 @@
 # commit SHA ("How a project takes the core" in README.md, point 5).
 #
 # Advisory, unless the caller turns that off: the status always passes and says what the check would have done ("would
-# wait, ..."), so nothing waits for it until a week of pull requests has shown it right. Turned off, the status stays
-# pending until the review has run, and a ruleset can require it. Dependabot's own pull request, every commit of it
-# Dependabot's and signed by GitHub, passes it where no review of Codex's has begun on it (floor rule 17), and one that
-# needs no security review and gets none by itself (floor rule 8: it touches no way in, or is a pure sync, where no
-# reviewer starts by itself) says so in a comment that opens "Security review:".
+# wait, ..."), so nothing waits for it until the project's owner turns that off. Turned off, the status stays pending
+# until the review has run, and a ruleset can require it: the core's own waits, required once its ruleset names it
+# (#320), a project's only where its owner makes it so. Where every review is a posted comment (none starts by itself,
+# as through a plug-in), the repository's owner's counts with nothing to set, and the status proves that a review was
+# posted for the head, not who made it: builder and reviewer may post under one login (#187). Dependabot's own pull
+# request, every commit of it Dependabot's and signed by GitHub, passes it where no review of Codex's has begun on it
+# (floor rule 17), and one that needs no security review and gets none by itself (floor rule 8: it touches no way in)
+# says so in a comment that opens "Security review:", naming the head.
 #
 # In a private repository each run is a job its owner pays for, a dozen or so a pull request, for a status that only
 # advises: there the job is skipped, which GitHub does not bill (core archive 201), unless the caller turns it on with
@@ -43,7 +49,10 @@
 # collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token
 # could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
 # summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
-# status, nothing more. A posted review that is later edited away or deleted is seen at the next push, not at once.
+# status, nothing more. The proof of a pure sync fetches the head's commits into a clone of its own and checks out
+# nothing, so no file of the pull request's is written to disk or run; git is given the token for this repository's
+# own address alone, in that command's environment, and nothing writes it to disk. A posted review that is later
+# edited away or deleted is seen at the next push, not at once.
 name: security-review
 
 on:
@@ -64,6 +73,11 @@ on:
         required: false
         type: boolean
         default: false
+      reviewers:
+        description: The accounts, besides the repository's owner, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -105,6 +119,8 @@ jobs:
           NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           ROOT: ${{ inputs.root }}
           ADVISORY: ${{ inputs.advisory }}
+          REVIEWERS: ${{ inputs.reviewers }}
+          SERVER: ${{ github.server_url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -136,8 +152,33 @@ jobs:
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
-          BOUND=$(held security-review.mjs) node "$ROOT/scripts/security-review.mjs" "$d/pull.json" "$d/comments.json" \
-            "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"
+          # a pure sync needs no security review where none starts by itself (floor rule 8; #99): where the pull request
+          # has a sync's shape (the manifest among its files, all of them whole, and none outside core/, it and the
+          # workflows), the default branch's pure-sync.mjs proves it on the head, in a clone of its own that fetches the
+          # head's commits by its SHA (never a ref GitHub moves after the push) and checks out nothing, all within the
+          # job's time so its status is always written, so no file of the pull request's is on disk and none runs; git sends
+          # the token to this repository's own address alone, from this command's environment, never written to disk
+          pure=
+          if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
+            && [ "$(jq '[.[][]] | length' "$d/files.json")" = "$(jq '.changed_files' "$d/pull.json")" ] \
+            && jq -e 'any(.[][]; .filename == "core-manifest.md") and all(.[][]; .filename == "core-manifest.md"
+              or (.filename | startswith("core/")) or (.filename | test("^\\.github/workflows/[^/]+\\.ya?ml$")))' \
+              "$d/files.json" > /dev/null
+          then
+            proof="$PWD/$ROOT/scripts/pure-sync.mjs"
+            key=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+            echo "::add-mask::$key"
+            if (n=${GIT_CONFIG_COUNT:-0}
+              export GIT_CONFIG_COUNT=$((n + 1)) "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader" \
+                "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key"
+              git init -q -b pr "$d/pr" && cd "$d/pr" && git remote add origin "$SERVER/$REPO.git" \
+                && timeout 90 git fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+                && [ "$(git rev-parse refs/heads/pr)" = "$head" ] && timeout 120 node "$proof" > "$d/pure.txt" 2>&1)
+            then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
+            else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
+          fi
+          BOUND=$(held security-review.mjs) PURE="$pure" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+            "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
             echo "The pull request is closed or a draft: nothing to say."
