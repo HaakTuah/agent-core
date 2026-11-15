@@ -26,7 +26,7 @@ owner creates from any device to stop its agents and deletes to let them go on.
   work-saved hook says so at the start), and the orchestrator on every wake.
 - Where it stands, no task starts, and a running one commits and pushes what it has and stops, saying so.
   - It never stops what the owner then asks a session for in person.
-- Where it cannot be read, the session says so and reads it again before each commit.
+- Where it cannot be read, the session says so.
 - It stops only that repository's agents, and no agent creates or deletes it.
 
 **Sessions:**

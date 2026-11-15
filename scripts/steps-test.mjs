@@ -120,7 +120,7 @@ const game = dirs["a-game"];
 const agents = path.join(game, "AGENTS.md");
 fs.writeFileSync(agents, fs.readFileSync(agents, "utf8").replace(/\n## Starting a task\n[\s\S]*?\n## Commands/, "\n## Commands").replace("These whole", "these whole")
   .replace(/at\nthe start of every task\./, "at the start\n  of every task."));
-fs.rmSync(path.join(game, ".github/workflows/core-moved.yml"));
+fs.rmSync(path.join(game, ".github/workflows/look.yml"));
 const wf = path.join(game, ".github/workflows/copies.yml");
 fs.writeFileSync(wf, fs.readFileSync(wf, "utf8").replace(/@[0-9a-f]{40}/g, `@${"b".repeat(40)}`));
 const manifest = path.join(game, "core-manifest.md");
@@ -129,7 +129,7 @@ const cfg = path.join(game, "checks/copies.json");
 fs.writeFileSync(cfg, JSON.stringify({ baseline: "checks/copies-baseline.json", code: ["src"] }, null, 2));
 let found = differences(project(game), fresh(project(game)));
 const has = (file, what) => found.some(d => d.startsWith(`${file}:`) && d.includes(what));
-ok(found.length === 4 && has("AGENTS.md", "Starting a task") && has(".github/workflows/core-moved.yml", "missing") && has("core-manifest.md", "the row \"*large file*\"") && has("checks/copies.json", "the key \"prose\""),
+ok(found.length === 4 && has("AGENTS.md", "Starting a task") && has(".github/workflows/look.yml", "missing") && has("core-manifest.md", "the row \"*large file*\"") && has("checks/copies.json", "the key \"prose\""),
   "a paragraph, a file, a table's row and a config's key that the project lacks are listed; a reflowed line, a row's own value and a pin moved are no difference", found.join("\n"));
 declare(game, '"AGENTS.md": its own way of starting a task, on the owner\'s word.');
 found = differences(project(game), fresh(project(game)));

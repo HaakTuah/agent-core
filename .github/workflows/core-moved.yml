@@ -10,6 +10,9 @@
 # project's own core/scripts/core-moved.mjs on the core's one exact Node; Node's own modules only, no package installed.
 # Nothing is checked out but the calling repository's default branch; the two commits are 40 hex characters before they
 # are used, and no other text reaches a command. It may write issues, and nothing else.
+# It then runs the scheduled look (core/scripts/look.mjs) with the same token, which reads no pull request, check or
+# status with it and says so: a project calls look.yml in its place, which grants those reads and runs both
+# (core/setup/template/workflows/look.yml.tmpl), and this one stays for the projects that have not moved.
 name: core-moved
 
 on:
@@ -40,3 +43,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node core/scripts/core-moved.mjs
+      - name: The scheduled look
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node core/scripts/look.mjs
