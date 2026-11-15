@@ -167,29 +167,29 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
    - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request (in a private
      repository, as the starter kit writes it, only on one that changes a file NuGet reads by name, so no other bills a
-     job), which calls the core's with the licence check's config: a restore of each project file git knows from its lock file alone
-     (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
-     config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads from
-     NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
-     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from
-     the manifest of the package the restore brought; what the restore brought that no lock file names is held to the
-     list for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named
-     in the config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
+     job), which calls the core's with the licence check's config: a restore of each project file git knows from its
+     lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
+     what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
+     from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
+     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the
+     manifest of the package the restore brought; what the restore brought that no lock file names is held to the list
+     for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
+     config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
      licence a machine can read is read by hand: a tool that only runs is then recorded in the audit as
-     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
-     off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
-     It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
-     private repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it
-     where a job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026,
-     the NuGet check where it can matter"). Like the signature
-     check, it first looks whether the pull request changes anything NuGet reads (its workflow's header lists what),
-     and passes without a restore where it changes none; any doubt runs it. Before the restore, which runs the pull
-     request's own build files, `nuget-fetch.mjs` fetches every package the lock files name, holds each to its lock
-     file's content hash and reads its licence from it, so no build has run beside that verdict; the tools a manifest
-     of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are fetched and held the same way, each at one
-     exact version and to the list for tools that only run (what is wrong with a tool the pull request's base held,
-     never read before this release, is reported, not failed). Where the first look restored, which runs the pull
-     request's build files, that read is left out: nothing it reads changed from the base.
+     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one off
+     its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It
+     fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a private
+     repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it where a
+     job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026, the NuGet
+     check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
+     NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
+     it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
+     lock files name, holds each to its lock file's content hash and reads its licence from it, so no build has run
+     beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are
+     fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
+     with a tool the pull request's base held, never read before this release, is reported, not failed). Where the first
+     look restored, which runs the pull request's build files, that read is left out: nothing it reads changed from the
+     base.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
