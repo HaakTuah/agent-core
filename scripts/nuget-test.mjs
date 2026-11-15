@@ -243,6 +243,8 @@ ok(viaOf(`<LanguageTargets>$(MSBuildThisFileDirectory)x<![CDATA[.xml]]></Languag
 ok(viaOf(`<OtherPath>$(MSBuildThisFileDirectory)other.xml;plain.xml</OtherPath><OutputPath>bin/</OutputPath>`) === "", "any other property brings in nothing by its value: what it could bring in is read for what it is");
 ok(projectRooted("\uFEFF \n<?xml version='1.0'?><!-- c --><!DOCTYPE p [<!ENTITY e 'x'>]><Project>") && projectRooted(`${" ".repeat(100000)}<project Sdk="x">`) && !projectRooted("<!DOCTYPE html><html>") && !projectRooted("<Projects>") && !projectRooted("<!-- <Project>"),
   "a file is a project where its root element is a Project, past blanks, marks, comments, processing instructions and a document type");
+ok([`<!DOCTYPE Project SYSTEM "a>b">`, `<!DOCTYPE Project PUBLIC "p" 'a>b'>`, `<!DOCTYPE Project [ <!ENTITY e "]>"> ]>`, `<!DOCTYPE Project [ <!-- ]> --> ]>`, `<!DOCTYPE Project [ <?pi ]> ?> ]>`].every((d) => projectRooted(`${d}<Project />`)) && !projectRooted(`<!DOCTYPE p "unclosed><Project />`),
+  "a document type is passed over to its own end, a \">\" or \"]\" in a quoted string, a comment or a processing instruction inside it no end (#283's security review)");
 ok(imported(`<CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)a.xml</CustomAfterMicrosoftCommonTargets${" ".repeat(500)}\n>`).map((x) => x.project).join() === "$(MSBuildThisFileDirectory)a.xml", "a property's end tag is read however many blanks stand before its \">\"");
 ok(importPath("build/A.props", "$(MSBuildThisFileDirectory)after.xml", { anchored: true }) === "build/after.xml" && importPath("build/A.props", "after.xml", { anchored: true }) === null && importPath("build/A.props", "/opt/x.xml", { anchored: true }) === "" && importPath("build/A.props", "after.xml") === "build/after.xml",
   "a property's value is known only where it starts at its own file's folder: MSBuild reads any other from its own targets' folder");
@@ -537,6 +539,13 @@ git("add", "-A"); git("commit", "-q", "-m", "a publish profile");
 ok(!pubCheck().failures.some(x => x.includes(PUB)) && pubCheck().reports.some(x => x.startsWith(`${PUB} names NuGetLockFilePath`) && x.includes("held before this check read it")), "the same project as the base held it: reported, and passes");
 ok(run("--imports").stdout.includes(`${PUB}\n`), "and the workflow's first look is told of it, so a change to it alone is checked");
 fs.rmSync(path.join(repo, "src/App/Properties"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no publish profile");
+// a file a project read by what it is imports, as the base held both: reported, so that a sync fails no project that
+// changed nothing (#283's security review)
+const FIX = "tests/fixtures/a.xml", FIXED = "tests/fixtures/b.xml";
+inRepo(FIX, `<Project><Import Project="b.xml" /></Project>`); inRepo(FIXED, "<Project><PropertyGroup><RestorePackagesPath>p</RestorePackagesPath></PropertyGroup></Project>"); git("add", "-A"); git("commit", "-q", "-m", "fixtures");
+const fixCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, FIX, FIXED], process.env, { base: "HEAD", baseConfig: null });
+ok(!fixCheck().failures.some(x => x.includes("tests/fixtures")) && fixCheck().reports.some(x => x.startsWith(`${FIXED}, which a build file brings in, names RestorePackagesPath`) && x.includes("held before this check read it")), "a file a project read by what it is imports, both as the base held them: reported, and passes", JSON.stringify(fixCheck()));
+fs.rmSync(path.join(repo, "tests"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no fixtures");
 // a submodule an Import names, as the base held it: reported, so that a sync fails no project that changed nothing (#283)
 inRepo("Directory.Build.props", `<Project><Import Project="ext/lib" Condition="false" /></Project>`); fs.mkdirSync(path.join(repo, "ext/lib"), { recursive: true });
 git("update-index", "--add", "--cacheinfo", `160000,${git("rev-parse", "HEAD").stdout.trim()},ext/lib`);

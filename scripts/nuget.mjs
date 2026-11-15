@@ -274,11 +274,20 @@ export function projectRooted(text) {
     if (text.startsWith("<?", i)) { const end = text.indexOf("?>", i + 2); if (end < 0) return false; i = end + 2; continue; }
     if (text.startsWith("<!--", i)) { const end = text.indexOf("-->", i + 4); if (end < 0) return false; i = end + 3; continue; }
     if (/^<!DOCTYPE/iu.test(text.slice(i, i + 9))) {
-      const open = text.indexOf("[", i), close = text.indexOf(">", i);
-      const end = open >= 0 && open < close ? text.indexOf("]", open) : close;
-      if (end < 0) return false;
-      i = text.indexOf(">", end) + 1;
-      if (i <= 0) return false;
+      // (a document type up to its own ">", past quoted strings, and an internal subset up to its "]", past quoted
+      // strings, comments and processing instructions, any of which may hold ">" or "]")
+      let j = i + 9, subset = false;
+      for (; j < text.length; j++) {
+        const c = text[j];
+        if (c === '"' || c === "'") { const end = text.indexOf(c, j + 1); if (end < 0) return false; j = end; continue; }
+        if (subset && text.startsWith("<!--", j)) { const end = text.indexOf("-->", j + 4); if (end < 0) return false; j = end + 2; continue; }
+        if (subset && text.startsWith("<?", j)) { const end = text.indexOf("?>", j + 2); if (end < 0) return false; j = end + 1; continue; }
+        if (c === "[" && !subset) subset = true;
+        else if (c === "]" && subset) subset = false;
+        else if (c === ">" && !subset) break;
+      }
+      if (j >= text.length) return false;
+      i = j + 1;
       continue;
     }
     return /^<Project(?![A-Za-z0-9_.:-])/iu.test(text.slice(i, i + 9));
@@ -631,7 +640,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   };
   const baseBytes = (file) => { const f = baseFile(file); return f === null ? null : bytesAt(f); };
   const broughtThen = (f) => {
-    if (!then) then = importsOf([...baseTree().keys()], baseBytes).brought;
+    // (the base's own projects read by what they are: each of today's that the base held as a project too)
+    if (!then) then = importsOf([...baseTree().keys()], baseBytes, [...byContent].filter((g) => { const b = baseTree().has(g) ? baseBytes(g) : null; return b !== null && projectRooted(markedText(b)); })).brought;
     return [...now.brought.get(f)].every((by) => then.get(f)?.has(by));
   };
   // (whether a file stands as the base held it, byte for byte, as MSBuild reads it: as the base's blob, save the line
