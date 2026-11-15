@@ -110,6 +110,7 @@ const takeSteps = (d, leave = null) => {
     gemini: { "docs/trial/GEMINI.md": null },
     look: { ".github/workflows/look.yml": look, ".github/workflows/core-moved.yml": null },
     suites: { ".github/workflows/tests.yml": read(d, ".github/workflows/tests.yml").replace(", 'core/**'", "") },
+    choices: { "docs/choices.md": fs.readFileSync(path.join(s.core, "setup", "template", "choices.md.tmpl"), "utf8").replace("Read whole: FILL IN: the day the first record is written, as 2026-11-15; each pass twice a year writes its own day.", "Read whole: 2026-11-20.").replace(/## Choice: FILL IN.*/, "## Choice: Node").replace(/- Reopens it: FILL IN.*/, "- Reopens it: a user with no Node.") },
     private: { ".github/workflows/security-review.yml": `${read(d, ".github/workflows/security-review.yml").trimEnd()}\n    with:\n      private: true\n` },
   };
   for (const [name, files] of Object.entries(work)) if (name !== leave) branch(d, `step-${name}`, files);

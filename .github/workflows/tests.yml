@@ -91,6 +91,9 @@ jobs:
       - name: The scheduled look and its state report
         if: ${{ !cancelled() }}
         run: node scripts/look-test.mjs
+      - name: The choice records
+        if: ${{ !cancelled() }}
+        run: node scripts/choices-test.mjs
       - name: The description check
         if: ${{ !cancelled() }}
         run: node scripts/pr-description-test.mjs

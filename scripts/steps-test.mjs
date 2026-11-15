@@ -190,6 +190,10 @@ found = differences(p1, fresh(p1), [olderKit, olderKit]);
 ok(found.length === 2 && found.some(d => d.startsWith("AGENTS.md: still holds the paragraph \"Every builder reads") && d.includes("no longer writes")) && found.some(d => d.startsWith("core-manifest.md: still holds the row \"*old slot*\"")),
   "a paragraph and a row an earlier kit wrote that the kit no longer writes, still held, are listed once each", found.join("\n"));
 ok(!fresh(p1, path.join(tmp, "nowhere")).length, "an earlier copy with no starter kit gives no kit to compare");
+fs.rmSync(path.join(older, "choices.md.tmpl"));
+const lacks = fresh(p1, older);
+ok(lacks.length === olderKit.length - 1 && !lacks.some(([to]) => to === "docs/choices.md") && differences(p1, fresh(p1), [lacks]).length === 2,
+  "an earlier kit that lacks a template added since still gives its other files to compare", lacks.map(([to]) => to).join());
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
 process.exitCode = failed ? 1 : 0;

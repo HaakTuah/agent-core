@@ -210,6 +210,7 @@ export const STEPS = [
   { lead: "15 November 2026, labels and openers", cost: COST.read, unread: "whether the labels stand and the issues and comments carry them is GitHub's answer, not a file's: `core/scripts/labels.mjs` asks it and says each mend, and each sync runs it from the next one on; the issue forms' \"Found while:\" line is a difference `core/scripts/fresh.mjs` lists" },
   { lead: "16 November 2026, the daily look", cost: COST.workflow, unread: "whether the project's daily job is to run, or its orchestrator carries the look, is no file's to say, as of the core has moved; where a `look.yml` is missing, `core/scripts/fresh.mjs` lists it at every sync, and the old daily job runs the look meanwhile" },
   { lead: "16 November 2026, the line that says what a pull request waits on", cost: COST.check, held: "the description check" },
+  { lead: "16 November 2026, choices that are hard to undo", cost: COST.read, unread: "which of a project's choices are hard to undo is a reading of the project, not a file's to say; where its *choice records* are missing, `core/scripts/fresh.mjs` lists the file at every sync, and `core/scripts/choices.mjs` lists the records it holds" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

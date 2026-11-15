@@ -42,6 +42,11 @@ const FILLS = [
   [/^( *)FILL IN: who can reach the project beyond.*$/m, "$1No one: it has no service."],
   [/^( *)FILL IN: what its users would lose.*$/m, "$1A wrong sum; the owner, the repository's good name."],
   [/^( *)FILL IN: each input the project takes.*$/m, "$1Its command line, from the user at hand."],
+  [/^Read whole: FILL IN.*$/m, "Read whole: 2026-11-01."],
+  [/^## Choice: FILL IN.*$/m, "## Choice: Node, with no dependencies"],
+  [/^FILL IN: its language, its engine[\s\S]*?second language weighed beside the first, and if one is taken, the line between them\.$/m,
+    "Criteria: it runs wherever its few users have Node, starts in under a second, and needs nothing installed. Options: Node, Python, a shell script. Challenger: a shell script needs nothing at all, but sums with decimals poorly. Picked: Node, for its numbers and its tests."],
+  [/^- Reopens it: FILL IN.*$/m, "- Reopens it: a user who has no Node."],
 ];
 
 // A fake key, built from pieces when the case is set, never a real one (floor rule 8).

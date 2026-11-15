@@ -24,23 +24,23 @@ provider, `modules/other-builders.md`, though none builds here (the *other build
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/github-calls.md`, `modules/orchestrating.md` and `modules/updates.md`.
+`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md` and `modules/choices.md`.
 
 Not taken, each for its reason:
 
 - `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
   player chooses to use, which are all that module governs.
 
-The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
-the audits and the reports written before 12 November 2026); the archive is `archive/instructions.md`, cited "(core
-archive N)"; the *settling references* and the *descriptions*: `README.md`; the *large file*: past about 50 KB; the
-*owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, and all that add to what
-every session reads at its start, whose cap they share, in the queue's order; the *design-checked PRs*: those that add
-or change a rule of the floor or the modules; the *review reference*: the line's issue, with the owner's words quoted
-on it; the *hard work*: a new or changed rule; the *size marks*: the cap of `scripts/size.mjs`, and its own mark for
-`QUEUE.md`, with no split mark; the *major version checks*: the suites of `.github/workflows/tests.yml`; *planning
-design*: none; the *other builders*: none, every file here being protected (`SECURITY.md`), so there are no *other
-builders' checks*.
+The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps the
+audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is
+`archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*: `README.md`; the
+*large file*: past about 50 KB; the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the
+same file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
+*design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
+issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *size marks*: the cap of
+`scripts/size.mjs`, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of
+`.github/workflows/tests.yml`; *planning design*: none; the *other builders*: none, every file here being protected
+(`SECURITY.md`), so there are no *other builders' checks*.
 
 ## The queue
 
@@ -200,7 +200,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   core works in other projects, and only those that hold use to read.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
-- **Every rule says what holds it** (core archive 195 and 222). Each rule of the floor and the modules, those that
+- **Every rule says what holds it** (core archive 195 and 223). Each rule of the floor and the modules, those that
   stood before too, names its holder, one of three: a check that fails where it is broken (a script, a workflow, a
   hook, or GitHub's setting that refuses it), a staged case, or the scheduled audit. `scripts/holders.json` names the
   checks and the audit by each rule's file and bold lead, a staged case names its own rules in its file, and
@@ -213,7 +213,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Reason: the audit of 13 November found 43 of 122 rules held by nothing but a session reading them, and nothing
   listed them. Held by `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names
   a rule that no longer stands or a check that is not there, and by the heading's check.
-- **Staged cases hold what no check reads** (core archive 222; #235). By default a rule is held by a check; where none
+- **Staged cases hold what no check reads** (core archive 223; #235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
   the case's script on what the session did, read from the project (its commits, its pushes, what it wrote to GitHub),

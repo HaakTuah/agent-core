@@ -14,8 +14,9 @@
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
 //     closes this one: a session closes it once it has found why.
-//   - What else is due: the staged cases, in the core alone (staged.mjs); the dose of the audits and the cleaning share
-//     joins DUE as its rule comes (#246).
+//   - What else is due: the staged cases, in the core alone (staged.mjs); the pass twice a year over the choices that
+//     are hard to undo (choices.mjs); and the dose of the audits and the cleaning share, which joins DUE as its rule
+//     comes (#246).
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again.
 // Its record is the body of one closed issue, "The scheduled look's record", which it writes on each run. A run by a
 // session (not GitHub's job) where the record shows a run less than SOON hours before does nothing more, so an
@@ -33,6 +34,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { look as choicesDue } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { answer, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
@@ -56,9 +58,11 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
 };
-// The readers of what else is due, each (ctx) => { title, body }, the body null where nothing of it stands, or null
-// where it does not apply here: the staged cases (#235); the audits and the cleaning share by the dose (#246) join here.
-export const DUE = [stagedCases];
+// The readers of what else is due, each (ctx) => { title, body, unread } or null, a body of null closing the issue it
+// keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over the
+// choices that are hard to undo (choices.mjs); and, as its rule comes, the audits and the cleaning share by the dose
+// (#246).
+export const DUE = [stagedCases, choicesDue];
 
 // The time of the last run its record holds, or null.
 export const lastRun = body => /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.exec(String(body ?? ""))?.[1] ?? null;
@@ -196,7 +200,7 @@ function main(args) {
   if (last && hoursBetween(last, at) > MISSED) add(TITLES.missed, `The look before this one ran at ${last}, ${hoursBetween(last, at)} h before this run at ${at}: over ${MISSED} h. Find why and mend it, then close this issue: GitHub switches a scheduled workflow off after 60 days with no activity in the repository (\`gh workflow enable\` turns it back on, as an orchestrator's wake does), a run can fail, and an orchestrator that carries the look may not have woken.`);
   // what else is due, as each rule that sets it comes
   for (const read of DUE) {
-    try { const due = read({ repo, manifest, at }); if (due) add(due.title, due.body); }
+    try { const due = read({ repo, manifest, at }); if (due) add(due.title, due.body, due.unread ?? null); }
     catch { say("A reader of what else is due could not read this repository: nothing of it was looked at."); }
   }
 
