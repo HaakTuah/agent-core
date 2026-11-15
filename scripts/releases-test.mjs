@@ -10,7 +10,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
-import { OWN, held, inTheCore, next } from "./release.mjs";
+import { OWN, costed, held, inTheCore, next } from "./release.mjs";
+import { STEPS } from "./steps.mjs";
 import { NOTES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, namedReleases, newestRelease, ownerOf, past, releasesIn } from "./releases.mjs";
 
 let failed = 0, count = 0;
@@ -149,6 +150,11 @@ fs.mkdirSync(path.join(nested, "core", "scripts"), { recursive: true });
 fs.writeFileSync(path.join(nested, "core-manifest.md"), "# Core manifest\n");
 git(path.join(nested, "core"), "init", "-q");
 ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a clone or submodule of the core under a project's core/");
+
+// what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
+const owners = STEPS.find(s => s.owner);
+ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
+  && costed("- **No such entry.** Done when three.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, and one with no step says so");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;
