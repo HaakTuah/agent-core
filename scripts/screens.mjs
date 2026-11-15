@@ -139,8 +139,12 @@ function baseOf() {
     if (tolerant(() => git(["cat-file", "-e", `${name}:${file}`])) === null) return null;
     try { return git(["show", `${name}:${file}`]); } catch { return refuse(`${name}:${file} could not be read`, "run the check again; where it fails again, the file at the base is too large for git's output here: say so in the pull request"); }
   };
-  // the config the base held: where the run names it, where the base's own manifest's row does, or the kit's path
-  const config = at => [at, where(show("core-manifest.md")), KIT].find(file => show(file) !== null) ?? null;
+  // the config the base held: where the run names it, where the base's own manifest's row does, or the kit's path; the
+  // first that reads as a config, else the first that stands
+  const config = at => {
+    const held = [...new Set([at, where(show("core-manifest.md")), KIT])].filter(file => show(file) !== null);
+    return held.find(file => tolerant(() => parseConfig(show(file), file)) !== null) ?? held[0] ?? null;
+  };
   return { name, show, config };
 }
 
@@ -152,7 +156,8 @@ function baseListed(base, at) {
   if (held === null) return null;
   const was = tolerant(() => parseConfig(base.show(held), `${base.name}:${held}`));
   const listed = was && tolerant(() => parseBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, "").listed);
-  return { listed: listed ?? new Map(), checks: was?.checks ?? new Map() };
+  // a config the base held that does not read as one counts every check as on, so nothing joins freely
+  return { listed: listed ?? new Map(), checks: was?.checks ?? new Map(CHECKS.map(check => [check, "binds"])) };
 }
 
 function first(config, at, self, found) {
