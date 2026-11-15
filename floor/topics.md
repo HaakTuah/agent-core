@@ -74,6 +74,14 @@ The floor's rules for particular work.
 - Pinned as rule 7 says.
 - A new one only with a reason, from a known publisher.
 - Findings from CI's audit fixed, not silenced.
+- **An agent's own tools are code with its sign-ins** (core archive 224): every plug-in, tool server, skill and hook the
+  project configures for its agents is listed under "agentTools" in its licence check's config, from a known
+  publisher, a plug-in or tool server at one exact version (a skill or hook is pinned by the project's commit, and
+  names the version of anything else it runs); the starter kit's hooks are the core's, listed by it.
+  - A session adds one only where its task or the owner's word names it, listing it in the same PR; never by its own
+    choice.
+  - It does not mean how a machine is set up for agents, which is the owner's (floor rule 18), nor what a provider
+    loads outside the project. Reason: a tool an agent loads runs with the session's sign-ins.
 
 **17. Dependabot's own PRs** (core archive 34).
 - One merges only if `dependabot[bot]` opened it from a branch in this repository, it changes only the manifests and

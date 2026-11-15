@@ -1,0 +1,152 @@
+// The agent-tools check (floor topic 15, "An agent's own tools are code with its sign-ins"; core archive 224): every
+// plug-in, tool server, skill and hook a project configures for its agents is listed under "agentTools" in its licence
+// check's config, each entry { "kind", "name", "publisher", "version" }: kind one of plugin, server, skill, hook; a
+// publisher named; a version that is one exact version (as SemVer writes one) or a full 40-character commit, which a
+// plug-in and a tool server must give and a skill or hook may (each is a file of the project's, pinned by its commit).
+// The hooks the starter kit writes (setup/template/claude-settings.json.tmpl, beside this copy) are the core's, listed
+// by it at the core's pin. An entry nothing configures fails too, so the list stays true.
+//
+// What it reads as configured, in the files committed at the project's root: `.claude/settings.json`, each hook by its
+// event and matcher ("PreToolUse Agent|Task") and each plug-in its "enabledPlugins" turns on ("name@marketplace");
+// `.mcp.json`, each tool server of its "mcpServers"; and `.claude/skills/`, each folder holding a SKILL.md. What a
+// person or a machine configures outside the repository is no file of the project's (floor rule 18), and another
+// provider's settings are read by the review.
+//
+// Nothing locks a project (AGENTS.md): until the config holds "agentTools", a pull request's base counts as the list,
+// read against the first parent of GitHub's merge (licences.mjs's baseOf), so only what the pull request itself adds
+// fails; with no base, as on a push, what is unlisted is noted and nothing fails. The sync note of 16 November 2026 has
+// the step that reads the list written (steps.mjs). In the core's own repository (`--core`) a missing list counts as an
+// empty one, so nothing unlisted stands. Node's own modules and git only.
+//
+//   node core/scripts/agent-tools.mjs <the licence check's config>     from a project's root, as licences.yml runs it
+//   node scripts/agent-tools.mjs .github/licences.json --core          in the core's own repository
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { exact } from "./exact-versions.mjs";
+import { baseOf, textAt } from "./licences.mjs";
+import { started } from "./started.mjs";
+
+const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
+const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
+const KIT = fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url));
+const show = value => JSON.stringify(value) ?? String(value);
+const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
+
+// The tools a project's files configure, as "kind name" keys, each with the file that configures it; and the problems
+// met reading them. `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
+// that hold a SKILL.md.
+export function configured(read, skills) {
+  const tools = new Map(), problems = [];
+  const json = file => {
+    const text = read(file);
+    if (text === null) return null;
+    try { const v = JSON.parse(text); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* (below) */ }
+    problems.push(`${file} cannot be read as a JSON object. Mend: correct it to JSON, as the tool that reads it takes it`);
+    return null;
+  };
+  const settings = json(".claude/settings.json");
+  for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
+    for (const group of Array.isArray(groups) ? groups : []) {
+      const matcher = typeof group?.matcher === "string" ? group.matcher : "";
+      tools.set(`hook ${matcher ? `${event} ${matcher}` : event}`, ".claude/settings.json");
+    }
+  }
+  for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) tools.set(`plugin ${name}`, ".claude/settings.json");
+  for (const name of Object.keys(json(".mcp.json")?.mcpServers ?? {})) tools.set(`server ${name}`, ".mcp.json");
+  for (const name of skills()) tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`);
+  return { tools, problems };
+}
+
+// The hooks the starter kit writes: the core's, listed by it.
+export function kitHooks(kit = KIT) {
+  try { return [...configured(f => (f === ".claude/settings.json" ? fs.readFileSync(kit, "utf8") : null), () => []).tools.keys()]; } catch { return []; }
+}
+
+// The list a config holds: { keys, problems }, keys the "kind name" of each well-formed entry; null where the config
+// holds no "agentTools".
+export function listed(config, file) {
+  if (!config || !Object.hasOwn(config, "agentTools")) return null;
+  const list = config.agentTools, keys = new Set(), problems = [];
+  if (!Array.isArray(list)) return { keys, problems: [`${file}: "agentTools" is no list. Mend: write it as a list of entries, each { "kind", "name", "publisher", "version" }`] };
+  list.forEach((entry, i) => {
+    const at = `${file}: "agentTools" entry ${i + 1}${typeof entry?.name === "string" ? ` (${show(entry.name)})` : ""}`;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) { problems.push(`${at} is no entry. Mend: write it as { "kind", "name", "publisher", "version" }`); return; }
+    const bad = [];
+    if (!Object.hasOwn(KINDS, entry.kind)) bad.push(`its kind ${show(entry.kind)} is none of ${Object.keys(KINDS).join(", ")}. Mend: write the kind it is`);
+    if (typeof entry.name !== "string" || !entry.name.trim()) bad.push(`it names no tool. Mend: write the name it is configured by`);
+    if (typeof entry.publisher !== "string" || !entry.publisher.trim()) bad.push(`it names no publisher. Mend: write who publishes it, "this project" for a file of its own`);
+    const version = entry.version;
+    if (version === undefined ? PINNED.has(entry.kind) : !(exact(version) || /^[0-9a-f]{40}$/u.test(version)))
+      bad.push(`${version === undefined ? "it gives no version" : `its version ${show(version)} is not one exact version`}. Mend: write the one it is taken at, such as 1.2.3, or the full 40-character commit`);
+    for (const b of bad) problems.push(`${at}: ${b}`);
+    if (!bad.length) keys.add(`${entry.kind} ${entry.name}`);
+  });
+  return { keys, problems };
+}
+
+const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice(0, at)]} ${show(key.slice(at + 1))}`; };
+
+// What breaks the rule in a project: { problems, unlisted }, the first held against the list where there is one, the
+// second the tools configured that neither the list nor the core lists (where there is no list, so that a caller may
+// hold them against a base). `list` is listed()'s answer, or null.
+export function check(tools, list, kit, file) {
+  const problems = [...(list?.problems ?? [])];
+  const unlisted = [...tools.keys()].filter(k => !kit.includes(k) && !list?.keys.has(k));
+  if (list) {
+    for (const k of unlisted) problems.push(`${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
+    for (const k of list.keys) if (!tools.has(k)) problems.push(`${file}: "agentTools" lists ${describe(k)}, which nothing configures. Mend: take its entry out of the list, in this pull request`);
+  }
+  return { problems, unlisted: list ? [] : unlisted };
+}
+
+// The project at `root`, at its working tree or at a commit `rev`.
+export function readProject(root, rev = null) {
+  const read = rev ? f => textAt(root, rev, f) : f => { try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+  const skills = () => {
+    if (rev) {
+      let out = "";
+      try { out = execFileSync("git", ["ls-tree", "-r", "--name-only", rev, "--", ".claude/skills"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { /* (none) */ }
+      return out.split("\n").map(f => /^\.claude\/skills\/([^/]+)\/SKILL\.md$/u.exec(f)?.[1]).filter(Boolean);
+    }
+    const dir = path.join(root, ".claude/skills");
+    try { return fs.readdirSync(dir).filter(n => fs.existsSync(path.join(dir, n, "SKILL.md"))); } catch { return []; }
+  };
+  return configured(read, skills);
+}
+
+// The whole check, from the project's root: { fail, notes }.
+export function run(root, file, { core = false, base = baseOf(root) } = {}) {
+  let config;
+  try { config = JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
+    return { fail: [`${file} cannot be read (${clean(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
+  }
+  const head = readProject(root), kit = kitHooks();
+  let list = listed(config, file);
+  if (!list && core) list = { keys: new Set(), problems: [] };
+  const { problems, unlisted } = check(head.tools, list, kit, file);
+  const fail = [...head.problems, ...problems], notes = [];
+  if (!unlisted.length) return { fail, notes };
+  if (!base) {
+    notes.push(`${file} holds no "agentTools" yet, so nothing fails here; not listed: ${unlisted.map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
+    return { fail, notes };
+  }
+  const before = readProject(root, base).tools;
+  for (const k of unlisted) {
+    if (before.has(k)) continue;
+    fail.push(`${describe(k)}, configured in ${head.tools.get(k)}, is new in this pull request and listed nowhere. Mend: list it under "agentTools" in ${file}, with every tool the project configures, each with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
+  }
+  if (unlisted.some(k => before.has(k))) notes.push(`not listed, as the base held them: ${unlisted.filter(k => before.has(k)).map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
+  return { fail, notes };
+}
+
+if (started(import.meta.url)) {
+  const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
+  if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
+  const { fail, notes } = run(process.cwd(), file, { core: args.includes("--core") });
+  for (const n of notes) console.log(`note ${n}`);
+  for (const f of fail) console.error(`FAIL: ${f}`);
+  console.log(fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed");
+  process.exitCode = fail.length ? 1 : 0;
+}
