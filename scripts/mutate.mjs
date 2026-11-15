@@ -118,10 +118,11 @@ function run(test, cwd, limit) {
   });
 }
 
-// A working copy of the project: a git worktree of HEAD, with the files that differ from it copied in.
+// A working copy of the project: a git worktree of HEAD, with the files that differ from it, staged or not, and the new
+// ones copied in.
 function copyOf(dir) {
   git(["worktree", "add", "--detach", "--quiet", dir, "HEAD"]);
-  const differ = git(["ls-files", "-z", "--modified", "--others", "--exclude-standard"]).split("\0").filter(Boolean);
+  const differ = [...git(["diff", "-z", "--name-only", "--no-renames", "HEAD"]).split("\0"), ...git(["ls-files", "-z", "--others", "--exclude-standard"]).split("\0")].filter(Boolean);
   for (const f of differ) {
     const from = path.join(".", f), to = path.join(dir, f);
     if (!fs.existsSync(from) || fs.lstatSync(from).isSymbolicLink()) continue;

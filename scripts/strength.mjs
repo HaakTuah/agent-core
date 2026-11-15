@@ -204,6 +204,10 @@ const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replaceme
 export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map() }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
+  if (!baseline && was) {
+    lines.push(`FAIL: ${at} stood on the base and this pull request takes it out. Mend: take it back as the base holds it (git checkout <the base> -- ${at}); only the audit's whole run writes it anew`);
+    return { lines, fails: true };
+  }
   if (!baseline) {
     lines.push(...faults.filter(f => SURVIVED.includes(f.status)).map(f => `survived: ${placed(f)}: ${said(f)}, and ${f.status === "NoCoverage" ? "no test runs that line" : "no test failed"}`));
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
@@ -278,8 +282,10 @@ function lower(p, named) {
   if (outside !== undefined) refuse(`${outside} is no file of the code the shape check's config reads`, "name files of its \"code\" that are no tests, joined by commas");
   const old = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   if (!old) refuse(`there is no baseline at ${p.at} to lower`, "write it first with the audit's whole run (--whole)");
-  const now = new Map();
-  for (const f of faultsOf(runTool(p.tool.command, files.join(",")), null).filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
+  const now = new Map(), found = faultsOf(runTool(p.tool.command, files.join(",")), null);
+  const unrun = found.filter(f => f.status === "Pending").length;
+  if (unrun) refuse(`the mutation tool left ${unrun} faults of ${files.join(", ")} not run, so what they would show is not known`, "run it again with no budget (MUTATE_BUDGET unset for the core's tool), or on fewer files at a time");
+  for (const f of found.filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
   const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `));
   const listed = Object.fromEntries([...old.listed].map(([id, n]) => [id, ours(id) ? Math.min(n.count ?? 0, now.get(id) ?? 0) : n.count ?? 0]).filter(([, c]) => c > 0).map(([id, c]) => [id, { count: c }]));
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => id in listed));

@@ -58,6 +58,12 @@ try {
   const named = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:2-2"], { cwd: dir, encoding: "utf8" });
   const lines = new Set(JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.map(m => m.location.start.line));
   ok(named.status === 0 && same([...lines], [2]), "the lines named alone take faults", named.stdout + named.stderr);
+  write("test/b-test.mjs", "import { big } from '../src/a.mjs';\nif (big(10)) process.exit(1);\n");
+  git("add", "test/b-test.mjs");
+  const staged = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
+  const edge = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
+  ok(staged.status === 0 && edge?.status === "Killed", "a test staged and not yet committed is run in the working copies", staged.stdout + staged.stderr + JSON.stringify(edge));
+  git("rm", "-q", "-f", "test/b-test.mjs");
   const outside = spawnSync(process.execPath, [SCRIPT, "--report", out, "test/a-test.mjs"], { cwd: dir, encoding: "utf8" });
   const bare = spawnSync(process.execPath, [SCRIPT], { cwd: dir, encoding: "utf8" });
   ok(outside.status === 1 && mended(outside.stderr) && bare.status === 1 && mended(bare.stderr), "a file outside the code, and a run told no report, are refused with their mend", outside.stderr + bare.stderr);

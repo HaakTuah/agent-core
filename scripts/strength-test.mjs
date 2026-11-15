@@ -64,6 +64,8 @@ const after = verdict({ faults: [f("survivor: z", "Survived"), f("survivor: x", 
 ok(after.fails && after.lines.filter(l => l.startsWith("FAIL")).length === 1 && mended(after.lines.join("\n")) && after.lines.join("\n").includes('"survivor: z"'), "once it stands, a survivor it does not list fails, naming its id, with its mend; one listed passes", after.lines.join("\n"));
 const short = verdict({ faults: [f("k", "Killed"), f("p", "Pending")], baseline: b({}), was: b({}), at: "s.json", deleted: [] });
 ok(!short.fails && short.lines.some(l => l.startsWith("1 faults on the changed lines were not run")), "once it stands, faults past the tool's budget are said to be held nowhere", short.lines.join("\n"));
+const taken = verdict({ faults: [], baseline: null, was: b({ "survivor: x": { count: 1 } }), at: "s.json", deleted: [] });
+ok(taken.fails && mended(taken.lines.join("\n")), "a pull request that takes out the baseline the base held fails, with its mend", taken.lines.join("\n"));
 const grew = verdict({ faults: [], baseline: b({ "survivor: x": { count: 2 } }), was: b({ "survivor: x": { count: 1 } }), at: "s.json", deleted: [] });
 ok(grew.fails && mended(grew.lines.join("\n")), "an entry that joined with no reason fails, with its mend", grew.lines.join("\n"));
 
@@ -106,6 +108,8 @@ try {
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && !r.stderr.includes("src/a.js:1") && r.stderr.includes("src/Game.cs:1"), "a listed fault whose line the change rewrote passes; a file in another language the tool reports is held too", r.stdout + r.stderr);
   sh("checkout", "--", "src/a.js"); sh("rm", "-q", "-f", "--cached", "src/Game.cs"); fs.rmSync(path.join(dir, "src/Game.cs"));
+  r = run(["--lower", "src/a.js"], { STATUS: "Pending" });
+  ok(r.status === 1 && mended(r.stderr) && JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed && Object.keys(JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed).length === 1, "a cleaning task's run that left faults not run lowers nothing, and says the mend", r.stdout + r.stderr);
   r = run(["--lower", "src/a.js"], { STATUS: "Killed" });
   const lowered = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
   const refused = run(["--lower", "test/a.test.js"]);
