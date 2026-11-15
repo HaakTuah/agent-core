@@ -42,7 +42,7 @@ Read whole: 2026-11-15
 - Chosen for: a workflow, a hook and a project's copy each call a script by its path, with nothing to build; each
   check's test stands next to it, and `.github/workflows/tests.yml` runs every one (the audit of #245 found the folder
   flat, with no import cycle: `reports/2026-11-14-how-code-is-put-together.md`).
-- Reopens it: `scripts/` passes 150 files, or the import check of #246 finds a cycle between them.
+- Reopens it: `scripts/` passes 150 files, or the shape check (`scripts/shape.mjs`) finds a cycle between them.
 
 ## Choice: the code is built and tested on Linux and on Windows, and on no other platform
 

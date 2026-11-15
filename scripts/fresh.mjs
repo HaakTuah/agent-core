@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
+import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { KIT_CONFIGS, call as callOf, configs, plain, project } from "./steps.mjs";
 
@@ -104,6 +105,13 @@ export function differences(p, kit, older = []) {
   return out;
 }
 
+// The shape check's baseline, at the path the project's config names for it, else where the kit writes it.
+function shapeBaseline(p) {
+  let config = null;
+  try { config = JSON.parse(p.read(shapeAt(p.manifest)) ?? "null"); } catch { /* (the kit's path, below) */ }
+  return typeof config?.baseline === "string" ? config.baseline : "checks/shape-baseline.json";
+}
+
 // What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
 // templates, what that kit would have written: a template it lacks, one this kit added since, gives that file nothing;
 // one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
@@ -118,21 +126,21 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const built = files(o, pin, modules, read);
     const gone = new Set(FILES.filter(([t]) => lacking.has(t)).map(([, to]) => to));
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
-    // (the choice records at the path the manifest names for them)
-    // (the checks' configs at the paths the project holds them, as its workflows and manifest name them: configs, in
-    // steps.mjs. One a workflow names only when it runs is compared nowhere here, the other check's still are: steps.mjs
-    // reports it not read)
+    // (the choice records and the shape check's config at the paths the manifest names for them; the checks' configs
+    // at the paths the project holds them, as its workflows and manifest name them: configs, in steps.mjs. One a
+    // workflow names only when it runs is compared nowhere here, the other check's still are: steps.mjs reports it not
+    // read)
     const at = configs(p);
-    const moved = { [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
-    const kit = built.filter(([to]) => !gone.has(to) && moved[to] !== null)
-      .map(([to, text]) => [to === CHOICES ? where(p.manifest) ?? CHOICES : moved[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
+    const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
+    const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null)
+      .map(([to, text]) => [placed[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
     const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
-    return [...kit, [slot, json(marks)], [at.licences, json(licences(o, () => false))], [at.baseline, json({ windows: {} })]].filter(([to]) => to !== null);
+    return [...kit, [slot, json(marks)], [at.licences, json(licences(o, () => false))], [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];
