@@ -71,20 +71,23 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the core's owner names when handing the release on and `scripts/release.mjs` prints with each release, and from then
    on its new script takes the releases by itself (#365).
 
-   **A release that brings nothing a project takes asks no sync of it** (#242; core archive 224). By default every
-   release past a project's pin is synced. Where the pin is the release just before the newest and nothing the project
-   takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes nothing, and
-   `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every file of the
-   core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does not name and
-   its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a project runs
-   names) and the core's own issue forms (`.github/ISSUE_TEMPLATE/`). In doubt it syncs: a change that cannot be read is
-   a change, and a module is taken where the list forgot it or the line says "all" or cannot be read. One release at
-   most is passed over, since the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at
-   the next release the project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays
-   whole and exact at its pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a
-   full SHA is refused. Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a
-   private repository, for a release that may bring it nothing. Held by `scripts/releases-test.mjs`,
-   `scripts/core-moved-test.mjs` and `scripts/upgrade-test.mjs`.
+   **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 227). By
+   default every release past a project's pin is synced. Where the pin is the release just before the newest and nothing
+   the project takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes
+   nothing, and `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every
+   file of the core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does
+   not name and its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a
+   project runs names), the core's own issue forms (`.github/ISSUE_TEMPLATE/`), and the core's own files that no project
+   reads, each named (#342): its queue, `QUEUE.md`, and the workflows no project can call, `own-description.yml`,
+   `own-look.yml`, `own-security-review.yml`, `release.yml`, `size.yml` and `tests.yml` under `.github/workflows/`
+   (`OWN_FILES` in `scripts/releases.mjs`). In doubt it syncs: a change that cannot be read is a change, and a module is
+   taken where the list forgot it or the line says "all" or cannot be read. One release at most is passed over, since
+   the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at the next release the
+   project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays whole and exact at its
+   pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a full SHA is refused.
+   Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a private repository, for
+   a release that may bring it nothing. Held by `scripts/releases-test.mjs`, `scripts/core-moved-test.mjs` and
+   `scripts/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
