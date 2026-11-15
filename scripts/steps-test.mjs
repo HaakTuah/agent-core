@@ -113,11 +113,37 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
 }
 fs.writeFileSync(marksFile, marksAsKit);
 
+// ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
+const inputs = STEPS.filter(s => s.lead === "16 November 2026, hostile tests for every named input");
+const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
+const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
+fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
+ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
+ok(!rule5("   - a shared link: its parts checked against their shape,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
+  "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
+ok(!rule5("   - a shared link: its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named");
+fs.mkdirSync(path.join(lockProject, "src"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "src/peer.mjs"), "\n");
+let missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; hostile tests: `tests/hostile/peer.test.mjs`.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "an item whose hostile tests are not there is reported, by its words, and only it, though the file of what checks it is there", report(missedInputs));
+missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: hostile tests: FILL IN\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "a \"FILL IN\" left in one item reads no other item as done: the item it stands in is reported", report(missedInputs));
+missedInputs = rule5("   Each message a peer sends, its size checked.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
+fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
+ok(notDone(lockProject, inputs)[0]?.mend.includes("could not read the project"), "a SECURITY.md with no rule 5 is reported as not read, never as done");
+fs.writeFileSync(secFile, secAsKit);
+// (only what this block wrote goes: an earlier stage's mend may have written its own tests there)
+for (const f of ["tests/hostile/link.test.mjs", "src/peer.mjs"]) fs.rmSync(path.join(lockProject, f));
+
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
 sec.stage(lockProject);
-ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported");
+ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported", report(notDone(lockProject)));
 declare(lockProject, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
 ok(!notDone(lockProject).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
 sec.mend(lockProject);
