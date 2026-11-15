@@ -15,9 +15,21 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
     lane, one only the owner can do labelled `needs-owner`;
   - sync the core in a routine lane, as "Sessions" in `modules/work-flow.md` says;
+  - run the scheduled look (`core/scripts/look.mjs`), which does nothing more where it ran less than 20 hours before;
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
+- **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
+  and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
+  the steps of a release not done, the labels and openers to mend, a run of its own missed, and what the dose of the
+  audits and the cleaning share and the staged cases make due, as their rules come (#246, #235); once a month, the
+  state report (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit
+  writes it) and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
+  - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is
+    all an owner does.
+  - It does not mean anything waits on the owner, nor that anything starts by itself on the owner's computer (floor
+    rule 8): the schedule lives in GitHub's job or in an orchestrator the owner started.
+  - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges. One session per task, continued for its review
   fixes while its context is under an hour old and small; otherwise a fresh one (core archive 10).
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can

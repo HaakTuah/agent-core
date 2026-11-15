@@ -146,7 +146,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
-  heading "What it asks of a project" below; and, for the dose, by the daily look once #248 builds it.
+  heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`) once #246
+  gives it the dose to read.
 - **A release says what it asks, step by step** (core archive 215). Whoever adds an entry to `setup/sync-notes.md`
   gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
@@ -176,6 +177,14 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   many of the owner's answers they matched (core archive 199); the numbers go into that review's report, beside the
   last ones'. Where the
   core's share grew and the project's own work did not, the review says why, or what of the core goes for it.
+- **The core's state report reads the projects that take it** (core archive 218): each month a session where gh
+  answers for the owner's account adds to the core's report what `node scripts/state-report.mjs --projects` prints:
+  the counts of each project whose manifest names this core and that is the owner's, or whose owner gave the core's
+  owner access, or whose manifest's row *shares its counts* says `yes`, found each time and listed nowhere by hand. A
+  private project is not named, nor one of another owner's ("a project of another owner"), and of either only counts and
+  conclusions are carried, nothing of its code or its discussions. It does not mean a project that is merely public is
+  read for the report, though a task may read it (`modules/how-to-work.md`). Reason: the owner wants to see how the
+  core works in other projects, and only those that hold use to read.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
 - **A new rule says what holds it** (core archive 195). A PR that changes the floor or the modules has the heading
