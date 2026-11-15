@@ -10,7 +10,8 @@
 //
 //   node scripts/staged.mjs                         each case, the rules it holds, and whether it is due
 //   node scripts/staged.mjs --set <case> <dir>      sets the case up in <dir>, a new folder outside any repository,
-//                                                   and prints the brief: given whole to a fresh session, nothing else
+//        [--at <sha>]                               from the core at HEAD (a commit of its main) or at <sha>, and
+//                                                   prints the brief: given whole to a fresh session, nothing else
 //   node scripts/staged.mjs --read <case> <dir>     once that session has ended: the verdict, read from <dir>
 //        [--record] [--tool <name>] [--model <words>]  and, with --record, written into RECORD
 //   node scripts/staged.mjs --wrong <case> <why>    marks the case's last recorded verdict as found wrong, and why
@@ -148,7 +149,8 @@ function main(argv) {
     const c = named(get("--set")), dir = argv[argv.indexOf("--set") + 2];
     if (!c) return;
     if (!dir) return fail("--set needs the folder to set the case in. Mend: give a new folder outside any repository, after the case's name");
-    console.log(setCase(c, path.resolve(dir)));
+    try { console.log(setCase(c, path.resolve(dir), get("--at") ? { at: get("--at") } : {})); }
+    catch (e) { return fail(`${c.name} could not be set in ${dir}: ${String(e.message).split("\n").filter(Boolean).join(" ")}. Mend: give a new, empty folder, from a clone whose HEAD is a commit of the core's main (or name one with --at <its full SHA>)`); }
     return;
   }
   if (argv.includes("--read")) {
