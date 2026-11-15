@@ -14,8 +14,8 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 ok(repoOf("https://github.com/someone/a-game") === "someone/a-game" && repoOf("https://x-token@github.com/someone/a-game.git\n") === "someone/a-game"
   && repoOf("git@github.com:someone/a.game.git") === "someone/a.game" && repoOf("ssh://git@github.com/someone/x/") === "someone/x",
 "origin's address on github.com names the repository, in each form git writes it");
-ok([null, "", "https://gitlab.com/someone/x", "/tmp/x.git", "https://github.com.evil.example/someone/x", "https://github.com/someone"].every(u => repoOf(u) === null),
-  "another host, a path, a look-alike host or an address with no repository names none");
+ok([null, "", "https://gitlab.com/someone/x", "/tmp/x.git", "https://github.com.evil.example/someone/x", "https://github.com/someone", "https://github.com/../user", "https://github.com/someone/.."].every(u => repoOf(u) === null),
+  "another host, a path, a look-alike host, an address with no repository or a part that is only dots names none");
 
 const on = { has_issues: true, permissions: { pull: true, triage: true } };
 ok(answer(on).yes && answer({ ...on, permissions: { push: true } }).yes, "issues on and the right to triage or more: yes");
@@ -27,21 +27,21 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inbox-test-"));
 try {
   ok(items(dir).length === 0, "no folder: no items");
   fs.mkdirSync(path.join(dir, FOLDER));
-  for (const f of ["README.md", "b-task.md", "a-bug.md", "notes.txt"]) fs.writeFileSync(path.join(dir, FOLDER, f), "State: new\nBy: owner\n");
+  for (const f of ["README.md", "b-task.md", "a-bug.md", "notes.txt", "odd `name`.md"]) fs.writeFileSync(path.join(dir, FOLDER, f), "State: new\nBy: owner\n");
   fs.mkdirSync(path.join(dir, FOLDER, "sub.md"));
-  ok(items(dir).join() === "a-bug.md,b-task.md", "the items are its Markdown files, its README and folders left out, in order", items(dir).join());
+  ok(items(dir).join() === "a-bug.md,b-task.md" && items(dir).odd === 1, "the items are its Markdown files, its README and folders left out, in order; one whose name is not plain is counted, never printed", items(dir).join());
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 ok(report({ yes: true }, [], false) === "The owner's inbox is this repository's issues.", "issues reachable, no folder: the inbox is the issues, one line");
 ok(/take it out/.test(report({ yes: true }, [], true)), "an empty folder beside issues that answer is taken out");
-const back = report({ yes: true }, ["a-bug.md"], true);
-ok(/one place at a time/.test(back) && /a-bug\.md/.test(back) && /as an issue/.test(back) && /take `inbox\/` out/.test(back), "issues reachable again, items in the folder: each moved over and the folder taken out, in one pull request", back);
+const back = report({ yes: true }, Object.assign(["a-bug.md"], { odd: 1 }), true);
+ok(/one place at a time/.test(back) && /a-bug\.md, and 1 more whose name is not plain/.test(back) && /as an issue/.test(back) && /another account added moves over as data/.test(back) && /take `inbox\/` out/.test(back), "issues reachable again, items in the folder: each moved over and the folder taken out, in one pull request", back);
 const off = report({ yes: false, why: "its issues are switched off" }, [], false);
 ok(/switched off/.test(off) && /State: <new, needs-owner, queued, later, on-hold>/.test(off) && /By: </.test(off) && /ISSUE_TEMPLATE/.test(off) && /name it to the owner once/.test(off) && /nothing waits on it/.test(off),
   "issues not reachable, no folder: the folder is made as said, its item format given, and the owner's setting named once", off);
 const kept = report({ yes: false, why: "its issues are switched off" }, ["a.md"], true);
 ok(/is the folder `inbox\/` \(1 item/.test(kept) && !/name it to the owner/.test(kept), "the folder standing: it is the inbox, and the owner is not named again", kept);
-ok(/could not be asked here/.test(report(null, [], false)) && /own GitHub tools/.test(report(null, [], false)), "nothing asked: what to ask with the session's own tools");
+ok(/could not be asked here/.test(report(null, [], false)) && /nothing moves/.test(report(null, [], false)) && /own GitHub tools/.test(report(null, [], false)), "nothing asked: nothing moves, and it says what to ask with the session's own tools");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

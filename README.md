@@ -37,8 +37,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
    `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`) and where the owner's
-   inbox is (`scripts/inbox.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
-   release says what it asks, step by step"). The core's
+   inbox is (`scripts/inbox.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is
+   merged, nothing waiting on it (`AGENTS.md`, "A release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
    submodule, but not the executable bit, which a copy made on Windows records for no file and which nothing reads. The

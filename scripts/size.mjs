@@ -28,7 +28,9 @@ import { started } from "./started.mjs";
 export const CAP = 23 * 1024;
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
 // project's size marks give each such file (modules/inbox.md, "The progress file holds order only"; core archive 216):
-// set at its first trim, as each project sets its own; it rises only as the cap does.
+// set at its first trim, as each project sets its own. A raise of it is read by the reviews, as any mark's is
+// (modules/review-guidelines.md, "A mark on what every session reads"); this script checks only that the queue is
+// under it.
 export const QUEUE = { file: "QUEUE.md", mark: 4 * 1024 };
 // the core's files every session reads at its start, by their paths here
 export const COUNTED = READ.filter(f => f.startsWith("core/")).map(f => f.slice("core/".length));

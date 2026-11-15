@@ -59,9 +59,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 4), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
-- **The file holds no note.** Where a module asks for one in the *progress file* (where to pick up after a passed
-  gate, a lane that waits), it goes in the description of the line's own PR, which the next builder reads with the
-  branch.
+- **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
+  description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
+  (`modules/work-flow.md`).
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day (core archive 211 and 212): an issue or note from the

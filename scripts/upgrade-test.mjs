@@ -330,10 +330,10 @@ function upgrade(p, from, ownChanges, expect) {
   if (process.platform !== "win32") inboxCase(p);
 }
 
-// The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo`, origin's address on github.com for
-// the call alone.
+// The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo` (left out: gh gives no answer at
+// all), origin's address on github.com for the call alone.
 function inbox(p, repo) {
-  fs.writeFileSync(ghData, JSON.stringify({ [`^repos/${p.repo}$`]: repo }));
+  fs.writeFileSync(ghData, JSON.stringify(repo === undefined ? {} : { [`^repos/${p.repo}$`]: repo }));
   const was = git(p.dir, "config", "--get", "remote.origin.url");
   git(p.dir, "remote", "set-url", "origin", `https://github.com/${p.repo}`);
   try { const r = spawnSync(process.execPath, ["core/scripts/inbox.mjs"], { cwd: p.dir, env: base, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; }
@@ -382,6 +382,8 @@ function inboxCase(p) {
   r = inbox(p, on);
   ok(/one place at a time/.test(r.out) && /another\.md/.test(r.out) && /take `inbox\/` out/.test(r.out), `${p.name}: once its issues answer, each open item is moved over and the folder taken out`, r.out);
   fs.rmSync(path.join(p.dir, "inbox/another.md"));
+  r = inbox(p, undefined);
+  ok(r.status === 0 && /could not be asked here/.test(r.out) && /nothing moves/.test(r.out), `${p.name}: where gh gives no answer at all, nothing moves and nothing fails`, r.out);
   r = inbox(p, { has_issues: true });
   ok(r.status === 0 && /could not be asked here/.test(r.out), `${p.name}: where GitHub answers for no account, it says what to ask, and fails nothing`, r.out);
 }

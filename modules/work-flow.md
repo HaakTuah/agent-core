@@ -35,7 +35,7 @@ owner creates from any device to stop its agents and deletes to let them go on.
 - Before that message, on a machine that outlives the session, clean up what you made (core archive 187): what later
   work needs is pushed, what you started is stopped, and your own worktree or clone, scratch files and local branches
   go, save what holds anything uncommitted or unpushed, which you push or leave and name in the message.
-- A long task may end a session at a passed gate, with a commit and a note in the *progress file* saying where to pick
+- A long task may end a session at a passed gate, with a commit and a note in its PR's description saying where to pick
   up (core archive 143).
 - A session of the trusted builder's (floor rule 3) that no orchestrator started, and the orchestrator on every wake,
   first checks whether the core has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so
