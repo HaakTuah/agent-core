@@ -38,6 +38,23 @@ ok(same(fn(loop), ["d:1:5:2"]), `a for await loop is a block, not a function (${
 ok(same(fn("const q = (a) / 2 / (b) / 3;\nfunction e() {\n  return 1;\n}\n"), ["e:2:3:0"]), "a / after an expression's ) is a division");
 ok(same(fn("#!/usr/bin/env node\nexport default async function main() {\n  return 1;\n}\n"), ["main:2:3:0"]), "a hashbang is passed over");
 
+// Branch points: each if, loop, case and catch, and each and, or and choice within a line; a function within is its own.
+const br = src => functions(tokens(src)).map(f => `${f.name}:${f.branches}`);
+const branching = [
+  "function g(a, b) {",
+  "  if (a && b || a?.c) { return a ? 1 : 2; } else if (b ?? a) { a ||= b; }",
+  "  for (const x of a) { while (x) { do { b--; } while (b); } }",
+  "  switch (a) { case 1: case 'two': break; default: }",
+  "  try { p.catch(e => e); } catch { /* none */ }",
+  "  const o = { if: 1, case: 2, for: 3 }, s = 'if (x) && ||', r = /a?b|c/, t = a | b & 1;",
+  "  const inner = y => { if (y) { return y && 1; } };",
+  "  return o.if;",
+  "}",
+].join("\n");
+ok(same(br(branching), ["g:13", "inner:2"]), `each if, loop, case and catch counts, and each and, or and choice; not a key, a member, a string, a regular expression or a single & or | (${br(branching)})`);
+const optional = "function h(a?: number, b?: string): void {\n  const c: A | B = a?.[0] ?? b!;\n  type T = { x?: number };\n  if (a) { use<T>(c); }\n}\n";
+ok(same(br(optional), ["h:2"]), `TypeScript's optional marks and unions are no branch points (${br(optional)})`);
+
 // Every form of a function, TypeScript's return types and type parameters among them.
 const forms = [
   "class A {",
