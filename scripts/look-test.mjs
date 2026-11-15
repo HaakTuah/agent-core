@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node scripts/look-test.mjs
-import { BOT, checksOf, idleBody, inboxFile, lastRun, mine, plan, slug, text } from "./look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, slug, text } from "./look.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "./state-report.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -18,6 +18,16 @@ ok(plan("a", null) === "open" && plan("a", open) === "nothing" && plan("b", open
   "a finding opens its issue, leaves it as it stands, updates it, or reopens the closed one: never a second");
 ok(plan(null, open) === "close" && plan(null, closed) === "nothing" && plan(null, null) === "nothing", "once nothing stands, an open issue closes, and nothing else happens");
 ok(plan(null, open, true) === "nothing" && plan("b", open, true) === "nothing", "what could not be read changes nothing: an issue is never closed on a reading that failed");
+
+// ---- what else is due, and whose it is to see ----
+const readers = [() => null, () => ({ title: "One", body: "a" }), () => ({ title: "Two", body: null, unread: "its file is no file" }), () => ({ title: "Three", body: "c", owner: true })];
+ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what: "a", unread: null }, { title: "Two", what: null, unread: "its file is no file" }, { title: "Three", what: "c", unread: null, owner: true }]),
+  "each reader of what is due gives its issue, one that has nothing to say gives none, and one says whether it is the owner's to see");
+ok(DUE.length === 3 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; Cleaning due: how the code is put together; An audit of how the code is put together is due",
+  "the look keeps an issue for the pass over the choices, for cleaning and for the audit by a reader");
+ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
+  && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued",
+  "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
 
 // ---- its own issues: GitHub's job's or the owner's account's, the newest of each title ----
 const issues = [
