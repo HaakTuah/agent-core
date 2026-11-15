@@ -118,7 +118,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
-     the config's "agentTools" does not list, with its publisher and version: floor topic 15). A package or
+     the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
+     configuration pins where it pins one: floor topic 15). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.

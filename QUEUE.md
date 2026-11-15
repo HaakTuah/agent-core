@@ -23,7 +23,6 @@ wanted").
 | #253 | rule builder | #246, or built with it |
 | #275 | rule builder | #253 |
 | #321 | rule builder | #275, or built with it |
-| #282 | rule builder | |
 | #284 | rule builder | #246 |
 | #285 | rule builder | #249 |
 | #286 | rule builder | #284 |
@@ -44,7 +43,6 @@ wanted").
 | #313 | rule builder | #359, the core's own inputs: its rules merged in #360 |
 | #314 | rule builder | #313 and #304 |
 | #350 | builder | #235 |
-| #352 | builder | |
 | #354 | builder | #246 |
 | #355 | builder | #246 |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
