@@ -167,6 +167,13 @@ export function report(texts, jobs) {
   return { schemaVersion: "1", thresholds: { high: 80, low: 60 }, files };
 }
 
+// The working copies taken away, as the run ends or is stopped.
+function takeAway(copies, scratch) {
+  for (const dir of copies.splice(0)) try { git(["worktree", "remove", "--force", dir]); } catch { /* (taken away below) */ }
+  fs.rmSync(scratch, { recursive: true, force: true });
+  try { git(["worktree", "prune"]); } catch { /* (nothing to prune) */ }
+}
+
 async function main(argv) {
   const at = argv.indexOf("--report"), out = at >= 0 ? argv[at + 1] : null;
   const b = argv.indexOf("--budget"), budget = Number(b >= 0 ? argv[b + 1] : process.env.MUTATE_BUDGET || Infinity);
@@ -178,6 +185,8 @@ async function main(argv) {
   const code = Object.keys(texts).filter(f => !tests.has(f) && !f.endsWith("package.json"));
   const wanted = wantedOf(named, code), testTexts = Object.fromEntries([...tests].filter(t => t in texts).map(t => [t, texts[t]]));
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "mutate-")), copies = [];
+  const stop = () => { takeAway(copies, scratch); process.exit(130); };
+  for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
     const jobs = [...wanted].flatMap(([file, lines]) => faults(texts[file], lines).map(f => ({ ...f, file, text: texts[file], tests: testsOf(file, testTexts) })));
     const width = Math.max(1, Math.min(os.cpus().length, jobs.length));
@@ -187,11 +196,7 @@ async function main(argv) {
     const count = s => jobs.filter(j => j.status === s).length;
     if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}`);
     console.log(`mutate: ${jobs.length} faults in ${wanted.size} files: ${count("Killed") + count("Timeout")} caught, ${count("Survived") + count("NoCoverage")} survived, ${count("Pending")} not run (the budget); the report is at ${out}`);
-  } finally {
-    for (const dir of copies) try { git(["worktree", "remove", "--force", dir]); } catch { /* (taken away below) */ }
-    fs.rmSync(scratch, { recursive: true, force: true });
-    try { git(["worktree", "prune"]); } catch { /* (nothing to prune) */ }
-  }
+  } finally { takeAway(copies, scratch); }
   return 0;
 }
 

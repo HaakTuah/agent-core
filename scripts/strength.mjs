@@ -97,11 +97,13 @@ export function linesArg(changed) {
 
 const collapse = (s, most) => { const t = String(s).replace(/\s+/gu, " ").trim(); return t.length > most ? `${t.slice(0, most - 1)}…` : t; };
 
+// The text a fault replaced.
+const originalOf = (lines, { start, end }) => (start.line === end.line ? lines[start.line - 1]?.slice(start.column - 1, end.column - 1) : lines[start.line - 1]?.slice(start.column - 1)) ?? "";
+
 // A fault's id in the baseline: its file, the text of its line, and what became what; stable where lines move.
 export function idOf(file, source, m) {
-  const lines = source.split(/\r?\n/u), { start, end } = m.location;
-  const original = start.line === end.line ? lines[start.line - 1]?.slice(start.column - 1, end.column - 1) : lines[start.line - 1]?.slice(start.column - 1);
-  return `survivor: ${file}: ${collapse(lines[start.line - 1] ?? "", 100)} [${collapse(original ?? "", 40)} -> ${collapse(m.replacement ?? "", 40)}]`;
+  const lines = source.split(/\r?\n/u);
+  return `survivor: ${file}: ${collapse(lines[m.location.start.line - 1] ?? "", 100)} [${collapse(originalOf(lines, m.location), 40)} -> ${collapse(m.replacement ?? "", 40)}]`;
 }
 
 const aPlace = p => p && Number.isInteger(p.line) && p.line > 0 && Number.isInteger(p.column) && p.column > 0;
@@ -119,7 +121,7 @@ export function faultsOf(text, wanted, root = ".") {
     if (typeof f?.source !== "string" || !Array.isArray(f.mutants) || !f.mutants.every(aMutant)) refuse(`the mutation tool's report holds ${file} in a form the check does not read`, "have the tool write the mutation-testing-elements schema: each file a \"source\" and \"mutants\", each with \"mutatorName\", \"location\" and \"status\"");
     for (const m of f.mutants) {
       if (wanted && !wanted.get(file)?.has(m.location.start.line)) continue;
-      out.push({ file, line: m.location.start.line, id: idOf(file, f.source, m), status: m.status, mutatorName: m.mutatorName, replacement: m.replacement ?? "" });
+      out.push({ file, line: m.location.start.line, id: idOf(file, f.source, m), status: m.status, mutatorName: m.mutatorName, original: originalOf(f.source.split(/\r?\n/u), m.location), replacement: m.replacement ?? "" });
     }
   }
   return out;
@@ -168,14 +170,14 @@ export function runTool(command, lines, cwd = ".") {
 }
 
 const placed = f => `${f.file}:${f.line}`;
-const said = f => `${f.mutatorName}${f.replacement === "" ? ", taken out" : `, made "${f.replacement}"`}`;
+const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replacement === "" ? "taken out" : `made "${collapse(f.replacement, 40)}"`}`;
 
 // What the check says of a pull request's run, and whether it fails: { lines, fails }.
 export function verdict({ faults, baseline, was, at, deleted }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
   if (!baseline) {
-    lines.push(...faults.filter(f => SURVIVED.includes(f.status)).map(f => `survived: ${placed(f)}: ${said(f)}, and no test failed`));
+    lines.push(...faults.filter(f => SURVIVED.includes(f.status)).map(f => `survived: ${placed(f)}: ${said(f)}, and ${f.status === "NoCoverage" ? "no test runs that line" : "no test failed"}`));
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
     return { lines, fails: false };
   }
