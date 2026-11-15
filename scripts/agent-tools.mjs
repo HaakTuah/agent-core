@@ -12,8 +12,8 @@
 // and `.claude/skills/`, each folder holding a SKILL.md. A link inside the checkout is followed; one that leads out of
 // it is not, and fails, save one the base held as it stands. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
 // another provider's settings, where a plug-in's marketplace or a tool server's command points, and whether the version
-// listed is the one run, are the review's. A hook the starter kit writes counts as the core's only where its command is
-// the kit's, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
+// listed is the one run, are the review's. A hook the starter kit writes counts as the core's only where it is the kit's
+// hook, of the same event, matcher, type and command, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
 // changes them asks in its sync note that a project whose list is written lists the hooks it kept.
 //
 // Nothing locks a project (AGENTS.md): until the config holds "agentTools", a pull request's base counts as the list,
@@ -42,7 +42,9 @@ const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u20
 // met reading them. `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
 // that hold a SKILL.md.
 export function configured(read, skills) {
-  const tools = new Map(), problems = [], shapes = new Map();
+  // (each tool's name, as the list writes it, and what it is: for a hook its event, matcher, type and command, or its
+  // whole text where it runs no command, which is what the kit's hooks and the base's are compared by)
+  const tools = new Map(), ids = new Map(), problems = [];
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -59,26 +61,29 @@ export function configured(read, skills) {
         // two hooks share a name)
         if (matcher.includes(": ")) problems.push(`${file}: the ${show(event)} hooks' matcher ${show(group.matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
         for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
-          const name = `hook ${event}${matcher}: ${typeof hook?.command === "string" ? hook.command : JSON.stringify(hook)}`;
-          // (a hook with no command is named by its text, which a command could equal: two such hooks share no name)
-          const kind = typeof hook?.command === "string" ? `command ${JSON.stringify(hook.type ?? null)}` : "text";
-          if (shapes.has(name) && shapes.get(name) !== kind) problems.push(`${file}: two of the ${show(event)} hooks share the name ${show(name.slice(5))}, one by its command and one by its text. Mend: give the one a command of its own, or take one out`);
-          shapes.set(name, kind);
+          const runs = hook?.type === "command" && typeof hook.command === "string";
+          const name = `hook ${event}${matcher}: ${runs ? hook.command : JSON.stringify(hook)}`;
+          const id = JSON.stringify(["hook", event, group.matcher ?? "", runs ? ["command", hook.command] : ["other", hook]]);
+          // (two hooks of one name that are not the same hook, as a command and a text that reads the same: neither is
+          // told apart from the other in the list)
+          if (ids.has(name) && ids.get(name) !== id) problems.push(`${file}: two of the ${show(event)} hooks share the name ${show(name.slice(5))} and are not the same hook. Mend: give the one a command of its own, or take one out`);
+          ids.set(name, id);
           tools.set(name, file);
         }
       }
     }
-    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) tools.set(`plugin ${name}`, file);
+    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); ids.set(`plugin ${name}`, `plugin ${name}`); }
   }
-  for (const name of Object.keys(json(".mcp.json")?.mcpServers ?? {})) tools.set(`server ${name}`, ".mcp.json");
-  for (const name of skills()) tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`);
-  return { tools, problems };
+  for (const name of Object.keys(json(".mcp.json")?.mcpServers ?? {})) { tools.set(`server ${name}`, ".mcp.json"); ids.set(`server ${name}`, `server ${name}`); }
+  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); ids.set(`skill ${name}`, `skill ${name}`); }
+  return { tools, ids, problems };
 }
 
-// The hooks the starter kit writes: the core's, listed by it. `text` is the kit's settings as a copy holds them.
+// The hooks the starter kit writes, each by what it is (configured()'s ids): the core's, listed by it. `text` is the
+// kit's settings as a copy holds them.
 const kitText = () => { try { return fs.readFileSync(KIT, "utf8"); } catch { return null; } };
 export function kitHooks(text = kitText()) {
-  return text === null ? [] : [...configured(f => (f === ".claude/settings.json" ? text : null), () => []).tools.keys()];
+  return text === null ? [] : [...configured(f => (f === ".claude/settings.json" ? text : null), () => []).ids.values()];
 }
 
 // The list a config holds: { keys, problems }, keys the "kind name" of each well-formed entry; null where the config
@@ -107,10 +112,11 @@ const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice
 
 // What breaks the rule in a project: { problems, unlisted }, the first held against the list where there is one, the
 // second the tools configured that neither the list nor the core lists (where there is no list, so that a caller may
-// hold them against a base). `list` is listed()'s answer, or null.
-export function check(tools, list, kit, file) {
+// hold them against a base). `head` is configured()'s answer, `list` listed()'s or null, `kit` kitHooks()'s.
+export function check(head, list, kit, file) {
+  const { tools, ids } = head;
   const problems = [...(list?.problems ?? [])];
-  const unlisted = [...tools.keys()].filter(k => !kit.includes(k) && !list?.keys.has(k));
+  const unlisted = [...tools.keys()].filter(k => !kit.includes(ids.get(k)) && !list?.keys.has(k));
   if (list) {
     for (const k of unlisted) problems.push(`${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
     for (const k of list.keys) if (!tools.has(k)) problems.push(`${file}: "agentTools" lists ${describe(k)}, which nothing configures. Mend: take its entry out of the list, in this pull request`);
@@ -186,7 +192,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
   let list = listed(config, file);
   if (!list && core) list = { keys: new Set(), problems: [] };
-  const { problems, unlisted } = check(head.tools, list, kit, file);
+  const { problems, unlisted } = check(head, list, kit, file);
   const fail = [...head.problems, ...problems], notes = [];
   // (a link out of the checkout fails, save one the base held as it stands: what stood before turns nothing red)
   for (const at of head.links) {
@@ -201,12 +207,12 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
     notes.push(`${file} holds no "agentTools" yet, so nothing fails here; not listed: ${unlisted.map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
     return { fail, notes };
   }
-  const before = readProject(root, base).tools;
+  const before = new Set(readProject(root, base).ids.values()), held = k => before.has(head.ids.get(k));
   for (const k of unlisted) {
-    if (before.has(k)) continue;
+    if (held(k)) continue;
     fail.push(`${describe(k)}, configured in ${head.tools.get(k)}, is new in this pull request and listed nowhere. Mend: list it under "agentTools" in ${file}, with every tool the project configures, each with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
   }
-  if (unlisted.some(k => before.has(k))) notes.push(`not listed, as the base held them: ${unlisted.filter(k => before.has(k)).map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
+  if (unlisted.some(held)) notes.push(`not listed, as the base held them: ${unlisted.filter(held).map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
   return { fail, notes };
 }
 

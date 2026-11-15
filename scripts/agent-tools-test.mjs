@@ -59,8 +59,9 @@ const fails = (r, what, ...says) => ok(r.status === 1 && mended(r.out) && says.e
 
 // ---- the kit's own hooks are the core's ----
 const kitGroups = JSON.parse(KIT).hooks;
-ok(JSON.stringify(kitHooks().map(k => k.slice(0, k.indexOf(":")))) === JSON.stringify(["hook SessionStart startup|resume", "hook PreToolUse Agent|Task", "hook Stop"]) && kitHooks()[2] === `hook Stop: ${kitGroups.Stop[0].hooks[0].command}`,
-  "the starter kit's hooks are read by event, matcher and command", JSON.stringify(kitHooks()));
+const kitIds = kitHooks().map(id => JSON.parse(id));
+ok(JSON.stringify(kitIds.map(([, event, matcher, [type]]) => [event, matcher, type])) === JSON.stringify([["SessionStart", "startup|resume", "command"], ["PreToolUse", "Agent|Task", "command"], ["Stop", "", "command"]]) && kitIds[2][3][1] === kitGroups.Stop[0].hooks[0].command,
+  "the starter kit's hooks are read by event, matcher, type and command", JSON.stringify(kitIds));
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");
@@ -145,6 +146,14 @@ fs.mkdirSync(path.join(emptyTarget, ".claude/skills"), { recursive: true });
 fs.symlinkSync("../../shared/later", path.join(emptyTarget, ".claude/skills/later"));
 git(emptyTarget, "add", "-A"); git(emptyTarget, "commit", "-q", "-m", "a link to a folder with no skill");
 fails(run(pr(emptyTarget, { "shared/later/SKILL.md": "x" })), "a skill a pull request adds behind a link the base held, where the base's target held none, is new", 'the skill "later", configured in .claude/skills/later/SKILL.md, is new in this pull request');
+// a hook of another type that carries a command's text is not that command's hook, against the kit or the base
+const asWeb = JSON.parse(KIT);
+asWeb.hooks.Stop[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid/x", command: asWeb.hooks.Stop[0].hooks[0].command };
+fails(run(project({ ".claude/settings.json": JSON.stringify(asWeb), ...listing() })), "a web hook carrying the kit's command is not the kit's hook", "hooks.example.invalid/x", "is not listed");
+const echoed = { hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [{ type: "command", command: "echo hi" }] }] } };
+const toWeb = structuredClone(echoed);
+toWeb.hooks.PostToolUse[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid", command: "echo hi" };
+fails(run(pr(project({ ".claude/settings.json": echoed }), { ".claude/settings.json": toWeb })), "and a command hook the base held, turned into a web hook with the same command, is new", "is new in this pull request");
 const skillsDirBase = project();
 fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
 fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
