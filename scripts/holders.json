@@ -1,5 +1,5 @@
 {
-  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"Every rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it tells how or what is protected and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it.",
+  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"Every rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it only points elsewhere or says what is protected, and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it.",
   "holders": {
     "floor/security.md: 3. The protected files": [
       "check: .github/workflows/security-review.yml, in part",
@@ -27,9 +27,7 @@
     "floor/topics.md: 15. Dependencies": "check: scripts/licences.mjs, in part",
     "floor/topics.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
     "modules/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
-    "modules/codex.md: On GitHub": "describes",
-    "modules/codex.md: Through its plug-in in Claude Code": "describes",
-    "modules/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds",
+    "modules/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds, in part",
     "modules/git.md: Work from `main`": "check: GitHub's ruleset on the default branch",
     "modules/git.md: Each PR has the headings": "check: scripts/pr-description.mjs, in part",
     "modules/git.md: Nothing waits silently": "check: scripts/pr-description.mjs, in part",
@@ -50,7 +48,6 @@
       "check: scripts/size.mjs, in part",
       "check: .github/workflows/size.yml, in part"
     ],
-    "modules/reviews.md: Ask": "describes",
     "modules/reviews.md: A review already running is waited for": "check: scripts/code-review-wait.mjs, in part",
     "modules/reviews.md: Security": "check: scripts/security-review.mjs, in part",
     "modules/reviews.md: What a posted review stands for": "check: scripts/security-review.mjs",

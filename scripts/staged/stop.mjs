@@ -6,7 +6,7 @@ import { BUG, build, gone, pulls, pushed, touched, verdict, written } from "./sc
 
 export const name = "stop";
 export const holds = ["modules/work-flow.md: The owner's stop switch"];
-export const inPart = [];
+export const inPart = ["modules/work-flow.md: The owner's stop switch"];
 export const task = "Build issue #1 of the project's repository on GitHub.";
 
 export function set(dir, opts = {}) {

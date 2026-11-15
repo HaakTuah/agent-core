@@ -32,7 +32,7 @@ Not taken, each for its reason:
   player chooses to use, which are all that module governs.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps the
-audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is
+audits, the reports written before 12 November 2026 and the staged cases' record); the *choice records*: `CHOICES.md`; the archive is
 `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*: `README.md`; the
 *large file*: past about 50 KB; the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the
 same file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
@@ -152,7 +152,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **A release says what it asks, step by step** (core archive 215). Whoever adds an entry to `setup/sync-notes.md`
   gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
-  is not done; or, where no check reads it, why, held by a staged case (#235). Every standing entry has one. Every sync
+  is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
   every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
   a task the project's agents take (`modules/orchestrating.md`; with no orchestrator, the session that syncs), a step
@@ -200,19 +200,21 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   core works in other projects, and only those that hold use to read.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
-- **Every rule says what holds it** (core archive 195 and 223). Each rule of the floor and the modules, those that
-  stood before too, names its holder, one of three: a check that fails where it is broken (a script, a workflow, a
-  hook, or GitHub's setting that refuses it), a staged case, or the scheduled audit. `scripts/holders.json` names the
-  checks and the audit by each rule's file and bold lead, a staged case names its own rules in its file, and
-  `scripts/holders.mjs` lists each rule with none in the core's monthly state report until it gains one or goes on the
-  owner's word. A staged case is the holder of last resort, for what no check reads exactly, and a review's finding
-  seen twice moves its rule up to a check (#254). A PR that changes the floor or the modules has the heading "What
-  holds it" (`.github/workflows/own-description.yml` fails one without it): for each rule it adds or widens, what went
-  wrong or would without it (an incident, a review's finding, the owner's reason), and its holder, or that it has none
-  yet; "None" where it adds no rule. It does not mean that a rule with no holder fails anything or goes by itself.
-  Reason: the audit of 13 November found 43 of 122 rules held by nothing but a session reading them, and nothing
-  listed them. Held by `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names
-  a rule that no longer stands or a check that is not there, and by the heading's check.
+- **Every rule says what holds it** (core archive 195 and 223). By default a rule of the floor or the modules is held by
+  a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
+  check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
+  none holds it yet, it is listed. Whoever writes or changes a rule names its holder in that PR: in
+  `scripts/holders.json`, by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
+  "What holds it" (`.github/workflows/own-description.yml` fails one without it), for each rule it adds or widens, what
+  went wrong or would without it (an incident, a review's finding, the owner's reason), and its holder, or that it has
+  none yet; "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists
+  each rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
+  review's finding seen twice moves its rule up to a check where one can hold it (#254). A line that only points
+  elsewhere or says what is protected, binding no one, is marked "describes" there and is not listed. It does not mean
+  that a rule with no holder fails anything or goes by itself, nor that a review is a holder. Reason: the audit of 13
+  November found 43 of 122 rules held by nothing but a session reading them, and nothing listed them. Held by
+  `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
+  stands or a check that is not there, and by the heading's check.
 - **Staged cases hold what no check reads** (core archive 223; #235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
