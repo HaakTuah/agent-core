@@ -9,7 +9,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NOT_A_FILE, REGISTRY, check, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
+import { NOT_A_FILE, REGISTRY, check as checked, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "./nuget.mjs";
+import { mended, unmended } from "./mend.mjs";
+
+// (each failure the check gives in this test, read as it prints it, for its mend; the last assertion says which did not
+// say one)
+const unsaid = [];
+const read = text => { unsaid.push(...unmended(text)); return text; };
+const check = (...args) => { const result = checked(...args); read(result.failures.map(f => `FAIL: ${f}`).join("\n")); return result; };
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -121,7 +128,7 @@ const said = result => result.failures.join("\n");
 const good = project({ ...direct(["Newtonsoft.Json", "13.0.3"], ["Serial.Lib", "3.0.5"]), "Lib.Dep": entry("Transitive", "2.0.0") }, direct(["Test.Tool", "9.0.0"], ["Newtonsoft.Json", "13.0.3"]));
 ok(good.failures.length === 0 && /^4 NuGet packages in 2 lock files checked \(3 in what ships, 1 tools that only run\), 0 accepted/.test(good.summary), "a project whose every package is exact and on its list passes: what ships to the floor's list, a test's tool to the tools'", said(good) + good.summary);
 const bad = project(direct(["Copy.Left", "4.0.0"], ["Test.Tool", "9.0.0"], ["By.File", "1.0.0"]), {});
-ok(bad.failures.length === 3 && /Copy\.Left@4\.0\.0 .*GPL-3\.0-only is off the list for what ships.*nuget\.accepted/.test(said(bad)) && /Test\.Tool@9\.0\.0 .*EPL-2\.0 is off the list for what ships/.test(said(bad)) && /By\.File@1\.0\.0 .*it ships, and its manifest names a licence file.*waits for the owner's yes \(floor rule 10\), in the config's "nuget\.accepted"/.test(said(bad)),
+ok(bad.failures.length === 3 && /Copy\.Left@4\.0\.0 .*GPL-3\.0-only is off the list for what ships.*nuget\.accepted/.test(said(bad)) && /Test\.Tool@9\.0\.0 .*EPL-2\.0 is off the list for what ships/.test(said(bad)) && /By\.File@1\.0\.0 .*it ships, and its manifest names a licence file.*waits for the owner's yes \(floor rule 10\)\. Mend: .*the config's "nuget\.accepted"/.test(said(bad)),
   "copyleft in what ships fails, a licence good enough for a tool is not good enough for what ships, and what ships under a licence in a file waits for the owner's yes", said(bad));
 
 // read by hand: a tool's entry in the audit, and the owner's yes for what ships
@@ -132,8 +139,8 @@ ok(/By\.File@1\.0\.0 .*names a licence file.*record it in checks\/audit\.json as
 ok(/LicenseRef-Odd, as checks\/audit\.json records it, is off the tools' list/.test(said(tool([{ ...hand, licence: "LicenseRef-Odd" }]))) && /names no licence/.test(said(tool([{ ...hand, licence: 5 }])))
   && /names a licence file/.test(said(tool([{ ...hand, name: "By.File@0.9.0" }]))), "an entry that records a licence off the tools' list, none, or another version does not pass it");
 ok(/names a licence file/.test(said(tool([{ ...hand, kind: undefined }]))) && /names a licence file/.test(said(tool([{ ...hand, kind: "data" }]))), "an entry of the same name that is not a NuGet package's covers none: the audit holds other things under such names");
-ok(/the entry By\.File@0\.9\.0, of "kind": "nuget", is for no package whose licence had to be read by hand: remove it/.test(said(tool([hand, { ...hand, name: "By.File@0.9.0" }])))
-  && /holds an entry for it, and its manifest names its licence itself \(MIT\): remove the entry/.test(said(project(direct(["Newtonsoft.Json", "13.0.3"]), {}, { entries: [{ ...hand, name: "Newtonsoft.Json@13.0.3" }] }))), "an entry for a version installed no more, or for a package whose manifest speaks for itself, fails: the audit's NuGet entries shrink by themselves");
+ok(/the entry By\.File@0\.9\.0, of "kind": "nuget", is for no package whose licence had to be read by hand\. Mend: take the entry out/.test(said(tool([hand, { ...hand, name: "By.File@0.9.0" }])))
+  && /holds an entry for it, and its manifest names its licence itself \(MIT\)\. Mend: take that entry out/.test(said(project(direct(["Newtonsoft.Json", "13.0.3"]), {}, { entries: [{ ...hand, name: "Newtonsoft.Json@13.0.3" }] }))), "an entry for a version installed no more, or for a package whose manifest speaks for itself, fails: the audit's NuGet entries shrink by themselves");
 ok(/GPL-3\.0-only is off/.test(said(project(direct(["Copy.Left", "4.0.0"]), {}, { entries: [{ ...hand, name: "Copy.Left@4.0.0" }] }))), "what a manifest names itself, no entry written by hand overrules");
 const shippedByHand = project(direct(["By.File", "1.0.0"]), {}, { entries: [{ ...hand, ships: true, notice: "n" }] });
 ok(shippedByHand.failures.length === 2 && /it ships, and its manifest names a licence file.*waits for the owner's yes/.test(said(shippedByHand)) && /it ships, so checks\/audit\.json holds no entry for it/.test(said(shippedByHand)),
@@ -153,12 +160,12 @@ ok(/accepted as a tool that only runs .*a yes for a tool is no yes for what ship
 ok(/it ships, so its notice ships too/.test(said(project(direct(["Weak.Copy", "2.1.0"]), {}, { nuget: { accepted: [accepted("Weak.Copy", "2.1.0", "LGPL-3.0-only", { notice: " " })] } }))), "an accepted package that ships has its notice there");
 ok([accepted("Non.Commercial", "5.0.0", "CC-BY-NC-4.0"), accepted("Non.Commercial", "5.0.0", "MIT"), accepted("Non.Commercial", "5.0.0", "LicenseRef-Free-For-Any-Use")].every(a => /terms floor rule 10 never allows/.test(said(project(direct(["Non.Commercial", "5.0.0"]), {}, { nuget: { accepted: [a] } }))))
   && /terms floor rule 10 never allows/.test(said(project(direct(["By.File", "1.0.0"]), {}, { nuget: { accepted: [accepted("By.File", "1.0.0", "LicenseRef-BUSL-1.1")] } }))), "no yes takes in terms the floor never allows, whatever the entry calls them: the manifest's own word counts, and the entry's");
-ok(/named in "nuget\.accepted" and in checks\/audit\.json both: an accepted package stands/.test(said(project(direct(["By.File", "1.0.0"]), {}, { entries: [{ ...hand, licence: "GPL-3.0-only" }], nuget: { accepted: [accepted("By.File", "1.0.0", "GPL-3.0-only")] } })))
-  && /named in "nuget\.accepted" and in checks\/audit\.json both: an accepted package stands/.test(said(project(direct(["By.File", "1.0.0"]), {}, { entries: [{ ...hand, ships: true, notice: "n" }], nuget: { accepted: [accepted("By.File", "1.0.0", "MIT")] } })))
-  && /and the entry is on its list: remove the yes/.test(said(tool([hand], { accepted: [accepted("By.File", "1.0.0", "MIT", { ships: false })] }))), "an accepted package with an audit entry too fails: the licence check would hold that entry to the list, and a tool's entry on the list needs no yes");
-ok(/names Newtonsoft\.Json@13\.0\.3, which is on its list and needs no yes: remove it/.test(said(project(direct(["Newtonsoft.Json", "13.0.3"]), {}, { nuget: { accepted: [accepted("Newtonsoft.Json", "13.0.3", "MIT")] } })))
-  && /names Gone@1\.0\.0, which nothing installs: remove it/.test(said(project({}, {}, { nuget: { accepted: [accepted("Gone", "1.0.0", "x")] } }))), "an accepted version that needs no yes, or is installed no more, fails: the list shrinks by itself");
-ok(["Business Source License 1.1", "none given", "the maker's own terms, bought", "MIT or Apache-2.0", "LicenseRef-", "LicenseRef-a b"].every(words => /which no machine can read: name it by an SPDX id/.test(said(project(direct(["By.File", "1.0.0"]), {}, { nuget: { accepted: [accepted("By.File", "1.0.0", words)] } }))))
+ok(/named in "nuget\.accepted" and in checks\/audit\.json both, and an accepted package stands/.test(said(project(direct(["By.File", "1.0.0"]), {}, { entries: [{ ...hand, licence: "GPL-3.0-only" }], nuget: { accepted: [accepted("By.File", "1.0.0", "GPL-3.0-only")] } })))
+  && /named in "nuget\.accepted" and in checks\/audit\.json both, and an accepted package stands/.test(said(project(direct(["By.File", "1.0.0"]), {}, { entries: [{ ...hand, ships: true, notice: "n" }], nuget: { accepted: [accepted("By.File", "1.0.0", "MIT")] } })))
+  && /and the entry is on its list\. Mend: take the yes out/.test(said(tool([hand], { accepted: [accepted("By.File", "1.0.0", "MIT", { ships: false })] }))), "an accepted package with an audit entry too fails: the licence check would hold that entry to the list, and a tool's entry on the list needs no yes");
+ok(/names Newtonsoft\.Json@13\.0\.3, which is on its list and needs no yes\. Mend: take that yes out/.test(said(project(direct(["Newtonsoft.Json", "13.0.3"]), {}, { nuget: { accepted: [accepted("Newtonsoft.Json", "13.0.3", "MIT")] } })))
+  && /names Gone@1\.0\.0, which nothing installs\. Mend: take that yes out/.test(said(project({}, {}, { nuget: { accepted: [accepted("Gone", "1.0.0", "x")] } }))), "an accepted version that needs no yes, or is installed no more, fails: the list shrinks by itself");
+ok(["Business Source License 1.1", "none given", "the maker's own terms, bought", "MIT or Apache-2.0", "LicenseRef-", "LicenseRef-a b"].every(words => /which no machine can read\. Mend: name it by an SPDX id/.test(said(project(direct(["By.File", "1.0.0"]), {}, { nuget: { accepted: [accepted("By.File", "1.0.0", words)] } }))))
   && ["LicenseRef-Vendor-EULA", "LGPL-3.0-only", "(MIT OR GPL-2.0-only)", "GPL-2.0-only WITH Classpath-exception-2.0", "CC-BY-4.0"].every(words => project(direct(["By.File", "1.0.0"]), {}, { nuget: { accepted: [accepted("By.File", "1.0.0", words)] } }).failures.length === 0),
   "what an accepted package is under is named so that a machine can read it: by ids this check knows, or as LicenseRef- and a name; words of one's own fail");
 ok(throws(() => project({}, {}, { nuget: { accepted: [accepted("A", "1", "x"), accepted("a", "1", "y")] } })) && throws(() => project({}, {}, { nuget: { accepted: [{ ...accepted("A", "1", "x"), ships: undefined }] } })), "a package accepted twice, or without a word on whether it ships, stops the check");
@@ -363,10 +370,10 @@ inRepo("checks/audit.json", JSON.stringify({ entries: [] }));
 inRepo("checks/licences.json", JSON.stringify({ ships: [], audit: "checks/audit.json", nuget: { ships: [L] } }));
 const git = (...args) => spawnSync("git", args, { cwd: repo, env, encoding: "utf8" });
 git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "a project");
-const run = (...args) => { const r = spawnSync(process.execPath, [path.join(repo, "core/scripts/nuget.mjs"), ...args], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr, stdout: r.stdout }; };
+const run = (...args) => { const r = spawnSync(process.execPath, [path.join(repo, "core/scripts/nuget.mjs"), ...args], { cwd: repo, env, encoding: "utf8" }); return { status: r.status, out: read(r.stdout + r.stderr), stdout: r.stdout }; };
 const left = restore("Copy.Left@4.0.0"), json = restore("Newtonsoft.Json@13.0.3");
 const strict = run("checks/licences.json", "--packages", left), advisory = run("checks/licences.json", "--packages", left, "--advisory");
-ok(strict.status === 1 && /^FAIL: Copy\.Left@4\.0\.0/m.test(strict.out) && /1 failing/.test(strict.out), "run in a project, it fails where a package is off its list", strict.out);
+ok(strict.status === 1 && /^FAIL: Copy\.Left@4\.0\.0/m.test(strict.out) && mended(strict.out) && /1 failing/.test(strict.out), "run in a project, it fails where a package is off its list, saying its mend", strict.out);
 ok(advisory.status === 0 && /^WOULD FAIL: Copy\.Left@4\.0\.0/m.test(advisory.out) && /Advisory: nothing fails for it yet/.test(advisory.out), "advisory, it says what it would fail, and passes", advisory.out);
 ok(run("checks/licences.json").status === 1 && run("--packages", left).status === 1 && run().status === 1 && run("checks/missing.json", "--packages", left, "--advisory").status === 1, "without its config or the restore's folder it fails, advisory or not");
 ok(run("--projects").status === 0 && run("--projects").stdout === "src/App/App.csproj\n", "asked for the project files, it lists what git knows, a line each, for the restore");
@@ -603,5 +610,6 @@ user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/Ap
 ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
 
+ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);

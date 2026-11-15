@@ -387,7 +387,7 @@ const key = (id, version) => `${id}@${version}`.toLowerCase();
 /** A JSON file's text without the byte-order mark dotnet reads past. */
 export const unmarked = (text) => (text.startsWith("\uFEFF") ? text.slice(1) : text);
 // what a lock entry that names a second content hash for a version is told: a restore keeps one file of each version
-export const twoHashes = "a restore keeps one file of each version, so one entry would fail its hash and the check would read the other's licence: restore again so that each names the one file (floor rule 15)";
+export const twoHashes = "a restore keeps one file of each version, so one entry would fail its hash and the check would read the other's licence. Mend: restore again so that each names the one file (floor rule 15)";
 // what is said of something the check came to read only lately (a second content hash, a .user file, a tool a lock
 // file also names) where the project held it as it stands before: reported, and passes (the owner's word, core archive
 // 207: what a project held before a check read more is reported, not failed)
@@ -407,24 +407,24 @@ const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u
 /** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {
   const nuget = config?.nuget;
-  if (!nuget || typeof nuget !== "object" || Array.isArray(nuget)) throw new Error('the config has no "nuget": { "ships": [...], "tools": [...] }');
+  if (!nuget || typeof nuget !== "object" || Array.isArray(nuget)) throw new Error('the config has no "nuget". Mend: add "nuget": { "ships": [...], "tools": [...] }, each list naming lock files');
   const odd = Object.keys(nuget).filter((k) => !["ships", "tools", "accepted", "sources"].includes(k));
-  if (odd.length) throw new Error(`the config's "nuget" holds keys it does not know: ${odd.join(", ")}`);
+  if (odd.length) throw new Error(`the config's "nuget" holds keys it does not know: ${odd.join(", ")}. Mend: take them out, or correct their spelling`);
   const paths = (name) => {
     const v = nuget[name] ?? [];
     const ok = (p) => typeof p === "string" && posix.normalize(p) === p && posix.basename(p) === LOCK && !p.startsWith("/") && !p.startsWith("../");
-    if (!Array.isArray(v) || !v.every(ok)) throw new Error(`the config's "nuget.${name}" is not a list of ${LOCK} files in the project, each written as git lists it`);
+    if (!Array.isArray(v) || !v.every(ok)) throw new Error(`the config's "nuget.${name}" is not a list of ${LOCK} files in the project. Mend: write each as git lists it, from the project's root`);
     return v;
   };
   const ships = paths("ships"), tools = paths("tools");
   const twice = ships.filter((p) => tools.includes(p)).concat(ships.filter((p, i) => ships.indexOf(p) !== i), tools.filter((p, i) => tools.indexOf(p) !== i));
-  if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}`);
+  if (twice.length) throw new Error(`the config's "nuget" names a lock file twice: ${[...new Set(twice)].join(", ")}. Mend: name each once, in "ships" or in "tools"`);
   const accepted = acceptedList(nuget.accepted, "nuget.accepted", /^[^@\s]+@[^@\s]+$/u, "<Id>@<version>", { same: (name) => name.toLowerCase() });
   const sources = nuget.sources ?? [];
   const source = (s) => typeof s === "string" && s.length <= 300 && (SOURCE_ADDRESS.test(s) || (SOURCE_FOLDER.test(s) && !s.toLowerCase().startsWith("core/")));
-  if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/"');
+  if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/". Mend: write each so, or take it out');
   const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
-  if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already`);
+  if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already. Mend: name each source once, and NuGet's registry not at all`);
   return { ships, tools, accepted, sources };
 }
 
@@ -471,21 +471,21 @@ export function sdkPacks(env = process.env, root = null) {
 export function lockPackages(text, lockPath) {
   const failures = [], split = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON`], split }; }
+  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
-    return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies")`], split };
+    return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies"). Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split };
   }
   for (const [framework, entries] of Object.entries(lock.dependencies)) {
-    if (!entries || typeof entries !== "object" || Array.isArray(entries)) { failures.push(`${lockPath}, ${framework}: not a list of packages`); continue; }
+    if (!entries || typeof entries !== "object" || Array.isArray(entries)) { failures.push(`${lockPath}, ${framework}: not a list of packages. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`); continue; }
     for (const [id, entry] of Object.entries(entries)) {
       const at = `${lockPath}, ${framework}: ${id}`;
       if (entry?.type === "Project") continue;
-      if (!["Direct", "Transitive", "CentralTransitive"].includes(entry?.type)) { failures.push(`${at}: a kind of entry this check does not know (${JSON.stringify(entry?.type)})`); continue; }
+      if (!["Direct", "Transitive", "CentralTransitive"].includes(entry?.type)) { failures.push(`${at}: a kind of entry this check does not know (${JSON.stringify(entry?.type)}). Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`); continue; }
       const { resolved, requested, contentHash } = entry;
-      if (!ID.test(id) || typeof resolved !== "string" || !VERSION.test(resolved)) { failures.push(`${at}: no package id and installed version it can read`); continue; }
-      if (typeof contentHash !== "string" || !contentHash) failures.push(`${at}: no content hash, so a restore cannot hold it to the package it was (floor rule 15)`);
+      if (!ID.test(id) || typeof resolved !== "string" || !VERSION.test(resolved)) { failures.push(`${at}: no package id and installed version it can read. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`); continue; }
+      if (typeof contentHash !== "string" || !contentHash) failures.push(`${at}: no content hash, so a restore cannot hold it to the package it was (floor rule 15). Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`);
       if (entry.type !== "Transitive" && ![`[${resolved}, )`, `[${resolved}]`, `[${resolved}, ${resolved}]`].includes(requested)) {
-        failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}: ask for one exact version, the one installed (floor rule 7)`);
+        failures.push(`${at}: the project asks for ${typeof requested === "string" ? requested : "no version it can read"} and the lock installs ${resolved}. Mend: in the project file, ask for one exact version, the one installed, ${resolved} (floor rule 7), and restore again`);
       }
       const was = packages.get(key(id, resolved));
       // (the last entry is kept, as before this was said, so the file read is the one read then)
@@ -616,10 +616,10 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   const own = tracked.filter((f) => !f.startsWith("core/"));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   for (const f of projectFiles(tracked)) {
-    if (!locks.has(posix.join(posix.dirname(f), LOCK))) failures.push(`${f} has no ${LOCK} beside it that git knows: set RestorePackagesWithLockFile, restore, and commit the lock file (floor rule 15)`);
+    if (!locks.has(posix.join(posix.dirname(f), LOCK))) failures.push(`${f} has no ${LOCK} beside it that git knows. Mend: set RestorePackagesWithLockFile to true in it, restore, and commit the lock file (floor rule 15)`);
   }
-  for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read: move the project to PackageReference`);
-  for (const f of own.filter((f) => OTHER_LOCK.test(posix.basename(f)))) failures.push(`${f}: a lock file under another name, which NuGet takes before ${LOCK} and this check does not read: keep the one name`);
+  for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read. Mend: move the project to PackageReference`);
+  for (const f of own.filter((f) => OTHER_LOCK.test(posix.basename(f)))) failures.push(`${f}: a lock file under another name, which NuGet takes before ${LOCK} and this check does not read. Mend: name it ${LOCK}, the one name`);
   // (each build file, and each file an Import brings in under another name, which the check reads only lately: what such
   // a file names is reported where the base held it as it stands, brought in by every file that brings it in now; one
   // a pull request adds, changes or brings into play with an Import of its own fails, as does what a build file names)
@@ -686,11 +686,11 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     return out.equals(here) || lf(out).equals(lf(here));
   };
   for (const [f, text] of now.files) {
-    const found = now.unreadable.get(f) === "not a file" ? ["is no file of bytes (a link to a device, a folder or a pipe): this check reads none, so what MSBuild would make of it is unseen: make it a file, or remove it"]
-      : now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports: save it as UTF-8"] : [
-      /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath: a lock file kept elsewhere is one this check does not read",
-      /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read",
-      /TreatAsLocalProperty/iu.test(text) && "names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them",
+    const found = now.unreadable.get(f) === "not a file" ? ["is no file of bytes (a link to a device, a folder or a pipe): this check reads none, so what MSBuild would make of it is unseen. Mend: make it a file, or remove it"]
+      : now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports. Mend: save it as UTF-8"] : [
+      /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath, and a lock file kept elsewhere is one this check does not read. Mend: take it out, keeping each lock file beside its project",
+      /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read. Mend: take it out",
+      /TreatAsLocalProperty/iu.test(text) && "names TreatAsLocalProperty: with it a project sets for itself what the restore sets for every project, the folder and the lock file among them. Mend: take it out",
     ].filter(Boolean);
     if (!found.length) continue;
     // (a .user file, read only lately, as the base held it beside a project file the base held too, which imports it:
@@ -704,19 +704,19 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   }
   for (const f of now.typed) reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
   for (const { from, project, via, why } of now.unread) reports.push(`${from} ${via ? `brings in ${project} by ${via}` : `imports ${project}`}, ${why}: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
-  for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read: give them in the project files`);
+  for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read. Mend: give them in the project files, and delete it`);
   // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
   // one git knows, and none is a link that leads elsewhere)
   for (const s of sources.filter((x) => !x.startsWith("https://"))) {
-    if (!own.some((f) => f.startsWith(s))) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows`);
+    if (!own.some((f) => f.startsWith(s))) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows. Mend: correct the folder's path, or take it out of "nuget.sources"`);
     const held = (dir) => {
       let entries = [];
       try { entries = readdirSync(join(root, dir), { withFileTypes: true }); } catch { /* (a folder that is not there holds nothing) */ }
       for (const e of entries) {
         const at = `${dir}${e.name}`;
-        if (e.isSymbolicLink()) failures.push(`${at}: a link, in a folder the config names as a source: what it leads to is not what the pull request shows`);
+        if (e.isSymbolicLink()) failures.push(`${at}: a link, in a folder the config names as a source: what it leads to is not what the pull request shows. Mend: put the file itself there`);
         else if (e.isDirectory()) held(`${at}/`);
-        else if (!tracked.includes(at)) failures.push(`${at}: a file git does not know, in a folder the config names as a source: a restore would take packages the pull request does not show`);
+        else if (!tracked.includes(at)) failures.push(`${at}: a file git does not know, in a folder the config names as a source: a restore would take packages the pull request does not show. Mend: add it to git, or delete it`);
       }
     };
     held(s);
@@ -726,8 +726,8 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   const givenSources = sourcesOf(config, root), folders = [...givenSources.filter((a) => !a.startsWith("https://")).map(place), ...sdkPacks(env, root)];
   const from = (source) => (/^https?:/iu.test(source) ? givenSources.includes(source) : folders.includes(place(source)));
   const listed = [...ships, ...tools];
-  for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config: say whether its packages ship`);
-  for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows`);
+  for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config. Mend: name it in "nuget.ships" where its packages reach users, else in "nuget.tools"`);
+  for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows. Mend: correct the path, or take it out`);
 
   const packages = new Map(); // by id@version, lower case: { id, version, shipped, lock }
   // (a lock file as the base held it, and listed by the base's config, so this check read it there: two content hashes
@@ -738,7 +738,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   const textOf = (f) => {
     if (!lockTexts.has(f)) {
       const bytes = readProject(root, f);
-      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe): this check reads none: make it a file`);
+      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe), and this check reads none. Mend: make it a file`);
       lockTexts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
     }
     return lockTexts.get(f);
@@ -789,9 +789,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   let entries = [];
   if (config.audit) {
     const bytes = readProject(root, config.audit);
-    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe): make it a file`);
-    entries = JSON.parse(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries;
-    if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list`);
+    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`);
+    try { entries = JSON.parse(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)
   const audited = new Map(entries.filter((e) => e && e.kind === "nuget" && typeof e.name === "string").map((e) => [e.name.toLowerCase(), e]));
@@ -809,51 +809,51 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     const manifest = join(packagesDir ?? "", p.id.toLowerCase(), p.version.toLowerCase(), `${p.id.toLowerCase()}.nuspec`);
     // (before the restore, one the fetch could not reach is read after it: the fetch said so)
     if (fetched && (!packagesDir || !existsSync(manifest))) { used.add(k); read.add(k); return; }
-    if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read: restore from the lock files first (dotnet restore --locked-mode)`); return; }
+    if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read. Mend: restore from the lock files first (dotnet restore --locked-mode), then run the check`); return; }
     // (where NuGet took it from, by NuGet's own record of this restore: nothing a project file says is read for it)
     let taken;
     try { taken = JSON.parse(readFileSync(join(dirname(manifest), TAKEN), "utf8"))?.source; } catch { /* (no record) */ }
-    if (typeof taken !== "string" || !taken) failures.push(`${name} (${where}): the restore left no record of where it took it from (${TAKEN}), so its source cannot be read`);
-    else if (!from(taken)) failures.push(`${name} (${where}): the restore took it from ${taken}, which is neither NuGet's own registry nor a source the config's "nuget.sources" names (floor rule 7)`);
+    if (typeof taken !== "string" || !taken) failures.push(`${name} (${where}): the restore left no record of where it took it from (${TAKEN}), so its source cannot be read. Mend: restore again from the lock files (dotnet restore --locked-mode) into an empty folder`);
+    else if (!from(taken)) failures.push(`${name} (${where}): the restore took it from ${taken}, which is neither NuGet's own registry nor a source the config's "nuget.sources" names (floor rule 7). Mend: take the package from NuGet's registry, or name its source in "nuget.sources" where the project keeps it`);
     const licence = manifestLicence(readFileSync(manifest, "utf8"));
     const entry = audited.get(k), a = yes.get(k);
     // (the lists hold a package as a package: a name the config gives data or a font, for npm's, widens nothing here)
     const allowed = allowedFor(p.id, p.shipped, null);
     let why, byHand = false;
     if (licence.expression !== undefined) {
-      if (entry) { read.add(k); failures.push(`${name}: ${config.audit} holds an entry for it, and its manifest names its licence itself (${licence.expression}): remove the entry`); }
-      if (licenceOk(licence.expression, allowed)) { if (a) { used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes: remove it`); } return; }
+      if (entry) { read.add(k); failures.push(`${name}: ${config.audit} holds an entry for it, and its manifest names its licence itself (${licence.expression}). Mend: take that entry out of ${config.audit}`); }
+      if (licenceOk(licence.expression, allowed)) { if (a) { used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes. Mend: take that yes out of "nuget.accepted"`); } return; }
       if (!a && p.shipped && p.lock && movedOff(licence.expression, allowed) && held(p.lock, k)) {
         reports.push(`${name} (${where}) ships under ${licence.expression}, which since ${[...MOVED_OFF].filter(([id]) => licence.expression.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "nuget.accepted" or has it replaced`);
         return;
       }
-      why = `${licence.expression} is off ${list}`;
+      why = `${licence.expression} is off ${list}. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner\'s yes, which goes in the config\'s "nuget.accepted" with the owner\'s words (floor rule 10)`;
     } else if (p.shipped) {
       // (what ships under a licence only a reading by hand gives waits for the owner's yes, whatever was read)
       byHand = true;
-      why = `it ships, and its manifest names ${licence.other}, no licence a machine can read: what ships under a licence read by hand waits for the owner's yes (floor rule 10), in the config's "nuget.accepted", with the licence as it was read`;
-      if (entry) { read.add(k); if (!a) failures.push(`${name}: it ships, so ${config.audit} holds no entry for it: its licence, read by hand, stands in "nuget.accepted" with the owner's yes`); }
+      why = `it ships, and its manifest names ${licence.other}, no licence a machine can read, and what ships under a licence read by hand waits for the owner's yes (floor rule 10). Mend: read the licence by hand, and file an issue asking the owner's yes, which goes in the config's "nuget.accepted" with the licence as it was read`;
+      if (entry) { read.add(k); if (!a) failures.push(`${name}: it ships, so ${config.audit} holds no entry for it, its licence read by hand standing in "nuget.accepted" with the owner's yes. Mend: take the entry out, and file an issue asking the owner's yes`); }
     } else if (!entry) {
       byHand = true;
-      why = `its manifest names ${licence.other}, no licence a machine can read: read it by hand and record it in ${config.audit ?? "the audit"} as "${name}", of "kind": "nuget"`;
+      why = `its manifest names ${licence.other}, no licence a machine can read. Mend: read it by hand and record it in ${config.audit ?? "the audit"} as "${name}", of "kind": "nuget"`;
     } else {
       read.add(k);
-      if (typeof entry.licence !== "string") why = `its entry in ${config.audit} names no licence`;
-      else if (licenceOk(entry.licence, allowed)) { if (a) { used.add(k); failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both, and the entry is on its list: remove the yes`); } return; }
-      else why = `${entry.licence}, as ${config.audit} records it, is off ${list}`;
+      if (typeof entry.licence !== "string") why = `its entry in ${config.audit} names no licence. Mend: give the entry the licence read by hand`;
+      else if (licenceOk(entry.licence, allowed)) { if (a) { used.add(k); failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both, and the entry is on its list. Mend: take the yes out of "nuget.accepted"`); } return; }
+      else why = `${entry.licence}, as ${config.audit} records it, is off ${list}. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner\'s yes, which goes in the config\'s "nuget.accepted" with the owner\'s words (floor rule 10)`;
     }
     if (a) {
       used.add(k);
       failures.push(...yesFaults(name, a, p.shipped, [licence.expression, entry?.licence], lists, '"nuget.accepted"'));
-      if (entry) failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both: an accepted package stands in "nuget.accepted" alone, since the licence check holds every audit entry to its list`);
+      if (entry) failures.push(`${name}: named in "nuget.accepted" and in ${config.audit} both, and an accepted package stands in "nuget.accepted" alone, since the licence check holds every audit entry to its list. Mend: take its entry out of ${config.audit}`);
       return;
     }
-    failures.push(`${name} (${where}): ${why}${byHand ? "" : `; one the owner wants anyway is named in the config's "nuget.accepted", with the owner's words (floor rule 10)`}`);
+    failures.push(`${name} (${where}): ${why}`);
   }
   for (const k of toolsRead) { used.add(k); read.add(k); }
   // (before the restore, a yes or an entry may be for what only the restore brings: the check after it holds those)
-  if (!fetched) for (const a of accepted) if (!used.has(a.package.toLowerCase())) failures.push(`"nuget.accepted" names ${a.package}, which nothing installs: remove it`);
-  if (!fetched) for (const [k, e] of audited) if (!read.has(k)) failures.push(`${config.audit}: the entry ${e.name}, of "kind": "nuget", is for no package whose licence had to be read by hand: remove it`);
+  if (!fetched) for (const a of accepted) if (!used.has(a.package.toLowerCase())) failures.push(`"nuget.accepted" names ${a.package}, which nothing installs. Mend: take that yes out of "nuget.accepted"`);
+  if (!fetched) for (const [k, e] of audited) if (!read.has(k)) failures.push(`${config.audit}: the entry ${e.name}, of "kind": "nuget", is for no package whose licence had to be read by hand. Mend: take the entry out of ${config.audit}`);
   const all = [...packages.values()], named = all.filter((p) => p.lock), shipped = named.filter((p) => p.shipped).length;
   const summary = `${named.length} NuGet packages in ${listed.length} lock files checked (${shipped} in what ships, ${named.length - shipped} tools that only run)` +
     `${unnamed ? `, and ${unnamed} more that the restore brought and no lock file names` : ""}${fetched ? ", read before the restore" : ""}, ${[...used].filter((k) => packages.has(k) && yes.has(k)).length} accepted on the owner's yes;${reports.length ? ` ${reports.length} reported, and passing;` : ""} ${failures.length} failing (floor rules 7 and 10)`;
@@ -873,7 +873,7 @@ if (started(import.meta.url)) {
     try { files = projectFiles(project().tracked); } catch (e) { fail(e.message); }
     // (a line each, for a shell to read: a name that would be more than one line is refused, never cut)
     const odd = files.filter((f) => shown(f) !== f);
-    if (odd.length) fail(`a project file whose name holds a line break or a control character: ${odd.join(", ")}`);
+    if (odd.length) fail(`a project file whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
     for (const f of files) console.log(f);
     process.exit(0);
   }
@@ -884,22 +884,22 @@ if (started(import.meta.url)) {
       files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => shown(f) !== f);
-    if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}`);
+    if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
     for (const f of files) console.log(f);
     process.exit(0);
   }
   const at = args.indexOf("--packages"), packagesDir = at >= 0 ? args[at + 1] : undefined;
   const configPath = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1));
   if (args.includes("--sources")) {
-    if (!configPath) fail("name the config: node core/scripts/nuget.mjs <config> --sources");
+    if (!configPath) fail("no config was named. Mend: name it: node core/scripts/nuget.mjs <config> --sources");
     let from;
     try { from = sourcesOf(loadConfig(configPath), project().root); } catch (e) { fail(e.message); }
     for (const s of from) console.log(s);
     process.exit(0);
   }
-  if (!configPath || !packagesDir) fail("name the config and the restore's folder: node core/scripts/nuget.mjs <config> --packages <folder> [--advisory]");
+  if (!configPath || !packagesDir) fail("the config or the restore's folder was not named. Mend: name both: node core/scripts/nuget.mjs <config> --packages <folder> [--advisory]");
   // (the config is read only where it is a file of bytes: a device would never end)
-  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe): make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
+  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
     const config = loadConfig(configPath), { root, tracked } = project();

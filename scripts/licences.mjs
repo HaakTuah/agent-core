@@ -423,7 +423,7 @@ export function check(config, root, base = null, baseConfig = null) {
   }
   let entries = [];
   if (config.audit) {
-    entries = JSON.parse(readFileSync(join(root, config.audit), "utf8")).entries;
+    try { entries = JSON.parse(readFileSync(join(root, config.audit), "utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
     // (an entry held at the base as it stands: the same name, version and licence)
     let before = [];
