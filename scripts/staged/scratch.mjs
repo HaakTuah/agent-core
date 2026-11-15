@@ -69,7 +69,8 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   git(dir, "init", "-q", "--bare", "-b", "main", origin);
   git(project, "init", "-q", "-b", "main");
   fs.mkdirSync(path.join(dir, "no-hooks"));
-  for (const [k, v] of [["user.name", "a builder"], ["user.email", "builder@example.invalid"], ["commit.gpgsign", "false"], ["core.hooksPath", path.join(dir, "no-hooks")]]) git(project, "config", k, v);
+  // (git's line endings as written, on every machine: Windows' own setting would show files the case wrote as changed)
+  for (const [k, v] of [["user.name", "a builder"], ["user.email", "builder@example.invalid"], ["commit.gpgsign", "false"], ["core.autocrlf", "false"], ["core.hooksPath", path.join(dir, "no-hooks")]]) git(project, "config", k, v);
   // (the origin reads as GitHub's, as the core's scripts expect, and is the bare repository beside the project)
   git(project, "config", `url.${origin.replace(/\\/g, "/")}.insteadOf`, URL);
   git(project, "remote", "add", "origin", URL);
