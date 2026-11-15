@@ -140,6 +140,7 @@ function pluginPin(name, markets) {
   // other fields; not its other plug-ins' entries)
   const from = { market: Object.fromEntries(Object.entries(source).filter(([k]) => k !== "plugins")), items: source.plugins.filter(p => p?.name === name.slice(0, at)) };
   const its = `${where}, by its entry for ${show(name.slice(0, at))},`;
+  if (from.items.length > 1) return { from, loose: `holds ${from.items.length} entries for ${show(name.slice(0, at))}, so which one is fetched is not plain`, where, mend: "keep one entry for it, fetched at one commit or exact version" };
   if (["github", "url", "git-subdir"].includes(entry?.source)) {
     if (commit(entry.sha)) return { pin: entry.sha, where: its, from };
     return { from, loose: entry.sha === undefined ? `names no "sha", so it takes ${takes(entry.ref, "the repository's default branch")}` : `gives as its "sha" ${show(entry.sha)}, which is no full commit as git writes one`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
