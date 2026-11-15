@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FOLDER, answer, items, repoOf, report } from "./inbox.mjs";
+import { FOLDER, answer, asked, items, repoOf, report, tried } from "./inbox.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -25,6 +25,23 @@ ok(answer(on).yes && answer({ ...on, permissions: { push: true } }).yes, "issues
 ok(!answer({ ...on, has_issues: false }).yes && /switched off/.test(answer({ ...on, has_issues: false }).why), "issues switched off: no, saying so");
 ok(!answer({ has_issues: true, permissions: { pull: true } }).yes && /may not write/.test(answer({ has_issues: true, permissions: { pull: true } }).why), "no right to write them: no");
 ok(!answer(null).yes && !answer("x").yes, "no answer: no");
+
+// an app's token (GitHub's job's own), whose `permissions` read no write whatever the job grants (#338): asked again
+const app = { has_issues: true, permissions: { admin: false, maintain: false, push: false, triage: false, pull: false } };
+const posts = (...said) => { const sent = []; const post = route => { sent.push(route); return said[sent.length - 1]; }; return { sent, post }; };
+const valid = { status: 1, err: 'gh: Invalid request.\n\n"name" wasn\'t supplied. (HTTP 422)' };
+const barred = { status: 1, err: "gh: Resource not accessible by integration (HTTP 403)" };
+let p = posts(valid, valid);
+ok(asked("o/n", app, p.post).yes && p.sent.join() === "repos/o/n/labels,repos/o/n/issues", "an app's token that GitHub takes a write from: yes, asked of a label and an issue", p.sent);
+p = posts(barred);
+ok(/may not write/.test(asked("o/n", app, p.post)?.why) && /issues: write/.test(asked("o/n", app, posts(barred).post).why) && p.sent.length === 1, "a token GitHub refuses: no, saying what grants it, and nothing more is asked");
+ok(asked("o/n", app, posts(valid, barred).post)?.yes === false, "a label but no issue (pull requests' right alone): no");
+ok(asked("o/n", app, posts(valid, { status: 1, err: "gh: Not Found (HTTP 404)" }).post)?.yes === false, "GitHub's Not Found to a write: no");
+for (const [said, what] of [[{ status: 1, err: "gh: API rate limit exceeded for installation (HTTP 403)" }, "a rate limit"], [{ status: 1, err: "gh: You have exceeded a secondary rate limit (HTTP 403)" }, "a secondary rate limit"], [{ status: 1, err: "gh: Bad Gateway (HTTP 502)" }, "a fault of GitHub's"], [{ status: null, err: "" }, "no gh"], [undefined, "nothing at all"]])
+  ok(asked("o/n", app, posts(said).post) === null, `${what} to a write: no answer, so nothing moves`);
+p = posts(valid, valid);
+ok(asked("o/n", on, p.post).yes && asked("o/n", { ...app, has_issues: false }, p.post).why.includes("switched off") && !p.sent.length, "a role that may write, or issues switched off: nothing more is asked");
+ok(tried(0) === "yes" && tried(1, "HTTP 422") === "yes" && tried(1, "HTTP 404") === "no" && tried(1, "HTTP 401") === null && tried(1, "HTTP 4031") === null, "what gh made of a write read exactly");
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inbox-test-"));
 try {
@@ -68,6 +85,14 @@ ${gh}
       r = run(how);
       ok(r.status === 0 && /could not be asked here[\s\S]*nothing moves/.test(r.out), `${said}: nothing is asked, nothing moves, nothing fails`, r.out);
     }
+    // an app's token: the role reads no write, and the writes of an empty body answer for it
+    const role = `if [ "$2" = "-X" ]; then cat >/dev/null; echo "$WRITE" >&2; exit 1; fi; echo '{"has_issues": true, "permissions": {"pull": false}}'`;
+    r = run(`WRITE='gh: Validation Failed (HTTP 422)'; ${role}`);
+    ok(r.status === 0 && /^The owner's inbox is this repository's issues\./.test(r.out), "a GitHub job's token that may write issues: the inbox is its issues", r.out);
+    r = run(`WRITE='gh: Resource not accessible by integration (HTTP 403)'; ${role}`);
+    ok(r.status === 0 && /^Issues cannot be read and written here \(the account signed in here may not write its issues \(a GitHub job's token may where its workflow's `permissions:` grants `issues: write`\)\)/.test(r.out), "a token GitHub refuses a write: the folder, and what grants the right", r.out);
+    r = run(`WRITE='gh: Bad Gateway (HTTP 502)'; ${role}`);
+    ok(r.status === 0 && /could not be asked here[\s\S]*nothing moves/.test(r.out), "a fault of GitHub's to the write: nothing moves", r.out);
     r = run(`echo '{"has_issues": false, "permissions": {"push": true}}'`);
     ok(r.status === 0 && /\(its issues are switched off\)/.test(r.out), "an answer with issues switched off: the folder", r.out);
   } finally { fs.rmSync(at, { recursive: true, force: true }); }
