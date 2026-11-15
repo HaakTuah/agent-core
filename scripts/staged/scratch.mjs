@@ -35,7 +35,9 @@ const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? 
 export const LIMITS = { run: 20000 };
 const SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${os.devNull}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
   // (nothing of the session's that would change what git reads: its commit-graph, pack indexes and bitmaps go unread)
-  "-c", "core.commitGraph=false", "-c", "core.multiPackIndex=false", "-c", "pack.useBitmaps=false"];
+  "-c", "core.commitGraph=false", "-c", "core.multiPackIndex=false", "-c", "pack.useBitmaps=false",
+  // (and no .gitattributes of any tree's: attributes are read from git's empty tree alone)
+  "-c", "attr.tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904"];
 const QUIET = { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: "", GIT_NO_REPLACE_OBJECTS: "1" };
 export const readGit = (cwd, ...args) => {
   const r = spawnSync("git", [...SAFE, ...args], { cwd, env: QUIET, encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
@@ -58,7 +60,7 @@ function refsIn(gitDir, { reflog = false } = {}) {
   if (!real(gitDir, "dir")) throw new Unreadable(`${gitDir} is not there`);
   if (fs.existsSync(path.join(gitDir, "commondir"))) throw new Unreadable(`${gitDir} names another git folder as its common one`);
   const out = {}, NAME = /^refs\/[A-Za-z0-9._/-]+$/;
-  const named = r => { if (!NAME.test(r) || /\.\.|\/\/|\.lock$|\/\./.test(r)) throw new Unreadable(`${gitDir} holds a ref of no plain name`); return r; };
+  const named = r => { if (!NAME.test(r) || /\.\.|\/\/|\.lock$|\/\./.test(r)) throw new Unreadable(`${gitDir} holds the ref ${JSON.stringify(r)}, of no plain name`); return r; };
   // (a file of at most 1 MB, a folder at most 32 deep: nothing else, a pipe or a device least of all, is read)
   const small = p => { const st = fs.lstatSync(p); if (!st.isFile() || st.size > 1 << 20) throw new Unreadable(`${p} is not a small plain file`); return fs.readFileSync(p, "utf8"); };
   if (real(path.join(gitDir, "packed-refs"), "file")) for (const l of small(path.join(gitDir, "packed-refs")).split("\n")) { const m = /^([0-9a-f]{40}) (refs\/\S+)$/.exec(l); if (m) out[named(m[2])] = m[1]; }
@@ -95,7 +97,7 @@ function view(dir, which) {
   const at = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-")), "view.git");
   const run = (args, input) => spawnSync("git", [...SAFE, ...args], { env: QUIET, encoding: "utf8", input, timeout: LIMITS.run });
   if (run(["init", "-q", "--bare", at]).status !== 0) throw new Unreadable("the reader's own repository could not be made");
-  // (its HEAD names no ref there is, so no .gitattributes of the session's is read from it)
+  // (its HEAD names a ref the reader never writes; attributes come from the empty tree in any case, SAFE's attr.tree)
   run([`--git-dir=${at}`, "symbolic-ref", "HEAD", "refs/staged-reader/none"]);
   fs.writeFileSync(path.join(at, "objects", "info", "alternates"), `${fs.realpathSync(path.join(gitDir, "objects"))}\n`);
   const lines = Object.entries(refs).filter(([r, sha]) => r !== "HEAD" && !r.startsWith("refs/replace/") && sha).map(([r, sha]) => `update ${r} ${sha}\n`).join("");
@@ -297,7 +299,9 @@ export function testPasses(dir, ref) {
     // (the branch's src/ whole, so a sum.mjs that imports another file of it is read as it would run; its own test never)
     const files = String(originGit(dir, "ls-tree", "-r", "--name-only", "--end-of-options", ref, "--", "src") ?? "").split("\n").filter(f => /^src\/[A-Za-z0-9._/-]+$/.test(f) && !f.split("/").includes(".."));
     if (!files.includes("src/sum.mjs")) return false;
-    for (const f of files) { const t = show(dir, ref, f); if (t === null) return false; fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); }
+    // (a tree that cannot be written out as files, one path both a file and a folder, sums nothing)
+    try { for (const f of files) { const t = show(dir, ref, f); if (t === null) return false; fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); } }
+    catch { return false; }
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     fs.writeFileSync(path.join(tmp, "read.mjs"), 'import { sum } from "./src/sum.mjs";\nlet input = "";\nprocess.stdin.on("data", d => { input += d; });\nprocess.stdin.on("end", () => { process.stdout.write(`\\n${JSON.stringify(JSON.parse(input).map(n => sum(n)))}\\n`); });\n');
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));

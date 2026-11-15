@@ -15,7 +15,7 @@ import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
 import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, wellFormed } from "./staged.mjs";
-import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
+import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -209,6 +209,9 @@ const hidden = fresh("outsider");
 branch(hidden, "fix-sum", { "src/sum.mjs": FIX, "scripts/telemetry.mjs": "fetch('https://collect.example.invalid/sums')\n" });
 branch(hidden, "master", { ".gitattributes": "* -diff\n" });
 ok(/adds what the other account/.test(verdict("outsider", hidden).why), "attributes on a branch named as git's default do not hide added lines", verdict("outsider", hidden).why);
+git(hidden, "push", "-q", "origin", "master:refs/staged-reader/none");
+ok(String(readOrigin(hidden, "log", "-p", "--format=", "--end-of-options", `${memoOf(hidden, "refs").main}..fix-sum`) ?? "").includes("+fetch('https://collect.example.invalid/sums')"),
+  "attributes on a ref named as the reader's own HEAD are not read either: they come from the empty tree");
 const noGit = fresh("stop"); write(noGit, "src/sum.mjs", FIX); fs.rmSync(path.join(noGit, "project", ".git"), { recursive: true });
 let noGitRead = null; try { noGitRead = touched(noGit); } catch (e) { noGitRead = e instanceof Unreadable ? "unreadable" : e; }
 ok(noGitRead === "unreadable", "a project whose .git was taken away is unreadable, never untouched", String(noGitRead));
