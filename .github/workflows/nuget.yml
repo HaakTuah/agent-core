@@ -26,17 +26,17 @@
 # restore a pull request cannot have changed, while the check still reports on every pull request (core archive 201).
 # Two looks: git's own diff against the base, as the signature check looks, for a project file, a lock file, a .props,
 # .targets, Directory.Build or response file, a .user file beside a project file, any file an Import in one, or a
-# property MSBuild's own targets import a file by, brings in (core/scripts/nuget.mjs --imports), packages.config, a
-# NuGet.Config, a global.json, .NET's tools manifest, a package file, the licence check's config and its audit, a
-# folder the config names as a source, the core's Node version and the calling workflow; and, where none changed,
-# NuGet's own word that every lock file still holds what its project asks for, however it asks (an import, a property,
-# any file a build reads), from a restore against an empty source that downloads nothing. It passes without a restore
-# only where both say so. Any doubt runs it: no base, a base that cannot be fetched, a config or Imports that cannot be
-# read, a listed file that is a link, an error of the restore's other than a locked package not found, or a package
-# downloaded beside a lock file, save the SDK's own reference packs (Microsoft.NETCore.App.Ref,
-# Microsoft.WindowsDesktop.App.Ref and Microsoft.AspNetCore.App.Ref), which it adds by itself. What the second look
-# leaves to the next change of a lock file: a source that a build file adds, from which a package of the same content
-# hash would come, since every package's bytes are its lock file's.
+# property MSBuild's own targets import a file by, brings in, and any file whose root element is a Project
+# (core/scripts/nuget.mjs --imports), packages.config, a NuGet.Config, a global.json, .NET's tools manifest, a package
+# file, the licence check's config and its audit, a folder the config names as a source, the core's Node version and the
+# calling workflow; and, where none changed, NuGet's own word that every lock file still holds what its project asks
+# for, however it asks (an import, a property, any file a build reads), from a restore against an empty source that
+# downloads nothing. It passes without a restore only where both say so. Any doubt runs it: no base, a base that cannot
+# be fetched, a config or Imports that cannot be read, a listed file that is a link, an error of the restore's other
+# than a locked package not found, or a package downloaded beside a lock file, save the SDK's own reference packs
+# (Microsoft.NETCore.App.Ref, Microsoft.WindowsDesktop.App.Ref and Microsoft.AspNetCore.App.Ref), which it adds by
+# itself. What the second look leaves to the next change of a lock file: a source that a build file adds, from which a
+# package of the same content hash would come, since every package's bytes are its lock file's.
 name: nuget
 
 on:
@@ -136,7 +136,8 @@ jobs:
             caller=${CALLER#"$GITHUB_REPOSITORY"/}; caller=${caller%%@*}
             [ -n "$caller" ] && [ "$caller" != "$CALLER" ] && paths+=(":(literal)$caller")
             # (each file an Import, or a property MSBuild's own targets import a file by, brings in under another name
-            # than a build file's, which the script reads as one: a change to it alone is one NuGet reads)
+            # than a build file's, and each whose root element is a Project, which the script reads as one: a change to
+            # it alone is one NuGet reads)
             imports=ok
             brought=$(node core/scripts/nuget.mjs --imports) || imports=
             while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$brought"
