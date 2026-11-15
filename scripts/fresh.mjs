@@ -26,6 +26,7 @@ import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 import { call as callOf, plain, project } from "./steps.mjs";
 
@@ -139,7 +140,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     let copies = null;
     try { copies = JSON.parse(p.read("checks/copies.json") ?? "null"); } catch { /* (the kit's path, below) */ }
     const licenceAt = call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
-    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]];
+    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })]];
   } catch (e) {
     if (!older) throw e;
     return [];

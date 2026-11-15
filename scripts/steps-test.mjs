@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { NOTES } from "./releases.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { COST, STEPS, leads, notDone, plain, project, report } from "./steps.mjs";
 
@@ -47,7 +48,7 @@ function kit(name, o) {
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
-  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), "{\n  \"listed\": {}\n}\n");
+  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
   return dir;
 }
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
@@ -79,6 +80,17 @@ for (const lead of some) STAGES[lead].stage(lockProject);
 ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
 for (const lead of some) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
+
+// ---- a shape baseline written before the check read C#, Python, JSX and shared scripts (#354): its mend names them ----
+const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
+fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
+let shapeMissed = notDone(lockProject);
+ok(shapeMissed.length === 1 && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, Python, scripts that share one global space/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+  "a shape baseline that names no reader is reported, its mend to write it with every reader", report(shapeMissed));
+execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
+shapeMissed = notDone(lockProject);
+ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).reads.length === Object.keys(READERS).length, "and the mend as written makes it done", report(shapeMissed));
+fs.writeFileSync(shapeBaseline, shapeAsKit);
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");

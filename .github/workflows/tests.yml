@@ -89,6 +89,9 @@ jobs:
       - name: The shape check
         if: ${{ !cancelled() }}
         run: node scripts/shape-test.mjs
+      - name: The shape check's readers of C# and Python
+        if: ${{ !cancelled() }}
+        run: node scripts/shape-readers-test.mjs
       - name: The dose a codebase's state sets
         if: ${{ !cancelled() }}
         run: node scripts/dose-test.mjs

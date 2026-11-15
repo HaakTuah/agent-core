@@ -1,5 +1,5 @@
 // Checks the measures of how a codebase is put together (code-shape.mjs, beside this file): its reader against
-// brackets in comments, strings, template literals and regular expressions, each measure on a few files made for it,
+// brackets in comments, strings, template literals, regular expressions and JSX, each measure on a few files made for it,
 // and a whole run in a scratch project that holds the core's copy, with its history and its suites. Run by the core's
 // tests workflow (.github/workflows/tests.yml).
 //
@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changedTogether, cycles, functions, globals, imports, isModule, measure, tokens } from "./code-shape.mjs";
+import { changedTogether, cycles, functions, globals, imports, isModule, jsxIn, measure, tokens } from "./code-shape.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -100,6 +100,35 @@ const bare = imports(tokens("export { local }\nimport { x } from './x.js'\nexpor
 ok(same(bare.map(i => `${i.kind} ${i.spec} ${i.names.join(",")}`), ["import ./x.js x", "import ./y.js default"]), `with no semicolons, a local export never takes the next statement's from (${bare.map(i => `${i.kind} ${i.spec} ${i.names}`).join("; ")})`);
 ok(!isModule(tokens("var a = 1;\nfunction b() { obj.import('x'); }\n")) && isModule(tokens("module.exports = {};\n")), "a file with no import, export or require is a script; module.exports makes one a module");
 ok(same(globals(tokens("var a = 1, z = 2;\nfunction b() { var inner; }\nclass C {}\nconst d = function named() {};\nlet e;\n(function iife() { var f; })();\n")), ["a", "b", "C", "d", "e"]), "a script's top-level names are read, and nothing inside a function");
+
+// JSX: an element is one token, the code in its { } read as code; where none may be (TypeScript, a comparison, a shift,
+// a type's parameters), a < is a sign as before.
+const app = [
+  "import React from 'react';",
+  "export function App({ items, user }) {",
+  "  const label = user ? \"it's\" : 'none';",
+  "  return (",
+  "    <div className=\"app\" onClick={() => { if (x) go(); }}>",
+  "      {/* don't { */}",
+  "      <h1>Don't {label} } {'{'}</h1>",
+  "      {items.length > 0 && items.map(i => <Item key={i.id} {...i} />)}",
+  "      <>",
+  "        <List<string> data={[1, 2]} render={(v) => v < 2 ? <b>{v}</b> : null} />",
+  "      </>",
+  "    </div>",
+  "  );",
+  "}",
+  "const f = <T,>(x: T) => { return x; };",
+  "function after(a) { return a < 3 && a > 1 && (a << 2) < 9 && a++ < 4; }",
+].join("\n");
+const jsx = tokens(app, true);
+ok(!jsx.lost && same(functions(jsx).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}:${f.branches}`), ["App:2:13:0:3", "(anonymous):5:1:0:1", "(anonymous):15:1:0:0", "after:16:1:0:3"]) && same(imports(jsx).map(i => i.spec), ["react"]),
+  `a component's lines, depth and branch points are read through its JSX, the code in its braces as code, its text and quotes as text (${functions(jsx).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}:${f.branches}`)})`);
+const shift = "let a = b << c, d = e++ < f, g = h < i;\nconst k = x => x < 1 ? <a/> : y;\n";
+ok(same(tokens(shift.split("\n")[0], true), tokens(shift.split("\n")[0])) && tokens(shift, true).some(t => t.t === "jsx"), "a shift, a comparison after x++ and one after a name stay signs; an element after ? is JSX");
+ok(tokens("const x = <div>\n  <p>open\n", true).lost && tokens("const f = <T>(x: T) => x;\n" + "function g() {}\n", true).lost && !tokens("const f = <T extends U>(x: T) => x;\n", true).lost,
+  "an element that never closes is lost, as is a type's parameter taken for one (<T>), whose functions cannot be told; <T extends U> and <T,> are parameters");
+ok(jsxIn("a.jsx") && jsxIn("a.tsx") && jsxIn("a.js") && jsxIn("a.mjs") && !jsxIn("a.ts") && !jsxIn("a.mts"), "JSX is read in .jsx, .tsx and JavaScript's files, never in TypeScript's own, where <T>x is a cast");
 
 // Cycles, between files and folders.
 const graph = new Map([["a", new Set(["b"])], ["b", new Set(["c"])], ["c", new Set(["a"])], ["d", new Set(["d"])], ["e", new Set(["a"])]]);

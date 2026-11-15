@@ -1,0 +1,360 @@
+// The shape check's reader of Python (shape.mjs and shape-readers.mjs, beside this file; #354). It reads a file's
+// logical lines, as Python joins them inside brackets and after a \ at a line's end, with its strings (an f-string's
+// code in its { } read as code); from them, each function a def opens and what each file imports. It never runs the
+// code. Node's own modules only.
+//
+// A function spans its def's line to its body's last line, a def within it measured on its own. Its depth is how deep
+// its control blocks nest (if, elif, else, for, while, try, except, finally, with, case; a match is the case's one
+// level, as a switch is in JavaScript), and it branches at each if, elif, for, while and except, a case at a line's
+// start, and each and and or, those of a comprehension and of a choice (a if b else c) too.
+// An import is read with where it stands: in a def, it runs when the function is called (as a dynamic import does in
+// JavaScript), and under `if TYPE_CHECKING:` it takes types alone; neither makes a cycle.
+import path from "node:path";
+
+// The standard library's modules, which lead to no file of the project and no package: Python 3.13's, with those that
+// earlier versions still hold.
+export const STDLIB = new Set(`__future__ abc antigravity argparse array ast asyncio atexit base64 bdb binascii bisect
+  builtins bz2 cProfile calendar cmath cmd code codecs codeop collections colorsys compileall concurrent configparser
+  contextlib contextvars copy copyreg csv ctypes curses dataclasses datetime dbm decimal difflib dis doctest email
+  encodings ensurepip enum errno faulthandler fcntl filecmp fileinput fnmatch fractions ftplib functools gc genericpath
+  getopt getpass gettext glob graphlib grp gzip hashlib heapq hmac html http idlelib imaplib importlib inspect io
+  ipaddress itertools json keyword linecache locale logging lzma mailbox marshal math mimetypes mmap modulefinder msvcrt
+  multiprocessing netrc nt ntpath nturl2path numbers opcode operator optparse os pathlib pdb pickle pickletools pkgutil
+  platform plistlib poplib posix posixpath pprint profile pstats pty pwd py_compile pyclbr pydoc pydoc_data pyexpat
+  queue quopri random re readline reprlib resource rlcompleter runpy sched secrets select selectors shelve shlex shutil
+  signal site smtplib socket socketserver sqlite3 sre_compile sre_constants sre_parse ssl stat statistics string
+  stringprep struct subprocess symtable sys sysconfig syslog tabnanny tarfile tempfile termios textwrap this threading
+  time timeit tkinter token tokenize tomllib trace traceback tracemalloc tty turtle turtledemo types typing
+  unicodedata unittest urllib uuid venv warnings wave weakref webbrowser winreg winsound wsgiref xml xmlrpc zipapp
+  zipfile zipimport zlib zoneinfo aifc asynchat asyncore audioop cgi cgitb chunk crypt distutils imghdr imp lib2to3
+  mailcap nis nntplib ossaudiodev pipes smtpd sndhdr spwd sunau telnetlib uu xdrlib`.split(/\s+/u));
+
+// The clock and randomness a system of rules may not take for itself (shape.mjs, "clock"): each a run of tokens, a
+// run that ends in "." taking any name after it.
+export const OWN = [
+  ...["time", "time_ns", "monotonic", "monotonic_ns", "perf_counter", "perf_counter_ns"].map(n => ({ run: ["time", ".", n], what: `time.${n}` })),
+  ...["now", "utcnow", "today"].map(n => ({ run: ["datetime", ".", n], what: `datetime.${n}` })),
+  { run: ["date", ".", "today"], what: "date.today" },
+  { run: ["random", "."], what: "random." }, { run: ["secrets", "."], what: "secrets." },
+  { run: ["from", "random", "import"], what: "from random import" }, { run: ["from", "secrets", "import"], what: "from secrets import" },
+  { run: ["uuid", ".", "uuid1"], what: "uuid.uuid1" }, { run: ["uuid", ".", "uuid4"], what: "uuid.uuid4" },
+  { run: ["os", ".", "urandom"], what: "os.urandom" },
+];
+
+const OPENS = "([{", CLOSES = ")]}";
+const PREFIX = /^[rRbBuUfF]{1,2}$/u;
+
+// The logical lines of a file's text: [{ indent, line, end, toks }], toks being { t: "id" | "num" | "str" | "punct",
+// v, line }; comments and blank lines dropped.
+export function logicalLines(src) {
+  const lex = new Lexer(src);
+  lex.code(false);
+  lex.close();
+  return lex.lines;
+}
+
+class Lexer {
+  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [] }); }
+
+  push(t, v, l = this.line) {
+    if (!this.current) this.current = { indent: this.indent, line: l, end: l, toks: [] };
+    this.current.toks.push({ t, v, line: l });
+  }
+
+  close() {
+    if (this.current) { this.current.end = this.line; this.lines.push(this.current); }
+    this.current = null;
+  }
+
+  // The code up to the end, or, `hole`, up to the } that closes an f-string's { (its format after a ! or : passed over).
+  code(hole) {
+    let depth = 0;
+    while (this.i < this.n) {
+      const c = this.src[this.i];
+      if (this.start) this.margin();
+      else if (this.blank(c) || this.literal(c)) continue;
+      else if (hole && depth === 0 && (c === "}" || c === ":" || (c === "!" && this.src[this.i + 1] !== "="))) { this.format(); return; }
+      else depth += this.sign(c);
+    }
+  }
+
+  // A physical line's indentation, a tab reaching the next multiple of 8.
+  margin() {
+    let col = 0;
+    for (; this.i < this.n && (this.src[this.i] === " " || this.src[this.i] === "\t"); this.i++) col = this.src[this.i] === "\t" ? (Math.floor(col / 8) + 1) * 8 : col + 1;
+    if (this.depth === 0 && !this.current) this.indent = col;
+    this.start = false;
+  }
+
+  blank(c) {
+    if (c === "\n") {
+      if (this.depth === 0) this.close();
+      this.line++; this.i++; this.start = true;
+      return true;
+    }
+    if (c === "\\" && this.src[this.i + 1] === "\n") { this.line++; this.i += 2; return true; } // (the line goes on)
+    if (c === "\\" && this.src.startsWith("\r\n", this.i + 1)) { this.line++; this.i += 3; return true; }
+    if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "﻿") { this.i++; return true; }
+    if (c !== "#") return false;
+    while (this.i < this.n && this.src[this.i] !== "\n") this.i++;
+    return true;
+  }
+
+  literal(c) {
+    if (c === "'" || c === '"') { this.string(""); return true; }
+    if (/[A-Za-z_\u0080-￿]/u.test(c)) { this.word(); return true; }
+    if (/[0-9]/u.test(c) || (c === "." && /[0-9]/u.test(this.src[this.i + 1] ?? ""))) {
+      let j = this.i + 1;
+      while (j < this.n && /[0-9A-Za-z_.]/u.test(this.src[j])) j++;
+      this.push("num", this.src.slice(this.i, j));
+      this.i = j;
+      return true;
+    }
+    return false;
+  }
+
+  // A name, or a string's prefix (f"", rb'') where a quote follows it.
+  word() {
+    let j = this.i + 1;
+    while (j < this.n && /[\w\u0080-￿]/u.test(this.src[j])) j++;
+    const w = this.src.slice(this.i, j);
+    this.i = j;
+    if (PREFIX.test(w) && (this.src[j] === "'" || this.src[j] === '"')) this.string(w.toLowerCase());
+    else this.push("id", w);
+  }
+
+  // A string from its quote, its prefix given: one "str" token, the code of an f-string's { } read after it.
+  string(prefix) {
+    const q = this.src[this.i], triple = this.src.startsWith(q.repeat(3), this.i), close = triple ? q.repeat(3) : q;
+    const from = this.line;
+    this.push("str", "", from);
+    this.i += close.length;
+    this.depth++; // (a line inside the string, or inside its code, ends no logical line)
+    while (this.i < this.n && !this.src.startsWith(close, this.i)) {
+      const c = this.src[this.i];
+      if (c === "\n" && !triple) break;
+      if (c === "\\") { if (this.src[this.i + 1] === "\n") this.line++; this.i += 2; continue; }
+      if (prefix.includes("f") && c === "{") { this.hole(); continue; }
+      if (c === "\n") this.line++;
+      this.i++;
+    }
+    this.depth--;
+    if (this.src.startsWith(close, this.i)) this.i += close.length;
+  }
+
+  // A { in an f-string: {{ a brace of its text, else the code up to its }.
+  hole() {
+    if (this.src[this.i + 1] === "{") { this.i += 2; return; }
+    this.i++;
+    this.code(true);
+  }
+
+  // An f-string's format, after its ! or :, to the } that ends its { (a { } inside it passed over): nothing to read.
+  format() {
+    for (let depth = 0; this.i < this.n; this.i++) {
+      const c = this.src[this.i];
+      if (c === "\n") this.line++;
+      if (c === "{") depth++;
+      else if (c === "}" && depth-- === 0) { this.i++; return; }
+    }
+  }
+
+  // A sign, its own token (:= one, so that it opens no block); how far it moves the brackets' depth.
+  sign(c) {
+    if (this.src.startsWith(":=", this.i)) { this.push("punct", ":="); this.i += 2; return 0; }
+    this.push("punct", c);
+    this.i++;
+    const moves = OPENS.includes(c) ? 1 : CLOSES.includes(c) ? -1 : 0;
+    this.depth = Math.max(0, this.depth + moves);
+    return moves;
+  }
+}
+
+const isId = (tok, v) => tok?.t === "id" && tok.v === v;
+const isP = (tok, v) => tok?.t === "punct" && tok.v === v;
+const CONTROL = new Set(["if", "elif", "else", "for", "while", "try", "except", "finally", "with", "case"]);
+const BRANCH = new Set(["if", "elif", "for", "while", "except", "and", "or"]);
+
+// Where a compound statement's header ends: the index of its first : outside brackets; -1 where it has none.
+function headerColon(toks) {
+  let depth = 0;
+  for (let k = 0; k < toks.length; k++) {
+    if (toks[k].t !== "punct") continue;
+    const v = toks[k].v;
+    if (OPENS.includes(v)) depth++;
+    else if (CLOSES.includes(v)) depth--;
+    else if (v === ":" && depth === 0) return k;
+  }
+  return -1;
+}
+
+// The statement a logical line opens: { word, at, colon }, word the keyword that opens a block (def, class, a control
+// word, match), at its index (an async passed over), colon where its header ends; word null where it opens none.
+function statement(toks) {
+  const at = isId(toks[0], "async") ? 1 : 0, word = toks[at]?.t === "id" ? toks[at].v : null;
+  const colon = headerColon(toks), soft = word === "match" || word === "case";
+  const opens = colon > at && (word === "def" || word === "class" || CONTROL.has(word) || word === "match")
+    && !(soft && toks[at + 1]?.t === "punct" && ["=", ".", ",", ")", ":"].includes(toks[at + 1].v));
+  return { word: opens ? word : null, at, colon };
+}
+
+const branchAt = (toks, k, first) => {
+  const tok = toks[k];
+  if (tok.t !== "id" || isP(toks[k - 1], ".")) return false;
+  return BRANCH.has(tok.v) || (tok.v === "case" && k === first);
+};
+
+// The innermost function open on the stack, and how many control blocks stand above it.
+function around(stack) {
+  let cd = 0;
+  for (let s = stack.length - 1; s >= 0; s--) {
+    if (stack[s].fn) return { fn: stack[s].fn, cd };
+    if (stack[s].control) cd++;
+  }
+  return { fn: null, cd };
+}
+
+// What a logical line imports: [{ level, module, names, line }], level the count of its leading dots.
+function importsOf(toks) {
+  if (isId(toks[0], "import")) {
+    return split(toks.slice(1)).map(part => ({ level: 0, module: dotted(part), names: [], line: toks[0].line })).filter(i => i.module);
+  }
+  if (!isId(toks[0], "from")) return [];
+  let k = 1, level = 0;
+  for (; isP(toks[k], "."); k++) level++;
+  const at = toks.findIndex(t => isId(t, "import"));
+  if (at < 0) return [];
+  const names = split(toks.slice(at + 1).filter(t => !isP(t, "(") && !isP(t, ")"))).map(part => (isP(part[0], "*") ? "*" : part[0]?.v)).filter(Boolean);
+  return [{ level, module: dotted(toks.slice(k, at)), names, line: toks[0].line }];
+}
+const split = toks => toks.reduce((parts, t) => (isP(t, ",") ? parts.push([]) : parts.at(-1).push(t), parts), [[]]);
+// (a dotted name, up to its `as`)
+const dotted = toks => { const end = toks.findIndex(t => isId(t, "as")); return (end < 0 ? toks : toks.slice(0, end)).filter(t => t.t === "id").map(t => t.v).join("."); };
+
+// A file read: { functions: [{ name, line, lines, depth, branches }], imports: [{ level, module, names, line, dynamic,
+// types }], toks }.
+export function readPython(src) {
+  const lines = logicalLines(src), stack = [], functions = [], imports = [];
+  for (const ln of lines) {
+    while (stack.length && stack.at(-1).indent >= ln.indent) stack.pop();
+    for (const s of stack) if (s.fn) s.fn.end = ln.end;
+    const { fn, cd } = around(stack), st = statement(ln.toks);
+    const inner = oneLine(ln, st, fn, cd);
+    if (inner) functions.push(inner);
+    const dynamic = !!fn || !!inner, types = stack.some(s => s.types);
+    for (const imp of importsOf(ln.toks)) imports.push({ ...imp, dynamic, types });
+    if (st.word) stack.push({ indent: ln.indent, fn: inner, control: CONTROL.has(st.word), types: st.word === "if" && isTypeChecking(ln.toks) });
+  }
+  for (const f of functions) { f.lines = f.end - f.line + 1; delete f.end; }
+  return { functions, imports, toks: lines.flatMap(l => l.toks) };
+}
+
+const isTypeChecking = toks => /^if (typing \. )?TYPE_CHECKING :$/u.test(toks.map(t => t.v).join(" "));
+
+// A logical line's branches and depth, counted to the function it lies in; the function a def opens, where it does,
+// its own tokens after the header counted to it.
+function oneLine(ln, st, fn, cd) {
+  const first = st.at, toks = ln.toks;
+  const def = st.word === "def" ? { name: toks[st.at + 1]?.v ?? "(anonymous)", line: ln.line, end: ln.end, depth: 0, branches: 0 } : null;
+  for (let k = 0; k < toks.length; k++) {
+    const to = def && k > st.colon ? def : fn;
+    if (to && branchAt(toks, k, first)) to.branches++;
+  }
+  if (fn && CONTROL.has(st.word)) fn.depth = Math.max(fn.depth, cd + 1);
+  return def;
+}
+
+// ---- where an import leads ----
+
+// Where a module's dotted path leads among the project's files: `<path>.py` or `<path>/__init__.py`, under the
+// project's root, the importing file's folder or src/; null where none.
+function moduleAt(parts, from, files) {
+  const p = parts.join("/");
+  for (const root of ["", `${path.posix.dirname(from)}/`.replace(/^\.\//u, ""), "src/"]) {
+    const found = [`${root}${p}.py`, `${root}${p}/__init__.py`].find(f => files.has(f));
+    if (found) return found;
+  }
+  return null;
+}
+
+// Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one.
+function bySuffix(parts, files) {
+  const p = parts.join("/"), ends = [`${p}.py`, `${p}/__init__.py`];
+  const found = [...files].filter(f => ends.some(e => f === e || f.endsWith(`/${e}`)));
+  return found.length === 1 ? found[0] : null;
+}
+
+// A relative import's files: each name that is a module of its own, else the module it names.
+function relative(from, imp, files) {
+  const up = path.posix.dirname(from).split("/").filter(s => s !== ".");
+  const base = [...up.slice(0, up.length - (imp.level - 1)), ...(imp.module ? imp.module.split(".") : [])].join("/");
+  const at = p => [`${p}.py`, `${p}/__init__.py`].map(f => f.replace(/^\//u, "")).find(f => files.has(f)) ?? null;
+  const subs = imp.names.filter(n => n !== "*").map(n => at(`${base}/${n}`));
+  const own = subs.length && subs.every(Boolean) ? null : at(base);
+  return [...subs.filter(Boolean), ...(own ? [own] : [])];
+}
+
+// Where an import leads: { to: [files] } where it is the project's own, else { outside, top }, outside its dotted name.
+// `known` says whether a top-level name is the standard library's, a package's the project declares or one the config
+// binds to a platform: such a name is never looked for among the project's files by the end of their paths.
+export function resolvePython(from, imp, files, known) {
+  if (imp.level > 0) return { to: relative(from, imp, files) };
+  const parts = imp.module.split("."), subs = imp.names.filter(n => n !== "*").map(n => [...parts, n]);
+  const find = p => moduleAt(p, from, files) ?? (known(parts[0]) ? null : bySuffix(p, files));
+  const named = subs.map(find).filter(Boolean);
+  const own = named.length === subs.length && subs.length ? null : find(parts);
+  const to = [...named, ...(own ? [own] : [])];
+  return to.length ? { to } : { outside: imp.module, top: parts[0] };
+}
+
+// ---- the packages a project declares ----
+
+// A package's name as pip compares it.
+export const normal = name => name.toLowerCase().replace(/[-_.]+/gu, "-");
+const requirement = s => /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/u.exec(s)?.[1] ?? null;
+
+// The packages of a requirements file: each line's name (an option, -r or -e, left out).
+function requirements(text) {
+  return text.split("\n").map(l => l.replace(/#.*/u, "").trim()).filter(l => l && !l.startsWith("-")).map(requirement).filter(Boolean);
+}
+
+// The packages of a pyproject.toml, by its tables: { ships, dev }. Read by its lines: [project]'s dependencies and
+// Poetry's dependencies ship; optional ones, dependency groups and Poetry's groups are of development.
+function pyproject(text) {
+  const out = { ships: [], dev: [] };
+  const quoted = s => [...s.matchAll(/["']([^"']+)["']/gu)].map(m => requirement(m[1])).filter(Boolean);
+  let table = "", list = null;
+  for (const raw of text.split("\n")) {
+    const l = raw.replace(/#.*/u, "").trim();
+    if (/^\[[^\]]+\]$/u.test(l)) { table = l.slice(1, -1).trim(); list = null; continue; }
+    const key = list ? null : /^([\w.-]+)\s*=\s*(.*)$/u.exec(l), kind = key ? tableKind(table, key[1]) : null;
+    if (kind === "array") list = table === "project" ? "ships" : "dev";
+    else if (kind) out[kind].push(key[1]);
+    if (!list) continue;
+    out[list].push(...quoted(key ? key[2] : l));
+    if ((key ? key[2] : l).includes("]")) list = null;
+  }
+  return out;
+}
+
+// What a key of a table names: "array", a list of requirements; "ships" or "dev", the key a package's own name.
+function tableKind(table, key) {
+  if ((table === "project" && key === "dependencies") || table === "project.optional-dependencies" || table === "dependency-groups") return "array";
+  if (table === "tool.poetry.dependencies") return key === "python" ? null : "ships";
+  if (table === "tool.poetry.dev-dependencies" || /^tool\.poetry\.group\.[^.]+\.dependencies$/u.test(table)) return "dev";
+  return null;
+}
+
+// The packages the project's own requirements files and pyproject.toml files declare: { ships, declared }, each a
+// Map of the name pip compares (normal) to the name as declared. A requirements file named for development or tests
+// (requirements-dev.txt, test-requirements.txt) declares packages of development alone.
+export function pythonPackages(texts) {
+  const ships = new Map(), declared = new Map();
+  const add = (names, shipped) => { for (const n of names) { declared.set(normal(n), n); if (shipped) ships.set(normal(n), n); } };
+  for (const [file, text] of Object.entries(texts)) {
+    const base = path.posix.basename(file);
+    if (/requirements.*\.txt$/iu.test(base)) add(requirements(text), !/dev|test/iu.test(base));
+    else if (base === "pyproject.toml") { const p = pyproject(text); add(p.ships, true); add(p.dev, false); }
+  }
+  return { ships, declared };
+}
