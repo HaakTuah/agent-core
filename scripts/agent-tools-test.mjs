@@ -266,6 +266,9 @@ const twoAt = sibling => ({ ".claude/settings.json": JSON.stringify({ ...JSON.pa
 const OTHER = { kind: "plugin", name: "other@example-market", publisher: "Example Tools", version: C1 };
 const siblings = run(pr(project({ ...twoAt(C1), ...listing(PLUGIN, OTHER) }), { ...twoAt(C2), ...listing(PLUGIN, { ...OTHER, version: C2 }) }));
 ok(siblings.status === 0 && /note as the base held it/.test(siblings.out), "a change to another plug-in's entry in the same settings marketplace leaves a breach the base held noted", siblings.out);
+const twice = inline({ source: "github", repo: "example/helper" });
+twice.plugins.push({ name: "helper", source: { source: "url", url: "https://example.invalid/helper.git" } });
+fails(run(pr(heldInline, marketAt(twice))), "and one that adds a second entry of the plug-in's name", 'names no "sha"');
 fails(run(pinned({ source: "github", repo: "example/market", ref: [C1] }, C1)), "a ref that is no text pins nothing", "names no commit");
 fails(run(pinned(inline({ source: "github", repo: "example/helper", sha: C1.toUpperCase() }), C1)), "and a sha not written as git writes a commit pins nothing", 'which is no full commit as git writes one');
 const pinnedNoList = project({ ...marketAt({ source: "github", repo: "example/market", ref: C1 }) });

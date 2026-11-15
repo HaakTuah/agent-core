@@ -136,8 +136,9 @@ function pluginPin(name, markets) {
   }
   if (source.source !== "settings" || !Array.isArray(source.plugins)) return null;
   const item = source.plugins.find(p => p?.name === name.slice(0, at)), entry = item?.source;
-  // (what it was read from: this plug-in's own entry and the marketplace's other fields, not its other plug-ins' entries)
-  const from = { market: Object.fromEntries(Object.entries(source).filter(([k]) => k !== "plugins")), item: item ?? null };
+  // (what it was read from: every entry of this plug-in's name, so that adding one is a change, and the marketplace's
+  // other fields; not its other plug-ins' entries)
+  const from = { market: Object.fromEntries(Object.entries(source).filter(([k]) => k !== "plugins")), items: source.plugins.filter(p => p?.name === name.slice(0, at)) };
   const its = `${where}, by its entry for ${show(name.slice(0, at))},`;
   if (["github", "url", "git-subdir"].includes(entry?.source)) {
     if (commit(entry.sha)) return { pin: entry.sha, where: its, from };
