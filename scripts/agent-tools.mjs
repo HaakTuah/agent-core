@@ -42,7 +42,7 @@ const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u20
 // met reading them. `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
 // that hold a SKILL.md.
 export function configured(read, skills) {
-  const tools = new Map(), problems = [];
+  const tools = new Map(), problems = [], shapes = new Map();
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -59,7 +59,12 @@ export function configured(read, skills) {
         // two hooks share a name)
         if (matcher.includes(": ")) problems.push(`${file}: the ${show(event)} hooks' matcher ${show(group.matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
         for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
-          tools.set(`hook ${event}${matcher}: ${typeof hook?.command === "string" ? hook.command : JSON.stringify(hook)}`, file);
+          const name = `hook ${event}${matcher}: ${typeof hook?.command === "string" ? hook.command : JSON.stringify(hook)}`;
+          // (a hook with no command is named by its text, which a command could equal: two such hooks share no name)
+          const kind = typeof hook?.command === "string" ? `command ${JSON.stringify(hook.type ?? null)}` : "text";
+          if (shapes.has(name) && shapes.get(name) !== kind) problems.push(`${file}: two of the ${show(event)} hooks share the name ${show(name.slice(5))}, one by its command and one by its text. Mend: give the one a command of its own, or take one out`);
+          shapes.set(name, kind);
+          tools.set(name, file);
         }
       }
     }

@@ -126,6 +126,9 @@ fails(run(pr(fileBase, { "README.md": "a change of its own\n" })), "a link out o
 const colon = JSON.parse(KIT);
 colon.hooks.Stop.push({ matcher: "Write: x", hooks: [{ type: "command", command: "y" }] });
 fails(run(project({ ".claude/settings.json": JSON.stringify(colon), ...listing({ kind: "hook", name: "Stop Write: x: y", publisher: "this project" }) })), "a matcher that holds \": \", which a hook's name splits at, fails", 'matcher "Write: x" holds ": "');
+const twins = JSON.parse(KIT), http = { type: "http", url: "https://hooks.example.invalid" };
+twins.hooks.PostToolUse = [{ hooks: [http, { type: "command", command: JSON.stringify(http) }] }];
+fails(run(project({ ".claude/settings.json": JSON.stringify(twins), ...listing({ kind: "hook", name: `PostToolUse: ${JSON.stringify(http)}`, publisher: "this project" }) })), "two hooks that would share a name, one by its command and one by its text, fail", "share the name");
 const skillsDirBase = project();
 fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
 fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
