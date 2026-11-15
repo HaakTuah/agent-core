@@ -26,6 +26,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runWorkflow } from "./workflow-run.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } };
@@ -100,7 +101,7 @@ function check({ dir, first }, { terms = TERMS, title = "A change", body = "Word
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 // (never printed in any case: GitHub's masking of the secret matches its case exactly)
-const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
+const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && mended(r.out) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
 const passes = (what, repo, opts) => { const r = check(repo, opts); ok(r.passed, `${what} passes`, r.out); };
 
 passes("a pull request with no term anywhere", pull([[{ "b.md": "plain words\n" }]]));
@@ -122,7 +123,7 @@ fails("a term in a commit's committer name", pull([[{ "b.md": "x\n" }, { GIT_COM
 // a name the machine's git writes into every commit fails in a private repository too, and the failure says how the
 // session mends the pull request itself (core archive 202), naming both commits
 const named = check(pull([[{ "b.md": "x\n" }, { GIT_AUTHOR_NAME: `A ${term}`, GIT_COMMITTER_EMAIL: `${other}@example.invalid` }], [{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: `A ${term}` }]]), { isPrivate: true });
-ok(!named.passed && /To mend it, on the machine that made them/.test(named.out) && /--reset-author/.test(named.out) && (named.out.split("author or committer (name or address):\n")[1]?.split("\n")[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
+ok(!named.passed && mended(named.out) && /Mend: on the machine that made them/.test(named.out) && /--reset-author/.test(named.out) && (named.out.split(/author or committer \(name or address\), below\.[^\n]*\n/u)[1]?.split("\n")[0].match(/\b[0-9a-f]{7,}\b/g) ?? []).length === 2 && ![term, other, wide].some(t => named.out.includes(t)),
   "a term in commits' author or committer fails in a private repository too, both commits named, the mend said and the term never printed", named.out);
 // a merge of main into the branch, as "update branch" makes it (GitHub's) or as a person does
 const onMain = [[{ "c.md": "y\n" }, {}, "on main"]];
@@ -239,12 +240,12 @@ const octopus = pull([[{ "b.md": "x\n" }], [dir => {
 fails("a term in a line an octopus merge adds of its own, taken out again later", octopus);
 // what a project held before the check read more fails too, a listed term being the one exception to reporting it, and
 // each failure says how the session takes the term out (core archive 207)
-const mended = (what, repo, opts, words) => { const r = check(repo, opts); ok(!r.passed && r.out.includes(words) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what}: it fails, saying how to take the term out`, r.out); };
-mended("a term main already held, in a file of text a .gitattributes marks binary, which the check reads only now", pull([[{ "b.md": "x\n" }]], [[{ ".gitattributes": "*.svg binary\n", "logo.svg": `<svg><title>${term}</title></svg>\n` }]]), {}, "edit each of those lines");
-mended("a term added in one commit and taken out in the next", pull([[{ "b.md": `${term}\n` }], [{ "b.md": "gone\n" }]]), {}, "To take it out of those commits");
-mended("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), {}, "git rebase -i origin/main");
-mended("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` }, "edit the title or the description");
-mended("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}` }, "pushing its work to a branch of another name");
+const mendedSays = (what, repo, opts, words) => { const r = check(repo, opts); ok(!r.passed && r.out.includes(words) && mended(r.out) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what}: it fails, saying how to take the term out`, r.out); };
+mendedSays("a term main already held, in a file of text a .gitattributes marks binary, which the check reads only now", pull([[{ "b.md": "x\n" }]], [[{ ".gitattributes": "*.svg binary\n", "logo.svg": `<svg><title>${term}</title></svg>\n` }]]), {}, "edit each of those lines");
+mendedSays("a term added in one commit and taken out in the next", pull([[{ "b.md": `${term}\n` }], [{ "b.md": "gone\n" }]]), {}, "rewrite those commits without it");
+mendedSays("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), {}, "git rebase -i origin/main");
+mendedSays("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` }, "edit the title or the description");
+mendedSays("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}` }, "pushing its work to a branch of another name");
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
