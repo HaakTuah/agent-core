@@ -89,6 +89,16 @@ try {
   sh("commit", "-qam", "a change");
   let r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 0 && r.stdout.includes("survived: src/a.js:2") && r.stdout.includes("Reported only") && !r.stdout.includes("src/a.js:1:"), "a pull request's run, with no baseline: the tool is told the changed line alone, its survivor shown, nothing failed", r.stdout + r.stderr);
+  // (a baseline that is a link, here to a file outside the project, is neither read nor written; links need a right
+  // of their own on Windows, so this case runs elsewhere)
+  if (process.platform !== "win32") {
+    const outside = path.join(os.tmpdir(), `strength-outside-${process.pid}.json`);
+    fs.writeFileSync(outside, "{\"listed\": {}}\n");
+    fs.symlinkSync(outside, path.join(dir, "checks/strength-baseline.json"));
+    const linked = run(["--whole"]);
+    ok(linked.status === 1 && mended(linked.stderr) && fs.readFileSync(outside, "utf8") === "{\"listed\": {}}\n", "a baseline reached through a link is refused, with its mend, and what it leads to is left as it was", linked.stdout + linked.stderr);
+    fs.rmSync(path.join(dir, "checks/strength-baseline.json")); fs.rmSync(outside);
+  }
   r = run(["--whole"], { STATUS: "Pending" });
   ok(r.status === 1 && mended(r.stderr) && !fs.existsSync(path.join(dir, "checks/strength-baseline.json")), "a whole run that left faults not run writes no baseline, and says the mend", r.stdout + r.stderr);
   r = run(["--whole"]);
