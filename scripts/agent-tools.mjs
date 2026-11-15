@@ -44,7 +44,8 @@ const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u20
 export function configured(read, skills) {
   // (each tool's name, as the list writes it, and what it is: for a hook its event, matcher and the whole hook, its type,
   // command, timeout and all, which is what the kit's hooks and the base's are compared by)
-  const tools = new Map(), ids = new Map(), problems = [];
+  const tools = new Map(), ids = new Map(), shapes = new Map(), clashed = new Set(), problems = [];
+  const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -63,19 +64,22 @@ export function configured(read, skills) {
         for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
           const runs = hook?.type === "command" && typeof hook.command === "string";
           const name = `hook ${event}${matcher}: ${runs ? hook.command : JSON.stringify(hook)}`;
-          const id = JSON.stringify(["hook", event, group.matcher ?? "", hook]);
-          // (two hooks of one name that are not the same hook, as a command and a text that reads the same: neither is
-          // told apart from the other in the list)
-          if (ids.has(name) && ids.get(name) !== id) problems.push(`${file}: two of the ${show(event)} hooks share the name ${show(name.slice(5))} and are not the same hook. Mend: give the one a command of its own, or take one out`);
-          ids.set(name, id);
+          const id = canonical(["hook", event, group.matcher ?? "", hook]);
+          // (a command and a hook of another type whose text reads as that command share a name, and the list could not
+          // tell them apart; two command hooks of one command, a timeout apart, are one name for the list, each kept)
+          const kinds = shapes.get(name) ?? new Set();
+          kinds.add(runs);
+          if (kinds.size > 1 && !clashed.has(name)) { clashed.add(name); problems.push(`${file}: a command and a hook of another type share the name ${show(name.slice(5))}. Mend: give the one a command of its own, or take one out`); }
+          shapes.set(name, kinds);
+          add(name, id);
           tools.set(name, file);
         }
       }
     }
-    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); ids.set(`plugin ${name}`, `plugin ${name}`); }
+    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); add(`plugin ${name}`, `plugin ${name}`); }
   }
-  for (const name of Object.keys(json(".mcp.json")?.mcpServers ?? {})) { tools.set(`server ${name}`, ".mcp.json"); ids.set(`server ${name}`, `server ${name}`); }
-  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); ids.set(`skill ${name}`, `skill ${name}`); }
+  for (const name of Object.keys(json(".mcp.json")?.mcpServers ?? {})) { tools.set(`server ${name}`, ".mcp.json"); add(`server ${name}`, `server ${name}`); }
+  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   return { tools, ids, problems };
 }
 
@@ -83,7 +87,7 @@ export function configured(read, skills) {
 // kit's settings as a copy holds them.
 const kitText = () => { try { return fs.readFileSync(KIT, "utf8"); } catch { return null; } };
 export function kitHooks(text = kitText()) {
-  return text === null ? [] : [...configured(f => (f === ".claude/settings.json" ? text : null), () => []).ids.values()];
+  return text === null ? [] : [...configured(f => (f === ".claude/settings.json" ? text : null), () => []).ids.values()].flatMap(set => [...set]);
 }
 
 // The list a config holds: { keys, problems }, keys the "kind name" of each well-formed entry; null where the config
@@ -108,6 +112,9 @@ export function listed(config, file) {
   return { keys, problems };
 }
 
+// A value as JSON with every object's keys in order, so that a hook is the same whichever order its keys are written in.
+const canonical = value => JSON.stringify(value, (_, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v));
+
 const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice(0, at)]} ${show(key.slice(at + 1))}`; };
 
 // What breaks the rule in a project: { problems, unlisted }, the first held against the list where there is one, the
@@ -116,7 +123,7 @@ const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice
 export function check(head, list, kit, file) {
   const { tools, ids } = head;
   const problems = [...(list?.problems ?? [])];
-  const unlisted = [...tools.keys()].filter(k => !kit.includes(ids.get(k)) && !list?.keys.has(k));
+  const unlisted = [...tools.keys()].filter(k => ![...ids.get(k)].every(id => kit.includes(id)) && !list?.keys.has(k));
   if (list) {
     for (const k of unlisted) problems.push(`${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
     for (const k of list.keys) if (!tools.has(k)) problems.push(`${file}: "agentTools" lists ${describe(k)}, which nothing configures. Mend: take its entry out of the list, in this pull request`);
@@ -218,7 +225,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
     notes.push(`${file} holds no "agentTools" yet, so nothing fails here; not listed: ${unlisted.map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
     return { fail, notes };
   }
-  const before = new Set(readProject(root, base).ids.values()), held = k => before.has(head.ids.get(k));
+  const before = new Set([...readProject(root, base).ids.values()].flatMap(set => [...set])), held = k => [...head.ids.get(k)].every(id => before.has(id));
   for (const k of unlisted) {
     if (held(k)) continue;
     fail.push(`${describe(k)}, configured in ${head.tools.get(k)}, is new in this pull request and listed nowhere. Mend: list it under "agentTools" in ${file}, with every tool the project configures, each with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
