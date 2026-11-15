@@ -127,8 +127,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   - a pull request that makes something worse than it stood may fail, and the session mends it there; every failure
     says its mend (#254);
   - what stood before the check came, or before it read more, never turns it red: the check keeps a baseline, what
-    breaks it today, listed and allowed only to shrink, and where none is written yet the pull request's base counts
-    as it. The one exception, on the owner's word and no other: the personal-terms check fails a listed term wherever
+    breaks it today, listed and allowed only to shrink. A sync pull request holds the copy alone, so until the list
+    is written the pull request's base counts as it, and the entry of `setup/sync-notes.md` that brings the check
+    has a step whose check reads that the list is written: no old breach goes unlisted. The one exception, on the owner's word and no other: the personal-terms check fails a listed term wherever
     it stands, one the project held before and a name a machine's git writes into each commit included, its failure
     saying how the session takes it out in that pull request itself (core archive 202 and 207);
   - it adds no billed job, since a private repository on GitHub's free plan pays a whole minute for each job and its
@@ -162,7 +163,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   steps taken out at random are reported, exactly those.
 - **A pull request says what it asks of a project** (core archive 215): one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
-  nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. Reason: two of the ideas
+  nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
+  every such change asks something of a project: "Nothing" is an answer, and most changes give it. Reason: two of the ideas
   queued on 14 November would have broken "Nothing locks a project", and only a reading caught them. Held by
   `.github/workflows/own-description.yml`, which fails one without it.
 - **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the

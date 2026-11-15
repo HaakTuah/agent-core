@@ -317,6 +317,7 @@ function upgrade(p, from, ownChanges, expect) {
   if (!added.length) console.log(`note ${p.name}: no step with a check is added since ${from.tag}`);
   const out = Object.keys(STAGES).filter(() => Math.random() < 0.5);
   if (!out.length) out.push(Object.keys(STAGES)[0]);
+  console.log(`note ${p.name}: the steps taken out at random: ${out.join("; ")}`);
   for (const lead of out) STAGES[lead].stage(p.dir);
   r = steps();
   ok(JSON.stringify(reported(r.out)) === JSON.stringify(STEP_LEADS.filter(l => out.includes(l))), `${p.name}: steps taken out at random are reported, exactly those (${out.length})`, `${out.join("\n")}\n---\n${r.out}`);
