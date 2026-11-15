@@ -15,8 +15,9 @@
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
 // config reads that branch's code (the check reads more: a system named, a mark lowered, the first baseline), or
 // where the baseline gives its reason under "grown", as a raised mark's is given, which the reviews read
-// (modules/review-guidelines.md, "What blocks"). An entry that is gone, or stands smaller, is lowered with --write, and
-// a pull request that leaves one standing fails, so the baseline is the debt as it is. It never guesses: an import that
+// (modules/review-guidelines.md, "What blocks"). An entry that is gone is taken out with --write, which lowers the
+// numbers that fell too, and a pull request that leaves one standing fails, so the baseline lists the debt as it is,
+// and what was mended cannot come back. It never guesses: an import that
 // leads nowhere it can tell, a file that holds JSX (whose functions its reader cannot tell) and a file in another
 // language are counted and said, never failed; a project holds those with its language's own tools.
 //
@@ -312,17 +313,17 @@ const written = (listed, grown, audited) => `${JSON.stringify({ ...(audited ? { 
 
 const SAFE = ["-c", "core.fsmonitor=false"];
 const git = (args, opts = {}) => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"], ...opts });
-const lsFiles = specs => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs]).split("\0").filter(Boolean) : []);
+const lsFiles = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], { cwd: root }).split("\0").filter(Boolean) : []);
 const readable = f => CODE.includes(path.posix.extname(f)) || path.posix.basename(f) === "package.json";
 const PACKAGES = ":(glob)**/package.json";
 
 // The project's files as they stand in the working folder: { texts, tests }, never through a link.
 export function standing(config, root = ".") {
   const texts = {};
-  for (const f of new Set([...lsFiles([...config.code, ...config.tests]), ...lsFiles([PACKAGES])].filter(readable))) {
+  for (const f of new Set([...lsFiles([...config.code, ...config.tests], root), ...lsFiles([PACKAGES], root)].filter(readable))) {
     try { if (!fs.lstatSync(path.join(root, f)).isSymbolicLink()) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
   }
-  return { texts, tests: new Set(lsFiles(config.tests)) };
+  return { texts, tests: new Set(lsFiles(config.tests, root)) };
 }
 
 // The same files as a commit holds them, read through an index of its own, so that the pathspecs mean what they mean
@@ -427,9 +428,9 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
   const fail = fresh(config, found, baseline, current);
-  const smaller = (id, n) => n !== true && NUMBERS.some(k => (current.get(id)[k] ?? 0) < (n[k] ?? 0));
-  const stale = [...baseline.listed].filter(([id, n]) => !current.has(id) || smaller(id, n)).map(([id]) => id);
-  if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone, moved or smaller now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
+  // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
+  const stale = [...baseline.listed.keys()].filter(id => !current.has(id));
+  if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
   if (base) fail.push(...againstBase({ config, at, baseline, base }));
   return { fail, notes: notesOf(found.read), listed: baseline.listed.size, read: found.read };
 }
