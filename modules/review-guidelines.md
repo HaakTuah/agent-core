@@ -48,6 +48,10 @@ A finding, not blocking:
 - Blocking: a trim that fails this; and a raise with no "Leanness check:" comment in the PR giving that session's
   answer, save for growth a sync of the core brought.
 
+**A brief written in a pull request** (a template of the starter kit, or a brief a module, script or workflow holds;
+core archive 223): blocking where it misses one of the four things "A brief is written as a rule is" in
+`modules/helpers.md` names, or gives its reader a title or stakes that are not real.
+
 **A rule file changed:**
 - Blocking: a rule that departs from the owner's archived words it cites.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in

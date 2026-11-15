@@ -2,7 +2,8 @@
 // fails in the floor or a module; under the dated records' folders a gendered pronoun fails only in a line a change
 // adds, read against the base, and not in a line quoting the owner, nor in an older line, nor without a base. A phrase
 // a rule may not use fails in a line a change adds to a rule file and is only reported where it stood before, moved
-// word for word, quoted, in code marks or read without a base. On Linux and on Windows. Git and Node's own modules.
+// word for word, quoted, in code marks or read without a base; so does one in a Markdown template of a folder the list
+// names, among them a title or a stake a brief may not give (#282). On Linux and on Windows. Git and Node's own modules.
 //
 //   node scripts/general-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -70,7 +71,7 @@ ok(r.status === 1, "in the floor and the modules the pronoun fails wherever it s
 // the phrases a rule may not use
 const RULE = "- The builder should consider a test.\n";
 r = words({}, { "modules/b.md": `# A module\n\n${RULE}` });
-ok(r.status === 1 && r.out.includes("modules/b.md:3:") && r.out.includes("in a rule this change writes. Mend: name who does what") && mended(r.out), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
+ok(r.status === 1 && r.out.includes("modules/b.md:3:") && r.out.includes("in a rule or brief this change writes. Mend: name who does what") && mended(r.out), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
 r = words({}, { "AGENTS.md": `# Here\n\n${RULE}` });
 ok(r.status === 1 && r.out.includes("AGENTS.md:3:"), "and in a line a change adds to a rule file the list names", r.out);
 r = words({ "modules/b.md": `# A module\n\n${RULE}` }, { "floor/a.md": "# The floor\n\nNothing here.\n" });
@@ -85,6 +86,18 @@ r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...con
 ok(r.status === 1 && r.out.includes("list of phrases a rule may not use is empty") && mended(r.out), "an empty list of phrases fails: it would pass anything", r.out);
 r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["rules"], list: config.phrases.list } });
 ok(r.status === 1 && r.out.includes("not there: rules") && mended(r.out), "a file or folder of the list that is not there fails", r.out);
+
+// a brief is written as a rule is (modules/helpers.md; #282): the list reads the starter kit's templates too, and holds
+// a title and a stake that are not real
+const kit = { ...config, phrases: { ...config.phrases, paths: [...config.phrases.paths, "setup/template"] } };
+r = words({}, { "setup/template/AGENTS.md.tmpl": `# {{project}}\n\n${RULE}`, "setup/template/workflows/a.yml.tmpl": "# should consider\n" }, true, kit);
+ok(r.status === 1 && r.out.includes("setup/template/AGENTS.md.tmpl:3:") && !r.out.includes("a.yml.tmpl") && mended(r.out), "one in a line a change adds to a Markdown template of a folder the list names fails; a workflow's template is not read", r.out);
+const real = JSON.parse(fs.readFileSync(path.join(path.dirname(script), "general.json"), "utf8"));
+const primed = { ...kit, phrases: { ...kit.phrases, list: real.phrases.list } };
+r = words({}, { "setup/template/AGENTS.md.tmpl": "# {{project}}\n\nYou are a world-class expert in this stack.\nThe fate of the world rests on it, and I will tip you.\n" }, true, primed);
+ok(r.status === 1 && r.out.includes("AGENTS.md.tmpl:3:") && r.out.includes("AGENTS.md.tmpl:4:") && /by what it does/.test(r.out) && /real reason/.test(r.out) && mended(r.out), "the core's list fails a brief that calls its reader an expert or gives it stakes that are not real", r.out);
+r = words({ "setup/template/AGENTS.md.tmpl": "# {{project}}\n" }, { "modules/b.md": "# A module\n\n- You built none of this; find what is wrong with it, as a demanding expert would. Its lower stakes stay low.\n" }, true, primed);
+ok(r.status === 0, "a role named by what it does, an expert named as a standard and stakes as a measure pass", r.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the words check`);
 process.exitCode = failed ? 1 : 0;

@@ -8,9 +8,11 @@
 // (core archive 201). A line quoted with ">", the owner's own words as the archive keeps them, is not read. Without
 // --base those folders are not read, and it says so.
 // The config's second list, "phrases", is the phrases a rule may not use ("A rule is written to one pattern" in
-// AGENTS.md; core archive 214): read in the files and folders it names, it reports each one that stands there and fails
-// one in a line a change adds against --base, a line moved word for word and one quoted with ">" aside. A phrase in
-// code marks (`clean`) is named, not used, and is not read. Without --base it only reports, and says so.
+// AGENTS.md; core archive 214), nor a brief (modules/helpers.md, "A brief is written as a rule is"; core archive 223):
+// read in the files it names and in the Markdown files of the folders it names, a template's (.md.tmpl) included, so
+// the starter kit's templates too, it reports each one that stands there and fails one in a line a change adds to one
+// of them against --base, a line moved word for word and one quoted with ">" aside. A phrase in code marks (`clean`)
+// is named, not used, and is not read. Without --base it only reports, and says so.
 // This repository only, run by size.yml with the base. Reads only; git and Node's own modules.
 //
 //   node scripts/general.mjs scripts/general.json [--base <commit>]
@@ -86,14 +88,14 @@ const phrases = phraseList.map(p => ({ re: new RegExp(p.pattern, "iu"), say: p.s
 const used = text => quoted(text) ? [] : phrases.map(p => ({ ...p, hit: text.replace(/`[^`]*`/gu, "").match(p.re) })).filter(p => p.hit);
 const absent = phrasePaths.filter(p => !fs.existsSync(p));
 if (absent.length) { console.log(`FAIL the files and folders read for the phrases are not there: ${absent.join(", ")}. Mend: run it from the core's root, or name in the config's "phrases" the files that stand`); process.exit(1); }
-const ruleFiles = phrasePaths.flatMap(p => fs.statSync(p).isDirectory() ? fs.readdirSync(p).filter(f => f.endsWith(".md")).map(f => path.posix.join(p, f)) : [p]).sort();
+const ruleFiles = phrasePaths.flatMap(p => fs.statSync(p).isDirectory() ? fs.readdirSync(p).filter(f => /\.md(\.tmpl)?$/u.test(f)).map(f => path.posix.join(p, f)) : [p]).sort();
 if (!ruleFiles.length) { console.log("FAIL no rule file was read for the phrases, so the check would pass anything. Mend: run it from the core's root, or name in the config's \"phrases\" the folders that hold the rules"); process.exit(1); }
 const fresh = new Set();
 let failedPhrases = 0, reported = 0;
 if (baseRev) {
-  for (const a of addedLines(phrasePaths)) {
+  for (const a of addedLines(phrasePaths).filter(a => ruleFiles.includes(a.file))) {
     fresh.add(`${a.file}:${a.line}`);
-    for (const { hit, say } of used(a.text)) { failedPhrases++; console.log(`FAIL ${a.file}:${a.line}: "${hit[0]}" in a rule this change writes. Mend: ${say}`); }
+    for (const { hit, say } of used(a.text)) { failedPhrases++; console.log(`FAIL ${a.file}:${a.line}: "${hit[0]}" in a rule or brief this change writes. Mend: ${say}`); }
   }
 } else console.log("no --base given: the phrases are only reported, none failed");
 for (const file of ruleFiles) {
@@ -102,6 +104,6 @@ for (const file of ruleFiles) {
     for (const { hit, say } of used(line)) { reported++; console.log(`${file}:${i + 1}: "${hit[0]}" reported, standing before this change; ${say} (the audit brings it to the pattern, #259)`); }
   });
 }
-console.log(`${ruleFiles.length} rule files read for ${phrases.length} phrases a rule may not use: ${failedPhrases} in what this change writes, ${reported} standing`);
+console.log(`${ruleFiles.length} rule and brief files read for ${phrases.length} phrases neither may use: ${failedPhrases} in what this change writes, ${reported} standing`);
 found += failedPhrases;
 process.exit(found ? 1 : 0);
