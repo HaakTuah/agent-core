@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../core-address.mjs";
-import { LABELS, build, git, github, pushed, show, verdict } from "./scratch.mjs";
+import { LABELS, build, git, github, pushed, readGit, show, verdict } from "./scratch.mjs";
 
 export const name = "steps";
 export const holds = ["AGENTS.md: A release says what it asks, step by step"];
@@ -28,7 +28,8 @@ const ROW = "| *code reviewers* | Codex, then Copilot, then the fallback reviewe
 const FILE = "docs/trial/GEMINI.md";
 const anyBranch = (dir, test) => pushed(dir).some(b => test(b));
 const lacks = (dir, file, line) => anyBranch(dir, b => !(show(dir, b, file) ?? line).includes(line));
-const workflows = (dir, b) => String(spawnSync("git", [`--git-dir=${path.join(dir, "origin.git")}`, "ls-tree", "--name-only", `${b}:.github/workflows`], { encoding: "utf8" }).stdout ?? "").split("\n").filter(Boolean);
+const listed = (dir, b, folder) => String(readGit(dir, `--git-dir=${path.join(dir, "origin.git")}`, "ls-tree", "--name-only", "--end-of-options", `${b}:${folder}`) ?? "").split("\n").filter(Boolean);
+const workflows = (dir, b) => listed(dir, b, ".github/workflows");
 
 // Whether a workflow's call passes `private: true`: a line of it under a `with:` line, indented deeper, read line by line.
 const withPrivate = text => {
@@ -55,7 +56,7 @@ export const PLANTED = {
   "13 November 2026, the modules a project takes": dir => anyBranch(dir, b => /^Floor: .*Modules: (?:all\b|.*`copilot\.md`)/m.test(show(dir, b, "core-manifest.md") ?? "")),
   "13 November 2026, what a project follows": dir => anyBranch(dir, b => /^\|\s*\*follows\*\s*\|\s*`main`\s*\|/m.test(show(dir, b, "core-manifest.md") ?? "")),
   "13 November 2026, the security-review check in a private repository": dir => anyBranch(dir, b => withPrivate(show(dir, b, ".github/workflows/security-review.yml") ?? "")),
-  "15 November 2026, the owner's inbox where issues cannot be reached": dir => !anyBranch(dir, b => show(dir, b, "inbox/README.md") !== null || String(spawnSync("git", [`--git-dir=${path.join(dir, "origin.git")}`, "ls-tree", "--name-only", `${b}:inbox`], { encoding: "utf8" }).stdout ?? "").trim() !== ""),
+  "15 November 2026, the owner's inbox where issues cannot be reached": dir => !anyBranch(dir, b => show(dir, b, "inbox/README.md") !== null || listed(dir, b, "inbox").length > 0),
   "15 November 2026, labels and openers": dir => { const have = new Set(github(dir).labels.map(l => l.name)); return LABELS.every(l => have.has(l.name)); },
   "16 November 2026, choices that are hard to undo": dir => anyBranch(dir, b => { const t = show(dir, b, "docs/choices.md") ?? ""; return /^Read whole: \d{4}-\d\d-\d\d/m.test(t) && /^## Choice: (?!FILL IN)\S/m.test(t) && /Reopens it: (?!FILL IN)\S/.test(t); }),
   "16 November 2026, the daily look": dir => anyBranch(dir, b => workflows(dir, b).includes("look.yml") && !workflows(dir, b).some(f => /\/core-moved\.yml@/.test(show(dir, b, `.github/workflows/${f}`) ?? ""))),

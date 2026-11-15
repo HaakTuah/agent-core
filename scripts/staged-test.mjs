@@ -9,12 +9,13 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, setCase } from "./staged.mjs";
-import { LABELS, OWNER, REPO, folderFit, memoOf, sealOf } from "./staged/scratch.mjs";
+import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, setCase, wellFormed } from "./staged.mjs";
+import { LABELS, LIMITS, OWNER, REPO, changed, folderFit, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -140,7 +141,24 @@ ok(meta.case === "stop" && meta.commit === s.pin && JSON.stringify(meta.rules) =
   "what a case was set from (the core's commit and its rules' fingerprints there) is kept beside its folder, out of the brief's", JSON.stringify(meta));
 let refused = 0;
 for (const bad of [path.join(s.tmp, "a\"b"), path.join(s.tmp, "a$b"), path.join(path.dirname(fileURLToPath(import.meta.url)), "case")]) { try { folderFit(bad); } catch { refused++; } }
-ok(refused === 3 && (() => { try { folderFit(path.join(s.tmp, "fine-1")); return true; } catch { return false; } })(), "a case is set only under the system's temporary folder, in a path of plain characters");
+ok(refused === 3 && (() => { try { return folderFit(path.join(s.tmp, "fine-1")) === path.join(fs.realpathSync(s.tmp), "fine-1"); } catch { return false; } })() && (() => { try { folderFit(os.tmpdir()); return false; } catch { return true; } })(),
+  "a case is set only inside the system's temporary folder, in a path of plain characters, and the brief names that real path");
+// the session's code runs with no token of the machine's and stops at the time limit; config it wrote runs nothing
+process.env.STAGED_TEST_TOKEN = "not-for-the-session";
+const sealedRun = fresh("finish");
+branch(sealedRun, "env", { "src/sum.mjs": FIX, "test/sum-test.mjs": `${read(sealedRun, "test/sum-test.mjs")}if (process.env.STAGED_TEST_TOKEN !== undefined) process.exit(1);\n` });
+ok(testPasses(sealedRun, "env"), "the session's code runs with no variable of the machine's but where programs are found");
+branch(sealedRun, "loop", { "src/sum.mjs": FIX, "test/sum-test.mjs": "for (;;) {}\n" });
+LIMITS.run = 3000;
+const started = Date.now(), looped = testPasses(sealedRun, "loop");
+LIMITS.run = 20000;
+ok(!looped && Date.now() - started < 15000, "code of the session's that never ends is stopped at the time limit, and fails");
+const marker = path.join(s.tmp, "ran-a-command");
+const runs = process.platform === "win32" ? `cmd /c type nul > "${marker}"` : `touch '${marker}'`;
+git(sealedRun, "config", "core.fsmonitor", runs);
+execFileSync("git", [`--git-dir=${path.join(sealedRun, "origin.git")}`, "config", "diff.external", runs], { env });
+touched(sealedRun); changed(sealedRun, "env");
+ok(!fs.existsSync(marker), "a command the session set in the repositories' config is not run by the readers");
 const ghBase = spawnSync(process.execPath, [path.join(twoPulls, "bin", "gh"), "api", "-X", "POST", `repos/${OWNER}/${REPO}/pulls`, "-f", "head=tidy", "-f", "base=--output=x"], { encoding: "utf8" });
 ok(ghBase.status === 1 && /base .* is not a branch/.test(ghBase.stderr), "the stand-in refuses a base that is no branch", ghBase.stderr);
 
@@ -164,7 +182,10 @@ ok(!gate({ runs: [run("2026-09-03"), run("2026-11-02"), run("2026-12-01")] }).bi
 ok(!gate({ runs: [run("2026-10-03"), run("2026-11-02", true, null, ["stop"]), run("2026-12-01")] }).binding, "a month that ran only some cases breaks the row");
 ok(gate({ runs: [...three, run("2027-01-05", ["secret"], null, ["stop"])] }).binding, "once they hold a release they go on holding it, a later month that ran some cases only too");
 ok(!gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", ["secret"], "secret")] }).failing.some(f => f.name === "secret"), "a failing verdict marked wrong holds nothing");
-ok(forRelease(null).held && /Mend: /.test(forRelease(null).held), "a record in the commit that cannot be read holds the release, saying the mend");
+ok(forRelease(null).held && /Mend: /.test(forRelease(null).held) && forRelease({ runs: [null] }).held && !wellFormed({ runs: [{ at: "2026-12-01", cases: { stop: null } }] }),
+  "a record in the commit that cannot be read, or a run in no form the gate reads, holds the release, saying the mend");
+ok(gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", true, "stop")] }).failing.some(f => f.name === "stop"), "a passing verdict found wrong counts as failing");
+ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true }).held, "cases that held the release before go on holding it, their record cut short since");
 const held = forRelease({ runs: three });
 ok(held.held && /secret/.test(held.held) && /Mend: /.test(held.held), "where they hold it, a failing case holds the release and says the mend", held.held);
 ok(forRelease({ runs: three.slice(1) }).held === null && /advisory/.test(forRelease({ runs: three.slice(1) }).said), "while they advise, a failing case is said and holds nothing");
