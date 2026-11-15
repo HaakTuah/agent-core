@@ -15,7 +15,6 @@ wanted").
 | --- | --- | --- |
 | #254 | rule builder | its second point: #235 |
 | #256 | rule builder | its staged case: #235 |
-| #242 | rule builder | |
 | #252 | rule builder | |
 | #235 | rule builder | |
 | #296 | builder | #235 |

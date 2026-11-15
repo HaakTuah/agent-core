@@ -212,7 +212,26 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind floor rules 3, 12 and 14 as they read since, each the same rule in fewer words.
 
-224. **14 and 15 November 2026** (the core; in chats with a session the owner had asked to look through the core, not
+224. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #242, labelled `by:chat`, under "What it is", saying the
+     owner agreed to it; no word of the owner's is quoted there). The owner agreed that, for the release a project would
+     move to, the sync and the core-moved check say whether anything the project takes has changed since its pin (the
+     floor, the modules its manifest lists, the scripts, hooks and workflows it runs or calls, and the sync notes that
+     ask something of it), and that where nothing has, the project may stay at its pin, the sync saying so and changing
+     nothing and the core-moved check opening no issue; that the copy stays whole and exact, compared at its pin as
+     before, and only the pin waits; that in doubt it syncs, the list of what never matters to a project exact and short
+     (a module its manifest does not list, the tests of the core's own scripts, the core's own issue forms), never a
+     guess; and that a project skips no more than the upgrade test covers, or the test covers the longer jump. The
+     reason the session gave: every release moved every pin, so every release was a sync pull request in each project,
+     whose checks are paid minutes in a private repository, five releases having been cut on the first day of releases.
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > Issues labelled `by:chat` carry my decisions; treat them as my word.
+
+     Behind "A release that brings nothing a project takes asks no sync of it" in `README.md`, "How a project takes the
+     core", point 1, and `staysAt` in `scripts/releases.mjs`, which `scripts/sync.mjs` and `scripts/core-moved.mjs` ask.
+
+225. **14 and 15 November 2026** (the core; in chats with a session the owner had asked to look through the core, not
      the design session, as that session recorded them on issue #246, whose current text, its note "What this issue
      asks to be built, in one place", sets the design out in full and says the owner agreed to it; and as the owner
      then told the orchestrator, who passed it on word for word to the builder of these rules). Of four practices put
