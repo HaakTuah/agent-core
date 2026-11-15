@@ -50,5 +50,7 @@ A finding, not blocking:
 
 **A rule file changed:**
 - Blocking: a rule that departs from the owner's archived words it cites.
+- Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
+  the core's `AGENTS.md`, "A rule is written to one pattern", or holding what that pattern keeps out (core archive 214).
 - A finding: a rule that adds text without replacing any, or makes anyone wait for the owner beyond floor rules 3 and 14
   (core archive 134).
