@@ -87,7 +87,9 @@ try {
   // to any other commit of main is reviewed like any PR, and merges after its review; core archive 201)
   const follows = followsOf(show(head, "core-manifest.md"));
   if (pin && follows !== "main" && !releasesIn(dir).some((r) => r.sha === pin)) {
-    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR`);
+    // (and how to take a release instead: a copy older than release-1 lands here, its own sync script taking main; #365)
+    const [newest] = releasesIn(dir);
+    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node core/scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
   }
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
   if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own) || entries(copyTree(pin, dir), dir) !== entries(`${head}:core`, own))) {

@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
-import { FILES, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
+import { FILES, GAME_ROWS, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
@@ -133,6 +133,28 @@ if (p.status === 0) {
   undo();
   ok(copy.status === 1 && /a new copy: .*\. Mend: keep it in the one place/.test(copy.stderr) && mended(copy.stderr) && noConfig.status === 1 && mended(noConfig.stderr),
     "a copy the project adds fails the copies check, as does a config it cannot read, each saying its mend", `${copy.stderr}${noConfig.stderr}`);
+  // (against the base, a rule file taken off SECURITY.md's list is held to the base's list, and a pathspec git cannot
+  // read fails with its mend, not git's own error)
+  const secAt = path.join(p.dir, "SECURITY.md"), secWas = fs.readFileSync(secAt, "utf8");
+  fs.writeFileSync(secAt, secWas.replace("**the rule files:** `docs/threat-model.md`;", "**the rule files:** `AGENTS.md`;"));
+  const offList = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env: { ...env, COPIES_BASE: "HEAD" }, encoding: "utf8" });
+  fs.writeFileSync(secAt, secWas);
+  const cfgP = path.join(p.dir, "checks/copies.json"), cfgPWas = fs.readFileSync(cfgP, "utf8");
+  // (a config named outside plain ASCII is found at the base all the same: git names it unquoted)
+  const wide = path.join(p.dir, "checks/cópies.json");
+  fs.writeFileSync(wide, cfgPWas);
+  git(p.dir, "add", "checks/cópies.json");
+  git(p.dir, "commit", "-q", "-m", "a config named outside plain ASCII");
+  fs.writeFileSync(wide, JSON.stringify({ ...JSON.parse(cfgPWas), prose: [] }));
+  const wideRun = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/cópies.json"], { cwd: p.dir, env: { ...env, COPIES_BASE: "HEAD" }, encoding: "utf8" });
+  git(p.dir, "reset", "-q", "--hard", "HEAD~1");
+  ok(wideRun.status === 1 && /checks\/cópies\.json reads \d+ files fewer than HEAD's config read/u.test(wideRun.stderr) && mended(wideRun.stderr), "a config named outside plain ASCII is held to the base's too", wideRun.stdout + wideRun.stderr);
+  fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), code: [":(bogus)x"] }));
+  const badSpec = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
+  fs.writeFileSync(cfgP, cfgPWas);
+  ok(secWas.includes("**the rule files:** `docs/threat-model.md`;") && offList.status === 1 && /files fewer than HEAD's config read: docs\/threat-model\.md \(prose\)/u.test(offList.stderr) && mended(offList.stderr)
+    && badSpec.status === 1 && /git cannot read the pathspecs :\(bogus\)x: .*\. Mend: write each as a plain git pathspec, .* in the config's "code" or "prose"/u.test(badSpec.stderr) && mended(badSpec.stderr),
+    "against the base, a rule file taken off SECURITY.md's list fails, and a pathspec git cannot read fails, each saying its mend", `${offList.stderr}${badSpec.stderr}`);
   // (code that matches other code once names and numbers are set aside is reported by the copies check, and fails
   // nothing; a function past a mark, which the kit's own shape config reads from the first day, fails with its mend)
   const twin = (a, b) => [`export function ${a}(seed, ${b}) {`, `  const ${a}Start = ${b}.first(seed) + 1;`, `  let ${a}Total = ${a}Start * 2;`, `  if (${a}Total > ${b}.limit) ${a}Total = ${b}.limit - 3;`, `  for (const ${a}Item of ${b}.items) ${a}Total += ${a}Item.weight;`,
@@ -164,6 +186,30 @@ if (p.status === 0) {
   ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*modules\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
     "the core's own copies check passes on the core, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
+  // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
+  // this one does not, fails with its mend, and the mend as worded passes; a config widened passes)
+  const cfgAt = path.join(core, ".github/copies.json"), cfgWas = fs.readFileSync(cfgAt, "utf8");
+  const againstBase = change => {
+    fs.writeFileSync(cfgAt, JSON.stringify(change(JSON.parse(cfgWas))));
+    const r = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "main" }, encoding: "utf8" });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  const same = againstBase(c => c);
+  fs.copyFileSync(path.join(core, ".github/copies-baseline.json"), path.join(core, ".github/moved.json"));
+  const moved = againstBase(c => ({ ...c, baseline: ".github/moved.json" }));
+  fs.rmSync(path.join(core, ".github/moved.json"));
+  const narrowed = againstBase(c => ({ ...c, prose: c.prose.filter(p => p !== "CLAUDE.md") }));
+  const narrowedCode = againstBase(c => ({ ...c, code: c.code.filter(p => p !== ".github/workflows/*.yml"), prose: [...c.prose, ".github/workflows/*.yml"] }));
+  const widened = againstBase(c => ({ ...c, prose: [...c.prose, ".node-version"] }));
+  git(core, "checkout", "-q", "main", "--", ".github/copies.json");
+  const mendedRun = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "main" }, encoding: "utf8" });
+  const back = /Mend: take the config back as main holds it \(git checkout main -- \.github\/copies\.json\)/u;
+  ok(same.status === 0 && widened.status === 0
+    && moved.status === 1 && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(moved.out) && back.test(moved.out) && mended(moved.out)
+    && narrowed.status === 1 && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(narrowed.out) && back.test(narrowed.out) && mended(narrowed.out)
+    && narrowedCode.status === 1 && /\.github\/workflows\/[^ ]+\.yml \(code\)/u.test(narrowedCode.out) && mended(narrowedCode.out)
+    && mendedRun.status === 0,
+    "against the base, a baseline moved or a file left out of the config fails, saying its mend, and the mend passes; a config widened passes", `${same.out}${moved.out}${narrowed.out}${narrowedCode.out}${widened.out}${mendedRun.stdout}${mendedRun.stderr}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;
@@ -185,6 +231,17 @@ if (p.status === 0) {
 }
 const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game");
 ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/licences.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(q.dir, "checks/licences.json")), "a private project without npm gets no call to CodeQL, the licence workflow or the signature check, and still its licence config", q.out.slice(0, 400));
+// (every kind the program writes: the core's manifest check, run in the project, gives no note on its first day, #329)
+for (const [what, r] of [["an npm project", p], ["a private game", q]]) {
+  if (r.status !== 0) continue;
+  const m = spawnSync(process.execPath, ["core/scripts/manifest-reads.mjs"], { cwd: r.dir, env, encoding: "utf8" });
+  ok(m.status === 0 && m.stdout.startsWith("ok ") && !m.stdout.includes("note "), `${what}: the core's manifest check, run in it, gives no note`, m.stdout.slice(0, 600));
+}
+if (q.status === 0) {
+  const qManifest = fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8"), left = q.out.split("\n");
+  ok(GAME_ROWS.every(([slot, what]) => qManifest.includes(`\n| *${slot}* | FILL IN: ${what} |\n`) && left.some(l => /^  core-manifest\.md:[0-9]+: /.test(l) && l.endsWith(`: ${what}`))),
+    "a game's manifest has a row for each slot game-design.md uses, each left to fill and named, without its table's bar, in what is left", q.out.slice(0, 1500));
+}
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
