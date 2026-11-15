@@ -246,6 +246,17 @@ const outputsOf = file => {
  * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). Each job's own
  * temporary folder is made under `temp` and removed when the job ends.
  */
+// Whether a trigger's `paths:` filter lets a change through, as GitHub's cheat sheet reads one: `*` (no slash), `**`
+// (any folders, none included, where `**/` begins it), `?` and `+` (zero or one, and one or more, of the character
+// before), `[...]`, `\` before a character taking it as itself, and `!` before a pattern taking out what it matches;
+// the last pattern a file matches decides, and the workflow starts where any changed file is let through.
+export function pathsLetThrough(patterns, changed) {
+  const re = glob => new RegExp(`^${glob.replace(/\\.|\*\*\/|\*\*|\*|\[[^\]]*\]|[.^${}()|\\]/g, t =>
+    t.length === 2 && t[0] === "\\" ? `\\${t[1]}` : t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*" : t.startsWith("[") ? t : `\\${t}`)}$`);
+  const rules = patterns.map(p => (p.startsWith("!") ? [false, re(p.slice(1))] : [true, re(p)]));
+  return changed.some(f => rules.reduce((let_, [keep, r]) => (r.test(f) ? keep : let_), false));
+}
+
 export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
   const defaults = wf.defaults?.run?.shell;

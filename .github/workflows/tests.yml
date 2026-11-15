@@ -6,12 +6,13 @@
 # (scripts/init-dotnet-test.mjs). Another writes projects with the starter kit of each of the last two releases, syncs
 # them to the commit under test and runs every check of the core on them, taking one package from npm's registry
 # (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so its checkout fetches them, and
-# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them.
+# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them. The staged cases'
+# test, which writes a scratch project with the starter kit for each case it reads, runs after it in that job.
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
-# The suites together, and the upgrade test, are each held to a time mark (the "suites" of .github/shape.json, by
-# scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
+# The suites together, each of their two parts on Windows, and the upgrade test, are each held to a time mark (the
+# "suites" of .github/shape.json, by scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
 name: tests
 
 on:
@@ -22,12 +23,26 @@ on:
 permissions:
   contents: read
 
+# (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a push to main
+# is its own group and is never cancelled; #388)
+concurrency:
+  group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in two jobs
+  # that run side by side, each under a time mark of its own: the suites that write a whole scratch project and run
+  # the core's checks or jobs on it, and the rest, each step's condition naming the part it is left out of; on Linux
+  # one job runs them all; #387)
   suites:
+    name: suites (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - { os: ubuntu-latest, part: all, suite: suites }
+          - { os: windows-latest, part: projects, suite: suites-projects }
+          - { os: windows-latest, part: rest, suite: suites-rest }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     defaults:
@@ -43,168 +58,175 @@ jobs:
       - name: The second the suites start at, for their time mark
         run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: The versions check
+        if: ${{ matrix.part != 'projects' }}
         run: node scripts/versions-test.mjs
       - name: The licence check's lists and readers
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/licences-test.mjs
       - name: The licence check on a whole project, and its scan
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/licence-scan-test.mjs
       - name: The licence scan on every form of a fetch
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/licence-fetch-test.mjs
       - name: The licences read back from the installed packages
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/licence-installed-test.mjs
       - name: The NuGet check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/nuget-test.mjs
       - name: The NuGet check's fetch before the restore, against each package's content hash
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/nuget-fetch-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (once, on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         run: node scripts/readers-test.mjs
       - name: The exact-versions check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/exact-versions-test.mjs
       - name: The agent-tools check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/agent-tools-test.mjs
       - name: The helper hook
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/helper-call-test.mjs
       - name: The work-saved hook
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/work-saved-test.mjs
       - name: The session's cost line
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/session-cost-test.mjs
       - name: The core's own measurement
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/core-cost-test.mjs
       - name: The measures of how code is put together
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/code-shape-test.mjs
       - name: The shape check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/shape-test.mjs
       - name: The screen checks' baseline
         if: ${{ !cancelled() }}
         run: node scripts/screens-test.mjs
       - name: The dose a codebase's state sets
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/dose-test.mjs
       - name: The stand-in's record
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/stand-in-record-test.mjs
       - name: The count of what the reviews find
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/review-record-test.mjs
       - name: The stalled lanes
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/stalled-test.mjs
       - name: The scheduled look and its state report
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/look-test.mjs
       - name: The choice records
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/choices-test.mjs
       - name: The description check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/pr-description-test.mjs
       - name: The security-review check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/security-review-test.mjs
       - name: The code-review wait
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/code-review-wait-test.mjs
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/clean-merges-test.mjs
       - name: The workflow check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/workflows-test.mjs
       - name: The core-moved check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/core-moved-test.mjs
       - name: Where the owner's inbox is, issues or the folder
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/inbox-test.mjs
       - name: The labels and openers, and their check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/labels-test.mjs
       - name: The core's releases, what a project follows, and cutting one
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/releases-test.mjs
       - name: The core's address stands in one place, and is this repository's
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/core-address-test.mjs
       - name: The tree a copy must be
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/copy-tree-test.mjs
       - name: The copy of the core's check (core.yml), its own job on scratch projects
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/core-yml-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/pure-sync-test.mjs
       - name: The proof that a change to what runs by itself is only comments and steps' names
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/comment-only-test.mjs
       - name: Whether a script was started by itself
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/started-test.mjs
       - name: The starter kit, and the core's own checks on a project it writes
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/init-test.mjs
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/nuget-gate-test.mjs
       - name: The personal-terms check, its own job on scratch pull requests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/personal-terms-test.mjs
       - name: The words check, the dated records' added lines too
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/general-test.mjs
       - name: The cap's own check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/size-test.mjs
       - name: The pointer check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/pointers-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/pointers.mjs --core
       - name: What a release asks of a project, step by step, and a project beside a fresh start
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/steps-test.mjs
+      - name: What holds each rule of the floor and the modules, read
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/holders-test.mjs
+      - name: What holds each rule names only rules that stand
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/holders.mjs
       - name: The check that the core takes each module or gives its reason
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/own-modules-test.mjs
       - name: The core takes each of its own modules, or its AGENTS.md gives its reason
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/own-modules.mjs
       - name: Each check's failure says its mend, and each check's test reads it
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/mend-test.mjs
       - name: The manifest check
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/manifest-reads-test.mjs
       - name: The core's own AGENTS.md fills each slot its modules use
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/manifest-reads.mjs --core
       - name: None of the core's own workflows names the forbidden trigger
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/workflows.mjs
       - name: What the core's own workflows and scripts use, each to its list
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/licences.mjs .github/licences.json
       - name: Every tool the core's own agents load is listed (floor topic 15)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/agent-tools.mjs .github/licences.json --core
       - name: The base branch's latest commit, for the core's copies baseline (once, on Linux; not the whole history)
         if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name == 'pull_request' }}
@@ -217,7 +239,9 @@ jobs:
           COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: node scripts/copies.mjs .github/copies.json
       - name: The suites kept to their time mark
-        run: node scripts/shape.mjs .github/shape.json --suite suites --since "$SUITES_START"
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
 
   upgrade:
     strategy:
@@ -225,7 +249,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -239,21 +263,26 @@ jobs:
           node-version-file: .node-version
       - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs
+      # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time)
+      - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
+        if: ${{ !cancelled() }}
+        run: node scripts/shape.mjs .github/shape.json --suite staged -- node scripts/staged-test.mjs
 
-  # (the one check the ruleset asks for by name: it passes only where the suites and the upgrade test passed on both; a
-  # job that ran out of its time is cancelled, which no failing test is, so the gate says which it was)
+  # (the one check the ruleset asks for by name: it passes only where the suites, and the upgrade test with the staged
+  # cases, passed on both; a job that ran out of its time is cancelled, which no failing test is, so the gate says which
+  # it was)
   tests:
     needs: [suites, upgrade]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: The suites and the upgrade test passed on Linux and on Windows
+      - name: The suites, the upgrade test and the staged cases passed on Linux and on Windows
         env:
           SUITES: ${{ needs.suites.result }}
           UPGRADE: ${{ needs.upgrade.result }}
         run: |
-          echo "the suites: $SUITES; the upgrade test: $UPGRADE"
+          echo "the suites: $SUITES; the upgrade test and the staged cases: $UPGRADE"
           if [ "$SUITES" = cancelled ] || [ "$UPGRADE" = cancelled ]; then
             echo "::error::a job was cancelled: it ran out of its time (timeout-minutes) or was stopped, which is no" \
               "failing test; its log shows the step it stood in, and re-running it is the first thing to try"

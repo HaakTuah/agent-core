@@ -33,7 +33,60 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind floor topics 5, 7, 9 and 19 and floor rule 14's cap on a run with a model, with the step "16 November 2026,
      hostile tests for every named input" in `scripts/steps.mjs`.
 
-228. **15 November 2026** (projects with a screen; in chats with a session the owner works with, not the design
+228. **14 and 15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not
+     the design session, as that session recorded it on issue #235, labelled `by:chat`, its note "What this issue asks
+     to be built, in one place" gathering what the owner agreed to). Of an audit that found 43 of 122 rules held by
+     nothing but a session reading them, and of staged cases that would test those rules on a fresh session, the
+     owner said:
+
+     > We need to address everything you identified.
+
+     and agreed to: staged cases, each a scratch project in which a fresh session is given a task where one rule is easy
+     to break, passed or failed by a script on what the session did, never on what it says of itself; advisory at
+     first, and holding a release only once they have been right for a while; eight cases so far, two of them from that
+     day's work (a builder that finishes without the owner, and a stricter check that meets old content); run under
+     each agent tool, a tool working with the core once it passes them; and every rule of the floor and the modules,
+     the old ones too, naming what holds it, one of three (a check that fails where it is broken, a staged case, or the
+     scheduled audit), a script listing those with none until they gain one or go on the owner's word, a staged case
+     the holder of last resort. Of running the cases before each release, the core's first five releases having been
+     cut within 21 hours:
+
+     > When multiple releases can in theory be daily, this might not be the best measurement.
+
+     So they run once a month, with the state report, and when a rule that has a case changes, as the owner agreed. To
+     the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "Every rule says what holds it" and "Staged cases hold what no check reads" in `AGENTS.md`,
+     `scripts/holders.json` and `scripts/holders.mjs`, `scripts/staged.mjs` and `scripts/staged/`, and the staged
+     cases' reader in `scripts/look.mjs` and gate in `scripts/release.mjs`.
+
+229. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it on issue #282, labelled `by:chat`; first added to #277, which had already been built and
+     closed, so it stands as an issue of its own). The owner asked:
+
+     > should there be any priming? Like telling builders that they are experts in what they are doing? Or that the
+     > fate of the world relies on them getting this perfectly right?
+
+     and agreed to four points, under the heading "A brief is written as a rule is (#277, built), with no priming":
+     what a session is handed says its role by what it does ("you built none of this; find what is wrong with it"), the
+     task, what done looks like and the reason; it calls the session no expert and invents no stakes, since neither
+     changes the work and a brief, like any request, may not imply what is not true; it holds for the briefs an
+     orchestrator writes for its builders, those a session writes for a helper or a reviewer, and the templates of the
+     starter kit; and it is held by the list of phrases a rule may not use, reading the brief templates too, and by a
+     point of the review guidelines on a brief written in a pull request. To the orchestrator, passed on word for word
+     to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "A brief is written as a rule is" in `modules/helpers.md`, its point under "A brief written in a pull
+     request" in `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json` as
+     `scripts/general.mjs` reads it in the starter kit's templates.
+
+230. **15 November 2026** (projects with a screen; in chats with a session the owner works with, not the design
      session, as that session recorded them on issue #284, labelled `by:chat`, whose description it named the issue's
      current text in a note of the same day; the description sets the design out in full, as eighteen points with what
      holds them and what stays out, and says the owner agreed to every point; and as the owner then told the

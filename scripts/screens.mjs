@@ -1,4 +1,4 @@
-// The screen checks' baseline (modules/screens.md, "What holds it"; core archive 228; #284): a project that turns on a
+// The screen checks' baseline (modules/screens.md, "What holds it"; core archive 230; #284): a project that turns on a
 // check of a screen names it in its config, and its own tool, which the core leaves to it, writes what it found; this
 // script holds that against the check's baseline, in the shape check's form (shape.mjs, beside this file; its
 // `unclaimed`), so nothing gets worse. A finding no listed entry covers is new: one of a check the config marks
