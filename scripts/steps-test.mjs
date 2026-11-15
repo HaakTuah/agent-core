@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { COST, STEPS, leads, notDone, plain, project, report } from "./steps.mjs";
@@ -21,6 +22,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
 const modules = fs.readdirSync(path.join(root, "modules")).filter(n => n.endsWith(".md"));
+const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
 // ---- every entry of the sync notes has its step, and each step is told done one way ----
 const notes = leads(fs.readFileSync(path.join(root, NOTES), "utf8"));
@@ -61,6 +63,10 @@ for (const [name, dir] of Object.entries(dirs)) {
     `${name}: its kind is read from what it holds, as the starter kit was told it`, JSON.stringify(o));
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
+  // (the core's own manifest check, on the modules and floor of this commit: a slot a module it takes uses, with no row,
+  // would be a note on the project's first day, #329)
+  const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: texts("modules"), floorTexts: texts("floor") });
+  ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
 }
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
