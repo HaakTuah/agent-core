@@ -83,6 +83,14 @@ for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lea
 ok(!notDone(lockProject).length, "and their mends make every one done");
 for (const lead of some) STAGES[lead].after?.(lockProject);
 
+// ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
+const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
+const suiteFile = path.join(lockProject, ".github/workflows/suites-filtered.yml");
+const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject).some(m => m.lead === SUITE_LEAD); };
+ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
+  && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
+fs.rmSync(suiteFile);
+
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
 const asKit = fs.readFileSync(signatures, "utf8");
