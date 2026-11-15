@@ -7,7 +7,8 @@
 // in the title, description or branch name; a file of text a .gitattributes marks binary, main's own too; a term listed
 // with blanks or a Windows line end around it; a commit dated before the rule too, since a date is whatever its maker
 // writes; each failure saying how the session takes the term out; a term in a link like a Claude Code session's but of
-// another shape or host, inside another address, or beside one (#261).
+// another shape or host, inside another address, or beside one (#261); a term in LICENSE or NOTICE out of their shape,
+// in the name line of a NOTICE, in such a file elsewhere or under another name, or in a commit that edits one (#257).
 // What passes: none of these; a term only in a file whose content is binary (not read); one only inside a Claude Code
 // session link's random id, wherever the check reads text; a file on main named with
 // a term before the rule, deleted or renamed away; only in the
@@ -16,7 +17,8 @@
 // signed by its key, while
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
-// names an older base; and a repository without the secret. The terms are invented, built from pieces as the test
+// names an older base; a term only in the copyright lines of LICENSE and NOTICE of their shape, at the root and in the
+// core's copy (#257); and a repository without the secret. The terms are invented, built from pieces as the test
 // runs, so no file holds them. On Linux and on Windows. Git, bash and Node's own modules.
 //
 //   node scripts/personal-terms-test.mjs
@@ -246,6 +248,35 @@ mendedSays("a term added in one commit and taken out in the next", pull([[{ "b.m
 mendedSays("a term in a commit's message", pull([[{ "b.md": "x\n" }, {}, `fix for ${term}`]]), {}, "git rebase -i origin/main");
 mendedSays("a term in the title", pull([[{ "b.md": "x\n" }]]), { title: `About ${other}` }, "edit the title or the description");
 mendedSays("a term in the branch's name", pull([[{ "b.md": "x\n" }]]), { branch: `claude/${other}` }, "pushing its work to a branch of another name");
+// LICENSE and NOTICE, at the root and in a project's copy of the core, where a copyright holder's name may stand (floor
+// rule 11; #257): the core's own two files, the holder replaced by a term, go unread while they keep their shape, and
+// only their copyright lines do; any other text, file or place still fails
+const LICENCE = fs.readFileSync(path.join(root, "LICENSE"), "utf8"), NOTICE = fs.readFileSync(path.join(root, "NOTICE"), "utf8");
+// (each copyright line opened as the core's own NOTICE opens its own, so this file holds no licence notice of its own
+// for the core's licence scan to audit)
+const opening = /^Copyright \S+/m.exec(NOTICE)?.[0], held = holder => `${opening} ${holder}`;
+const licence = holder => LICENCE.replace(/^( *)Copyright \[yyyy\] \[name of copyright owner\]$/m, `$1${held(holder)}`);
+const notice = holder => NOTICE.replace(/^Copyright .*$/m, held(holder));
+ok(opening && licence(term) !== LICENCE && notice(term) !== NOTICE, "the core's LICENSE holds Apache's line for the holder, and its NOTICE a copyright line");
+passes("a term only in the holder's line of the core's LICENSE and NOTICE, at the root and in core/, one with Windows line ends", pull([[{ LICENSE: licence(`A ${term}`), NOTICE: notice(term), "core/LICENSE": licence(other).replace(/\n/g, "\r\n"), "core/NOTICE": notice(`${wide} AS`) }]]));
+passes("a NOTICE whose holder a later commit changes to a term (as the owner does by hand)", pull([[{ NOTICE: NOTICE }], [{ NOTICE: notice(term) }]]));
+passes("a LICENSE of copyright lines alone, each holding a term", pull([[{ LICENSE: `${held(term)}. All rights reserved.\n${held(other)}\n` }]]));
+mendedSays("a NOTICE with a line more than its name and copyright lines", pull([[{ NOTICE: `${notice(term)}Made by hand.\n` }]]), {}, "bring one named here back to that");
+fails("a term in a NOTICE's name line", pull([[{ NOTICE: `A ${term} work\n${held(other)}\n` }]]));
+fails("a LICENSE one word off Apache's text, a term in its holder's line", pull([[{ LICENSE: licence(term).replace("royalty-free", "royalty-bearing") }]]));
+fails("a term in a LICENSE's holder's line that holds an address", pull([[{ LICENSE: licence(`${term}@example.invalid`) }]]));
+fails("a term in a holder's line longer than a hundred characters", pull([[{ NOTICE: notice(`${term} ${"x".repeat(100)}`) }]]));
+fails("a LICENSE of four copyright lines, a term in one", pull([[{ LICENSE: `${[term, "a", "b", "c"].map(held).join("\n")}\n` }]]));
+fails("a NOTICE of its shape in another folder", pull([[{ "docs/NOTICE": notice(term) }]]));
+fails("a NOTICE.md of a NOTICE's shape", pull([[{ "NOTICE.md": notice(term) }]]));
+// (under a UTF-8 locale, as GitHub's runners have, where grep drops a line that is not UTF-8, and any after a late NUL)
+fails("a term on a line in Latin-1 added to the core's NOTICE", pull([[{ NOTICE: Buffer.concat([Buffer.from(notice("x")), Buffer.from(`caf\u00e9 ${term}\n`, "latin1")]) }]]), { locale: "C.UTF-8" });
+fails("a term on a line in Latin-1 added to the core's LICENSE, in core/", pull([[{ "core/LICENSE": Buffer.concat([Buffer.from(licence("x")), Buffer.from(`caf\u00e9 ${term}\n`, "latin1")]) }]]), { locale: "C.UTF-8" });
+fails("a term after a NUL far into LICENSE", pull([[{ LICENSE: `${licence("x")}${"\n".repeat(200000)}\u0000\n${term} here\n` }]]), { locale: "C.UTF-8" });
+fails("a term after a NUL far into LICENSE, in the C locale", pull([[{ LICENSE: `${licence("x")}${"\n".repeat(200000)}\u0000\n${term} here\n` }]]));
+fails("a term on a line in Latin-1 in a NOTICE main already held", pull([[{ "b.md": "x\n" }]], [[{ NOTICE: Buffer.concat([Buffer.from(notice("x")), Buffer.from(`caf\u00e9 ${term}\n`, "latin1")]) }]]), { locale: "C.UTF-8" });
+fails("a term in the message of a commit that edits NOTICE alone", pull([[{ NOTICE: notice("x") }, {}, `holder ${term}`]]));
+fails("a term in a NOTICE out of its shape in one commit, brought to it in the next", pull([[{ NOTICE: `${notice(term)}more words\n` }], [{ NOTICE: notice(term) }]]));
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });

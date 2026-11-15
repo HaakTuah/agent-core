@@ -69,7 +69,10 @@ saved data; a weakened check).
   family, home, age, health, memberships or money, nor anything else about the owner's life outside the project.
   - Excepted: the GitHub account in the repository's own address; the name and address GitHub itself writes as the
     author of a commit it makes and signs (a merge, an edit on github.com), from the profile of the account that acts,
-    where its owner keeps them there; and the company name a project is sold under, naming no person.
+    where its owner keeps them there; the company name a project is sold under, naming no person; and, since an
+    account's name can change, a copyright holder's name, a person's or a company's, that the holder alone types into
+    `LICENSE` or `NOTICE` at a repository's root (a sync carries the core's into its copy), no session told it or
+    writing it otherwise, and nothing else there (core archive 221).
 - The owner's archived words leave such details out as "[…]".
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 

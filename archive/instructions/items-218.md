@@ -111,3 +111,41 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "What a posted review stands for" in `modules/reviews.md`, `scripts/security-review.mjs`, the core's
      `security-review.yml` and `own-security-review.yml`.
+
+221. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #257, labelled `by:chat`, its last note there gathering what
+     the owner agreed to). The owner asked:
+
+     > Also, add open license for just agent-core.
+
+     and agreed to a licence for the core alone, `archive/` and `reports/` left out as the owner's own words and records.
+     Of the choice of licence:
+
+     > Just if it became distributed, I would want clear credit from someone who distributes it further.
+
+     So the Apache License 2.0, with a notice file each distributor passes on. Of who the notice names as the holder:
+
+     > HaakTuah is not nessecarily a permanent name, while […] more probably is. […] So I favor a solution which
+     > excempts just this kind of file.
+
+     and, of a project of another owner, held by a company:
+
+     > […] also ought to be able to do that in such an file.
+
+     So floor rule 11 excepts a copyright holder's name in a repository's licence and notice files, in the core and in
+     every project, under three guards the owner agreed to: the personal-terms check leaves those two files unread only
+     while they keep their shape, only the holder types the name, and nothing else is excepted. Of the work's name:
+
+     > Would've been a bit fun to call the repo "hammurabi's-agentic-code"
+
+     So the work is also named "Hammurabi's Agentic Code", in the notice and in a line under the README's title, and
+     nothing is renamed. To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     > (2) #257 has grown: it now changes floor rule 11 and the personal-terms check, so its line is a rule builder's,
+     > not a builder's.
+
+     Behind floor rule 11's exception for a copyright holder's name, the exemption and shape check in
+     `.github/workflows/personal-terms.yml`, `LICENSE`, `NOTICE` and "Licence" in `README.md`.
