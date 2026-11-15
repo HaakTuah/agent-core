@@ -55,6 +55,9 @@ export function configured(read, skills) {
     for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
       for (const group of Array.isArray(groups) ? groups : []) {
         const matcher = typeof group?.matcher === "string" && group.matcher ? ` ${group.matcher}` : "";
+        // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let
+        // two hooks share a name)
+        if (matcher.includes(": ")) problems.push(`${file}: the ${show(event)} hooks' matcher ${show(group.matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
         for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
           tools.set(`hook ${event}${matcher}: ${typeof hook?.command === "string" ? hook.command : JSON.stringify(hook)}`, file);
         }
@@ -152,6 +155,11 @@ export function readProject(root, rev = null) {
   return { ...configured(read, skills), links };
 }
 
+// Whether the commit `rev` holds the path `at` as a link (git's mode 120000), not a file whose text names the same place.
+function linkAt(root, rev, at) {
+  try { return execFileSync("git", ["ls-tree", rev, "--", at], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).startsWith("120000 "); } catch { return false; }
+}
+
 // The whole check, from the project's root: { fail, notes }.
 export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   let config;
@@ -169,7 +177,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
   if (!unlisted.length) return { fail, notes };

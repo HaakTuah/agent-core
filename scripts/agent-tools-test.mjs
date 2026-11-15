@@ -119,6 +119,13 @@ fs.symlinkSync(path.join(away, "settings.json"), path.join(linkedBase, ".mcp.jso
 git(linkedBase, "add", "-A"); git(linkedBase, "commit", "-q", "-m", "links");
 const kept = run(pr(linkedBase, { "README.md": "a change of its own\n" }));
 ok(kept.status === 0 && /note .*"\.mcp\.json" is a link .*as the base held it/.test(kept.out) && /not listed, as the base held them: the skill "notes"/.test(kept.out), "a skill linked inside the checkout and a link out of it, both held by the base, are noted and fail nothing", kept.out);
+const fileBase = project({ ".mcp.json": path.join(away, "settings.json") });
+fs.rmSync(path.join(fileBase, ".mcp.json"));
+fs.symlinkSync(path.join(away, "settings.json"), path.join(fileBase, ".mcp.json"));
+fails(run(pr(fileBase, { "README.md": "a change of its own\n" })), "a link out of the checkout where the base held a file of the same text fails: only a link the base held stands", '".mcp.json" is a link that leads out');
+const colon = JSON.parse(KIT);
+colon.hooks.Stop.push({ matcher: "Write: x", hooks: [{ type: "command", command: "y" }] });
+fails(run(project({ ".claude/settings.json": JSON.stringify(colon), ...listing({ kind: "hook", name: "Stop Write: x: y", publisher: "this project" }) })), "a matcher that holds \": \", which a hook's name splits at, fails", 'matcher "Write: x" holds ": "');
 const skillsDirBase = project();
 fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
 fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
