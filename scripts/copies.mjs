@@ -19,25 +19,38 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ruleFiles } from "./rule-files.mjs";
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+// Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
+// core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
+// (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
+// can differ)
 const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+const HERE = fileURLToPath(new URL(".", import.meta.url));
+let where;
+try {
+  where = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: HERE, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+    .split(/\r?\n/u);
+} catch {
+  fail(`copies.mjs stands in no git work tree, and the check reads the files git lists. Mend: run the script that stands in the repository's clone (core/scripts/copies.mjs in a project)`);
+}
+const ROOT = where[0], CORE = where[1].replace(/scripts\/$/u, "");
+const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template/copies.json.tmpl`;
+const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
-if (!configPath) fail("no config was named. Mend: name it: node core/scripts/copies.mjs <config> [--write | --first]");
+if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
 let config;
-try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (core/setup/template/copies.json.tmpl): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
-process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
+process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails.
 const KEYS = ["baseline", "code", "prose", "proseFromSecurity"];
 const unknown = Object.keys(config || {}).filter(k => !KEYS.includes(k));
-if (!config || typeof config !== "object" || Array.isArray(config)) fail("the config is not a JSON object. Mend: write the config as the starter kit does (core/setup/template/copies.json.tmpl): a JSON object with \"baseline\", the baseline's path, \"code\" and \"prose\", lists of git pathspecs, and \"proseFromSecurity\": true or false");
+if (!config || typeof config !== "object" || Array.isArray(config)) fail(`the config is not a JSON object. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`);
 if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out; it reads "baseline", "code", "prose" and "proseFromSecurity" alone`);
 const list = (v, key) => {
   if (v === undefined) return [];
   if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths. Mend: write it as a list of git pathspecs, each a non-empty string`);
   return v;
 };
-if (typeof config.baseline !== "string" || !config.baseline) fail('the config names no "baseline". Mend: name the baseline\'s path in "baseline", as the starter kit writes it (core/setup/template/copies.json.tmpl)');
+if (typeof config.baseline !== "string" || !config.baseline) fail(`the config names no "baseline". Mend: name the baseline's path in "baseline", as the starter kit writes it (${TEMPLATE})`);
 if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
@@ -130,7 +143,7 @@ if (process.argv.includes("--first")) {
   console.log(`${BASELINE}: the first baseline, ${found.length} old copies in ${places.size} windows, to be removed over time`);
   process.exit(0);
 }
-if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}. Mend: write the project's first with node core/scripts/copies.mjs ${configPath} --first, and commit it`);
+if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}. Mend: write the project's first with ${SELF} ${configPath} --first, and commit it`);
 let base;
 try { base = JSON.parse(fs.readFileSync(BASELINE, "utf8")); } catch { fail(`cannot read ${BASELINE} as JSON. Mend: take it back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); }
 if (!base || typeof base.windows !== "object" || base.windows === null || Array.isArray(base.windows)) fail(`${BASELINE} has no "windows" object. Mend: take it back as main holds it (git checkout origin/main -- ${BASELINE}); { "windows": {} } lists none`);
@@ -165,7 +178,7 @@ if (process.argv.includes('--write')) {
   console.log(`${BASELINE}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped`);
   if (fresh.length) process.exit(1);
 } else {
-  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run node core/scripts/copies.mjs ${configPath} --write and commit the baseline it lowers`);
+  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${configPath} --write and commit the baseline it lowers`);
   if (fresh.length || shrunk.length) process.exit(1);
   console.log(`ok   no new copies (${found.length} old ones, listed in ${BASELINE}, to be removed)`);
 }
