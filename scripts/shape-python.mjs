@@ -10,6 +10,7 @@
 // An import is read with where it stands: in a def, it runs when the function is called (as a dynamic import does in
 // JavaScript), and under `if TYPE_CHECKING:` it takes types alone; neither makes a cycle.
 import path from "node:path";
+import { NEST } from "./code-shape.mjs";
 
 // The standard library's modules, which lead to no file of the project and no package: Python 3.13's, with those that
 // earlier versions still hold.
@@ -33,8 +34,8 @@ export const STDLIB = new Set(`__future__ abc antigravity argparse array ast asy
 // run that ends in "." taking any name after it.
 export const OWN = [
   ...["time", "time_ns", "monotonic", "monotonic_ns", "perf_counter", "perf_counter_ns"].map(n => ({ run: ["time", ".", n], what: `time.${n}` })),
-  ...["now", "utcnow", "today"].map(n => ({ run: ["datetime", ".", n], what: `datetime.${n}` })),
-  { run: ["date", ".", "today"], what: "date.today" },
+  ...["now", "utcnow", "today"].flatMap(n => [{ run: ["datetime", ".", n], what: `datetime.${n}` }, { run: ["datetime", ".", "datetime", ".", n], what: `datetime.datetime.${n}` }]),
+  { run: ["date", ".", "today"], what: "date.today" }, { run: ["datetime", ".", "date", ".", "today"], what: "datetime.date.today" },
   { run: ["random", "."], what: "random." }, { run: ["secrets", "."], what: "secrets." },
   { run: ["from", "random", "import"], what: "from random import" }, { run: ["from", "secrets", "import"], what: "from secrets import" },
   { run: ["uuid", ".", "uuid1"], what: "uuid.uuid1" }, { run: ["uuid", ".", "uuid4"], what: "uuid.uuid4" },
@@ -50,11 +51,12 @@ export function logicalLines(src) {
   const lex = new Lexer(src);
   lex.code(false);
   lex.close();
+  lex.lines.lost = lex.lost;
   return lex.lines;
 }
 
 class Lexer {
-  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [] }); }
+  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [], nest: 0, lost: false }); }
 
   push(t, v, l = this.line) {
     if (!this.current) this.current = { indent: this.indent, line: l, end: l, toks: [] };
@@ -146,7 +148,10 @@ class Lexer {
   hole() {
     if (this.src[this.i + 1] === "{") { this.i += 2; return; }
     this.i++;
+    if (this.nest >= NEST) { this.lost = true; this.i = this.n; return; } // (past it, the file is lost)
+    this.nest++;
     this.code(true);
+    this.nest--;
   }
 
   // An f-string's format, after its ! or :, to the } that ends its { (a { } inside it passed over): nothing to read.
@@ -231,7 +236,7 @@ const split = toks => toks.reduce((parts, t) => (isP(t, ",") ? parts.push([]) : 
 // (a dotted name, up to its `as`)
 const dotted = toks => { const end = toks.findIndex(t => isId(t, "as")); return (end < 0 ? toks : toks.slice(0, end)).filter(t => t.t === "id").map(t => t.v).join("."); };
 
-// A file read: { functions: [{ name, line, lines, depth, branches }], imports: [{ level, module, names, line, dynamic,
+// A file read: { functions: [{ name, line, lines, depth, branches }], null where its code nests past NEST, imports: [{ level, module, names, line, dynamic,
 // types }], toks }.
 export function readPython(src) {
   const lines = logicalLines(src), stack = [], functions = [], imports = [];
@@ -241,12 +246,19 @@ export function readPython(src) {
     const { fn, cd } = around(stack), st = statement(ln.toks);
     const inner = oneLine(ln, st, fn, cd);
     if (inner) functions.push(inner);
-    const dynamic = !!fn || !!inner, types = stack.some(s => s.types);
-    for (const imp of importsOf(ln.toks)) imports.push({ ...imp, dynamic, types });
+    const dynamic = !!fn || !!inner, types = stack.some(s => s.types) || (st.word === "if" && isTypeChecking(ln.toks.slice(0, st.colon + 1)));
+    for (const part of statements(ln.toks, st)) for (const imp of importsOf(part)) imports.push({ ...imp, dynamic, types });
     if (st.word) stack.push({ indent: ln.indent, fn: inner, control: CONTROL.has(st.word), types: st.word === "if" && isTypeChecking(ln.toks) });
   }
   for (const f of functions) { f.lines = f.end - f.line + 1; delete f.end; }
-  return { functions, imports, toks: lines.flatMap(l => l.toks) };
+  return { functions: lines.lost ? null : functions, imports, toks: lines.flatMap(l => l.toks) };
+}
+
+// A logical line's simple statements: those after `;`, and of a compound statement those after its header's colon
+// (`if x: import y`).
+function statements(toks, st) {
+  const body = st.word ? toks.slice(st.colon + 1) : toks;
+  return body.reduce((parts, t) => (isP(t, ";") ? parts.push([]) : parts.at(-1).push(t), parts), [[]]);
 }
 
 const isTypeChecking = toks => /^if (typing \. )?TYPE_CHECKING :$/u.test(toks.map(t => t.v).join(" "));
@@ -347,7 +359,7 @@ function pyproject(text) {
     else if (kind) out[kind].push(key[1]);
     if (!list) continue;
     out[list].push(...quoted(key ? key[2] : l));
-    if ((key ? key[2] : l).includes("]")) list = null;
+    if ((key ? key[2] : l).replace(/"[^"]*"|'[^']*'/gu, "").includes("]")) list = null; // (requests[socks] is no end)
   }
   return out;
 }

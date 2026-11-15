@@ -254,7 +254,7 @@ function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
   if (!system) ctx.unnamed.push(file);
   ctx.readers.set(file, r.reader);
-  if (!r.functions) ctx.read.jsx++;
+  if (!r.functions) { ctx.read.jsx++; if (!ctx.tests.has(file)) add(ctx, "lost", file, "lost"); }
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, r.functions);
   if (domain === "rules") ownClock(ctx, file, r);
   for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
@@ -313,7 +313,7 @@ export function groupOf(id) {
   const kind = id.slice(0, id.indexOf(": ")), key = id.slice(kind.length + 2);
   if (kind === "function") return { kind, group: key.slice(key.indexOf("#") + 1).replace(/#\d+$/u, "") };
   if (kind === "crossing" || kind === "inside") return { kind, group: key.slice(0, key.indexOf(": ")) };
-  if (kind === "cycle") return { kind, group: "cycle" };
+  if (kind === "cycle" || kind === "lost") return { kind, group: kind };
   if (kind === "clock" || kind === "global") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
   return { kind, group: key.slice(key.lastIndexOf(" -> ") + 4) };
 }
@@ -323,6 +323,7 @@ export function fileOf(id) {
   const { kind } = groupOf(id), key = id.slice(kind.length + 2);
   if (kind === "function") return key.slice(0, key.indexOf("#", key.lastIndexOf("/") + 1));
   if (kind === "clock" || kind === "global") return key.slice(0, key.lastIndexOf(": "));
+  if (kind === "lost") return key;
   const from = kind === "crossing" || kind === "inside" ? key.slice(key.indexOf(": ") + 2) : key;
   return from.slice(0, from.indexOf(" -> "));
 }
@@ -364,7 +365,7 @@ export function parseBaseline(text, at, restore) {
   try { b = JSON.parse(text); } catch { refuse(`${at} could not be read as JSON`, restore); }
   if (!isObject(b) || !isObject(b.listed) || !Object.entries(b.listed).every(([id, v]) => /^[a-z]+: \S/u.test(id) && anEntry(v))) refuse(`${at} has no "listed" object of entries the check reads`, restore);
   if (!optional(b.grown, g => isObject(g) && Object.values(g).every(v => typeof v === "string"))) refuse(`"grown" in ${at} is not an object of reasons`, "give each entry that had to join, by its id, its reason in a sentence, or take \"grown\" out");
-  if (!optional(b.reads, strings)) refuse(`"reads" in ${at} is not a list of the check's readers`, `take it out, then run the check with --write, which writes it`);
+  if (!optional(b.reads, r => Array.isArray(r) && r.every(x => Object.hasOwn(READERS, x)))) refuse(`"reads" in ${at} is not a list of the check's readers (${Object.keys(READERS).join(", ")})`, `take it out, then run the check with --write, which writes it`);
   return { listed: new Map(Object.entries(b.listed)), grown: b.grown ?? {}, audited: isObject(b.audited) ? b.audited : null, reads: b.reads ?? FIRST_READS };
 }
 
@@ -439,6 +440,8 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (an element of JSX that never closes, a type's parameter in .tsx it takes for one, as in <T>(x: T) => T, or code nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
@@ -490,10 +493,13 @@ const stoodAt = (base, config) => { const before = base.standing(); return new M
 
 // Against the pull request's base: what joined the baseline that the base neither listed nor held, and each mark
 // raised, where "grown" gives no reason.
-function againstBase({ config, at, baseline, base, found }) {
+function againstBase({ config, at, self, baseline, base, found }) {
   const fail = [];
   const was = base.baseline === null ? null : tolerant(() => parseBaseline(base.baseline, base.name, "").listed);
   const old = base.config === null ? null : tolerant(() => parseConfig(base.config, base.name));
+  // (the readers a baseline names only grow: one dropped would let what it lists go unlisted while it stands)
+  const dropped = base.baseline === null ? [] : (tolerant(() => parseBaseline(base.baseline, base.name, "").reads) ?? []).filter(r => !baseline.reads.includes(r));
+  if (dropped.length) fail.push([`FAIL: ${config.baseline} no longer names ${plural(dropped.length, "reader")} that ${base.name}'s names: ${dropped.join(", ")}. Mend: take "reads" back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write if the baseline must be lowered`]);
   let joined = unclaimed(baseline.listed, was ?? new Map(), config.marks);
   if (joined.length) joined = unclaimed(new Map(joined.map(id => [id, baseline.listed.get(id)])), base.stood(), config.marks).filter(id => !said(baseline.grown, id));
   if (joined.length) fail.push([`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} neither listed nor held, and the baseline only shrinks. Mend: take each out of the baseline and mend the code as the check then says; only where there is no other way, give each its reason under "grown" in the baseline, by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...some(joined, baseline.listed)]);
@@ -508,7 +514,6 @@ function againstBase({ config, at, baseline, base, found }) {
 // What the check read and does not hold, each said, never failed.
 function notesOf(read) {
   const notes = [];
-  if (read.jsx) notes.push(`${plural(read.jsx, "file holds", "files hold")} JSX that the reader cannot follow to its end (an element that never closes, or a type's parameters it takes for one): their imports are held, their functions not`);
   if (read.nowhere) notes.push(`${plural(read.nowhere, "import leads", "imports lead")} nowhere the check can tell (no file, no package the project declares, no alias the config names): not held`);
   if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone${read.systems ? ", and a new one fails" : ""}`);
   if (read.noEntrance && read.systems > 1) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
@@ -529,7 +534,7 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
   const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id));
   if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
-  if (base) fail.push(...againstBase({ config, at, baseline, base, found }));
+  if (base) fail.push(...againstBase({ config, at, self, baseline, base, found }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id)).length;
   return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read };
 }

@@ -128,6 +128,8 @@ const shift = "let a = b << c, d = e++ < f, g = h < i;\nconst k = x => x < 1 ? <
 ok(same(tokens(shift.split("\n")[0], true), tokens(shift.split("\n")[0])) && tokens(shift, true).some(t => t.t === "jsx"), "a shift, a comparison after x++ and one after a name stay signs; an element after ? is JSX");
 ok(tokens("const x = <div>\n  <p>open\n", true).lost && tokens("const f = <T>(x: T) => x;\n" + "function g() {}\n", true).lost && !tokens("const f = <T extends U>(x: T) => x;\n", true).lost,
   "an element that never closes is lost, as is a type's parameter taken for one (<T>), whose functions cannot be told; <T extends U> and <T,> are parameters");
+const deepTemplate = `const x = ${"`${".repeat(3000)}1${"}`".repeat(3000)};\n`, deepJsx = `const x = ${"<a>".repeat(3000)}${"</a>".repeat(3000)};\n`;
+ok(tokens(deepTemplate).lost && tokens(deepJsx, true).lost, "a template or an element nested past the reader's limit loses the file, and overflows no stack");
 ok(jsxIn("a.jsx") && jsxIn("a.tsx") && jsxIn("a.js") && jsxIn("a.mjs") && !jsxIn("a.ts") && !jsxIn("a.mts"), "JSX is read in .jsx, .tsx and JavaScript's files, never in TypeScript's own, where <T>x is a cast");
 
 // Cycles, between files and folders.

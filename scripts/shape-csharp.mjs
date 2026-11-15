@@ -11,7 +11,7 @@
 // namespace N; `using static N.T;` and an alias, the files that declare the type T in N. What a file sees by its own
 // namespace, and a name written out in full, it takes without a directive, and the reader does not read.
 import path from "node:path";
-import { functions, isId, isP, typeParameters } from "./code-shape.mjs";
+import { NEST, functions, isId, isP, typeParameters } from "./code-shape.mjs";
 
 // The clock and randomness a system of rules may not take for itself (shape.mjs, "clock"): each a run of tokens.
 export const OWN = [
@@ -27,13 +27,15 @@ export const OWN = [
 export function csTokens(src) {
   const lex = new Lexer(src);
   lex.code(false);
+  lex.out.lost = lex.lost;
   return lex.out;
 }
 
 class Lexer {
-  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, out: [], gap: true }); }
+  // (fresh: nothing but white space stands before i on its line, where a # opens a preprocessor line)
+  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, out: [], gap: true, fresh: true, nest: 0, lost: false }); }
 
-  push(t, v, l = this.line) { this.out.push({ t, v, line: l, gap: this.gap }); this.gap = false; }
+  push(t, v, l = this.line) { this.out.push({ t, v, line: l, gap: this.gap }); this.gap = false; this.fresh = false; }
   lines(a, b) { for (let k = a; k < b; k++) if (this.src[k] === "\n") this.line++; }
 
   // The code up to the end, or, `hole`, up to the } that ends an interpolated string's { (its format after a : or ,
@@ -52,9 +54,9 @@ class Lexer {
 
   blank(c) {
     const { src, i, n } = this;
-    if (c === "\n") { this.line++; this.i++; return (this.gap = true); }
+    if (c === "\n") { this.line++; this.i++; this.fresh = true; return (this.gap = true); }
     if (/\s/u.test(c) || c === "﻿") { this.i++; return (this.gap = true); }
-    const preprocessor = c === "#" && /^[ \t]*$/u.test(src.slice(src.lastIndexOf("\n", i - 1) + 1, i));
+    const preprocessor = c === "#" && this.fresh;
     if (preprocessor || (c === "/" && src[i + 1] === "/")) { while (this.i < n && src[this.i] !== "\n") this.i++; return (this.gap = true); }
     if (c !== "/" || src[i + 1] !== "*") return false;
     const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
@@ -106,12 +108,20 @@ class Lexer {
     if (c === "\\" && !verbatim) { this.lines(this.i, this.i + 2); this.i += 2; return true; }
     if (holes && (c === "{" || c === "}")) {
       if (next === c) this.i += 2;
-      else if (c === "{") { this.i++; this.code(true); } else this.i++;
+      else if (c === "{") { this.i++; this.hole(); } else this.i++;
       return true;
     }
     if (c === "\n") this.line++;
     this.i++;
     return true;
+  }
+
+  // The code of an interpolated string's { }, one level deeper; past NEST, nothing more of the file, which is lost.
+  hole() {
+    if (this.nest >= NEST) { this.lost = true; this.i = this.n; return; }
+    this.nest++;
+    this.code(true);
+    this.nest--;
   }
 
   // A raw string ("""), to the same count of quotes: its holes, where it has them, not read.
@@ -221,7 +231,8 @@ function directive(toks, k) {
   const alias = toks[from]?.t === "id" && isP(toks[from + 1], "=");
   const d = dotted(toks, alias ? from + 2 : from);
   let end = d.end;
-  if (alias && isP(toks[end], "<")) while (end < toks.length && !isP(toks[end], ";")) end++; // (a generic type's arguments)
+  const limit = end + 64; // (a generic type's arguments, never read past)
+  if (alias && isP(toks[end], "<")) while (end < toks.length && end < limit && !isP(toks[end], ";")) end++;
   return d.name && isP(toks[end], ";") ? { target: d.name, static: isStatic, alias } : null;
 }
 
@@ -257,11 +268,11 @@ function typeAt(toks, k, frames, types) {
   if (toks[at]?.t === "id" && toks[at].v !== "where") types.add(within(frames, toks[at].v));
 }
 
-// A file read: { functions, usings: [{ target, static, alias }], namespaces, types, toks }.
+// A file read: { functions (null where its code nests past NEST), usings: [{ target, static, alias }], namespaces, types, toks }.
 export function readCsharp(src) {
   const toks = csTokens(src);
   const usings = toks.map((_, k) => directive(toks, k)).filter(Boolean);
-  return { functions: functions(toks, CSHARP), usings, ...declared(toks), toks };
+  return { functions: toks.lost ? null : functions(toks, CSHARP), usings, ...declared(toks), toks };
 }
 
 // Where the project's C# declares each namespace and type: { namespaces, types }, each a Map of a name to its files.

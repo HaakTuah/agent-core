@@ -8,7 +8,7 @@
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
 // --write lists it (AGENTS.md, "Nothing locks a project").
 import path from "node:path";
-import { CODE, functions, globals, imports, isModule, jsxIn, tokens } from "./code-shape.mjs";
+import { CODE, functions, globals, imports, isModule, isP, jsxIn, tokens } from "./code-shape.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
 import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
 
@@ -84,8 +84,25 @@ function moduleByPackage(file, modules) {
 export function shared(file, r, idx) {
   if (r.lang !== "javascript" || NEVER_SCRIPTS.includes(path.posix.extname(file)) || /\.d\.[cm]?ts$/u.test(file)) return null;
   if (isModule(r.toks) || moduleByPackage(file, idx.modules)) return null;
-  return globals(r.toks);
+  return bindings(r.toks);
 }
+
+// The names a script's top level declares: the first of each list (globals), and each after a comma at the list's
+// own level that a = , or ; follows (var a = f(x, y), b = 2, c;).
+function bindings(toks) {
+  const names = new Set(globals(toks));
+  let depth = 0, list = false;
+  for (let k = 0; k < toks.length; k++) {
+    const v = toks[k].t === "punct" ? toks[k].v : null;
+    if (v && "([{".includes(v)) depth++;
+    else if (v && ")]}".includes(v)) depth = Math.max(0, depth - 1);
+    else if (depth === 0 && toks[k].t === "id" && ["var", "let", "const"].includes(toks[k].v)) list = true;
+    else if (depth === 0 && v === ";") list = false;
+    else if (list && depth === 0 && another(toks, k)) names.add(toks[k + 1].v);
+  }
+  return [...names];
+}
+const another = (toks, k) => isP(toks[k], ",") && toks[k + 1]?.t === "id" && ["=", ",", ";"].some(v => isP(toks[k + 2], v));
 
 // Where an import of C# or Python leads: { to: [files] } where it is the project's own, else { outside, names }, names
 // what the config's "platform" and "wraps" are matched against (the name, and each name it lies under), and how it is

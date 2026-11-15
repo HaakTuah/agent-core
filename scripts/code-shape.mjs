@@ -66,12 +66,15 @@ export function tokens(src, jsx = false) {
 // Whether a file's tokens are read with JSX: a file of .jsx or .tsx, and one of JavaScript, where no expression may
 // start with a < (in TypeScript one may: a cast, <T>x, which a file of .tsx cannot hold).
 export const jsxIn = file => [".jsx", ".tsx", ".js", ".mjs", ".cjs"].includes(path.posix.extname(file));
+// How deep a template's code, an element or its code may nest before the reader stops: past it the file is lost, so
+// that no file overflows the reader's stack.
+export const NEST = 200;
 const TAG = /^<\s*(?:>|[A-Za-z_$])/u; // (a fragment, or a tag's name)
 const TYPE_PARAMETER = /^<\s*(?:const\s+)?[A-Za-z_$][\w$]*\s*(?:,|=|extends\b)/u; // (<T,> or <T extends U> in .tsx)
 
 class Lexer {
   constructor(src, jsx) {
-    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false });
+    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false, nest: 0 });
     // (parens: for each open (, whether it opens an if, for, while or with's condition)
     this.i = src.startsWith("#!") ? src.indexOf("\n") : 0;
     if (this.i < 0) this.i = this.n;
@@ -80,8 +83,19 @@ class Lexer {
   push(t, v, l = this.line) { this.prev = { t, v, line: l }; this.out.push(this.prev); }
   lines(a, b) { for (let k = a; k < b; k++) if (this.src[k] === "\n") this.line++; }
 
+  // What `read` reads, one level deeper; past NEST, nothing more of the file, which is lost.
+  nested(read) {
+    if (this.nest >= NEST) { this.lost = true; this.i = this.n; return false; }
+    this.nest++;
+    try { return read(); } finally { this.nest--; }
+  }
+
   // The code up to the end, or, `inner`, up to the } that closes the { before it (not a token): whether it reached it.
   code(inner) {
+    return inner ? this.nested(() => this.run(true)) : this.run(false);
+  }
+
+  run(inner) {
     let depth = 0;
     while (this.i < this.n) {
       const c = this.src[this.i];
@@ -210,6 +224,10 @@ class Lexer {
   element() {
     const ahead = this.src.slice(this.i, this.i + 200);
     if (!TAG.test(ahead) || TYPE_PARAMETER.test(ahead)) return false;
+    return this.nested(() => this.tag());
+  }
+
+  tag() {
     this.push("jsx", "<");
     this.i++;
     this.space();

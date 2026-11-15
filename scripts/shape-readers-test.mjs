@@ -111,6 +111,8 @@ ok(same(py.imports.map(i => `${".".repeat(i.level)}${i.module} [${i.names}]${i.d
   "Python: its imports are read, relative ones with their level; one in a def runs when it is called, one under TYPE_CHECKING takes types alone", JSON.stringify(py.imports));
 ok(same(logicalLines("a = (1,\n  2)\nb = 3 \\\n  + 4\n\n# c\n    \n").map(l => `${l.line}-${l.end}`), ["1-2", "3-4"]), "Python: lines in brackets and after a \\ are one logical line; blank and comment lines are none");
 ok(same(shown(readPython("def f():\n\tif a:\n\t\treturn '''x\nif y:\n  z'''\n\treturn 1\n").functions), ["f:1:6:1:1"]), "Python: a tab indents to the next multiple of 8, and a string's lines open no block");
+const inline = readPython("import a; import b\nif sys.platform == 'win32': import winreg\nif TYPE_CHECKING: from t import T\ndef f(): import lazy\n");
+ok(same(inline.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}${i.types ? " types" : ""}`), ["a", "b", "winreg", "t types", "lazy dynamic"]), "Python: imports after a ; and in a one-line suite are read, with where they stand", JSON.stringify(inline.imports));
 const files = new Set(["pkg/__init__.py", "pkg/a/m.py", "pkg/a/x.py", "pkg/mod.py", "src/lib/util.py", "tools/helpers.py", "app/json.py", "two/dup.py", "three/dup.py"]);
 const std = n => STDLIB.has(n);
 const lead = (from, imp) => JSON.stringify(resolvePython(from, { names: [], ...imp }, files, std));
@@ -121,11 +123,22 @@ ok(lead("main.py", { level: 0, module: "lib.util" }) === '{"to":["src/lib/util.p
 ok(lead("main.py", { level: 0, module: "json" }) === '{"outside":"json","top":"json"}' && lead("main.py", { level: 0, module: "dup" }) === '{"outside":"dup","top":"dup"}' && lead("main.py", { level: 0, module: "numpy.linalg" }) === '{"outside":"numpy.linalg","top":"numpy"}',
   "Python: the standard library is never taken for a file of the project's that ends in its name, and a name two files end in leads nowhere the reader can tell");
 const pyPackages = pythonPackages({
-  "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
+  "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests[socks]>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
   "requirements-dev.txt": "ruff==1\n-r requirements.txt\n", "requirements.txt": "numpy # x\n-e .\nscikit_learn>=1\n",
 });
 ok(same([...pyPackages.ships.values()], ["requests", "PyYAML", "flask", "numpy", "scikit_learn"]) && same([...pyPackages.declared.keys()].sort(), ["black", "flask", "numpy", "pytest", "pyyaml", "requests", "ruff", "scikit-learn"]),
   "Python: the packages pyproject.toml and requirements files declare are read, those of development apart, by the name pip compares", JSON.stringify([[...pyPackages.ships.values()], [...pyPackages.declared.keys()]]));
+
+// ---- what no file can do to the readers: overflow their stack, or take time past its length ----
+const deepCs = `class A { string s = ${"$\"{".repeat(5000)}x${"}\"".repeat(5000)}; void B() { } }\n`;
+const deepPy = `x = ${'f"{'.repeat(5000)}1${'}"'.repeat(5000)}\ndef f():\n    return 1\n`;
+let threw = "";
+try { ok(readCsharp(deepCs).functions === null && readPython(deepPy).functions === null, "code nested past the readers' limit loses the file's functions, and throws nothing"); } catch (e) { threw = e.message; ok(false, "code nested past the readers' limit throws nothing", threw); }
+const started = Date.now();
+csTokens(`${"#".repeat(400000)}\n`);
+readCsharp(`${"using A = B<".repeat(40000)}\n`);
+csharpPackages({ "x.csproj": "<PackageReference Include=\"a\" ".repeat(100000) });
+ok(Date.now() - started < 5000, `a line of #, aliases that never close and references that never close are read in time linear in their length (${Date.now() - started} ms)`);
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

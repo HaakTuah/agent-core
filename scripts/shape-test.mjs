@@ -64,9 +64,11 @@ const branchy = `export function many(a, b) {\n  return ${Array.from({ length: 1
 const deep = "export function nest(a) {\n  if (a) { for (;;) { while (a) { if (a) { try { a(); } catch { a = 0; } } } } }\n}\n";
 const lostJsx = `const cast = <T>(x: T) => x;\n${long("lost", 200)}`;
 let found = survey({ "src/a.js": long("tall", 61) + long("fine", 60) + branchy + deep, "src/a.test.js": long("inATest", 200), "src/b.jsx": `export const B = () => <p>{x}</p>;\n${long("inJsx", 200)}`, "src/c.tsx": lostJsx }, cfg({ tests: ["src/a.test.js"] }), new Set(["src/a.test.js"]));
-ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall", "function: src/b.jsx#inJsx"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 5,
-  "a function past a mark is found: its lines, its depth, its branch points, in a file with JSX too; one at the mark, a test's and one in a file whose JSX the reader cannot follow are not", ids(found));
-ok(found.readers.get("src/a.js") === "javascript" && found.readers.get("src/b.jsx") === "jsx" && found.readers.get("src/c.tsx") === "jsx" && verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: "{\"listed\":{}}" }).notes.some(n => /1 file holds JSX that the reader cannot follow/.test(n)), "each file's reader is known, and a file whose JSX cannot be followed is said", JSON.stringify([...found.readers]));
+ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall", "function: src/b.jsx#inJsx", "lost: src/c.tsx"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 5,
+  "a function past a mark is found: its lines, its depth, its branch points, in a file with JSX too; one at the mark and a test's are not; a file whose JSX the reader cannot follow is found as such, its functions not", ids(found));
+const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts"], listed: {} }) }).fail.flat().join("\n");
+ok(found.readers.get("src/a.js") === "javascript" && found.readers.get("src/b.jsx") === "jsx" && found.readers.get("src/c.tsx") === "jsx" && mended(lostSaid) && /1 file of code holds what the reader cannot follow/.test(lostSaid) && /src\/c\.tsx/.test(lostSaid),
+  "each file's reader is known, and a new file the reader cannot follow fails, with its mend, so that no line hides a file's functions", lostSaid);
 found = survey({ "src/a.js": long("same", 70) + long("same", 80) }, cfg({}));
 ok(same(ids(found), ["function: src/a.js#same", "function: src/a.js#same#2"]), "two functions of one name in a file are told apart");
 
@@ -123,17 +125,18 @@ found = survey({
   "pyproject.toml": '[project]\nname = "game"\ndependencies = ["requests>=2"]\n[project.optional-dependencies]\ndev = ["pytest"]\n',
   "game/__init__.py": "",
   "game/rules/__init__.py": "from .dice import roll\n",
-  "game/rules/dice.py": `import random\nfrom game.view import board\nimport requests\n\n${pyLong("roll", 61)}`,
+  "game/rules/dice.py": `import random\nimport datetime\nfrom game.view import board\nimport requests\nstarted = datetime.datetime.now()\n\n${pyLong("roll", 61)}`,
   "game/view/board.py": "from ..rules import dice\nimport requests\nimport pytest\nimport winreg\nimport yaml\n\ndef later():\n    from game.host import io\n",
   "game/host/io.py": "import winreg\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from game.view.board import later\n",
 }, cfg({ ...layered, platform: ["winreg"] }));
-ok(same(ids(found), ["clock: game/rules/dice.py: random.", "crossing: rules -> view: game/rules/dice.py -> game/view/board.py", "crossing: view -> host: game/view/board.py -> game/host/io.py", "cycle: game/rules/dice.py -> game/view/board.py", "cycle: game/view/board.py -> game/rules/dice.py",
+ok(same(ids(found), ["clock: game/rules/dice.py: datetime.datetime.now", "clock: game/rules/dice.py: random.", "crossing: rules -> view: game/rules/dice.py -> game/view/board.py", "crossing: view -> host: game/view/board.py -> game/host/io.py", "cycle: game/rules/dice.py -> game/view/board.py", "cycle: game/view/board.py -> game/rules/dice.py",
   "function: game/rules/dice.py#roll", "package: game/rules/dice.py -> requests", "package: game/view/board.py -> requests", "platform: game/view/board.py -> winreg"]) && found.read.nowhere === 1 && found.readers.get("game/host/io.py") === "python",
   "Python: the same, relative imports too; an import in a def crosses but makes no cycle, nor one of types alone; a package of development alone and the standard library are not found, and an undeclared one is counted", ids(found));
 found = survey({
   "web/a.js": "var App = {};\nfunction helper() {}\n",
   "web/b.js": "function helper() {}\n",
   "web/c.js": "const Only = 1;\n",
+  "web/d.js": "var p = f(1, 2), q = 2;\n",
   "web/m.js": "export const x = 1;\nconst y = 2;\n",
   "web/n.mjs": "const a = 1, b = 2;\n",
   "web/t.d.ts": "declare const A: number;\ndeclare const B: number;\n",
@@ -141,8 +144,8 @@ found = survey({
   "esm/s.js": "const p = 1;\nconst q = 2;\n",
   "web/a.test.js": "function one() {}\nfunction two() {}\n",
 }, cfg({}), new Set(["web/a.test.js"]));
-ok(same(ids(found), ["global: web/a.js: App", "global: web/a.js: helper", "global: web/b.js: helper"]) && same(["global: web/a.js: helper", "function: a/b.js#f#2", "cycle: x.js -> y.js", "crossing: a -> b: x.js -> y.js", "clock: z.js: Date.now"].map(fileOf), ["web/a.js", "a/b.js", "x.js", "x.js", "z.js"]) && readerOf("global: web/b.js: helper", found.readers) === "scripts",
-  "scripts that share one global space: a second name of one file and a name two files declare are found; one name of its own, a module (by what it holds, its extension or its package.json), types alone and a test are not", ids(found));
+ok(same(ids(found), ["global: web/a.js: App", "global: web/a.js: helper", "global: web/b.js: helper", "global: web/d.js: p", "global: web/d.js: q"]) && same(["global: web/a.js: helper", "function: a/b.js#f#2", "cycle: x.js -> y.js", "crossing: a -> b: x.js -> y.js", "clock: z.js: Date.now"].map(fileOf), ["web/a.js", "a/b.js", "x.js", "x.js", "z.js"]) && readerOf("global: web/b.js: helper", found.readers) === "scripts",
+  "scripts that share one global space: a second name of one file (one of a list too) and a name two files declare are found; one name of its own, a module (by what it holds, its extension or its package.json), types alone and a test are not", ids(found));
 
 // ---- what covers an entry ----
 const M = new Map([["function: a.js#f", { lines: 100, depth: 2, branches: 3 }], ["cycle: a.js -> b.js", true], ["crossing: rules -> view: a.js -> b.js", true]]);
@@ -208,7 +211,10 @@ v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall
 ok(!v.fail.some(f => /gone or moved/.test(f[0])) && v.notes.some(n => /1 entry listed there reads otherwise now/.test(n)), "an entry listed of a file a new reader reads otherwise is said, not failed", said(v));
 v = judge({ now: csBig, baseline: JSON.stringify({ ...allReads, listed: {} }), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && /held already is not in/.test(said(v)) && !v.notes.some(n => /written before/.test(n)), "once the baseline names the reader, what it does not list fails as any other", said(v));
-ok(mended(`FAIL: ${(() => { try { parseBaseline(JSON.stringify({ reads: "all", listed: {} }), "b.json", ""); return ""; } catch (e) { return e.message; } })()}`), "readers that are no list are refused, with their mend");
+const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
+ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
+v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
+ok(mended(said(v)) && /no longer names 4 readers that origin\/main's names: jsx, csharp, python, scripts/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
