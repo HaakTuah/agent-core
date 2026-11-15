@@ -458,19 +458,19 @@ for (const tag of starts) {
 if (synced) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
-  const testOnly = (...own) => {
+  const ownOnly = (...own) => {
     for (const f of ["scripts/upgrade-test.mjs", ...own]) fs.appendFileSync(path.join(theCore, f), "\n");
     git(theCore, "add", "-A");
-    git(theCore, "commit", "-q", "-m", "a test of the core's own, alone");
+    git(theCore, "commit", "-q", "-m", "only the core's own files");
     git(theCore, "tag", `release-${++n}`);
     return git(theCore, "rev-parse", "HEAD");
   };
-  testOnly("QUEUE.md", ".github/workflows/tests.yml"); // (and the core's own queue and a workflow no project calls: #342)
+  ownOnly("QUEUE.md", ".github/workflows/tests.yml"); // (and the core's own queue and a workflow no project calls: #342)
   git(p.dir, "checkout", "-q", "-B", "stays", "main");
   const was = git(p.dir, "status", "--porcelain"), manifest = () => fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8");
   let s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && /changes nothing this project takes/.test(s.out) && git(p.dir, "status", "--porcelain") === was && manifest().includes(head), `${p.name}: a release that changes only a test of the core's own scripts, its queue and its tests workflow asks no sync of it, and changes nothing`, s.out);
-  const third = testOnly();
+  const third = ownOnly();
   s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(`release-${n}`) && manifest().includes(third), `${p.name}: at the next release it syncs all the same, two releases on`, s.out);
 }

@@ -123,7 +123,7 @@ ok(!naming.length, "nothing a project runs names a test of the core's own script
 // trigger, and no file of the starter kit names it; one left off it matters, as anything in doubt does)
 const kit = walk(path.join(repo, "setup", "template")).map(f => fs.readFileSync(f, "utf8")).join("\n");
 const workflows = fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => /\.ya?ml$/.test(f)).map(f => `.github/workflows/${f}`);
-const callable = workflows.filter(f => /^\s*workflow_call\s*:/m.test(fs.readFileSync(path.join(repo, f), "utf8")));
+const callable = workflows.filter(f => /\bworkflow_call\b/.test(fs.readFileSync(path.join(repo, f), "utf8"))); // (in any form: a block, a list, a flow, quoted)
 const wrong = OWN_FILES.filter(f => f.startsWith(".github/workflows/")).filter(f => !workflows.includes(f) || callable.includes(f) || kit.includes(path.basename(f)));
 ok(!wrong.length, "each workflow on the list of the core's own files is one no project can call", `${wrong.join(", ")}\n     Mend: take it off OWN_FILES in releases.mjs, since a project calls it or it is gone`);
 ok(fs.existsSync(path.join(repo, "QUEUE.md")) && !kit.includes("QUEUE.md"), "the core's queue is its own: no file of the starter kit names it");
