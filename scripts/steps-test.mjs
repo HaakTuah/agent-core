@@ -90,6 +90,15 @@ fs.writeFileSync(signatures, asKit.replace(/^on:\n  pull_request:\n/m, "on: [pus
 ok(notDone(lockProject).length === 1, "one that is not started by a pull request is reported", report(notDone(lockProject)));
 fs.writeFileSync(signatures, asKit);
 
+// ---- a size marks file the reading-size check cannot read: the step is reported as not read, never as done ----
+const marksFile = path.join(lockProject, "checks/sizes.json"), marksAsKit = fs.readFileSync(marksFile, "utf8");
+for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wrong shape"]]) {
+  fs.writeFileSync(marksFile, broken);
+  const missed = notDone(lockProject);
+  ok(missed.length === 1 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end"), `size marks of ${what} are reported as not read`, report(missed));
+}
+fs.writeFileSync(marksFile, marksAsKit);
+
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
