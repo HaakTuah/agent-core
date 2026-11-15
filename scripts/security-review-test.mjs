@@ -113,7 +113,7 @@ ok(is(judge(pull, [late, said("Security review: before"), said("Security review:
 ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...late, updated_at: at }, said("Security review: x")]), false, NOT_FOUND)) && is(judge(pull, [summary(open), { ...said("Security review: x"), created_at: "soon" }]), false, NOT_FOUND), "a summary, or a review, with no time that can be read: nothing counts as posted after it");
 ok(is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T11:00:00Z")], [finding("2026-11-12T10:30:00Z")]), true, "after its newest finding"), "where the finding is found, its own time is read, never the summary's");
 const unfound = judge(pull, [late, said("Security review: the fix checked")], [], [], undefined, false);
-ok(unfound.done === true && unfound.why.startsWith("before this check came, so not waited for: Codex's open security finding is not among the comments"), "a pull request from before the check is told the finding is not found and no review after it, never held");
+ok(unfound.done === true && unfound.why.startsWith("before this check came, so not waited for: Codex's open security finding is not among the comments") && is(judge(pull, [late], [], [], undefined, false), false, NOT_FOUND), "a pull request from before the check is told the finding is not found and no review after it, never held; with no review posted at all it waits, as it did before");
 ok([true, false].every((a) => status(judge(pull, [late, said("Security review: x")]), a).description.endsWith("post a \"Security review:\" now") && status(unfound, a).description.endsWith("nor a review after it")), "the status says it whole, within GitHub's 140 characters, before the check came too");
 
 // Dependabot's own pull request.

@@ -16,7 +16,8 @@
 // the finding is fixed). Where the mark stands and no finding of Codex's is to be found among the comments (one given
 // in a review's own body, which the workflow does not fetch), only such a comment posted after Codex's summary last
 // changed settles it, the latest the finding can have come, and the status says so; a pull request from before the
-// check is told, never held (BOUND=false, below).
+// check whose review came before that change is told, never held (BOUND=false, below), and one with none waits, as
+// before.
 // Dependabot's own pull request (opened by it from a branch of the repository, every commit of it written by Dependabot
 // and signed by GitHub, so that one somebody else has pushed to, or brought up to date by a merge, is its own no
 // longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
@@ -176,8 +177,9 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits, cha
     // none is to be found among the comments (one in a review's own body, say): only a review posted after Codex's
     // summary last changed settles it, the latest the finding can have come (#251)
     if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}; its open finding is not among the comments, and a review is posted after it` };
-    if (bound) return { sha, done: false, why: "Codex marks a security finding open, not among the comments: post a \"Security review:\" now" };
-    // (one whose head does not hold this check as the default branch does stood before it came: reported)
+    // (one whose head does not hold this check as the default branch does stood before it came: reported, where a
+    // review is posted, which settled it before; with none posted it waited before, and waits still)
+    if (bound || last === -Infinity) return { sha, done: false, why: "Codex marks a security finding open, not among the comments: post a \"Security review:\" now" };
     return { sha, done: true, why: "before this check came, so not waited for: Codex's open security finding is not among the comments, nor a review after it" };
   }
   if (posted.length > 0) return { sha, done: true, why: "a security review is posted on the pull request" };
