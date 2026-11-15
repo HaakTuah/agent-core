@@ -251,8 +251,14 @@ const outputsOf = file => {
 // before), `[...]`, `\` before a character taking it as itself, and `!` before a pattern taking out what it matches;
 // the last pattern a file matches decides, and the workflow starts where any changed file is let through.
 export function pathsLetThrough(patterns, changed) {
-  const re = glob => new RegExp(`^${glob.replace(/\\.|\*\*\/|\*\*|\*|\[[^\]]*\]|[.^${}()|\\]/g, t =>
-    t.length === 2 && t[0] === "\\" ? `\\${t[1]}` : t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*" : t.startsWith("[") ? t : `\\${t}`)}$`);
+  // (a `?` or `+` with no character before it, and a `[` or `]` outside a whole class, is taken as itself, as is a
+  // pattern that still makes no expression: it is read, never refused)
+  const re = glob => {
+    const body = glob.replace(/\\.|\*\*\/|\*\*|\*|\[[^\]]+\]|[?+]|[.^${}()|\\[\]]/g, (t, at) =>
+      t.length === 2 && t[0] === "\\" ? `\\${t[1]}` : t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*"
+        : t.length > 2 && t.startsWith("[") ? t : (t === "?" || t === "+") ? (at === 0 || "/*".includes(glob[at - 1]) ? `\\${t}` : t) : `\\${t}`);
+    try { return new RegExp(`^${body}$`); } catch { return { test: f => f === glob }; }
+  };
   const rules = patterns.map(p => (p.startsWith("!") ? [false, re(p.slice(1))] : [true, re(p)]));
   return changed.some(f => rules.reduce((let_, [keep, r]) => (r.test(f) ? keep : let_), false));
 }

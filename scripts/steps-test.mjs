@@ -13,6 +13,7 @@ import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
+import { pathsLetThrough } from "./workflow-run.mjs";
 import { COST, STEPS, configs, leads, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
@@ -96,6 +97,9 @@ const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_re
 ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
   && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
 fs.rmSync(suiteFile);
+ok(pathsLetThrough(["+x.yml", "?y.yml", "a[b.yml", "c]d.yml", "dir/+e"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.yml"]) && pathsLetThrough(["a[b.yml"], ["a[b.yml"])
+  && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir/+e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),
+  "a filter's `?` or `+` with no character before it, and a lone `[` or `]`, is read as itself, never refused");
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
