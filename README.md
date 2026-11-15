@@ -165,8 +165,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
      itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
-   - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
-     core's with the licence check's config: a restore of each project file git knows from its lock file alone
+   - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request (in a private
+     repository, as the starter kit writes it, only on one that changes a file NuGet reads by name, so no other bills a
+     job), which calls the core's with the licence check's config: a restore of each project file git knows from its lock file alone
      (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
      config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads from
      NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
@@ -178,7 +179,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
      off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
      It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
-     private repository calls it like any other: it needs nothing of GitHub's paid code security. Like the signature
+     private repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it
+     where a job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026,
+     the NuGet check where it can matter"). Like the signature
      check, it first looks whether the pull request changes anything NuGet reads (its workflow's header lists what),
      and passes without a restore where it changes none; any doubt runs it. Before the restore, which runs the pull
      request's own build files, `nuget-fetch.mjs` fetches every package the lock files name, holds each to its lock

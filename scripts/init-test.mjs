@@ -13,6 +13,7 @@ import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
 import { FILES, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
+import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
@@ -48,7 +49,7 @@ const templates = [];
 const walk = dir => { for (const e of fs.readdirSync(path.join(root, TEMPLATES, dir), { withFileTypes: true })) e.isDirectory() ? walk(path.posix.join(dir, e.name)) : templates.push(path.posix.join(dir, e.name)); };
 walk("");
 ok(templates.every(t => t.endsWith(".tmpl")), "every file of the kit ends in .tmpl, so no tool or check takes one for the real thing", templates.filter(t => !t.endsWith(".tmpl")).join());
-const listed = new Set([...FILES.map(([t]) => t), "dependabot-npm.yml.tmpl", "dependabot-nuget.yml.tmpl"]);
+const listed = new Set([...FILES.map(([t]) => t), "dependabot-npm.yml.tmpl", "dependabot-nuget.yml.tmpl", "workflows/nuget-paths.yml.tmpl"]);
 ok(templates.every(t => listed.has(t)) && [...listed].every(t => templates.includes(t)), "every template is listed in FILES, and every listed one is there", [...templates.filter(t => !listed.has(t)), ...[...listed].filter(t => !templates.includes(t))].join());
 ok(new Set(FILES.map(([, to]) => to)).size === FILES.length, "no two templates become the same file");
 
@@ -75,6 +76,13 @@ const whole = files({ owner: "someone", name: "P", packages: "tools" }, A, ["git
 const dependabot = o => files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/dependabot.yml")[1];
 const ecosystems = text => (text.match(/package-ecosystem: "/g) ?? []).length;
 ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    directory: "/"\n') && ecosystems(dependabot({ nuget: "." })) === 2 && dependabot({ nuget: "src" }).includes('directory: "/src"\n') && ecosystems(dependabot({})) === 1 && !dependabot({}).includes("nuget"), "a project whose packages come from NuGet gets Dependabot's updates for them, for its folder, beside the actions' own, and one that named no installer gets the actions' alone");
+// a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name (#373)
+const nugetCall = o => parseYaml(files({ owner: "someone", name: "P", nuget: ".", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/workflows/nuget.yml")[1]);
+const privateCall = nugetCall({ private: true }), publicCall = nugetCall({});
+const filter = privateCall.on.pull_request?.paths ?? [];
+ok(filter.length > 0 && pathsLetThrough(filter, ["App.csproj"]) && pathsLetThrough(filter, ["src/App/packages.lock.json"]) && pathsLetThrough(filter, ["NuGet.Config"]) && pathsLetThrough(filter, ["checks/licences.json"])
+  && !pathsLetThrough(filter, ["README.md", "src/App/Program.cs", "core/scripts/nuget.mjs"]) && privateCall.jobs.nuget.with.config === "checks/licences.json" && publicCall.on.pull_request === null,
+  "a private project's NuGet check starts only on a pull request that changes a file NuGet reads by name, so no other bills a job; a public one's on every pull request", JSON.stringify(privateCall.on));
 const both = dependabot({ packages: "web", nuget: "." });
 ok(ecosystems(both) === 3 && both.indexOf('directory: "/web"') > 0 && both.indexOf('directory: "/web"') < both.indexOf('"nuget"') && (both.match(/^version: 2$/gm) ?? []).length === 1, "a project with both installers gets both, in one config");
 ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");

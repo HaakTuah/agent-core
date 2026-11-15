@@ -141,7 +141,7 @@ export const STEPS = [
       const locks = [...new Set(projects.map(f => path.posix.join(path.posix.dirname(f), "packages.lock.json")))];
       const missing = locks.filter(l => !p.files.includes(l));
       if (missing.length) wrong.push(`each project file's \`packages.lock.json\` is committed, lock files turned on (\`RestorePackagesWithLockFile\`): ${missing.join(", ")}`);
-      if (!call(p, "nuget.yml")) wrong.push("a `.github/workflows/nuget.yml` calls the core's, as `core/setup/template/workflows/nuget.yml.tmpl` has it");
+      if (!call(p, "nuget.yml")) wrong.push("a `.github/workflows/nuget.yml` calls the core's, as `core/setup/template/workflows/nuget.yml.tmpl` has it (in a private repository with the `paths:` of `nuget-paths.yml.tmpl` beside it), or its owner declines the check in the manifest's \"Differences\", as the entry \"16 November 2026, the NuGet check where it can matter\" says");
       let config = null;
       try { config = JSON.parse(p.read(licenceConfig(p)) ?? "null"); } catch { /* (read as missing, below) */ }
       const named = new Set([...(config?.nuget?.ships ?? []), ...(config?.nuget?.tools ?? [])]);
@@ -235,6 +235,8 @@ export const STEPS = [
       if (own.length && !runs) wrong.push(`the workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
       return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
     } },
+  { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow,
+    unread: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -1,0 +1,24 @@
+    # (a private repository, where each job is a billed minute: the job starts only on a pull request that changes a
+    # file NuGet reads by the name .NET gives it, the names the core's nuget.yml looks at first. What that leaves to
+    # the next such pull request: a file a build file brings in under another name, and a lock file a build no longer
+    # matches through a property alone. With no job, no status: a ruleset that requires "nuget" waits on the other pull
+    # requests, so a project with one takes these lines out.)
+    paths:
+      - '**/*.csproj'
+      - '**/*.fsproj'
+      - '**/*.vbproj'
+      - '**/*.props'
+      - '**/*.targets'
+      - '**/*.rsp'
+      - '**/*.user'
+      - '**/packages.lock.json'
+      - '**/packages.*.lock.json'
+      - '**/packages.config'
+      - '**/[Nn]u[Gg]et.[Cc]onfig'
+      - '**/global.json'
+      - '**/dotnet-tools.json'
+      - '**/*.nupkg'
+      - 'checks/licences.json'
+      - 'checks/licences-audit.json'
+      - 'core/.node-version'
+      - '.github/workflows/nuget.yml'
