@@ -131,6 +131,15 @@ if (p.status === 0) {
   const offList = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env: { ...env, COPIES_BASE: "HEAD" }, encoding: "utf8" });
   fs.writeFileSync(secAt, secWas);
   const cfgP = path.join(p.dir, "checks/copies.json"), cfgPWas = fs.readFileSync(cfgP, "utf8");
+  // (a config named outside plain ASCII is found at the base all the same: git names it unquoted)
+  const wide = path.join(p.dir, "checks/cópies.json");
+  fs.writeFileSync(wide, cfgPWas);
+  git(p.dir, "add", "checks/cópies.json");
+  git(p.dir, "commit", "-q", "-m", "a config named outside plain ASCII");
+  fs.writeFileSync(wide, JSON.stringify({ ...JSON.parse(cfgPWas), prose: [] }));
+  const wideRun = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/cópies.json"], { cwd: p.dir, env: { ...env, COPIES_BASE: "HEAD" }, encoding: "utf8" });
+  git(p.dir, "reset", "-q", "--hard", "HEAD~1");
+  ok(wideRun.status === 1 && /checks\/cópies\.json reads \d+ files fewer than HEAD's config read/u.test(wideRun.stderr) && mended(wideRun.stderr), "a config named outside plain ASCII is held to the base's too", wideRun.stdout + wideRun.stderr);
   fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), code: [":(bogus)x"] }));
   const badSpec = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
   fs.writeFileSync(cfgP, cfgPWas);

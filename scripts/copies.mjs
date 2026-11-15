@@ -41,9 +41,9 @@ const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignor
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
 if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
 // (the config's path from the root, as git names it at the base: git says it, as it says the root, so no spelling of a
-// path can differ)
+// path can differ, and unquoted, -z, so a name outside plain ASCII is the name itself)
 let CONFIG_AT;
-try { CONFIG_AT = git(["ls-files", "--full-name", "--error-unmatch", "--", configPath]).split(/\r?\n/u)[0]; } catch { CONFIG_AT = path.relative(ROOT, path.resolve(configPath)).split(path.sep).join("/"); }
+try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(ROOT, path.resolve(configPath)).split(path.sep).join("/"); }
 let config;
 try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
