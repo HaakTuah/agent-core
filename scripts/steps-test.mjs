@@ -92,7 +92,7 @@ fs.writeFileSync(signatures, asKit);
 
 // ---- a size marks file the reading-size check cannot read: the step is reported as not read, never as done ----
 const marksFile = path.join(lockProject, "checks/sizes.json"), marksAsKit = fs.readFileSync(marksFile, "utf8");
-for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wrong shape"]]) {
+for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wrong shape"], ["\nFAIL: x\n", "no JSON, a line of which reads as a verdict"]]) {
   fs.writeFileSync(marksFile, broken);
   const missed = notDone(lockProject);
   ok(missed.length === 1 && missed[0].lead.startsWith("14 November 2026, the size marks") && missed[0].mend.includes("did not run to its end"), `size marks of ${what} are reported as not read`, report(missed));
