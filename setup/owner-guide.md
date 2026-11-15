@@ -21,8 +21,8 @@ you can correct it (floor rule 14, `modules/inbox.md`). A yes is asked for:
 - a step that cannot be undone, or that spends money beyond what you set aside;
 - a package you want that is under a licence off the allowed list, or one whose licence only a person can read
   (floor rule 10);
-- a change to the files that run by themselves or hold the rules, where your project names no builder to change them
-  (floor rule 3);
+- a change to the floor or the review guidelines, which needs your yes in its pull request, and a change to the files
+  that run by themselves or hold the rules where your project names no builder to make it (floor rule 3);
 - a difference from a module's rule in your project, which only you may give (`README.md`, "How a project takes the core",
   point 7).
 
@@ -50,7 +50,9 @@ each commit, and stops. Delete the branch to let them go on. It stops only that 
   most often, is skipped there unless you turn it on (`README.md`, "A private repository").
 
 What a release adds never turns an old breach of your own red: it is listed, and your agents work it down by tasks.
-Nothing it brings stops your project or waits on you (`AGENTS.md`, "Nothing locks a project").
+Nothing it brings stops your project or waits on you (`AGENTS.md`, "Nothing locks a project"). The one exception is the
+check on your list of personal terms: it fails a listed term wherever it stands, an old one and a name your machine's
+git writes into each commit too, and its failure says how a session takes it out in that pull request.
 
 ## The settings that are yours
 
@@ -62,5 +64,7 @@ it unset. A project starting out gets the list printed at the end of `scripts/in
 
 ## Telling the core something
 
-A fault, an idea or a question about the core itself is an issue on this repository (`README.md`, "Reporting to the
-core"); a rule that did not fit your project is the same, so that the core may learn from it.
+A fault, an idea or a question about the core itself is an issue on this repository, and so is a rule that did not fit
+your project, so that the core may learn from it (`README.md`, "Reporting to the core"). A weakness is never an issue,
+which anyone can read: it goes to this repository's Security tab, "Report a vulnerability" (`floor/topics.md`,
+"Reporting a weakness").
