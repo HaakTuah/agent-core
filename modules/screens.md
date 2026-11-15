@@ -111,8 +111,9 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
 ## What the review does
 
 18. **A critique by fixed questions,** on every pull request that changes a screen, by a fresh session that wrote none
-    of it, at the design check's model and effort (`modules/claude.md`), given the pictures of point 17 and the
-    *direction* and nothing from the builder: not its three lines, its description or its account of what it mended.
+    of it, at the design check's model and effort (`modules/claude.md`), given the pictures of point 17, the walk by
+    the Tab key and the list of words where those checks are on, and the *direction*, and nothing from the builder: not
+    its three lines, its description or its account of what it mended.
     - Is it plain within three seconds what this screen is for?
     - Which is the primary action? Blurred, is it still plainly first?
     - After each action, can the user tell what happened?
