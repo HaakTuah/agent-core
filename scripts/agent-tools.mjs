@@ -46,6 +46,9 @@ import { started } from "./started.mjs";
 const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
 const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
 const COMMIT = /^[0-9a-f]{40}$/u; // (a full commit, as git writes it and Claude Code takes it)
+const commit = v => typeof v === "string" && COMMIT.test(v);
+// (how a "ref" or "sha" that pins nothing reads: none, a branch or tag, or what is no text at all)
+const takes = (v, none) => (v === undefined ? none : typeof v === "string" ? `the branch or tag ${show(v)}` : `the value ${show(v)}, which names no commit`);
 const KIT = fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url));
 const show = value => JSON.stringify(value) ?? String(value);
 const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
@@ -128,15 +131,15 @@ function pluginPin(name, markets) {
   if (!source || typeof source !== "object") return null;
   const where = `the marketplace ${show(name.slice(at + 1))} in ${market.file}`;
   if (source.source === "github" || source.source === "git") {
-    if (COMMIT.test(source.ref ?? "")) return { pin: source.ref, where, from: source };
-    return { from: source, loose: `takes ${source.ref === undefined ? "its repository's default branch" : `the branch or tag ${show(source.ref)}`}`, where, mend: `set its "ref" to the full 40-character commit of the marketplace meant` };
+    if (commit(source.ref)) return { pin: source.ref, where, from: source };
+    return { from: source, loose: `takes ${takes(source.ref, "its repository's default branch")}`, where, mend: `set its "ref" to the full 40-character commit of the marketplace meant` };
   }
   if (source.source !== "settings" || !Array.isArray(source.plugins)) return null;
   const entry = source.plugins.find(p => p?.name === name.slice(0, at))?.source;
   const its = `${where}, by its entry for ${show(name.slice(0, at))},`;
   if (["github", "url", "git-subdir"].includes(entry?.source)) {
-    if (COMMIT.test(entry.sha ?? "")) return { pin: entry.sha, where: its, from: source };
-    return { from: source, loose: `names no "sha", so it takes ${entry.ref === undefined ? "the repository's default branch" : `the branch or tag ${show(entry.ref)}`}`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
+    if (commit(entry.sha)) return { pin: entry.sha, where: its, from: source };
+    return { from: source, loose: entry.sha === undefined ? `names no "sha", so it takes ${takes(entry.ref, "the repository's default branch")}` : `gives as its "sha" ${show(entry.sha)}, which is no full commit as git writes one`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
   }
   if (entry?.source === "npm") return npmPin(entry.package, entry.version, its, pkg => `with its "package" as "${pkg}" and its "version" one exact version, such as 1.2.3`, source);
   return null;
@@ -308,11 +311,12 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const fail = [...head.problems, ...problems], notes = [];
   // (a pin breach the base held as it stands, the tool's whole configuration (its source or package, not only its pin)
   // and its entry both unchanged, is noted, and so is each where there is no base, as on a push; in the core's own
-  // repository none may stand)
+  // repository none may stand. A list written for the first time is held to an exact pin at once, its entry being the
+  // pull request's own text, while a tool its base fetched at no fixed version is noted)
   const baseProject = base ? readProject(root, base) : null;
   const baseList = base ? listed(baseConfig && typeof baseConfig === "object" ? baseConfig : null, file) : null;
   for (const [k, problem] of pins) {
-    const same = baseProject && canonical(baseProject.pins.get(k) ?? null) === canonical(head.pins.get(k)) && (!baseList || baseList.versions.get(k) === list.versions.get(k));
+    const same = baseProject && canonical(baseProject.pins.get(k) ?? null) === canonical(head.pins.get(k)) && (baseList ? baseList.versions.get(k) === list.versions.get(k) : !head.pins.get(k).pin);
     if (core || (base && !same)) fail.push(problem);
     else notes.push(`${base ? "as the base held it" : "with no base to read against"}, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
   }
