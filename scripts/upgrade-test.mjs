@@ -39,7 +39,7 @@ import { CORE } from "./core-address.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { STEPS, leads } from "./steps.mjs";
-import { evaluate, parseYaml, runWorkflow } from "./workflow-run.mjs";
+import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "./workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
 let failed = 0, count = 0;
@@ -201,6 +201,8 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     if (trigger === null) continue;
     if (trigger.branches && !trigger.branches.includes("main")) continue;
     if (event === "pull_request" && trigger.types && !trigger.types.includes("synchronize") && !trigger.types.includes("opened")) continue;
+    // (a `paths:` filter, as GitHub reads it against what the pull request changes from its base)
+    if (event === "pull_request" && trigger.paths && !pathsLetThrough(trigger.paths, git(p.dir, "diff", "--name-only", `${baseSha}...${sha}`).split("\n").filter(Boolean))) continue;
     // (a workflow of the project's own that calls none of the core's, run as GitHub would where asked: its steps run the
     // project's copy of the core's scripts)
     if (ownToo && Object.values(wf.jobs ?? {}).every(job => !String(job?.uses ?? "").toLowerCase().startsWith(`${CORE.toLowerCase()}/`))) {
@@ -354,6 +356,35 @@ function upgrade(p, from, ownChanges, expect) {
   if (process.platform !== "win32") inboxCase(p);
 }
 
+// A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
+// `paths:` (what fresh.mjs lists as lacking where the call has none) starts no job on a pull request that changes
+// nothing NuGet reads by name, and one where a project file changed; and a project whose owner declines the check, in
+// the manifest's "Differences", is told no step about it and starts no job for it at all.
+function nugetInPrivate(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const wf = path.join(p.dir, ".github/workflows/nuget.yml"), manifest = path.join(p.dir, "core-manifest.md");
+  const fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
+  const commit = what => { git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", what); git(p.dir, "push", "-q", "origin", "main"); return git(p.dir, "rev-parse", "HEAD"); };
+  const pr = (from, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); const head = git(p.dir, "rev-parse", "HEAD"); git(p.dir, "checkout", "-q", "main"); return started(checks(p, "pull_request", head, { baseSha: from, dry: true })); };
+  const docs = dir => fs.appendFileSync(path.join(dir, "README.md"), "\nMore words.\n");
+  const projectFile = dir => fs.appendFileSync(path.join(dir, "src/App/App.csproj"), "<!-- a note -->\n");
+  const nuget = jobs => jobs.some(w => w.startsWith("nuget.yml/"));
+  const had = fs.readFileSync(wf, "utf8");
+  ok(/^on:\r?\n {2}pull_request:\r?\n\r?\n/m.test(had) ? /nuget\.yml: lacks [^\n]*paths:/.test(fresh()) : true, `${p.name}: where its call to the NuGet check has no paths, fresh.mjs lists the starter kit's as lacking`, fresh());
+  fs.writeFileSync(wf, had.replace(/^ {2}pull_request:\r?\n(?! {4}paths:)/m, on => `${on}${fs.readFileSync(path.join(theCore, "setup/template/workflows/nuget-paths.yml.tmpl"), "utf8")}`));
+  const kit = commit("the NuGet check where it can matter");
+  ok(!/nuget\.yml/.test(fresh()), `${p.name}: with the starter kit's paths, fresh.mjs lists nothing of its NuGet call`, fresh());
+  ok(!nuget(pr(kit, docs)), `${p.name}: a pull request that changes nothing NuGet reads by name starts no NuGet job`);
+  ok(nuget(pr(kit, projectFile)), `${p.name}: one that changes a project file starts it`);
+  const before = pr(kit, projectFile);
+  fs.rmSync(wf);
+  fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^## Differences\r?\nNone\.\r?\n/m, d => `${d.split(/\r?\n/)[0]}\n- "13 November 2026, the NuGet check" and ".github/workflows/nuget.yml": not taken, on the owner's word; the project's own build job restores with --locked-mode and runs core/scripts/nuget.mjs after it.\n`));
+  const declined = commit("the NuGet check declined");
+  const r = node(p.dir, "core/scripts/steps.mjs"), after = pr(declined, projectFile);
+  ok(r.out.includes("Every step a check reads is done") && !/nuget\.yml/.test(fresh()), `${p.name}: its owner declining the NuGet check in "Differences", no step and no difference is reported for it`, `${r.out}\n${fresh()}`);
+  ok(!nuget(after) && after.every(w => before.includes(w)), `${p.name}: and a pull request that changes a project file starts no NuGet job, and no job it did not start before`, after.join("\n"));
+}
+
 // The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo` (left out: gh gives no answer at
 // all), origin's address on github.com for the call alone.
 function inbox(p, repo) {
@@ -472,7 +503,7 @@ for (const tag of starts) {
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-
+  nugetInPrivate(dotnetProject);
 }
 
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the

@@ -19,7 +19,8 @@
 //   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
 //   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
-//              workflows, which need it (README.md, point 5, "A private repository")
+//              workflows, which need it (README.md, point 5, "A private repository"), and a NuGet check started only
+//              by a pull request that changes a file NuGet reads by name
 //   --game     a game: the module game-design.md with the others
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -170,6 +171,9 @@ export function files(o, pin, moduleNames, read) {
       if (o.packages !== undefined) text += fill(read("dependabot-npm.yml.tmpl"), { ...words, npm: folder(o.packages) });
       if (o.nuget !== undefined) text += fill(read("dependabot-nuget.yml.tmpl"), { ...words, nuget: folder(o.nuget) });
     }
+    // (a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name: no other
+    // pull request bills its job; AGENTS.md, "Nothing locks a project")
+    if (to === ".github/workflows/nuget.yml" && o.private) text = text.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${fill(read("workflows/nuget-paths.yml.tmpl"), words)}`);
     return [to, text];
   });
 }
