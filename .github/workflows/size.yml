@@ -2,11 +2,12 @@
 # one that grows what every session reads at its start past it, and one that raises the cap by more than one step or
 # with no "Leanness check:" comment (a fresh session's answer that it read all the rules for room:
 # modules/review-guidelines.md, "A mark on what every session reads"); and the words check (scripts/general.mjs) fails
-# one that uses a word true only for some of the projects that take the core, or a gendered pronoun for the owner in a
-# line it adds to the dated records, read against the base. This repository only; no project calls it. Reads only, with
-# no secret: the raise is read from git alone, the merge commit against its first parent, the base, and of the pull
-# request's comments only who wrote each and how it opens is used, in a file the script reads; no text of a comment
-# reaches a command.
+# one that uses a word true only for some of the projects that take the core, a gendered pronoun for the owner in a
+# line it adds to the dated records, or a phrase a rule may not use in a line it adds to a rule file, read against the
+# base, and reports the phrases that stood before it (AGENTS.md, "A rule is written to one pattern"). This repository
+# only; no project calls it. Reads only, with no secret: the raise is read from git alone, the merge commit against its
+# first parent, the base, and of the pull request's comments only who wrote each and how it opens is used, in a file
+# the script reads; no text of a comment reaches a command.
 name: size
 
 on:
@@ -48,5 +49,5 @@ jobs:
       - name: A raise of the cap is one step, and has its leanness check
         if: ${{ github.event_name == 'pull_request' }}
         run: node scripts/size.mjs --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json"
-      - name: The floor and the modules fit any project
+      - name: The floor and the modules fit any project, and a rule written uses no phrase a rule may not use
         run: node scripts/general.mjs scripts/general.json --base HEAD^1
