@@ -19,6 +19,12 @@ const PIN = "0".repeat(40);
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
 export const STAGES = {
+  "16 November 2026, hostile tests for every named input": {
+    // (rule 5 of SECURITY.md lists an input whose hostile tests are nowhere; the mend writes them where it names them)
+    stage: dir => write(dir, "SECURITY.md", read(dir, "SECURITY.md").replace(/^(5\. .*\r?\n)(?:(?!\d+\. |#).*\r?\n)*/m,
+      "$1   - a peer's message: its type and size checked on arrival; its hostile tests: `tests/hostile/peer-message.test.mjs`.\n")),
+    mend: dir => write(dir, "tests/hostile/peer-message.test.mjs", "// too long, the wrong type, markup, a file path, a number out of range, nothing at all\n"),
+  },
   "16 November 2026, an agent's own tools listed": {
     // (a plug-in turned on and listed nowhere; the mend lists it, with its publisher and one exact version)
     stage: dir => {
@@ -120,5 +126,21 @@ export const STAGES = {
       write(dir, "checks/shape.json", read(dir, "core/setup/template/shape.json.tmpl"));
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
+  },
+  "16 November 2026, the NuGet check where it can matter": {
+    // (a project file that imports a build file of another name than those the call's paths name)
+    stage: dir => {
+      const call = fs.existsSync(at(dir, ".github/workflows/nuget.yml")) ? read(dir, ".github/workflows/nuget.yml") : NUGET;
+      write(dir, ".github/workflows/nuget.yml", /^ {4}paths:/m.test(call) ? call : call.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${read(fileURLToPath(new URL("..", import.meta.url)), "setup/template/workflows/nuget-paths.yml.tmpl")}`));
+      write(dir, "staged-import/Imports.csproj", '<Project Sdk="Microsoft.NET.Sdk">\n  <Import Project="deps.xml" />\n</Project>\n');
+      write(dir, "staged-import/deps.xml", "<Project>\n</Project>\n");
+      write(dir, "staged-import/packages.lock.json", "{\n  \"version\": 1,\n  \"dependencies\": {}\n}\n");
+      const config = JSON.parse(read(dir, "checks/licences.json"));
+      config.nuget ??= { ships: [], tools: [] };
+      config.nuget.ships = [...(config.nuget.ships ?? []), "staged-import/packages.lock.json"];
+      write(dir, "checks/licences.json", `${JSON.stringify(config, null, 2)}\n`);
+    },
+    // (as the step words it: the file added to the paths, by its exact path)
+    mend: dir => write(dir, ".github/workflows/nuget.yml", read(dir, ".github/workflows/nuget.yml").replace(/^( {4}paths:\r?\n)/m, "$1      - 'staged-import/deps.xml'\n")),
   },
 };

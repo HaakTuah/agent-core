@@ -1,7 +1,7 @@
 # Choices that are hard to undo
 
 Read before a session makes a choice that is hard to undo or advises the owner on one, and by the reader of a pass
-over the recorded choices (core archive 222 and 228).
+over the recorded choices (core archive 222 and 231).
 
 A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
 kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
@@ -93,5 +93,5 @@ sign written in a measure.
 
 Held by: the starter kit, whose *choice records* ask for a new project's stack before its first code; the scheduled
 look, which keeps the pass's issue and that of a sign written in a measure while it holds (`core/scripts/choices.mjs`,
-its test running both on a project made for it, and on the core's own records); a staged case (#235), in which the
+its test running both on a project made for it, and on the core's own records); a staged case (#256), in which the
 common answer is the wrong one for a project's stated aims; and, for the rest, the reviews alone.

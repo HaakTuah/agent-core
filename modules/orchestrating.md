@@ -2,8 +2,9 @@
 
 Read by the orchestrator (`modules/roles.md`) when it starts.
 
-- **It builds nothing itself** (core archive 27): every lane goes to a builder session of its own, with its own brief,
-  another provider's first (`modules/roles.md`), at the builder's model and effort.
+- **It builds nothing itself** (core archive 27): every lane goes to a builder session of its own, with its own brief
+  (`modules/helpers.md`, "A brief is written as a rule is"), another provider's first (`modules/roles.md`), at the
+  builder's model and effort.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn (core archive 200), on the owner's computer
@@ -23,10 +24,10 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
   the steps of a release not done, the labels and openers to mend, a run of its own missed, the cleaning and each
   audit the codebase's state makes due (`modules/cleaning.md`), the pass over the choices that are hard to undo and a
-  sign of theirs written in a measure that holds (`modules/choices.md`), and what the staged cases make due, as their
-  rule comes (#235); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the project's
-  daily job (`look.yml`, as the starter kit writes it) and the orchestrator's wake; where issues cannot be reached,
-  its files go to the inbox (`--inbox`).
+  sign of theirs written in a measure that holds (`modules/choices.md`), and in the core alone the staged cases due
+  (`core/scripts/staged.mjs`); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the
+  project's daily job (`look.yml`, as the starter kit writes it) and the orchestrator's wake; where issues cannot be
+  reached, its files go to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
