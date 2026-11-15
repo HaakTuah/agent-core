@@ -238,7 +238,7 @@ function upgrade(p, from, ownChanges, expect) {
     // its machine writes a listed name into every commit: the personal-terms check alone fails, saying how to mend it,
     // and the session mends it in the pull request itself, as the failure says (core archive 202)
     const failed = onSync.filter(([, r]) => !r.passed);
-    ok(failed.length === 1 && failed[0][0].startsWith("personal-terms.yml/") && failed[0][1].steps.some(x => /To mend it, on the machine that made them/.test(x.out)),
+    ok(failed.length === 1 && failed[0][0].startsWith("personal-terms.yml/") && failed[0][1].steps.some(x => /Mend: on the machine that made them/.test(x.out)),
       `${p.name}: on the sync's pull request, its commit carrying a listed name, only the personal-terms check fails, and it says how to mend it`, failures(onSync));
     named.set(p.dir, { GIT_AUTHOR_NAME: p.owner, GIT_AUTHOR_EMAIL: `${p.owner}@users.noreply.github.com`, GIT_COMMITTER_NAME: p.owner, GIT_COMMITTER_EMAIL: `${p.owner}@users.noreply.github.com` });
     git(p.dir, "rebase", "-q", "--exec", "git commit --amend --no-edit --reset-author", "origin/main");
