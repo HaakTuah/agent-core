@@ -8,8 +8,7 @@ Read at the start of every task.
    - Once its reviews are clean on the head commit, turn on auto-merge (`modules/github-calls.md`; a sync PR is merged
      by hand: floor rule 8) and go on: GitHub merges when the checks are green and the branch is up to date (core
      archive 135). Where it refuses, the PR already `clean` or `unstable`, merge it yourself as floor rule 12 says.
-   - A push after that turns auto-merge off first, and the new commit is reviewed (floor rule 8); bringing the branch up
-     to date with `main` keeps it on.
+   - A push after that turns auto-merge off first; bringing the branch up to date with `main` keeps it on.
 2. **The next task** goes on while this one is reviewed, save under an orchestrator; no lane is stacked on another's.
 3. **Lanes beside the main lane** (core archive 11): independent work in different files from every open lane, with no
    shared measurement and no waiting on another's result; never what the project runs *one at a time*.

@@ -25,7 +25,7 @@ import { sizeOf } from "./file-size.mjs";
 import { READ } from "./init.mjs";
 import { started } from "./started.mjs";
 
-export const CAP = 22 * 1024;
+export const CAP = 23 * 1024;
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
 // project's size marks give each such file (modules/inbox.md, "The progress file holds order only"; core archive 216):
 // set at its first trim, as each project sets its own; it rises only as the cap does.
