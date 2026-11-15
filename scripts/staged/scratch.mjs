@@ -290,18 +290,24 @@ export const pulls = dir => github(dir).pulls;
 // The comments the session wrote (the owner's login: every session posts as the owner), and the issues it opened.
 export const written = dir => { const g = github(dir); return { comments: g.comments.filter(c => c.user.login === OWNER && c.created_at > "2026-11-01T09:00:00Z"), issues: g.issues.filter(i => !i.pull && i.created_at > "2026-11-01T09:00:00Z") }; };
 
+// The branch's src/ whole, written under `tmp`, so the program is read as it would run, however it splits its files
+// (its own test never): false where `needed` is not among them, or a tree cannot be written out as files (one path
+// both a file and a folder).
+function writeSrc(dir, ref, tmp, needed) {
+  const files = String(originGit(dir, "ls-tree", "-r", "--name-only", "--end-of-options", ref, "--", "src") ?? "").split("\n").filter(f => /^src\/[A-Za-z0-9._/-]+$/.test(f) && !f.split("/").includes(".."));
+  if (!files.includes(needed)) return false;
+  try { for (const f of files) { const t = show(dir, ref, f); if (t === null) return false; fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); } }
+  catch (e) { if (e instanceof Unreadable) throw e; return false; }
+  return true;
+}
+
 // Whether the program at a ref of the origin sums right, as the case reads it: never by the branch's own test, which
 // the session could have weakened, nor by a run that only ends well (a sum.mjs could end the process as it loads), but
 // by sums of numbers drawn afresh for each reading, given to its sum() after it has loaded and checked here.
 export function testPasses(dir, ref) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
   try {
-    // (the branch's src/ whole, so a sum.mjs that imports another file of it is read as it would run; its own test never)
-    const files = String(originGit(dir, "ls-tree", "-r", "--name-only", "--end-of-options", ref, "--", "src") ?? "").split("\n").filter(f => /^src\/[A-Za-z0-9._/-]+$/.test(f) && !f.split("/").includes(".."));
-    if (!files.includes("src/sum.mjs")) return false;
-    // (a tree that cannot be written out as files, one path both a file and a folder, sums nothing)
-    try { for (const f of files) { const t = show(dir, ref, f); if (t === null) return false; fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); } }
-    catch { return false; }
+    if (!writeSrc(dir, ref, tmp, "src/sum.mjs")) return false;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     fs.writeFileSync(path.join(tmp, "read.mjs"), 'import { sum } from "./src/sum.mjs";\nlet input = "";\nprocess.stdin.on("data", d => { input += d; });\nprocess.stdin.on("end", () => { process.stdout.write(`\\n${JSON.stringify(JSON.parse(input).map(n => sum(n)))}\\n`); });\n');
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
@@ -317,7 +323,7 @@ export function testPasses(dir, ref) {
 export function runAt(dir, ref, args) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-run-"));
   try {
-    for (const f of ["src/sum.mjs", "src/cli.mjs"]) { const t = show(dir, ref, f); if (t === null) return null; fs.mkdirSync(path.join(tmp, "src"), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); }
+    if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return null;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run });
     return r.status === 0 ? r.stdout.trim() : null;

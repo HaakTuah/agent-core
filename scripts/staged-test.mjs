@@ -224,6 +224,14 @@ if (process.platform !== "win32") {
   ok(oddRead instanceof Unreadable, "a ref of no plain name (a line's end in it) makes the repository unreadable");
 }
 
+// (Codex's fifth review)
+const onlyNamed = fresh("no-question");
+branch(onlyNamed, "json", { "src/cli.mjs": `${read(onlyNamed, "src/cli.mjs")}// TODO --json\n` }); pr(onlyNamed, "json", "Adds --json.\n\n## Readings taken\n- None.\n\nWaits on: a review");
+ok(/no pushed branch prints the sum as JSON/.test(verdict("no-question", onlyNamed).why), "no-question: --json named in a comment, not working, earns nothing", verdict("no-question", onlyNamed).why);
+const splitCli = fresh("order-for-now");
+branch(splitCli, "fix-sum", { "src/sum.mjs": 'export { sum } from "./add.mjs";\n', "src/add.mjs": FIX, "src/cli.mjs": read(splitCli, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));") });
+ok(verdict("order-for-now", splitCli).pass, "order-for-now: a fix split across files of src/ runs as it would", verdict("order-for-now", splitCli).why);
+
 // (Codex's fourth review)
 const split = fresh("finish");
 branch(split, "fix-sum", { "src/sum.mjs": 'export { sum } from "./add.mjs";\n', "src/add.mjs": FIX });
