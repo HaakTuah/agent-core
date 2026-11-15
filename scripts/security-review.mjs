@@ -78,10 +78,16 @@ const POSTED = /^(?:\*\*)?Security review:/u;
 export const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
 // who posts the review a waiting status asks for, and when, the actor first, since a commit status shows only a short
-// description (#395; modules/reviews.md, point 3): the fallback reviewer, after its own check of the newest commit,
-// never Codex asked by a comment, which it answers with a code review
+// description (#395; modules/reviews.md, point 3). Where Codex's app starts the review by itself (its summary is on
+// the pull request, read or not), the fallback reviewer, after its own check of the newest commit, never Codex asked by
+// a comment, which it answers with a code review; elsewhere, the security reviewer the project uses, asked again.
 const CHECKS = 'the fallback reviewer checks the head, posts "Security review: <whole SHA>"';
 const HIDDEN = `an open finding of Codex's is in no comment. Mend: ${CHECKS}`;
+function mendsFor(read) {
+  const app = read.unread === true || (read.review !== null && typeof read.review === "object");
+  return app ? { post: CHECKS, none: "wait 5 min; then the fallback reviewer reviews, posts one" }
+    : { post: 'your security reviewer checks the head, posts "Security review: <whole SHA>"', none: "your security reviewer reviews; with Codex's app, the fallback reviewer after 5 min" };
+}
 // the words Codex's app writes for a review under way; any other (completed, none, or one not known) is none running,
 // so that a form nobody documents can never hold a pull request for good (scripts/code-review-wait.mjs reads them too)
 export const RUNNING = ["running", "queued", "pending", "in_progress"];
@@ -152,7 +158,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const forHead = chain === undefined ? posted : posted.filter((comment) => named(comment.body).some((at) => chain.has(at)));
   // the merge from main where the chain stops for want of proof (#323): a review of it, or of a later commit, stands
   const cut = chain === undefined ? undefined : unproved(pull, flat(commits), sha, more.merges);
-  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true, cut });
+  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true, cut, mends: mendsFor(read) });
   if (running && !verdict.done && all.length > 0 && posted.length === 0) {
     const why = "Codex's security review is running, begun after every \"Security review:\" posted. Mend: wait for it";
     // (one whose head does not hold this check as the default branch does stood before it came: reported)
@@ -240,7 +246,7 @@ export function pinsAlone(file, pinned = USES) {
 // whether a posted review holds what comment-only.mjs printed on this head: comments and steps' names alone
 const ALONE = /^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/mu;
 export const commentsAlone = (body, sha) => typeof body === "string" && ALONE.test(body) && new RegExp(`^\\s*checked head ${sha}(?![0-9a-f])`, "mu").test(body);
-function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, reviewComments, commits, changed, bound, pure, cut }) {
+function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, reviewComments, commits, changed, bound, pure, cut, mends }) {
   const short = sha.slice(0, 7);
   // what a review of an earlier commit wants, where a merge from main after it is not the one git makes (#323)
   const notGits = cut === undefined ? "" : `; merge ${cut.slice(0, 7)} is not the merge git makes`;
@@ -258,7 +264,7 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
       // review names the head, or a commit only such updates follow (a pure sync needs none, its review waited for)
       if (pure || !bind || (at !== undefined && stand(at))) return { sha, done: true, why: `Codex's security review has run${on}` };
       if (forHead.length > 0) return { sha, done: true, why: `${postedWhy}; Codex's saw ${at === undefined ? "a commit not named" : `${at.slice(0, 7)}, earlier`}` };
-      const saw = at === undefined ? "no commit it names" : at.slice(0, 7);
+      const saw = at === undefined ? "no named commit" : at.slice(0, 7);
       if (cut !== undefined && at !== undefined && standsFrom(pull, flat(commits), sha).has(at)) return hold(`Codex saw ${saw}, before unproved merge ${cut.slice(0, 7)}. Mend: ${CHECKS}`, `Codex's review saw ${saw}${notGits}`);
       return hold(`Codex saw ${saw}, not the head ${short}. Mend: ${CHECKS}`, `Codex's review saw ${saw}, not the head ${short}`);
     }
@@ -300,9 +306,9 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   if (dependabots && !(review !== null && typeof review === "object" && typeof review.status === "string")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
   // (one naming a commit that only a merge from main git would not make follows: that merge named, #323)
   const loose = cut === undefined ? undefined : standsFrom(pull, all, sha);
-  if (cut !== undefined && posted.some((comment) => named(comment.body).some((at) => loose.has(at)))) return hold(`a review predates unproved merge ${cut.slice(0, 7)}. Mend: ${CHECKS}`, `a security review saw an earlier commit${notGits}`);
-  if (posted.length > 0) return hold(`a posted review names not the head ${short}. Mend: ${CHECKS}`, `a security review is posted, but names not the head ${short}`);
-  return { sha, done: false, why: "no security review has run yet. Mend: wait 5 min; then the fallback reviewer reviews, posts one" };
+  if (cut !== undefined && posted.some((comment) => named(comment.body).some((at) => loose.has(at)))) return hold(`a review predates unproved merge ${cut.slice(0, 7)}. Mend: ${mends.post}`, `a security review saw an earlier commit${notGits}`);
+  if (posted.length > 0) return hold(`a posted review names not the head ${short}. Mend: ${mends.post}`, `a security review is posted, but names not the head ${short}`);
+  return { sha, done: false, why: `no security review has run yet. Mend: ${mends.none}` };
 }
 
 // the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the
