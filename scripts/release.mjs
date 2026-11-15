@@ -24,7 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
-import { RECORD, forRelease, gate, wellFormed } from "./staged.mjs";
+import { RECORD, forRelease, gate, lost, wellFormed } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -116,10 +116,11 @@ function main(argv) {
     let record = { runs: [] }, there = true;
     try { inBare(dir, ["cat-file", "-e", `${sha}:${RECORD}`]); } catch { there = false; }
     if (there) { try { record = JSON.parse(inBare(dir, ["show", `${sha}:${RECORD}`])); if (!Array.isArray(record?.runs)) record = null; } catch { record = null; } }
-    // (and the release before's own, so cases that held it go on holding this one, its record cut short or not)
-    let boundBefore = false;
-    if (before) try { const prior = JSON.parse(inBare(dir, ["show", `${before.sha}:${RECORD}`])); boundBefore = wellFormed(prior) && gate(prior).binding; } catch { /* (none then) */ }
-    const staged = forRelease(record, { boundBefore });
+    // (the record only grows, so the release before's, whole, is in this one: its binding carries on, and none of its
+    // verdicts is lost)
+    let boundBefore = false, gone = [];
+    if (before) try { const prior = JSON.parse(inBare(dir, ["show", `${before.sha}:${RECORD}`])); if (wellFormed(prior)) { boundBefore = gate(prior).binding; gone = lost(prior, record); } } catch { /* (none then) */ }
+    const staged = forRelease(record, { boundBefore, cut: gone });
     console.log(staged.said);
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
     if (staged.held) return fail(`${name} is not cut: ${staged.held}.`);

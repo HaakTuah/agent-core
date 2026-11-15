@@ -26,17 +26,29 @@ export const git = (cwd, ...args) => execFileSync("git", args, { cwd, env: plain
 // so no sign-in or token reaches code the session wrote.
 const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "" } : {}) };
 
-// The readers' git, once the session has worked: the session could have written the scratch repositories' config, so
-// each call turns off the settings that run a command (an fsmonitor, an external diff, a pager, hooks), runs with no
-// variable of the machine's but where programs are found (no sign-in or token), and stops after a time; and every ref
-// it is given follows --end-of-options at the call. Gives the output, or null where git failed.
+// The readers' git, once the session has worked. The session could have written the scratch repositories' config and
+// attributes, so before a reader reads, each repository's config is put back as the case set it, from the copy in the
+// seal, and its info/attributes taken out (guard); and each call also turns off what runs a command (an fsmonitor, an
+// external diff, a pager, hooks, a signature's program), writes no index, runs with no variable of the machine's but
+// where programs are found (no sign-in or token), and stops after a time. Every ref it is given follows
+// --end-of-options at the call. Gives the output, or null where git failed.
 export const LIMITS = { run: 20000 };
-const SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${path.join(os.tmpdir(), "no-hooks-here")}`, "-c", "core.untrackedCache=false"];
+const SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${os.devNull}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false"];
 export const readGit = (cwd, ...args) => {
-  const r = spawnSync("git", [...SAFE, ...args], { cwd, env: { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull, GIT_TERMINAL_PROMPT: "0" }, encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
+  const r = spawnSync("git", [...SAFE, ...args], { cwd, env: { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: os.devNull, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" }, encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
   return r.status === 0 ? r.stdout : null;
 };
-const tryGit = readGit;
+const REPOS = { project: ["project", ".git"], origin: ["origin.git"] };
+// (the config as the case set it, kept in the seal when it is sealed; put back, and info/attributes taken out)
+const keepConfig = dir => { for (const [name, at] of Object.entries(REPOS)) fs.copyFileSync(path.join(dir, ...at, "config"), path.join(sealOf(dir), `${name}-config`)); };
+export function guard(dir) {
+  for (const [name, at] of Object.entries(REPOS)) {
+    const kept = path.join(sealOf(dir), `${name}-config`);
+    if (fs.existsSync(kept)) fs.copyFileSync(kept, path.join(dir, ...at, "config"));
+    fs.rmSync(path.join(dir, ...at, "info", "attributes"), { force: true });
+  }
+}
+const tryGit = (dir, ...args) => { guard(dir); return readGit(dir, ...args); };
 
 // The program every case's project holds: a sum with a bug in it (it leaves out the last number), and its test.
 export const PROGRAM = {
@@ -149,7 +161,7 @@ export function branchesOf(dir) {
 export const sealOf = dir => `${path.resolve(dir)}.seal`;
 export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
 export const memoOf = (dir, name) => JSON.parse(fs.readFileSync(path.join(sealOf(dir), `${name}.json`), "utf8"));
-export const seal = dir => memo(dir, "refs", branchesOf(dir));
+export const seal = dir => { memo(dir, "refs", branchesOf(dir)); keepConfig(dir); };
 const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
@@ -246,6 +258,7 @@ export function runAt(dir, ref, args) {
 // The project's own working folder: whether anything there differs from what the case set (committed or not).
 export function touched(dir) {
   const project = path.join(dir, "project");
+  guard(dir);
   const status = readGit(project, "status", "--porcelain"), count = readGit(project, "rev-list", "--count", "--branches", `^${base(dir)}`);
   return status === null || count === null || status.trim() !== "" || count.trim() !== "0";
 }

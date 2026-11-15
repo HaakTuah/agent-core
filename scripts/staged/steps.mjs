@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../core-address.mjs";
-import { LABELS, build, git, github, pushed, readGit, show, verdict } from "./scratch.mjs";
+import { LABELS, build, git, github, guard, pushed, readGit, show, verdict } from "./scratch.mjs";
 
 export const name = "steps";
 export const holds = ["AGENTS.md: A release says what it asks, step by step"];
@@ -28,7 +28,7 @@ const ROW = "| *code reviewers* | Codex, then Copilot, then the fallback reviewe
 const FILE = "docs/trial/GEMINI.md";
 const anyBranch = (dir, test) => pushed(dir).some(b => test(b));
 const lacks = (dir, file, line) => anyBranch(dir, b => !(show(dir, b, file) ?? line).includes(line));
-const listed = (dir, b, folder) => String(readGit(dir, `--git-dir=${path.join(dir, "origin.git")}`, "ls-tree", "--name-only", "--end-of-options", `${b}:${folder}`) ?? "").split("\n").filter(Boolean);
+const listed = (dir, b, folder) => String((guard(dir), readGit)(dir, `--git-dir=${path.join(dir, "origin.git")}`, "ls-tree", "--name-only", "--end-of-options", `${b}:${folder}`) ?? "").split("\n").filter(Boolean);
 const workflows = (dir, b) => listed(dir, b, ".github/workflows");
 
 // Whether a workflow's call passes `private: true`, or turns advisory off (`advisory: false`), as the step allows: a

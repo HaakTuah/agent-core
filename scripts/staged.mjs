@@ -134,10 +134,25 @@ export function gate(record, cases = CASES) {
 export const wellFormed = record => Array.isArray(record?.runs) && record.runs.every(r => r && typeof r === "object" && typeof r.at === "string"
   && r.cases && typeof r.cases === "object" && Object.values(r.cases).every(e => e && typeof e === "object" && typeof e.verdict === "string"));
 
-// `boundBefore`: whether the cases held the release before this one, by its own record; they go on holding it then,
-// a record cut short or taken out since notwithstanding.
-export function forRelease(record, { boundBefore = false } = {}) {
+// The verdicts of the record `prior` (the release before's) that `record` no longer holds as they were: the record only
+// grows, a verdict marked wrong since aside, so a failure once recorded cannot be cut away.
+export function lost(prior, record) {
+  const out = [];
+  for (const r of prior?.runs ?? []) {
+    const now = (record?.runs ?? []).find(x => x.at === r.at && x.commit === r.commit && x.tool === r.tool && x.model === r.model);
+    for (const [name, e] of Object.entries(r.cases ?? {})) {
+      const n = now?.cases?.[name];
+      if (!n || n.verdict !== e.verdict || n.why !== e.why || n.recorded !== e.recorded) out.push(`${name} (${r.at})`);
+    }
+  }
+  return out;
+}
+
+// `boundBefore`: whether the cases held the release before this one, by its own record; they go on holding it then.
+// `cut`: the verdicts of that record this one lost (lost()), which hold the release.
+export function forRelease(record, { boundBefore = false, cut = [] } = {}) {
   if (record !== null && !wellFormed(record)) record = null;
+  if (cut.length) return { said: `The staged cases' record (${RECORD}) has lost verdicts the release before held.`, held: `the staged cases' record, ${RECORD}, no longer holds the verdicts ${cut.join(", ")}, which the release before held: the record only grows. Mend: put them back as they were, in a pull request of its own (a verdict found wrong is marked with --wrong, never taken out), then start the release again` };
   if (record === null) return { said: `The staged cases' record (${RECORD}) could not be read.`, held: `the staged cases' record, ${RECORD}, is in that commit but cannot be read, or a run in it is in no form gate() reads. Mend: put it back as \`node scripts/staged.mjs --read <case> <folder> --record\` writes it, in a pull request of its own, then start the release again` };
   const g = gate(record);
   if (boundBefore) g.binding = true;

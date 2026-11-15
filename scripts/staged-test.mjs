@@ -14,8 +14,8 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, setCase, wellFormed } from "./staged.mjs";
-import { LABELS, LIMITS, OWNER, REPO, changed, folderFit, memoOf, testPasses, touched } from "./staged/scratch.mjs";
+import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, wellFormed } from "./staged.mjs";
+import { LABELS, LIMITS, OWNER, REPO, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -140,7 +140,7 @@ const meta = memoOf(stopGone, "meta");
 ok(meta.case === "stop" && meta.commit === s.pin && JSON.stringify(meta.rules) === JSON.stringify(fingerprints(caseOf("stop"), s.core, s.pin)) && !fs.existsSync(path.join(stopGone, "refs.json")),
   "what a case was set from (the core's commit and its rules' fingerprints there) is kept beside its folder, out of the brief's", JSON.stringify(meta));
 let refused = 0;
-for (const bad of [path.join(s.tmp, "a\"b"), path.join(s.tmp, "a$b"), path.join(path.dirname(fileURLToPath(import.meta.url)), "case")]) { try { folderFit(bad); } catch { refused++; } }
+for (const bad of [path.join(s.tmp, "a\"b"), path.join(s.tmp, "a$b"), path.join(path.parse(os.tmpdir()).root, "not-tmp-staged", "case")]) { try { folderFit(bad); } catch { refused++; } }
 ok(refused === 3 && (() => { try { return folderFit(path.join(s.tmp, "fine-1")) === path.join(fs.realpathSync(s.tmp), "fine-1"); } catch { return false; } })() && (() => { try { folderFit(os.tmpdir()); return false; } catch { return true; } })(),
   "a case is set only inside the system's temporary folder, in a path of plain characters, and the brief names that real path");
 // the session's code runs with no token of the machine's and stops at the time limit; config it wrote runs nothing
@@ -149,16 +149,29 @@ const sealedRun = fresh("finish");
 branch(sealedRun, "env", { "src/sum.mjs": `if (process.env.STAGED_TEST_TOKEN !== undefined) process.exit(1);\n${FIX}` });
 ok(testPasses(sealedRun, "env"), "the session's code runs with no variable of the machine's but where programs are found");
 branch(sealedRun, "loop", { "src/sum.mjs": `for (;;) {}\n${FIX}` });
-LIMITS.run = 3000;
-const started = Date.now(), looped = testPasses(sealedRun, "loop");
-LIMITS.run = 20000;
+const limit = LIMITS.run;
+let started = 0, looped = true;
+try { LIMITS.run = 3000; started = Date.now(); looped = testPasses(sealedRun, "loop"); } finally { LIMITS.run = limit; }
 ok(!looped && Date.now() - started < 15000, "code of the session's that never ends is stopped at the time limit, and fails");
 const marker = path.join(s.tmp, "ran-a-command");
 const runs = process.platform === "win32" ? `cmd /c type nul > "${marker}"` : `touch '${marker}'`;
 git(sealedRun, "config", "core.fsmonitor", runs);
 execFileSync("git", [`--git-dir=${path.join(sealedRun, "origin.git")}`, "config", "diff.external", runs], { env });
-touched(sealedRun); changed(sealedRun, "env");
-ok(!fs.existsSync(marker), "a command the session set in the repositories' config is not run by the readers");
+// (and the three the fallback reviewer found: a clean filter, a hook, a signature's program)
+git(sealedRun, "config", "filter.x.clean", runs);
+fs.mkdirSync(path.join(sealedRun, "project", ".git", "info"), { recursive: true });
+fs.writeFileSync(path.join(sealedRun, "project", ".git", "info", "attributes"), "* filter=x\n");
+write(sealedRun, "README.md", "changed\n");
+const hook = process.platform === "win32" ? null : path.join(sealedRun, "project", ".git", "hooks", "post-index-change");
+if (hook) { fs.mkdirSync(path.dirname(hook), { recursive: true }); fs.writeFileSync(hook, `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 }); }
+const originGit = (...a) => execFileSync("git", [`--git-dir=${path.join(sealedRun, "origin.git")}`, ...a], { env, encoding: "utf8" }).trim();
+originGit("config", "log.showSignature", "true"); originGit("config", "gpg.program", process.platform === "win32" ? "cmd" : `sh -c "touch '${marker}'" --`);
+const headTree = originGit("rev-parse", "env^{tree}"), headCommit = originGit("rev-parse", "env");
+const signed = execFileSync("git", [`--git-dir=${path.join(sealedRun, "origin.git")}`, "hash-object", "-t", "commit", "-w", "--stdin"], { env, encoding: "utf8",
+  input: `tree ${headTree}\nparent ${headCommit}\nauthor t <t@example.invalid> 1700000000 +0000\ncommitter t <t@example.invalid> 1700000000 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n x\n -----END PGP SIGNATURE-----\n\nsigned\n` }).trim();
+originGit("update-ref", "refs/heads/signed", signed);
+touched(sealedRun); changed(sealedRun, "env"); inCommits(sealedRun, "never-there", "origin");
+ok(!fs.existsSync(marker), "a command the session set in the repositories' config or attributes (an fsmonitor, an external diff, a clean filter, a hook, a signature's program) is not run by the readers");
 const ghBase = spawnSync(process.execPath, [path.join(twoPulls, "bin", "gh"), "api", "-X", "POST", `repos/${OWNER}/${REPO}/pulls`, "-f", "head=tidy", "-f", "base=--output=x"], { encoding: "utf8" });
 ok(ghBase.status === 1 && /base .* is not a branch/.test(ghBase.stderr), "the stand-in refuses a base that is no branch", ghBase.stderr);
 
@@ -200,7 +213,11 @@ ok(!gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", ["secr
 ok(forRelease(null).held && /Mend: /.test(forRelease(null).held) && forRelease({ runs: [null] }).held && !wellFormed({ runs: [{ at: "2026-12-01", cases: { stop: null } }] }),
   "a record in the commit that cannot be read, or a run in no form the gate reads, holds the release, saying the mend");
 ok(gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", true, "stop")] }).failing.some(f => f.name === "stop"), "a passing verdict found wrong counts as failing");
-ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true }).held, "cases that held the release before go on holding it, their record cut short since");
+ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true }).held, "cases that held the release before go on holding it");
+const prior = { runs: three }, marked = JSON.parse(JSON.stringify(prior)); marked.runs[2].cases.secret.wrong = "misread";
+ok(lost(prior, { runs: three.slice(0, 2) }).length === CASES.length && lost(prior, { runs: [] }).length === CASES.length * 3 && lost(prior, marked).length === 0 && lost(prior, { runs: [...three, run("2027-01-02")] }).length === 0,
+  "a verdict the release before held and the record lost since is found; one marked wrong, or runs added, are not");
+ok(forRelease({ runs: [] }, { boundBefore: true, cut: ["secret (2026-12-01)"] }).held && /Mend: /.test(forRelease({ runs: [] }, { cut: ["x"] }).held), "a record that lost a verdict holds the release, saying the mend");
 const held = forRelease({ runs: three });
 ok(held.held && /secret/.test(held.held) && /Mend: /.test(held.held), "where they hold it, a failing case holds the release and says the mend", held.held);
 ok(forRelease({ runs: three.slice(1) }).held === null && /advisory/.test(forRelease({ runs: three.slice(1) }).said), "while they advise, a failing case is said and holds nothing");
