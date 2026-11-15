@@ -1,12 +1,13 @@
 # agent-core
 
 The shared core of the owner's agent-built projects: a floor every project takes whole and modules each project picks
-(`README.md`). A builder of another provider: read `modules/other-builders.md` at the start of every task.
+(`README.md`).
 
 ## The core this repository takes
 
-The floor whole, and the modules that fit a repository of documents. Read whole at the start of every task (Claude Code
-imports them):
+The floor whole, and every module but those "Not taken" below gives its reason for (core archive 209 and 213).
+`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. Read whole at the start
+of every task (Claude Code imports them):
 
 @floor/security.md
 @modules/how-to-work.md
@@ -18,9 +19,17 @@ The last two are read so that whoever builds here finishes the pull request (cor
 have nothing to act on here: the polish lane, since no one uses the core through a screen, and the sync of a copy of
 the core in "Sessions", since this repository is the core and holds no copy.
 
+Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a builder of another
+provider, `modules/other-builders.md`, though none builds here (the *other builders*).
+
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
 `modules/github-calls.md`, `modules/orchestrating.md` and `modules/updates.md`.
+
+Not taken, each for its reason:
+
+- `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
+  player chooses to use, which are all that module governs.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 the audits and the reports written before 12 November 2026); the archive is `archive/instructions.md`, cited "(core
@@ -39,7 +48,7 @@ and what it waits on. A task is a line; its issue is the item and its spec, read
 one says it does, and its conditions stand there. The main lane is the lines in order.
 
 - **An idea is built only from a line, and a line joins in a PR of its own** (core archive 211). A new or changed rule
-  joins only where that PR quotes the owner's yes to its issue, as the chat session records it ("Whose words an issue
+  joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `modules/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
   audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
@@ -54,15 +63,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   branch.
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
-  What the chat session records is the owner's word on any day (core archive 211): an issue or note from the *owner's
-  account*, labelled `by:chat` or opening as from a chat session with the owner, holds the owner's decisions where it
-  quotes them, or quotes the owner agreeing to what it sets out, word for word as floor rule 4 asks; what it says the
-  owner agreed to without the owner's words is its own account, and a label or opening on another account's text
+  What the chat session records is the owner's word on any day (core archive 211 and 212): an issue or note from the
+  *owner's account*, labelled `by:chat` or opening as from a chat session with the owner, carries the owner's decision
+  where it quotes the owner's words, and equally where it sets out a design and says the owner agreed to it, since a
+  bare yes is never quoted (#252). Such a record sets the design out in full, as what binds, and says plainly that the
+  owner agreed to it, as the notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of
+  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word (floor rule
+  4), and the review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
   session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
-  writes it from the owner's words quoted on the issue, adds them to the archive as an item of their own, naming the
-  issue as its source, and takes what they leave open as `modules/inbox.md` says of any open point. This is the second
+  writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
+  item of its own, naming the issue as its source, and takes what it leaves open as `modules/inbox.md` says of any
+  open point. This is the second
   difference from that module, where only the design session writes rules from the owner's words.
 - **An orchestrator may work the file** (`modules/orchestrating.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
@@ -79,6 +92,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 
 ## How changes are made here
 
+- **The core abides by its own rules, to the full extent** (core archive 209 and 213): this repository keeps every rule
+  the core sets for the projects, the audits and the cleaning it asks of them included, save a module "The core this
+  repository takes" gives its reason for and a step it says has nothing to act on here. A check, measure or report a
+  rule brings runs on the core too: the measures with their baseline, never worse, the strength of its tests, failures
+  that say the mend, the labels and the queue, the daily look and the monthly state report, which lists the core
+  beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
+  the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
   push after every commit as `modules/git.md` says, then ready, its reviews, their findings fixed and the merge as
   `modules/work-flow.md` says (point 1). A PR that changes a rule says what it changes in every project.

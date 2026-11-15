@@ -25,6 +25,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { scratchEnv } from "./scratch-core.mjs";
 import { evaluate, parseYaml, runWorkflow } from "./workflow-run.mjs";
 
 let failed = 0, count = 0;
@@ -49,18 +50,14 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "upgrade-test-"));
 process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
 const slash = p => p.replace(/\\/g, "/");
 const theCore = path.join(tmp, "the-core");
-const url = `https://github.com/${CORE}`;
 // (what each program it starts reads of the user's own is the scratch folder's: no home, npm or NuGet setting, cache or
-// token of the user's reaches a check)
-const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|CLAUDE_|GH_|NPM_|NUGET_|DOTNET_CLI_HOME$)|^npm_|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
+// token of the user's reaches a check; the last two releases' sync.mjs finds its bare repository by itself)
+const env = scratchEnv(theCore, tmp, { findsBare: true });
 const home = path.join(tmp, "home");
 fs.mkdirSync(path.join(home, "AppData", "Local"), { recursive: true });
 fs.mkdirSync(path.join(home, "AppData", "Roaming"), { recursive: true });
 Object.assign(env, { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "AppData", "Roaming"), LOCALAPPDATA: path.join(home, "AppData", "Local"), XDG_CONFIG_HOME: path.join(home, ".config"),
   npm_config_cache: path.join(home, ".npm") }); // (npm's own config is the home's, which holds none)
-Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1",
-  // (the core's address leads to the scratch core, and no git call reaches the network: a call that the rewrite misses fails)
-  GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_0: url, GIT_CONFIG_KEY_1: `url.${slash(theCore)}.insteadOf`, GIT_CONFIG_VALUE_1: `${url}.git`, GIT_ALLOW_PROTOCOL: "file" });
 const named = new Map(); // (a project's folder, and the name git writes into each commit made in it)
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: { ...env, ...named.get(dir) }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };

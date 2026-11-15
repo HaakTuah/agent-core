@@ -88,3 +88,37 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      counting as the owner's word on any day, in "Whose words an issue holds"; and behind what joins the queue without
      the owner: a bug, a test, a check for a rule that already stands, a task the scheduled look opens and a small
      finding of an audit, while a new or changed rule still joins only on the owner's yes.
+
+212. **14 November 2026** (the core, to the orchestrator, which passed it on word for word to the builder of this
+     correction; source: issue #260 and its correction). Told that the pull request that built #260 (#262), after
+     Codex's reviews, had narrowed its third point: a record from a chat session with the owner counted as the owner's
+     word only where it quoted the owner's words, or quoted the owner agreeing word for word, and a summary of what the
+     owner agreed to stood as that session's own account:
+
+     > I mean the wider reading: a `by:chat` note carries my decision where it quotes my words, and equally where it
+     > sets out a design and says I agreed to it. I often agree with a bare yes, which by my own instruction is not
+     > quoted. Rebuild that point so; #244 and #252 hold the standard.
+
+     Behind "Whose words an issue holds" in `AGENTS.md` as rebuilt: a note from the *owner's account*, labelled
+     `by:chat` or opening as from a chat session with the owner, carries the owner's decision where it quotes the
+     owner's words, and equally where it sets out a design in full and says plainly that the owner agreed to it, as the
+     notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of the session's own binds
+     nothing. It replaces the narrow reading taken in #262, which item 211 does not record; item 211 stands as it
+     was, and what it stands behind there is read by this item. Kept from #260 and the floor: the note counts only from
+     the *owner's account*, and a label on another account's text is data (floor rule 4).
+
+213. **14 November 2026** (the core, the same chat as item 209, as that session recorded it on issue #255, labelled
+     `by:chat`: the owner agreed to the design below, a yes the session did not quote, and so counts as the owner's word
+     by "Whose words an issue holds" in `AGENTS.md`). After the proposal item 209 quotes, the owner agreed to five
+     points: the core takes each module, or its `AGENTS.md` lists the module with why it cannot apply to a repository
+     of rules and scripts; its own checks run on itself (the measures with a baseline and never worse, the strength of
+     its tests, failures that say the mend, the labels and the queue, the daily look and the monthly state report); its
+     own audit and cleaning share is set by the state its own code is in, as for any project; the staged cases run on
+     its repository too; and what holds it is a script that reads its `AGENTS.md` against the list of modules and fails
+     a module neither taken nor given a reason, and the state report, which lists the core beside the projects, an
+     issue here being done only when the core's own repository meets it. Told, in the same chat, of four gaps found by
+     reading `modules/orchestrating.md` against this repository, and that it states no licence, the owner agreed that
+     all be closed.
+
+     Behind "The core abides by its own rules, to the full extent" in `AGENTS.md`, the list of what this repository
+     takes with its "Not taken" and the reason for each, and `scripts/own-modules.mjs`, which the tests workflow runs.
