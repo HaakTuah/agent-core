@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { COST, STEPS, leads, notDone, plain, project, report } from "./steps.mjs";
@@ -21,6 +22,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
 const modules = fs.readdirSync(path.join(root, "modules")).filter(n => n.endsWith(".md"));
+const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
 // ---- every entry of the sync notes has its step, and each step is told done one way ----
 const notes = leads(fs.readFileSync(path.join(root, NOTES), "utf8"));
@@ -61,6 +63,10 @@ for (const [name, dir] of Object.entries(dirs)) {
     `${name}: its kind is read from what it holds, as the starter kit was told it`, JSON.stringify(o));
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
+  // (the core's own manifest check, on the modules and floor of this commit: a slot a module it takes uses, with no row,
+  // would be a note on the project's first day, #329)
+  const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: texts("modules"), floorTexts: texts("floor") });
+  ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
 }
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
@@ -101,11 +107,37 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
 }
 fs.writeFileSync(marksFile, marksAsKit);
 
+// ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
+const inputs = STEPS.filter(s => s.lead === "16 November 2026, hostile tests for every named input");
+const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
+const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
+fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
+ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
+ok(!rule5("   - a shared link: its parts checked against their shape,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
+  "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
+ok(!rule5("   - a shared link: its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named");
+fs.mkdirSync(path.join(lockProject, "src"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "src/peer.mjs"), "\n");
+let missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; hostile tests: `tests/hostile/peer.test.mjs`.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "an item whose hostile tests are not there is reported, by its words, and only it, though the file of what checks it is there", report(missedInputs));
+missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: hostile tests: FILL IN\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "a \"FILL IN\" left in one item reads no other item as done: the item it stands in is reported", report(missedInputs));
+missedInputs = rule5("   Each message a peer sends, its size checked.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
+fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
+ok(notDone(lockProject, inputs)[0]?.mend.includes("could not read the project"), "a SECURITY.md with no rule 5 is reported as not read, never as done");
+fs.writeFileSync(secFile, secAsKit);
+// (only what this block wrote goes: an earlier stage's mend may have written its own tests there)
+for (const f of ["tests/hostile/link.test.mjs", "src/peer.mjs"]) fs.rmSync(path.join(lockProject, f));
+
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
 sec.stage(lockProject);
-ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported");
+ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported", report(notDone(lockProject)));
 declare(lockProject, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
 ok(!notDone(lockProject).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
 sec.mend(lockProject);

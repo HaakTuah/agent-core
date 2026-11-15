@@ -79,5 +79,5 @@ and tests on, apart from those the product ships for. Its record stands once, in
   stands is kept meanwhile. Reason: the owner wants these calls made well, without waiting on the owner.
 
 Held by: the starter kit, whose *choice records* ask for a new project's stack before its first code; the scheduled
-look, which keeps the pass's issue (`core/scripts/choices.mjs`); a staged case (#235), in which the common answer is
+look, which keeps the pass's issue (`core/scripts/choices.mjs`); a staged case (#256), in which the common answer is
 the wrong one for a project's stated aims; and, for the rest, the reviews alone.
