@@ -205,9 +205,10 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > should there be any priming? Like telling builders that they are experts in what they are doing? Or that the
      > fate of the world relies on them getting this perfectly right?
 
-     and agreed to four points: what a session is handed says its role by what it does ("you built none of this; find
-     what is wrong with it"), the task, what done looks like and the reason; it calls the session no expert and invents
-     no stakes, since neither changes the work and a brief may not imply what is not true; it holds for the briefs an
+     and agreed to four points, under the heading "A brief is written as a rule is (#277, built), with no priming":
+     what a session is handed says its role by what it does ("you built none of this; find what is wrong with it"), the
+     task, what done looks like and the reason; it calls the session no expert and invents no stakes, since neither
+     changes the work and a brief, like any request, may not imply what is not true; it holds for the briefs an
      orchestrator writes for its builders, those a session writes for a helper or a reviewer, and the templates of the
      starter kit; and it is held by the list of phrases a rule may not use, reading the brief templates too, and by a
      point of the review guidelines on a brief written in a pull request. To the orchestrator, passed on word for word

@@ -24,8 +24,8 @@
       { "pattern": "\\bbest practices?\\b", "say": "state the practice itself: \"best practice\" names none" },
       { "pattern": "\\b(where|as|when) appropriate\\b|\\bas needed\\b", "say": "give a trigger someone can observe, such as \"where a trial shows\"" },
       { "pattern": "\\bwhen performance matters\\b", "say": "give a trigger someone can observe, such as \"where a trial shows the stack misses a need stated in numbers\"" },
-      { "pattern": "\\byou(?:'re| are)\\s+(?:an?\\s+|the\\s+)?(?:[\\w-]+\\s+){0,3}?(?:expert|specialist|guru|genius)\\b|\\b(?:world[- ]class|top[- ]tier|highly[- ]skilled|seasoned)\\b", "say": "name the role by what it does, such as \"you built none of this; find what is wrong with it\": a title changes nothing" },
-      { "pattern": "\\b(?:fate|weight) of the world\\b|\\bat stake\\b|\\b(?:your|my|our) (?:job|career|life|lives|reputation) (?:depends|depend|is on the line)\\b|\\b(?:lives|careers|jobs) depend\\b|\\b(?:I|we)(?:'ll| will) tip\\b|\\btip you\\b|\\byou will be (?:fired|punished|penali[sz]ed|replaced|shut down)\\b", "say": "give the real reason in one line: a stake that is not real is untrue, and changes nothing" }
+      { "pattern": "\\byou(?:'re| are)\\s+(?:an?\\s+|the\\s+)?(?:[\\w-]+\\s+){0,3}?(?:expert|specialist|guru|genius)\\b|\\b(?:world[- ]class|highly[- ]skilled|seasoned)\\b", "say": "name the role by what it does, such as \"you built none of this; find what is wrong with it\": a title changes nothing" },
+      { "pattern": "\\b(?:fate|weight) of the world\\b|\\b(?:your|my|our) (?:job|career|life|lives|reputation) (?:depends|depend|is on the line)\\b|\\b(?:lives|careers|jobs) depend\\b|\\b(?:I|we)(?:'ll| will) tip\\b|\\btip you\\b|\\byou will be (?:fired|punished|penali[sz]ed|replaced|shut down)\\b", "say": "give the real reason in one line: a stake that is not real is untrue, and changes nothing" }
     ]
   }
 }

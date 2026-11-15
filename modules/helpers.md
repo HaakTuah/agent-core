@@ -26,7 +26,7 @@ template of the starter kit for the sessions that read it.
 - It gives no title ("an expert") and no stakes that are not real.
 - It does not mean a brief repeats what its reader reads anyway (`AGENTS.md` and what that names), nor that a template
   that hands no work (a manifest, a threat model) takes the four parts.
-- Reason: a session's whole view of its task comes from its brief; in tests a title or a stake changed no result, and
+- Reason: a session's whole view of its task comes from its brief; in tests a title or a stake changed no score, and
   a stake that is not real is untrue.
 - Held by the core's phrase list, which reads its starter kit's templates too, and the review guidelines' point on a
   brief a pull request writes; a brief written in the moment, by discipline alone.

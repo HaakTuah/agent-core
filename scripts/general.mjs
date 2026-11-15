@@ -11,9 +11,9 @@
 // AGENTS.md; core archive 214), nor a brief (modules/helpers.md, "A brief is written as a rule is"; core archive 223).
 // It reports each one that stands in the files it names and in the Markdown files of the folders it names, a
 // template's (.md.tmpl) included, so the starter kit's templates too. It fails one in a line a change adds against
-// --base to any file there or under those folders, save a template of another kind (a workflow's), a line moved word
-// for word and one quoted with ">" aside. A phrase in code marks (`clean`) is named, not used, and is not read. Without
-// --base it only reports, and says so.
+// --base to any file there or under those folders, save a template of another kind (a workflow's) in a folder of
+// templates, a line moved word for word and one quoted with ">" aside. A phrase in code marks (`clean`) is named, not
+// used, and is not read. Without --base it only reports, and says so.
 // This repository only, run by size.yml with the base. Reads only; git and Node's own modules.
 //
 //   node scripts/general.mjs scripts/general.json [--base <commit>]
@@ -94,7 +94,10 @@ if (!ruleFiles.length) { console.log("FAIL no rule file was read for the phrases
 const fresh = new Set();
 let failedPhrases = 0, reported = 0;
 if (baseRev) {
-  for (const a of addedLines(phrasePaths).filter(a => !/\.tmpl$/u.test(a.file) || /\.md\.tmpl$/u.test(a.file))) {
+  // (a template of another kind is left out only under a folder of templates, one that holds a Markdown template)
+  const kits = phrasePaths.filter(p => ruleFiles.some(f => f.startsWith(`${p}/`) && /\.md\.tmpl$/u.test(f)));
+  const other = file => /\.tmpl$/u.test(file) && !/\.md\.tmpl$/u.test(file) && kits.some(k => file.startsWith(`${k}/`));
+  for (const a of addedLines(phrasePaths).filter(a => !other(a.file))) {
     fresh.add(`${a.file}:${a.line}`);
     for (const { hit, say } of used(a.text)) { failedPhrases++; console.log(`FAIL ${a.file}:${a.line}: "${hit[0]}" in a rule or brief this change writes. Mend: ${say}`); }
   }
