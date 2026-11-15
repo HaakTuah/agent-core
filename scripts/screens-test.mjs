@@ -75,8 +75,12 @@ ok(rw.checks.has("values") && rw.listed.has("values: cart: #0f0") && rw.listed.h
 
 // ---- the baseline lowered ----
 const listed = new Map([["rendered: cart: contrast of the total", { count: 3 }], ["rendered: cart: gone", true], ["values: about: #0f0", true]]);
-const low = lowered(listed, f);
+const low = lowered(listed, f, c.checks);
 ok(low.get("rendered: cart: contrast of the total").count === 2 && !low.has("rendered: cart: gone") && low.has("values: about: #0f0"), "--write lowers what was run and keeps what was not");
+const valuesOff = parseConfig(config({ console: "reports" }), "c");
+const offRun = parseFound(found(["home"], { "values: home: raw red": true }), "f", valuesOff);
+const kept = rewritten({ listed: new Map([["values: home: raw red", true]]), grown: {}, checks: new Set(["values", "console"]) }, valuesOff, offRun, "s");
+ok(kept.listed.has("values: home: raw red"), "--write keeps the entries of a check switched off, whose findings the run does not read");
 
 // ---- whole runs ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "screens-test-"));

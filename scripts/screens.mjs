@@ -104,7 +104,7 @@ export function verdict({ config, at, self, found, baseline, base }) {
     if (config.checks.get(partsOf(id).check) === "binds") fail.push(`FAIL: ${id}: new, and the check ${partsOf(id).check} binds here. Mend: ${MENDS[partsOf(id).check]}; then run the project's tool and this check again`);
     else said.push(`said ${id}: new; the check ${partsOf(id).check} reports here and fails nothing`);
   }
-  const gone = [...baseline.listed].filter(([id, n]) => config.checks.get(partsOf(id).check) === "binds" && JSON.stringify(lowered(new Map([[id, n]]), found).get(id)) !== JSON.stringify(n)).map(([id]) => id);
+  const gone = [...baseline.listed].filter(([id, n]) => config.checks.get(partsOf(id).check) === "binds" && JSON.stringify(lowered(new Map([[id, n]]), found, config.checks).get(id)) !== JSON.stringify(n)).map(([id]) => id);
   if (gone.length) fail.push(`FAIL: ${config.baseline} lists ${plural(gone.length, "entry", "entries")} of a screen this run read that ${gone.length === 1 ? "is" : "are"} mended or smaller now, and the baseline lists only what stands. Mend: lower it with node ${self} <found> ${at} --write, and commit the baseline`, ...gone.map(id => `  ${id}`));
   if (base?.listed) {
     // an entry of a check the base had not listed joins freely: the check reads more, and what stood is listed
@@ -131,7 +131,7 @@ const written = (listed, grown, checks) => {
 // What --write lists: the baseline lowered to what stands, and, of each check turned on that it has not listed yet,
 // what a run over every screen found; it throws where the run did not cover every screen.
 export function rewritten(baseline, config, found, self) {
-  const listed = lowered(baseline.listed, found), checks = new Set(baseline.checks);
+  const listed = lowered(baseline.listed, found, config.checks), checks = new Set(baseline.checks);
   const unlisted = [...config.checks.keys()].filter(check => !checks.has(check));
   if (unlisted.length && !found.all) refuse(`the ${unlisted.join(", ")} ${unlisted.length === 1 ? "check has" : "checks have"} never been listed, and this run did not cover every screen`, `run the project's tool over every screen, writing "all": true, then node ${self} <found> --write again`);
   for (const check of unlisted) {
@@ -141,12 +141,13 @@ export function rewritten(baseline, config, found, self) {
   return { listed, checks };
 }
 
-// The baseline lowered to what still stands: an entry of a screen that was run stays only where it was found again,
-// at the smaller count; one of a screen not run stays as it is.
-export function lowered(listed, found) {
+// The baseline lowered to what still stands: an entry of a screen that was run, of a check turned on (`on`), stays
+// only where it was found again, at the smaller count; one of a screen not run, or of a check switched off, whose
+// findings the run does not read, stays as it is.
+export function lowered(listed, found, on) {
   const out = new Map();
   for (const [id, n] of listed) {
-    if (!found.screens.has(partsOf(id).screen)) { out.set(id, n); continue; }
+    if (!found.screens.has(partsOf(id).screen) || !on.has(partsOf(id).check)) { out.set(id, n); continue; }
     const now = found.found.get(id);
     if (now === undefined) continue;
     out.set(id, now === true || n === true ? n : { count: Math.min(now.count, n.count) });
