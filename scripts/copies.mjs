@@ -30,7 +30,7 @@ try {
   where = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: HERE, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
     .split(/\r?\n/u);
 } catch {
-  fail(`${HERE} is in no git work tree, and the check reads the files git lists. Mend: run the script that stands in the repository's clone (core/scripts/copies.mjs in a project)`);
+  fail(`copies.mjs stands in no git work tree, and the check reads the files git lists. Mend: run the script that stands in the repository's clone (core/scripts/copies.mjs in a project)`);
 }
 const ROOT = where[0], CORE = where[1].replace(/scripts\/$/u, "");
 const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template/copies.json.tmpl`;
