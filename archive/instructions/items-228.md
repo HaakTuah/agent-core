@@ -1,8 +1,8 @@
-# The owner's words behind the core: items 227 onward
+# The owner's words behind the core: items 228 onward
 
 How they are kept, and where each item lives: `archive/instructions.md`.
 
-227. **15 November 2026** (projects with a screen; in chats with a session the owner works with, not the design
+228. **15 November 2026** (projects with a screen; in chats with a session the owner works with, not the design
      session, as that session recorded them on issue #284, labelled `by:chat`, whose description it named the issue's
      current text in a note of the same day; the description sets the design out in full, as eighteen points with what
      holds them and what stays out, and says the owner agreed to every point; and as the owner then told the

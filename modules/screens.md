@@ -1,7 +1,7 @@
 # Screens
 
 Read when a screen is designed, added or changed, in a project people use through one, and before a polish-lane task
-(core archive 227). A screen is what a project's users see and act through: a page of a site, an app's view, a desktop
+(core archive 228). A screen is what a project's users see and act through: a page of a site, an app's view, a desktop
 program's window. A project with no screen has nothing here to act on.
 
 **Whom it binds, and when.** By default each point below binds the builder of a pull request that adds or changes a
