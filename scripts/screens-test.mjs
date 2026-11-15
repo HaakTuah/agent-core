@@ -2,8 +2,9 @@
 // new against the baseline and what a listed entry covers, a check that reports against one that binds, each check's
 // own mend, an entry mended but still listed, the baseline lowered only on the screens run, and whole runs in a
 // scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that joins the
-// baseline against the base, a base that is no commit, a baseline moved, a config taken out, and a path outside the
-// project. Each failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline moved, a
+// config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each failure
+// is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/screens-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -50,10 +51,12 @@ ok(verdict({ config: c, at: "c", self: "s", found: grew, baseline: base }).said.
 const other = parseFound(found(["home"], { "rendered: home: contrast of the total": { count: 1 } }), "f", c);
 ok(verdict({ config: c, at: "c", self: "s", found: other, baseline: base }).said.length === 1, "an entry of another screen covers nothing, though that screen was not run");
 const joined = { listed: new Map([...base.listed, ["values: home: #f00 in the button", true]]), grown: {} };
-v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed } });
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed, checks: c.checks } });
 ok(v.fail[0]?.includes("only shrinks") && v.fail[1] === "  values: home: #f00 in the button" && mended(v.fail.join("\n")), "an entry that joins the baseline against the base fails, with its mend", v.fail.join("\n"));
-v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...joined, grown: { "values: home: #f00 in the button": "the button's red is the brand's, which the direction keeps" } }, base: { name: "origin/main", listed: base.listed } });
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...joined, grown: { "values: home: #f00 in the button": "the button's red is the brand's, which the direction keeps" } }, base: { name: "origin/main", listed: base.listed, checks: c.checks } });
 ok(v.fail.length === 0, "one given its reason under \"grown\" joins");
+v = verdict({ config: c, at: "c", self: "s", found: f, baseline: joined, base: { name: "origin/main", listed: base.listed, checks: new Map([["rendered", "reports"]]) } });
+ok(v.fail.length === 0, "an entry of a check the base did not turn on joins freely: the check reads more, and what stood is listed", v.fail.join("\n"));
 
 const stale = { listed: new Map([["values: home: #f00 in the button", true], ["values: cart: #0f0", true]]), grown: {} };
 v = verdict({ config: c, at: "c", self: "s", found: parseFound(found(["home"], {}), "f", c), baseline: stale });
@@ -104,6 +107,12 @@ try {
   fs.rmSync(path.join(dir, "checks/screens.json"));
   r = run(["found.json"], { SCREENS_BASE: "main" });
   ok(r.code === 1 && mended(r.out) && r.out.includes("is gone"), "a config the base holds may not be taken out, with its mend", r.out);
+  git("checkout", "-q", "-b", "custom"); fs.writeFileSync(path.join(dir, "checks/custom.json"), config({ values: "binds" }));
+  fs.writeFileSync(path.join(dir, "core-manifest.md"), "## Slots\n| Slot | Here |\n| --- | --- |\n| *screen checks* | `checks/custom.json` |\n");
+  git("add", "-A"); git("commit", "-qm", "custom");
+  fs.rmSync(path.join(dir, "checks/custom.json")); fs.rmSync(path.join(dir, "core-manifest.md"));
+  r = run(["found.json"], { SCREENS_BASE: "custom" });
+  ok(r.code === 1 && mended(r.out) && r.out.includes("checks/custom.json is gone"), "a config the base's manifest named, taken out with its row, fails, with its mend", r.out);
   fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
   r = run(["../found.json"]);
   ok(r.code === 1 && mended(r.out) && r.out.includes("not inside the project"), "a config or file of findings outside the project is refused, with its mend", r.out);

@@ -94,7 +94,8 @@ export function verdict({ config, at, self, found, baseline, base }) {
   const gone = [...baseline.listed].filter(([id, n]) => config.checks.get(partsOf(id).check) === "binds" && JSON.stringify(lowered(new Map([[id, n]]), found).get(id)) !== JSON.stringify(n)).map(([id]) => id);
   if (gone.length) fail.push(`FAIL: ${config.baseline} lists ${plural(gone.length, "entry", "entries")} of a screen this run read that ${gone.length === 1 ? "is" : "are"} mended or smaller now, and the baseline lists only what stands. Mend: lower it with node ${self} <found> ${at} --write, and commit the baseline`, ...gone.map(id => `  ${id}`));
   if (base?.listed) {
-    const joined = unclaimed(baseline.listed, base.listed, {}, own).filter(id => !(baseline.grown[id] ?? "").trim());
+    // an entry of a check the base did not turn on joins freely: the check reads more, and what stood is listed
+    const joined = unclaimed(baseline.listed, base.listed, {}, own).filter(id => base.checks.has(partsOf(id).check) && !(baseline.grown[id] ?? "").trim());
     if (joined.length) fail.push(`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} did not, and the baseline only shrinks. Mend: take each out of the baseline (git checkout ${base.name} -- ${config.baseline}, then node ${self} <found> ${at} --write) and mend the screen; only where there is no other way, give each its reason under "grown" by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...joined.map(id => `  ${id}`));
   }
   return { fail, said, listed: baseline.listed.size };
@@ -131,20 +132,27 @@ function baseOf() {
   const name = process.env.SCREENS_BASE || "";
   if (!name) return null;
   if (!/^\w[\w./^~-]*$/u.test(name)) refuse(`SCREENS_BASE (${JSON.stringify(name).slice(0, 80)}) is no plain name of a commit or branch`, "set it to the pull request's base, such as origin/main");
-  const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] });
+  const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"] });
   try { git(["rev-parse", "--verify", "--quiet", `${name}^{commit}`]); } catch { refuse(`${name} is not a commit here`, `fetch it (git fetch origin ${name.replace(/^origin\//u, "")}), or set SCREENS_BASE to the pull request's base`); }
-  return { name, show: file => tolerant(() => git(["show", `${name}:${file}`])) };
+  // a file the base does not hold is null; one it holds and that cannot be read refuses, never reading as none
+  const show = file => {
+    if (tolerant(() => git(["cat-file", "-e", `${name}:${file}`])) === null) return null;
+    try { return git(["show", `${name}:${file}`]); } catch { return refuse(`${name}:${file} could not be read`, "run the check again; where it fails again, the file at the base is too large for git's output here: say so in the pull request"); }
+  };
+  // the config the base held: where the run names it, where the base's own manifest's row does, or the kit's path
+  const config = at => [at, where(show("core-manifest.md")), KIT].find(file => show(file) !== null) ?? null;
+  return { name, show, config };
 }
 
-// What the base's baseline listed, read where the base's own config put it: null only where the base had no config
-// (the pull request turns the checks on, and writes the first baseline); an empty list where its baseline is gone.
+// What the base's baseline listed, read where the base's own config put it, and the checks that config turned on:
+// null only where the base had no config (the pull request turns the checks on, and writes the first baseline); an
+// empty list where its baseline is gone.
 function baseListed(base, at) {
-  const held = [at, where(base.show("core-manifest.md")), KIT].find(file => base.show(file) !== null);
-  if (held === undefined) return null;
-  const text = base.show(held);
-  const was = tolerant(() => parseConfig(text, `${base.name}:${held}`));
+  const held = base.config(at);
+  if (held === null) return null;
+  const was = tolerant(() => parseConfig(base.show(held), `${base.name}:${held}`));
   const listed = was && tolerant(() => parseBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, "").listed);
-  return listed ?? new Map();
+  return { listed: listed ?? new Map(), checks: was?.checks ?? new Map() };
 }
 
 function first(config, at, self, found) {
@@ -165,12 +173,12 @@ function run(config, at, self, found, command) {
     fs.writeFileSync(config.baseline, written(kept, baseline.grown));
     return console.log(`${config.baseline}: ${plural(kept.size, "entry", "entries")} listed, ${baseline.listed.size} before`), 0;
   }
-  const b = baseOf(), listed = b && baseListed(b, at);
-  const v = verdict({ config, at, self, found, baseline, base: b && { name: b.name, listed } });
+  const b = baseOf(), was = b && baseListed(b, at);
+  const v = verdict({ config, at, self, found, baseline, base: was && { name: b.name, ...was } });
   for (const line of v.said) console.log(line);
   if (found.off) console.log(`note ${plural(found.off, "finding")} of checks the config leaves off, not read`);
   if (!b) console.log("note no base to compare with (set SCREENS_BASE to the branch the work started from), so the baseline was not checked for what joined it");
-  else if (listed === null) console.log(`note ${b.name} had no config at ${at}: this pull request turns the checks on, and its baseline is the first`);
+  else if (was === null) console.log(`note ${b.name} had no config at ${at}: this pull request turns the checks on, and its baseline is the first`);
   for (const line of v.fail) console.error(line);
   if (v.fail.length) return 1;
   console.log(`ok   nothing new that binds on ${plural(found.screens.size, "screen")}; ${plural(v.listed, "old finding")} listed in ${config.baseline}`);
@@ -180,8 +188,8 @@ function run(config, at, self, found, command) {
 // Where no config stands: every check is off, unless the base held one, which no pull request takes out.
 function off(at, named) {
   if (named) refuse(`there is no config at ${at}`, `write it as core/modules/screens.md, "What holds it", says, or run with no config named`);
-  const b = baseOf();
-  if (b?.show(at) != null) refuse(`${at} is gone, and ${b.name} holds it: no pull request takes the screen checks' config out`, `take it back as ${b.name} holds it (git checkout ${b.name} -- ${at})`);
+  const held = baseOf()?.config(at);
+  if (held) refuse(`${held} is gone, and ${process.env.SCREENS_BASE} holds it: no pull request takes the screen checks' config out`, `take it back as ${process.env.SCREENS_BASE} holds it (git checkout ${process.env.SCREENS_BASE} -- ${held}), with its row in core-manifest.md where the base had one`);
   console.log(`ok   no screen check is on here (${at} does not stand): each is off until the project names it`);
   return 0;
 }
