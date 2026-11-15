@@ -105,13 +105,14 @@ function bindings(toks) {
 // The names a destructuring pattern at k binds ({ a, b: c, d = f(x, y) } or [e, ...g]): each name in its braces and
 // brackets, not in a default's parentheses, that a , } ] or = follows, a key (a :) and a member (a .) aside.
 function pattern(toks, k) {
-  const names = [], open = [];
+  const names = [];
+  let open = 0, parens = 0; // (the brackets open, and how many of them are a default's parentheses)
   if (!isP(toks[k], "{") && !isP(toks[k], "[")) return names;
   for (let j = k; j < toks.length; j++) {
     const v = toks[j].t === "punct" ? toks[j].v : null;
-    if (v && "([{".includes(v)) open.push(v);
-    else if (v && ")]}".includes(v) && (open.pop(), open.length === 0)) return names;
-    else if (toks[j].t === "id" && !open.includes("(") && !isP(toks[j - 1], ".") && [",", "}", "]", "="].some(s => isP(toks[j + 1], s))) names.push(toks[j].v);
+    if (v && "([{".includes(v)) { open++; if (v === "(") parens++; }
+    else if (v && ")]}".includes(v)) { open--; if (v === ")") parens--; if (open === 0) return names; }
+    else if (toks[j].t === "id" && parens === 0 && !isP(toks[j - 1], ".") && [",", "}", "]", "="].some(s => isP(toks[j + 1], s))) names.push(toks[j].v);
   }
   return names;
 }

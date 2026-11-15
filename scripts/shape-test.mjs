@@ -332,6 +332,13 @@ r = run([], { SHAPE_BASE: "base" });
 ok(r.status === 1 && mended(r.out) && /no longer names 4 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
 fs.rmSync(path.join(dir, "checks/moved.json"));
 git("checkout", "-q", "--", ".");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
+put("checks/other.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
+put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /no longer names 4 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
+for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
+git("checkout", "-q", "--", ".");
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));

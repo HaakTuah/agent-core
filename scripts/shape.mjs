@@ -634,13 +634,19 @@ function unwritten(self, base) {
   return 0;
 }
 
-// The baseline's path as the base's own config names it (a pull request that moves it is compared with the old one).
-const baselineAt = (base, at) => { const text = base.show(at); return text === null ? null : tolerant(() => parseConfig(text, base.name).baseline); };
+// The base's config and baseline as the base's own rules place them, so that a pull request that moves either is
+// compared with the old one: the config one named on the command line (the workflow's), else the one the base's
+// manifest (in the core, its AGENTS.md) names; the baseline where that config names it.
+function baseFiles(base, named) {
+  const at = named ?? where(base.show("core-manifest.md") ?? base.show("AGENTS.md"));
+  const config = base.show(at), baseline = config === null ? null : tolerant(() => parseConfig(config, base.name).baseline);
+  return { config, baseline: baseline === null ? null : base.show(baseline) };
+}
 
-function check(config, at, self, found, base) {
+function check(config, at, self, found, base, named) {
   if (!fs.existsSync(notLinked(config.baseline))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
-    base: base && { name: base.name, baseline: base.show(baselineAt(base, at) ?? config.baseline), config: base.show(at), standing: () => standingAt(base.name, config) } });
+    base: base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${note}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(line);
@@ -659,7 +665,7 @@ function main(argv) {
   const command = { "--first": first, "--write": write }[rest[0] ?? ""];
   if (rest.length > 1 || (rest.length && !command)) refuse(`the check does not know ${rest.join(" ")}`, `run node ${self} [<config>] [--first | --write], or --suite <name> with -- <command> or --since <seconds>`);
   const now = standing(config), found = survey(now.texts, config, now.tests);
-  if (!command) return check(config, at, self, found, base);
+  if (!command) return check(config, at, self, found, base, named);
   if (command === write && !fs.existsSync(config.baseline)) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base, found);
 }
