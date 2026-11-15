@@ -80,9 +80,9 @@ ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    director
 const nugetCall = o => parseYaml(files({ owner: "someone", name: "P", nuget: ".", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/workflows/nuget.yml")[1]);
 const privateCall = nugetCall({ private: true }), publicCall = nugetCall({});
 const filter = privateCall.on.pull_request?.paths ?? [];
-ok(filter.length > 0 && pathsLetThrough(filter, ["App.csproj"]) && pathsLetThrough(filter, ["src/App/packages.lock.json"]) && pathsLetThrough(filter, ["NuGet.Config"]) && pathsLetThrough(filter, ["checks/licences.json"])
+ok(filter.length > 0 && pathsLetThrough(filter, ["App.csproj"]) && pathsLetThrough(filter, ["src/App/packages.lock.json"]) && pathsLetThrough(filter, ["NuGet.Config"]) && pathsLetThrough(filter, ["src/App.CSPROJ"]) && pathsLetThrough(filter, ["Packages.Lock.Json"]) && pathsLetThrough(filter, ["a/packages.net8.0.lock.json"]) && pathsLetThrough(filter, ["checks/licences.json"])
   && !pathsLetThrough(filter, ["README.md", "src/App/Program.cs", "core/scripts/nuget.mjs"]) && privateCall.jobs.nuget.with.config === "checks/licences.json" && publicCall.on.pull_request === null,
-  "a private project's NuGet check starts only on a pull request that changes a file NuGet reads by name, so no other bills a job; a public one's on every pull request", JSON.stringify(privateCall.on));
+  "a private project's NuGet check starts only on a pull request that changes a file NuGet reads by name, in any case, so no other bills a job; a public one's on every pull request", JSON.stringify(privateCall.on));
 const both = dependabot({ packages: "web", nuget: "." });
 ok(ecosystems(both) === 3 && both.indexOf('directory: "/web"') > 0 && both.indexOf('directory: "/web"') < both.indexOf('"nuget"') && (both.match(/^version: 2$/gm) ?? []).length === 1, "a project with both installers gets both, in one config");
 ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");
