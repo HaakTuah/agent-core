@@ -166,6 +166,12 @@ jobs:
       - name: The core takes each of its own modules, or its AGENTS.md gives its reason
         if: ${{ !cancelled() }}
         run: node scripts/own-modules.mjs
+      - name: The manifest check
+        if: ${{ !cancelled() }}
+        run: node scripts/manifest-reads-test.mjs
+      - name: The core's own AGENTS.md fills each slot its modules use
+        if: ${{ !cancelled() }}
+        run: node scripts/manifest-reads.mjs --core
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() }}
         run: node scripts/workflows.mjs
