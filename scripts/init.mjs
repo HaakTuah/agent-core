@@ -145,10 +145,21 @@ export function fill(text, words) {
   return out;
 }
 
+// A game's own rows of its manifest: the slots modules/game-design.md uses, each left for the project to fill (#329).
+export const GAME_ROWS = [
+  ["computer players", "what the game calls its computer players, and where their logic lives"],
+  ["measured players", "the computer players the measurement plays, and where they live"],
+  ["what they are shown", "what the computer players are shown of the game, and where it is made"],
+  ["use-against-ignore measurement", "the command that plays a feature used against it ignored, and what it prints"],
+  ["where the numbers go", "where that measurement's numbers are kept"],
+  ["where rules are taught", "where a player learns the rules, such as the help screen's file"],
+];
+
 // Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
 // `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
-  const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game)." };
+  const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game).",
+    games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "" };
   return FILES.filter(([, , when]) => !when || when(o)).map(([template, to]) => {
     let text = fill(read(template), words);
     // (Dependabot's own part for each installer the project named, after the part every project has)
@@ -228,7 +239,7 @@ function init(argv) {
   git(["add", "--", "checks/copies-baseline.json"], here, guarded());
 
   console.log(`The starter kit is written: ${out.length + 3} files (the last three checks/sizes.json, checks/licences.json and checks/copies-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
-  const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).trim()}` : null).filter(Boolean));
+  const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");

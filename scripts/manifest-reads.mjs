@@ -22,7 +22,8 @@ import { readSection } from "./own-modules.mjs";
 import { started } from "./started.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
-const italics = text => [...String(text).matchAll(/(?<![*\w])\*([^*\n]+?)\*(?![*\w])/gu)].map(m => plain(m[1]));
+// (a phrase in italics may run over one line break, as a module's text wraps it: "*where the numbers\n  go*")
+const italics = text => [...String(text).matchAll(/(?<![*\w])\*([^*\n]+?(?:\n[ \t]*[^*\n]+?)?)\*(?![*\w])/gu)].map(m => plain(m[1]));
 const section = (lines, title) => {
   const at = lines.findIndex(l => l === title);
   if (at < 0) return [];

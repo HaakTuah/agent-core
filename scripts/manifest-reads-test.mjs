@@ -26,6 +26,8 @@ const table = slotTable(README);
 ok(table.size === 5 && table.get("follows").fallback && !table.get("progress file").fallback && table.get("tiny file").what === "a game's names", "the slots table is read, a slot with a default marked, one row of several names shared", JSON.stringify([...table]));
 ok(italicsOk(), "an italic phrase that is no slot is no slot used");
 function italicsOk() { return !has(run(manifest("all", ROWS + "\n| *big file* | x |")), "keep it lean"); }
+const wrapped = notes({ manifest: manifest("all", ROWS), readme: README, moduleTexts: { ...MODULES, "g.md": "Uses the *big\n  file*, as a wrapped line has it." }, floorTexts: FLOOR });
+ok(has(wrapped, "no row for *big file*"), "a slot whose name a module wraps over a line break is read as used", wrapped.join("\n"));
 
 ok(run(manifest("all", ROWS + "\n| *big file* | `1 KB` |")).length === 0, "all modules taken, every slot they use filled or with a default: no note");
 let n = run(manifest("`a.md`, `b.md`, `g.md`", ROWS + "\n| *big file* | `1 KB` |"));
