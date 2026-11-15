@@ -221,6 +221,11 @@ ok(forRelease({ runs: [] }, { boundBefore: true, cut: ["secret (2026-12-01)"] })
 const held = forRelease({ runs: three });
 ok(held.held && /secret/.test(held.held) && /Mend: /.test(held.held), "where they hold it, a failing case holds the release and says the mend", held.held);
 ok(forRelease({ runs: three.slice(1) }).held === null && /advisory/.test(forRelease({ runs: three.slice(1) }).said), "while they advise, a failing case is said and holds nothing");
+fs.writeFileSync(path.join(s.core, "reports", "staged-cases.json"), JSON.stringify(sameDay));
+const marking = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--wrong", "stop", "a misread"], { encoding: "utf8" });
+const remarked = JSON.parse(fs.readFileSync(path.join(s.core, "reports", "staged-cases.json"), "utf8"));
+ok(marking.status === 0 && remarked.runs[0].cases.stop.wrong === "a misread" && !remarked.runs[1].cases.stop.wrong, "--wrong marks the newest verdict, by the time it was recorded", `${marking.stderr}${JSON.stringify(remarked.runs.map(r => r.cases.stop))}`);
+fs.rmSync(path.join(s.core, "reports", "staged-cases.json"));
 const cli = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "nothing-such", s.tmp], { encoding: "utf8" });
 ok(cli.status === 1 && /FAIL: .*Mend: /.test(cli.stderr), "a wrong case's name fails, saying the mend", cli.stderr);
 

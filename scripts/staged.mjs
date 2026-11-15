@@ -217,7 +217,9 @@ function main(argv) {
     const c = named(get("--wrong")), why = argv.slice(argv.indexOf("--wrong") + 2).join(" ").trim();
     if (!c) return;
     if (!why) return fail("--wrong needs why the verdict was wrong. Mend: say it after the case's name");
-    const record = readRecord(), run = [...record.runs].reverse().find(r => r.cases?.[c.name]);
+    // (the newest verdict as latest() orders them, by the time each was recorded)
+    const record = readRecord(), when = r => String(r.cases[c.name].recorded ?? r.at);
+    const run = record.runs.filter(r => r.cases?.[c.name]).reduce((a, r) => (!a || when(r) >= when(a) ? r : a), null);
     if (!run) return fail(`${c.name} has no recorded verdict. Mend: run it and record it first`);
     run.cases[c.name].wrong = why;
     writeRecord(record);

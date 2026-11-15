@@ -166,13 +166,14 @@ const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
 // folder's name reaches a brief (floor rule 11; where the temporary folder itself lies in the home folder, as on
-// Windows, only under it), and of letters, digits and . _ / - alone (\\ and : too on Windows), so its path is safe
+// Windows, only under it), and of letters, digits and . _ / - alone (\\ : and ~ too on Windows, whose short names hold one; ~ not first in a word
+// is no shell expansion), so its path is safe
 // inside the brief's shell line. Gives that path.
 export function folderFit(dir) {
   const at = path.resolve(dir), tmp = fs.realpathSync(os.tmpdir()), home = (() => { try { return fs.realpathSync(os.homedir()); } catch { return null; } })();
   const real = fs.existsSync(at) ? fs.realpathSync(at) : path.join(fs.realpathSync(path.dirname(at)), path.basename(at));
   const under = (p, folder) => p.startsWith(`${folder}${path.sep}`);
-  if (!under(real, tmp) || (home && under(real, home) && !under(tmp, home)) || !(process.platform === "win32" ? /^[A-Za-z0-9._/\\:-]+$/ : /^[A-Za-z0-9._/-]+$/).test(real))
+  if (!under(real, tmp) || (home && under(real, home) && !under(tmp, home)) || !(process.platform === "win32" ? /^[A-Za-z0-9._/\\:~-]+$/ : /^[A-Za-z0-9._/-]+$/).test(real))
     throw new Error(`${dir} is not a folder of letters, digits and . _ / - inside the system's temporary folder (${tmp})`);
   return real;
 }
