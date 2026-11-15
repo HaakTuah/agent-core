@@ -103,8 +103,10 @@ function sync(tmp) {
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
   for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"]]) {
     if (!fs.existsSync(path.join("core", "scripts", script))) continue;
-    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8" });
-    console.log(`${r.stdout}${r.stderr}`.trim() || `core/scripts/${script} said nothing`);
+    // (each given ten minutes, so that none can hold the sync: one that runs past them is named)
+    const r = spawnSync(process.execPath, [path.join("core", "scripts", script), ...args], { encoding: "utf8", timeout: 600000 });
+    console.log(`${r.stdout ?? ""}${r.stderr ?? ""}`.trim() || `core/scripts/${script} said nothing`);
+    if (r.error) console.log(`core/scripts/${script} was stopped after ten minutes: run it again by itself`);
   }
 }
 
