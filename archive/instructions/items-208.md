@@ -122,3 +122,25 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind "The core abides by its own rules, to the full extent" in `AGENTS.md`, the list of what this repository
      takes with its "Not taken" and the reason for each, and `scripts/own-modules.mjs`, which the tests workflow runs.
+
+214. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it on issue #277, labelled `by:chat`; and to the orchestrator, which passed it on word for word to
+     the builder of this rule). The session had proposed one pattern for writing a rule, after three rules of the core
+     had been read against what the owner meant that evening, each for want of an observable trigger or a reason. The
+     owner asked:
+
+     > Is this the optimal way for development, and how to phrase the rules
+
+     and agreed to the six points the session set out (the default first, then the exception; a trigger someone can
+     observe; one actor and one action; what it does not mean; its reason in one line; what holds it), to what is kept
+     out of a rule (adjectives that measure nothing, "should consider", lists of preferred technologies, and what a
+     check's failure can say at the moment it matters), and to queueing the pattern as a rule, held by a point of the
+     review guidelines and a list of phrases a rule may not use, reporting first. To the orchestrator, of the queue:
+
+     > (1) Queue lines to add: #277 (how a rule is written) as the first line, before #247, a rule builder's; every
+     > rule line after it is written in its pattern. #275 (the test audit) after #253, a rule builder's. #278
+     > (dependency checks for Cargo) under "Not taken up", a builder's, waiting on a project's choice record first
+     > naming a Cargo dependency that ships.
+
+     Behind "A rule is written to one pattern" in `AGENTS.md`, its point under "A rule file changed" in
+     `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json`, which `scripts/general.mjs` reads.

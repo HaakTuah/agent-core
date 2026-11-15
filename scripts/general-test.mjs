@@ -1,7 +1,8 @@
 // Checks the words check (general.mjs, beside this file) on a scratch repository: a word that fits only some projects
 // fails in the floor or a module; under the dated records' folders a gendered pronoun fails only in a line a change
-// adds, read against the base, and not in a line quoting the owner, nor in an older line, nor without a base. On Linux
-// and on Windows. Git and Node's own modules.
+// adds, read against the base, and not in a line quoting the owner, nor in an older line, nor without a base. A phrase
+// a rule may not use fails in a line a change adds to a rule file and is only reported where it stood before, moved
+// word for word, quoted, in code marks or read without a base. On Linux and on Windows. Git and Node's own modules.
 //
 //   node scripts/general-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -20,16 +21,17 @@ Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYS
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const config = { paths: ["floor", "modules"], exempt: [], words: [
   { pattern: "\\bgames?\\b", say: "the project" },
-  { pattern: "\\b(he|him|his|himself|she|her|hers|herself)\\b", say: "the owner", added: ["archive", "reports"] }] };
+  { pattern: "\\b(he|him|his|himself|she|her|hers|herself)\\b", say: "the owner", added: ["archive", "reports"] }],
+  phrases: { paths: ["floor", "modules", "AGENTS.md"], list: [{ pattern: "\\bshould consider\\b", say: "name who does what" }] } };
 
 let n = 0;
 // A repository whose first commit holds `start` and whose second adds `change`; the check's exit and words.
-function words(start, change, base = true) {
+function words(start, change, base = true, json = config) {
   const dir = path.join(tmp, `repo-${++n}`);
   const put = files => { for (const [f, text] of Object.entries(files)) { if (text === null) { fs.rmSync(path.join(dir, f)); continue; } fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };
   fs.mkdirSync(dir);
   git(dir, "init", "-q", "-b", "main");
-  put({ "floor/a.md": "# The floor\n", "modules/b.md": "# A module\n", "general.json": JSON.stringify(config), ...start });
+  put({ "floor/a.md": "# The floor\n", "modules/b.md": "# A module\n", "AGENTS.md": "# Here\n", "general.json": JSON.stringify(json), ...start });
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "base");
   put(change);
@@ -63,6 +65,25 @@ const none = spawnSync(process.execPath, [script, "general.json", "--base", "no-
 ok(bad.status === 1 && none.status === 1 && /--base needs a commit/.test(bad.stdout + none.stdout), "a --base that is an option, or no commit, is refused", `${bad.stdout}${bad.stderr}${none.stdout}`);
 r = words({}, { "modules/b.md": "# A module\n\nAsked, he said yes.\n" });
 ok(r.status === 1, "in the floor and the modules the pronoun fails wherever it stands, as before", r.out);
+
+// the phrases a rule may not use
+const RULE = "- The builder should consider a test.\n";
+r = words({}, { "modules/b.md": `# A module\n\n${RULE}` });
+ok(r.status === 1 && r.out.includes("modules/b.md:3:") && r.out.includes("in a rule this change writes"), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
+r = words({}, { "AGENTS.md": `# Here\n\n${RULE}` });
+ok(r.status === 1 && r.out.includes("AGENTS.md:3:"), "and in a line a change adds to a rule file the list names", r.out);
+r = words({ "modules/b.md": `# A module\n\n${RULE}` }, { "floor/a.md": "# The floor\n\nNothing here.\n" });
+ok(r.status === 0 && /modules\/b\.md:3: "should consider" reported/.test(r.out), "one that stood before the change is reported, and passes", r.out);
+r = words({ "modules/b.md": `# A module\n\n${RULE}` }, { "modules/b.md": "# A module\n", "floor/a.md": `# The floor\n\n${RULE}` });
+ok(r.status === 0 && r.out.includes("floor/a.md:3:") && r.out.includes("reported"), "one moved word for word to another rule file is reported, not failed", r.out);
+r = words({}, { "modules/b.md": "# A module\n\n> The owner: we should consider it.\n\n- A phrase is named in code marks: `should consider`.\n" });
+ok(r.status === 0 && !r.out.includes("modules/b.md:"), "one in a line quoting the owner, or in code marks, is not read", r.out);
+r = words({}, { "modules/b.md": `# A module\n\n${RULE}` }, false);
+ok(r.status === 0 && r.out.includes("only reported") && r.out.includes("modules/b.md:3:"), "without a base each is only reported, and it says so", r.out);
+r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["floor"], list: [] } });
+ok(r.status === 1 && r.out.includes("list of phrases a rule may not use is empty"), "an empty list of phrases fails: it would pass anything", r.out);
+r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["rules"], list: config.phrases.list } });
+ok(r.status === 1 && r.out.includes("not there: rules"), "a file or folder of the list that is not there fails", r.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the words check`);
 process.exitCode = failed ? 1 : 0;

@@ -35,6 +35,7 @@ wanted").
 | #185 | builder | |
 | #246 | rule builder | #247 and #245's report |
 | #253 | rule builder | #247, #246 and #245's report |
+| #275 | rule builder | #253 |
 | #259 | a builder that built none of the batch | every line above it |
 
 ## Beside any line
@@ -49,6 +50,7 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #204 | builder | a stop that was ignored |
+| #278 | builder | a project's choice record first naming a Cargo dependency that ships |
 | #163 | the owner | on hold |
 | #187 | the owner | on hold |
 | #188 | the owner | on hold, after #187 |

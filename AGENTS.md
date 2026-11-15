@@ -147,6 +147,18 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   blocking point of a review that fails where it is broken, or that only discipline holds it; "None" where it adds no
   rule. The rules only discipline holds are listed at each review of the core the owner asks for, each to gain a
   check, to stay on the owner's word, or to go.
+- **A rule is written to one pattern** (core archive 214). Whoever writes or changes a rule of the floor, the modules or
+  this file writes it in six parts: the default first, then the one condition that changes it; a trigger someone can
+  observe ("a trial shows the stack misses a need stated in numbers", never `when performance matters`); one actor and
+  one action, who does what; what it does not mean, where a reader could overreach; its reason, in one line; and what
+  holds it (a check, a staged case or the audit, #235), named under "What holds it" as the point above says. Kept out:
+  adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of preferred
+  technologies, which date within months, and whatever a check's failure can say at the moment it matters (#254). A
+  rule that stands and no change touches is the one exception: the audit of the core against itself (#259) brings it
+  to the pattern instead. It does not mean a project's own rules are asked anything; they may be written the same way.
+  Reason: in one evening three rules were read against what the owner meant, each for want of an observable trigger or
+  a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
+  guidelines ("A rule file changed").
 - **Rules are written for any project** (core archive 150). The projects that take the core differ in what they build
   (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read
   them (anyone, the owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what
