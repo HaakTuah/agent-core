@@ -326,7 +326,8 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   says how the session mends that pull request: git's name set in the repository, its commits rewritten (core archive
   202). It fails any listed term the same way, one a project held before the check read it included, each failure
   saying how the session takes it out (core archive 207); only the random id of a link to a Claude Code session, which
-  can hold a short term by chance, is left unread (#261).
+  can hold a short term by chance, is left unread (#261), and `LICENSE` and `NOTICE`, at the root and in `core/`,
+  while they keep the shape the check's header gives, so a copyright holder may stand there (floor rule 11; #257).
 - Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
   Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
   is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is asked

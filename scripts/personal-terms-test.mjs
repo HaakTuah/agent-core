@@ -269,6 +269,12 @@ fails("a term in a holder's line longer than a hundred characters", pull([[{ NOT
 fails("a LICENSE of four copyright lines, a term in one", pull([[{ LICENSE: `${[term, "a", "b", "c"].map(held).join("\n")}\n` }]]));
 fails("a NOTICE of its shape in another folder", pull([[{ "docs/NOTICE": notice(term) }]]));
 fails("a NOTICE.md of a NOTICE's shape", pull([[{ "NOTICE.md": notice(term) }]]));
+// (under a UTF-8 locale, as GitHub's runners have, where grep drops a line that is not UTF-8, and any after a late NUL)
+fails("a term on a line in Latin-1 added to the core's NOTICE", pull([[{ NOTICE: Buffer.concat([Buffer.from(notice("x")), Buffer.from(`caf\u00e9 ${term}\n`, "latin1")]) }]]), { locale: "C.UTF-8" });
+fails("a term on a line in Latin-1 added to the core's LICENSE, in core/", pull([[{ "core/LICENSE": Buffer.concat([Buffer.from(licence("x")), Buffer.from(`caf\u00e9 ${term}\n`, "latin1")]) }]]), { locale: "C.UTF-8" });
+fails("a term after a NUL far into LICENSE", pull([[{ LICENSE: `${licence("x")}${"\n".repeat(200000)}\u0000\n${term} here\n` }]]), { locale: "C.UTF-8" });
+fails("a term after a NUL far into LICENSE, in the C locale", pull([[{ LICENSE: `${licence("x")}${"\n".repeat(200000)}\u0000\n${term} here\n` }]]));
+fails("a term on a line in Latin-1 in a NOTICE main already held", pull([[{ "b.md": "x\n" }]], [[{ NOTICE: Buffer.concat([Buffer.from(notice("x")), Buffer.from(`caf\u00e9 ${term}\n`, "latin1")]) }]]), { locale: "C.UTF-8" });
 fails("a term in the message of a commit that edits NOTICE alone", pull([[{ NOTICE: notice("x") }, {}, `holder ${term}`]]));
 fails("a term in a NOTICE out of its shape in one commit, brought to it in the next", pull([[{ NOTICE: `${notice(term)}more words\n` }], [{ NOTICE: notice(term) }]]));
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));

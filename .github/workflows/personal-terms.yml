@@ -17,8 +17,9 @@
 # it fails, since the diff names it. It reads no file whose content is binary (a NUL byte, as git tells it:
 # `git grep -I`, a diff's "Binary files differ"), pictures included, whatever a .gitattributes says, which the check
 # never reads. It prints only where a term was found (file and line, a file whose name holds a term by its line alone,
-# or the commit), never the term. Of all it reads, it leaves unread only the random id of a link to a Claude Code
-# session (https://claude.ai/code/session_01 and 22 characters of base58, a whole link, a blank, the line's end or a
+# or the commit), never the term. Of all it reads, it leaves unread only LICENSE and NOTICE while they keep the shape
+# described below, at the root and in core/, which floor rule 11 lets hold a copyright holder's name (#257), and the
+# random id of a link to a Claude Code session (https://claude.ai/code/session_01 and 22 characters of base58, a whole link, a blank, the line's end or a
 # mark of punctuation after it), which a
 # tool writes at the end of every builder's commit message and description: such a run of characters holds a short term
 # by chance and is no one's personal information, while the rest of the link and of its line is read (#261). Each failure says how the session takes the term out, one the project held before the
@@ -91,6 +92,10 @@ jobs:
           shaped() { # (a revision and a path: whether that file is of its shape there)
             local text flat
             case $(git ls-tree --format='%(objectmode)' "$1" -- "$2" 2> /dev/null) in 100644 | 100755) ;; *) return 1 ;; esac
+            # (text alone, UTF-8 with no control character but a tab or a line's end, counted by bytes, so that no grep
+            # below drops a line it would take for binary, a NUL however late included)
+            git cat-file blob "$1:$2" | iconv -f UTF-8 -t UTF-8 > /dev/null 2>&1 || return 1
+            [ "$(git cat-file blob "$1:$2" | LC_ALL=C tr -d '\t\r\n\040-\176\200-\377' | wc -c | tr -d ' ')" = 0 ] || return 1
             text=$(git cat-file blob "$1:$2" | tr -d '\r' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep -v '^$') || return 1
             case $(printf '%s\n' "$text" | grep -c '^Copyright[[:space:]]') in 1 | 2 | 3) ;; *) return 1 ;; esac
             if printf '%s\n' "$text" | grep '^Copyright[[:space:]]' | LC_ALL=C.UTF-8 grep -q -v -E "$held"; then return 1; fi
