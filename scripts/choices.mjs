@@ -1,4 +1,4 @@
-// The records of the choices that are hard to undo (modules/choices.md; core archive 222 and 227): where a project
+// The records of the choices that are hard to undo (modules/choices.md; core archive 222 and 228): where a project
 // keeps them, what they hold, whether the pass over them, twice a year, is due, and whether a sign written in a measure
 // has tripped. Where they are: the *choice records*, a row of the manifest's slots or, in the core, a slot of its
 // AGENTS.md; left out, the starter kit's file, KIT. A record is a heading "## Choice: " and what was chosen, its sign

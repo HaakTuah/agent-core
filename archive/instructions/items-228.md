@@ -1,8 +1,8 @@
-# The owner's words behind the core: items 227 onward
+# The owner's words behind the core: items 228 onward
 
 How they are kept, and where each item lives: `archive/instructions.md`.
 
-227. **15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+228. **15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
      design session, as that session recorded it on issue #256, labelled `by:chat`, its note "What this issue asks to
      be built, in one place" gathering what the owner agreed to, and as a builder's issue, #330, set out the part of
      it pull request #328 could not build). Of what reopens a choice, the owner agreed to part C of that note, whose

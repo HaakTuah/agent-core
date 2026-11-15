@@ -1,7 +1,7 @@
 # Choices that are hard to undo
 
 Read before a session makes a choice that is hard to undo or advises the owner on one, and by the reader of a pass
-over the recorded choices (core archive 222 and 227).
+over the recorded choices (core archive 222 and 228).
 
 A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
 kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
