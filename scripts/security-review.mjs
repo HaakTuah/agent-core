@@ -6,10 +6,11 @@
 // one else can post under), saying its security review is completed; or a comment that opens "Security review:" from
 // the repository's owner, a member or a collaborator, which is how another reviewer's, or the fallback reviewer's, is
 // posted (modules/reviews.md, point 3). Where Codex's summary says its security review is running, only such a comment
-// posted after the summary last changed ends the wait for it (that review is waited for: core archive 206), never one
-// posted before it began, a note that none is needed among them (the summary's last change is the latest the review can
-// have begun, so a comment posted between its start and a later change of the summary is set aside too, and is posted
-// again). Where Codex's summary says a finding of its security review is open, the check
+// posted after it began ends the wait for it (that review is waited for: core archive 206), never one posted before, a
+// note that none is needed among them: it began when the summary's row for it says it has run since, where that time
+// can be read and is no later than the summary's last change, and otherwise at that last change, the latest it can
+// have begun. A new push starts it again, so a review posted on an earlier head counts no longer while it runs. Where
+// Codex's summary says a finding of its security review is open, the check
 // waits until such a comment is posted after Codex's newest security finding: the fallback reviewer's check of the fix
 // (Codex's own mark of an open finding does not clear by itself once the finding is fixed). Where the mark stands and
 // no finding of Codex's is to be found among the comments, such a comment settles it whenever it was posted.
@@ -66,11 +67,11 @@ const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry
 const codexs = (comment) => comment.user?.login === CODEX && comment.user.type === "Bot" && typeof comment.body === "string";
 const newest = (times) => times.reduce((latest, at) => (at > latest ? at : latest), -Infinity); // -Infinity: none
 
-// what the summary Codex's app keeps says of its reviews: { state, at }, the whole state and when the summary last
-// changed (GitHub's updated_at, as given), or {} where there is no summary,
-// and { unread: true } where a summary of Codex's is there but its state cannot be read, a form nobody documents having
-// changed (core archive 201). The app keeps one summary and edits it, so the first comment of its that opens as one is
-// read, never a later look-alike. scripts/code-review-wait.mjs reads its code review from it too.
+// what the summary Codex's app keeps says of its reviews: { state, at, body }, the whole state, when the summary last
+// changed (GitHub's updated_at, as given) and its text, or {} where there is no summary, and { unread: true } where a
+// summary of Codex's is there but its state cannot be read, a form nobody documents having changed (core archive 201).
+// The app keeps one summary and edits it, so the first comment of its that opens as one is read, never a later
+// look-alike. scripts/code-review-wait.mjs reads its code review from it too.
 const OPENS = /^<!-- codex-pull-request-review-summary -->/u;
 export function codexState(comments) {
   for (const comment of flat(comments)) {
@@ -79,14 +80,20 @@ export function codexState(comments) {
     let state;
     try { state = text === undefined ? undefined : JSON.parse(text.replaceAll("&#123;", "{").replaceAll("&#125;", "}")); } catch { state = undefined; }
     if (state === null || typeof state !== "object" || !("security_review" in state)) return { unread: true };
-    return { state, at: comment.updated_at };
+    return { state, at: comment.updated_at, body: comment.body };
   }
   return {};
 }
-// of its security review: { review, at }, review undefined where there is none it can read, or { unread: true }
+// the row of the summary's table for its security review, while it runs: "🔄 **Running** since" the time it began
+const SINCE = /^\| 🔒 \*\*Security Review\*\* \| 🔄 \*\*Running\*\* since <relative-time datetime="([0-9T:.Z-]{1,40})">/mu;
+// of its security review: { review, began }, review undefined where there is none it can read, or { unread: true };
+// began is when the review began as a number (NaN where no time can be read): its row's time, where that is no later
+// than the summary's last change, or else that change
 function codex(comments) {
   const read = codexState(comments);
-  return read.state ? { review: read.state.security_review, at: read.at } : read;
+  if (!read.state) return read;
+  const changed = Date.parse(read.at), since = Date.parse(SINCE.exec(read.body)?.[1]);
+  return { review: read.state.security_review, began: since <= changed ? since : changed };
 }
 // what the check says where Codex's summary is there but cannot be read: a warning beside the status, which waits or
 // passes as it would with no summary at all
@@ -99,16 +106,16 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const list = flat(comments);
   const all = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
-  // while Codex's own runs, only a review posted after the summary last changed counts (a time that cannot be read is
-  // taken as the newest, so nothing is posted after it)
+  // while Codex's own runs, only a review posted after it began counts (a time that cannot be read is taken as the
+  // newest, so nothing is posted after it)
   const running = review !== null && typeof review === "object" && RUNNING.includes(review.status);
-  const began = Date.parse(read.at) || Infinity;
+  const began = Number.isFinite(read.began) ? read.began : Infinity;
   const posted = running ? all.filter((comment) => (Date.parse(comment.created_at) || -Infinity) > began) : all;
   let verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits);
   if (running && !verdict.done && all.length > 0 && posted.length === 0) {
-    const why = "Codex's security review is running, and every \"Security review:\" was posted before it began: wait, or post one now";
+    const why = "Codex's security review is running, begun after every \"Security review:\" posted: wait, or post one now";
     // (one whose head does not hold this check as the default branch does stood before it came: reported)
-    verdict = bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
+    verdict = bound ? { sha, done: false, why } : { sha, done: true, why: "before this check came, so not waited for: Codex's security review began after every \"Security review:\"" };
   }
   // floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted
   if (verdict.done && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
