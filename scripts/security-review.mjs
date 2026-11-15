@@ -258,7 +258,6 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   // has, Codex's running, is waited for as above
   if (pure && !(review !== null && typeof review === "object" && RUNNING.includes(review.status))) return { sha, done: true, why: "a pure sync, as pure-sync.mjs proves: no review needed (floor rule 8)" };
   if (forHead.length > 0) return { sha, done: true, why: postedWhy };
-  if (posted.length > 0) return hold(`a security review is posted, but names not the head ${short}. Mend: post one naming the head's whole SHA`, `a security review is posted, but names not the head ${short}`);
   // Dependabot's own, with no review of Codex's begun on it: the floor holds it another way (rule 17). Its own means
   // opened by it from a branch of the repository, every commit written by it and signed by GitHub, the head among them.
   const all = flat(commits);
@@ -266,6 +265,7 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   const dependabots = pull.user?.login === DEPENDABOT && pull.user.type === "Bot" && typeof pull.head.repo?.full_name === "string" && pull.head.repo.full_name === pull.base?.repo?.full_name
     && all.length > 0 && all.every(its) && all.some((commit) => commit.sha === sha);
   if (dependabots && !(review !== null && typeof review === "object" && typeof review.status === "string")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
+  if (posted.length > 0) return hold(`a security review is posted, but names not the head ${short}. Mend: post one naming the head's whole SHA`, `a security review is posted, but names not the head ${short}`);
   return { sha, done: false, why: "no security review has run yet" };
 }
 
