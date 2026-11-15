@@ -29,7 +29,8 @@
 //
 //   node core/scripts/look.mjs            the look (GITHUB_REPOSITORY and GH_TOKEN set by GitHub's job; else the
 //                                         clone's origin and gh's own sign-in)
-//   node core/scripts/look.mjs --dry      what it would open, update, reopen or close; it writes nothing
+//   node core/scripts/look.mjs --dry      what it would open, update, reopen or close; it writes nothing (inbox.mjs's
+//                                         asked() may send an empty body, which creates nothing)
 //   node core/scripts/look.mjs --now      a session's run though the record shows one less than SOON hours before
 //   node core/scripts/look.mjs --inbox    where issues cannot be reached, writes what it would open to inbox/
 import { spawnSync } from "node:child_process";
@@ -38,7 +39,7 @@ import path from "node:path";
 import { look as choicesDue } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
-import { answer, FOLDER, repoOf } from "./inbox.mjs";
+import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { ownerOf } from "./releases.mjs";
@@ -188,7 +189,7 @@ function main(args) {
   else {
     let got = null, refused = false;
     try { got = JSON.parse(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
-    reach = got && typeof got === "object" && got.permissions ? answer(got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
+    reach = got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
   }
   if (!reach) { say(`The scheduled look could not ask GitHub here (gh is not installed, answers for no account, or gave no answer): nothing was looked at. Run \`node ${scripts}/look.mjs\` where gh answers.`); return 0; }
 
