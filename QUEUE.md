@@ -25,6 +25,23 @@ wanted").
 | #246 | rule builder | #245's report |
 | #253 | rule builder | #246 and #245's report |
 | #275 | rule builder | #253 |
+| #282 | rule builder | |
+| #284 | rule builder | #246 |
+| #285 | rule builder | #235 and #249 |
+| #286 | rule builder | #284 |
+| #302 | rule builder | |
+| #303 | rule builder | #235 and #302 |
+| #304 | rule builder | #249 |
+| #305 | rule builder | #282 and #304 |
+| #306 | rule builder | #304 |
+| #307 | rule builder | #235 |
+| #308 | rule builder | #253 and #304 |
+| #309 | rule builder | #304 |
+| #310 | rule builder | #246, #256 and #285 |
+| #311 | rule builder | #286 |
+| #312 | rule builder | |
+| #313 | rule builder | #312 |
+| #314 | rule builder | #313 and #304 |
 | #259 | a builder that built none of the batch | every line above it |
 
 ## Beside any line
