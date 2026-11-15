@@ -238,6 +238,7 @@ function init(argv) {
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
   console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);
   console.log("  the Actions setting that every action is pinned to a full commit SHA; the Actions secret PERSONAL_TERMS; and the security reviewer's app.");
+  console.log("\nWhat owning this project asks of the owner, in one plain page: core/setup/owner-guide.md");
 }
 
 if (started(import.meta.url)) {
