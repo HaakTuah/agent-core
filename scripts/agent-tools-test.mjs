@@ -14,6 +14,10 @@ import { STEPS, notDone } from "./steps.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./agent-tools.mjs", import.meta.url));
 const KIT = fs.readFileSync(fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url)), "utf8");
+// Links (and git storing them as links) are read on Linux and macOS, where GitHub's runners run the check in a project;
+// on Windows, where making one needs a right the runner may not give, those cases are left out and said so.
+const LINKS = process.platform !== "win32";
+if (!LINKS) console.log("note the cases with links are run on Linux and macOS alone");
 let failed = 0, count = 0;
 const made = [];
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail ? `\n${detail}` : ""}`); } };
@@ -93,6 +97,7 @@ fails(run(project({ ...listing({ kind: "extension", name: "x", publisher: "y", v
 fails(run(project({ "checks/licences.json": { lockfiles: [], agentTools: {} } })), "a list that is no list fails", '"agentTools" is no list');
 fails(run(project({ ".mcp.json": "{ not json" })), "a tool's settings that are no JSON fail", ".mcp.json cannot be read as a JSON object");
 fails(run(project({ "checks/licences.json": "{" })), "a config that is no JSON fails", "checks/licences.json cannot be read");
+if (LINKS) {
 // links: one inside the checkout is followed, as the tool that reads it follows it; one that leads out is not
 const inside = project({ ...listing() });
 fs.mkdirSync(path.join(inside, "shared/notes"), { recursive: true });
@@ -124,6 +129,7 @@ const fileBase = project({ ".mcp.json": path.join(away, "settings.json") });
 fs.rmSync(path.join(fileBase, ".mcp.json"));
 fs.symlinkSync(path.join(away, "settings.json"), path.join(fileBase, ".mcp.json"));
 fails(run(pr(fileBase, { "README.md": "a change of its own\n" })), "a link out of the checkout where the base held a file of the same text fails: only a link the base held stands", '".mcp.json" is a link that leads out');
+}
 const colon = JSON.parse(KIT);
 colon.hooks.Stop.push({ matcher: "Write: x", hooks: [{ type: "command", command: "y" }] });
 fails(run(project({ ".claude/settings.json": JSON.stringify(colon), ...listing({ kind: "hook", name: "Stop Write: x: y", publisher: "this project" }) })), "a matcher that holds \": \", which a hook's name splits at, fails", 'matcher "Write: x" holds ": "');
@@ -132,6 +138,7 @@ twins.hooks.PostToolUse = [{ hooks: [http, { type: "command", command: JSON.stri
 fails(run(project({ ".claude/settings.json": JSON.stringify(twins), ...listing({ kind: "hook", name: `PostToolUse: ${JSON.stringify(http)}`, publisher: "this project" }) })), "two hooks that would share a name, one by its command and one by its text, fail", "share the name");
 // the base read through git's own tree as the working tree is read
 passes(run(pr(project({ ".claude/skills/résumé/SKILL.md": "x" }), { "README.md": "a change of its own\n" })), "a skill whose folder's name git would quote, held by the base, stays in its baseline");
+if (LINKS) {
 const settingsLinked = project();
 fs.writeFileSync(path.join(settingsLinked, "shared-settings.json"), withPlugins({ "helper@example-market": true }));
 fs.rmSync(path.join(settingsLinked, ".claude/settings.json"));
@@ -146,6 +153,7 @@ fs.mkdirSync(path.join(emptyTarget, ".claude/skills"), { recursive: true });
 fs.symlinkSync("../../shared/later", path.join(emptyTarget, ".claude/skills/later"));
 git(emptyTarget, "add", "-A"); git(emptyTarget, "commit", "-q", "-m", "a link to a folder with no skill");
 fails(run(pr(emptyTarget, { "shared/later/SKILL.md": "x" })), "a skill a pull request adds behind a link the base held, where the base's target held none, is new", 'the skill "later", configured in .claude/skills/later/SKILL.md, is new in this pull request');
+}
 // a hook of another type that carries a command's text is not that command's hook, against the kit or the base
 const asWeb = JSON.parse(KIT);
 asWeb.hooks.Stop[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid/x", command: asWeb.hooks.Stop[0].hooks[0].command };
@@ -154,6 +162,7 @@ const echoed = { hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [{ ty
 const toWeb = structuredClone(echoed);
 toWeb.hooks.PostToolUse[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid", command: "echo hi" };
 fails(run(pr(project({ ".claude/settings.json": echoed }), { ".claude/settings.json": toWeb })), "and a command hook the base held, turned into a web hook with the same command, is new", "is new in this pull request");
+if (LINKS) {
 const skillsDirBase = project();
 fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
 fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
@@ -163,6 +172,7 @@ passes(run(pr(skillsDirBase, { "README.md": "a change of its own\n" })), "and so
 if (process.platform !== "win32") {
   const odd = run(project({ ".claude/skills/x\n::warning::injected/SKILL.md": "x", ...listing() }));
   ok(odd.status === 1 && !/^::warning::/m.test(odd.out) && mended(odd.out), "a skill folder's name with a line break in it prints on the failure's own line, so it writes no workflow command", odd.out);
+}
 }
 // a sync that changes the kit's hooks: the project's own, as the base's kit wrote them, still count as the core's
 const synced = project({ ...listing() });
