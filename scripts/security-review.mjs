@@ -12,12 +12,12 @@
 // have begun. Where a push starts it again, a review posted before that counts no longer while it runs; where Codex
 // does not start it on a push, the later commit's check stays with the reviews, as below. Where Codex's summary says a
 // finding of its security review is open, the check waits until such a comment is posted after Codex's newest security
-// finding: the fallback reviewer's check of the fix (Codex's own mark of an open finding does not clear by itself once
-// the finding is fixed). Where the mark stands and no finding of Codex's is to be found among the comments (one given
-// in a review's own body, which the workflow does not fetch), only such a comment posted after Codex's summary last
-// changed settles it, the latest the finding can have come, and the status says so; a pull request from before the
-// check whose review came before that change is told, never held (BOUND=false, below), and one with none waits, as
-// before.
+// finding, and after Codex's summary last changed: the fallback reviewer's check of the fix (Codex's own mark of an
+// open finding does not clear by itself once the finding is fixed). A finding given in a review's own body alone, which
+// the workflow does not fetch, is not to be found among the comments, so the summary's last change is the latest any
+// can have come; where none is found at all, the status says so. A pull request from before the check whose review
+// came before that change is told, never held (BOUND=false, below), and one with no review after the newest finding
+// found, or with none at all where none is found, waits, as before.
 // Dependabot's own pull request (opened by it from a branch of the repository, every commit of it written by Dependabot
 // and signed by GitHub, so that one somebody else has pushed to, or brought up to date by a merge, is its own no
 // longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
@@ -36,8 +36,8 @@
 // before it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull
 // request that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which
 // the workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so
-// it says of a review posted before Codex's running one began, or before its summary last changed where an open
-// finding is not to be found (AGENTS.md, "Nothing locks a project"); brought up to
+// it says of a review posted before Codex's running one began, or before its summary last changed where it marks a
+// finding open (AGENTS.md, "Nothing locks a project"); brought up to
 // date with main, it is held. What it does not hold: what a
 // posted review says, whether a finding is blocking, who posted each of two reviews (one login may post both), that
 // comment-only.mjs's printout is true (its code reviewer runs it again), and that a later commit which changes what
@@ -167,12 +167,20 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits, cha
   if (review !== null && typeof review === "object" && review.status === "completed") {
     const on = typeof review.commit_sha === "string" && SHA.test(review.commit_sha) ? ` (on ${review.commit_sha.slice(0, 7)})` : "";
     if (review.has_unresolved_findings !== true) return { sha, done: true, why: `Codex's security review has run${on}` };
-    // a finding of it is marked open: only a review posted after its newest finding settles it
+    // a finding of it is marked open: only a review posted after its newest finding, and its summary's last change,
+    // settles it
     const found = newest([...list, ...flat(reviewComments)].filter((comment) => codexs(comment) && FINDING.test(comment.body)).map((comment) => Date.parse(comment.created_at) || Infinity));
     const last = newest(posted.map((comment) => Date.parse(comment.created_at) || -Infinity));
     if (found !== -Infinity) {
-      if (last > found) return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted after its newest finding` };
-      return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
+      if (last <= found) return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
+      // after the newest found, but a newer one may be given in a review's own body alone, which is not fetched: the
+      // review settles the mark only if posted after Codex's summary last changed too, the latest that one can have
+      // come (#293)
+      if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted after its newest finding` };
+      // (one whose head does not hold this check as the default branch does stood before it came, when this settled it:
+      // reported)
+      if (bound) return { sha, done: false, why: "a review follows Codex's newest security finding, but its summary changed since: post a \"Security review:\" now" };
+      return { sha, done: true, why: "before this check came, so not waited for: Codex's summary changed after the review that followed its newest finding" };
     }
     // none is to be found among the comments (one in a review's own body, say): only a review posted after Codex's
     // summary last changed settles it, the latest the finding can have come (#251)
