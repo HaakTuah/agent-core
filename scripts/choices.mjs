@@ -52,16 +52,24 @@ export function due(found, at) {
   return days >= DAYS ? `its line "Read whole:" says ${found.read}, ${days} days before ${at.slice(0, 10)}` : null;
 }
 
+// The most a records file is read to: a handful of records a year is a few KB.
+export const MOST = 256 * 1024;
+
 // The records of the project at `root`, read from inside it alone: { file, text } (text null where there is no such
-// file), or { file, unread } where its name or the file cannot be read so.
+// file), or { file, unread } where its name or the file cannot be read so: no link is followed, at the file or at any
+// folder on its way, and no file past MOST is read.
 export function records(rules, root = ".") {
   const file = where(rules);
   if (!file) return { file: null, unread: "the *choice records* named in the rules is no plain path inside the project" };
-  const to = path.join(root, file);
-  let stat;
-  try { stat = fs.lstatSync(to); } catch { return { file, text: null }; }
-  if (!stat.isFile()) return { file, unread: `${file} is no regular file (a link or a folder)` };
-  try { return { file, text: fs.readFileSync(to, "utf8") }; } catch { return { file, unread: `${file} could not be read` }; }
+  const parts = file.split("/");
+  for (let i = 1; i <= parts.length; i++) {
+    let stat;
+    try { stat = fs.lstatSync(path.join(root, ...parts.slice(0, i))); } catch { return { file, text: null }; }
+    if (stat.isSymbolicLink()) return { file, unread: `${file} is no regular file (a link stands on its way)` };
+    if (i === parts.length && !stat.isFile()) return { file, unread: `${file} is no regular file (a folder)` };
+    if (i === parts.length && stat.size > MOST) return { file, unread: `${file} is past ${MOST} bytes` };
+  }
+  try { return { file, text: fs.readFileSync(path.join(root, file), "utf8") }; } catch { return { file, unread: `${file} could not be read` }; }
 }
 
 // The scheduled look's reader (look.mjs, DUE): the pass's issue, its body null where nothing is due, so the look closes

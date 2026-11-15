@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DAYS, KIT, TITLE, due, look, parse, records, where } from "./choices.mjs";
+import { DAYS, KIT, MOST, TITLE, due, look, parse, records, where } from "./choices.mjs";
 import { DUE } from "./look.mjs";
 
 let failed = 0, count = 0;
@@ -71,10 +71,16 @@ try { fs.symlinkSync(path.join(linked, "real.md"), path.join(linked, "docs", "ch
 if (link) {
   const r = look({ manifest: "", at: at("2027-06-01"), root: linked });
   ok(r.body === null && /no regular file/.test(r.unread ?? ""), "a link is not followed: the look leaves its issue as it stands", JSON.stringify(r));
+  const folder = project("folder", { "elsewhere/choices.md": file("2020-01-01") });
+  fs.symlinkSync(path.join(folder, "elsewhere"), path.join(folder, "docs"));
+  const f = look({ manifest: "", at: at("2027-06-01"), root: folder });
+  ok(f.body === null && /a link stands on its way/.test(f.unread ?? ""), "nor is a link at a folder on the file's way", JSON.stringify(f));
 } else console.log("note no link can be made here, so a link's case is not run");
 const outside = look({ manifest: "| *choice records* | `../kit/docs/choices.md` |", at: at("2027-06-01"), root: kit });
 ok(outside.body === null && /no plain path/.test(outside.unread ?? ""), "a name outside the project is not read");
 ok(records("", path.join(tmp, "none")).text === null, "a missing file reads as none, not as unread");
+const large = project("large", { "docs/choices.md": `${file("2020-01-01")}${"x".repeat(MOST)}` });
+ok(/past \d+ bytes/.test(records("", large).unread ?? ""), "a file past the most it reads is not read");
 
 // ---- the script ----
 const run = dir => spawnSync(process.execPath, [path.join(here, "choices.mjs")], { cwd: dir, encoding: "utf8" });
