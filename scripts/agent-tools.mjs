@@ -135,13 +135,15 @@ function pluginPin(name, markets) {
     return { from: source, loose: `takes ${takes(source.ref, "its repository's default branch")}`, where, mend: `set its "ref" to the full 40-character commit of the marketplace meant` };
   }
   if (source.source !== "settings" || !Array.isArray(source.plugins)) return null;
-  const entry = source.plugins.find(p => p?.name === name.slice(0, at))?.source;
+  const item = source.plugins.find(p => p?.name === name.slice(0, at)), entry = item?.source;
+  // (what it was read from: this plug-in's own entry and the marketplace's other fields, not its other plug-ins' entries)
+  const from = { market: Object.fromEntries(Object.entries(source).filter(([k]) => k !== "plugins")), item: item ?? null };
   const its = `${where}, by its entry for ${show(name.slice(0, at))},`;
   if (["github", "url", "git-subdir"].includes(entry?.source)) {
-    if (commit(entry.sha)) return { pin: entry.sha, where: its, from: source };
-    return { from: source, loose: entry.sha === undefined ? `names no "sha", so it takes ${takes(entry.ref, "the repository's default branch")}` : `gives as its "sha" ${show(entry.sha)}, which is no full commit as git writes one`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
+    if (commit(entry.sha)) return { pin: entry.sha, where: its, from };
+    return { from, loose: entry.sha === undefined ? `names no "sha", so it takes ${takes(entry.ref, "the repository's default branch")}` : `gives as its "sha" ${show(entry.sha)}, which is no full commit as git writes one`, where: its, mend: `set the entry's "sha" to the full 40-character commit meant` };
   }
-  if (entry?.source === "npm") return npmPin(entry.package, entry.version, its, pkg => `with its "package" as "${pkg}" and its "version" one exact version, such as 1.2.3`, source);
+  if (entry?.source === "npm") return npmPin(entry.package, entry.version, its, pkg => `with its "package" as "${pkg}" and its "version" one exact version, such as 1.2.3`, from);
   return null;
 }
 // (npx's own options, read before the package it runs; one it does not know here leaves the server to the review)
