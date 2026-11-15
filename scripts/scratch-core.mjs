@@ -1,4 +1,6 @@
-// What the core's own tests stand on. For the starter kit's (init-test.mjs, init-dotnet-test.mjs): a scratch copy of the
+// What the core's own tests stand on. For any test: the core's root, a tally of its assertions and a scratch folder
+// removed when it ends; and, for one that runs a workflow calling gh (clean-merges-test.mjs, pure-sync-test.mjs), a
+// stand-in for GitHub's API. For the starter kit's (init-test.mjs, init-dotnet-test.mjs): a scratch copy of the
 // core as it stands here, committed in a repository of its own, and scratch projects beside it, all in one temporary
 // folder that is removed when the test ends. Every git call in it runs without the user's and the system's git
 // settings, and without git's own variables that point at another repository, so a test sees only what it sets itself.
@@ -17,7 +19,27 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/** The core's root, where these scripts stand. */
+export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/** A test's tally: `ok(cond, what, detail)` prints "ok" or "FAIL" and what is asserted, with up to 800 characters of
+ *  the detail under a failure; `done(what)` prints how many failed, or the count of assertions on `what`, and sets the
+ *  exit code. */
+export function tally() {
+  let failed = 0, count = 0;
+  return {
+    ok: (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } },
+    done: what => { console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on ${what}`); process.exitCode = failed ? 1 : 0; },
+  };
+}
+
+/** A temporary folder named from `prefix`, removed when the test ends. */
+export function scratchDir(prefix) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  // (a program a test started may hold a file a moment longer, on Windows: tried again, and never the test's failure)
+  process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+  return tmp;
+}
 
 // `prefix` names the temporary folder. It gives: `tmp`, that folder; `env`, the environment of every call; `git(dir,
 // ...args)` and `run(dir, ...args)`, git and Node run in a folder (run: the script and its arguments, giving its exit
@@ -25,9 +47,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // init.mjs; `fresh(name)`, a new empty repository under tmp; and `project(name, ...args)`, a new one in which the
 // starter kit was run with those arguments.
 export function scratch(prefix) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  // (a program a test started may hold a file a moment longer, on Windows: tried again, and never the test's failure)
-  process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+  const tmp = scratchDir(prefix);
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
   Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" });
   const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -71,4 +91,27 @@ export function checkoutStandIn(env, tmp) {
     git(tmp, "clone", "-q", "--no-checkout", `https://github.com/${w.repository}`, to);
     git(to, "checkout", "-q", "--detach", w.ref);
   };
+}
+
+/** The stand-in for GitHub's API, for a test that runs a workflow calling gh (clean-merges-test.mjs,
+ *  pure-sync-test.mjs): a `gh` first on the PATH that answers a GET from the JSON file `ghData` (a route's pattern to
+ *  its answer; none found: gh's own "Not Found"), and logs each call with -X, its route and what it was sent, to
+ *  `ghLog`; and the project's address, https://github.com/someone/project, rewritten to the repository `origin`. It
+ *  gives `env`, the environment to run the workflow in, with the paths of the two files. */
+export function ghStandIn(env, tmp, origin) {
+  const stubs = path.join(tmp, "bin"), ghData = path.join(tmp, "gh-data.json"), ghLog = path.join(tmp, "gh-log");
+  fs.mkdirSync(stubs);
+  fs.writeFileSync(path.join(stubs, "gh"), `#!/usr/bin/env node
+const fs = require("fs");
+const a = process.argv.slice(2), data = JSON.parse(fs.readFileSync(process.env.GH_DATA, "utf8"));
+const route = a.find((x, i) => i > 0 && !x.startsWith("-") && !["-X", "--input", "--jq"].includes(a[i - 1]));
+if (a.includes("-X")) { fs.appendFileSync(process.env.GH_LOG, route + " " + fs.readFileSync(0, "utf8") + "\\n"); process.exit(0); }
+const found = Object.entries(data).find(([pattern]) => new RegExp(pattern).test(route));
+if (!found) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }
+console.log(JSON.stringify(a.includes("--slurp") ? [found[1]] : found[1]));
+`, { mode: 0o755 });
+  const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+  const n = Number(env.GIT_CONFIG_COUNT);
+  return { ghData, ghLog, env: { ...env, [PATHKEY]: `${stubs}${path.delimiter}${env[PATHKEY]}`, GH_DATA: ghData, GH_LOG: ghLog,
+    GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(origin)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: "https://github.com/someone/project.git" } };
 }

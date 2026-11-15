@@ -7,10 +7,10 @@ what you will be asked; it holds no rule of its own, and where it points, the ru
 ## What the core does for your project
 
 It is the set of rules and checks your agents work by, so that you write none of them and every project that takes it
-works alike. It sits in your repository as an exact copy under `core/`, pinned to one commit of this repository and
-never edited by hand, beside a few files of your own: a manifest, your rule files and the workflows that call the core's
-checks (`README.md`, "How a project takes the core"). Your agents work in branches and pull requests; `main` changes only
-by a merged pull request whose checks have passed, never by a push (floor rule 12). Nothing in the repository, a pull
+works alike. It sits in your repository as a copy under `core/`, beside a few files of your own: a manifest, your rule
+files and the workflows that call the core's checks (`README.md`, "How a project takes the core", says how the copy is
+kept and pinned). Your agents work in branches and pull requests; `main` changes only by a merged pull request whose
+checks have passed, never by a push (floor rule 12). Nothing in the repository, a pull
 request or a log holds a secret or anything personal about you (floor rules 1 and 11).
 
 ## What it will ask of you

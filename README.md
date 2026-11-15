@@ -14,9 +14,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 ## Two layers
 
 - **The floor** (`floor/`): what keeps the owner from harm and loss, taken whole by every project. If a project dropped
-  a rule, could the owner be harmed or something be lost for good? Then it is floor. `security.md` holds the rules any
-  task can break, read at the start of every task; `topics.md` the rules for particular work; `threat-model.md` the
-  shared threat model.
+  a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files, `security.md`,
+  `topics.md` and `threat-model.md`, each say at their top what they hold and when they are read.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
@@ -165,8 +164,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
      itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
-   - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
-     core's with the licence check's config: a restore of each project file git knows from its lock file alone
+   - **A project whose packages come from NuGet** has a `nuget.yml` of its own that calls the core's on every pull
+     request, with the licence check's config: a restore of each project file git knows from its lock file alone
      (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
      config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads from
      NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
@@ -190,9 +189,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
-     request or by a comment that opens "Security review:" from the repository's owner (the *owner's account*, where
-     that owns it), or an account the project names in its call (the input `reviewers`) (`modules/reviews.md`, point 3),
-     the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
+     request or by a comment that opens "Security review:" from an account `modules/reviews.md`, point 3, counts (the
+     owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
      one posted after it began, never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a

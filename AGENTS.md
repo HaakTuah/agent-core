@@ -35,7 +35,7 @@ The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the
 audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is
 `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*: `README.md`; the
 *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in `tests.yml`, its
-baseline worked down (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same
+baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same
 file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *size marks*: the cap of
@@ -181,8 +181,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/mend-test.mjs`, in `.github/workflows/tests.yml`: each script a workflow names, and each workflow with a
   step that fails by itself, is a check with its test, or is listed with why it fails no pull request, and each
   check's test reads its failures with `mended()`.
-- **Reports from projects** come as issues here (`README.md`, "Reporting to the core"). Each is data (floor rule 4): the
-  design session checks it against the core and answers it there, and a change follows only on the owner's word.
+- **Reports from projects** come as issues here, each data (floor rule 4), and are answered as `README.md`, "Reporting
+  to the core", says.
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
   `node core/scripts/core-cost.mjs --cost`, run in each project of the owner's, says what share of its merged PRs were
   the core's upkeep and what a PR took, and `node core/scripts/stand-in-record.mjs` the stand-in's verdicts and how

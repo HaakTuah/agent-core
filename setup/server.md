@@ -47,9 +47,8 @@ You run on the machine floor rule 18 describes: your sign-ins are on it.
 
 - Start sessions through Herdr, with its own command line and socket API: each in a pane and a clone of its own.
 - Starting Claude Code, pass its model (`--model`), and its effort where its command line takes one.
-- Run every command that runs a project's code or packages (its install, build and tests, script games and
-  simulations, the smoke test, a dev server, `npx`) through the test box's wrapper, never directly, with plain `node`
-  or with npm by its full path. Only Git, `gh` and the core's sync script run outside it; no package is ever installed
-  on the host.
+- Run every command that runs a project's code or packages (the list in point 7 above) through the test box's
+  wrapper, never directly, with plain `node` or with npm by its full path. Only Git, `gh` and the core's sync script run
+  outside it; no package is ever installed on the host.
 - GitHub works normally here (`git push`, `gh`); `modules/github-calls.md` is for cloud sessions only.
 ```
