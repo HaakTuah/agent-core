@@ -234,10 +234,14 @@ ok(["build/dep s.xml, which", "build/b.xml, which", "build/c.xml, which", "build
 ok(projects(`<Import Project="a&amp;b.xml;x&lt;y&#59;z;&bogus;" />`) === "a&b.xml,x<y,z,&bogus" && importPath("A.props", "&bogus") === null, "a reference to & < > \" ' is decoded, and an entity XML does not know is one the check cannot know");
 // a file a property MSBuild's own targets import a file by names, as an Import's (#274): read where its value starts at
 // its own file's folder, reported where it does not, since MSBuild reads it from the folder of its own targets
-const viaProps = imported(`<Project><PropertyGroup><CustomAfterMicrosoftCommonTargets Condition="'$(A)' != ''">$(MSBuildThisFileDirectory)after.xml;<!-- $(MSBuildThisFileDirectory)gone.xml -->
-  $(MSBuildThisFileDirectory)b&amp;c.xml<![CDATA[;$(MSBuildThisFileDirectory)<raw>.xml]]></CustomAfterMicrosoftCommonTargets><directorybuildpropspath>rel.xml</directorybuildpropspath><DirectoryPackagesPropsPath /><OtherPath>$(MSBuildThisFileDirectory)other.xml</OtherPath><CustomBeforeMicrosoftCommonProps>$(MSBuildThisFileDirectory)x.xml<Inner /></CustomBeforeMicrosoftCommonProps></PropertyGroup></Project>`);
-ok(viaProps.map((x) => `${x.project}|${x.via}`).join() === "$(MSBuildThisFileDirectory)after.xml|CustomAfterMicrosoftCommonTargets,$(MSBuildThisFileDirectory)b&c.xml|CustomAfterMicrosoftCommonTargets,$(MSBuildThisFileDirectory)<raw>.xml|CustomAfterMicrosoftCommonTargets,rel.xml|directorybuildpropspath,$(MSBuildThisFileDirectory)x.xml|CustomBeforeMicrosoftCommonProps,$(an element inside it)|CustomBeforeMicrosoftCommonProps",
-  "a property MSBuild's own targets import a file by is read as XML gives its text, a comment in it passed over and CDATA as written, in any case; another property is not, and one with an element inside it is read up to it, the rest one the check cannot know", JSON.stringify(viaProps));
+const viaOf = (text) => imported(`<Project><PropertyGroup>${text}</PropertyGroup></Project>`).map((x) => `${x.project}|${x.via}${x.loose ? "|loose" : ""}`).join();
+ok(viaOf(`<CustomAfterMicrosoftCommonTargets Condition="'$(A)' != ''">$(MSBuildThisFileDirectory)after.xml;<!-- $(MSBuildThisFileDirectory)gone.xml -->\n  $(MSBuildThisFileDirectory)b&amp;c.xml</CustomAfterMicrosoftCommonTargets>`) === "$(MSBuildThisFileDirectory)after.xml|CustomAfterMicrosoftCommonTargets,$(MSBuildThisFileDirectory)b&c.xml|CustomAfterMicrosoftCommonTargets"
+  && viaOf(`<directorybuildpropspath>rel.xml</directorybuildpropspath><DirectoryPackagesPropsPath /><NuGetRestoreTargets>  <![CDATA[$(MSBuildThisFileDirectory)<raw>.xml]]></NuGetRestoreTargets>`) === "rel.xml|directorybuildpropspath,$(MSBuildThisFileDirectory)<raw>.xml|NuGetRestoreTargets",
+  "a property MSBuild's own targets import a file by is read as XML gives its text, in any case: a comment in it passed over, references decoded, CDATA that comes first as written");
+ok(viaOf(`<LanguageTargets>$(MSBuildThisFileDirectory)x<![CDATA[.xml]]></LanguageTargets>`) === "$(markup inside it)|LanguageTargets" && viaOf(`<CustomBeforeMicrosoftCommonProps>$(MSBuildThisFileDirectory)x.xml;<Inner /></CustomBeforeMicrosoftCommonProps>`) === "$(MSBuildThisFileDirectory)x.xml|CustomBeforeMicrosoftCommonProps,$(markup inside it)|CustomBeforeMicrosoftCommonProps",
+  "CDATA after text, or an element inside, MSBuild takes as the markup it is written in: such a property's value is one the check cannot know, what stands before an element followed all the same");
+ok(viaOf(`<OtherPath>$(MSBuildThisFileDirectory)other.xml;plain.xml</OtherPath><OutputPath>bin/</OutputPath><Odd>$(MSBuildThisFileDirectory)a<![CDATA[b]]></Odd>`) === "$(MSBuildThisFileDirectory)other.xml|OtherPath|loose",
+  "any other property is read only for a name that starts at its own file's folder, and only where MSBuild reads its text as XML gives it");
 ok(imported(`<CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)a.xml</CustomAfterMicrosoftCommonTargets${" ".repeat(500)}\n>`).map((x) => x.project).join() === "$(MSBuildThisFileDirectory)a.xml", "a property's end tag is read however many blanks stand before its \">\"");
 ok(importPath("build/A.props", "$(MSBuildThisFileDirectory)after.xml", { anchored: true }) === "build/after.xml" && importPath("build/A.props", "after.xml", { anchored: true }) === null && importPath("build/A.props", "/opt/x.xml", { anchored: true }) === "" && importPath("build/A.props", "after.xml") === "build/after.xml",
   "a property's value is known only where it starts at its own file's folder: MSBuild reads any other from its own targets' folder");
@@ -246,6 +250,15 @@ put("build/after.xml", "<Project><PropertyGroup><RestorePackagesPath>p</RestoreP
 const byProperty = reported(["build/Props.props", "build/after.xml"]);
 ok(byProperty.reports.some(x => x.startsWith("build/after.xml, which a build file brings in, names RestorePackagesPath")) && byProperty.reports.some(x => x.startsWith("build/Props.props brings in ../plain.xml by CustomAfterMicrosoftCommonTargets, a file whose path this check cannot know without the build")) && byProperty.reports.length === 2,
   "a file a property brings in is read like a build file, and one whose path the check cannot know is reported, by the property's name", JSON.stringify(byProperty));
+// (a decoy whose name CDATA would spell, and what any other property brings in: XML read, an icon passed over, a file
+// in another encoding reported; #283's security review)
+put("build/Props.props", `<Project><PropertyGroup><CustomAfterMicrosoftCommonTargets>$(MSBuildThisFileDirectory)x<![CDATA[.xml]]></CustomAfterMicrosoftCommonTargets><Mine>$(MSBuildThisFileDirectory)mine.xml;$(MSBuildThisFileDirectory)app.ico;$(MSBuildThisFileDirectory)wide.xml</Mine></PropertyGroup><Import Project="$(Mine)" /></Project>`);
+put("build/x.xml", "<Project />"); put("build/mine.xml", "<Project><PropertyGroup><NuGetLockFilePath>m</NuGetLockFilePath></PropertyGroup></Project>");
+put("build/app.ico", Buffer.from([0, 0, 1, 0, 1, 0, 0xff, 0xfe])); put("build/wide.xml", Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("<Project />", "utf16le")]));
+const loose = reported(["build/Props.props", "build/x.xml", "build/mine.xml", "build/app.ico", "build/wide.xml"]);
+ok(loose.reports.some(x => x.startsWith("build/Props.props brings in $(markup inside it) by CustomAfterMicrosoftCommonTargets")) && loose.reports.some(x => x.startsWith("build/mine.xml, which a build file brings in, names NuGetLockFilePath"))
+  && loose.reports.some(x => x.includes("brings in $(MSBuildThisFileDirectory)wide.xml by Mine, a file this check does not read (not plain UTF-8)")) && !loose.reports.some(x => x.includes("app.ico")) && !loose.reports.some(x => x.startsWith("build/x.xml")),
+  "a property's value written with CDATA after text is reported, never read as its decoy; a file any other property names from its own folder is read where it is XML, an icon passed over and a file in another encoding reported", JSON.stringify(loose));
 if (process.platform !== "win32") {
   fs.symlinkSync("/dev/null", path.join(tmp, "build/device.xml"));
   ok(readProject(tmp, "build/device.xml") === NOT_A_FILE && readProject(tmp, "build") === NOT_A_FILE && readProject(tmp, "build/none.xml") === null && Buffer.isBuffer(readProject(tmp, "build/after.xml")), "a path that leads to a device or a folder is no file, and is never read");
@@ -504,6 +517,21 @@ if (process.platform !== "win32") {
   git("add", "-A"); git("commit", "-q", "-m", "a device link");
   ok(!devCheck().failures.some(x => x.includes("build/dev.xml")) && devCheck().reports.some(x => x.startsWith("build/dev.xml, which a build file brings in, is no file of bytes") && x.includes("held before this check read it")), "the same link as the base held it: reported, and passes");
   for (const f of ["build/dev.xml", "Directory.Build.props"]) fs.rmSync(path.join(repo, f)); git("add", "-A"); git("commit", "-q", "-m", "no device link");
+}
+// a submodule an Import names, as the base held it: reported, so that a sync fails no project that changed nothing (#283)
+inRepo("Directory.Build.props", `<Project><Import Project="ext/lib" Condition="false" /></Project>`); fs.mkdirSync(path.join(repo, "ext/lib"), { recursive: true });
+git("update-index", "--add", "--cacheinfo", `160000,${git("rev-parse", "HEAD").stdout.trim()},ext/lib`);
+const subCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "Directory.Build.props", "ext/lib"], process.env, { base: "HEAD", baseConfig: null });
+ok(subCheck().failures.some(x => x.startsWith("ext/lib, which a build file brings in, is no file of bytes")), "a submodule the pull request adds and imports: it fails");
+git("add", "Directory.Build.props"); git("commit", "-q", "-m", "a submodule imported");
+ok(!subCheck().failures.some(x => x.includes("ext/lib")) && subCheck().reports.some(x => x.startsWith("ext/lib, which a build file brings in, is no file of bytes") && x.includes("held before this check read it")), "the same submodule as the base held it: reported, and passes", JSON.stringify(subCheck()));
+git("rm", "-q", "--cached", "ext/lib"); fs.rmSync(path.join(repo, "ext"), { recursive: true }); fs.rmSync(path.join(repo, "Directory.Build.props")); git("add", "-A"); git("commit", "-q", "-m", "no submodule");
+// a lock file or a tools manifest that leads to a device: failed with its reason, never read (#283)
+if (process.platform !== "win32") {
+  const DEV = "dev/Dev/packages.lock.json"; inRepo("dev/Dev/Dev.csproj", "<Project />"); fs.symlinkSync("/dev/zero", path.join(repo, DEV)); fs.symlinkSync("/dev/zero", path.join(repo, "dev/dotnet-tools.json"));
+  const devLock = check({ ships: [], nuget: { tools: [DEV] } }, repo, restore(), ["dev/Dev/Dev.csproj", DEV, "dev/dotnet-tools.json"], process.env, { base: "HEAD", baseConfig: null, fetched: true });
+  ok(devLock.failures.some(x => x.startsWith(`${DEV} is no file of bytes`)) && devLock.failures.some(x => x.startsWith("dev/dotnet-tools.json is no file of bytes")), "a lock file or a tools manifest that leads to a device fails with its reason, and is never read", JSON.stringify(devLock));
+  fs.rmSync(path.join(repo, "dev"), { recursive: true });
 }
 // a .user file not plain UTF-8, which the base held beside no project file and the pull request brings into play with
 // one: it fails, as any .user file so brought (#272)
