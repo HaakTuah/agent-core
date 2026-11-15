@@ -42,7 +42,7 @@ wanted").
 | #310 | rule builder | #246, #256 and #285 |
 | #311 | rule builder | #286 |
 | #325 | rule builder | #256, #305, #311 and #322 |
-| #313 | rule builder | #312 |
+| #313 | rule builder | #359, the core's own inputs: its rules merged in #360 |
 | #314 | rule builder | #313 and #304 |
 | #350 | builder | #235 |
 | #352 | builder | |
