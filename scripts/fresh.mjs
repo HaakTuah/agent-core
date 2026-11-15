@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 import { TEMPLATES, files } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { call, project } from "./steps.mjs";
+import { call, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the project's own from its first task)
@@ -116,7 +116,7 @@ if (started(import.meta.url)) {
     const older = at < 0 ? [] : fs.readdirSync(process.argv[at + 1]).map(d => fresh(p, path.join(process.argv[at + 1], d, TEMPLATES)));
     console.log(report(differences(p, fresh(p), older)));
   } catch (e) {
-    console.error(`FAIL: the project could not be compared (${e.message}): run it from the project's root, a git repository`);
+    console.error(`FAIL: the project could not be compared (${plain(e.message)}): run it from the project's root, a git repository`);
     process.exitCode = 1;
   }
 }

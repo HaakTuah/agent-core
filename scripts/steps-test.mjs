@@ -12,7 +12,7 @@ import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { TEMPLATES, files } from "./init.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
-import { COST, STEPS, leads, notDone, project, report } from "./steps.mjs";
+import { COST, STEPS, leads, notDone, plain, project, report } from "./steps.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -86,6 +86,8 @@ sec.mend(lockProject);
 // ---- a check that cannot read the project is reported, never read as done ----
 const throwing = [{ lead: "a step", cost: COST.check, check: () => { throw new Error("cannot read it"); } }];
 ok(notDone(lockProject, throwing)[0]?.mend.includes("could not read the project"), "a check that throws is reported as not read, never as done");
+const leaked = plain(`ENOENT: no such file, open '${path.join(lockProject, "x")}' and '${path.join(os.tmpdir(), "y")}' and '${path.join(os.homedir(), "z")}'`, lockProject);
+ok(!leaked.includes(lockProject) && !leaked.includes(os.tmpdir()) && !leaked.includes(os.homedir()) && leaked.includes("<the project>"), "an error's words carry no path of the machine's into what a sync prints", leaked);
 
 // ---- beside a fresh start: each kind of difference is listed, and a declared file is not compared ----
 const game = dirs["a-game"];

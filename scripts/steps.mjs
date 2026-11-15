@@ -15,6 +15,7 @@
 //   node core/scripts/steps.mjs          from a project's root: the steps not done, each with its mend; nothing else
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
@@ -142,6 +143,15 @@ export const STEPS = [
   { lead: "15 November 2026, every step has its check", cost: COST.check, unread: "it asks that the steps above be run, which every sync from this one on does by itself" },
 ];
 
+// An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
+// home folder), since what is printed may be pasted into a pull request's description (floor rule 1).
+export function plain(message, root = process.cwd()) {
+  let text = String(message);
+  for (const [at, as] of [[path.resolve(root), "<the project>"], [HERE, "<the copy>"], [os.tmpdir(), "<a temporary folder>"], [os.homedir(), "<home>"]])
+    if (at && at.length > 1) for (const spelling of new Set([at, at.replace(/\\/g, "/")])) text = text.split(spelling).join(as);
+  return text;
+}
+
 // Whether the manifest declares a step undone on purpose: a line of its "Differences" that quotes the step's lead.
 export const declared = (p, step) => p.differences.some(l => l.includes(`"${step.lead}"`));
 
@@ -153,7 +163,7 @@ export function notDone(root, steps = STEPS) {
   for (const step of steps) {
     if (!step.check || declared(p, step)) continue;
     let mend;
-    try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${e.message}): read the entry in \`core/${NOTES}\` against it.`; }
+    try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read the entry in \`core/${NOTES}\` against it.`; }
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
   }
   return out;
@@ -170,7 +180,7 @@ if (started(import.meta.url)) {
   try {
     console.log(report(notDone(process.cwd())));
   } catch (e) {
-    console.error(`FAIL: the steps could not be read here (${e.message}): run it from the project's root, a git repository`);
+    console.error(`FAIL: the steps could not be read here (${plain(e.message)}): run it from the project's root, a git repository`);
     process.exitCode = 1;
   }
 }
