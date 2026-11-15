@@ -26,8 +26,11 @@
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }).
 //
 //   node core/scripts/shape.mjs [<config>]            the check; with no config named, the one the manifest's *shape
-//                                                     check* names, else checks/shape.json, and nothing where the
-//                                                     project has none yet
+//                                                     check* names, else checks/shape.json. A project that has not
+//                                                     written one yet is held to the starter kit's own, with the
+//                                                     pull request's base as its baseline: from the sync that
+//                                                     brings the check nothing gets worse, and nothing that stood
+//                                                     fails (AGENTS.md, "Nothing locks a project")
 //   node core/scripts/shape.mjs <config> --first      write the first baseline, what stands when a project takes the
 //                                                     check; only where no baseline exists yet
 //   node core/scripts/shape.mjs <config> --write      lower the baseline to what still stands; it adds only what
@@ -49,6 +52,7 @@ import { CODE, cycles, functions, imports, resolve, tokens } from "./code-shape.
 import { started } from "./started.mjs";
 
 export const KIT = "checks/shape.json";
+const TEMPLATE = fileURLToPath(new URL("../setup/template/shape.json.tmpl", import.meta.url));
 // First guesses, which use tunes (the report of 14 November 2026; #246, part G).
 export const MARKS = { lines: 60, depth: 4, branches: 15 };
 // The domains a project names its systems under, leaving out what it lacks; a name of its own is allowed beside them.
@@ -387,10 +391,14 @@ function fresh({ config, at, self, found, baseline, current, base }) {
     news = news.filter(id => left.has(id));
     if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, or the baseline was lowered past what stands. Mend: list them with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
   }
-  const byKind = new Map();
-  for (const id of news) { const k = found.entries.get(id).kind; byKind.set(k, [...(byKind.get(k) ?? []), id]); }
-  for (const [kind, ids] of byKind) { const [what, mend] = SAID[kind](ids.length, config); fail.push([`FAIL: ${what}. Mend: ${mend}`, ...some(ids, current)]); }
-  return fail;
+  return [...fail, ...byKind(news, found, current, config)];
+}
+
+// The failures of new breaches, one for each kind, with its mend and the breaches under it.
+function byKind(news, found, current, config, also = "") {
+  const kinds = new Map();
+  for (const id of news) { const k = found.entries.get(id).kind; kinds.set(k, [...(kinds.get(k) ?? []), id]); }
+  return [...kinds].map(([kind, ids]) => { const [what, mend] = SAID[kind](ids.length, config); return [`FAIL: ${what}. Mend: ${mend}${also}`, ...some(ids, current)]; });
 }
 
 // The marks the config raises or drops against the base's: each by the id its reason stands under in "grown".
@@ -513,9 +521,24 @@ function configAt(named, self, base) {
   const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")));
   if (fs.existsSync(at)) return at;
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
-  if (base?.show(at) != null) refuse(`${at} is gone, and ${base.name} holds it: no pull request takes the shape check out`, `take it back as ${base.name} holds it (git checkout ${base.name} -- ${at})`);
-  console.log(`ok   the shape check is not taken here yet: no ${at} (core/setup/sync-notes.md, "how code is put together")`);
+  if (base?.show(at) != null) refuse(`${at} is gone, and ${base.name} holds it: no pull request takes the shape check's config out`, `take it back as ${base.name} holds it (git checkout ${base.name} -- ${at})`);
   return null;
+}
+
+// A project that has not written its config yet: held to the starter kit's own, with the pull request's base as its
+// baseline, so that from the sync that brings the check nothing gets worse and nothing that stood before fails.
+function unwritten(self, base) {
+  const config = parseConfig(fs.readFileSync(TEMPLATE, "utf8"), "the starter kit's config");
+  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes.md, "how code is put together")`;
+  if (!base) { console.log(`ok   ${yet}, and there is no base to compare with: nothing was held`); return 0; }
+  const now = standing(config), found = survey(now.texts, config, now.tests);
+  const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
+  const news = unclaimed(current, stoodAt({ standing: () => standingAt(base.name, config) }, config), config.marks);
+  const fail = byKind(news, found, current, config, `; a file of tests is not held to the marks once the project's own config names it under "tests"`);
+  for (const line of fail.flat()) console.error(line);
+  if (fail.length) return 1;
+  console.log(`ok   nothing new in how the code is put together against ${base.name}, by the starter kit's config: ${yet}`);
+  return 0;
 }
 
 function check(config, at, self, found, base) {
@@ -534,7 +557,7 @@ function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/"); // (as a mend names it)
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const base = baseOf(), at = configAt(named, self, base);
-  if (at === null) return 0;
+  if (at === null) return unwritten(self, base);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
   if (rest[0] === "--suite") return suite(config, at, self, rest.slice(1));
   const command = { "--first": first, "--write": write }[rest[0] ?? ""];

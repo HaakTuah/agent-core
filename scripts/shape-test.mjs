@@ -159,7 +159,17 @@ put("src/view/index.js", "import { one } from '../rules/index.js';\nexport const
 put("README.md", "A scratch project.\n");
 commit("a project");
 let r = run([]);
-ok(r.status === 0 && /not taken here yet: no checks\/shape\.json/.test(r.out), "a project with no config passes: the check is not taken there yet", r.out);
+ok(r.status === 0 && /has not written its config of the shape check yet/.test(r.out) && /nothing was held/.test(r.out), "a project with no config and no base passes, and says that nothing was held", r.out);
+git("branch", "before");
+r = run([], { SHAPE_BASE: "before" });
+ok(r.status === 0 && /nothing new in how the code is put together against before, by the starter kit's config/.test(r.out), "with a base, a project with no config is held to the starter kit's, the base as its baseline: what stood passes", r.out);
+put("src/rules/more.js", long("another", 61));
+put("src/rules/more.test.js", long("inATest", 200));
+put("core/scripts/copied.js", long("theCores", 200));
+r = run([], { SHAPE_BASE: "before" });
+ok(r.status === 1 && mended(r.out) && /1 function passes a mark/.test(r.out) && /more\.js#another/.test(r.out) && !/inATest|theCores/.test(r.out) && /once the project's own config names it under "tests"/.test(r.out),
+  "and a pull request that adds a function past a mark fails, with its mend; a test's and the core's copy are not read", r.out);
+for (const f of ["src/rules/more.js", "src/rules/more.test.js", "core"]) fs.rmSync(path.join(dir, f), { recursive: true });
 r = run(["checks/shape.json"]);
 ok(r.status === 1 && mended(r.out), "a config named and not there fails, with its mend", r.out);
 put("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], systems: { rules: { domain: "rules", paths: ["src/rules/"], entrance: "src/rules/index.js" }, view: { domain: "display", paths: ["src/view/"], uses: ["rules"] } }, suites: { quick: 30, slow: { [process.platform]: 0.001 } } }, null, 2));
@@ -216,7 +226,7 @@ ok(r.status === 1 && mended(r.out) && /raises or drops 1 mark/.test(r.out) && /m
 git("checkout", "-q", "--", "checks/shape.json");
 fs.rmSync(path.join(dir, "checks/shape.json"));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no pull request takes the shape check out/.test(r.out), "a pull request that takes the config out fails", r.out);
+ok(r.status === 1 && mended(r.out) && /no pull request takes the shape check's config out/.test(r.out), "a pull request that takes the config out fails", r.out);
 git("checkout", "-q", "--", "checks/shape.json");
 r = run([], { SHAPE_BASE: "no such; branch" });
 ok(r.status === 1 && mended(r.out), "a base that is no plain name is refused", r.out);

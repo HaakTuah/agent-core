@@ -20,6 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES } from "./releases.mjs";
+import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
@@ -78,6 +79,18 @@ const progressOf = manifest => slot(manifest, "progress file", "docs/PROGRESS.md
 const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 // The licence check's config a project names (its NuGet check's input, else the starter kit's path).
 const licenceConfig = p => call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
+
+// Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
+// its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
+// that config names. Null where both stand; else the mend.
+function shapeWritten(p) {
+  const at = shapeAt(p.manifest), text = p.read(at);
+  const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
+  let config;
+  try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
+  return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
+}
 
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
@@ -211,7 +224,8 @@ export const STEPS = [
   { lead: "16 November 2026, the daily look", cost: COST.workflow, unread: "whether the project's daily job is to run, or its orchestrator carries the look, is no file's to say, as of the core has moved; where a `look.yml` is missing, `core/scripts/fresh.mjs` lists it at every sync, and the old daily job runs the look meanwhile" },
   { lead: "16 November 2026, the line that says what a pull request waits on", cost: COST.check, held: "the description check" },
   { lead: "16 November 2026, choices that are hard to undo", cost: COST.read, unread: "which of a project's choices are hard to undo is a reading of the project, not a file's to say; where its *choice records* are missing, `core/scripts/fresh.mjs` lists the file at every sync, and `core/scripts/choices.mjs` lists the records it holds" },
-  { lead: "16 November 2026, how code is put together", cost: COST.config, unread: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, not a file's to say; where the shape check's config or its baseline is missing, `core/scripts/fresh.mjs` lists the file at every sync, and the copies workflow's step says on every pull request that the check is not taken yet" },
+  { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
+    partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

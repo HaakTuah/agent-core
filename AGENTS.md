@@ -164,8 +164,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
   nothing showed that it was. Held by `scripts/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `scripts/upgrade-test.mjs`: after the sync every step reads done,
-  each step added since the release started from, taken out, is reported and its mend as written makes it done, and
-  steps taken out at random are reported, exactly those.
+  but one the release adds that it asks of every project (a check's own list to write), which is reported and done
+  by its mend as written; each step added since the release started from, taken out, is reported and its mend as
+  written makes it done, and steps taken out at random are reported, exactly those.
 - **A pull request says what it asks of a project** (core archive 215): one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
