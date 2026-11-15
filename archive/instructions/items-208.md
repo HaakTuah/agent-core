@@ -187,3 +187,39 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "Nothing locks a project", "A release says what it asks, step by step" and "A pull request says what it asks
      of a project" in `AGENTS.md`; `scripts/steps.mjs`, `scripts/fresh.mjs`, the steps the sync and the release print,
      the cases of `scripts/upgrade-test.mjs`, and the heading `.github/workflows/own-description.yml` asks for.
+
+216. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #238, labelled `by:chat`, in its text and seven notes, the
+     last of which, "What this issue asks to be built, in one place", gathers them and holds where they differ). Shown
+     that every session reads the *progress file* at its start, and that in the owner's two games it stood at its size
+     mark, the owner agreed to a queue of the items the session had found in the core and said:
+
+     > We need to address everything you identified.
+
+     A second count corrected the first: the files did not balloon, the mark stopping them, but sat at it, with
+     finished entries, long accounts of what was built and notes of the owner's answers in them. The owner agreed to
+     three rules: a finished entry leaves the file in the pull request that finishes it; an entry says what is next and
+     points to its pull requests for what was done; and the file has a size mark of its own, set by each project at its
+     own first trim, the general mark holding there until it does. The owner agreed too that issues are the way in: an
+     idea, a bug or a decision of the owner's is filed as an issue, its text there alone; the queue file holds order
+     only; one writer, the orchestrator or the design session, moves issues into it, in a pull request that is the
+     trust gate, nothing being built straight from an issue, and any other session changes only its own item's line; a
+     planned build order needs no issues. Of a project whose issues may be switched off, the owner said:
+
+     > […] should be fallbacks if it can't be reached. Like for giving new tasks from owner to work queue.
+
+     and agreed that a check asks at each sync and on the scheduled look whether issues can be read and written; that
+     where they cannot, the same flow runs from an inbox folder in the repository, one small file an item; that the
+     owner gives a task by saying it to any session, or by adding the file; that switching issues on is the owner's
+     setting, reported once and never a stop; and that one place is used at a time, the open files moved over once
+     issues can be reached. A count found the queue file truly conflicted six times in 250 pull requests: the rules
+     rest on what every session reads at its start and on an order kept in one place, not on collisions. To the
+     orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "Issues are the way in" and "The *progress file* holds order only" in `modules/inbox.md`, the *progress
+     file*'s slot in `README.md`, the starter kit's template for it, `scripts/inbox.mjs`, the steps "15 November 2026,
+     the progress file holds order only" and "15 November 2026, the owner's inbox where issues cannot be reached" of
+     `scripts/steps.mjs`, and the queue's own mark in `scripts/size.mjs`.
