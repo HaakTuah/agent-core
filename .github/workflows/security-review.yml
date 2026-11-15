@@ -13,7 +13,9 @@
 # review open, only such a comment settles it, posted after its newest finding where one is to be found; nothing else
 # counts (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show
 # a change to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
-# which count, and when one is enough). A project calls it (workflow_call) from
+# which count, and when one is enough); of a pull request whose head does not hold the check's scripts as the default
+# branch does, which stood before the check came, what the check reads more is said, never waited for. A project
+# calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
 # and on issue_comment (created and edited), so that the status follows a review the moment its comment arrives and
 # moves with each push, in a job that grants contents: read, pull-requests: read and statuses: write, pinned to a full
@@ -113,8 +115,20 @@ jobs:
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100" > "$d/findings.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
-          node "$ROOT/scripts/security-review.mjs" "$d/pull.json" "$d/comments.json" "$d/findings.json" \
-            "$d/commits.json" "$d/files.json" > "$d/out.json"
+          # whether the pull request's head holds a script of the check as this branch does: one that does not stood
+          # before the check came, and what the check reads more is said of it, never waited for (AGENTS.md, "Nothing
+          # locks a project")
+          head=$(jq -r '.head.sha // empty' "$d/pull.json")
+          held() {
+            local p="$ROOT/scripts/$1"
+            p="${p#./}"
+            [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo false; return; }
+            local theirs
+            theirs=$(gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> /dev/null || true)
+            if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
+          }
+          BOUND=$(held security-review.mjs) node "$ROOT/scripts/security-review.mjs" "$d/pull.json" "$d/comments.json" \
+            "$d/findings.json" "$d/commits.json" "$d/files.json" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
             echo "The pull request is closed or a draft: nothing to say."
@@ -128,8 +142,8 @@ jobs:
           # whose core is older has no such script, and says nothing of it)
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
-            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" "$d/comments.json" "$d/commits.json" \
-              "$d/files.json" > "$d/code.json" \
+            if BOUND=$(held code-review-wait.mjs) node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+              "$d/comments.json" "$d/commits.json" "$d/files.json" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
             else echo "::warning::the code-review status could not be written: scripts/code-review-wait.mjs or its post failed"; fi

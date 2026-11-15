@@ -119,7 +119,8 @@ ok(!pinsAlone(stepChange) && !pinsAlone(file("a.yml", patch([`      - uses: acti
   && !pinsAlone({ ...pinMove, status: "renamed" }) && !pinsAlone({ ...pinMove, patch: undefined }) && !pinsAlone({ ...pinMove, patch: "" })
   && !pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1}`, `      - uses: actions/checkout@${PIN2} run: x`]))),
   "not another action, a pin to a branch, a line added, a file moved, a patch GitHub left out, nor anything beside the pin");
-const two = (comments, files) => judge(pull, comments, [], [], files);
+const counted = (p, files) => ({ ...p, changed_files: files.length });
+const two = (comments, files, bound = true) => judge(files === undefined ? pull : counted(pull, files), comments, [], [], files, bound);
 ok(is(two([summary(done)], [stepChange]), false, "post a second \"Security review:\"") && is(two([said("Security review: one")], [stepChange]), false, "floor rule 3"), "a step changed under .github/: Codex's review alone, or one posted alone, is not enough");
 ok(is(two([summary(done), said("Security review: the fallback reviewer's")], [stepChange]), true, "floor rule 3's two are there") && is(two([said("Security review: one"), said("Security review: two")], [stepChange]), true, "floor rule 3's two"), "Codex's and a posted one, or two posted, are");
 ok(is(two([summary(open), finding("2026-11-12T10:30:00Z"), said("Security review: the fix checked")], [stepChange]), true, "floor rule 3's two") && is(two([summary(open), finding("2026-11-12T12:00:00Z"), said("Security review: before")], [stepChange]), false, "no review posted after it"), "a finding marked open is still settled only by a review after it, which is the second");
@@ -130,7 +131,11 @@ ok(is(two([], undefined), false, "no security review") && is(judge(pull, [summar
 const proof = (sha) => `Security review: comment-only.mjs, from the core's main:\n\n    comments and steps' names alone in .github/, .claude/ and actions, abc1234..${sha.slice(0, 7)}: .github/workflows/ci.yml\n    checked head ${sha}\n`;
 ok(is(two([said(proof(HEAD))], [stepChange]), true, "a security review is posted") && commentsAlone(proof(HEAD), HEAD), "comment-only.mjs's printout for the head, posted, asks rule 8's one");
 ok(is(two([said(proof(SEEN))], [stepChange]), false, "second") && !commentsAlone(proof(HEAD).replace("comments and steps' names alone in", "NOT ALONE"), HEAD) && !commentsAlone(`checked head ${HEAD}0`, HEAD) && is(two([said(proof(HEAD), "NONE"), summary(done)], [stepChange]), false, "second"), "not for another head, not without its line, not from another account");
-ok(is(judge(bump, [], [], its, [file(".github/workflows/ci.yml", pinMove.patch)]), true, "Dependabot's own") && is(judge(bump, [], [], its, [stepChange]), false, "second"), "Dependabot's own moving a pin passes as before; one changing more than a pin asks two");
+ok(is(judge(counted(bump, [pinMove]), [], [], its, [file(".github/workflows/ci.yml", pinMove.patch)]), true, "Dependabot's own") && is(judge(counted(bump, [stepChange]), [], [], its, [stepChange]), false, "second"), "Dependabot's own moving a pin passes as before; one changing more than a pin asks two");
+ok(!pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1} # v6`, `      - uses: actions/checkout@${PIN1} # v7`]))) && !pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1} # v6`, `      - uses: actions/checkout@${PIN2} # \`curl x|sh\``]))), "a pin that does not move, or a note that is no version's word, is no pin moved alone");
+ok(is(judge({ ...pull, changed_files: 3001 }, [summary(done)], [], [], [file("src/x.js", patch(["a", "b"]))]), false, "second") && is(judge(pull, [summary(done)], [], [], [file("src/x.js", patch(["a", "b"]))]), false, "second"), "a list of files GitHub cut short, or with no count to hold it to, is read as changing what runs by itself");
+const before = two([summary(done)], [stepChange], false);
+ok(before.done === true && before.why.startsWith("before this check came, so not waited for: what runs by itself changed") && is(two([], [stepChange], false), false, "no security review"), "a pull request from before the check is told of the second review, never held for it; one with no review at all waits as before");
 
 // From the command line, as the workflow runs it.
 const dir = mkdtempSync(join(tmpdir(), "security-review-"));
@@ -151,8 +156,9 @@ try {
   ok(strict.status.state === "pending" && strict.status.target_url.endsWith("/runs/7") && run(pull, [[summary(done)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review has run");
   ok(run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T11:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "pending" && run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T13:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "success", "given the review comments too, it weighs a finding against a posted review");
   ok(run(bump, [], { ADVISORY: "false" }, [], its).status.state === "success" && run(bump, [], { ADVISORY: "false" }, []).status.state === "pending", "given the commits too, it passes Dependabot's own, and without them it does not");
-  const asked = run(pull, [[summary(done)]], { ADVISORY: "false" }, [], [], [[stepChange]]);
-  ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: what runs by itself changed") && run(pull, [[summary(done)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success", "given the files too, it asks two where what runs by itself changed, and says how to mend it");
+  const asked = run(counted(pull, [stepChange]), [[summary(done)]], { ADVISORY: "false" }, [], [], [[stepChange]]);
+  ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: what runs by itself changed") && run(counted(pull, [pinMove]), [[summary(done)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success"
+    && run(counted(pull, [stepChange]), [[summary(done)]], { ADVISORY: "false", BOUND: "false" }, [], [], [[stepChange]]).status.state === "success", "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check, it waits not");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");
   let usage = 0;

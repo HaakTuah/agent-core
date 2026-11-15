@@ -11,25 +11,31 @@
 // (modules/reviews.md, "Which") has had none: neither Codex's code review completed nor such a comment names the head
 // commit, or one that only updates from `main` follow (merges whose second parent is no commit of the pull request's,
 // as GitHub's "Update branch" makes; floor rule 8: nothing is reviewed twice). None is needed where every changed file
-// is a Markdown file outside the rule files (docs alone: floor rule 3's names in any folder, the copy under core/,
-// .github/, .claude/, .agents/ and .agent/, those the project's SECURITY.md adds, and in the core's own repository
-// floor/ and modules/), nor where the pull request has a sync's shape: the copy under core/, the manifest's pin and
-// workflows whose pins alone move (floor rule 8: a pure sync gets no review; that its copy is the core's is
-// scripts/pure-sync.mjs's to prove, not this check's). Given neither, it waits only for a review running, as it did
-// before it read them. It does not hold what a review says, that a docs PR another provider built got its code review,
-// nor that a merge from `main` brought no change of its own: those stay with the builder and the reviews. It prints, as
-// JSON, the commit to mark and the status to give it, named "code-review", or {} for a pull request that is closed or a
-// draft. While "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the
-// check would have done, as the security-review status's.
+// is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
+// CLAUDE.local.md too, the copy under core/, .github/, .claude/, .agents/ and .agent/, and those the project's
+// SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
+// a sync's shape: the copy under core/, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
+// sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's). Given
+// neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
+// files, 250 commits) is read as needing a review and as proving no update from main. A pull request whose head does
+// not hold this script as the default branch does (BOUND=false, which the workflow sets) stood before the check came:
+// its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
+// date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
+// does not hold what a review says, that docs another provider built got their code review, nor that a merge from
+// `main` brought no change of its own: those stay with the builder and the reviews. It prints, as JSON, the commit to
+// mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
+// "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check would
+// have done, as the security-review status's.
 //
 // Usage:  node scripts/code-review-wait.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its commits, the same> <its files, the same>]
-//         ADVISORY=false for a status that waits; RUN_URL for the link the status carries.
+//         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
+//         the link the status carries.
 import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { UNREAD, WRITERS, codexState, pinsAlone, status } from "./security-review.mjs";
+import { UNREAD, WRITERS, codexState, pinsAlone, status, whole } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -40,13 +46,15 @@ const RUNNING = ["running", "queued", "pending", "in_progress"];
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 
 // { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name)
-export function judge(pull, comments, commits, files, rules = []) {
+export function judge(pull, comments, commits, files, rules = [], bound = true) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
-  const list = flat(comments);
-  const read = codexState(list);
-  if (read.unread) return { sha, done: true, why: "no code review is running", warning: UNREAD };
-  const review = read.state?.code_review;
+  const read = codexState(flat(comments));
+  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound);
+  // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
+  return read.unread ? { ...verdict, warning: UNREAD } : verdict;
+}
+function judgeWith(sha, list, review, pull, commits, files, rules, bound) {
   const short = sha.slice(0, 7);
   // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
   // commit must not stand for this one
@@ -57,22 +65,28 @@ export function judge(pull, comments, commits, files, rules = []) {
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
     return { sha, done: false, why: `Codex's code review of ${short} is still running` };
   }
-  if (commits === undefined || files === undefined || !needs(pull, flat(files), rules)) return { sha, done: true, why: "no code review is running" };
+  if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules))) return { sha, done: true, why: "no code review is running" };
   const seen = new Set(posted);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string") seen.add(review.commit_sha);
-  if (stands(flat(commits), sha, seen)) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
-  return { sha, done: false, why: `no code review of ${short}: ask one, or post "Code review:" naming its whole SHA (modules/reviews.md)` };
+  // (a list of commits GitHub cut short, at 250, proves no update from main: only a review of the head stands then)
+  const all = flat(commits);
+  if (Number.isInteger(pull.commits) && all.length >= pull.commits ? stands(all, sha, seen) : seen.has(sha)) return { sha, done: true, why: "a code review has run, and nothing but updates from main since" };
+  const why = `no code review of ${short}: ask one, or post "Code review:" naming its whole SHA (modules/reviews.md)`;
+  // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
+  return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
 
 // whether a pull request needs a code review: not where it holds docs alone, or has a sync's shape (the manifest's pin
 // moved alone among them)
 const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under core\/.*)$/u;
-const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
+const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
 function needs(pull, files, rules) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename]).filter((name) => name !== undefined);
   if (names.length === 0 || names.some((name) => typeof name !== "string")) return names.length > 0;
-  const core = String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase();
-  const rule = (name) => RULES.test(name) || rules.includes(name) || (core && /^(?:floor|modules)\//u.test(name));
+  // (in the core's own repository every file is protected, its SECURITY.md says, and every pull request gets its code
+  // review: AGENTS.md, "How changes are made here")
+  if (String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
+  const rule = (name) => RULES.test(name) || rules.includes(name);
   if (names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
   const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith("core/") && (file.previous_filename ?? "core/").startsWith("core/"))
     || (/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.filename) && pinsAlone(file)));
@@ -101,6 +115,6 @@ if (started(import.meta.url)) {
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
   try { rules = ruleFiles(); } catch { rules = []; }
-  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules);
+  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false");
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }
