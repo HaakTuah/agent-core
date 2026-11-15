@@ -31,14 +31,15 @@ const lacks = (dir, file, line) => anyBranch(dir, b => !(show(dir, b, file) ?? l
 const listed = (dir, b, folder) => String(readGit(dir, `--git-dir=${path.join(dir, "origin.git")}`, "ls-tree", "--name-only", "--end-of-options", `${b}:${folder}`) ?? "").split("\n").filter(Boolean);
 const workflows = (dir, b) => listed(dir, b, ".github/workflows");
 
-// Whether a workflow's call passes `private: true`: a line of it under a `with:` line, indented deeper, read line by line.
+// Whether a workflow's call passes `private: true`, or turns advisory off (`advisory: false`), as the step allows: a
+// line of it under a `with:` line, indented deeper, read line by line.
 const withPrivate = text => {
   let under = -1;
   for (const line of String(text).split("\n")) {
     const indent = line.length - line.trimStart().length;
     if (line.trim() === "with:") { under = indent; continue; }
     if (under >= 0 && line.trim() && indent <= under) under = -1;
-    if (under >= 0 && /^private:\s*true\b/.test(line.trim())) return true;
+    if (under >= 0 && /^(?:private:\s*true|advisory:\s*false)\b/.test(line.trim())) return true;
   }
   return false;
 };

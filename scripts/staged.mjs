@@ -81,10 +81,14 @@ export function readRecord(root = ROOT) {
 const writeRecord = (record, root = ROOT) => fs.writeFileSync(path.join(root, RECORD), `${JSON.stringify({ about: ABOUT, ...record }, null, 2)}\n`);
 const ABOUT = "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged cases hold what no check reads\"): each run's day, the core's commit, the tool and model the fresh session ran on, and each case's verdict, with a fingerprint of each rule it holds as the rule stood then. Written by `node scripts/staged.mjs --read <case> <dir> --record`, and `--wrong`; committed in a pull request of its own.";
 
-// Each case's newest verdict: { name: { at, ...entry } }.
+// Each case's newest verdict: { name: { at, ...entry } }, by the time each verdict was recorded (`recorded`), or its
+// run's day where it has none.
 export function latest(record) {
-  const out = {};
-  for (const run of record.runs) for (const [name, entry] of Object.entries(run.cases ?? {})) if (!out[name] || run.at >= out[name].at) out[name] = { at: run.at, ...entry };
+  const out = {}, when = e => String(e.recorded ?? e.at);
+  for (const run of record.runs) for (const [name, entry] of Object.entries(run.cases ?? {})) {
+    const e = { at: run.at, ...entry };
+    if (!out[name] || when(e) >= when(out[name])) out[name] = e;
+  }
   return out;
 }
 
@@ -188,7 +192,7 @@ function main(argv) {
       if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);
       let run = record.runs.find(r => r.at === at && r.tool === tool && r.model === model && r.commit === meta.commit);
       if (!run) record.runs.push(run = { at, commit: meta.commit, tool, model, all: CASES.map(x => x.name), cases: {} });
-      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: v.why, rules: meta.rules };
+      run.cases[c.name] = { verdict: v.pass ? "pass" : "fail", why: v.why, rules: meta.rules, recorded: new Date().toISOString() };
       writeRecord(record);
       console.log(`recorded in ${RECORD}`);
     }
