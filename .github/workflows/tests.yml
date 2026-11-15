@@ -163,6 +163,15 @@ jobs:
       - name: What a release asks of a project, step by step, and a project beside a fresh start
         if: ${{ !cancelled() }}
         run: node scripts/steps-test.mjs
+      - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
+        if: ${{ !cancelled() }}
+        run: node scripts/staged-test.mjs
+      - name: What holds each rule of the floor and the modules, read
+        if: ${{ !cancelled() }}
+        run: node scripts/holders-test.mjs
+      - name: What holds each rule names only rules that stand
+        if: ${{ !cancelled() }}
+        run: node scripts/holders.mjs
       - name: The check that the core takes each module or gives its reason
         if: ${{ !cancelled() }}
         run: node scripts/own-modules-test.mjs

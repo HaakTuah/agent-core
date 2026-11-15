@@ -7,7 +7,9 @@
 // done yet: steps.mjs, beside this file), and cuts nothing. The owner tags nothing by hand: the
 // release workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands
 // it the commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has
-// moved on from that commit, or where a check on it has not passed. Git and Node's own modules only.
+// moved on from that commit, or where a check on it has not passed; and, once the staged cases hold a release
+// (staged.mjs, beside this file), where one failed in its last run as that commit's record holds it. Git and Node's
+// own modules only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file>
@@ -22,6 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { RECORD, forRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -108,7 +111,13 @@ function main(argv) {
       : asks.length
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
+    // (the staged cases' record as the commit to be released holds it, never the working folder's)
+    let record = { runs: [] };
+    try { record = JSON.parse(inBare(dir, ["show", `${sha}:${RECORD}`])); } catch { /* (none recorded yet) */ }
+    const staged = forRelease(Array.isArray(record?.runs) ? record : { runs: [] });
+    console.log(staged.said);
     if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
+    if (staged.held) return fail(`${name} is not cut: ${staged.held}.`);
     let list = null;
     try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
     const reasons = held(list);

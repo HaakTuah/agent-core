@@ -1,7 +1,8 @@
 // The state report (modules/orchestrating.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
-// (floor rule 14): each measure that keeps a baseline against the last report, the rules by what holds them where a
-// script counts them, and what the look keeps open past a week. In a project it ends with its counts for the core,
+// (floor rule 14): each measure that keeps a baseline against the last report, in the core the rules of the floor and
+// the modules by what holds them, those with none listed (holders.mjs, beside this file), and what the look keeps open
+// past a week. In a project it ends with its counts for the core,
 // counts and conclusions only: the commit its copy holds and how far behind the core's main that is, the steps of a
 // release not done, and of the pull requests merged the month before, how many were the core's upkeep (core-cost.mjs,
 // beside this file, sorts them). In the core it says that a session adds the projects' part, which --projects prints:
@@ -52,8 +53,9 @@ export function share(pulls, rules) {
 const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "none merged");
 
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
-// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them.
-export function body({ core, month, measures, previous, overdue, counts = null, scripts }) {
+// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
+// `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them.
+export function body({ core, month, measures, previous, overdue, counts = null, holders = null, scripts }) {
   const was = previous ? /^- copies: (\d+)/m.exec(previous)?.[1] : undefined;
   const lines = [
     `The state of ${core ? "the core" : "this project"} for ${month}, as the scheduled look reads it on its first run of the month (\`${scripts}/state-report.mjs\`). It reports and asks nothing: whatever is due already has its task. A session that reads it files as a task anything it shows that has none, and closes it.`,
@@ -63,7 +65,8 @@ export function body({ core, month, measures, previous, overdue, counts = null, 
       : core ? "- None: in the core's own repository no baseline may stand." : "- None: no measure keeps a baseline here yet.",
     "",
     "**The rules, by what holds them**",
-    "- Not counted: no script counts them yet, so the report leaves them out rather than guess.",
+    ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
+      : "- The core's rules, in the core's own report; this project's own rules are not counted."]),
     "",
     "**What is overdue**",
     ...(overdue.length ? overdue.map(o => `- #${o.number} ${o.title}: open since ${o.since.slice(0, 10)}.`) : ["- Nothing: no task the look keeps has stood open past a week."]),

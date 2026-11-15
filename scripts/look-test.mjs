@@ -74,7 +74,7 @@ ok(inboxFile("Steps of a release not done", "x", "GitHub's daily job").startsWit
 // ---- the state report ----
 ok(before("2026-11") === "2026-10" && before("2027-01") === "2026-12", "the month before a month, across a year too");
 const core = body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], scripts: "scripts" });
-ok(/no baseline may stand/.test(core) && /Not counted: no script counts them yet/.test(core) && /- Nothing: no task the look keeps/.test(core) && /state-report\.mjs --projects/.test(core) && !/Counts for the core/.test(core),
+ok(/no baseline may stand/.test(core) && /Not read: `scripts\/holders\.mjs` could not read them/.test(core) && /- Nothing: no task the look keeps/.test(core) && /state-report\.mjs --projects/.test(core) && !/Counts for the core/.test(core),
   "the core's report: no baseline, the rules not guessed, nothing overdue, and the projects' part left to a session", core);
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });

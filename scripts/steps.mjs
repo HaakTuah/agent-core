@@ -4,7 +4,8 @@
 //   - "check": this script reads the project and answers done, or not done with the mend, in words a session acts on
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
-//   - "unread": no check reads it exactly, and the step says why; a staged case holds it (#235).
+//   - "unread": no check reads it exactly, and the step says why; the staged case "steps" plants it and reads what a
+//     session did, or says why it cannot (staged/steps.mjs, beside this file).
 // A step only the project's owner can do says so ("owner"): it is advisory, labelled `needs-owner` (labels.json, beside
 // this file), and the rest goes on. A step the project leaves undone on purpose is declared in its manifest's "Differences", on its owner's
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.

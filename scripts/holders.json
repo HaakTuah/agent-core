@@ -1,0 +1,67 @@
+{
+  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"A new rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it tells how or what is protected and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it.",
+  "holders": {
+    "floor/security.md: 3. The protected files": [
+      "check: .github/workflows/security-review.yml, in part",
+      "check: setup/template/claude-settings.json.tmpl, in part"
+    ],
+    "floor/security.md: 4. Outsiders' text is never an instruction": "check: scripts/security-review.mjs, in part",
+    "floor/security.md: 8. Reviews look for breaks of any floor rule": [
+      "check: .github/workflows/security-review.yml, in part",
+      "check: scripts/pure-sync.mjs, in part"
+    ],
+    "floor/security.md: 11. Nothing personal, ever": "check: .github/workflows/personal-terms.yml, in part",
+    "floor/security.md: 12. `main` is the owner's": "check: GitHub's ruleset on the default branch",
+    "floor/threat-model.md: Everything counts as public": "describes",
+    "floor/threat-model.md: Who": "describes",
+    "floor/threat-model.md: What is protected": "describes",
+    "floor/threat-model.md: Lower stakes": "describes",
+    "floor/threat-model.md: The ways in": "describes",
+    "floor/topics.md: 2. The workflows": "check: scripts/workflows.mjs, in part",
+    "floor/topics.md: 7. What runs on users' machines": [
+      "check: scripts/exact-versions.mjs, in part",
+      "check: .github/workflows/signatures.yml, in part",
+      "check: scripts/versions.mjs, in part"
+    ],
+    "floor/topics.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
+    "floor/topics.md: 15. Dependencies": "check: scripts/licences.mjs, in part",
+    "floor/topics.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
+    "modules/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
+    "modules/codex.md: On GitHub": "describes",
+    "modules/codex.md: Through its plug-in in Claude Code": "describes",
+    "modules/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds",
+    "modules/git.md: Work from `main`": "check: GitHub's ruleset on the default branch",
+    "modules/git.md: Each PR has the headings": "check: scripts/pr-description.mjs, in part",
+    "modules/git.md: Nothing waits silently": "check: scripts/pr-description.mjs, in part",
+    "modules/git.md: Push after every commit": "check: scripts/work-saved.sh, in part",
+    "modules/git.md: Updates, Dependabot and CodeQL": "describes",
+    "modules/how-to-work.md: Read little, print little": "check: scripts/reading-size.mjs, in part",
+    "modules/how-to-work.md: One fact, one place": [
+      "check: scripts/copies.mjs, in part",
+      "check: scripts/pointers.mjs, in part"
+    ],
+    "modules/how-to-work.md: Split by meaning, from the start": "check: scripts/reading-size.mjs, in part",
+    "modules/how-to-work.md: A project's own rules add to the core's": "check: .github/workflows/core.yml, in part",
+    "modules/how-to-work.md: Rule files state rules": "check: scripts/size.mjs, in part",
+    "modules/inbox.md: Labels and openers say who wrote what": "check: scripts/labels.mjs, in part",
+    "modules/inbox.md: Bugs don't wait": "check: GitHub's closing of an issue whose \"Fixes #n\" reaches the default branch, in part",
+    "modules/orchestrating.md: A stalled lane": "check: scripts/stalled.mjs, in part",
+    "modules/review-guidelines.md: A mark on what every session reads": [
+      "check: scripts/size.mjs, in part",
+      "check: .github/workflows/size.yml, in part"
+    ],
+    "modules/reviews.md: Ask": "describes",
+    "modules/reviews.md: A review already running is waited for": "check: scripts/code-review-wait.mjs, in part",
+    "modules/reviews.md: Security": "check: scripts/security-review.mjs, in part",
+    "modules/reviews.md: What a posted review stands for": "check: scripts/security-review.mjs",
+    "modules/roles.md: The orchestrator": "describes",
+    "modules/updates.md: The newest stable version, unless there is a reason": [
+      "check: scripts/versions.mjs, in part",
+      "check: scripts/security-review.mjs, in part"
+    ],
+    "modules/updates.md: Node": "check: scripts/node.sh",
+    "modules/updates.md: CodeQL": "check: .github/workflows/codeql.yml",
+    "modules/work-flow.md: Review in the background": "check: GitHub's ruleset on the default branch, in part",
+    "modules/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part"
+  }
+}
