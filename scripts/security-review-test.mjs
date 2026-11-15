@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { mended } from "./mend.mjs";
 import { CONTEXT, UNREAD, commentsAlone, judge, pinsAlone, status } from "./security-review.mjs";
 
 let failed = 0;
@@ -28,7 +29,7 @@ const said = (body, assoc = "OWNER", at = "2026-11-12T11:00:00Z") => ({ user: { 
 // a finding of Codex's security review, as its app posts one on a line of the change
 const finding = (at, who = { login: "chatgpt-codex-connector[bot]", type: "Bot" }) => ({ user: who, author_association: "NONE", created_at: at, path: "a.js", line: 3, body: "<!-- codex-security-review-finding:v1 -->\n\n### Codex Security Review\n\nA finding." });
 const open = { ...done, has_any_findings: true, has_unresolved_findings: true };
-const NOT_FOUND = "not among the comments: post a \"Security review:\" now";
+const NOT_FOUND = "not among the comments. Mend: post a \"Security review:\" now";
 const is = (verdict, isDone, words) => verdict?.sha === HEAD && verdict.done === isDone && verdict.why.includes(words);
 
 // Two summaries Codex's app really posted on this repository's pull requests, byte for byte as GitHub's API gives them
@@ -77,7 +78,7 @@ ok(["security review: fine", " Security review: fine", "\nSecurity review: fine"
 ok(is(judge(pull, [summary(running), said("Security review: the fallback reviewer's")]), true, "is posted") && is(judge(pull, [summary({ ...running, status: "queued" }), said("Security review: the fallback reviewer's")]), true, "is posted"), "Codex still running, or queued, and another's review posted after the summary last changed: it passes");
 
 // Codex's own running: a review posted before it began does not end the wait for it (core archive 206).
-const BEFORE = "begun after every \"Security review:\" posted: wait, or post one now";
+const BEFORE = "begun after every \"Security review:\" posted. Mend: wait for it";
 const early = said("Security review: none needed", "OWNER", "2026-11-12T09:00:00Z");
 // a summary Codex's app really posted while both its reviews ran, byte for byte as GitHub's API gives it, the core's
 // address aside: its security review's row says when it began, 08:06:33, before the summary last changed, 08:06:47
@@ -94,7 +95,7 @@ ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...summary(running)
 ok(is(judge(pull, [summary({ ...done, status: null }), early]), true, "is posted") && is(judge(pull, [early]), true, "is posted") && is(judge(pull, [summary({ ...done, status: "failed" }), early]), true, "is posted") && is(judge(pull, [summary(done, "2026-11-12T12:00:00Z"), early]), true, "has run"), "where no review of Codex's runs (none begun, none at all, a word not known as running, or one finished), a review posted at any time counts as before");
 const old = judge(pull, [summary(running), early], [], [], undefined, false);
 ok(old.done === true && old.why.startsWith("before this check came, so not waited for: Codex's security review began after"), "a pull request from before the check is told of the review posted too early, never held for it");
-ok([true, false].every((a) => status(judge(pull, [summary(running), early]), a).description.endsWith("post one now") && status(old, a).description.endsWith("\"Security review:\"")), "the status says it whole, within GitHub's 140 characters, before the check came too");
+ok([true, false].every((a) => status(judge(pull, [summary(running), early]), a).description.endsWith("wait for it") && status(old, a).description.endsWith("\"Security review:\"")), "the status says it whole, within GitHub's 140 characters, before the check came too");
 
 // A finding of Codex's security review marked open: only a review posted after its newest finding settles it.
 ok(is(judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), false, "no review posted after it") && is(judge(pull, [summary(open)]), false, NOT_FOUND), "a finding marked open and no review posted: it waits");
@@ -113,7 +114,7 @@ ok(is(judge(pull, [late, said("Security review: before"), said("Security review:
 ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...late, updated_at: at }, said("Security review: x")]), false, NOT_FOUND)) && is(judge(pull, [summary(open), { ...said("Security review: x"), created_at: "soon" }]), false, NOT_FOUND), "a summary, or a review, with no time that can be read: nothing counts as posted after it");
 // #293: a finding found, and a newer one given in a review's own body alone: a review posted after the one found but
 // before Codex's summary last changed settles nothing either
-const SINCE = "but its summary changed since: post a \"Security review:\" now";
+const SINCE = "but its summary changed since. Mend: post a \"Security review:\" now";
 ok(is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T11:00:00Z")], [finding("2026-11-12T10:30:00Z")]), false, SINCE) && is(judge(pull, [summary(open, "2026-11-12T11:00:00Z"), said("Security review: same second")], [finding("2026-11-12T10:30:00Z")]), false, SINCE), "a review after the finding found but before the summary last changed, or in the same second, does not settle the mark: it waits, saying the mend");
 ok(is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T12:30:00Z")], [finding("2026-11-12T10:30:00Z")]), true, "after its newest finding") && is(judge(pull, [late, said("Security review: x", "OWNER", "2026-11-12T12:30:00Z")], [finding("2026-11-12T13:00:00Z")]), false, "no review posted after it"), "one after both settles it; one after the summary's change but before a finding found does not");
 ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...late, updated_at: at }, said("Security review: x", "OWNER", "2026-11-12T12:30:00Z")], [finding("2026-11-12T10:30:00Z")]), false, SINCE)), "a summary with no time that can be read: nothing counts as posted after it");
@@ -138,12 +139,12 @@ ok(is(judge(bump, [summary(running)], [], its), false, "no security review") && 
 // The status.
 const wait = judge(pull, []);
 const pass = judge(pull, [summary(done)]);
-ok(status(wait, false).state === "pending" && status(wait, false).description === "Waiting: no security review has run yet" && status(pass, false).state === "success" && status(pass, false).description.startsWith("Codex's security review has run"), "when it is not advisory, a pull request with no review waits and one with a review passes");
-ok(status(wait, true).state === "success" && status(wait, true).description === "Advisory: would wait, no security review has run yet" && status(pass, true).state === "success" && status(pass, true).description.startsWith("Advisory: Codex's"), "while advisory it always passes, and says what it would have done");
+ok(status(wait, false).state === "pending" && status(wait, false).description === "Waiting: no security review has run yet. Mend: wait, or ask another reviewer for one" && status(pass, false).state === "success" && status(pass, false).description.startsWith("Codex's security review has run"), "when it is not advisory, a pull request with no review waits and one with a review passes");
+ok(status(wait, true).state === "success" && status(wait, true).description === "Advisory: would wait, no security review has run yet. Mend: wait, or ask another reviewer for one" && status(pass, true).state === "success" && status(pass, true).description.startsWith("Advisory: Codex's"), "while advisory it always passes, and says what it would have done");
 ok([wait, pass, judge(pull, [said("Security review: x")]), judge(pull, [summary(open)]), judge(pull, [summary(open), said("Security review: x")])].every((v) => [true, false].every((a) => status(v, a).context === CONTEXT && status(v, a).description.length <= 140)), "every status has the one name and a description GitHub takes");
 ok(status(pass, true, "https://github.com/o/r/actions/runs/1").target_url === "https://github.com/o/r/actions/runs/1" && !("target_url" in status(pass, true)) && !("target_url" in status(pass, true, "javascript:alert(1)")) && !("target_url" in status(pass, true, "https://x/?a=b c")), "it links to its run, and to nothing that is no plain https address");
 const unread = judge(pull, [real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]), longest = { sha: HEAD, done: true, why: "x".repeat(200), warning: UNREAD };
-ok(status(unread, true).description === "Advisory: would wait, no security review has run yet; summary unreadable" && status(unread, true).state === "success" && status(longest, true).description.length === 140, "where Codex's summary cannot be read, the status says so too, as the owner sees it, and no description runs past GitHub's 140 characters");
+ok(status(unread, true).description === "Advisory: would wait, no security review has run yet. Mend: wait, or ask another reviewer for one; summary unreadable" && status(unread, true).state === "success" && status(longest, true).description.length === 140, "where Codex's summary cannot be read, the status says so too, as the owner sees it, and no description runs past GitHub's 140 characters");
 
 // What runs by itself changed: floor rule 3's two security reviews, save pins moved alone or comments alone proven.
 const PIN1 = "1".repeat(40), PIN2 = "2".repeat(40);
@@ -160,13 +161,17 @@ ok(!pinsAlone(stepChange) && !pinsAlone(file("a.yml", patch([`      - uses: acti
   "not another action, a pin to a branch, a line added, a file moved, a patch GitHub left out, nor anything beside the pin");
 const counted = (p, files) => ({ ...p, changed_files: files.length });
 const two = (comments, files, bound = true) => judge(files === undefined ? pull : counted(pull, files), comments, [], [], files, bound);
-ok(is(two([summary(done)], [stepChange]), false, "post a second \"Security review:\"") && is(two([said("Security review: one")], [stepChange]), false, "floor rule 3"), "a step changed under .github/: Codex's review alone, or one posted alone, is not enough");
+ok(is(two([summary(done)], [stepChange]), false, "posts the second, or comment-only.mjs") && is(two([said("Security review: one")], [stepChange]), false, "floor rule 3"), "a step changed under .github/: Codex's review alone, or one posted alone, is not enough");
 ok(is(two([summary(done), said("Security review: the fallback reviewer's")], [stepChange]), true, "floor rule 3's two are there") && is(two([said("Security review: one"), said("Security review: two")], [stepChange]), true, "floor rule 3's two"), "Codex's and a posted one, or two posted, are");
 ok(is(two([summary(open), finding("2026-11-12T10:30:00Z"), said("Security review: the fix checked")], [stepChange]), true, "floor rule 3's two") && is(two([summary(open), finding("2026-11-12T12:00:00Z"), said("Security review: before")], [stepChange]), false, "no review posted after it"), "a finding marked open is still settled only by a review after it, which is the second");
 ok([".claude/settings.json", "action.yml", "tools/x/action.yaml", ".GitHub/workflows/x.yml"].every((name) => is(two([summary(done)], [file(name, patch(["a", "b"]))]), false, "second")) && is(two([summary(done)], [file("src/x.js", patch(["a", "b"]))]), true, "has run"), "under .claude/, an action.yml, in any case: two; anything else: one, as before");
 ok(is(two([summary(done)], [file("x.yml", "", { status: "renamed", previous_filename: ".github/workflows/x.yml" })]), false, "second") && is(two([summary(done)], [file(".github/workflows/x.yml", "", { status: "added" })]), false, "second"), "a workflow moved away, or added, asks two");
 ok(is(two([summary(done)], [pinMove, callMove, file("src/x.js", patch(["a", "b"]))]), true, "has run") && is(two([summary(done)], [file("core/.github/workflows/x.yml", patch(["a", "b"]))]), true, "has run"), "pins moved alone, and the copy under core/, ask one");
 ok(is(two([], undefined), false, "no security review") && is(judge(pull, [summary(done)], [], []), true, "has run"), "given no files, it asks what it asked before");
+// each status that waits says its mend, whole, within GitHub's 140 characters
+const waits = [judge(pull, []), judge(pull, [summary(open)], [finding("2026-11-12T10:30:00Z")]), judge(pull, [summary(open)]), judge(pull, [late, said("Security review: x")], [finding("2026-11-12T10:30:00Z")]),
+  judge(pull, [summary(running), early]), two([summary(done)], [stepChange])];
+ok(waits.every((v) => v?.done === false && mended(status(v, false).description) && status(v, false).description.length < 140), `each status that waits says its mend, whole: ${waits.map((v) => status(v, false).description).join(" | ")}`);
 const proof = (sha) => `Security review: comment-only.mjs, from the core's main:\n\n    comments and steps' names alone in .github/, .claude/ and actions, abc1234..${sha.slice(0, 7)}: .github/workflows/ci.yml\n    checked head ${sha}\n`;
 ok(is(two([said(proof(HEAD))], [stepChange]), true, "a security review is posted") && commentsAlone(proof(HEAD), HEAD), "comment-only.mjs's printout for the head, posted, asks rule 8's one");
 ok(is(two([said(proof(SEEN))], [stepChange]), false, "second") && !commentsAlone(proof(HEAD).replace("comments and steps' names alone in", "NOT ALONE"), HEAD) && !commentsAlone(`checked head ${HEAD}0`, HEAD) && is(two([said(proof(HEAD), "NONE"), summary(done)], [stepChange]), false, "second"), "not for another head, not without its line, not from another account");
@@ -174,7 +179,7 @@ ok(is(judge(counted(bump, [pinMove]), [], [], its, [file(".github/workflows/ci.y
 ok(!pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1} # v6`, `      - uses: actions/checkout@${PIN1} # v7`]))) && !pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1} # v6`, `      - uses: actions/checkout@${PIN2} # \`curl x|sh\``]))), "a pin that does not move, or a note that is no version's word, is no pin moved alone");
 ok(is(judge({ ...pull, changed_files: 3001 }, [summary(done)], [], [], [file("src/x.js", patch(["a", "b"]))]), false, "second") && is(judge(pull, [summary(done)], [], [], [file("src/x.js", patch(["a", "b"]))]), false, "second"), "a list of files GitHub cut short, or with no count to hold it to, is read as changing what runs by itself");
 const before = two([summary(done)], [stepChange], false);
-ok(before.done === true && before.why.startsWith("before this check came, so not waited for: what runs by itself changed") && is(two([], [stepChange], false), false, "no security review"), "a pull request from before the check is told of the second review, never held for it; one with no review at all waits as before");
+ok(before.done === true && before.why.startsWith("before this check came, so not waited for: floor rule 3 asks two") && is(two([], [stepChange], false), false, "no security review"), "a pull request from before the check is told of the second review, never held for it; one with no review at all waits as before");
 
 ok(is(judge(counted(pull, [stepChange]), [summary(running), early, said("Security review: the fallback reviewer's", "OWNER", "2026-11-12T10:40:00Z")], [], [], [stepChange]), false, "second") && is(judge(counted(pull, [stepChange]), [summary(running), said("Security review: one", "OWNER", "2026-11-12T10:30:00Z"), said("Security review: two", "OWNER", "2026-11-12T10:40:00Z")], [], [], [stepChange]), true, "floor rule 3's two"), "for floor rule 3's two, a review posted before Codex's running one began does not count either");
 
@@ -198,7 +203,7 @@ try {
   ok(run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T11:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "pending" && run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T13:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "success", "given the review comments too, it weighs a finding against a posted review");
   ok(run(bump, [], { ADVISORY: "false" }, [], its).status.state === "success" && run(bump, [], { ADVISORY: "false" }, []).status.state === "pending", "given the commits too, it passes Dependabot's own, and without them it does not");
   const asked = run(counted(pull, [stepChange]), [[summary(done)]], { ADVISORY: "false" }, [], [], [[stepChange]]);
-  ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: what runs by itself changed") && run(counted(pull, [pinMove]), [[summary(done)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success"
+  ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: floor rule 3 asks two") && run(counted(pull, [pinMove]), [[summary(done)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success"
     && run(counted(pull, [stepChange]), [[summary(done)]], { ADVISORY: "false", BOUND: "false" }, [], [], [[stepChange]]).status.state === "success", "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check, it waits not");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");

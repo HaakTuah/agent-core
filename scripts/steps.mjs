@@ -179,10 +179,10 @@ export const STEPS = [
       const r = spawnSync(process.execPath, [script, marks], { cwd: p.root, encoding: "utf8", env: { ...process.env, SIZES_BASE: "" } });
       // (a run that never reached its end, where its notes and its verdict are given, read nothing: reported as not
       // read, never as done. It ends passing with its "ok" line, or failing with its verdicts alone, every line of its
-      // errors one, and none of the refusals it gives before it reads: no config named, one of the wrong shape, or no
-      // base to compare with. A config that is no JSON throws, and the error's lines, its text among them, are no verdicts)
+      // errors one, and none of the refusals it gives before it reads: no config named, one that is no JSON or of the
+      // wrong shape, or no base to compare with)
       const out = `${r.stdout}`, lines = `${r.stderr}`.split(/\r?\n/).filter(Boolean);
-      const early = /^FAIL: (name the config|.* must hold "each"|\S+ is not a commit here)/;
+      const early = /^FAIL: (no config was named|.* could not be read as JSON|.* is not in the form the check reads|\S+ is not a commit here)/;
       const ended = !r.error && (r.status === 0 ? /^ok {3}read by every session/m.test(out)
         : r.status === 1 && lines.length > 0 && lines.every(l => l.startsWith("FAIL: ") && !early.test(l)));
       if (!ended) throw new Unread(`the reading-size check did not run to its end on ${marks}`);

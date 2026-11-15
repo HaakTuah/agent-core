@@ -20,6 +20,7 @@ wanted").
 | #242 | rule builder | |
 | #252 | rule builder | |
 | #235 | rule builder | |
+| #296 | builder | #235 |
 | #249 | rule builder | #235 |
 | #250 | rule builder | #249 |
 | #246 | rule builder | #245's report |

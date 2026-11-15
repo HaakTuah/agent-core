@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { check } from "./exact-versions.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0;
 const reader = (files) => (p) => { if (!Object.hasOwn(files, p)) throw new Error(`no such file: ${p}`); return files[p]; };
@@ -78,7 +79,7 @@ expect("an override that points to a workspace asked for by a star fails", proje
 expect("an override with a number too large for npm to read as one fails", overridden({ b: "9007199254740992.0.0" }), ['overrides "b": "9007199254740992.0.0" is not one exact version']);
 expect("an override at a range fails", overridden({ b: "^2.0.0" }), ['overrides "b": "^2.0.0" is not one exact version']);
 expect("an override inside another is read", overridden({ "b@1": { ".": "2.0.0", c: "latest" } }), ['overrides "b@1 > c": "latest" is not one exact version']);
-expect("a key that picks among versions, its value left unsaid, fails: npm would take the pick as the value", overridden({ "b@^1": {} }), ['overrides "b@^1": a key that picks among versions needs its value said']);
+expect("a key that picks among versions, its value left unsaid, fails: npm would take the pick as the value", overridden({ "b@^1": {} }), ['overrides "b@^1": a key that picks among versions has no value of its own. Mend: give it one']);
 expect("so does one with a scope before its name", overridden({ "@s/b@^1": { c: "2.0.0" } }), ['overrides "@s/b@^1": a key that picks']);
 expect("a key that picks among versions passes with its value said as a text", overridden({ "b@^1": "2.0.0", "@s/b@1.x": "3.0.0" }), 0);
 expect("and with its value said as the dot of its list", overridden({ "b@^1": { ".": "2.0.0", c: "4.0.0" } }), 0);
@@ -119,11 +120,11 @@ function run(spec) {
     writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: ["tools/package-lock.json"] }));
     writeFileSync(join(dir, "tools", "package.json"), JSON.stringify({ devDependencies: { a: spec } }));
     writeFileSync(join(dir, "tools", "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" } } }));
-    try { execFileSync(process.execPath, [fileURLToPath(new URL("./exact-versions.mjs", import.meta.url)), "licences.json"], { cwd: dir, stdio: "pipe" }); return 0; } catch (e) { return e.status; }
+    try { execFileSync(process.execPath, [fileURLToPath(new URL("./exact-versions.mjs", import.meta.url)), "licences.json"], { cwd: dir, stdio: "pipe" }); return 0; } catch (e) { return mended(String(e.stderr)) ? e.status : "a failure without its mend"; }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 if (run("1.2.3") !== 0) { failed++; console.error("FAIL run from a project's root: an exact version does not pass"); }
-if (run("^1.2.3") !== 1) { failed++; console.error("FAIL run from a project's root: a range does not fail"); }
+if (run("^1.2.3") !== 1) { failed++; console.error("FAIL run from a project's root: a range does not fail, saying its mend"); }
 
 console.log(failed ? `${failed} FAILED` : "ok   the exact-versions check tells every case apart");
 process.exit(failed ? 1 : 0);

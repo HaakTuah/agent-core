@@ -23,17 +23,17 @@ const args = process.argv.slice(2);
 const at = args.indexOf("--base");
 const baseRev = at >= 0 ? args[at + 1] : null;
 // (a commit, never an option: git is asked whether it is one, and it stands after --end-of-options)
-if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/.test(baseRev ?? "") || (() => { try { execFileSync("git", ["rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })())) { console.log("--base needs a commit"); process.exit(1); }
+if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/.test(baseRev ?? "") || (() => { try { execFileSync("git", ["rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })())) { console.log(`FAIL --base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`); process.exit(1); }
 const config = JSON.parse(fs.readFileSync(args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json", "utf8"));
 const account = { pattern: OWNER.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"), say: "the *owner's account*, or the repository's own address" };
 const words = [...config.words, account].map(w => ({ re: new RegExp(w.pattern, "iu"), say: w.say }));
 const exempt = new Set(config.exempt);
-if (!config.words.length) { console.log("the list of words is empty: the check would pass anything"); process.exit(1); }
+if (!config.words.length) { console.log("FAIL the config's list \"words\" is empty, so the check would pass anything. Mend: put its words back in scripts/general.json"); process.exit(1); }
 const files = config.paths
   .flatMap(dir => fs.readdirSync(dir).filter(f => f.endsWith(".md")).map(f => path.posix.join(dir, f)))
   .filter(f => !exempt.has(f))
   .sort();
-if (!files.length) { console.log("no file of the floor or the modules was read: the check would pass anything"); process.exit(1); }
+if (!files.length) { console.log(`FAIL no file of the floor or the modules was read (${config.paths.join(", ")}), so the check would pass anything. Mend: run it from the core's root, or name in the config's "paths" the folders that hold them`); process.exit(1); }
 
 // The lines a change adds under the given files and folders, against the base: each line a hunk of git's own diff
 // adds, counted by the hunk's own header (so no added line is taken for a file's), by its file and line number; one the
@@ -62,7 +62,7 @@ for (const file of files) {
   fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
     for (const { re, say } of words) {
       const hit = line.match(re);
-      if (hit) { found++; console.log(`${file}:${i + 1}: "${hit[0]}" fits only some projects; say ${say}`); }
+      if (hit) { found++; console.log(`FAIL ${file}:${i + 1}: "${hit[0]}" fits only some projects. Mend: say ${say}`); }
     }
   });
 }
@@ -74,26 +74,26 @@ for (const w of config.words.filter(w => w.added?.length)) {
   const added = addedLines(w.added);
   for (const a of added) {
     const hit = quoted(a.text) ? null : a.text.match(re);
-    if (hit) { found++; console.log(`${a.file}:${a.line}: "${hit[0]}" in a line this change adds; say ${w.say}`); }
+    if (hit) { found++; console.log(`FAIL ${a.file}:${a.line}: "${hit[0]}" in a line this change adds. Mend: say ${w.say}`); }
   }
   console.log(`${added.length} lines added under ${w.added.join(", ")} since ${baseRev} read for "${w.pattern}"`);
 }
 
 // the phrases a rule may not use: each that stands reported, each in a line this change adds failed
 const { paths: phrasePaths = [], list: phraseList = [] } = config.phrases ?? {};
-if (!phraseList.length) { console.log("the list of phrases a rule may not use is empty: the check would pass anything"); process.exit(1); }
+if (!phraseList.length) { console.log("FAIL the config's list of phrases a rule may not use is empty, so the check would pass anything. Mend: put its phrases back in scripts/general.json"); process.exit(1); }
 const phrases = phraseList.map(p => ({ re: new RegExp(p.pattern, "iu"), say: p.say }));
 const used = text => quoted(text) ? [] : phrases.map(p => ({ ...p, hit: text.replace(/`[^`]*`/gu, "").match(p.re) })).filter(p => p.hit);
 const absent = phrasePaths.filter(p => !fs.existsSync(p));
-if (absent.length) { console.log(`the phrases' files and folders are not there: ${absent.join(", ")}`); process.exit(1); }
+if (absent.length) { console.log(`FAIL the files and folders read for the phrases are not there: ${absent.join(", ")}. Mend: run it from the core's root, or name in the config's "phrases" the files that stand`); process.exit(1); }
 const ruleFiles = phrasePaths.flatMap(p => fs.statSync(p).isDirectory() ? fs.readdirSync(p).filter(f => f.endsWith(".md")).map(f => path.posix.join(p, f)) : [p]).sort();
-if (!ruleFiles.length) { console.log("no rule file was read for the phrases: the check would pass anything"); process.exit(1); }
+if (!ruleFiles.length) { console.log("FAIL no rule file was read for the phrases, so the check would pass anything. Mend: run it from the core's root, or name in the config's \"phrases\" the folders that hold the rules"); process.exit(1); }
 const fresh = new Set();
 let failedPhrases = 0, reported = 0;
 if (baseRev) {
   for (const a of addedLines(phrasePaths)) {
     fresh.add(`${a.file}:${a.line}`);
-    for (const { hit, say } of used(a.text)) { failedPhrases++; console.log(`${a.file}:${a.line}: "${hit[0]}" in a rule this change writes; ${say} (AGENTS.md, "A rule is written to one pattern")`); }
+    for (const { hit, say } of used(a.text)) { failedPhrases++; console.log(`FAIL ${a.file}:${a.line}: "${hit[0]}" in a rule this change writes. Mend: ${say}`); }
   }
 } else console.log("no --base given: the phrases are only reported, none failed");
 for (const file of ruleFiles) {

@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { coreGaps, filledIn, modulesOf, notes, slotTable } from "./manifest-reads.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, more = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${more ? `\n${more}` : ""}`); } };
@@ -56,10 +57,10 @@ const agents = slots => `# x\n\n## The core this repository takes\n\n@modules/a.
 const own = a => coreGaps({ agents: a, readme: README, moduleTexts: MODULES, floorTexts: FLOOR });
 ok(own(agents("The slots here: the *progress file*: `Q.md`; the *owner's account*: `me`.")).length === 0, "the core's own slots paragraph that fills each slot passes, and a module not taken uses none");
 let g = own(agents("The slots here: the *progress file*: `Q.md`."));
-ok(g.length === 1 && has(g, "no *owner's account*") && has(g, "floor/f.md"), "a gap in the core's own slots fails, saying the slot to add", g.join("\n"));
+ok(g.length === 1 && has(g, "no *owner's account*") && has(g, "floor/f.md") && mended(g.map(f => `FAIL: ${f}`).join("\n")), "a gap in the core's own slots fails, saying the slot to add as its mend", g.join("\n"));
 g = own(agents("The slots here: the *owner's account*: `me`.\n\n@modules/b.md"));
 ok(g.length === 1 && has(g, "no *progress file*"), "a slot a module taken here uses and the paragraph lacks fails", g.join("\n"));
-ok(has(own(agents("no paragraph").replace("The slots here", "x")), "The slots here"), "an AGENTS.md with no slots paragraph fails");
+ok(has(own(agents("no paragraph").replace("The slots here", "x")), "The slots here") && mended(own(agents("no paragraph").replace("The slots here", "x")).map(f => `FAIL: ${f}`).join("\n")), "an AGENTS.md with no slots paragraph fails, saying its mend");
 
 // a project staged with the core's own files as its copy
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-reads-"));

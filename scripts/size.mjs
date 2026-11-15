@@ -58,38 +58,39 @@ export function answered(comments) {
 // trusted and the check fails.
 export function raised(base, head, comments, running = capOf(head)) {
   const from = capOf(base), to = capOf(head);
-  if (to === null || to !== running) return "this file's line that sets CAP is not the one line the check reads, or does not set the cap the script runs with: export const CAP = <KB> * 1024;";
-  if (from === null) return "the base's scripts/size.mjs has no line that sets CAP as the check reads it, so whether this pull request raises the cap cannot be told";
+  if (to === null || to !== running) return "scripts/size.mjs: its line that sets CAP is not the one line the check reads, or does not set the cap the script runs with. Mend: write it as the one line export const CAP = <KB> * 1024; and nothing else that sets CAP";
+  if (from === null) return "the base's scripts/size.mjs has no line that sets CAP as the check reads it, so whether this pull request raises the cap cannot be told. Mend: bring the branch up to date with main, whose scripts/size.mjs sets it so, and run the check again";
   if (to <= from) return null;
-  if (to - from !== 1024) return `the cap rises from ${from} to ${to} bytes: it rises one step of a whole KB at a time (AGENTS.md, "The size cap keeps the rules lean and decides nothing else")`;
+  if (to - from !== 1024) return `scripts/size.mjs: the cap rises from ${from} to ${to} bytes, more than one step. Mend: set CAP to ${from / 1024 + 1} * 1024, one step of a whole KB, or leave it and say the rules in fewer words`;
   if (answered(comments)) return null;
-  return `the cap rises from ${from} to ${to} bytes, and the pull request has no comment that opens "Leanness check:": a fresh session reads all the rules for room first, its answer is posted so, and this check is run again (modules/review-guidelines.md, "A mark on what every session reads")`;
+  return `scripts/size.mjs: the cap rises from ${from} to ${to} bytes, and the pull request has no comment that opens "Leanness check:". Mend: have a fresh session read all the rules for room, post its answer in a comment that opens "Leanness check:", and run this check again; or leave CAP and say the rules in fewer words`;
 }
 
 function main([flag, baseFile, commentsFile]) {
   if (flag === "--raise") {
     let base = null, comments = null;
     try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
-    if (comments === null) { console.error("FAIL: name the base's size.mjs and the pull request's comments: node scripts/size.mjs --raise <base> <comments>"); return 1; }
+    if (comments === null) { console.error("FAIL: the base's size.mjs or the pull request's comments could not be read. Mend: name both, readable: node scripts/size.mjs --raise <base> <comments, as JSON>"); return 1; }
     const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAP);
     if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
     console.log(capOf(base) < CAP ? `ok   the cap rises from ${capOf(base)} to ${CAP} bytes, and the pull request holds a leanness check's answer` : `ok   the cap is not raised (${CAP} bytes)`);
     return 0;
   }
   const missing = [...COUNTED, QUEUE.file].filter(f => !fs.existsSync(f));
-  if (!COUNTED.length || missing.length) { console.error(`FAIL: what every session reads at its start cannot be counted: ${missing.join(", ") || "the list is empty"}`); return 1; }
+  if (!COUNTED.length || missing.length) { console.error(`FAIL: what every session reads at its start cannot be counted: ${missing.join(", ") || "the list is empty"}. Mend: run it from the core's root, where each of those files stands, or put back the one moved or taken out`); return 1; }
   const total = COUNTED.reduce((sum, f) => sum + sizeOf(f), 0), queue = sizeOf(QUEUE.file);
   console.log(`what every session reads at its start (${COUNTED.join(", ")}): ${total} bytes of ${CAP}`);
   console.log(`the queue (${QUEUE.file}): ${queue} bytes of its mark, ${QUEUE.mark}`);
   let status = 0;
   if (total > CAP) {
-    console.error("FAIL: over the cap. Say the rule in fewer words and trim what is said twice; raise CAP only once a\n"
-      + "fresh session has read all the rules for room and found too little (AGENTS.md, \"How changes are made here\").");
+    console.error(`FAIL: what every session reads at its start is ${total - CAP} bytes over the cap. Mend: say the rules this\n`
+      + "pull request changes in fewer words and trim what is said twice; raise CAP by one KB only once a fresh session has\n"
+      + "read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".");
     status = 1;
   }
   if (queue > QUEUE.mark) {
-    console.error(`FAIL: ${QUEUE.file} is past its mark. It holds what is next and in flight and nothing done: take out each\n`
-      + "finished line, and a note that belongs in a pull request's description (AGENTS.md, \"The queue\").");
+    console.error(`FAIL: ${QUEUE.file} is ${queue - QUEUE.mark} bytes past its mark. Mend: take out each finished line, and any\n`
+      + "note, which belongs in the description of its line's pull request: the file holds what is next and nothing done.");
     status = 1;
   }
   return status;

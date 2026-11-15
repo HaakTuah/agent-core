@@ -59,3 +59,24 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `modules/how-to-work.md`, "The scheduled look" in `modules/orchestrating.md`, "The core's state report reads the
      projects that take it" in `AGENTS.md`, the line `scripts/pr-description.mjs` asks, `scripts/look.mjs`,
      `scripts/state-report.mjs`, the core's `look.yml` and `own-look.yml` and the starter kit's `look.yml`.
+
+219. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #254, labelled `by:chat`). Shown what a search of how others
+     build with agents had found, as evidence and not instruction, among it that a failing check whose failure carries
+     its own fix is read at the moment it matters, by any tool, and that a correction that keeps coming up is moved from
+     documentation into a check, and what the session would build from it, these two among it, the owner asked and
+     agreed:
+
+     > What do we implement from this […]? Go ahead with making us better?
+
+     So every check of the core fails with what is wrong, where, and what a session does about it, in words it acts on
+     with no rule file open, each check's own test reading its failure for that mend; and a kind of finding the count
+     of what reviews find shows a second time gets a check where one can hold it exactly, or a staged case where none
+     can, staying a point of the review guidelines until then. To the orchestrator, passed on word for word to the
+     builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "A check that fails says the mend" in `AGENTS.md`, `scripts/mend.mjs` and `scripts/mend-test.mjs`, and the
+     failures of every check of the core.

@@ -5,6 +5,7 @@
 //   node scripts/own-modules-test.mjs
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { mended } from "./mend.mjs";
 import { faults, SECTION } from "./own-modules.mjs";
 
 let failed = 0, count = 0;
@@ -34,6 +35,13 @@ f = faults(agents("@modules/a.md\n\nNot taken:\n\n- `modules/b.md`: it governs g
 ok(f.length === 1 && has(f, "modules/c.md is neither taken"), "a module named only inside another's reason is not taken");
 f = faults("# x\n\n`modules/a.md`, `modules/b.md`, `modules/c.md`\n", MODULES);
 ok(f.length === 1 && has(f, "has no section"), "an AGENTS.md without the section fails");
+
+// each fault says its mend, as the script prints it
+const every = [
+  faults(agents("@modules/a.md\n\nNot taken:\n\n- `modules/b.md`:\n- `modules/b.md`: x\n- c.md since\n\n`modules/d.md` and `modules/b.md`"), MODULES),
+  faults("# x\n", MODULES),
+].flat();
+ok(every.length >= 6 && mended(every.map(f => `FAIL: ${f}`).join("\n")), `each fault says its mend: ${every.join("; ")}`);
 
 // the core's own AGENTS.md and modules
 try {

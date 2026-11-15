@@ -67,11 +67,11 @@ export function nuspecOf(zip) {
  */
 export function toolsOf(text, at) {
   let manifest;
-  try { manifest = JSON.parse(unmarked(text)); } catch { return { tools: [], failures: [`${at} is not JSON`], failed: [] }; }
+  try { manifest = JSON.parse(unmarked(text)); } catch { return { tools: [], failures: [`${at} is not JSON. Mend: correct it to JSON, as dotnet writes a tools manifest`], failed: [] }; }
   const tools = [], failed = [];
   for (const [id, entry] of Object.entries(manifest?.tools ?? {})) {
-    if (!ID.test(id)) { failed.push({ id, version: entry?.version, failure: `${at}: ${shown(id)}: no tool id it can read` }); continue; }
-    if (typeof entry?.version !== "string" || !EXACT.test(entry.version)) { failed.push({ id, version: entry?.version, failure: `${at}: ${id}: no one exact version (${shown(JSON.stringify(entry?.version))}): name the one version it runs (floor rule 7)` }); continue; }
+    if (!ID.test(id)) { failed.push({ id, version: entry?.version, failure: `${at}: ${shown(id)}: no tool id it can read. Mend: name the tool by its NuGet package id` }); continue; }
+    if (typeof entry?.version !== "string" || !EXACT.test(entry.version)) { failed.push({ id, version: entry?.version, failure: `${at}: ${id}: no one exact version (${shown(JSON.stringify(entry?.version))}). Mend: name the one version it runs, such as 1.2.3 (floor rule 7)` }); continue; }
     tools.push({ id, version: entry.version });
   }
   return { tools, failures: failed.map((f) => f.failure), failed };
@@ -232,7 +232,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
   const textOf = (f) => {
     if (!texts.has(f)) {
       const bytes = readProject(root, f);
-      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe): this check reads none: make it a file`);
+      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe), and this check reads none. Mend: make it a file`);
       texts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
     }
     return texts.get(f);
@@ -280,29 +280,29 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     let bytes = null, taken = null, hashed = null, unread = false, other = null;
     for (const source of sources) {
       let got;
-      try { got = await fromSource(source, p.id, p.version); } catch (e) { out.failures.push(`${name}: ${source} could not be read (${shown(e.message)})`); break; }
+      try { got = await fromSource(source, p.id, p.version); } catch (e) { out.failures.push(`${name}: ${source} could not be read (${shown(e.message)}). Mend: run the check again; where the source stays unreadable, take the package from NuGet's registry or another source the config names`); break; }
       if (got === undefined) { unread = true; continue; }
       if (!got) continue;
       let h;
-      try { h = contentHash(got); } catch (e) { out.failures.push(`${name}: the file ${source} gives: ${shown(e.message)}`); break; }
+      try { h = contentHash(got); } catch (e) { out.failures.push(`${name}: the file ${source} gives: ${shown(e.message)}. Mend: take the package from a source that gives it as NuGet packs one`); break; }
       // (a locked package is the file its lock file names: one source's other file leaves the next source to try)
       if (!p.tool && h !== p.contentHash) { other ??= source; continue; }
       bytes = got; taken = source; hashed = h; break;
     }
-    if (bytes && p.alsoTool && other) (p.alsoHeld ? out.reports : out.failures).push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${other} gives: take the tool from the source that gives the locked file, or name it there first${p.alsoHeld ? ` ${heldBefore}` : ""}`);
+    if (bytes && p.alsoTool && other) (p.alsoHeld ? out.reports : out.failures).push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${other} gives. Mend: take the tool from the source that gives the locked file, or name that source first${p.alsoHeld ? ` ${heldBefore}` : ""}`);
     if (!bytes && !out.failures.length) {
-      if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15)`);
+      if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15). Mend: take it from the source that gives the locked file, named in the config's "nuget.sources"; where the new file is meant, move to a new version in a pull request of its own, never writing the lock file anew over this one`);
       else if (unread && !p.tool) out.notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);
-      else if (unread) out.failures.push(`${name}: a tool held by no source this reads (a feed not of NuGet's v3 form), and no restore brings a tool: take it from a source of NuGet's v3 form`);
-      else out.failures.push(`${name}: in neither NuGet's registry nor a source the config names`);
+      else if (unread) out.failures.push(`${name}: a tool held by no source this reads (a feed not of NuGet's v3 form), and no restore brings a tool. Mend: take it from a source of NuGet's v3 form`);
+      else out.failures.push(`${name}: in neither NuGet's registry nor a source the config names. Mend: take it from NuGet's registry, or name its source in the config's "nuget.sources"`);
     }
     if (bytes) {
       let nuspec;
-      try { nuspec = nuspecOf(bytes); } catch (e) { out.failures.push(`${name}: ${shown(e.message)}`); }
+      try { nuspec = nuspecOf(bytes); } catch (e) { out.failures.push(`${name}: ${shown(e.message)}. Mend: replace the package, or file an issue on the core naming it, so that its reader learns that form`); }
       // (a tool has no content hash: the file is the one its manifest names, by id and version as NuGet compares them)
       const says = nuspec === undefined ? null : named(nuspec);
       if (nuspec !== undefined && p.tool && (!says || says.id.toLowerCase() !== p.id.toLowerCase() || normal(says.version) !== normal(p.version))) {
-        out.failures.push(`${name}: the file ${taken} gives names ${says ? `${shown(says.id)}@${shown(says.version)}` : "no one id and version"} in its manifest`);
+        out.failures.push(`${name}: the file ${taken} gives names ${says ? `${shown(says.id)}@${shown(says.version)}` : "no one id and version"} in its manifest. Mend: take the package from a source whose file names it as the lock file does`);
         nuspec = undefined;
       }
       if (nuspec !== undefined) {
@@ -331,9 +331,9 @@ if (started(import.meta.url)) {
   const args = process.argv.slice(2), at = args.indexOf("--into");
   const fail = (msg) => { console.error(`FAIL: ${shown(msg)}`); process.exit(1); };
   const configPath = args.find((a, i) => !a.startsWith("--") && i !== at + 1), into = at >= 0 ? args[at + 1] : undefined;
-  if (!configPath || !into) fail("name the config and a folder of its own: node core/scripts/nuget-fetch.mjs <config> --into <folder>");
+  if (!configPath || !into) fail("the config or a folder of its own was not named. Mend: name both: node core/scripts/nuget-fetch.mjs <config> --into <folder>");
   // (the config is read only where it is a file of bytes: a device would never end)
-  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe): make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
+  try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();

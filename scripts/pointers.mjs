@@ -36,7 +36,7 @@ const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
 let RULES;
 try { RULES = CORE ? tracked.filter(f => /^(floor|modules)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }
-for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: the rule file ${rf} is no tracked file`); process.exitCode = 1; }
+for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: the rule file ${rf} is no tracked file. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
@@ -157,7 +157,7 @@ for (const rf of RULES) {
           p = p.replace(/^core(\/|$)/, '');
           if (!p) continue;
           // (no project's copy holds the core's reports: .gitattributes)
-          if (/^reports(\/|$)/.test(p)) { broken.push(`${where}: \`${f.file}\` is in no project's copy of the core`); continue; }
+          if (/^reports(\/|$)/.test(p)) { broken.push(`${where}: \`${f.file}\` is in no project's copy of the core. Mend: point to what a project's copy holds, or say it without the path`); continue; }
         }
         if (!files.has(p) && !dirs.has(p + '/')) {
           const same = !p.includes('/') ? tracked.filter(t => t.endsWith('/' + p)) : [];
@@ -203,6 +203,6 @@ for (const u of new Set(unread)) console.log(`note ${u}`);
 // (in a project, a floor rule or an archive item that is not there is listed apart, read but found nowhere)
 for (const u of new Set(notFound)) console.log(`note ${u} (read, and not found: listed, not failed, in a project)`);
 if (quotes.length) console.log(`note ${new Set(quotes).size} quotes are no section of any file the rule files name, so read as quotes: ${[...new Set(quotes)].map(q => `"${q}"`).join(', ')}`);
-for (const x of new Set(broken)) console.error(`FAIL: a broken pointer: ${x}`);
+for (const x of new Set(broken)) console.error(`FAIL: a broken pointer: ${x}${x.includes(". Mend: ") ? "" : ". Mend: point it at the file, heading or numbered point that holds what it means, or take it out where that is gone"}`);
 if (broken.length) process.exit(1);
 console.log(`ok   ${count} pointers in the rule files lead somewhere (${unread.length} in forms it cannot read${notFound.length ? `, ${notFound.length} read and not found` : ""}, listed above)`);

@@ -80,7 +80,7 @@ jobs:
           # cannot have a file of text taken for binary and left unread; git older than 2.40 fails the check)
           empty=$(git hash-object -t tree /dev/null); g() { git --attr-source="$empty" "$@"; }
           rc=0; g -c core.quotePath=false grep -I -z -n -i -F -f "$list" -- . > "$RUNNER_TEMP/hits" || rc=$?
-          if [ "$rc" -gt 1 ]; then echo "git could not read the files (it needs git 2.40 or later)"; found=1; fi
+          if [ "$rc" -gt 1 ]; then echo "FAIL git could not read the files. Mend: run the check where git is 2.40 or later."; found=1; fi
           # (each hit as git gives it: the file's name and the line's number each ended by a NUL, the line by a newline;
           # one is dropped only where grep finds a term in the line and none once a session's id is out, so a hit grep
           # would not make alone, as in a case it folds otherwise than git, still fails; what is printed is held to the
@@ -93,12 +93,11 @@ jobs:
             case $line in '' | *[!0-9]*) line='?' ;; esac; printf '%s:%s\n' "$name" "$line"
           done < "$RUNNER_TEMP/hits")
           if [ -n "$hits" ]; then
-            echo "A personal term is in these files (file:line), held before this pull request or added by it:"
+            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included."
             # (the names between GitHub's own marks that stop its runner reading workflow commands, under a token of
             # this run's alone, so that no name is read as one)
             token=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); echo "::stop-commands::$token"
             printf '%s\n' "$hits"; echo "::$token::"
-            echo "To take it out: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included."
             found=1
           fi
           if [ -n "$BASE" ]; then
@@ -111,6 +110,7 @@ jobs:
             side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
             commits=$(git rev-list "$BASE..$head" "^$side")
             bad="" people="" added="" names=""
+            rewrite="Mend: rewrite those commits without it, though a later one took it away, since merging keeps every commit (git rebase -i origin/main, a message reworded, a commit edited), and push the branch again (git push --force-with-lease); main is never rewritten."
             # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
             # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
             # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
@@ -152,7 +152,7 @@ jobs:
               parents=$(($(git rev-list --parents -n 1 "$c" | wc -w) - 1))
               if [ "$parents" -gt 2 ]; then how=--cc plus="^[+]{$parents}"; else how=--remerge-diff plus='^[+]'; fi
               if ! patch=$(g show --format= --patch "$how" --no-ext-diff --no-textconv --no-color "$c"); then
-                echo "git could not show what $short adds (it needs git 2.40 or later)"; found=1
+                echo "FAIL git could not show what $short adds. Mend: run the check where git is 2.40 or later."; found=1
               # (each line read without its own marks of an added line, and no more of it, so a link can start it; a line
               # that is not UTF-8 read too, never taken for binary and left out)
               elif printf '%s\n' "$patch" | grep -a -E "$plus" | sed -E "s/$plus//" | unlinked | grep -q -i -F -f "$list"; then added="$added $short"; fi
@@ -161,20 +161,16 @@ jobs:
               # those its own resolution writes)
               if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames --diff-filter=d -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
             done
-            if [ -n "$bad" ]; then echo "A personal term is in these commits' messages:"; echo "$bad"; found=1; fi
+            if [ -n "$bad" ]; then echo "FAIL A personal term is in these commits' messages (below). $rewrite"; echo "$bad"; found=1; fi
             if [ -n "$people" ]; then
-              echo "A personal term is in these commits' author or committer (name or address):"; echo "$people"; found=1
-              echo "To mend it, on the machine that made them: set git's name and address in this repository to the account's login and its no-reply address (git config user.name <login>; git config user.email <the no-reply address under Settings, Emails>), rewrite this pull request's commits with them (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
+              echo "FAIL A personal term is in these commits' author or committer (name or address), below. Mend: on the machine that made them, set git's name and address in this repository to the account's login and its no-reply address (git config user.name <login>; git config user.email <the no-reply address under Settings, Emails>), rewrite this pull request's commits with them (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
+              echo "$people"; found=1
             fi
-            if [ -n "$added" ]; then echo "A personal term is in a line that these commits add:"; echo "$added"; found=1; fi
-            if [ -n "$names" ]; then echo "A personal term is in the name of a file that these commits write:"; echo "$names"; found=1; fi
-            if [ -n "$bad$added$names" ]; then
-              echo "To take it out of those commits, though a later one took it away (merging keeps every commit): rewrite them without it (git rebase -i origin/main, a message reworded, a commit edited) and push the branch again (git push --force-with-lease). main is never rewritten."
-            fi
+            if [ -n "$added" ]; then echo "FAIL A personal term is in a line that these commits add (below). $rewrite"; echo "$added"; found=1; fi
+            if [ -n "$names" ]; then echo "FAIL A personal term is in the name of a file that these commits write (below). $rewrite"; echo "$names"; found=1; fi
           fi
           if printf '%s\n' "$TITLE" "$BODY" "$BRANCH" | unlinked | grep -q -i -F -f "$list"; then
-            echo "A personal term is in the PR's title, description or branch name."; found=1
-            echo "To take it out: edit the title or the description; a branch's name is taken out by pushing its work to a branch of another name and opening the pull request from it."
+            echo "FAIL A personal term is in the PR's title, description or branch name. Mend: edit the title or the description; a branch's name is taken out by pushing its work to a branch of another name and opening the pull request from it."; found=1
           fi
           rm -rf "$list" "$RUNNER_TEMP/hits" "$RUNNER_TEMP/github-keys"
           exit "$found"

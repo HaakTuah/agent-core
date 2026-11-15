@@ -13,6 +13,7 @@ import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
 import { FILES, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -114,7 +115,15 @@ if (p.status === 0) {
   undo = grow("AGENTS.md", 3000);
   const ownGrew = sizeCheck();
   undo();
-  ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total/.test(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total .*\. Mend: make them smaller/.test(ownGrew.stderr) && mended(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  // (a copy the project adds fails the copies check, and each failure says its mend)
+  undo = grow("AGENTS.md", 0);
+  fs.appendFileSync(path.join(p.dir, "AGENTS.md"), `\n${fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
+  const copy = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
+  const noConfig = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/none.json"], { cwd: p.dir, env, encoding: "utf8" });
+  undo();
+  ok(copy.status === 1 && /a new copy: .*\. Mend: keep it in the one place/.test(copy.stderr) && mended(copy.stderr) && noConfig.status === 1 && mended(noConfig.stderr),
+    "a copy the project adds fails the copies check, as does a config it cannot read, each saying its mend", `${copy.stderr}${noConfig.stderr}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;

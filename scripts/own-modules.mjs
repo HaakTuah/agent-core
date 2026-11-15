@@ -25,7 +25,7 @@ const BULLET = /^- `modules\/([^`\s/]+\.md)`:(.*)$/u;
 export function readSection(agents) {
   const lines = String(agents).split(/\r?\n/u);
   const start = lines.indexOf(SECTION);
-  if (start < 0) return { error: `AGENTS.md has no section "${SECTION.slice(3)}", which names the modules this repository takes` };
+  if (start < 0) return { error: `AGENTS.md has no section "${SECTION.slice(3)}", which names the modules this repository takes. Mend: put the section back, naming each module of modules/ or listing it under "Not taken" with its reason` };
   let end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
   if (end < 0) end = lines.length;
   const section = lines.slice(start + 1, end);
@@ -42,8 +42,8 @@ export function readSection(agents) {
       inList.add(i);
       if (section[i].startsWith("  ")) { notTaken.set(current, `${notTaken.get(current)} ${section[i].trim()}`); continue; }
       const m = BULLET.exec(section[i]);
-      if (!m) { found.push(`AGENTS.md, "Not taken": "${section[i]}" is not in the form - \`modules/<name>\`: <the reason>`); current = null; continue; }
-      if (notTaken.has(m[1])) found.push(`AGENTS.md, "Not taken": modules/${m[1]} is listed twice`);
+      if (!m) { found.push(`AGENTS.md, "Not taken": "${section[i]}" is not in the form it reads. Mend: write it - \`modules/<name>\`: <the reason>`); current = null; continue; }
+      if (notTaken.has(m[1])) found.push(`AGENTS.md, "Not taken": modules/${m[1]} is listed twice. Mend: keep one of its lines, with its reason`);
       current = m[1];
       notTaken.set(current, m[2].trim());
     }
@@ -60,14 +60,14 @@ export function faults(agents, modules) {
   if (error) return [error];
   const all = new Set(modules);
   for (const name of [...taken, ...notTaken.keys()].filter(n => !all.has(n)).sort()) {
-    found.push(`AGENTS.md, "${SECTION.slice(3)}", names modules/${name}, which is no module of modules/`);
+    found.push(`AGENTS.md, "${SECTION.slice(3)}", names modules/${name}, which is no module of modules/. Mend: correct the name, or take it out where the module is gone`);
   }
   for (const name of [...all].sort()) {
     if (notTaken.has(name)) {
-      if (notTaken.get(name) === "") found.push(`AGENTS.md, "Not taken": modules/${name} has no reason; give why it cannot apply to a repository of rules and scripts, or take it`);
-      if (taken.has(name)) found.push(`AGENTS.md, "${SECTION.slice(3)}": modules/${name} is both taken and listed as not taken; keep one`);
+      if (notTaken.get(name) === "") found.push(`AGENTS.md, "Not taken": modules/${name} has no reason. Mend: give why it cannot apply to a repository of rules and scripts, or take it`);
+      if (taken.has(name)) found.push(`AGENTS.md, "${SECTION.slice(3)}": modules/${name} is both taken and listed as not taken. Mend: keep one`);
     } else if (!taken.has(name)) {
-      found.push(`modules/${name} is neither taken nor given a reason: name it in AGENTS.md, "${SECTION.slice(3)}", where it is read, or list it there under "Not taken" with why it cannot apply here`);
+      found.push(`modules/${name} is neither taken nor given a reason. Mend: name it in AGENTS.md, "${SECTION.slice(3)}", where it is read, or list it there under "Not taken" with why it cannot apply here`);
     }
   }
   return found;
@@ -80,7 +80,7 @@ function main() {
     agents = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8");
     modules = fs.readdirSync(path.join(root, "modules")).filter(f => f.endsWith(".md"));
   } catch (e) {
-    console.error(`FAIL: ${e.message}`);
+    console.error(`FAIL: AGENTS.md or modules/ could not be read (${e.message}). Mend: run it from a clone of the core, where both stand`);
     return 1;
   }
   const found = faults(agents, modules);

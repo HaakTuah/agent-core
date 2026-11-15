@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
 import { checkoutStandIn, scratchEnv } from "./scratch-core.mjs";
 import { runWorkflow } from "./workflow-run.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200).replace(/\n/g, "\n     ")}`}`); } };
@@ -74,7 +75,7 @@ function check(files = {}, { branch = "main", at = B, without = null } = {}) {
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 const passes = (what, ...args) => { const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
-const fails = (what, words, ...args) => { const r = check(...args); ok(!r.passed && r.out.includes(words), `${what}: fails, saying so`, r.out); };
+const fails = (what, words, ...args) => { const r = check(...args); ok(!r.passed && r.out.includes(words) && mended(r.out), `${what}: fails, saying so and its mend`, r.out); };
 
 passes("a project whose copy is the core at its pin, each call pinned where its workflow is the same");
 fails("a default branch of another name", "The default branch here is trunk", {}, { branch: "trunk" });

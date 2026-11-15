@@ -27,13 +27,14 @@ import { sizeOf as size } from "./file-size.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
-if (!MARKS) { console.error("FAIL: name the config: node core/scripts/reading-size.mjs <config>"); process.exit(1); }
-const marks = JSON.parse(fs.readFileSync(MARKS, "utf8"));
+if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/reading-size.mjs <config>"); process.exit(1); }
+let marks;
+try { marks = JSON.parse(fs.readFileSync(MARKS, "utf8")); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
 const num = v => Number.isInteger(v) && v > 0, nums = o => o && typeof o === "object" && !Array.isArray(o) && Object.values(o).every(num);
 const shape = [num(marks.each), nums(marks.read), num(marks.total), num(marks.split), marks.past === undefined || nums(marks.past),
   marks.skip === undefined || Array.isArray(marks.skip) && marks.skip.every(s => typeof s === "string" && s.length)];
 if (shape.includes(false)) {
-  console.error(`FAIL: ${MARKS} must hold "each", "total" and "split" (byte counts), "read" (each file to its mark), and may hold "past" (each file to its mark) and "skip" (paths)`);
+  console.error(`FAIL: ${MARKS} is not in the form the check reads. Mend: write it to hold "each", "total" and "split" (byte counts), "read" (each file to its mark), and, if it needs them, "past" (each file to its mark) and "skip" (paths)`);
   process.exit(1);
 }
 marks.past ??= {};
@@ -47,11 +48,11 @@ const fail = [], notes = [];
 // the files every session reads; their total, the project's own alone (the core's copy under core/ left out)
 let total = 0, core = 0;
 for (const [f, mark] of Object.entries(marks.read)) {
-  if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file: update ${MARKS}`); continue; }
+  if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file. Mend: in ${MARKS}, name it as it now stands, or take it out where no session reads it`); continue; }
   const n = size(f);
   if (f.startsWith("core/")) core += n; else total += n;
-  if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}: make it smaller; its mark in ${MARKS} rises only as "A mark on what every session reads" in core/modules/review-guidelines.md says`);
-  else if (mark > marks.each && n < mark) fail.push(`${f} has shrunk to ${n} bytes: lower its mark in ${MARKS} from ${mark} to ${Math.max(n, marks.each)}`);
+  if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}. Mend: make it smaller, moving what no session needs at every start to a file read when needed; or, once a fresh session that wrote none of it has read the project's own such files whole for more to trim and found too little, raise its mark in ${MARKS}`);
+  else if (mark > marks.each && n < mark) fail.push(`${f} has shrunk to ${n} bytes. Mend: lower its mark in ${MARKS} from ${mark} to ${Math.max(n, marks.each)}`);
 }
 // (a total that leaves room above the project's own files for more than half of what the core's copy every session
 // reads comes to, as one set when it counted that copy does however the core grew since: said, with the mark to set
@@ -61,7 +62,7 @@ const least = (Math.ceil(total / 1024) + 1) * 1024;
 const over = marks.total - total - core / 2;
 const to = core && over > 0 ? Math.max(marks.total - Math.ceil(over / core) * core, least) : marks.total;
 if (to < marks.total) notes.push(`the total in ${MARKS}, ${marks.total}, leaves ${marks.total - total} bytes of room above the project's own files, more than half what the core's copy every session reads comes to (${core}), which the core's own cap holds: set it to ${to} (core/setup/sync-notes.md, 14 November 2026)`);
-if (total > marks.total) fail.push(`the project's own files every session reads total ${total} bytes, past their mark of ${marks.total}: make them smaller; the mark in ${MARKS} rises only as "A mark on what every session reads" in core/modules/review-guidelines.md says`);
+if (total > marks.total) fail.push(`the project's own files every session reads total ${total} bytes, past their mark of ${marks.total}. Mend: make them smaller, moving what no session needs at every start to a file read when needed; or, once a fresh session that wrote none of it has read the project's own such files whole for more to trim and found too little, raise the total in ${MARKS}`);
 
 // Step 0: files past the split mark that the PR changes
 // (a file is read to be counted only where its bytes on disk are past the mark: counted, it is never larger)
@@ -71,12 +72,12 @@ let base = process.env.SIZES_BASE;
 if (!base) try { base = git(["merge-base", "origin/main", "HEAD"]).trim(); } catch { base = ""; }
 if (base) {
   let changed;
-  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here: fetch it`); process.exit(1); }
+  try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
   for (const f of big.filter(f => changed.has(f))) {
-    if (!(marks.past[f] >= size(f))) fail.push(`${f} is ${size(f)} bytes, past the ${marks.split}-byte mark, and this PR changes it: split it by meaning first (Step 0, "Split by meaning" in core/modules/how-to-work.md), or list it under "past" in ${MARKS} and say why in the PR`);
+    if (!(marks.past[f] >= size(f))) fail.push(`${f} is ${size(f)} bytes, past the ${marks.split}-byte mark, and this PR changes it. Mend: split it by meaning first, in a pull request of its own that proves its behaviour unchanged, and change it after; or list it under "past" in ${MARKS} and say why in this pull request`);
   }
 } else notes.push("no base to compare with (set SIZES_BASE), so the files past the split mark were not checked for changes");
-for (const f of Object.keys(marks.past)) if (!big.includes(f)) fail.push(`${MARKS} lists ${f} under "past", but it is not past ${marks.split} bytes now: remove it`);
+for (const f of Object.keys(marks.past)) if (!big.includes(f)) fail.push(`${MARKS} lists ${f} under "past", but it is not past ${marks.split} bytes now. Mend: take it out of "past"`);
 
 for (const n of notes) console.log(`note ${n}`);
 for (const x of fail) console.error(`FAIL: ${x}`);

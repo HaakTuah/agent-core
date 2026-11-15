@@ -22,29 +22,29 @@ import { ruleFiles } from "./rule-files.mjs";
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
-if (!configPath) fail("name the config: node core/scripts/copies.mjs <config> [--write | --first]");
+if (!configPath) fail("no config was named. Mend: name it: node core/scripts/copies.mjs <config> [--write | --first]");
 let config;
-try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON`); }
+try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (core/setup/template/copies.json.tmpl): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails.
 const KEYS = ["baseline", "code", "prose", "proseFromSecurity"];
 const unknown = Object.keys(config || {}).filter(k => !KEYS.includes(k));
-if (!config || typeof config !== "object" || Array.isArray(config)) fail("the config is not a JSON object");
-if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}`);
+if (!config || typeof config !== "object" || Array.isArray(config)) fail("the config is not a JSON object. Mend: write the config as the starter kit does (core/setup/template/copies.json.tmpl): a JSON object with \"baseline\", the baseline's path, \"code\" and \"prose\", lists of git pathspecs, and \"proseFromSecurity\": true or false");
+if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out; it reads "baseline", "code", "prose" and "proseFromSecurity" alone`);
 const list = (v, key) => {
   if (v === undefined) return [];
-  if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths`);
+  if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths. Mend: write it as a list of git pathspecs, each a non-empty string`);
   return v;
 };
-if (typeof config.baseline !== "string" || !config.baseline) fail('the config names no "baseline"');
-if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false');
+if (typeof config.baseline !== "string" || !config.baseline) fail('the config names no "baseline". Mend: name the baseline\'s path in "baseline", as the starter kit writes it (core/setup/template/copies.json.tmpl)');
+if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
 let fromSecurity = [];
 if (config.proseFromSecurity) try { fromSecurity = ruleFiles(); } catch (e) { fail(e.message); }
 const proseSpecs = PROSE_SPECS.concat(fromSecurity);
-if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check ("code", "prose")');
+if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check. Mend: list the code in "code" and the prose in "prose", as git pathspecs, or set "proseFromSecurity" to true');
 const LINES = 8, MIN_CHARS = 240, WORDS = 12;
 const hash = s => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
 
@@ -125,19 +125,19 @@ const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(p
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
 if (process.argv.includes("--first")) {
-  if (fs.existsSync(BASELINE)) fail(`${BASELINE} exists: --first writes only a project's first baseline`);
+  if (fs.existsSync(BASELINE)) fail(`${BASELINE} exists, and --first writes only a project's first baseline. Mend: run the check without --first, or --write to lower the baseline`);
   fs.writeFileSync(BASELINE, JSON.stringify({ windows: Object.fromEntries([...places].sort()) }, null, 2) + "\n");
   console.log(`${BASELINE}: the first baseline, ${found.length} old copies in ${places.size} windows, to be removed over time`);
   process.exit(0);
 }
-if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}: write a project's first with --first`);
+if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}. Mend: write the project's first with node core/scripts/copies.mjs ${configPath} --first, and commit it`);
 let base;
-try { base = JSON.parse(fs.readFileSync(BASELINE, "utf8")); } catch { fail(`cannot read ${BASELINE} as JSON`); }
-if (!base || typeof base.windows !== "object" || base.windows === null || Array.isArray(base.windows)) fail(`${BASELINE} has no "windows" object ({ "windows": {} } lists none)`);
+try { base = JSON.parse(fs.readFileSync(BASELINE, "utf8")); } catch { fail(`cannot read ${BASELINE} as JSON. Mend: take it back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); }
+if (!base || typeof base.windows !== "object" || base.windows === null || Array.isArray(base.windows)) fail(`${BASELINE} has no "windows" object. Mend: take it back as main holds it (git checkout origin/main -- ${BASELINE}); { "windows": {} } lists none`);
 // A count is a whole number of places, at least two; anything else would let a copy through, so it fails.
 const counted = (w, where) => {
   const bad = Object.entries(w || {}).filter(([h, n]) => !/^[0-9a-f]{12}$/.test(h) || !Number.isInteger(n) || n < 2);
-  if (bad.length) { console.error(`FAIL: ${where} holds ${bad.length} windows without a whole count of two or more`); process.exit(1); }
+  if (bad.length) { console.error(`FAIL: ${where} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); process.exit(1); }
   return w;
 };
 counted(base.windows, BASELINE);
@@ -148,24 +148,24 @@ counted(base.windows, BASELINE);
 // count it raises there fails, whoever wrote it.
 const from = process.env.COPIES_BASE;
 if (from) {
-  try { git(["rev-parse", "--verify", `${from}^{commit}`]); } catch { console.error(`FAIL: COPIES_BASE ${from} is not a commit here: fetch it`); process.exit(1); }
+  try { git(["rev-parse", "--verify", `${from}^{commit}`]); } catch { console.error(`FAIL: COPIES_BASE ${from} is not a commit here. Mend: fetch it (git fetch origin ${from}) before the check runs`); process.exit(1); }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
   const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => !(h in old) || n > old[h]) : [];
-  if (raised.length) { console.error(`FAIL: ${BASELINE} adds or raises ${raised.length} windows against ${from}: the baseline only shrinks`); process.exit(1); }
+  if (raised.length) { console.error(`FAIL: ${BASELINE} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
 }
 const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 const fresh = found.filter(c => c.windows.some(over));
 const shrunk = Object.keys(base.windows).filter(h => !places.has(h) || places.get(h) < base.windows[h]);
-for (const c of fresh) console.error(`FAIL: a new copy: ${c.places.join(' and ')} (it starts "${c.starts}"); point to one place instead`);
+for (const c of fresh) console.error(`FAIL: a new copy: ${c.places.join(' and ')} (it starts "${c.starts}"). Mend: keep it in the one place it belongs and point there from the others`);
 if (process.argv.includes('--write')) {
   base.windows = Object.fromEntries(Object.entries(base.windows).filter(([h]) => places.has(h)).map(([h, n]) => [h, Math.min(n, places.get(h))]));
   fs.writeFileSync(BASELINE, JSON.stringify(base, null, 2) + '\n');
   console.log(`${BASELINE}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped`);
   if (fresh.length) process.exit(1);
 } else {
-  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now: run --write to lower it`);
+  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run node core/scripts/copies.mjs ${configPath} --write and commit the baseline it lowers`);
   if (fresh.length || shrunk.length) process.exit(1);
   console.log(`ok   no new copies (${found.length} old ones, listed in ${BASELINE}, to be removed)`);
 }

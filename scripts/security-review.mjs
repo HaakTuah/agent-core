@@ -120,7 +120,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const changed = Number.isFinite(read.changed) ? read.changed : Infinity;
   let verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits, changed, bound);
   if (running && !verdict.done && all.length > 0 && posted.length === 0) {
-    const why = "Codex's security review is running, begun after every \"Security review:\" posted: wait, or post one now";
+    const why = "Codex's security review is running, begun after every \"Security review:\" posted. Mend: wait for it";
     // (one whose head does not hold this check as the default branch does stood before it came: reported)
     verdict = bound ? { sha, done: false, why } : { sha, done: true, why: "before this check came, so not waited for: Codex's security review began after every \"Security review:\"" };
   }
@@ -128,7 +128,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (verdict.done && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
     const codexDone = review !== null && typeof review === "object" && review.status === "completed";
     if ((codexDone ? 1 : 0) + posted.length < 2) {
-      const why = `what runs by itself changed: post a second "Security review:" (floor rule 3), or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
+      const why = `floor rule 3 asks two. Mend: the fallback reviewer posts the second, or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
       // a pull request whose head does not hold this check as the default branch does stood before it came: reported
       verdict = bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
     } else verdict = { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
@@ -172,14 +172,14 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits, cha
     const found = newest([...list, ...flat(reviewComments)].filter((comment) => codexs(comment) && FINDING.test(comment.body)).map((comment) => Date.parse(comment.created_at) || Infinity));
     const last = newest(posted.map((comment) => Date.parse(comment.created_at) || -Infinity));
     if (found !== -Infinity) {
-      if (last <= found) return { sha, done: false, why: "a finding of Codex's security review has no review posted after it" };
+      if (last <= found) return { sha, done: false, why: "a finding of Codex's security review has no review posted after it. Mend: answer it, then post a \"Security review:\"" };
       // after the newest found, but a newer one may be given in a review's own body alone, which is not fetched: the
       // review settles the mark only if posted after Codex's summary last changed too, the latest that one can have
       // come (#293)
       if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted after its newest finding` };
       // (one whose head does not hold this check as the default branch does stood before it came, when this settled it:
       // reported)
-      if (bound) return { sha, done: false, why: "a review follows Codex's newest security finding, but its summary changed since: post a \"Security review:\" now" };
+      if (bound) return { sha, done: false, why: "a review follows Codex's newest security finding, but its summary changed since. Mend: post a \"Security review:\" now" };
       return { sha, done: true, why: "before this check came, so not waited for: Codex's summary changed after the review that followed its newest finding" };
     }
     // none is to be found among the comments (one in a review's own body, say): only a review posted after Codex's
@@ -187,7 +187,7 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits, cha
     if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}; its open finding is not among the comments, and a review is posted after it` };
     // (one whose head does not hold this check as the default branch does stood before it came: reported, where a
     // review is posted, which settled it before; with none posted it waited before, and waits still)
-    if (bound || last === -Infinity) return { sha, done: false, why: "Codex marks a security finding open, not among the comments: post a \"Security review:\" now" };
+    if (bound || last === -Infinity) return { sha, done: false, why: "Codex marks a security finding open, not among the comments. Mend: post a \"Security review:\" now" };
     return { sha, done: true, why: "before this check came, so not waited for: Codex's open security finding is not among the comments, nor a review after it" };
   }
   if (posted.length > 0) return { sha, done: true, why: "a security review is posted on the pull request" };
@@ -198,7 +198,7 @@ function judgeWith(sha, list, posted, review, pull, reviewComments, commits, cha
   const dependabots = pull.user?.login === DEPENDABOT && pull.user.type === "Bot" && typeof pull.head.repo?.full_name === "string" && pull.head.repo.full_name === pull.base?.repo?.full_name
     && all.length > 0 && all.every(its) && all.some((commit) => commit.sha === sha);
   if (dependabots && !(review !== null && typeof review === "object" && typeof review.status === "string")) return { sha, done: true, why: "Dependabot's own, which floor rule 17 holds" };
-  return { sha, done: false, why: "no security review has run yet" };
+  return { sha, done: false, why: "no security review has run yet. Mend: wait, or ask another reviewer for one" };
 }
 
 // the commit status GitHub is given: while advisory always a pass, saying what the check would have done (context: the
