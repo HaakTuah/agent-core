@@ -93,6 +93,45 @@ function shapeWritten(p) {
   return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
 }
 
+// Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
+// first without its number and title; null where there is none.
+function rule5(text) {
+  const lines = text?.split("\n") ?? [], at = lines.findIndex(l => /^5\.\s/.test(l));
+  if (at < 0) return null;
+  const end = lines.findIndex((l, i) => i > at && /^(\d+\.\s|#)/.test(l));
+  return [lines[at].replace(/^5\.\s*(\*\*[^*]*\*\*)?:?/, ""), ...lines.slice(at + 1, end < 0 ? undefined : end)];
+}
+// A block's items: each a list line at its outermost depth, with the lines under it indented deeper (its wrapped text
+// and the items nested in it).
+function listItems(block) {
+  const items = [];
+  let depth = null;
+  for (const l of block) {
+    const indent = /^\s*/.exec(l)[0].length, item = /^\s*[-*]\s/.test(l);
+    if (item && (depth === null || indent <= depth)) { depth = indent; items.push(l); }
+    else if (items.length && l.trim() && indent > depth) items[items.length - 1] += `\n${l}`;
+  }
+  return items;
+}
+// Whether an item names its tests: a path in backticks after the words "hostile tests" that is a file or folder of the
+// project (one the item names for what checks the input does not count).
+function namesTests(p, item) {
+  const there = f => { const n = f.replace(/^\.\//, "").replace(/\/+$/, ""); return !!n && p.files.some(x => x === n || x.startsWith(`${n}/`)); };
+  return [...(/hostile\s+tests\b([\s\S]*)/i.exec(item)?.[1] ?? "").matchAll(/`([^`]+)`/g)].some(m => there(m[1]));
+}
+const CASES = "too long, the wrong type, markup, a file path, a number out of range, nothing at all";
+// The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
+// once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
+function hostileTests(p) {
+  const block = rule5(p.read("SECURITY.md"));
+  if (!block) throw new Unread("no SECURITY.md with a rule 5 to read");
+  const items = listItems(block), said = block.join("\n");
+  if (!items.length && (/FILL IN/.test(said) || /^None\b/i.test(said.trim()))) return null;
+  if (!items.length) return `In \`SECURITY.md\`, rule 5, list each input anyone but the user at hand can shape as an item of its own (a line that opens \`- \`), saying what checks it and then, after the words "hostile tests:", naming in backticks the file or folder that holds them (${CASES}), or write "None" where the project takes none.`;
+  const bare = items.filter(l => !namesTests(p, l)).map(l => l.split("\n")[0].trim().slice(2).trim());
+  return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
@@ -251,34 +290,7 @@ export const STEPS = [
     } },
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
     partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
-  { lead: "16 November 2026, hostile tests for every named input", cost: COST.read,
-    // (rule 5 of the project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: each input
-    // is an item whose backticks after "hostile tests" name a file or folder of the project)
-    check: p => {
-      const text = p.read("SECURITY.md");
-      const lines = text?.split("\n") ?? [], at = lines.findIndex(l => /^5\.\s/.test(l));
-      if (at < 0) throw new Unread("no SECURITY.md with a rule 5 to read");
-      const end = lines.findIndex((l, i) => i > at && /^(\d+\.\s|#)/.test(l));
-      const block = [lines[at].replace(/^5\.\s*(\*\*[^*]*\*\*)?:?/, ""), ...lines.slice(at + 1, end < 0 ? undefined : end)];
-      // (an item is a list line at the block's outermost depth, with the lines under it indented deeper: its wrapped
-      // text and the items nested in it)
-      const items = [];
-      let depth = null;
-      for (const l of block) {
-        const indent = /^\s*/.exec(l)[0].length, item = /^\s*[-*]\s/.test(l);
-        if (item && (depth === null || indent <= depth)) { depth = indent; items.push(l); }
-        else if (items.length && l.trim() && indent > depth) items[items.length - 1] += `\n${l}`;
-      }
-      // ("None", or the starter kit's "FILL IN", reads done only while rule 5 lists no input: once one is listed, each is
-      // read, and an item whose tests are still "FILL IN" names none)
-      if (!items.length && (/FILL IN/.test(block.join("\n")) || /^None\b/i.test(block.join("\n").trim()))) return null;
-      const there = f => { const n = f.replace(/^\.\//, "").replace(/\/+$/, ""); return !!n && p.files.some(x => x === n || x.startsWith(`${n}/`)); };
-      // (only a path named after the words "hostile tests" counts: one the item names for what checks the input does not)
-      const tests = l => [...(/hostile\s+tests\b([\s\S]*)/i.exec(l)?.[1] ?? "").matchAll(/`([^`]+)`/g)].map(m => m[1]);
-      const bare = items.filter(l => !tests(l).some(there)).map(l => l.split("\n")[0].trim().slice(2).trim());
-      if (!items.length) return "In `SECURITY.md`, rule 5, list each input anyone but the user at hand can shape as an item of its own (a line that opens `- `), saying what checks it and then, after the words \"hostile tests:\", naming in backticks the file or folder that holds them (too long, the wrong type, markup, a file path, a number out of range, nothing at all), or write \"None\" where the project takes none.";
-      return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words \"hostile tests:\", in backticks, a file or folder of the project that holds them (too long, the wrong type, markup, a file path, a number out of range, nothing at all): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
-    },
+  { lead: "16 November 2026, hostile tests for every named input", cost: COST.read, check: hostileTests,
     partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
 ];
