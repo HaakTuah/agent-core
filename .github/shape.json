@@ -1,0 +1,5 @@
+{
+  "baseline": ".github/shape-baseline.json",
+  "code": ["scripts"],
+  "tests": ["scripts/*-test.mjs"]
+}

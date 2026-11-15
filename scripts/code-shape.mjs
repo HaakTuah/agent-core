@@ -208,23 +208,26 @@ export function globals(toks) {
 // = of an assignment; and a choice (a ? that neither chains, `a?.b`, nor marks a name as optional in TypeScript, which
 // a `:`, `)`, `,`, `;`, `=`, `]` or `}` follows).
 const NOT_A_CHOICE = new Set([":", ")", ",", ";", "=", "]", "}"]);
-export function branchesAt(toks, k) {
-  const tok = toks[k], next = toks[k + 1], prev = toks[k - 1];
-  if (tok.t === "id") {
-    if (!notMember(toks, k)) return false;
-    if (tok.v === "if" || tok.v === "while") return isP(next, "(");
-    if (tok.v === "for") return isP(next, "(") || isId(next, "await");
-    if (tok.v === "catch") return isP(next, "(") || isP(next, "{");
-    return tok.v === "case" && !isP(next, ":"); // (not a key named case)
-  }
-  if (tok.t !== "punct") return false;
+const BRANCH_WORD = {
+  if: next => isP(next, "("),
+  while: next => isP(next, "("),
+  for: next => isP(next, "(") || isId(next, "await"),
+  catch: next => isP(next, "(") || isP(next, "{"),
+  case: next => !isP(next, ":"), // (not a key named case)
+};
+function branchSign(tok, prev, next) {
   if (tok.v === "&" || tok.v === "|") return isP(next, tok.v) && !isP(prev, tok.v);
-  if (tok.v !== "?") return false;
-  if (isP(prev, "?")) return false; // the second sign of ??
-  if (isP(next, "?")) return true; // ??
+  if (tok.v !== "?" || isP(prev, "?")) return false; // (the second sign of ?? is counted at its first)
+  if (isP(next, "?")) return true;
   if (isP(next, ".")) return false; // a?.b (the . of a number is the number's own token)
   return !!next && !(next.t === "punct" && NOT_A_CHOICE.has(next.v));
 }
+export function branchesAt(toks, k) {
+  const tok = toks[k];
+  if (tok.t === "punct") return branchSign(tok, toks[k - 1], toks[k + 1]);
+  return tok.t === "id" && Object.hasOwn(BRANCH_WORD, tok.v) && notMember(toks, k) && BRANCH_WORD[tok.v](toks[k + 1]);
+}
+const countBranch = (toks, k, block) => { if (block?.fn && branchesAt(toks, k)) block.fn.branches++; };
 
 // The functions of a file: [{ name, line, lines, depth, branches }], lines from the line of its body's { to that of its
 // }, depth the deepest its control blocks nest inside it, branches how often it branches (branchesAt), a function
@@ -235,7 +238,7 @@ export function functions(toks) {
   const top = () => { for (let s = stack.length - 1; s >= 0; s--) if (stack[s].v === "{") return stack[s]; return null; };
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
-    if (branchesAt(toks, k)) { const fn = top()?.fn; if (fn) fn.branches++; }
+    countBranch(toks, k, top());
     if (tok.t !== "punct") continue;
     if (tok.v === "(" || tok.v === "[") stack.push({ v: tok.v, k });
     else if (tok.v === "{") {
@@ -412,17 +415,22 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
   const lengths = fns.map(f => f.lines).sort((a, b) => a - b);
   const byLength = [...fns].sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file) || a.line - b.line);
   const byDepth = [...fns].sort((a, b) => b.depth - a.depth || b.lines - a.lines || a.file.localeCompare(b.file));
-  const byBranches = [...fns].sort((a, b) => b.branches - a.branches || a.file.localeCompare(b.file) || a.line - b.line);
   return {
     files: { code: code.length, other },
     imports: { total, crossingAFolder: crossing, intoTheRepository: [...offered.values()].reduce((s, o) => s + o.by.size, 0), external: Object.fromEntries([...external].sort((a, b) => b[1] - a[1])), unresolved, foldersBothWays: bothWays.sort((x, y) => Math.min(...y.imports) - Math.min(...x.imports)) },
     cycles: { files: cycles(fileGraph), folders: cycles(folderGraph), filesWithTypes: cycles(withTypes) },
     hubs: hubs.filter(h => h.importedBy > 1),
     globals: { scripts: scripts.length, names: scripts.reduce((s, x) => s + x.names.length, 0), inMoreThanOne: [...declared].filter(([, f]) => f.length > 1).map(([name, f]) => ({ name, files: f.sort() })).sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name)) },
-    functions: { count: fns.length, lines: { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 }, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length, depth4OrMore: fns.filter(f => f.depth >= 4).length, over15Branches: fns.filter(f => f.branches > 15).length, over30Branches: fns.filter(f => f.branches > 30).length, longest: byLength.slice(0, 20), deepest: byDepth.filter(f => f.depth > 0).slice(0, 20), mostBranching: byBranches.filter(f => f.branches > 0).slice(0, 20) },
+    functions: { count: fns.length, lines: { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 }, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length, depth4OrMore: fns.filter(f => f.depth >= 4).length, ...branching(fns), longest: byLength.slice(0, 20), deepest: byDepth.filter(f => f.depth > 0).slice(0, 20) },
     changedTogether: changedTogether(commits, new Set(code)),
     suites,
   };
+}
+
+// How the functions branch: how many do so more than 15 and more than 30 times, and the twenty that branch most.
+function branching(fns) {
+  const most = fns.filter(f => f.branches > 0).sort((a, b) => b.branches - a.branches || a.file.localeCompare(b.file) || a.line - b.line);
+  return { over15Branches: fns.filter(f => f.branches > 15).length, over30Branches: fns.filter(f => f.branches > 30).length, mostBranching: most.slice(0, 20) };
 }
 
 // The pairs of files changed in the same commits, most often first: how often, and what share of the rarer one's
