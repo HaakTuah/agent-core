@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mended } from "./mend.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -41,7 +42,7 @@ for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]])
   ok(r.code === 1 && /AGENTS\.md:5: "shipping it" is no heading/.test(r.out), `a section that is not there fails, named with its line, with ${ending} line ending`);
 }
 r = run(bare);
-ok(r.code === 1 && /^FAIL: the project has no SECURITY\.md yet/m.test(r.out) && !/^\s+at /m.test(r.out), "a project with no SECURITY.md yet is told so in a line, with no stack");
+ok(r.code === 1 && mended(r.out) && /^FAIL: the project has no SECURITY\.md yet/m.test(r.out) && !/^\s+at /m.test(r.out), "a project with no SECURITY.md yet is told so in a line, with no stack");
 // a floor rule and an archive item, read in the project's copy of the core's floor and archive
 const CORE = { "core/floor/security.md": "# The floor\n\n**1. Nothing secret.** Text.\n\n**8. Reviews.** As rule 1 says.\n", "core/floor/topics.md": "# Topics\n\n**10. Licences.** Text.\n",
   "core/archive/instructions/items-001.md": "# Items\n\n1. **1 November 2026**. Words.\n\n2. **2 November 2026**. Words.\n" };
@@ -64,13 +65,13 @@ try {
   for (const f of ["pointers.mjs", "rule-files.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
   for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: coreDir, stdio: "ignore" });
   const c = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" });
-  ok(c.status === 1 && /FAIL: a broken pointer: modules\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
+  ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: modules\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
   const core = (file, text) => { put(file, text); execFileSync("git", ["add", "-A"], { cwd: coreDir, stdio: "ignore" }); const r = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
   put("modules/a.md", "# A module\n\nNothing cited.\n");
   const ten = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 10 says.\n");
   ok(ten.status === 0 && !/rule 10/.test(ten.out), "a lone rule in the floor's own file is found in any of the floor's files: rule 10 in topics.md, cited from security.md", ten.out);
   const nineteen = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 19 says.\n");
-  ok(nineteen.status === 1 && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
+  ok(nineteen.status === 1 && mended(nineteen.out) && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor\. Mend: point it at/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** Text.\n");
   const capital = core("modules/a.md", "# A module\n\nFloor rule 16 says so (Core archive 998).\n");
   ok(capital.status === 1 && /floor rule 16/i.test(capital.out) && /core archive 998/i.test(capital.out), "a citation opening a sentence, \"Floor rule\" or \"Core archive\", is read too", capital.out);

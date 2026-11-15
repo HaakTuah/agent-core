@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mended } from "./mend.mjs";
 import { CAP, COUNTED, QUEUE, answered, capOf, raised } from "./size.mjs";
 
 let failed = 0, count = 0;
@@ -59,17 +60,20 @@ ok(QUEUE.mark < 20 * 1024 && /^the queue \(QUEUE\.md\): \d+ bytes of its mark, \
 const queueFile = path.join(path.dirname(path.dirname(file)), QUEUE.file), queueText = fs.readFileSync(queueFile);
 try {
   fs.writeFileSync(queueFile, Buffer.concat([queueText, Buffer.alloc(QUEUE.mark, "x")]));
-  ok(run().status === 1 && /QUEUE\.md is past its mark[\s\S]*take out each\nfinished line/.test(run().out), "a queue past its mark fails, saying the mend", run().out);
+  ok(run().status === 1 && /QUEUE\.md is \d+ bytes past its mark\. Mend: take out each finished line/.test(run().out) && mended(run().out), "a queue past its mark fails, saying the mend", run().out);
 } finally { fs.writeFileSync(queueFile, queueText); }
 ok(run("--raise", same, none).status === 0 && run("--raise", same, none).out.includes("the cap is not raised"), "against a base with the same cap it passes with no comment");
-ok(run("--raise", lower, none).status === 1 && run("--raise", lower, none).out.includes("Leanness check:") && run("--raise", lower, one).status === 0 && run("--raise", lower, one).out.includes("holds a leanness check's answer"), "against a base with a lower cap it fails without the answer and passes with it");
+ok(run("--raise", lower, none).status === 1 && run("--raise", lower, none).out.includes("Leanness check:") && mended(run("--raise", lower, none).out) && run("--raise", lower, one).status === 0 && run("--raise", lower, one).out.includes("holds a leanness check's answer"), "against a base with a lower cap it fails without the answer and passes with it");
+for (const r of [run("--raise"), run("--raise", same, put("bad.json", "{"))]) ok(r.status === 1 && mended(r.out), "without its files it fails, saying the mend", r.out);
+const over = put("over.mjs", at(CAP / 1024 - 2));
+ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set CAP to /.test(run("--raise", over, one).out) && mended(run("--raise", over, one).out), "a raise of more than one step fails, saying the cap to set", run("--raise", over, one).out);
 // (a copy of the script whose real cap is not the one its readable line says, run as itself)
 fs.cpSync(path.dirname(file), path.join(tmp, "scripts"), { recursive: true });
 fs.writeFileSync(path.join(tmp, "scripts", "size.mjs"), own.replace(/^export const CAP = (\d+) \* 1024;$/m, (line, kb) => `/*\n${line}\n*/\nexport const CAP = ${Number(kb) + 8}*1024;`));
 const hidden = spawnSync(process.execPath, [path.join(tmp, "scripts", "size.mjs"), "--raise", same, one], { cwd: tmp, encoding: "utf8" });
-ok(hidden.status === 1 && hidden.stderr.includes("does not set the cap the script runs with") && !hidden.stdout.includes("ok"), "run as itself, a script whose real cap hides behind a look-alike line fails the raise check, answer or no answer", hidden.stdout + hidden.stderr);
+ok(hidden.status === 1 && hidden.stderr.includes("does not set the cap the script runs with") && mended(hidden.stderr) && !hidden.stdout.includes("ok"), "run as itself, a script whose real cap hides behind a look-alike line fails the raise check, answer or no answer", hidden.stdout + hidden.stderr);
 const elsewhere = spawnSync(process.execPath, [file], { cwd: tmp, encoding: "utf8" });
-ok(elsewhere.status === 1 && /cannot be counted: floor\/security\.md, .*modules\/git\.md/.test(elsewhere.stderr), "where the files it counts are not there (run from another folder), it fails and names each", elsewhere.stdout + elsewhere.stderr);
+ok(elsewhere.status === 1 && /cannot be counted: floor\/security\.md, .*modules\/git\.md/.test(elsewhere.stderr) && mended(elsewhere.stderr), "where the files it counts are not there (run from another folder), it fails and names each", elsewhere.stdout + elsewhere.stderr);
 ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--raise", same, path.join(tmp, "missing.json")).status === 1 && run("--raise", same, put("bad.json", "{")).status === 1 && run("--raise", path.join(tmp, "missing.mjs"), one).status === 1,
   "without its two files, or with one it cannot read, it fails");
 

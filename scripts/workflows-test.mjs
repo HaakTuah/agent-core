@@ -2,8 +2,12 @@
 // and the core's own workflows pass. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/workflows-test.mjs
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mended } from "./mend.mjs";
 import { lines, readable, reads, unlinked } from "./workflows.mjs";
 
 let failed = 0;
@@ -32,4 +36,19 @@ ok(unlinked([".github", ".GitHub/workflows", ".github/workflows", ".github/depen
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
 ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workflows/${f}`, "utf8"))), "the core's own workflows pass");
+
+// run on a scratch project: each failure says its mend
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
+try {
+  fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
+  for (const f of ["workflows.mjs", "started.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, import.meta.url)), path.join(tmp, "core/scripts", f));
+  fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
+  fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));
+  for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: tmp, stdio: "ignore" });
+  const r = spawnSync(process.execPath, [path.join(tmp, "core/scripts/workflows.mjs")], { cwd: tmp, encoding: "utf8" });
+  const out = r.stdout + r.stderr;
+  const good = r.status === 1 && /a\.yml:2: pull_request_target .*\. Mend: take the word out/.test(out) && /and on 2 more lines\. Mend:/.test(out) && /b\.yml: not UTF-8 text.*Mend: save it as UTF-8/.test(out) && mended(out);
+  ok(good, `run, it fails each, by file and line, and each failure says its mend${good ? "" : `:\n${out}`}`);
+} finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);
