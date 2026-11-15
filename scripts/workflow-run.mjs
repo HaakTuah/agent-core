@@ -285,7 +285,9 @@ function globMatches(items, name) {
   for (const item of items) {
     const next = new Set();
     if (item.folders) {
-      for (const p of at) { next.add(p); for (let j = p; j < name.length; j++) if (name[j] === "/") next.add(j + 1); }
+      let from = name.length;
+      for (const p of at) { next.add(p); if (p < from) from = p; }
+      for (let j = from; j < name.length; j++) if (name[j] === "/") next.add(j + 1);
     } else {
       for (const p of at) if (item.min === 0) next.add(p);
       for (const p of [...at].sort((a, b) => a - b)) {
