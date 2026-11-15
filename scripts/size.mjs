@@ -14,7 +14,8 @@
 // which a pull request runs in its own version. Run from this repository's root by the size workflow
 // (.github/workflows/size.yml); Node's own modules only.
 //
-//   node scripts/size.mjs                                  what every session reads at its start, against the cap
+//   node scripts/size.mjs                                  what every session reads at its start, against the cap,
+//                                                          and the queue against its own mark
 //   node scripts/size.mjs --raise <base> <comments>        a raise has its leanness check: <base>, this file as the
 //                                                          pull request's base holds it; <comments>, the pull
 //                                                          request's comments as GitHub's API gives them
@@ -25,6 +26,10 @@ import { READ } from "./init.mjs";
 import { started } from "./started.mjs";
 
 export const CAP = 22 * 1024;
+// The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
+// project's size marks give each such file (modules/inbox.md, "The progress file holds order only"; core archive 216):
+// set at its first trim, as each project sets its own; it rises only as the cap does.
+export const QUEUE = { file: "QUEUE.md", mark: 4 * 1024 };
 // the core's files every session reads at its start, by their paths here
 export const COUNTED = READ.filter(f => f.startsWith("core/")).map(f => f.slice("core/".length));
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
@@ -69,14 +74,23 @@ function main([flag, baseFile, commentsFile]) {
     console.log(capOf(base) < CAP ? `ok   the cap rises from ${capOf(base)} to ${CAP} bytes, and the pull request holds a leanness check's answer` : `ok   the cap is not raised (${CAP} bytes)`);
     return 0;
   }
-  const missing = COUNTED.filter(f => !fs.existsSync(f));
+  const missing = [...COUNTED, QUEUE.file].filter(f => !fs.existsSync(f));
   if (!COUNTED.length || missing.length) { console.error(`FAIL: what every session reads at its start cannot be counted: ${missing.join(", ") || "the list is empty"}`); return 1; }
-  const total = COUNTED.reduce((sum, f) => sum + sizeOf(f), 0);
+  const total = COUNTED.reduce((sum, f) => sum + sizeOf(f), 0), queue = sizeOf(QUEUE.file);
   console.log(`what every session reads at its start (${COUNTED.join(", ")}): ${total} bytes of ${CAP}`);
-  if (total <= CAP) return 0;
-  console.error("FAIL: over the cap. Say the rule in fewer words and trim what is said twice; raise CAP only once a\n"
-    + "fresh session has read all the rules for room and found too little (AGENTS.md, \"How changes are made here\").");
-  return 1;
+  console.log(`the queue (${QUEUE.file}): ${queue} bytes of its mark, ${QUEUE.mark}`);
+  let status = 0;
+  if (total > CAP) {
+    console.error("FAIL: over the cap. Say the rule in fewer words and trim what is said twice; raise CAP only once a\n"
+      + "fresh session has read all the rules for room and found too little (AGENTS.md, \"How changes are made here\").");
+    status = 1;
+  }
+  if (queue > QUEUE.mark) {
+    console.error(`FAIL: ${QUEUE.file} is past its mark. It holds what is next and in flight and nothing done: take out each\n`
+      + "finished line, and a note that belongs in a pull request's description (AGENTS.md, \"The queue\").");
+    status = 1;
+  }
+  return status;
 }
 
 if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));

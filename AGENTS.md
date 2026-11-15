@@ -37,9 +37,10 @@ archive N)"; the *settling references* and the *descriptions*: `README.md`; the 
 *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the same file, and all that add to what
 every session reads at its start, whose cap they share, in the queue's order; the *design-checked PRs*: those that add
 or change a rule of the floor or the modules; the *review reference*: the line's issue, with the owner's words quoted
-on it; the *hard work*: a new or changed rule; the *size marks*: the cap of `scripts/size.mjs`, which has no split
-mark; the *major version checks*: the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other
-builders*: none, every file here being protected (`SECURITY.md`), so there are no *other builders' checks*.
+on it; the *hard work*: a new or changed rule; the *size marks*: the cap of `scripts/size.mjs`, and its own mark for
+`QUEUE.md`, with no split mark; the *major version checks*: the suites of `.github/workflows/tests.yml`; *planning
+design*: none; the *other builders*: none, every file here being protected (`SECURITY.md`), so there are no *other
+builders' checks*.
 
 ## The queue
 

@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CAP, COUNTED, answered, capOf, raised } from "./size.mjs";
+import { CAP, COUNTED, QUEUE, answered, capOf, raised } from "./size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -55,6 +55,12 @@ const expected = [...imported, named].sort();
 ok(named && JSON.stringify([...COUNTED].sort()) === JSON.stringify(expected) && !COUNTED.includes("floor/topics.md") && !COUNTED.includes("modules/reviews.md"),
   "it counts what every session reads at its start, as the starter kit's templates name it (the floor's security.md, the modules read then, each builder's own), and no file read only when needed", `${COUNTED} against ${expected}`);
 ok(run().status === 0 && /what every session reads at its start \(floor\/security\.md, .*\): \d+ bytes of \d+$/m.test(run().out), "with no argument it holds those files to the cap", run().out);
+ok(QUEUE.mark < 20 * 1024 && /^the queue \(QUEUE\.md\): \d+ bytes of its mark, \d+$/m.test(run().out), "it holds the queue to a mark of its own, below the general mark a project's size marks give each file", run().out);
+const queueFile = path.join(path.dirname(path.dirname(file)), QUEUE.file), queueText = fs.readFileSync(queueFile);
+try {
+  fs.writeFileSync(queueFile, Buffer.concat([queueText, Buffer.alloc(QUEUE.mark, "x")]));
+  ok(run().status === 1 && /QUEUE\.md is past its mark[\s\S]*take out each\nfinished line/.test(run().out), "a queue past its mark fails, saying the mend", run().out);
+} finally { fs.writeFileSync(queueFile, queueText); }
 ok(run("--raise", same, none).status === 0 && run("--raise", same, none).out.includes("the cap is not raised"), "against a base with the same cap it passes with no comment");
 ok(run("--raise", lower, none).status === 1 && run("--raise", lower, none).out.includes("Leanness check:") && run("--raise", lower, one).status === 0 && run("--raise", lower, one).out.includes("holds a leanness check's answer"), "against a base with a lower cap it fails without the answer and passes with it");
 // (a copy of the script whose real cap is not the one its readable line says, run as itself)

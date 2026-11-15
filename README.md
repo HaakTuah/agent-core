@@ -36,8 +36,8 @@ owner's words, and marks an answer that rests on them alone unsure (`modules/inb
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
    project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
    `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
-   step not done and every difference from what the starter kit writes today (`scripts/fresh.mjs`), for the sync PR's
-   description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
+   step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`) and where the owner's
+   inbox is (`scripts/inbox.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
@@ -224,7 +224,7 @@ and each manifest says what fills it. A task is a project's unit of work; the ma
 | --- | --- |
 | *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`) |
 | *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
-| *progress file* | the file that holds the queue and what is done |
+| *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`modules/inbox.md`) |
 | *report* | where a task's report, with its "Readings taken", goes |
 | *settling references* | what open points are settled against, with the owner's past words |
 | *descriptions* | every place that describes what a change changes, for each kind of reader |

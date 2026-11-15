@@ -71,6 +71,10 @@ export const calls = (p, name) => (readable(p, text => text.toLowerCase().includ
 export const call = (p, name) => calls(p, name)[0] ?? null;
 
 const PROJECT_FILES = /\.(cs|fs|vb)proj$/;
+// The paths the manifest's slots name for the progress file and the size marks, else the starter kit's.
+const slot = (manifest, name, kit) => new RegExp(`^\\|\\s*\\*${name}\\*\\s*\\|\\s*\`([^\`]+)\``, "m").exec(manifest)?.[1] ?? kit;
+const progressOf = manifest => slot(manifest, "progress file", "docs/PROGRESS.md");
+const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 // The licence check's config a project names (its NuGet check's input, else the starter kit's path).
 const licenceConfig = p => call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
 
@@ -169,7 +173,7 @@ export const STEPS = [
     // (the reading-size check passes and says so in a note, which no run of it turns red: this step reads that note,
     // from the project's own copy of the check, and gives its number)
     check: p => {
-      const marks = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
+      const marks = marksOf(p.manifest);
       const script = path.join(p.root, "core", "scripts", "reading-size.mjs");
       if (!fs.existsSync(script) || p.read(marks) === null) throw new Unread(`no copy of the reading-size check, or no ${marks}, to read`);
       const r = spawnSync(process.execPath, [script, marks], { cwd: p.root, encoding: "utf8", env: { ...process.env, SIZES_BASE: "" } });
@@ -187,6 +191,21 @@ export const STEPS = [
     } },
   { lead: "14 November 2026, a listed name in a commit's author", cost: COST.check, held: "the personal-terms check" },
   { lead: "15 November 2026, every step has its check", cost: COST.check, unread: "it asks that the steps above be run, which every sync from this one on does by itself" },
+  { lead: "15 November 2026, the progress file holds order only", cost: COST.read,
+    // (a mark of its own is one below the general mark, "each"; a file under a quarter of that has had no time to fill,
+    // and its first trim, which sets the mark, comes once it passes it: the general mark holds there till then)
+    check: p => {
+      const file = progressOf(p.manifest), marksAt = marksOf(p.manifest);
+      const text = p.read(file);
+      let marks = null;
+      try { marks = JSON.parse(p.read(marksAt) ?? "null"); } catch { /* (read as missing, below) */ }
+      if (text === null || !(Number.isInteger(marks?.each) && marks.each > 0 && marks.read && typeof marks.read === "object"))
+        throw new Unread(`no ${file}, or no ${marksAt} with its "each" and "read", to read`);
+      const mark = marks.read?.[file], bytes = Buffer.byteLength(text);
+      if ((Number.isInteger(mark) && mark < marks.each) || bytes < marks.each / 4) return null;
+      return `Trim \`${file}\` once, in a pull request of its own: each finished entry leaves it (its pull request and issue keep it), each entry says only what is next and points to its pull requests for what was done, and each line of a queued issue holds its issue, who builds it and what it waits on, nothing more (\`core/modules/inbox.md\`, "The *progress file* holds order only"). Then give it a mark of its own under "read" in \`${marksAt}\`: a number of bytes the project chooses, below "each" (${marks.each}) and at least its size after the trim.`;
+    } },
+  { lead: "15 November 2026, the owner's inbox where issues cannot be reached", cost: COST.read, unread: "whether issues can be read and written here is GitHub's answer, not a file's: `core/scripts/inbox.mjs` asks it, and each sync runs it from the next one on" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -18,7 +18,8 @@
 // baseline. After the sync, a pull request that adds a copy fails, and the mend as the failure words it passes; every
 // step a release asks reads done (steps.mjs); each step the commit under test adds over the release started from,
 // taken out, is reported, and its mend as written makes it done; and steps taken out at random are reported, exactly
-// those. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
+// those. Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
+// queued, built and closed there passes every check on each pull request. It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.
@@ -322,6 +323,67 @@ function upgrade(p, from, ownChanges, expect) {
   r = steps();
   ok(JSON.stringify(reported(r.out)) === JSON.stringify(STEP_LEADS.filter(l => out.includes(l))), `${p.name}: steps taken out at random are reported, exactly those (${out.length})`, `${out.join("\n")}\n---\n${r.out}`);
   clean();
+
+  // where issues answer as switched off, the owner's inbox is the folder: a task given, queued, built and closed there,
+  // each in a pull request of its own and merged, with no check failing (core archive 216). On Linux alone, since the
+  // script starts gh as a program, which a stand-in on Windows cannot be.
+  if (process.platform !== "win32") inboxCase(p);
+}
+
+// The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo`, origin's address on github.com for
+// the call alone.
+function inbox(p, repo) {
+  fs.writeFileSync(ghData, JSON.stringify({ [`^repos/${p.repo}$`]: repo }));
+  const was = git(p.dir, "config", "--get", "remote.origin.url");
+  git(p.dir, "remote", "set-url", "origin", `https://github.com/${p.repo}`);
+  try { const r = spawnSync(process.execPath, ["core/scripts/inbox.mjs"], { cwd: p.dir, env: base, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; }
+  finally { git(p.dir, "remote", "set-url", "origin", was); }
+}
+
+function inboxCase(p) {
+  const off = { has_issues: false, permissions: { admin: true, push: true, triage: true, pull: true } };
+  const on = { ...off, has_issues: true };
+  let r = inbox(p, off);
+  ok(r.status === 0 && /^Issues cannot be read and written here \(its issues are switched off\), so the owner's inbox is the folder `inbox\/`/.test(r.out) && /name it to the owner once/.test(r.out),
+    `${p.name}: where its issues answer as switched off, the inbox is the folder, and the owner is to be told once`, r.out);
+  const item = "State: new\nBy: owner\n\n**What it is**\nA word more in the README.\n\n**Why it matters**\nIt says what the project is.\n";
+  const progress = "docs/PROGRESS.md", line = "1. `inbox/a-word-more.md`, a builder's; it waits on nothing.";
+  const merged = (what, change) => {
+    git(p.dir, "checkout", "-q", "-B", "change", "main");
+    change(p.dir);
+    git(p.dir, "add", "-A");
+    git(p.dir, "commit", "-q", "-m", what);
+    git(p.dir, "push", "-q", "-f", "origin", "change");
+    const main = git(p.dir, "rev-parse", "main");
+    const results = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main, title: what });
+    ok(!failures(results), `${p.name}: with the inbox in the folder, the pull request that ${what} passes every check (${started(results).length} jobs)`, failures(results));
+    git(p.dir, "checkout", "-q", "main");
+    git(p.dir, "merge", "-q", "--no-ff", "-m", `Merge: ${what}`, "change");
+    git(p.dir, "push", "-q", "origin", "main");
+  };
+  merged("makes the folder and files a task the owner gave", dir => {
+    write(dir, "inbox/README.md", `# The owner's inbox\n\n${r.out.trim()}\n`);
+    write(dir, "inbox/a-word-more.md", item);
+  });
+  r = inbox(p, off);
+  ok(/^The owner's inbox is the folder `inbox\/` \(1 item/.test(r.out) && !/name it to the owner/.test(r.out), `${p.name}: once the folder stands, it is the inbox, and the owner's setting is not named again`, r.out);
+  merged("queues it", dir => {
+    write(dir, "inbox/a-word-more.md", item.replace("State: new", "State: queued"));
+    write(dir, progress, fs.readFileSync(path.join(dir, progress), "utf8").replace(/^1\. FILL IN:.*$/m, line));
+  });
+  merged("builds it and closes it", dir => {
+    fs.appendFileSync(path.join(dir, "README.md"), "\nA project.\n");
+    fs.rmSync(path.join(dir, "inbox/a-word-more.md"));
+    write(dir, progress, fs.readFileSync(path.join(dir, progress), "utf8").replace(`${line}\n`, ""));
+  });
+  r = inbox(p, off);
+  ok(/^The owner's inbox is the folder `inbox\/` \(0 item/.test(r.out), `${p.name}: the task closed, the folder stands with no item`, r.out);
+  write(p.dir, "inbox/another.md", item);
+  r = inbox(p, on);
+  ok(/one place at a time/.test(r.out) && /another\.md/.test(r.out) && /take `inbox\/` out/.test(r.out), `${p.name}: once its issues answer, each open item is moved over and the folder taken out`, r.out);
+  fs.rmSync(path.join(p.dir, "inbox/another.md"));
+  r = inbox(p, { has_issues: true });
+  ok(r.status === 0 && /could not be asked here/.test(r.out), `${p.name}: where GitHub answers for no account, it says what to ask, and fails nothing`, r.out);
 }
 
 // Old content, as a project holds it before a check reads it: a breach of each kind a check reads, committed with the
