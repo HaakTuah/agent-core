@@ -24,18 +24,22 @@ provider, `modules/other-builders.md`, though none builds here (the *other build
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md` and `modules/choices.md`.
+`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md`, `modules/choices.md`,
+`modules/code-shape.md` and `modules/cleaning.md`.
 
 Not taken, each for its reason:
 
 - `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
   player chooses to use, which are all that module governs.
 
-The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps the
-audits and the reports written before 12 November 2026); the *choice records*: `CHOICES.md`; the archive is
-`archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*: `README.md`; the
-*large file*: past about 50 KB; the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines that change the
-same file, and all that add to what every session reads at its start, whose cap they share, in the queue's order; the
+The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
+those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
+`CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
+`README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
+`tests.yml`, its baseline worked down (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
+that change the same file, and all that add to what every session reads at its start, whose cap they share, in the
+queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *size marks*: the cap of
 `scripts/size.mjs`, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of
@@ -118,7 +122,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   queue is worked through ("One batch, then one release"). The owner tags nothing by hand:
   the owner, or a session the owner tells and whose own limits let it, starts the `release` workflow on `main` (its
   page under Actions has the button; `.github/workflows/release.yml`; core archive 197), and the workflow cuts it only
-  where every check on `main`'s newest commit has passed: the tag `release-N` on that commit, never moved or deleted
+  where every check on `main`'s newest commit has passed and, once the staged cases hold a release ("Staged cases hold
+  what no check reads"), no case failed in its last run: the tag `release-N` on that commit, never moved or deleted
   afterwards. `node scripts/release.mjs` says what the next one would carry.
 - **Nothing locks a project** (core archive 201, 207 and 215), in any owner's project, the core's owner's own included.
   By default, once a project syncs to a release, nothing the release brings stops its work or waits on its owner:
@@ -139,19 +144,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   A baseline is a debt, not an exemption: the project's agents work it down by tasks, at the dose the codebase's state
   sets, never by a red check, and in the core's own repository none may stand (#259). The audits and the cleaning
   share run by themselves in every project; its owner may change the dose with one line of the manifest, and is not
-  asked to (#246, #248). It does not mean that all a release brings arrives advisory or off, nor that old code is left
+  asked to (`modules/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
   alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
   waiting on its owner, for something it did not change. Held by `scripts/upgrade-test.mjs`, in
   `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
-  heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`) once #246
-  gives it the dose to read.
+  heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
+  reads it from the shape check's baseline (`scripts/dose.mjs`).
 - **A release says what it asks, step by step** (core archive 215). Whoever adds an entry to `setup/sync-notes.md`
   gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
-  is not done; or, where no check reads it, why, held by a staged case (#235). Every standing entry has one. Every sync
+  is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
   every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
   a task the project's agents take (`modules/orchestrating.md`; with no orchestrator, the session that syncs), a step
@@ -161,8 +166,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
   nothing showed that it was. Held by `scripts/steps-test.mjs`, which fails an entry with no step and a step with a
   check that cannot be taken out and mended, and by `scripts/upgrade-test.mjs`: after the sync every step reads done,
-  each step added since the release started from, taken out, is reported and its mend as written makes it done, and
-  steps taken out at random are reported, exactly those.
+  but one the release adds that it asks of every project (a check's own list to write), which is reported and done
+  by its mend as written; each step added since the release started from, taken out, is reported and its mend as
+  written makes it done, and steps taken out at random are reported, exactly those.
 - **A pull request says what it asks of a project** (core archive 215): one that changes the floor, a module, a script,
   the setup or a workflow has the heading "What it asks of a project", saying what happens in a project that changes
   nothing of its own: nothing, a baseline written, or an ask in the sync notes with its cost. It does not mean that
@@ -199,23 +205,47 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   core works in other projects, and only those that hold use to read.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
-- **A new rule says what holds it** (core archive 195). A PR that changes the floor or the modules has the heading
-  "What holds it" (`.github/workflows/own-description.yml` fails one without it): for each rule it adds or widens, what
-  went wrong or would without it (an incident, a review's finding, the owner's reason), and the check, hook, setting or
-  blocking point of a review that fails where it is broken, or that only discipline holds it; "None" where it adds no
-  rule. The rules only discipline holds are listed at each review of the core the owner asks for, each to gain a
-  check, to stay on the owner's word, or to go.
+- **Every rule says what holds it** (core archive 195 and 228). By default a rule of the floor or the modules is held by
+  a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
+  check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
+  none holds it yet, it is listed. Whoever writes or changes a rule names its holder in that PR: in
+  `scripts/holders.json`, by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
+  "What holds it" (`.github/workflows/own-description.yml` fails one without it), for each rule it adds or widens, what
+  went wrong or would without it (an incident, a review's finding, the owner's reason), and its holder, or that it has
+  none yet; "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists
+  each rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
+  review's finding seen twice moves its rule up to a check where one can hold it (#254). A line that only points
+  elsewhere or says what is protected, binding no one, is marked "describes" there and is not listed. It does not mean
+  that a rule with no holder fails anything or goes by itself, nor that a review is a holder. Reason: the audit of 13
+  November found 43 of 122 rules held by nothing but a session reading them, and nothing listed them. Held by
+  `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
+  stands or a check that is not there, and by the heading's check.
+- **Staged cases hold what no check reads** (core archive 228; #235). By default a rule is held by a check; where none
+  can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
+  (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
+  the case's script on what the session did, read from the project (its commits, its pushes, what it wrote to GitHub),
+  never on what it says of itself. A case is due on the first scheduled look of each month, and once the words of a
+  rule it holds change (`node scripts/staged.mjs`); the look then keeps the issue "Staged cases to run". The session
+  that takes it runs each due case in a fresh helper at the builder's model and high effort, records the verdicts in
+  `reports/staged-cases.json` in a pull request of its own, and says there of each failure whether the rule, the case
+  or the session was wrong. The cases advise until three months in a row have run every one with no verdict found
+  wrong; from then `scripts/release.mjs` cuts no release while a case's last verdict fails. They are run under each
+  agent tool the core is used with, and a tool works with the core once it passes them (#249). It does not mean that a
+  case runs on a pull request or in a project, nor that one stands where a check could read the breach. Reason: no
+  check sees how a session behaves, and the core's two staged runs, each of which changed it, were never run again
+  when the rules or the models changed. Held by `scripts/staged-test.mjs` (each case read as set, kept and broken;
+  what is due; when the cases hold a release), in `.github/workflows/tests.yml`, and by the look's issue.
 - **A rule is written to one pattern** (core archive 214). Whoever writes or changes a rule of the floor, the modules or
   this file writes it in six parts: the default first, then the one condition that changes it; a trigger someone can
   observe ("a trial shows the stack misses a need stated in numbers", never `when performance matters`); one actor and
   one action, who does what; what it does not mean, where a reader could overreach; its reason, in one line; and what
-  holds it (a check, a staged case or the audit, #235), named under "What holds it" as the point above says. Kept out:
-  adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of preferred
-  technologies, which date within months, and whatever a check's failure can say at the moment it matters (#254). A
-  rule that stands and no change touches is the one exception: the audit of the core against itself (#259) brings it
-  to the pattern instead. It does not mean a project's own rules are asked anything; they may be written the same way.
-  Reason: in one evening three rules were read against what the owner meant, each for want of an observable trigger or
-  a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
+  holds it (a check, a staged case or the audit), named under "What holds it" as "Every rule says what holds it" says.
+  Kept out: adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of
+  preferred technologies, which date within months, and whatever a check's failure can say at the moment it matters
+  (#254). A rule that stands and no change touches is the one exception: the audit of the core against itself (#259)
+  brings it to the pattern instead. It does not mean a project's own rules are asked anything; they may be written the
+  same way. Reason: in one evening three rules were read against what the owner meant, each for want of an observable
+  trigger or a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
   guidelines ("A rule file changed").
 - **Rules are written for any project** (core archive 150). The projects that take the core differ in what they build
   (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read

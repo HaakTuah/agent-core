@@ -5,11 +5,15 @@
 # past the split mark is split before it is changed), with the marks the project names; and a check that needs no
 # config, the workflow check (floor rule 2: no workflow names the trigger it forbids), and the manifest check, which
 # reports and never fails (every module the manifest's list neither takes nor leaves out, every slot a taken module uses
-# that no row fills). A project calls it (workflow_call) on every pull request and push to main, docs-only changes
+# that no row fills); and the shape check (the core's modules/code-shape.md: nothing new of a function past a mark, an
+# import across a boundary nobody declared, a cycle or a tie to one platform, what stood before listed in a baseline
+# that only shrinks), which holds a project that has not written its config yet to the starter kit's own, with the
+# pull request's base as its baseline. A project calls it (workflow_call) on every pull request and push to main, docs-only changes
 # included, since the rule files are what it guards most, pinned to a full commit SHA ("How a project takes the core"
 # in README.md, point 5). It runs the project's own core/scripts/copies.mjs, pointers.mjs, reading-size.mjs,
-# workflows.mjs and manifest-reads.mjs, with the configs the project names, on the core's one exact Node; Node's own
-# modules only, no package installed. Read-only, with no secret.
+# workflows.mjs, manifest-reads.mjs and shape.mjs, with the configs the project names (the shape check's by its
+# manifest's row, or where the starter kit writes it), on the core's one exact Node; Node's own modules only, no
+# package installed. Read-only, with no secret.
 name: copies
 
 on:
@@ -31,6 +35,11 @@ jobs:
   copies:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
+    # main, a schedule or a start by hand is its own group and is never cancelled; #388)
+    concurrency:
+      group: copies-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-${{ inputs.config }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,3 +72,8 @@ jobs:
       - name: The manifest takes or leaves out each module and fills each slot they use (reports, never fails)
         if: ${{ !cancelled() }}
         run: node core/scripts/manifest-reads.mjs
+      - name: Nothing new in how the code is put together
+        if: ${{ !cancelled() }}
+        env:
+          SHAPE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: node core/scripts/shape.mjs

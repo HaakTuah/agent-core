@@ -1,7 +1,8 @@
 // The state report (modules/orchestrating.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
-// (floor rule 14): each measure that keeps a baseline against the last report, the rules by what holds them where a
-// script counts them, and what the look keeps open past a week. In a project it ends with its counts for the core,
+// (floor rule 14): each measure that keeps a baseline against the last report, in the core the rules of the floor and
+// the modules by what holds them, those with none listed (holders.mjs, beside this file), and what the look keeps open
+// past a week. In a project it ends with its counts for the core,
 // counts and conclusions only: the commit its copy holds and how far behind the core's main that is, the steps of a
 // release not done, and of the pull requests merged the month before, how many were the core's upkeep (core-cost.mjs,
 // beside this file, sorts them). In the core it says that a session adds the projects' part, which --projects prints:
@@ -19,7 +20,9 @@ import path from "node:path";
 import { CORE } from "./core-address.mjs";
 import { classify } from "./core-cost.mjs";
 import { pinOf } from "./core-moved.mjs";
+import { reading, rulesOf } from "./dose.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
+import { report as holdersReport } from "./holders.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 
@@ -42,6 +45,23 @@ export function copies(root, manifest) {
   } catch { return null; }
 }
 
+// The shape check's baseline, as the project's rules name its config (dose.mjs reads it: its manifest, or, where
+// `manifest` is null, the core's own AGENTS.md): { at, count, state }, the old breaches it lists and the state the
+// codebase is in; null where the project has not taken the check or it cannot be read.
+export function shape(root, manifest) {
+  try { const r = reading(rulesOf(manifest, root).rules, root); return r && { at: r.config.baseline, count: r.listed, state: r.state }; } catch { return null; }
+}
+
+// The lines of the measures against their baselines: each with its count at the last report, where that report gave it.
+function measured({ core, measures, shape: shaped, previous }) {
+  const was = (name, count) => { const then = previous ? new RegExp(`^- ${name}: (\\d+)`, "m").exec(previous)?.[1] : undefined; return then === undefined ? "" : `, ${then} at the last report`; };
+  const lines = [];
+  if (measures) lines.push(`- copies: ${measures.count} old copies in its baseline (\`${measures.at}\`)${was("copies")}.`);
+  if (shaped) lines.push(`- how the code is put together: ${shaped.count} old breaches in its baseline (\`${shaped.at}\`)${was("how the code is put together")}; the codebase is ${shaped.state}.`);
+  if (lines.length) return lines;
+  return [core ? "- None: in the core's own repository no baseline may stand." : "- None: no measure keeps a baseline here yet."];
+}
+
 // The pull requests merged in `month` (`pulls`, each { branch, files, ours }) sorted as core-cost.mjs sorts them.
 export function share(pulls, rules) {
   const by = { sync: 0, upkeep: 0, update: 0, own: 0 };
@@ -51,19 +71,23 @@ export function share(pulls, rules) {
 
 const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "none merged");
 
+// The rules of the floor and the modules by what holds them, as holders.mjs reads them now; null where it cannot.
+const heldNow = () => { try { return holdersReport(); } catch { return null; } };
+
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
-// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them.
-export function body({ core, month, measures, previous, overdue, counts = null, scripts }) {
-  const was = previous ? /^- copies: (\d+)/m.exec(previous)?.[1] : undefined;
+// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
+// `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
+// here where left out, and null where they could not be read.
+export function body({ core, month, measures, shape: shaped = null, previous, overdue, counts = null, holders = core ? heldNow() : null, scripts }) {
   const lines = [
     `The state of ${core ? "the core" : "this project"} for ${month}, as the scheduled look reads it on its first run of the month (\`${scripts}/state-report.mjs\`). It reports and asks nothing: whatever is due already has its task. A session that reads it files as a task anything it shows that has none, and closes it.`,
     "",
     "**The measures against their baselines**",
-    measures ? `- copies: ${measures.count} old copies in its baseline (\`${measures.at}\`)${was === undefined ? "" : `, ${was} at the last report`}.`
-      : core ? "- None: in the core's own repository no baseline may stand." : "- None: no measure keeps a baseline here yet.",
+    ...measured({ core, measures, shape: shaped, previous }),
     "",
     "**The rules, by what holds them**",
-    "- Not counted: no script counts them yet, so the report leaves them out rather than guess.",
+    ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
+      : "- The core's rules, in the core's own report; this project's own rules are not counted."]),
     "",
     "**What is overdue**",
     ...(overdue.length ? overdue.map(o => `- #${o.number} ${o.title}: open since ${o.since.slice(0, 10)}.`) : ["- Nothing: no task the look keeps has stood open past a week."]),

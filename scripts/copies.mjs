@@ -3,8 +3,9 @@
 // places, unless the baseline lists every window of it (a run of lines or words) in as many places, as one of the old
 // copies, which are removed over time and never added to. A listed window gone or in fewer places fails too, so the
 // baseline only shrinks. A copy may move (cut from one place, pasted in another), since its places do not grow: moving
-// is how a fact reaches its better home. Node's own modules only, so the check needs no install. It runs from the
-// project's root, whatever the directory it is started from.
+// is how a fact reaches its better home. It also lists the near-copies, the runs of code that match once names and
+// numbers are set aside, and fails none of them. Node's own modules only, so the check needs no install. It runs from
+// the project's root, whatever the directory it is started from.
 //
 //   node core/scripts/copies.mjs <config>            the check
 //   node core/scripts/copies.mjs <config> --write    lower the baseline to what still stands (it never adds a copy)
@@ -19,25 +20,38 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ruleFiles } from "./rule-files.mjs";
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+// Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
+// core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
+// (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
+// can differ)
 const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+const HERE = fileURLToPath(new URL(".", import.meta.url));
+let where;
+try {
+  where = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], { cwd: HERE, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+    .split(/\r?\n/u);
+} catch {
+  fail(`copies.mjs stands in no git work tree, and the check reads the files git lists. Mend: run the script that stands in the repository's clone (core/scripts/copies.mjs in a project)`);
+}
+const ROOT = where[0], CORE = where[1].replace(/scripts\/$/u, "");
+const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template/copies.json.tmpl`;
+const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
-if (!configPath) fail("no config was named. Mend: name it: node core/scripts/copies.mjs <config> [--write | --first]");
+if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
 let config;
-try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (core/setup/template/copies.json.tmpl): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
-process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
+process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails.
 const KEYS = ["baseline", "code", "prose", "proseFromSecurity"];
 const unknown = Object.keys(config || {}).filter(k => !KEYS.includes(k));
-if (!config || typeof config !== "object" || Array.isArray(config)) fail("the config is not a JSON object. Mend: write the config as the starter kit does (core/setup/template/copies.json.tmpl): a JSON object with \"baseline\", the baseline's path, \"code\" and \"prose\", lists of git pathspecs, and \"proseFromSecurity\": true or false");
+if (!config || typeof config !== "object" || Array.isArray(config)) fail(`the config is not a JSON object. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`);
 if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out; it reads "baseline", "code", "prose" and "proseFromSecurity" alone`);
 const list = (v, key) => {
   if (v === undefined) return [];
   if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths. Mend: write it as a list of git pathspecs, each a non-empty string`);
   return v;
 };
-if (typeof config.baseline !== "string" || !config.baseline) fail('the config names no "baseline". Mend: name the baseline\'s path in "baseline", as the starter kit writes it (core/setup/template/copies.json.tmpl)');
+if (typeof config.baseline !== "string" || !config.baseline) fail(`the config names no "baseline". Mend: name the baseline's path in "baseline", as the starter kit writes it (${TEMPLATE})`);
 if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
@@ -130,7 +144,7 @@ if (process.argv.includes("--first")) {
   console.log(`${BASELINE}: the first baseline, ${found.length} old copies in ${places.size} windows, to be removed over time`);
   process.exit(0);
 }
-if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}. Mend: write the project's first with node core/scripts/copies.mjs ${configPath} --first, and commit it`);
+if (!fs.existsSync(BASELINE)) fail(`no baseline at ${BASELINE}. Mend: write the project's first with ${SELF} ${configPath} --first, and commit it`);
 let base;
 try { base = JSON.parse(fs.readFileSync(BASELINE, "utf8")); } catch { fail(`cannot read ${BASELINE} as JSON. Mend: take it back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); }
 if (!base || typeof base.windows !== "object" || base.windows === null || Array.isArray(base.windows)) fail(`${BASELINE} has no "windows" object. Mend: take it back as main holds it (git checkout origin/main -- ${BASELINE}); { "windows": {} } lists none`);
@@ -155,6 +169,28 @@ if (from) {
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => !(h in old) || n > old[h]) : [];
   if (raised.length) { console.error(`FAIL: ${BASELINE} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
 }
+// Near-copies (modules/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
+// numbers are set aside, and are no exact copy. Reported, never failed: code that only looks alike is no second copy
+// of a fact, and whether one function should serve both is a reader's call, the audit's.
+const KEPT = new Set(("if else for while do switch case default break continue return function class const let var new try catch finally throw import export from async await yield typeof "
+  + "instanceof in of void delete this super extends static public private protected readonly interface type enum namespace def elif pass lambda with as and or not is using struct foreach true false null").split(" "));
+const skeleton = line => line.replace(/\b\d[\w.]*/g, "0").replace(/[A-Za-z_$][\w$]*/g, w => (KEPT.has(w) ? w : "N"));
+const NEAR_CHARS = 120;
+function nearCopies() {
+  const lines = new Map();
+  const exact = place => {
+    const [, file, from, to] = /^(.*):(\d+)-(\d+)$/.exec(place);
+    if (!lines.has(file)) lines.set(file, fs.readFileSync(file, "utf8").split("\n"));
+    return codeUnits(lines.get(file).slice(from - 1, to).join("\n")).map(u => u.t).join("\n");
+  };
+  return find(ls(CODE_SPECS), text => codeUnits(text).map(u => ({ ...u, t: skeleton(u.t) })), LINES, "\n", NEAR_CHARS).copies.filter(c => new Set(c.places.map(exact)).size > 1);
+}
+if (!process.argv.includes("--write")) {
+  const near = nearCopies();
+  if (near.length) console.log(`note ${near.length} ${near.length === 1 ? "run of code matches another" : "runs of code match others"} once names and numbers are set aside (reported, never failed: the audit's reader judges whether one function should serve both)`);
+  for (const c of near.slice(0, 10)) console.log(`  ${c.places.join(" and ")}`);
+  if (near.length > 10) console.log(`  and ${near.length - 10} more`);
+}
 const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 const fresh = found.filter(c => c.windows.some(over));
 const shrunk = Object.keys(base.windows).filter(h => !places.has(h) || places.get(h) < base.windows[h]);
@@ -165,7 +201,7 @@ if (process.argv.includes('--write')) {
   console.log(`${BASELINE}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped`);
   if (fresh.length) process.exit(1);
 } else {
-  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run node core/scripts/copies.mjs ${configPath} --write and commit the baseline it lowers`);
+  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${configPath} --write and commit the baseline it lowers`);
   if (fresh.length || shrunk.length) process.exit(1);
   console.log(`ok   no new copies (${found.length} old ones, listed in ${BASELINE}, to be removed)`);
 }

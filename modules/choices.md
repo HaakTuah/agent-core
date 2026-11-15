@@ -54,8 +54,8 @@ and tests on, apart from those the product ships for. Its record stands once, in
   shows the stack cannot meet it, its builder opens a choice record. It does not mean that another language being
   faster in general is a reason by itself. The record:
   - shows first where the time or the memory goes, since most slowness is in the algorithm;
-  - takes a part, never the whole: the other language goes behind a declared boundary (#246), as any system does, and
-    the rest of the code keeps its language;
+  - takes a part, never the whole: the other language goes behind a declared boundary (`modules/code-shape.md`), as
+    any system does, and the rest of the code keeps its language;
   - counts the whole cost: the second toolchain, the build step, tests and checks in two languages, and how well
     agents write it;
   - rests on a benchmark of the heavy path, not the feature built twice: no one fits a part into the old stack first
@@ -79,5 +79,5 @@ and tests on, apart from those the product ships for. Its record stands once, in
   stands is kept meanwhile. Reason: the owner wants these calls made well, without waiting on the owner.
 
 Held by: the starter kit, whose *choice records* ask for a new project's stack before its first code; the scheduled
-look, which keeps the pass's issue (`core/scripts/choices.mjs`); a staged case (#235), in which the common answer is
+look, which keeps the pass's issue (`core/scripts/choices.mjs`); a staged case (#256), in which the common answer is
 the wrong one for a project's stated aims; and, for the rest, the reviews alone.

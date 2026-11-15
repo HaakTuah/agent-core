@@ -13,12 +13,15 @@
 // files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs them. GitHub's own services
 // (CodeQL, the dependency review) are not run here, and GitHub's API is a stand-in that gives the security-review check
 // one completed review. The sync's pull request is pure, as pure-sync.mjs reads it from the release it moves to, in
-// both projects. Each holds old content too, a breach of each kind a check reads (a long file, two folders that import
-// each other, a module its manifest's list does not name, a copy in its prose): none fails, and the copy stands in its
+// both projects. Each holds old content too, a breach of each kind a check reads (a long file, a function past a mark,
+// two files that import each other, a module its manifest's list does not name, a copy in its prose): none fails, a
+// pull request that adds a function past a mark does, saying its mend, and the copy stands in its
 // baseline. After the sync, a pull request that adds a copy fails, and the mend as the failure words it passes; every
-// step a release asks reads done (steps.mjs); each step the commit under test adds over the release started from,
-// taken out, is reported, and its mend as written makes it done; and steps taken out at random are reported, exactly
-// those; then that a release changing only a test of the core's own asks no sync, and the next one syncs all the same.
+// step a release asks reads done (steps.mjs), but one the commit under test adds that it asks of every project (a
+// check's own list to write), which is reported, alone, and done by its mend as written; each step the commit under
+// test adds over the release started from, taken out, is reported, and its mend as written makes it done; and steps
+// taken out at random are reported, exactly those; then that a release changing only the core's own files (a test, its queue, a workflow no project calls) asks no
+// sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
 // queued, built and closed there passes every check on each pull request. And a copy older than the first release,
 // written by hand since no starter kit stood then, takes the release as the sync notes say (preRelease, below). It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
@@ -327,16 +330,29 @@ function upgrade(p, from, ownChanges, expect) {
   git(p.dir, "commit", "-q", "-m", "point to one place instead");
   const mended = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: main1, only: "copies.yml" });
   ok(mended.length && !failures(mended), `${p.name}: the mend as the failure words it, the copy taken out, passes`, failures(mended));
+  // (the shape check holds from the sync on, though the project has written no config of it yet: the pull request's
+  // base is its baseline, so the old function past a mark and the old cycle passed above, and a new one fails)
+  const taller = own(main1, dir => fs.writeFileSync(path.join(dir, "src/newer.js"), `export function newer(a) {\n${"  a += 1;\n".repeat(70)}  return a;\n}\n`));
+  const tall = checks(p, "pull_request", taller, { baseSha: main1, only: "copies.yml" }).filter(([, r]) => !r.passed);
+  ok(tall.length === 1 && tall[0][1].steps.some(x => /1 function passes a mark[\s\S]*Mend: split each by what it does/.test(x.out)), `${p.name}: a pull request that adds a function past a mark fails, and its failure says the mend`, failures(tall) || "it passed");
 
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
   git(p.dir, "checkout", "-q", "main");
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
   const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
-  let r = steps();
-  ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: after the sync, every step a check reads is done`, r.out);
   const before = leads(git(theCore, "show", `${from.sha}:setup/sync-notes.md`));
   const added = STEP_LEADS.filter(lead => !before.includes(lead) && STAGES[lead]);
+  // (a step the commit under test adds that asks something of every project, a check's own list to write, the sync
+  // alone does not do: it is reported, it alone, and its mend as written, merged as the project's own pull request
+  // would be, makes it done)
+  let r = steps();
+  const asked = reported(r.out);
+  ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
+  for (const lead of asked) STAGES[lead].mend(p.dir);
+  if (asked.length) { git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "what the release asks of every project"); }
+  r = steps();
+  ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);
   for (const lead of added) {
     STAGES[lead].stage(p.dir);
     r = steps();
@@ -426,6 +442,7 @@ function seed(p, eol) {
   write(p.dir, "src/long.js", `${lines(2000)}${eol}`);
   write(p.dir, "src/a/x.js", `import { y } from "../b/y.js";${eol}export const x = () => y;${eol}`);
   write(p.dir, "src/b/y.js", `import { x } from "../a/x.js";${eol}export const y = () => x;${eol}`);
+  write(p.dir, "src/tall.js", `export function tall(a) {${eol}${`  a += 1;${eol}`.repeat(70)}  return a;${eol}}${eol}`);
   const manifest = path.join(p.dir, "core-manifest.md");
   fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^(Floor: whole\. Modules: .*?)`copilot\.md`, /m, "$1"));
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- Nothing secret goes in the repository/.test(l)) ?? "";
@@ -481,25 +498,25 @@ for (const tag of starts) {
 
 }
 
-// A release that brings nothing a project takes asks no sync of it (#242): with the copy it has just taken, the project
-// stays at the release that carries the change while the next one changes only a test of the core's own scripts, and
+// A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
+// project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
 if (synced) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
-  const testOnly = () => {
-    fs.appendFileSync(path.join(theCore, "scripts", "upgrade-test.mjs"), "\n");
+  const ownOnly = (...own) => {
+    for (const f of ["scripts/upgrade-test.mjs", ...own]) fs.appendFileSync(path.join(theCore, f), "\n");
     git(theCore, "add", "-A");
-    git(theCore, "commit", "-q", "-m", "a test of the core's own, alone");
+    git(theCore, "commit", "-q", "-m", "only the core's own files");
     git(theCore, "tag", `release-${++n}`);
     return git(theCore, "rev-parse", "HEAD");
   };
-  testOnly();
+  ownOnly("QUEUE.md", ".github/workflows/tests.yml"); // (and the core's own queue and a workflow no project calls: #342)
   git(p.dir, "checkout", "-q", "-B", "stays", "main");
   const was = git(p.dir, "status", "--porcelain"), manifest = () => fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8");
   let s = node(p.dir, "core/scripts/sync.mjs");
-  ok(s.status === 0 && /changes nothing this project takes/.test(s.out) && git(p.dir, "status", "--porcelain") === was && manifest().includes(head), `${p.name}: a release that changes only a test of the core's own scripts asks no sync of it, and changes nothing`, s.out);
-  const third = testOnly();
+  ok(s.status === 0 && /changes nothing this project takes/.test(s.out) && git(p.dir, "status", "--porcelain") === was && manifest().includes(head), `${p.name}: a release that changes only a test of the core's own scripts, its queue and its tests workflow asks no sync of it, and changes nothing`, s.out);
+  const third = ownOnly();
   s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(`release-${n}`) && manifest().includes(third), `${p.name}: at the next release it syncs all the same, two releases on`, s.out);
 }

@@ -1,7 +1,9 @@
 // For the tests alone (steps-test.mjs and upgrade-test.mjs, beside this file): for each step steps.mjs reads with a
 // check, how a project that missed it holds it (`stage`, written into the project at `dir`) and its mend as the step
 // words it (`mend`), so that a test can take a step out of a synced project, see the sync report exactly that, and
-// see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. Node's own modules.
+// see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. One marked
+// `asked` is a step a project that changed nothing of its own still has to do once a sync brings it (a check's own
+// list to write): upgrade-test.mjs sees it reported after the sync, alone, and done by its mend. Node's own modules.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,6 +19,12 @@ const PIN = "0".repeat(40);
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
 export const STAGES = {
+  "16 November 2026, hostile tests for every named input": {
+    // (rule 5 of SECURITY.md lists an input whose hostile tests are nowhere; the mend writes them where it names them)
+    stage: dir => write(dir, "SECURITY.md", read(dir, "SECURITY.md").replace(/^(5\. .*\r?\n)(?:(?!\d+\. |#).*\r?\n)*/m,
+      "$1   - a peer's message: its type and size checked on arrival; its hostile tests: `tests/hostile/peer-message.test.mjs`.\n")),
+    mend: dir => write(dir, "tests/hostile/peer-message.test.mjs", "// too long, the wrong type, markup, a file path, a number out of range, nothing at all\n"),
+  },
   "16 November 2026, an agent's own tools listed": {
     // (a plug-in turned on and listed nowhere; the mend lists it, with its publisher and one exact version)
     stage: dir => {
@@ -108,6 +116,15 @@ export const STAGES = {
       write(dir, "docs/PROGRESS.md", read(dir, "docs/PROGRESS.md").replace(/\n## Done\n[\s\S]*$/, "\n"));
       const m = JSON.parse(read(dir, "checks/sizes.json"));
       write(dir, "checks/sizes.json", `${JSON.stringify({ ...m, read: { ...m.read, "docs/PROGRESS.md": Math.min(m.each - 1, fs.statSync(at(dir, "docs/PROGRESS.md")).size + 1024) } }, null, 2)}\n`);
+    },
+  },
+  "16 November 2026, how code is put together": {
+    asked: true,
+    stage: dir => { for (const f of ["checks/shape.json", "checks/shape-baseline.json"]) fs.rmSync(at(dir, f), { force: true }); },
+    // (as the step words it: the config as the starter kit writes it, then its first baseline)
+    mend: dir => {
+      write(dir, "checks/shape.json", read(dir, "core/setup/template/shape.json.tmpl"));
+      spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
 };

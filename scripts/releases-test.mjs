@@ -10,9 +10,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
-import { OWN, costed, held, inTheCore, next } from "./release.mjs";
+import { OWN, costed, held, inTheCore, next, older } from "./release.mjs";
 import { STEPS } from "./steps.mjs";
-import { NOTES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -107,17 +107,26 @@ const taking = (list, left = "`b.md` (no use here)") => `# Core manifest\n\nFloo
 const onlyA = taking("`how-to-work.md`, `modules/a.md`");
 ok(!matters("scripts/x-test.mjs", onlyA) && !matters(".github/ISSUE_TEMPLATE/f.md", onlyA) && !matters("modules/b.md", onlyA), "what never matters: a test of the core's own scripts, its own issue forms, a module the manifest leaves out by name");
 ok(matters("modules/c.md", onlyA) && matters("modules/b.md", taking("`a.md`", "")) && matters("modules/b.md", taking("every module but `game-design.md`", "`game-design.md` (no game)")), "a module the list forgot, named nowhere, still matters: in doubt it syncs");
-ok(["modules/a.md", "modules/how-to-work.md", "scripts/x.mjs", "scripts/x-test-data.json", "scripts/sub/y-test.mjs", "floor/security.md", NOTES, ".github/workflows/core.yml", "README.md", "QUEUE.md", "archive/instructions.md"].every(f => matters(f, onlyA)), "everything else matters: a module it names, a script, the floor, the notes, a workflow, the rest of the copy");
+ok(OWN_FILES.every(f => !matters(f, onlyA)) && !matters("QUEUE.md", onlyA) && !matters(".github/workflows/tests.yml", onlyA), "nor do the core's own files, its queue and each workflow no project can call (#342)");
+ok(["modules/a.md", "modules/how-to-work.md", "scripts/x.mjs", "scripts/x-test-data.json", "scripts/sub/y-test.mjs", "floor/security.md", NOTES, ".github/workflows/core.yml", ".github/workflows/core-moved.yml", ".github/workflows/own-other.yml", "README.md", "queue.md", "archive/instructions.md"].every(f => matters(f, onlyA)), "everything else matters: a module it names, a script, the floor, the notes, a workflow a project calls or one not named, the rest of the copy");
 ok(matters("modules/b.md", taking("all")) && matters("modules/b.md", "# Core manifest\n") && matters("modules/b.md", taking("<the list>")), "every module matters where the manifest takes all, or its list cannot be read");
 // (that a test of the core's own scripts never matters holds only while nothing a project runs names one: no script but
 // a test, no file of the starter kit and no workflow but the core's own tests.yml, outside its comments)
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
-const runs = [...fs.readdirSync(path.join(repo, "scripts")).filter(f => !/-test\.mjs$/.test(f)).map(f => path.join(repo, "scripts", f)), ...walk(path.join(repo, "setup", "template")),
+const runs = [...walk(path.join(repo, "scripts")).filter(f => !/-test\.mjs$/.test(f)), ...walk(path.join(repo, "setup", "template")),
   ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => f !== "tests.yml").map(f => path.join(repo, ".github", "workflows", f))];
 const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
   .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);
 ok(!naming.length, "nothing a project runs names a test of the core's own scripts, outside a comment", `${naming.join(", ")}\n     Mend: a project runs no test of the core's: move what it needs into a script without -test in its name, or take ${"`scripts/*-test.mjs`"} off the list of what never matters (matters in releases.mjs)`);
+// (and that each of the core's own workflows on the list is one no project can call: it exists, has no workflow_call
+// trigger, and no file of the starter kit names it; one left off it matters, as anything in doubt does)
+const kit = walk(path.join(repo, "setup", "template")).map(f => fs.readFileSync(f, "utf8")).join("\n");
+const workflows = fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => /\.ya?ml$/.test(f)).map(f => `.github/workflows/${f}`);
+const callable = workflows.filter(f => /\bworkflow_call\b/.test(fs.readFileSync(path.join(repo, f), "utf8"))); // (in any form: a block, a list, a flow, quoted)
+const wrong = OWN_FILES.filter(f => f.startsWith(".github/workflows/")).filter(f => !workflows.includes(f) || callable.includes(f) || kit.includes(path.basename(f)));
+ok(!wrong.length, "each workflow on the list of the core's own files is one no project can call", `${wrong.join(", ")}\n     Mend: take it off OWN_FILES in releases.mjs, since a project calls it or it is gone`);
+ok(fs.existsSync(path.join(repo, "QUEUE.md")) && !kit.includes("QUEUE.md"), "the core's queue is its own: no file of the starter kit names it");
 const other = path.join(tmp, "other");
 fs.mkdirSync(other);
 git(other, "init", "-q", "-b", "main");
@@ -160,6 +169,8 @@ ok(held(list()).join() === "no check has passed on it yet" && held(list(run("siz
 ok(held(list(run("release", "completed", "failure", OWN), run("tests", "completed", "success"))).length === 0 && held(list(run("release", "in_progress", null, OWN))).join() === "no check has passed on it yet", "the release workflow's own runs, an earlier try that failed too, are no check of the commit");
 ok(held({ total_count: 3, workflow_runs: [run("tests", "completed", "success")] }).join().includes("3 runs stand on it and 1 were read"), "a list read only in part holds it");
 ok([null, undefined, {}, [], "text", { workflow_runs: [] }, { total_count: "1", workflow_runs: [run("tests", "completed", "success")] }, { total_count: 1, workflow_runs: {} }].every(l => held(l).join() === "the list of the checks on it could not be read"), "so does a list in any other form");
+const handed = older("release-7", "b".repeat(40));
+ok(handed.includes(`node core/scripts/sync.mjs ${"b".repeat(40)}`) && handed.includes("older than release-1") && handed.includes("release-7"), "each release says how a copy older than release-1 takes it: once, with the release's full SHA (#365)", handed);
 // (asked of the script itself, in this repository: each stops before anything is fetched or pushed)
 const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("./release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha> and --runs <file>|needs a value/.test(r.stderr) && !r.stdout; };
 ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at"), "a cut asked for without the commit it is for, or without the checks on it, is refused before anything is fetched");

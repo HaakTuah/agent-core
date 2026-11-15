@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { COST, STEPS, configs, leads, notDone, plain, project, report, runsOwn } from "./steps.mjs";
@@ -21,6 +22,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
 const modules = fs.readdirSync(path.join(root, "modules")).filter(n => n.endsWith(".md"));
+const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
 // ---- every entry of the sync notes has its step, and each step is told done one way ----
 const notes = leads(fs.readFileSync(path.join(root, NOTES), "utf8"));
@@ -47,6 +49,7 @@ function kit(name, o) {
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
+  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), "{\n  \"listed\": {}\n}\n");
   return dir;
 }
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
@@ -60,6 +63,10 @@ for (const [name, dir] of Object.entries(dirs)) {
     `${name}: its kind is read from what it holds, as the starter kit was told it`, JSON.stringify(o));
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
+  // (the core's own manifest check, on the modules and floor of this commit: a slot a module it takes uses, with no row,
+  // would be a note on the project's first day, #329)
+  const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: texts("modules"), floorTexts: texts("floor") });
+  ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
 }
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
@@ -100,11 +107,37 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
 }
 fs.writeFileSync(marksFile, marksAsKit);
 
+// ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
+const inputs = STEPS.filter(s => s.lead === "16 November 2026, hostile tests for every named input");
+const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
+const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
+fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
+ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
+ok(!rule5("   - a shared link: its parts checked against their shape,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
+  "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
+ok(!rule5("   - a shared link: its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named");
+fs.mkdirSync(path.join(lockProject, "src"), { recursive: true });
+fs.writeFileSync(path.join(lockProject, "src/peer.mjs"), "\n");
+let missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; hostile tests: `tests/hostile/peer.test.mjs`.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "an item whose hostile tests are not there is reported, by its words, and only it, though the file of what checks it is there", report(missedInputs));
+missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: hostile tests: FILL IN\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "a \"FILL IN\" left in one item reads no other item as done: the item it stands in is reported", report(missedInputs));
+missedInputs = rule5("   Each message a peer sends, its size checked.\n");
+ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
+fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
+ok(notDone(lockProject, inputs)[0]?.mend.includes("could not read the project"), "a SECURITY.md with no rule 5 is reported as not read, never as done");
+fs.writeFileSync(secFile, secAsKit);
+// (only what this block wrote goes: an earlier stage's mend may have written its own tests there)
+for (const f of ["tests/hostile/link.test.mjs", "src/peer.mjs"]) fs.rmSync(path.join(lockProject, f));
+
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
 const sec = STAGES["12 November 2026, the security review shown on every pull request"];
 sec.stage(lockProject);
-ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported");
+ok(notDone(lockProject).length === 1, "a project with no security-review workflow is reported", report(notDone(lockProject)));
 declare(lockProject, '"12 November 2026, the security review shown on every pull request": not wanted here, the owner said (a private repository).');
 ok(!notDone(lockProject).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
 sec.mend(lockProject);
@@ -217,6 +250,15 @@ ok(at.licences === "config/licences.json" && at.audit === "config/audit.json" &&
 ok(runsOwn(ownP, "licences.mjs").length === 1 && !runsOwn(ownP, "exact-versions.mjs").length, "a workflow runs a script only where a step's run: value runs it, a comment that names it read as none");
 const dotted = { files: [], read: () => null, manifest: "", workflows: { "a.yml": { text: "x", yaml: { jobs: { j: { steps: [{ run: "node ./core/scripts/licences.mjs a.json\nnode vendor/core/scripts/copies.mjs b.json" }] } } } } } };
 ok(runsOwn(dotted, "licences.mjs").length === 1 && !runsOwn(dotted, "copies.mjs").length, "a script started as ./core/scripts/ is run; one under another folder's core/scripts/ is not the copy's");
+// (the argument read as the shell reads it: past an option, through a line's continuation, quoted, and after a quoted
+// script; and a slot read in its own cell, past the script and any command)
+const passing = (run, manifest = "") => configs({ ...dotted, manifest, workflows: { "a.yml": { text: "x", yaml: { jobs: { j: { steps: [{ run }] } } } } } }).copies;
+ok(passing("node core/scripts/copies.mjs --first config/c.json") === "config/c.json" && passing("node core/scripts/copies.mjs \\\n  config/c.json") === "config/c.json"
+  && passing('node core/scripts/copies.mjs "config/my copies.json"') === "config/my copies.json" && passing('node "./core/scripts/copies.mjs" config/c.json') === "config/c.json"
+  && passing("echo none", "| *copies check* | `node core/scripts/copies.mjs` with `config/s.json` | more `x.json` |\n") === "config/s.json",
+  "an argument is read past an option, a line's continuation and quotes, and the slot in its own cell past the script");
+ok(configs({ ...dotted, workflows: { "a.yml": { text: "x", yaml: { jobs: { j: { steps: [{ run: 'node core/scripts/copies.mjs "${{ inputs.c }}"' }] } } } } } }).copies === null, "a quoted argument that names it only when the workflow runs is not read");
+ok(passing("# a note \\\nnode core/scripts/copies.mjs config/c.json") === "config/c.json", "a comment that ends in a backslash continues nothing, as the shell reads it");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
@@ -229,6 +271,41 @@ fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.repla
 const halfP = project(ownDir), half = configs(halfP);
 ok(half.licences === "config/licences.json" && half.audit === "config/audit.json" && half.copies === null && half.baseline === null && fresh(halfP).some(([to]) => to === "config/licences.json") && !fresh(halfP).some(([to]) => /^(checks|config)\/copies/.test(to)),
   "a config one workflow names only when it runs leaves that check's paths unread, and the other check's read and compared", JSON.stringify(half));
+ok(differences(halfP, fresh(halfP)).some(d => d.startsWith("a config not compared: ") && d.includes("$COPIES")), "and the differences say the config they did not compare, and why");
+// (a project whose licence and NuGet checks are called with configs of their own: the "nuget" part is looked for in the
+// NuGet check's, the rest in the licence check's)
+const mixed = kit("mixed-configs", { packages: ".", nuget: "src" });
+const lic = JSON.parse(fs.readFileSync(path.join(mixed, "checks/licences.json"), "utf8"));
+const { nuget: nugetPart, ...npmPart } = lic;
+fs.mkdirSync(path.join(mixed, "config"));
+fs.writeFileSync(path.join(mixed, "config/npm.json"), JSON.stringify(npmPart, null, 2));
+fs.writeFileSync(path.join(mixed, "config/dotnet.json"), JSON.stringify({ nuget: nugetPart }, null, 2));
+fs.rmSync(path.join(mixed, "checks/licences.json"));
+for (const [wf, to] of [["licences.yml", "config/npm.json"], ["nuget.yml", "config/dotnet.json"]]) {
+  const at = path.join(mixed, ".github/workflows", wf);
+  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace("config: checks/licences.json", `config: ${to}`));
+}
+execFileSync("git", ["add", "-A"], { cwd: mixed });
+const mixedP = project(mixed), mixedFound = differences(mixedP, fresh(mixedP));
+ok(configs(mixedP).licences === "config/npm.json" && configs(mixedP).nuget === "config/dotnet.json" && !mixedFound.some(d => /^(config|checks)\//.test(d)),
+  "a licence config and a NuGet config of their own are each compared with their own part of the kit's", mixedFound.join("\n"));
+// (and a NuGet call that names its config outright is read where the licence config is named only when a workflow runs)
+const licencesLate = { ...mixedP, workflows: { ...mixedP.workflows, "licences.yml": { text: "licences.mjs", yaml: { jobs: { j: { steps: [{ run: 'node core/scripts/licences.mjs "$LICENCES"' }] } } } } } };
+const late = configs(licencesLate);
+ok(late.licences === null && late.nuget === "config/dotnet.json" && fresh(licencesLate).some(([to]) => to === "config/dotnet.json"),
+  "a NuGet config the NuGet call names outright is read and compared where the licence config cannot be", JSON.stringify(late));
+// (#368: a call's input that names its config only when the workflow runs, an expression, is never read as a path: that
+// check's config is reported not read and compared nowhere, the licence config without the "nuget" part, and the others
+// read and compared)
+for (const [wf, from] of [["copies.yml", "checks/copies.json"], ["nuget.yml", "config/dotnet.json"]]) {
+  const at = path.join(mixed, ".github/workflows", wf);
+  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace(`config: ${from}`, `config: \${{ vars.${wf.split(".")[0].toUpperCase()} }}`));
+}
+execFileSync("git", ["add", "-A"], { cwd: mixed });
+const exprP = project(mixed), exprAt = configs(exprP), exprFound = differences(exprP, fresh(exprP));
+ok(exprAt.licences === "config/npm.json" && exprAt.nuget === null && exprAt.copies === null && exprAt.baseline === null
+  && exprFound.filter(d => d.startsWith("a config not compared: ") && d.includes("${{ vars.")).length === 2 && !exprFound.some(d => /^(config|checks)\/|^\$\{\{/.test(d)),
+  "a config a call passes as an expression is reported not read and compared nowhere, and the other configs read and compared", `${JSON.stringify(exprAt)}\n${exprFound.join("\n")}`);
 // (with only a comment naming the script before it, the old reading took the comment's next word as the config)
 fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.replace("          node core/scripts/agent-tools.mjs config/licences.json\n", ""));
 missedOwn = notDone(ownDir);

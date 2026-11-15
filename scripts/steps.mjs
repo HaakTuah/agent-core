@@ -4,7 +4,8 @@
 //   - "check": this script reads the project and answers done, or not done with the mend, in words a session acts on
 //     with no rule file open;
 //   - "held": a check of the project's own, named, fails where the step is not done, and its failure says the mend;
-//   - "unread": no check reads it exactly, and the step says why; a staged case holds it (#235).
+//   - "unread": no check reads it exactly, and the step says why; the staged case "steps" plants it and reads what a
+//     session did, or says why it cannot (staged/steps.mjs, beside this file).
 // A step only the project's owner can do says so ("owner"): it is advisory, labelled `needs-owner` (labels.json, beside
 // this file), and the rest goes on. A step the project leaves undone on purpose is declared in its manifest's "Differences", on its owner's
 // word, by a line that quotes the step's lead ("13 November 2026, the core has moved"): such a step is not reported.
@@ -21,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { CORE } from "./core-address.mjs";
 import { NOTES } from "./releases.mjs";
+import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
@@ -32,6 +34,7 @@ export const COST = {
   line: "a line or two of a protected file: one small pull request of the trusted builder's",
   workflow: "a workflow's change: one small pull request, with floor rule 3's two security reviews",
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
+  config: "a check's config and its first baseline: one small pull request of the trusted builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
 };
 
@@ -70,6 +73,15 @@ export const calls = (p, name) => (readable(p, text => text.toLowerCase().includ
   .flatMap(({ yaml }) => Object.values(yaml?.jobs ?? {}))
   .filter(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/${name}@`.toLowerCase()));
 export const call = (p, name) => calls(p, name)[0] ?? null;
+// The input the project's call to the core's workflow passes (its `with:`), undefined where there is no call or it passes
+// none. One that names it only when the workflow runs (an expression) throws, so the check that needs it is reported not
+// read, never read as a path.
+const input = (p, name, key = "config") => {
+  const v = call(p, name)?.with?.[key];
+  if (v !== undefined && typeof v !== "string") throw new Unread(`the project's call to the core's ${name} passes its ${key} as no text`);
+  if (v?.includes("${{")) throw new Unread(`the project's call to the core's ${name} passes its ${key} as ${v}, which names it only when the workflow runs`);
+  return v;
+};
 
 const PROJECT_FILES = /\.(cs|fs|vb)proj$/;
 // The paths the manifest's slots name for the progress file and the size marks, else the starter kit's.
@@ -77,19 +89,35 @@ const slot = (manifest, name, kit) => new RegExp(`^\\|\\s*\\*${name}\\*\\s*\\|\\
 const progressOf = manifest => slot(manifest, "progress file", "docs/PROGRESS.md");
 const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 
-// What a workflow of the project's runs: the `run:` values of its jobs' steps, a shell comment (a line's, or the end of
-// one after a space) left out, so that a comment naming a script is never read as running it (#364).
+// What a workflow of the project's runs: the `run:` values of its jobs' steps, a line continued by "\" joined to the
+// next, and a shell comment (a line's, or the end of one after a space) left out, so that a comment naming a script is
+// never read as running it (#364).
 const runs = w => Object.values(w.yaml?.jobs ?? {}).flatMap(job => (job?.steps ?? []).map(s => typeof s?.run === "string" ? s.run : ""))
-  .join("\n").split("\n").map(l => l.replace(/(^|[ \t])#.*$/, "")).join("\n");
+  .join("\n").split("\n").map(l => l.replace(/(^|[ \t])#.*$/, "")).join("\n").replace(/\\\r?\n/g, " ");
 const script = name => new RegExp(`(?<![\\w./-])(?:\\./)?core/scripts/${name.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}(?![\\w.-])`);
 // The project's own workflows that run a script of its copy of the core (`core/scripts/<name>`), as [file, workflow].
 export const runsOwn = (p, name) => (readable(p, text => text.includes(name)), Object.entries(p.workflows)).filter(([, w]) => script(name).test(runs(w)));
-// The first argument those workflows pass to it, quotes taken off; undefined where none passes one. One that names it
+// The first argument those workflows pass to it that is no option, quotes taken off; undefined where none passes one. One that names it
 // only when the workflow runs (a variable or an expression) throws, so the check that needs it is reported not read.
+// (each word after the script as the shell reads it: quoted, or bare up to a space or an operator; an option, which
+// starts with "-", is passed over)
+const WORD = /^[ \t]+(?:"([^"\n]*)"|'([^'\n]*)'|([^\s"'\\;&|<>]+))/;
 const passedTo = (own, name) => {
-  const passed = own.map(([, w]) => new RegExp(`${script(name).source}[ \\t]+(["']?)([^\\s"']+)\\1`).exec(runs(w))?.[2]).find(Boolean);
-  if (passed && /[$%{]/.test(passed)) throw new Unread(`the project's own workflow passes the config of core/scripts/${name} as ${passed}, which names it only when the workflow runs`);
-  return passed;
+  const at = new RegExp(`${script(name).source}["']?`, "g");
+  for (const [, w] of own) {
+    const text = runs(w);
+    for (const m of text.matchAll(at)) {
+      let rest = text.slice(m.index + m[0].length), word;
+      while ((word = WORD.exec(rest))) {
+        rest = rest.slice(word[0].length);
+        const passed = word[1] ?? word[2] ?? word[3];
+        if (passed.startsWith("-")) continue;
+        if (/[$%{]/.test(passed)) throw new Unread(`the project's own workflow passes the config of core/scripts/${name} as ${passed}, which names it only when the workflow runs`);
+        return passed;
+      }
+    }
+  }
+  return undefined;
 };
 // The configs of the project's licence and copies checks where the project holds them (#366), each as the check is run:
 // the config a call to the core's workflow passes, else the one a workflow of the project's own passes to the script
@@ -100,24 +128,82 @@ export const KIT_CONFIGS = { licences: "checks/licences.json", audit: "checks/li
 const key = (p, file, name) => { try { const v = JSON.parse(p.read(file) ?? "null")?.[name]; return typeof v === "string" && v ? v : null; } catch { return null; } };
 // Each check's apart, so that one whose config cannot be read throws alone (Unread, above), never the other's.
 export function licenceConfigs(p) {
-  const licences = call(p, "licences.yml")?.with?.config
+  const licences = input(p, "licences.yml")
     ?? (calls(p, "licences.yml").length ? undefined : passedTo(runsOwn(p, "agent-tools.mjs"), "agent-tools.mjs") ?? passedTo(runsOwn(p, "licences.mjs"), "licences.mjs"))
-    ?? call(p, "nuget.yml")?.with?.config ?? KIT_CONFIGS.licences;
+    ?? input(p, "nuget.yml") ?? KIT_CONFIGS.licences;
   return { licences, audit: key(p, licences, "audit") ?? KIT_CONFIGS.audit };
 }
 export function copiesConfigs(p) {
-  const slotted = (/^\|\s*\*copies check\*\s*\|(.*)\|\s*$/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? []).map(v => v.slice(1, -1)).find(v => !v.startsWith("core/"));
-  const copies = call(p, "copies.yml")?.with?.config ?? passedTo(runsOwn(p, "copies.mjs"), "copies.mjs") ?? slotted ?? KIT_CONFIGS.copies;
+  // (the slot's own cell: the backticked file that is neither the script nor a command)
+  const slotted = (/^\|\s*\*copies check\*\s*\|([^|\n]*)/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? []).map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !/^(\.\/)?core\//.test(v));
+  const copies = input(p, "copies.yml") ?? passedTo(runsOwn(p, "copies.mjs"), "copies.mjs") ?? slotted ?? KIT_CONFIGS.copies;
   return { copies, baseline: key(p, copies, "baseline") ?? KIT_CONFIGS.baseline };
 }
-// Both, each path null where its check's config cannot be read (Unread); any other error is thrown, never hidden.
+// The NuGet check's config: its own input where the project calls it, read first, so that it stands where the licence
+// check's cannot be read; else the licence check's.
+const nugetOf = (p, licences) => input(p, "nuget.yml") ?? licences();
+// All of them, with the NuGet check's as `nuget`; each path null where its check's config cannot be read (Unread), and
+// why under `unread`, so the reader can say what it did not compare. Any other error is thrown, never hidden.
 export function configs(p) {
-  const or = (read, names) => { try { return read(p); } catch (e) { if (!(e instanceof Unread)) throw e; return Object.fromEntries(names.map(n => [n, null])); } };
-  return { ...or(licenceConfigs, ["licences", "audit"]), ...or(copiesConfigs, ["copies", "baseline"]) };
+  const unread = [];
+  const or = (read, names) => { try { return read(p); } catch (e) { if (!(e instanceof Unread)) throw e; unread.push(e.message); return Object.fromEntries(names.map(n => [n, null])); } };
+  const licence = or(licenceConfigs, ["licences", "audit"]);
+  const nuget = or(q => ({ nuget: nugetOf(q, () => licence.licences) }), ["nuget"]);
+  return { ...licence, ...nuget, ...or(copiesConfigs, ["copies", "baseline"]), unread: [...new Set(unread)] };
 }
-// The licence check's config, and the NuGet check's: its own input where the project calls it, else the licence check's.
 const licenceConfig = p => licenceConfigs(p).licences;
-const nugetConfig = p => call(p, "nuget.yml")?.with?.config ?? licenceConfig(p);
+const nugetConfig = p => nugetOf(p, () => licenceConfig(p));
+
+// Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
+// its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
+// that config names. Null where both stand; else the mend.
+function shapeWritten(p) {
+  const at = shapeAt(p.manifest), text = p.read(at);
+  const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
+  let config;
+  try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
+  return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
+}
+
+// Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
+// first without its number and title; null where there is none.
+function rule5(text) {
+  const lines = text?.split("\n") ?? [], at = lines.findIndex(l => /^5\.\s/.test(l));
+  if (at < 0) return null;
+  const end = lines.findIndex((l, i) => i > at && /^(\d+\.\s|#)/.test(l));
+  return [lines[at].replace(/^5\.\s*(\*\*[^*]*\*\*)?:?/, ""), ...lines.slice(at + 1, end < 0 ? undefined : end)];
+}
+// A block's items: each a list line at its outermost depth, with the lines under it indented deeper (its wrapped text
+// and the items nested in it).
+function listItems(block) {
+  const items = [];
+  let depth = null;
+  for (const l of block) {
+    const indent = /^\s*/.exec(l)[0].length, item = /^\s*[-*]\s/.test(l);
+    if (item && (depth === null || indent <= depth)) { depth = indent; items.push(l); }
+    else if (items.length && l.trim() && indent > depth) items[items.length - 1] += `\n${l}`;
+  }
+  return items;
+}
+// Whether an item names its tests: a path in backticks after the words "hostile tests" that is a file or folder of the
+// project (one the item names for what checks the input does not count).
+function namesTests(p, item) {
+  const there = f => { const n = f.replace(/^\.\//, "").replace(/\/+$/, ""); return !!n && p.files.some(x => x === n || x.startsWith(`${n}/`)); };
+  return [...(/hostile\s+tests\b([\s\S]*)/i.exec(item)?.[1] ?? "").matchAll(/`([^`]+)`/g)].some(m => there(m[1]));
+}
+const CASES = "too long, the wrong type, markup, a file path, a number out of range, nothing at all";
+// The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
+// once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
+function hostileTests(p) {
+  const block = rule5(p.read("SECURITY.md"));
+  if (!block) throw new Unread("no SECURITY.md with a rule 5 to read");
+  const items = listItems(block), said = block.join("\n");
+  if (!items.length && (/FILL IN/.test(said) || /^None\b/i.test(said.trim()))) return null;
+  if (!items.length) return `In \`SECURITY.md\`, rule 5, list each input anyone but the user at hand can shape as an item of its own (a line that opens \`- \`), saying what checks it and then, after the words "hostile tests:", naming in backticks the file or folder that holds them (${CASES}), or write "None" where the project takes none.`;
+  const bare = items.filter(l => !namesTests(p, l)).map(l => l.split("\n")[0].trim().slice(2).trim());
+  return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
+}
 
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
@@ -262,10 +348,15 @@ export const STEPS = [
       let config = null;
       try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
       const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
-      const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...toolsCheck(head, list, kitHooks(), file).problems];
+      const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...(({ problems, pins }) => [...problems, ...pins.map(([, problem]) => problem)])(toolsCheck(head, list, kitHooks(), file))];
       if (own.length && !beside) wrong.push(`the workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
-      return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
+      return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, the one its configuration pins where it can pin one, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
     } },
+  { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
+    partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
+  { lead: "16 November 2026, hostile tests for every named input", cost: COST.read, check: hostileTests,
+    partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
+  { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
