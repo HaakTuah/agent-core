@@ -115,11 +115,11 @@ export function verdict({ config, at, self, found, baseline, base }) {
 }
 
 // A baseline as the check reads it: shape.mjs's form, and "checks", those whose findings it has listed from a run over
-// every screen.
+// every screen (null where the key is missing).
 export function readBaseline(text, at, restore) {
-  const b = parseBaseline(text, at, restore), { checks = [] } = JSON.parse(text);
-  if (!Array.isArray(checks) || !checks.every(c => CHECKS.includes(c))) refuse(`"checks" in ${at} is not a list of the module's checks`, restore);
-  return { ...b, checks: new Set(checks) };
+  const b = parseBaseline(text, at, restore), { checks } = JSON.parse(text);
+  if (checks !== undefined && !(Array.isArray(checks) && checks.every(c => CHECKS.includes(c)))) refuse(`"checks" in ${at} is not a list of the module's checks`, restore);
+  return { ...b, checks: checks === undefined ? null : new Set(checks) };
 }
 
 // A baseline as the check writes it: the checks it has listed, what grew kept for what stays, the entries sorted.
@@ -184,14 +184,14 @@ function baseOf() {
 
 // What the base's baseline listed, read where the base's own config put it, and the checks it had listed: null only
 // where the base had no config (the pull request turns the checks on, and writes the first baseline). Where the base's
-// baseline is gone, an empty list and the checks its config turned on; where its config does not read, every check, so
-// nothing joins freely.
+// baseline is gone or names no checks, its config's checks; where its config does not read, every check, so nothing
+// joins freely.
 function baseListed(base, at) {
   const held = base.config(at);
   if (held === null) return null;
   const was = tolerant(() => parseConfig(base.show(held), `${base.name}:${held}`));
   const b = was && tolerant(() => readBaseline(base.show(was.baseline) ?? "", `${base.name}:${was.baseline}`, ""));
-  return { listed: b?.listed ?? new Map(), checks: b?.checks ?? new Set(was ? was.checks.keys() : CHECKS) };
+  return { listed: b?.listed ?? new Map(), checks: b?.checks ?? new Set(was ? was.checks.keys() : CHECKS) }; // (a baseline with no "checks": its config's)
 }
 
 function first(config, at, self, found) {
@@ -207,7 +207,8 @@ function run(config, at, self, found, command) {
   if (command === "--first") return first(config, at, self, found);
   if (!fs.existsSync(inside(config.baseline, "the baseline"))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} <found> ${at} --first, and commit it`);
   const restore = `take it back as the base holds it, or write it again with node ${self} <found> ${at} --first, in a pull request the reviews read`;
-  const baseline = readBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, restore);
+  const read = readBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, restore);
+  const baseline = { ...read, checks: read.checks ?? new Set() }; // (one with no "checks" has listed none from a whole run)
   if (command === "--write") {
     const { listed, checks } = rewritten(baseline, config, found, self);
     fs.writeFileSync(config.baseline, written(listed, baseline.grown, checks));

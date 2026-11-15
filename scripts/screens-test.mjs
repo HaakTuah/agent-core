@@ -132,6 +132,12 @@ try {
   fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
   r = run(["found.json"], { SCREENS_BASE: "broken" });
   ok(r.code === 1 && r.out.includes("only shrinks"), "a config the base held that does not read as one lets nothing join freely", r.out);
+  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ listed: { "values: home: #f00 in the button": true } }));
+  fs.writeFileSync(path.join(dir, "checks/screens.json"), config({ values: "binds" }));
+  git("add", "-A"); git("commit", "-qm", "no checks key"); git("branch", "nokey");
+  fs.writeFileSync(path.join(dir, "checks/screens-baseline.json"), JSON.stringify({ checks: ["values"], listed: { "values: home: #f00 in the button": true, "values: home: 13px in the title": true } }));
+  r = run(["found.json"], { SCREENS_BASE: "nokey" });
+  ok(r.code === 1 && r.out.includes("only shrinks"), "a base baseline with no \"checks\" counts its config's checks as listed, so nothing joins freely", r.out);
   r = run(["../found.json"]);
   ok(r.code === 1 && mended(r.out) && r.out.includes("not inside the project"), "a config or file of findings outside the project is refused, with its mend", r.out);
   r = run(["found.json", "--bogus"]);
