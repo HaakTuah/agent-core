@@ -212,21 +212,27 @@ export const STEPS = [
   { lead: "16 November 2026, the line that says what a pull request waits on", cost: COST.check, held: "the description check" },
   { lead: "16 November 2026, choices that are hard to undo", cost: COST.read, unread: "which of a project's choices are hard to undo is a reading of the project, not a file's to say; where its *choice records* are missing, `core/scripts/fresh.mjs` lists the file at every sync, and `core/scripts/choices.mjs` lists the records it holds" },
   { lead: "16 November 2026, an agent's own tools listed", cost: COST.line,
-    // (the agent-tools check's own reading, with a missing list read as an empty one: what it would fail once written)
+    // (the agent-tools check's own reading, with a missing list read as an empty one: what it would fail once written.
+    // The core's licences.yml runs the check itself; a project that runs the licence script from a workflow of its own
+    // runs it beside it, as of exact versions, and the config is the one that workflow passes)
     check: p => {
-      const file = licenceConfig(p);
-      let config = null;
-      try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
-      const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
-      const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...toolsCheck(head.tools, list, kitHooks(), file).problems];
-      // (the core's licences.yml runs the check itself; a project that runs the licence script from a workflow of its
-      // own runs it beside it, as of exact versions)
       let own = [];
       if (!calls(p, "licences.yml").length) {
         readable(p, text => text.includes("licences.mjs"));
         own = Object.entries(p.workflows).filter(([, w]) => /core\/scripts\/licences\.mjs/.test(w.text ?? ""));
       }
-      if (own.length && !own.some(([, w]) => /core\/scripts\/agent-tools\.mjs/.test(w.text ?? ""))) wrong.push(`the workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/agent-tools.mjs <its config>\` beside it, as the core's \`licences.yml\` does`);
+      const runs = own.some(([, w]) => /core\/scripts\/agent-tools\.mjs/.test(w.text ?? ""));
+      let file = licenceConfig(p);
+      if (own.length) {
+        const passed = own.map(([, w]) => (runs ? /core\/scripts\/agent-tools\.mjs[ \t]+(["']?)([^\s"']+)\1/ : /core\/scripts\/licences\.mjs[ \t]+(["']?)([^\s"']+)\1/).exec(w.text ?? "")?.[2]).find(Boolean);
+        if (passed && /[$%{]/.test(passed)) throw new Unread(`the project's own licence workflow passes its config as ${passed}, which names it only when the workflow runs`);
+        if (passed) file = passed;
+      }
+      let config = null;
+      try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
+      const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
+      const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...toolsCheck(head.tools, list, kitHooks(), file).problems];
+      if (own.length && !runs) wrong.push(`the workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
       return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
     } },
 ];

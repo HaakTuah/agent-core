@@ -136,22 +136,33 @@ export function readProject(root, rev = null) {
     }
     return false;
   };
-  const read = rev ? f => textAt(root, rev, f) : f => { if (outside(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
-  // (at a commit: each entry under the folder, a link to a folder inside the repository followed once, as the tree has it)
-  const entries = (dir, hops = 0) => {
+  // At a commit, git's own tree is walked as the working tree is: a link inside the repository is followed (eight hops at
+  // most), one that leads out of it is not, and names are read as git stores them (-z: no quoting).
+  const tree = at => {
     let out = "";
-    try { out = execFileSync("git", ["ls-tree", "-r", rev, "--", dir], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { /* (none) */ }
-    const list = out.split("\n").filter(Boolean).map(l => { const [meta, f] = l.split("\t"); return { link: meta.startsWith("120000 "), f }; });
-    if (hops < 2 && list.length === 1 && list[0].f === dir && list[0].link) {
-      const to = path.posix.normalize(path.posix.join(path.posix.dirname(dir), textAt(root, rev, dir) ?? ""));
-      return to.startsWith("..") || path.posix.isAbsolute(to) ? [] : entries(to, hops + 1).map(e => ({ ...e, f: `${dir}${e.f.slice(to.length)}` }));
-    }
-    return list;
+    try { out = execFileSync("git", ["ls-tree", "-z", rev, "--", at], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { /* (none) */ }
+    return out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"), [mode, type] = l.slice(0, tab).split(" "); return { mode, type, f: l.slice(tab + 1) }; });
   };
+  const resolve = (f, hops = 0) => {
+    const parts = f.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const at = parts.slice(0, i).join("/"), entry = tree(at).find(e => e.f === at);
+      if (!entry) return null;
+      if (entry.mode !== "120000") continue;
+      const to = path.posix.normalize(path.posix.join(path.posix.dirname(at), textAt(root, rev, at) ?? "/"));
+      if (hops >= 8 || to === ".." || to.startsWith("../") || path.posix.isAbsolute(to)) return null;
+      return resolve([to, ...parts.slice(i)].join("/"), hops + 1);
+    }
+    return { f, type: tree(f).find(e => e.f === f)?.type ?? "tree" };
+  };
+  const read = rev ? f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; }
+    : f => { if (outside(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
   const skills = () => {
     if (rev) {
-      const names = entries(".claude/skills").map(({ link, f }) => (/^\.claude\/skills\/([^/]+)\/SKILL\.md$/u.exec(f) ?? (link ? /^\.claude\/skills\/([^/]+)$/u.exec(f) : null))?.[1]);
-      return [...new Set(names.filter(Boolean))];
+      const dir = resolve(".claude/skills");
+      if (dir?.type !== "tree") return [];
+      const names = tree(`${dir.f}/`).map(e => e.f.slice(dir.f.length + 1));
+      return names.filter(n => resolve(`.claude/skills/${n}/SKILL.md`)?.type === "blob");
     }
     if (outside(".claude/skills")) return [];
     const dir = path.join(root, ".claude/skills");

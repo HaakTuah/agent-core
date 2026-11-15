@@ -129,6 +129,22 @@ fails(run(project({ ".claude/settings.json": JSON.stringify(colon), ...listing({
 const twins = JSON.parse(KIT), http = { type: "http", url: "https://hooks.example.invalid" };
 twins.hooks.PostToolUse = [{ hooks: [http, { type: "command", command: JSON.stringify(http) }] }];
 fails(run(project({ ".claude/settings.json": JSON.stringify(twins), ...listing({ kind: "hook", name: `PostToolUse: ${JSON.stringify(http)}`, publisher: "this project" }) })), "two hooks that would share a name, one by its command and one by its text, fail", "share the name");
+// the base read through git's own tree as the working tree is read
+passes(run(pr(project({ ".claude/skills/résumé/SKILL.md": "x" }), { "README.md": "a change of its own\n" })), "a skill whose folder's name git would quote, held by the base, stays in its baseline");
+const settingsLinked = project();
+fs.writeFileSync(path.join(settingsLinked, "shared-settings.json"), withPlugins({ "helper@example-market": true }));
+fs.rmSync(path.join(settingsLinked, ".claude/settings.json"));
+fs.symlinkSync("../shared-settings.json", path.join(settingsLinked, ".claude/settings.json"));
+git(settingsLinked, "add", "-A"); git(settingsLinked, "commit", "-q", "-m", "linked settings");
+const viaLink = run(pr(settingsLinked, { "README.md": "a change of its own\n" }));
+ok(viaLink.status === 0 && /not listed, as the base held them: the plug-in "helper@example-market"/.test(viaLink.out), "a settings file linked inside the checkout is read at the base through its link, so what it held stays in the baseline", viaLink.out);
+const emptyTarget = project();
+fs.mkdirSync(path.join(emptyTarget, "shared/later"), { recursive: true });
+fs.writeFileSync(path.join(emptyTarget, "shared/later/README.md"), "x");
+fs.mkdirSync(path.join(emptyTarget, ".claude/skills"), { recursive: true });
+fs.symlinkSync("../../shared/later", path.join(emptyTarget, ".claude/skills/later"));
+git(emptyTarget, "add", "-A"); git(emptyTarget, "commit", "-q", "-m", "a link to a folder with no skill");
+fails(run(pr(emptyTarget, { "shared/later/SKILL.md": "x" })), "a skill a pull request adds behind a link the base held, where the base's target held none, is new", 'the skill "later", configured in .claude/skills/later/SKILL.md, is new in this pull request');
 const skillsDirBase = project();
 fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
 fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
@@ -155,8 +171,12 @@ const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tool
 const ownRun = "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n";
 ok(step.length === 1 && !notDone(project({ ...listing() }), step).length, "the step reads done in a project that configures only the kit's hooks");
 const noRun = notDone(project({ ".github/workflows/licences-own.yml": ownRun }), step);
-ok(noRun.length === 1 && noRun[0].mend.includes("runs `node core/scripts/agent-tools.mjs <its config>` beside it"), "and not done where a workflow of the project's own runs the licence script without the agent-tools check", JSON.stringify(noRun));
+ok(noRun.length === 1 && noRun[0].mend.includes("runs `node core/scripts/agent-tools.mjs checks/licences.json` beside it"), "and not done where a workflow of the project's own runs the licence script without the agent-tools check", JSON.stringify(noRun));
 ok(!notDone(project({ ".github/workflows/licences-own.yml": `${ownRun}      - run: node core/scripts/agent-tools.mjs checks/licences.json\n` }), step).length, "and done once that workflow runs it beside it");
+const elsewhere = { "config/licences.json": { lockfiles: [], agentTools: [{ kind: "server", name: "files", publisher: "Example Tools", version: "2.0.0" }] }, ".mcp.json": { mcpServers: { files: { command: "files-server" } } } };
+ok(!notDone(project({ ...elsewhere, ".github/workflows/licences-own.yml": `${ownRun.replaceAll("checks/licences.json", "config/licences.json")}      - run: node core/scripts/agent-tools.mjs config/licences.json\n` }), step).length, "and reads the config the project's own workflow passes, where it names another");
+const byVariable = notDone(project({ ".github/workflows/licences-own.yml": `${ownRun.replace("checks/licences.json", '"$CONFIG"')}      - run: node core/scripts/agent-tools.mjs "$CONFIG"\n` }), step);
+ok(byVariable.length === 1 && byVariable[0].mend.includes("could not read the project") && byVariable[0].mend.includes("$CONFIG"), "and says it cannot read one the workflow passes by a variable, never read as done", JSON.stringify(byVariable));
 ok(notDone(project({ ".claude/settings.json": withPlugins({ "helper@example-market": true }) }), step)[0]?.mend.includes('the plug-in "helper@example-market"'), "and not done where a tool is configured and the list is not written");
 ok(listed({ lockfiles: [] }, "c") === null, "a config with no \"agentTools\" holds no list");
 
