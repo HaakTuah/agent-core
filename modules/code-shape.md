@@ -27,8 +27,9 @@ one declared entrance.
   It does not mean more systems than someone could describe in a sentence each, a fixed name for the layers inside
   one, or a rewrite to reach them: what then crosses is listed in the baseline. Reason: where most files reach into
   one shared middle, each feature touches the middle, a builder reads widely before it changes anything, and lanes
-  cannot run side by side, so the work becomes *one at a time*. Held by the shape check's count of the files in no
-  system, which it says on every run, and by the audit's first question.
+  cannot run side by side, so the work becomes *one at a time*. Held by the shape check, which, once a project names
+  a system, fails a new file of code that lies in none, and says on every run how many old ones do; and by the
+  audit's first question.
 - **Between systems, absolute for new code:**
   - the rules import nothing outward: not the display, input, the network, storage or a platform, and the clock and
     randomness are passed in to them;
@@ -36,7 +37,7 @@ one declared entrance.
   - each system has one entrance, and the others use only that;
   - each piece of data has one owner, and the others get a view they cannot change, or send a command;
   - each third-party package the project ships with is wrapped in one system;
-  - a system's tests run without the systems it does not use.
+  - a system's tests run without the other systems.
 
   The trigger is an import, or a call to the clock, that breaks one: the shape check fails it, naming the file, and the
   session mends it as the failure says. It does not mean that a system never reads what another holds: it reads it
@@ -58,9 +59,7 @@ one declared entrance.
   held to the marks, nor that the numbers are the aim: file size was held, and files became small while staying one
   piece, so the checks read what depends on what and the audit's reader judges what no number shows. Reason: on 15
   November 2026 three codebases held 19, 54 and 79 functions with more than 30 branch points, the worst in the files
-  changed most. Held by the shape check. A hub, a file most others import, has no mark: one that holds one small fact
-  is as it should be, and the audit's reader judges the others. The time a user waits on, and how strong the tests
-  are, get their own measures as their rules come (#318, #253).
+  changed most. Held by the shape check.
 - **The tests have a time mark.** By default each suite a project names in the config's "suites" has a mark in
   seconds, set with room above what it takes today so that a slow runner fails nothing, and is started through the
   check (`--suite`), which fails one that passes and took longer. Each system's tests can be started alone. The
@@ -80,14 +79,19 @@ one declared entrance.
   that one with no rules of its own invents some. Reason: rules that never import the display are tested, ported and
   run by a machine without it. Held by the shape check once the rules and the display are named systems; until then
   by discipline alone.
-- **Near-copies are reported.** The copies check lists the runs of code that match once names and numbers are set
-  aside, and fails none. The audit's reader judges each: whether one function should serve both. It does not mean that
-  code which only looks alike is joined: "One fact, one place" forbids a second copy of a fact, and code joined too
-  early is harder to change than two plain pieces. Reason: exact copies were held, and copies that differ only in
-  their names were up to 2.5% of a codebase that nothing saw. Held by the copies check's report.
+- **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
+  of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the
+  audit's reader judges whether one function should serve both. It does not mean that such code is joined by rule:
+  "One fact, one place" forbids a second copy of a fact, and code joined too early is harder to change than two plain
+  pieces. Reason: exact copies were held, and copies that differ only in their names were up to 2.5% of a codebase
+  that nothing saw. Held by the copies check's report.
+
+**What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
+the audit's reader judges the others. The time a user waits on, and how strong the tests are, get their own measures
+as their rules come (#318, #253).
 
 **What the check reads.** JavaScript and TypeScript, by the reader of the measures (`core/scripts/code-shape.mjs`). It
 never guesses: a file that holds JSX, whose functions its reader cannot tell, an import that leads nowhere it can tell
-and a file in another language are counted and said on every run, never failed. A project holds those to the same
-rules with its language's own tools, named in its *shape check*. A project that has not written its config yet is
-held to the starter kit's own, with each pull request's base as its baseline, from the sync that brings the check.
+and a file in another language are counted and said on every run, never failed; until the check reads them (#354),
+the audit's reader holds that code to these rules. A project that has not written its config yet is held to the
+starter kit's own, with each pull request's base as its baseline, from the sync that brings the check.

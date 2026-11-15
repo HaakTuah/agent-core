@@ -6,7 +6,7 @@
     "tools": { "domain": "tools", "paths": ["scripts/"] }
   },
   "suites": {
-    "suites": { "linux": 300, "win32": 880 },
+    "suites": { "linux": 300 },
     "upgrade": { "linux": 240, "win32": 700 }
   }
 }

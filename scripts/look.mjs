@@ -68,9 +68,11 @@ export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).fil
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
 
 // The labels an issue the look keeps should carry where its state label is not the one that fits: the others as they
-// stand, and needs-owner or queued; null where they fit already.
+// stand, and needs-owner or queued; null where they fit already, and where a session gave it another state (later,
+// on-hold), which the look leaves as it is.
 export function relabelled(labels, owner) {
   const [want, drop] = owner ? [OWNERS, LABELS[0]] : [LABELS[0], OWNERS];
+  if (labels.includes("later") || labels.includes("on-hold")) return null;
   return labels.includes(want) && !labels.includes(drop) ? null : [...labels.filter(l => l !== drop && l !== want), want];
 }
 

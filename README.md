@@ -263,7 +263,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
 | *copies check* | the check that fails a new copy, and its config for `scripts/copies.mjs` |
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` |
-| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks, and, for code in a language that script does not read, the tool that holds it (`modules/code-shape.md`); left out, `checks/shape.json`, which the starter kit writes |
+| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`modules/code-shape.md`); left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`modules/cleaning.md`; `scripts/dose.mjs` reads it); left out, the state read from the shape check's baseline |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`modules/cleaning.md`); left out, `docs/audits/` |
 | *large file* | how large a file is before it is never read whole |

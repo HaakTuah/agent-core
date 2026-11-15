@@ -15,11 +15,14 @@
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
 // config reads that branch's code (the check reads more: a system named, a mark lowered, the first baseline), or
 // where the baseline gives its reason under "grown", as a raised mark's is given, which the reviews read
-// (modules/review-guidelines.md, "What blocks"). An entry that is gone is taken out with --write, which lowers the
+// (modules/review-guidelines.md, "What blocks"). A config changed to read less (its code, tests, systems, platform or
+// aliases) fails where the base's config finds a breach new in what it no longer reads, and neither the config nor the
+// baseline is read or written through a link. An entry that is gone is taken out with --write, which lowers the
 // numbers that fell too, and a pull request that leaves one standing fails, so the baseline lists the debt as it is,
 // and what was mended cannot come back. It never guesses: an import that
 // leads nowhere it can tell, a file that holds JSX (whose functions its reader cannot tell) and a file in another
-// language are counted and said, never failed; a project holds those with its language's own tools.
+// language are counted and said, never failed (#354 asks for their readers). Once the config names a system, a file
+// of code the pull request adds that lies in none fails too, read against the base's files.
 //
 // The config's other keys: "code" and "tests", git pathspecs of what is read (tests for their imports alone);
 // "aliases", each prefix an import may start with to the path it stands for; "suites", each suite's time mark in
@@ -229,7 +232,7 @@ function oneImport(ctx, from, imp) {
 
 function oneFile(ctx, file, text) {
   const toks = tokens(text), system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null;
-  if (!system) ctx.read.unnamed++;
+  if (!system) ctx.unnamed.push(file);
   if (JSX.includes(path.posix.extname(file))) ctx.read.jsx++;
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, toks);
   if (domain === "rules") ownClock(ctx, file, toks);
@@ -254,16 +257,18 @@ function wrappedOnce(ctx) {
 }
 
 // What the check finds in the files given ({ path: text }, package.json files among them): `entries`, a Map of each
-// breach's id to { kind, group, n }, n its numbers where it has any; and `read`, the counts of what it read. `tests`
-// is the set of the files that are tests: read for their imports, not held to the marks.
+// breach's id to { kind, group, n }, n its numbers where it has any; `read`, the counts of what it read; and
+// `unnamed`, the files of code in no system. `tests` is the set of the files that are tests: read for their imports,
+// not held to the marks.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(f => CODE.includes(path.posix.extname(f))).sort();
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
-  const ctx = { config, tests, files: new Set(Object.keys(texts)), ...manifests(texts), entries: new Map(), graph: new Map(), usedBy: new Map(), read };
+  const ctx = { config, tests, files: new Set(Object.keys(texts)), ...manifests(texts), entries: new Map(), graph: new Map(), usedBy: new Map(), unnamed: [], read };
   for (const file of code) oneFile(ctx, file, texts[file]);
   onCycles(ctx);
   wrappedOnce(ctx);
-  return { entries: ctx.entries, read };
+  read.unnamed = ctx.unnamed.length;
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed };
 }
 
 // ---- the baseline ----
@@ -355,6 +360,17 @@ export function standingAt(commit, config) {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
+// A config or a baseline is read and written only as a file of the project's own: never through a link, at the file
+// or at a folder on its way, which could lead outside the project (floor rule 13).
+export function notLinked(file, root = ".") {
+  const parts = file.split("/");
+  for (let i = 1; i <= parts.length; i++) {
+    const found = tolerant(() => fs.lstatSync(path.join(root, ...parts.slice(0, i))));
+    if (found?.isSymbolicLink()) refuse(`${file} is reached through a link (${parts.slice(0, i).join("/")})`, "make it a plain file of the project's own, inside the project: the check reads and writes through no link");
+  }
+  return path.join(root, file);
+}
+
 // The config the manifest's *shape check* row names (its first path to a .json file, in backticks), else the kit's.
 export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*shape check\*.*$/mu.exec(String(manifest ?? ""))?.[0] ?? "")?.[1] ?? KIT;
 
@@ -421,16 +437,31 @@ const stoodAt = (base, config) => { const before = base.standing(); return new M
 
 // Against the pull request's base: what joined the baseline that the base neither listed nor held, and each mark
 // raised, where "grown" gives no reason.
-function againstBase({ config, at, baseline, base }) {
+function againstBase({ config, at, baseline, base, found }) {
   const fail = [];
   const was = base.baseline === null ? null : tolerant(() => parseBaseline(base.baseline, base.name, "").listed);
   const old = base.config === null ? null : tolerant(() => parseConfig(base.config, base.name));
   let joined = unclaimed(baseline.listed, was ?? new Map(), config.marks);
   if (joined.length) joined = unclaimed(new Map(joined.map(id => [id, baseline.listed.get(id)])), base.stood(), config.marks).filter(id => !said(baseline.grown, id));
   if (joined.length) fail.push([`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} neither listed nor held, and the baseline only shrinks. Mend: take each out of the baseline and mend the code as the check then says; only where there is no other way, give each its reason under "grown" in the baseline, by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...some(joined, baseline.listed)]);
+  fail.push(...readsLess({ config, old, base, current: found.entries }));
+  // (once a system is named, a file of code the base did not hold lies in one)
+  const loose = Object.keys(config.systems).length ? found.unnamed.filter(f => !(f in base.standing().texts)) : [];
+  if (loose.length) fail.push([`FAIL: ${plural(loose.length, "new file", "new files")} of code ${loose.length === 1 ? "lies" : "lie"} in no system. Mend: put each under the "paths" of the system it belongs to in ${at}, or name its system there, with its paths, the systems it uses and its entrance`, ...loose.slice(0, 20).map(f => `  ${f}`)]);
   const unsaid = (old ? raised(config, old) : []).filter(id => !said(baseline.grown, id));
   if (unsaid.length) fail.push([`FAIL: ${at} raises or drops ${plural(unsaid.length, "mark")} against ${base.name}. Mend: first make the code or the suite fit its mark; only where it cannot, give the raise its reason under "grown" in ${config.baseline}, by the id below, and in the pull request, with a fresh session's word there that it found no other way`, ...unsaid.map(id => `  ${id}`)]);
   return fail;
+}
+
+// Where the config changed against the base's: what the base's config, with this one's marks, finds new in the code
+// as it stands, and this config no longer reads. A config may not be made to read less so that a breach passes.
+function readsLess({ config, old, base, current }) {
+  const parts = c => JSON.stringify([c.code, c.tests, c.systems, c.platform, c.aliases]);
+  if (!old || !base.under || parts(old) === parts(config)) return [];
+  const { now, then } = base.under({ ...old, marks: config.marks });
+  const entries = at => new Map([...survey(at.texts, { ...old, marks: config.marks }, at.tests).entries].map(([id, e]) => [id, e.n]));
+  const found = entries(now), hidden = unclaimed(found, entries(then), config.marks).filter(id => !current.has(id));
+  return hidden.length ? [[`FAIL: ${plural(hidden.length, "breach", "breaches")} that ${base.name}'s config finds new ${hidden.length === 1 ? "is" : "are"} not read by the config as this change leaves it. Mend: mend each as the base's config asks, or take back the part of the config's change that reads less (its "code", "tests", "systems", "platform" or "aliases")`, ...some(hidden, found)]] : [];
 }
 
 // What the check read and does not hold, each said, never failed.
@@ -438,24 +469,24 @@ function notesOf(read) {
   const notes = [];
   if (read.jsx) notes.push(`${plural(read.jsx, "file holds", "files hold")} JSX, whose functions the reader cannot tell: their imports are held, their functions not`);
   if (read.nowhere) notes.push(`${plural(read.nowhere, "import leads", "imports lead")} nowhere the check can tell (no file, no package the project declares, no alias the config names): not held`);
-  if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone`);
+  if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone${read.systems ? ", and a new one fails" : ""}`);
   if (read.noEntrance && read.systems > 1) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
   return notes;
 }
 
 // The check's verdict on a project: { fail: [[line, ...details]], notes, listed, read }. `base`, where the pull
 // request's base is known: { name, baseline (its text there, or null), config (its text there, or null), standing: ()
-// => the base's files as `config` reads them }.
+// => the base's files as `config` reads them, under: c => the files now and at the base as a config `c` reads them }.
 export function verdict({ config, at, self, found, baselineText, base }) {
   const restore = base ? `take it back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write` : `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`;
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
-  if (base) base.stood = once(() => stoodAt(base, config));
+  if (base) { base.standing = once(base.standing); base.stood = once(() => stoodAt(base, config)); }
   const fail = fresh({ config, at, self, found, baseline, current, base });
   // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
   const stale = [...baseline.listed.keys()].filter(id => !current.has(id));
   if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
-  if (base) fail.push(...againstBase({ config, at, baseline, base }));
+  if (base) fail.push(...againstBase({ config, at, baseline, base, found }));
   return { fail, notes: notesOf(found.read), listed: baseline.listed.size, read: found.read };
 }
 
@@ -486,7 +517,7 @@ function suite(config, at, self, [name, ...rest]) {
 }
 
 function first(config, at, self, numbers) {
-  if (fs.existsSync(config.baseline)) refuse(`${config.baseline} exists, and --first writes only a project's first baseline`, `run node ${self} ${at} to check, or with --write to lower the baseline`);
+  if (fs.existsSync(notLinked(config.baseline))) refuse(`${config.baseline} exists, and --first writes only a project's first baseline`, `run node ${self} ${at} to check, or with --write to lower the baseline`);
   fs.mkdirSync(path.dirname(config.baseline), { recursive: true });
   fs.writeFileSync(config.baseline, written(numbers, {}, null));
   console.log(`${config.baseline}: the first baseline, ${plural(numbers.size, "entry", "entries")} that stand today, to be cleaned over time`);
@@ -497,7 +528,7 @@ function first(config, at, self, numbers) {
 // number that fell is lowered, and nothing joins but what "grown" gives a reason for and, where the base is told,
 // what the base held already as this config reads its code (the check reads more than it did).
 function write(config, at, self, numbers, base) {
-  const old = parseBaseline(fs.readFileSync(config.baseline, "utf8"), config.baseline, `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`);
+  const old = parseBaseline(fs.readFileSync(notLinked(config.baseline), "utf8"), config.baseline, `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`);
   let joins = unclaimed(numbers, old.listed, config.marks);
   if (base && joins.length) joins = unclaimed(new Map(joins.map(id => [id, numbers.get(id)])), stoodAt({ standing: () => standingAt(base.name, config) }, config), config.marks);
   joins = new Set(joins);
@@ -521,7 +552,7 @@ function baseOf() {
 // AGENTS.md), else the kit's; null where the project has none yet.
 function configAt(named, self, base) {
   const at = named ?? where(tolerant(() => fs.readFileSync("core-manifest.md", "utf8")) ?? tolerant(() => fs.readFileSync("AGENTS.md", "utf8")));
-  if (fs.existsSync(at)) return at;
+  if (fs.existsSync(notLinked(at))) return at;
   if (named) refuse(`there is no config at ${at}`, `write it as the starter kit does (core/setup/template/shape.json.tmpl), then node ${self} ${at} --first`);
   if (base?.show(at) != null) refuse(`${at} is gone, and ${base.name} holds it: no pull request takes the shape check's config out`, `take it back as ${base.name} holds it (git checkout ${base.name} -- ${at})`);
   return null;
@@ -544,9 +575,9 @@ function unwritten(self, base) {
 }
 
 function check(config, at, self, found, base) {
-  if (!fs.existsSync(config.baseline)) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
+  if (!fs.existsSync(notLinked(config.baseline))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
-    base: base && { name: base.name, baseline: base.show(config.baseline), config: base.show(at), standing: () => standingAt(base.name, config) } });
+    base: base && { name: base.name, baseline: base.show(config.baseline), config: base.show(at), standing: () => standingAt(base.name, config), under: c => ({ now: standing(c), then: standingAt(base.name, c) }) } });
   for (const note of v.notes) console.log(`note ${note}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(line);

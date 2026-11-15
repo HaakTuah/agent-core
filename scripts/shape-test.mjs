@@ -144,6 +144,17 @@ v = judge({ now: {}, conf: cfg({ marks: { lines: 80 }, suites: { unit: 90, win: 
 ok(mended(said(v)) && same(v.fail[0].slice(1), ["  mark: lines", "  mark: suite unit", "  mark: suite win", "  mark: suite gone", "  mark: suite loose"]), "a mark raised, a suite's raised on one platform, and one dropped or left unmarked on a platform, fail against the base", said(v));
 v = judge({ now: {}, conf: cfg({ marks: { lines: 80 } }), baseline: JSON.stringify({ grown: { "mark: lines": "the generated tables run to 75 lines each" }, listed: {} }), base: baseOf(listed([]), {}, config({})) });
 ok(v.fail.length === 0, "and pass where \"grown\" gives the raise its reason");
+const named = cfg({ systems: { rules: { paths: ["src/rules/"] } } });
+v = judge({ now: { "src/rules/a.js": "export const a = 1;\n", "src/old.js": "export const o = 1;\n", "src/new.js": "export const n = 1;\n" }, conf: named, baseline: listed([]), base: baseOf(listed([]), { "src/old.js": "export const o = 1;\n" }) });
+ok(mended(said(v)) && v.fail.length === 1 && /1 new file of code lies in no system/.test(said(v)) && v.fail[0].slice(1).join() === "  src/new.js", "once a system is named, a file of code the pull request adds that lies in none fails; one the base held does not", said(v));
+v = judge({ now: { "src/new.js": "export const n = 1;\n" }, baseline: listed([]), base: baseOf(listed([]), {}) });
+ok(v.fail.length === 0, "where no system is named yet, none does");
+const wide = { "src/a.js": long("tall", 100), "lib/b.js": long("hidden", 70) }, narrow = config({}), wider = JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src", "lib"] });
+const less = then => ({ ...baseOf(listed([f100]), then, wider), under: () => ({ now: { texts: wide, tests: new Set() }, then: { texts: then, tests: new Set() } }) });
+v = judge({ now: { "src/a.js": long("tall", 100) }, conf: parseConfig(narrow), baseline: listed([f100]), base: less({ "src/a.js": long("tall", 100) }) });
+ok(mended(said(v)) && v.fail.length === 1 && /1 breach that origin\/main's config finds new is not read by the config as this change leaves it/.test(said(v)) && /lib\/b\.js#hidden/.test(said(v)), "a config changed to read less fails where the base's config finds a new breach in what it no longer reads", said(v));
+v = judge({ now: { "src/a.js": long("tall", 100) }, conf: parseConfig(narrow), baseline: listed([f100]), base: less(wide) });
+ok(v.fail.length === 0, "and passes where what it no longer reads holds nothing new");
 ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read: 90 }, listed: {} }), "b.json", "").audited.listed === 3, "a baseline keeps the day and the counts of its last audit");
 
 // ---- whole runs, in a scratch repository ----
@@ -231,6 +242,15 @@ git("checkout", "-q", "--", "checks/shape.json");
 r = run([], { SHAPE_BASE: "no such; branch" });
 ok(r.status === 1 && mended(r.out), "a base that is no plain name is refused", r.out);
 ok(run([], { SHAPE_BASE: "nowhere" }).status === 1 && mended(run([], { SHAPE_BASE: "nowhere" }).out) && run(["--sideways"]).status === 1 && mended(run(["--sideways"]).out), "and so are a base that is no commit and an option the check does not know");
+
+if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
+  fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));
+  fs.symlinkSync("../elsewhere.json", path.join(dir, "checks/shape-baseline.json"));
+  ok([[], ["--write"]].every(a => { const x = run(a); return x.status === 1 && mended(x.out) && /reached through a link/.test(x.out); }) && fs.readFileSync(path.join(dir, "elsewhere.json"), "utf8").includes("listed"),
+    "a baseline that is a link is neither read nor written through", run([]).out);
+  fs.rmSync(path.join(dir, "checks/shape-baseline.json"));
+  fs.renameSync(path.join(dir, "elsewhere.json"), path.join(dir, "checks/shape-baseline.json"));
+}
 
 // a suite held to its time
 r = run(["checks/shape.json", "--suite", "quick", "--", process.execPath, "-e", "console.log('ran')"]);

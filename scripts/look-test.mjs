@@ -26,7 +26,7 @@ ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what:
 ok(DUE.length === 3 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; Cleaning due: how the code is put together; An audit of how the code is put together is due",
   "the look keeps an issue for the pass over the choices, for cleaning and for the audit by a reader");
 ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
-  && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued",
+  && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued" && relabelled(["later", "by:look"], true) === null && relabelled(["on-hold"], false) === null,
   "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
 
 // ---- its own issues: GitHub's job's or the owner's account's, the newest of each title ----

@@ -22,7 +22,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
+import { notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 export const STATES = ["in debt", "paying down", "in standard"];
@@ -107,9 +107,9 @@ function shareGot(config, at, root) {
 // baseline cannot be read, with the mend the shape check gives.
 export function reading(rules, root = ".") {
   const at = where(rules);
-  if (!fs.existsSync(path.join(root, at))) return null;
+  if (!fs.existsSync(notLinked(at, root))) return null;
   const config = parseConfig(fs.readFileSync(path.join(root, at), "utf8"), at);
-  const baseline = parseBaseline(fs.readFileSync(path.join(root, config.baseline), "utf8"), config.baseline, "run the shape check, which says how");
+  const baseline = parseBaseline(fs.readFileSync(notLinked(config.baseline, root), "utf8"), config.baseline, "run the shape check, which says how");
   const now = standing(config, root), found = survey(now.texts, config, now.tests);
   const counts = { listed: baseline.listed.size, read: found.read.functions + found.read.imports };
   return { at, config, baseline, ...counts, state: stateOf(counts, named(rules)), named: named(rules) };
@@ -126,7 +126,7 @@ export function cleaningBody(r, { changes, commits }, got, home) {
   return [stateLine(r), "",
     `**The cleaning lane's share while it is so:** ${SHARE[r.state]}. What it got: ${share}. No check holds the share: it is shown, and the orchestrator hands out lanes by it.`, "",
     `**Clean first** (where change meets tangle: what the baseline lists of a file, times its changes in the newest ${commits} commits git holds here), after the files the queue's next entries will touch:`,
-    ...first.map(f => `- \`${f.file}\`: ${f.entries} listed, changed ${f.changes} times`), "",
+    ...first.map(f => `- \`${f.file.replace(/`/gu, "'")}\`: ${f.entries} listed, changed ${f.changes} times`), "",
     `**How** (\`${home}modules/cleaning.md\`): each a small pull request of its own that proves behaviour unchanged by the tests, takes its entries out of the baseline (\`node ${home}scripts/shape.mjs --write\`) and changes nothing a user sees; where the tests cannot prove it, they come first. \`node ${home}scripts/dose.mjs\` gives this list as it stands.`].join("\n");
 }
 
