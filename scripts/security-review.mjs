@@ -16,17 +16,26 @@
 // 17 asks for is asked). A pull request that needs no security review and gets none by itself says so in a comment of
 // that kind, which its code reviewer checks (modules/reviews.md, point 3); the status then says a review is posted, and
 // cannot tell that note from a review. Nothing else on the pull request counts: not its description, not a comment of
-// anyone else, not a review's own text. What it does not hold: what a posted review says, whether a finding is
-// blocking, and that a later commit which changes what the review was for got its check; those stay with the builder
-// and the reviews. It prints, as JSON, the commit to mark and the status to give it, or {} for a pull request that is
+// anyone else, not a review's own text.
+// Where the pull request changes what runs by itself (a file comment-only.mjs reads: under .github/ or .claude/, or an
+// action.yml; the copy under core/ aside, which only a sync changes), it asks floor rule 3's two security reviews:
+// Codex's and a posted one, or two posted. One is enough, as before, where each such file only moves pins (changed in
+// place, each changed line a `uses:` line whose whole SHA, and the note after it, alone differ: an action's version,
+// rule 17, or a sync's calls to the core's workflows), or where a posted review holds what comment-only.mjs printed on
+// the head ("checked head" and its whole SHA: comments and steps' names alone, rule 8's one). Given no list of the
+// files (a workflow older than this script), it asks one review, as it did before it read them. What it does not hold:
+// what a posted review says, whether a finding is blocking, who posted each of two reviews (one login may post both),
+// that comment-only.mjs's printout is true (its code reviewer runs it again), and that a later commit which changes
+// what the review was for got its check; those stay with the builder and the reviews. It prints, as JSON, the commit to mark and the status to give it, or {} for a pull request that is
 // closed or a draft. While "advisory" (the workflow's input, on unless turned off) the status is always a pass that
 // says what the check would have done, so a week of pull requests shows whether it is right before anything waits for
 // it.
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
-//           [<its review comments, the same> [<its commits, the same>]]
+//           [<its review comments, the same> [<its commits, the same> [<its files, the same>]]]
 //         ADVISORY=false for a status that waits; RUN_URL for the link the status carries.
 import { readFileSync } from "node:fs";
+import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
 
 const CODEX = "chatgpt-codex-connector[bot]";
@@ -70,15 +79,46 @@ function codex(comments) {
 export const UNREAD = "Codex's summary is on the pull request, but its state cannot be read: its form may have changed, and scripts/security-review.mjs must learn it";
 
 // { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name)
-export function judge(pull, comments, reviewComments, commits) {
+export function judge(pull, comments, reviewComments, commits, files) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const list = flat(comments);
   const posted = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
-  const verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits);
+  let verdict = judgeWith(sha, list, posted, review, pull, reviewComments, commits);
+  // floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted
+  if (verdict.done && files !== undefined && flat(files).some((file) => runs(file) && !pinsAlone(file)) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
+    const codexDone = review !== null && typeof review === "object" && review.status === "completed";
+    if ((codexDone ? 1 : 0) + posted.length < 2) {
+      verdict = { sha, done: false, why: `what runs by itself changed: post a second "Security review:" (floor rule 3), or comment-only.mjs's printout for ${sha.slice(0, 7)}` };
+    } else verdict = { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
+  }
   return warning ? { ...verdict, warning } : verdict;
 }
+
+// what runs by itself, as comment-only.mjs reads it, the copy of the core under core/ aside (only a sync changes it,
+// and its code passed its reviews in the core's own pull request: floor rule 8); a file moved counts on either side
+const runs = (file) => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith("core/") && RUNS.test(name));
+// a `uses:` line pinned to a whole SHA, with the note after it if any: [the line with the pin and note set aside]
+const USES = /^(\s*(?:-\s+)?["']?uses["']?\s*:\s*["']?[^\s"'@#]+@)[0-9a-f]{40}(["']?)(?:\s+#.*)?$/u;
+// whether a file, as GitHub's API gives it among a pull request's files, only moves pins: changed in place, and in
+// each hunk of its patch the removed and added lines pair one to one, each pair a `uses:` line that differs only in
+// its whole SHA and the note after it (a patch GitHub leaves out, a file too large, is no proof); or, given another
+// pattern, lines it reads alike once its groups alone are kept
+export function pinsAlone(file, pinned = USES) {
+  if (file?.status !== "modified" || typeof file.patch !== "string" || file.patch === "") return false;
+  const hunks = [];
+  for (const line of file.patch.split("\n")) {
+    if (line.startsWith("@@")) hunks.push({ "-": [], "+": [] });
+    else if (hunks.length && (line[0] === "-" || line[0] === "+")) hunks.at(-1)[line[0]].push(line.slice(1));
+  }
+  const bare = (line) => pinned.exec(line)?.slice(1).join("\u0000");
+  return hunks.length > 0 && hunks.every((hunk) => hunk["-"].length === hunk["+"].length
+    && hunk["-"].every((line, i) => bare(line) !== undefined && bare(line) === bare(hunk["+"][i])));
+}
+// whether a posted review holds what comment-only.mjs printed on this head: comments and steps' names alone
+const ALONE = /^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/mu;
+export const commentsAlone = (body, sha) => typeof body === "string" && ALONE.test(body) && new RegExp(`^\\s*checked head ${sha}(?![0-9a-f])`, "mu").test(body);
 function judgeWith(sha, list, posted, review, pull, reviewComments, commits) {
   if (review !== null && typeof review === "object" && review.status === "completed") {
     const on = typeof review.commit_sha === "string" && SHA.test(review.commit_sha) ? ` (on ${review.commit_sha.slice(0, 7)})` : "";
@@ -112,12 +152,12 @@ export function status(verdict, advisory, url, context = CONTEXT) {
 }
 
 if (started(import.meta.url)) {
-  const [pullFile, commentsFile, reviewCommentsFile, commitsFile] = process.argv.slice(2);
+  const [pullFile, commentsFile, reviewCommentsFile, commitsFile, filesFile] = process.argv.slice(2);
   if (!pullFile || !commentsFile) {
-    console.error("usage: node scripts/security-review.mjs <the pull request, as JSON> <its comments, as JSON> [<its review comments, as JSON> [<its commits, as JSON>]]");
+    console.error("usage: node scripts/security-review.mjs <the pull request, as JSON> <its comments, as JSON> [<its review comments, as JSON> [<its commits, as JSON> [<its files, as JSON>]]]");
     process.exit(2);
   }
   const read = (file) => JSON.parse(readFileSync(file, "utf8"));
-  const verdict = judge(read(pullFile), read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : []);
+  const verdict = judge(read(pullFile), read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : [], filesFile ? read(filesFile) : undefined);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

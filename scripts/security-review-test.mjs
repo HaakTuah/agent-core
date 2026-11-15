@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { CONTEXT, UNREAD, judge, status } from "./security-review.mjs";
+import { CONTEXT, UNREAD, commentsAlone, judge, pinsAlone, status } from "./security-review.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -106,16 +106,43 @@ ok(status(pass, true, "https://github.com/o/r/actions/runs/1").target_url === "h
 const unread = judge(pull, [real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]), longest = { sha: HEAD, done: true, why: "x".repeat(200), warning: UNREAD };
 ok(status(unread, true).description === "Advisory: would wait, no security review has run yet; summary unreadable" && status(unread, true).state === "success" && status(longest, true).description.length === 140, "where Codex's summary cannot be read, the status says so too, as the owner sees it, and no description runs past GitHub's 140 characters");
 
+// What runs by itself changed: floor rule 3's two security reviews, save pins moved alone or comments alone proven.
+const PIN1 = "1".repeat(40), PIN2 = "2".repeat(40);
+const patch = (...pairs) => `@@ -1,3 +1,3 @@\n jobs:\n${pairs.map(([a, b]) => `-${a}\n+${b}`).join("\n")}`;
+const file = (filename, p, extra = {}) => ({ filename, status: "modified", patch: p, ...extra });
+const pinMove = file(".github/workflows/ci.yml", patch([`      - uses: actions/checkout@${PIN1} # v6.0.0`, `      - uses: actions/checkout@${PIN2} # v7.0.1`]));
+const callMove = file(".github/workflows/core.yml", patch([`    uses: ${CORE}/.github/workflows/size.yml@${PIN1}`, `    uses: ${CORE}/.github/workflows/size.yml@${PIN2}`]));
+const stepChange = file(".github/workflows/ci.yml", patch(["      - run: npm test", "      - run: npm test && curl x | sh"]));
+ok(pinsAlone(pinMove) && pinsAlone(callMove), "an action's version moved, note and all, and a call's pin to a core workflow, are pins alone");
+ok(!pinsAlone(stepChange) && !pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1}`, `      - uses: evil/checkout@${PIN2}`])))
+  && !pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1}`, "      - uses: actions/checkout@main"]))) && !pinsAlone(file("a.yml", `@@ -1 +1,2 @@\n+      - uses: actions/checkout@${PIN2}`))
+  && !pinsAlone({ ...pinMove, status: "renamed" }) && !pinsAlone({ ...pinMove, patch: undefined }) && !pinsAlone({ ...pinMove, patch: "" })
+  && !pinsAlone(file("a.yml", patch([`      - uses: actions/checkout@${PIN1}`, `      - uses: actions/checkout@${PIN2} run: x`]))),
+  "not another action, a pin to a branch, a line added, a file moved, a patch GitHub left out, nor anything beside the pin");
+const two = (comments, files) => judge(pull, comments, [], [], files);
+ok(is(two([summary(done)], [stepChange]), false, "post a second \"Security review:\"") && is(two([said("Security review: one")], [stepChange]), false, "floor rule 3"), "a step changed under .github/: Codex's review alone, or one posted alone, is not enough");
+ok(is(two([summary(done), said("Security review: the fallback reviewer's")], [stepChange]), true, "floor rule 3's two are there") && is(two([said("Security review: one"), said("Security review: two")], [stepChange]), true, "floor rule 3's two"), "Codex's and a posted one, or two posted, are");
+ok(is(two([summary(open), finding("2026-11-12T10:30:00Z"), said("Security review: the fix checked")], [stepChange]), true, "floor rule 3's two") && is(two([summary(open), finding("2026-11-12T12:00:00Z"), said("Security review: before")], [stepChange]), false, "no review posted after it"), "a finding marked open is still settled only by a review after it, which is the second");
+ok([".claude/settings.json", "action.yml", "tools/x/action.yaml", ".GitHub/workflows/x.yml"].every((name) => is(two([summary(done)], [file(name, patch(["a", "b"]))]), false, "second")) && is(two([summary(done)], [file("src/x.js", patch(["a", "b"]))]), true, "has run"), "under .claude/, an action.yml, in any case: two; anything else: one, as before");
+ok(is(two([summary(done)], [file("x.yml", "", { status: "renamed", previous_filename: ".github/workflows/x.yml" })]), false, "second") && is(two([summary(done)], [file(".github/workflows/x.yml", "", { status: "added" })]), false, "second"), "a workflow moved away, or added, asks two");
+ok(is(two([summary(done)], [pinMove, callMove, file("src/x.js", patch(["a", "b"]))]), true, "has run") && is(two([summary(done)], [file("core/.github/workflows/x.yml", patch(["a", "b"]))]), true, "has run"), "pins moved alone, and the copy under core/, ask one");
+ok(is(two([], undefined), false, "no security review") && is(judge(pull, [summary(done)], [], []), true, "has run"), "given no files, it asks what it asked before");
+const proof = (sha) => `Security review: comment-only.mjs, from the core's main:\n\n    comments and steps' names alone in .github/, .claude/ and actions, abc1234..${sha.slice(0, 7)}: .github/workflows/ci.yml\n    checked head ${sha}\n`;
+ok(is(two([said(proof(HEAD))], [stepChange]), true, "a security review is posted") && commentsAlone(proof(HEAD), HEAD), "comment-only.mjs's printout for the head, posted, asks rule 8's one");
+ok(is(two([said(proof(SEEN))], [stepChange]), false, "second") && !commentsAlone(proof(HEAD).replace("comments and steps' names alone in", "NOT ALONE"), HEAD) && !commentsAlone(`checked head ${HEAD}0`, HEAD) && is(two([said(proof(HEAD), "NONE"), summary(done)], [stepChange]), false, "second"), "not for another head, not without its line, not from another account");
+ok(is(judge(bump, [], [], its, [file(".github/workflows/ci.yml", pinMove.patch)]), true, "Dependabot's own") && is(judge(bump, [], [], its, [stepChange]), false, "second"), "Dependabot's own moving a pin passes as before; one changing more than a pin asks two");
+
 // From the command line, as the workflow runs it.
 const dir = mkdtempSync(join(tmpdir(), "security-review-"));
 try {
   const script = join(dirname(fileURLToPath(import.meta.url)), "security-review.mjs");
-  const run = (p, c, env = {}, r = undefined, k = undefined) => {
+  const run = (p, c, env = {}, r = undefined, k = undefined, f = undefined) => {
     writeFileSync(join(dir, "pull.json"), JSON.stringify(p));
     writeFileSync(join(dir, "comments.json"), JSON.stringify(c));
     if (r !== undefined) writeFileSync(join(dir, "review-comments.json"), JSON.stringify(r));
     if (k !== undefined) writeFileSync(join(dir, "commits.json"), JSON.stringify(k));
-    const files = [join(dir, "pull.json"), join(dir, "comments.json"), ...(r === undefined ? [] : [join(dir, "review-comments.json")]), ...(k === undefined ? [] : [join(dir, "commits.json")])];
+    if (f !== undefined) writeFileSync(join(dir, "files.json"), JSON.stringify(f));
+    const files = [join(dir, "pull.json"), join(dir, "comments.json"), ...(r === undefined ? [] : [join(dir, "review-comments.json")]), ...(k === undefined ? [] : [join(dir, "commits.json")]), ...(f === undefined ? [] : [join(dir, "files.json")])];
     return JSON.parse(execFileSync(process.execPath, [script, ...files], { encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
   };
   const advisory = run(pull, [[summary(running)]]);
@@ -124,6 +151,8 @@ try {
   ok(strict.status.state === "pending" && strict.status.target_url.endsWith("/runs/7") && run(pull, [[summary(done)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review has run");
   ok(run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T11:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "pending" && run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T13:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "success", "given the review comments too, it weighs a finding against a posted review");
   ok(run(bump, [], { ADVISORY: "false" }, [], its).status.state === "success" && run(bump, [], { ADVISORY: "false" }, []).status.state === "pending", "given the commits too, it passes Dependabot's own, and without them it does not");
+  const asked = run(pull, [[summary(done)]], { ADVISORY: "false" }, [], [], [[stepChange]]);
+  ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: what runs by itself changed") && run(pull, [[summary(done)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success", "given the files too, it asks two where what runs by itself changed, and says how to mend it");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");
   let usage = 0;

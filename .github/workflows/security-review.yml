@@ -1,17 +1,19 @@
 # The security-review check (floor rule 8: a PR that touches a way in merges only after its security review has run, and
 # none with a blocking security finding open), for every project that takes the core: it gives the head commit of each
 # open pull request that is no draft a commit status, "security-review", that says whether its security review has run,
-# and beside it a second, "code-review", that says whether a code review running on that commit has finished
-# (scripts/code-review-wait.mjs; modules/reviews.md, point 2: a review already running is waited for, and one that
-# hangs is taken over, its review posted in a comment that opens "Code review:" naming the commit by its whole SHA,
-# which ends the wait; such a comment starts the job only where the check is not advisory, since an advisory status
-# passes anyway and the next push or Codex's own summary rewrites it, so that no project starts a job for it it did not
-# start before).
+# and beside it a second, "code-review", that says whether a code review running on that commit has finished, and
+# whether a pull request that needs a code review has had one (scripts/code-review-wait.mjs; modules/reviews.md,
+# "Which" and point 2: a review already running is waited for, and one that hangs is taken over, its review posted in a
+# comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
+# job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
+# summary rewrites it, so that no project starts a job for it it did not start before).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a member or a collaborator, which is how the fallback
 # reviewer's or another reviewer's is posted (modules/reviews.md, point 3); where Codex marks a finding of its security
 # review open, only such a comment settles it, posted after its newest finding where one is to be found; nothing else
-# counts (scripts/security-review.mjs, whose header says what it does not hold). A project calls it (workflow_call) from
+# counts (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show
+# a change to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
+# which count, and when one is enough). A project calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
 # and on issue_comment (created and edited), so that the status follows a review the moment its comment arrives and
 # moves with each push, in a job that grants contents: read, pull-requests: read and statuses: write, pinned to a full
@@ -110,8 +112,9 @@ jobs:
           gh api --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100" > "$d/comments.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100" > "$d/findings.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
+          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
           node "$ROOT/scripts/security-review.mjs" "$d/pull.json" "$d/comments.json" "$d/findings.json" \
-            "$d/commits.json" > "$d/out.json"
+            "$d/commits.json" "$d/files.json" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
             echo "The pull request is closed or a draft: nothing to say."
@@ -125,7 +128,8 @@ jobs:
           # whose core is older has no such script, and says nothing of it)
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
-            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" "$d/comments.json" > "$d/code.json" \
+            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" "$d/comments.json" "$d/commits.json" \
+              "$d/files.json" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
             else echo "::warning::the code-review status could not be written: scripts/code-review-wait.mjs or its post failed"; fi
