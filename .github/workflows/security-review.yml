@@ -193,14 +193,15 @@ jobs:
             else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
           fi
           # an update from main stands for nothing reviewed before it unless it is the merge git makes of its parents
-          # (#323): the default branch's clean-merges.mjs proves which are, in that clone, with no token; where it
+          # (#323): the default branch's clean-merges.mjs proves which are, in that clone, with no token (the step's
+          # GH_TOKEN taken from its environment too); where it
           # cannot, none is, and a review of the head is asked (a default branch whose core is older has no such
           # script, and its scripts read the parents alone, as before)
           merges=()
           if [ -f "$ROOT/scripts/clean-merges.mjs" ]; then echo '[]' > "$d/merges.json"; merges=("$d/merges.json"); fi
           if [ -n "$merge" ]; then
             proof="$PWD/$ROOT/scripts/clean-merges.mjs"
-            if [ -n "$cloned" ] && (cd "$d/pr" && timeout 60 node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
+            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN timeout 60 node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
               && jq -e 'type == "array"' "$d/proved.json" > /dev/null
             then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
