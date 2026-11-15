@@ -221,7 +221,6 @@ jobs:
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         env:
           COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        if: ${{ matrix.part != 'projects' }}
         run: node scripts/copies.mjs .github/copies.json
       - name: The suites kept to their time mark
         env:
