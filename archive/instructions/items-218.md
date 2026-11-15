@@ -199,6 +199,20 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      core's own `CHOICES.md`.
 
 223. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it on issues #326 and #331, the one in a note, the other in its text under "The owner's word", and
+     as the owner then told the orchestrator, who passed it on word for word to the builder of these trims). Shown three
+     trims of the floor that leanness checks had found and left, since no queued yes covered a change to the floor
+     (floor rule 14's first bullet, which its heading already says; "never force-pushed" in rule 12, which "never pushed
+     to" covers; and the first "`AGENTS.md`, `CLAUDE.md`" in rule 3's list of rule files, which "an `AGENTS.md` or
+     `CLAUDE.md` in any folder" covers), the owner agreed to all three, and told the orchestrator:
+
+     > Also from the owner:
+     > - Yes to three floor trims: #326, and the two that the leanness check on pull request #287 found and left ("never
+     >   force-pushed" in rule 12, and the first `AGENTS.md`, `CLAUDE.md` in rule 3's list).
+
+     Behind floor rules 3, 12 and 14 as they read since, each the same rule in fewer words.
+
+224. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
      session recorded it on issue #282, labelled `by:chat`; first added to #277, which had already been built and
      closed, so it stands as an issue of its own). The owner asked:
 

@@ -49,7 +49,7 @@ A finding, not blocking:
   answer, save for growth a sync of the core brought.
 
 **A brief written in a pull request** (a template of the starter kit that hands work, or a brief a module, script or
-workflow holds; core archive 223): blocking where it misses one of the four things "A brief is written as a rule is"
+workflow holds; core archive 224): blocking where it misses one of the four things "A brief is written as a rule is"
 in `modules/helpers.md` names, or gives its reader a title or stakes that are not real.
 
 **A rule file changed:**
