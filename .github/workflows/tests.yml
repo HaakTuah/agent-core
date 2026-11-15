@@ -22,6 +22,12 @@ on:
 permissions:
   contents: read
 
+# (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a push to main
+# is its own group and is never cancelled; #388)
+concurrency:
+  group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   suites:
     strategy:

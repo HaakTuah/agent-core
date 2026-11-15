@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
+import { parseYaml } from "./workflow-run.mjs";
 import { lines, readable, reads, unlinked } from "./workflows.mjs";
 
 let failed = 0;
@@ -51,4 +52,28 @@ try {
   const good = r.status === 1 && /a\.yml:2: pull_request_target .*\. Mend: take the word out/.test(out) && /and on 2 more lines\. Mend:/.test(out) && /b\.yml: not UTF-8 text.*Mend: save it as UTF-8/.test(out) && mended(out);
   ok(good, `run, it fails each, by file and line, and each failure says its mend${good ? "" : `:\n${out}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+// ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
+// Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
+// the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
+// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
+// at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
+// merged branches, which no pull request starts and which never cancel, and the scheduled ones.
+const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
+const CANCEL = "${{ github.event_name == 'pull_request' }}";
+const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml"]);
+const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
+const loose = [];
+for (const file of fs.readdirSync(wfDir).filter(f => f.endsWith(".yml") && !APART.has(f))) {
+  const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+  for (const [id, job] of Object.entries(wf.jobs ?? {})) {
+    const c = job.concurrency ?? wf.concurrency;
+    if (!(c && typeof c.group === "string" && c.group.includes(KEY) && c["cancel-in-progress"] === CANCEL)) loose.push(`${file}/${id}`);
+  }
+}
+ok(!loose.length, `each job a pull request starts gives way to a newer run for the same pull request, and only then${loose.length ? `: not ${loose.join(", ")}` : ""}`);
+const groups = Object.fromEntries(fs.readdirSync(wfDir).filter(f => f.endsWith(".yml")).map(f => [f, parseYaml(fs.readFileSync(path.join(wfDir, f), "utf8"))]));
+ok(Object.values(groups["codeql.yml"].jobs)[0].concurrency.group.includes("${{ matrix.language }}") && groups["signatures.yml"].jobs.signatures.concurrency.group.includes("${{ inputs.directory }}") && groups["nuget.yml"].jobs.nuget.concurrency.group.includes("${{ inputs.config }}"),
+  "and jobs of one run that differ (a matrix, a call for each lock folder or config) are groups of their own, so none cancels another");
+ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] === false, "while the security-review check's runs go one at a time, never cancelled");
+
 process.exit(failed ? 1 : 0);
