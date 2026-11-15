@@ -59,7 +59,8 @@ one declared entrance.
   piece, so the checks read what depends on what and the audit's reader judges what no number shows. Reason: on 15
   November 2026 three codebases held 19, 54 and 79 functions with more than 30 branch points, the worst in the files
   changed most. Held by the shape check. A hub, a file most others import, has no mark: one that holds one small fact
-  is as it should be, and the audit's reader judges the others.
+  is as it should be, and the audit's reader judges the others. The time a user waits on, and how strong the tests
+  are, get their own measures as their rules come (#318, #253).
 - **The tests have a time mark.** By default each suite a project names in the config's "suites" has a mark in
   seconds, set with room above what it takes today so that a slow runner fails nothing, and is started through the
   check (`--suite`), which fails one that passes and took longer. Each system's tests can be started alone. The
@@ -88,4 +89,5 @@ one declared entrance.
 **What the check reads.** JavaScript and TypeScript, by the reader of the measures (`core/scripts/code-shape.mjs`). It
 never guesses: a file that holds JSX, whose functions its reader cannot tell, an import that leads nowhere it can tell
 and a file in another language are counted and said on every run, never failed. A project holds those to the same
-rules with its language's own tools, named in its *shape check*.
+rules with its language's own tools, named in its *shape check*. A project that has not written its config yet is
+held to the starter kit's own, with each pull request's base as its baseline, from the sync that brings the check.

@@ -7,7 +7,8 @@
 # reports and never fails (every module the manifest's list neither takes nor leaves out, every slot a taken module uses
 # that no row fills); and the shape check (the core's modules/code-shape.md: nothing new of a function past a mark, an
 # import across a boundary nobody declared, a cycle or a tie to one platform, what stood before listed in a baseline
-# that only shrinks), which passes, saying so, in a project that has not taken it yet. A project calls it (workflow_call) on every pull request and push to main, docs-only changes
+# that only shrinks), which holds a project that has not written its config yet to the starter kit's own, with the
+# pull request's base as its baseline. A project calls it (workflow_call) on every pull request and push to main, docs-only changes
 # included, since the rule files are what it guards most, pinned to a full commit SHA ("How a project takes the core"
 # in README.md, point 5). It runs the project's own core/scripts/copies.mjs, pointers.mjs, reading-size.mjs,
 # workflows.mjs, manifest-reads.mjs and shape.mjs, with the configs the project names (the shape check's by its
@@ -66,7 +67,7 @@ jobs:
       - name: The manifest takes or leaves out each module and fills each slot they use (reports, never fails)
         if: ${{ !cancelled() }}
         run: node core/scripts/manifest-reads.mjs
-      - name: Nothing new in how the code is put together (where the project has taken the shape check)
+      - name: Nothing new in how the code is put together
         if: ${{ !cancelled() }}
         env:
           SHAPE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}

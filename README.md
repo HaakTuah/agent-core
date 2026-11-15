@@ -103,7 +103,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `pull_request_target` (floor rule 2).
    - **The shape check,** in the same job: `shape.mjs`, with a config of the project's own (the *shape check*: its
      systems, its marks and its suites' time marks) and a baseline of what stood before it, which only shrinks
-     (`modules/code-shape.md`). It passes, saying so, in a project that has not taken it yet. From its baseline
+     (`modules/code-shape.md`). A project that has not written its config yet is held to the starter kit's, with each
+     pull request's base as its baseline. From its baseline
      `dose.mjs` reads the state the codebase is in, and the scheduled look keeps the cleaning and the audits that
      state makes due (`modules/cleaning.md`).
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
