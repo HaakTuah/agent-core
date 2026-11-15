@@ -6,6 +6,9 @@ the core the same way, its *owner's account* filled in, and in its copy "the own
 in `archive/`, whose words stay the core's owner's: its stand-in weighs them as that owner's reasoning, after its own
 owner's words, and marks an answer that rests on them alone unsure (`modules/inbox.md`; core archive 166).
 
+A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
+the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
+
 ## Two layers
 
 - **The floor** (`floor/`): what keeps the owner from harm and loss, taken whole by every project. If a project dropped
