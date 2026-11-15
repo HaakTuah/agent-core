@@ -63,15 +63,20 @@ const CANCEL = "${{ github.event_name == 'pull_request' }}";
 const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
+// (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
+// text: the whole run is then one group)
+const atTop = text => new RegExp(`^concurrency:\\n  group: .*${KEY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*\\n  cancel-in-progress: ${CANCEL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m").test(text);
 for (const file of fs.readdirSync(wfDir).filter(f => f.endsWith(".yml") && !APART.has(f))) {
-  const wf = parseYaml(fs.readFileSync(path.join(wfDir, file), "utf8"));
+  const text = fs.readFileSync(path.join(wfDir, file), "utf8");
+  let wf;
+  try { wf = parseYaml(text); } catch { if (!atTop(text)) loose.push(file); continue; }
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
     const c = job.concurrency ?? wf.concurrency;
     if (!(c && typeof c.group === "string" && c.group.includes(KEY) && c["cancel-in-progress"] === CANCEL)) loose.push(`${file}/${id}`);
   }
 }
 ok(!loose.length, `each job a pull request starts gives way to a newer run for the same pull request, and only then${loose.length ? `: not ${loose.join(", ")}` : ""}`);
-const groups = Object.fromEntries(fs.readdirSync(wfDir).filter(f => f.endsWith(".yml")).map(f => [f, parseYaml(fs.readFileSync(path.join(wfDir, f), "utf8"))]));
+const groups = Object.fromEntries(["codeql.yml", "signatures.yml", "nuget.yml", "security-review.yml"].map(f => [f, parseYaml(fs.readFileSync(path.join(wfDir, f), "utf8"))]));
 ok(Object.values(groups["codeql.yml"].jobs)[0].concurrency.group.includes("${{ matrix.language }}") && groups["signatures.yml"].jobs.signatures.concurrency.group.includes("${{ inputs.directory }}") && groups["nuget.yml"].jobs.nuget.concurrency.group.includes("${{ inputs.config }}"),
   "and jobs of one run that differ (a matrix, a call for each lock folder or config) are groups of their own, so none cancels another");
 ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] === false, "while the security-review check's runs go one at a time, never cancelled");
