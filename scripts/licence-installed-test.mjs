@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { check, leftOut, lockForm, plainVersion } from "./licence-installed.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -70,7 +71,7 @@ ok(["node_modules//mossgrip-lib", "node_modules///mossgrip-lib", "node_modules/.
 const shrink = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { version: "1.0.0", license: "ISC" } }, "npm-shrinkwrap.json");
 ok(/npm-shrinkwrap\.json says its licence is "MIT"/.test(said(shrink)), "a shrinkwrap file alone is the lock file read");
 fs.writeFileSync(path.join(shrink, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { [A]: { version: "1.0.0", license: "ISC" } } }));
-ok(/threw: both npm-shrinkwrap\.json and package-lock\.json stand in the folder: keep one/.test(said(shrink)), "where both lock files stand, an install reads one and the licence check may read the other: it stops");
+ok(/threw: both npm-shrinkwrap\.json and package-lock\.json stand in the folder\. Mend: delete one/.test(said(shrink)), "where both lock files stand, an install reads one and the licence check may read the other: it stops");
 const none = path.join(tmp, "none"); fs.mkdirSync(none);
 const old = project({}, {}); fs.writeFileSync(path.join(old, "package-lock.json"), JSON.stringify({ lockfileVersion: 1, dependencies: {} }));
 const broken = project({}, {}); fs.writeFileSync(path.join(broken, "package-lock.json"), "{");
@@ -104,7 +105,7 @@ ok(leftOut(chain, LINUX).has("node_modules/c199") && !leftOut(chain, LINUX).has(
 const script = fileURLToPath(new URL("./licence-installed.mjs", import.meta.url));
 const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8", cwd: tmp });
 const fine = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { version: "1.0.0", license: "MIT" } }), forged = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { version: "1.0.0", license: "GPL-3.0-only" } });
-ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(run(fine).stdout) && run(forged).status === 1 && /^FAIL: "node_modules\/mossgrip-lib": /.test(run(forged).stderr) && run(none).status === 1 && run().status === 1,
+ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(run(fine).stdout) && run(forged).status === 1 && /^FAIL: "node_modules\/mossgrip-lib": /.test(run(forged).stderr) && mended(run(forged).stderr) && run(none).status === 1 && mended(run(none).stderr) && run().status === 1 && mended(run().stderr),
   "as a program: it passes and says what it read, fails with each failure on a line, and fails where there is no lock file, the folder named or the current one");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the licences read back from the packages`);

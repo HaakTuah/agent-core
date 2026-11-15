@@ -361,9 +361,9 @@ function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join
   const base = posix.dirname(lockPath) === "." ? "" : posix.dirname(lockPath);
   const read = (p) => JSON.parse(text(posix.join(base, p)));
   const lock = read(posix.basename(lockPath));
-  if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm 7 or later (npm install --package-lock-only)`);
+  if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
-  if (odd) throw new Error(`${lockPath} holds an entry at ${JSON.stringify(odd[0]).slice(0, 200)} that is not written as npm writes one. Mend: write it anew with npm (npm install --package-lock-only), never by hand`);
+  if (odd) throw new Error(`${lockPath} holds an entry at ${JSON.stringify(odd[0]).slice(0, 200)} that is not written as npm writes one. Mend: write it anew with npm, never by hand: its install, given --package-lock-only`);
   const workspaces = workspacesIn(read("package.json"), posix.join(base, "package.json"));
   const shipped = ships ? shippedPaths(lock.packages, workspaces, (dir) => read(posix.join(dir, "package.json"))) : new Set();
   return lockRead(lock.packages, workspaces)

@@ -42,15 +42,15 @@ function overrides(value, list, file, at, problems, picks = false) {
     points = lists.length > 0 && lists.every((deps) => exact(deps[value.slice(1)]));
   }
   if (typeof value === "string") {
-    if (!exact(value) && !points) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
+    if (!exact(value) && !points) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version. Mend: write one, such as 1.2.3, then write the lock file anew with npm: its install, given --package-lock-only`);
   } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    if (picks && !Object.hasOwn(value, ".")) problems.push(`${file}: overrides ${show(at)}: a key that picks among versions needs its value said, as a text or as "."`);
+    if (picks && !Object.hasOwn(value, ".")) problems.push(`${file}: overrides ${show(at)}: a key that picks among versions has no value of its own. Mend: give it one, one exact version as a text, or "." for the version the project names`);
     for (const [name, inner] of Object.entries(value)) {
       const here = at === "" ? name : `${at} > ${name}`;
-      if (name === "." && typeof inner !== "string") problems.push(`${file}: overrides ${show(here)}: ${show(inner)} is not one exact version`);
+      if (name === "." && typeof inner !== "string") problems.push(`${file}: overrides ${show(here)}: ${show(inner)} is not one exact version. Mend: write one, such as 1.2.3`);
       else overrides(inner, list, file, here, problems, name.indexOf("@", 1) !== -1);
     }
-  } else problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version`);
+  } else problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version. Mend: write one, such as 1.2.3, then write the lock file anew with npm: its install, given --package-lock-only`);
 }
 
 // The entry npm installs for `name` as seen from the package at `from`: the nearest node_modules going up.
@@ -69,28 +69,28 @@ export function check(lockfile, read) {
   const packages = lock?.packages;
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
-  if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread`);
+  if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread. Mend: write the lock file anew with npm: its install, given --package-lock-only`);
   for (const key of Object.keys(packages).filter(own)) {
-    if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's`); continue; }
+    if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's. Mend: make it a folder inside the project, or take it out of the project's workspaces, then write the lock file anew with npm: its install, given --package-lock-only`); continue; }
     const file = posix.join(root, key, "package.json");
     let list;
-    try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${e.message})`); continue; }
+    try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${e.message}). Mend: correct it to JSON`); continue; }
     if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
     for (const kind of KINDS) {
       const deps = list?.[kind];
       if (deps === undefined) continue;
-      if (deps === null || typeof deps !== "object" || Array.isArray(deps)) { problems.push(`${file}: "${kind}" is no list of names and versions`); continue; }
+      if (deps === null || typeof deps !== "object" || Array.isArray(deps)) { problems.push(`${file}: "${kind}" is no list of names and versions. Mend: write it as an object of each name to its version`); continue; }
       for (const [name, spec] of Object.entries(deps)) {
         const entry = installed(packages, key, name);
         const linked = entry !== null && typeof entry === "object" && entry.link === true && typeof entry.resolved === "string";
         if (linked && own(entry.resolved) && inside(entry.resolved) && Object.hasOwn(packages, entry.resolved)) continue; // (one of the project's own)
         if (!exact(spec)) {
-          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version`);
+          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version. Mend: write the one exact version the lock file installs${entry && typeof entry === "object" && typeof entry.version === "string" ? `, ${entry.version}` : ""}, then write the lock file anew with npm: its install, given --package-lock-only`);
         } else if (entry === undefined) {
           if (kind === "peerDependencies" || kind === "optionalDependencies") continue; // (a lock file may leave these out)
-          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not in ${lockfile}`);
+          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not in ${lockfile}. Mend: write the lock file anew with npm: its install, given --package-lock-only`);
         } else if (entry === null || typeof entry !== "object" || spec !== entry.version) {
-          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not the version the lock file installs (${show(entry?.version ?? null)})`);
+          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not the version the lock file installs (${show(entry?.version ?? null)}). Mend: write the lock file anew with npm: its install, given --package-lock-only, or write the version it installs`);
         }
       }
     }
@@ -102,8 +102,8 @@ if (started(import.meta.url)) {
   const configPath = process.argv[2];
   if (!configPath) { console.error("usage: node core/scripts/exact-versions.mjs <the licence check's config>"); process.exit(2); }
   let lockfiles;
-  try { lockfiles = JSON.parse(readFileSync(configPath, "utf8")).lockfiles ?? []; } catch (e) { console.error(`FAIL: ${configPath} cannot be read (${e.message})`); process.exit(1); }
-  if (!Array.isArray(lockfiles) || lockfiles.some((f) => typeof f !== "string")) { console.error(`FAIL: "lockfiles" in ${configPath} is no list of paths`); process.exit(1); }
+  try { lockfiles = JSON.parse(readFileSync(configPath, "utf8")).lockfiles ?? []; } catch (e) { console.error(`FAIL: ${configPath} cannot be read (${e.message}). Mend: name the licence check's config, written as JSON`); process.exit(1); }
+  if (!Array.isArray(lockfiles) || lockfiles.some((f) => typeof f !== "string")) { console.error(`FAIL: "lockfiles" in ${configPath} is no list of paths. Mend: write it as a list of the lock files' paths`); process.exit(1); }
   const problems = lockfiles.flatMap((f) => check(posix.normalize(f), (p) => readFileSync(p, "utf8")));
   for (const p of problems) console.error(`FAIL: ${p}`);
   console.log(problems.length ? `${problems.length} dependencies not at one exact version (floor rule 7)` : `ok   every dependency of ${lockfiles.length} lock file${lockfiles.length === 1 ? "" : "s"} is at the one exact version it installs`);

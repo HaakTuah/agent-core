@@ -206,7 +206,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         for (const line of commandLines(json)) fetches(String(line), f, line.literal === true);
         const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
         if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
-          fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile (npm install --package-lock-only) and name it in the config's "lockfiles"`);
+          fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile with npm, by its install given --package-lock-only, and name it in the config's "lockfiles"`);
       }
     } else if (other) {
       if (!byHand(f)) fail(`${f} is in a language the scan cannot read. Mend: name it in the "files" of the entries of what it uses`);
