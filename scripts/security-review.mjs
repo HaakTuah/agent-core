@@ -9,11 +9,12 @@
 // posted after it began ends the wait for it (that review is waited for: core archive 206), never one posted before, a
 // note that none is needed among them: it began when the summary's row for it says it has run since, where that time
 // can be read and is no later than the summary's last change, and otherwise at that last change, the latest it can
-// have begun. A new push starts it again, so a review posted on an earlier head counts no longer while it runs. Where
-// Codex's summary says a finding of its security review is open, the check
-// waits until such a comment is posted after Codex's newest security finding: the fallback reviewer's check of the fix
-// (Codex's own mark of an open finding does not clear by itself once the finding is fixed). Where the mark stands and
-// no finding of Codex's is to be found among the comments, such a comment settles it whenever it was posted.
+// have begun. Where a push starts it again, a review posted before that counts no longer while it runs; where Codex
+// does not start it on a push, the later commit's check stays with the reviews, as below. Where Codex's summary says a
+// finding of its security review is open, the check waits until such a comment is posted after Codex's newest security
+// finding: the fallback reviewer's check of the fix (Codex's own mark of an open finding does not clear by itself once
+// the finding is fixed). Where the mark stands and no finding of Codex's is to be found among the comments, such a
+// comment settles it whenever it was posted.
 // Dependabot's own pull request (opened by it from a branch of the repository, every commit of it written by Dependabot
 // and signed by GitHub, so that one somebody else has pushed to, or brought up to date by a merge, is its own no
 // longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
