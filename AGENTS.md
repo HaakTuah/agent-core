@@ -174,8 +174,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
   `node core/scripts/core-cost.mjs --cost`, run in each project of the owner's, says what share of its merged PRs were
   the core's upkeep and what a PR took, and `node core/scripts/stand-in-record.mjs` the stand-in's verdicts and how
-  many of the owner's answers they matched (core archive 199); the numbers go into that review's report, beside the
-  last ones'. Where the
+  many of the owner's answers they matched (core archive 199), and `node core/scripts/review-record.mjs` what each
+  review found and the bugs that reached `main` all the same (#234); the numbers go into that review's report, beside
+  the last ones'. Where the
   core's share grew and the project's own work did not, the review says why, or what of the core goes for it.
 - **The core's state report reads the projects that take it** (core archive 218): each month the session that takes
   the core's state report, where gh answers for the owner's account, adds to it what `node scripts/state-report.mjs --projects` prints:

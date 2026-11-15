@@ -80,6 +80,20 @@ export function print(t, repo) {
   return lines.join("\n");
 }
 
+// The rows gh gives for a path, one JSON value a line of what `jq` prints, page by page: a cloud session's gh cannot
+// follow pages by itself. `path` has its `?` already.
+export function pages(path, jq) {
+  const rows = [];
+  for (let page = 1; page <= 500; page++) {
+    const out = execFileSync("gh", ["api", `${path}&per_page=100&page=${page}`, "--jq", jq],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
+    const got = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
+    rows.push(...got);
+    if (got.length < 100) break;
+  }
+  return rows;
+}
+
 function main(args) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const open = args.includes("--open"), at = args.indexOf("--repo"), by = args.indexOf("--owner");
@@ -92,18 +106,6 @@ function main(args) {
   if (!REPO.test(repo ?? "")) fail("the repository is not known: give --repo owner/name, or run in a clone of it");
   const account = by >= 0 ? args[by + 1] : repo.split("/")[0];
   const same = login => String(login ?? "").toLowerCase() === account.toLowerCase(); // (GitHub's logins ignore case)
-  // (page by page: a cloud session's gh cannot follow pages by itself)
-  const pages = (path, jq) => {
-    const rows = [];
-    for (let page = 1; page <= 500; page++) {
-      const out = execFileSync("gh", ["api", `${path}&per_page=100&page=${page}`, "--jq", jq],
-        { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
-      const got = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
-      rows.push(...got);
-      if (got.length < 100) break;
-    }
-    return rows;
-  };
   const comments = pages(`repos/${repo}/issues/comments?sort=created`,
     ".[] | [(.issue_url | split(\"/\") | last), .created_at, .user.login, .body] | @json")
     .map(([issue, at, login, body]) => ({ issue, at, body, writer: same(login) }));
