@@ -198,7 +198,21 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `scripts/look.mjs`, the starter kit's `docs/choices.md`, the slots *choice records* and *owner's choices*, and the
      core's own `CHOICES.md`.
 
-223. **14 and 15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not
+223. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it on issues #326 and #331, the one in a note, the other in its text under "The owner's word", and
+     as the owner then told the orchestrator, who passed it on word for word to the builder of these trims). Shown three
+     trims of the floor that leanness checks had found and left, since no queued yes covered a change to the floor
+     (floor rule 14's first bullet, which its heading already says; "never force-pushed" in rule 12, which "never pushed
+     to" covers; and the first "`AGENTS.md`, `CLAUDE.md`" in rule 3's list of rule files, which "an `AGENTS.md` or
+     `CLAUDE.md` in any folder" covers), the owner agreed to all three, and told the orchestrator:
+
+     > Also from the owner:
+     > - Yes to three floor trims: #326, and the two that the leanness check on pull request #287 found and left ("never
+     >   force-pushed" in rule 12, and the first `AGENTS.md`, `CLAUDE.md` in rule 3's list).
+
+     Behind floor rules 3, 12 and 14 as they read since, each the same rule in fewer words.
+
+224. **14 and 15 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not
      the design session, as that session recorded it on issue #235, labelled `by:chat`, its note "What this issue asks
      to be built, in one place" gathering what the owner agreed to). Of an audit that found 43 of 122 rules held by
      nothing but a session reading them, and of staged cases that would test those rules on a fresh session, the
