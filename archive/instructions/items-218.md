@@ -319,7 +319,20 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      the count of branch points in `scripts/code-shape.mjs`, the near-copies in `scripts/copies.mjs`, the starter kit's
      `checks/shape.json`, and the slots *shape check*, *dose* and *audits*.
 
-227. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+227. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
+     session recorded it in a note on issue #342, labelled `by:builder` and filed by the builder of #242, and as the
+     owner then told the orchestrator, who passed it on word for word to the builder of this rule). Shown that the
+     list of what never matters to a project (item 224) left out the core's own queue and the core's workflows that no
+     project calls, so that nearly every release still asked a sync, the owner agreed that `QUEUE.md` and those
+     workflows join the list, on the condition the session proposed: each workflow is named one by one, the list holding
+     no "and similar" and no pattern. To the orchestrator:
+
+     > From the owner: yes to #342, with each workflow named one by one and no "and similar".
+
+     Behind the core's own files named in "A release that brings nothing a project takes asks no sync of it" in
+     `README.md`, "How a project takes the core", point 1, and `OWN_FILES` in `scripts/releases.mjs`.
+
+228. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
      design session, as that session recorded it on issue #253, labelled `by:chat`, under "What it is", saying the
      owner agreed to it). The session set out what a search the owner had asked for found, and what it would build from
      it, this among it: a measure of how strong a project's tests are, whether they would fail if a fault were put into
