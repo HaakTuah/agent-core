@@ -18,6 +18,7 @@
 //
 //   node core/scripts/core-cost.mjs [--since YYYY-MM-DD] [--split YYYY-MM-DD] [--cost]
 import { execFileSync } from "node:child_process";
+import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 
@@ -133,6 +134,12 @@ export function repoOf() {
   return REPO.test(repo ?? "") ? repo : null;
 }
 
+// The project's rule files for `classify`: in the core's own repository every file is protected (its SECURITY.md, rule 3),
+// so every file is a rule file and its pull requests count as upkeep; anywhere else, the list its SECURITY.md gives
+// (`read`, rule-files.mjs).
+export const EVERY = { includes: () => true };
+export const rulesFor = (repo, read = ruleFiles) => (repo === CORE ? EVERY : read());
+
 // The pull requests merged into the default branch from `since` (a day, or none), as { number, when, kind, lines },
 // and the repository ({ repo, merged }): read from the clone the process runs in, whose root is its directory. It
 // throws where the clone knows no default branch. Without a repository no branch counts as Dependabot's, which it says.
@@ -169,7 +176,7 @@ function main(argv) {
   const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
   for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
   let rules;
-  try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = ruleFiles(); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
+  try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = rulesFor(repoOf()); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
   let repo, merged;
   try { ({ repo, merged } = mergedPulls(rules, since)); } catch (e) { fail(e.message); }
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");

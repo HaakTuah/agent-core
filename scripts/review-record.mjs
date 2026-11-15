@@ -24,9 +24,8 @@
 //
 //   node core/scripts/review-record.mjs [--since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
-import { mergedPulls } from "./core-cost.mjs";
+import { mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
 import { codexState } from "./security-review.mjs";
-import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { pages } from "./stand-in-record.mjs";
 
@@ -53,7 +52,7 @@ export function postedKind(body) {
   if (!m) return null;
   if (m[1] === "Design check") return "design";
   if (m[1] === "Code review") return "code";
-  return /^(?:\*\*)?none needed\b/iu.test(m[2]) ? "none-needed" : "security";
+  return /^(?:\*\*)?\s*none needed\b/iu.test(m[2]) ? "none-needed" : "security";
 }
 
 // The blocking points a posted review declares, as a number, or null where it declares none in the forms read or its
@@ -177,7 +176,7 @@ function main(args) {
   if (args.includes("--since") && !DAY.test(since ?? "")) fail("--since takes a day, YYYY-MM-DD");
   if (args.includes("--owner") && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(by ?? "")) fail("--owner needs the owner's account after it");
   let rules;
-  try { process.chdir(execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim()); rules = ruleFiles(); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
+  try { process.chdir(execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim()); rules = rulesFor(repoOf()); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
   let repo, merged;
   try { ({ repo, merged } = mergedPulls(rules, since)); } catch (e) { fail(e.message); }
   if (!repo) fail("the repository is not known (GITHUB_REPOSITORY, or origin's address)");
@@ -188,8 +187,8 @@ function main(args) {
   const inline = pages(`repos/${repo}/pulls/comments?sort=created&direction=asc`,
     ".[] | {pull: (.pull_request_url | split(\"/\") | last | tonumber), in_reply_to_id, user: {login: .user.login, type: .user.type}, body} | @json");
   const issues = pages(`repos/${repo}/issues?state=all&labels=bug`,
-    ".[] | select(.pull_request == null) | {number, at: .created_at, login: .user.login, body} | @json")
-    .filter(b => !since || b.at >= `${since}T00:00:00Z`);
+    ".[] | {number, at: .created_at, login: .user.login, body, pull: (.pull_request != null)} | @json")
+    .filter(b => !b.pull && (!since || b.at >= `${since}T00:00:00Z`)); // (pull requests are taken out after paging, so that a page's length is still GitHub's own)
   const pulls = merged.map(m => ({ number: m.number, kind: m.kind,
     reviews: perPull(issueComments.filter(c => c.issue === m.number), inline.filter(c => c.pull === m.number), owner) }));
   const t = tally(pulls);
