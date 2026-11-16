@@ -17,16 +17,17 @@ import { leadsOut } from "./guards.mjs";
 export const ENTRY_FILES = { claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" };
 // The folders a tool takes its instructions from (floor rule 3; tools/kiro.md and antigravity.md): every file in them.
 export const FOLDERS = [".kiro/steering", ".kiro/agents", ".agents/rules", ".agent/rules"];
-// (a file of the work tree is read only where, every link on its way followed, it lies inside the project: one that
-// leads out reads as not there)
+// (a file of the work tree is read only where, every link on its way followed, it lies inside the project and is a
+// file: one that leads out, or to a folder, reads as not there)
 const inside = f => !leadsOut(process.cwd(), f);
 const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(f => f && inside(f)); } catch { return []; } };
-const readHere = f => (fs.existsSync(f) && inside(f) ? fs.readFileSync(f, "utf8") : null);
+const readHere = f => { try { return inside(f) && fs.statSync(f).isFile() ? fs.readFileSync(f, "utf8") : null; } catch { return null; } };
 const FLOOR = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"];
 const TOOL_FILES = ["GEMINI.md", ...Object.values(ENTRY_FILES)];
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
-// to its base: a link followed while it leads to a file of that tree, at most 40 deep; null where it leads out of it or
-// nowhere, and for what is no file (a folder, a submodule). Run from the project's root.
+// to its base: every link on a path followed, the file's own and a folder's on its way, while it leads inside that tree,
+// at most 40 in all; null where one leads out of it or nowhere, and for what is no file (a folder, a submodule). Run
+// from the project's root.
 export function readAt(commit) {
   const run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   let modes = null;
@@ -37,16 +38,16 @@ export function readAt(commit) {
     }
     return modes.get(f);
   };
+  const show = at => { try { return run(["show", `${commit}:${at}`]); } catch { return null; } };
   return f => {
-    for (let at = f, hops = 0; hops <= 40; hops++) {
-      const m = mode(at);
-      if (m === undefined || !/^1[02]0/u.test(m)) return null;
-      let text;
-      try { text = run(["show", `${commit}:${at}`]); } catch { return null; }
-      if (m !== "120000") return text;
-      if (/^([\\/]|[A-Za-z]:)/u.test(text)) return null;
-      at = path.posix.normalize(path.posix.join(path.posix.dirname(at), text.replace(/\\/gu, "/")));
-      if (at === ".." || at.startsWith("../")) return null;
+    for (let at = path.posix.normalize(f), hops = 0; hops <= 40; hops++) {
+      if (at === ".." || at.startsWith("../") || at.startsWith("/")) return null;
+      // (the first part of the path, its own end included, that is a link: what stands there is read through it)
+      const parts = at.split("/"), k = parts.findIndex((_, i) => mode(parts.slice(0, i + 1).join("/")) === "120000");
+      if (k < 0) return /^100/u.test(mode(at) ?? "") ? show(at) : null;
+      const link = parts.slice(0, k + 1).join("/"), to = show(link);
+      if (to === null || /^([\\/]|[A-Za-z]:)/u.test(to)) return null;
+      at = path.posix.normalize(path.posix.join(path.posix.dirname(link), to.replace(/\\/gu, "/"), ...parts.slice(k + 1)));
     }
     return null;
   };

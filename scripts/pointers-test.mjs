@@ -124,6 +124,10 @@ try {
     g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a steering file that is a link inside");
     t = check({ POINTERS_BASE: "HEAD" });
     ok(t.status === 0 && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/inside\.md:3: .*the pull request's base held it/m.test(t.out), "a tool's file that is a link inside the project is read through it at the base too, so what it held is noted", t.out);
+    fs.symlinkSync("../../docs", path.join(tools, ".kiro/steering/docs"));
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a link to a folder");
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 0 && !/EISDIR/.test(t.out), "a link to a folder in a tool's folder is passed over, failing nothing", t.out);
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails

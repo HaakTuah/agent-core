@@ -132,6 +132,14 @@ try {
     check({}, "--tools");
     r = check({ COPIES_BASE: linked });
     ok(r.status === 0 && !/not yet in the baseline/.test(r.out), "and --tools lists it, which the base allows", r.out);
+    // (a link to a folder in a tool's folder is no file of it; a link through a linked folder is read through both)
+    fs.symlinkSync("../../docs", path.join(dir, ".kiro/steering/docs"));
+    fs.symlinkSync("docs", path.join(dir, "docsl"));
+    put("docs/b.md", `# More\n\n${SAID}.\n`);
+    fs.symlinkSync("../../docsl/b.md", path.join(dir, ".kiro/steering/through.md"));
+    const through = commit("a link to a folder, and one through a linked folder");
+    r = check({ COPIES_BASE: through });
+    ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*through\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it at the base too", r.out);
   }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);

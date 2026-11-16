@@ -15,6 +15,7 @@
 //
 //   node core/scripts/steps.mjs          from a project's root: the steps not done, each with its mend; nothing else
 import { execFileSync, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -146,9 +147,23 @@ function keysOnce(p) {
 // `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
 // old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
 // holds and fails none; null where nothing is left to list.
+// Both checks read only the files git tracks, as the work tree holds them, and the copies check its config and baseline
+// besides: where none of those changed since the last reading in this process, that reading's answer stands, so the
+// two runs are made once for each state of the project (a sync reads it once; a test, many times).
+const listedBefore = new Map();
 function toolFilesListed(p) {
   const config = copiesConfig(p);
   if (!p.safe(config)) throw new Unread(`the copies check's config \`${shown(config)}\` is no regular file of the project's own of at most ${READ_MOST} bytes`);
+  const git = args => execFileSync("git", args, { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 });
+  let baseline = null;
+  try { baseline = JSON.parse(p.read(config) ?? "")?.baseline; } catch { /* (its own run says what of the config it cannot read) */ }
+  const state = crypto.createHash("sha256").update(git(["ls-files", "-s", "-z"]));
+  for (const f of [...git(["ls-files", "-m", "-z"]).split("\0").filter(Boolean), config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
+  const key = `${p.root}\0${state.digest("hex")}`;
+  if (!listedBefore.has(key)) listedBefore.set(key, toolFilesRead(p, config));
+  return listedBefore.get(key);
+}
+function toolFilesRead(p, config) {
   const run = (script, args, env) => {
     const at = path.join(p.root, corePath(p.root) || "core/", "scripts", script);
     if (!fs.existsSync(at)) throw new Unread(`no copy of ${script} to run`);
