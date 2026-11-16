@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
 import { FIRST, HEADING, KINDS, LABEL, LEAST, MEASURES, MONTHS, OUTCOMES, corrections, counted, kindOf, lines, measure, outcomesFrom, windowOf } from "./outcomes.mjs";
-import { gather, read } from "./outcomes-read.mjs";
+import { gather, read, report as monthly } from "./outcomes-read.mjs";
 import { body, countsFrom } from "./state-report.mjs";
 
 let failed = 0, count = 0;
@@ -35,16 +35,20 @@ const found = corrections([
   issue(4, OWNER, "Correction: looks wrong\nBrought in by: #13", ["bug"]),
   issue(5, OWNER, "Brought in by: #14"),
   { ...issue(6, OWNER, "Correction: misread"), pull_request: {} },
+  issue(7, OWNER, "A bug.", [LABEL, "bug"]),
 ], [
   { issue: 1, at: "2026-10-06T00:00:00Z", login: OWNER, body: "Correction: rule missing\nBrought in by: #15" },
   { issue: 1, at: "2026-10-07T00:00:00Z", login: OWNER, body: "Correction: looks wrong" },
   { issue: 1, at: "2026-10-08T00:00:00Z", login: "someone-else", body: "Correction: misread" },
   { issue: 1, at: "2026-10-09T00:00:00Z", login: OWNER, body: "no kind here" },
+  { issue: 5, at: "2026-10-10T00:00:00Z", login: "someone-else", body: "Brought in by: #99" },
+  { issue: 7, at: "2026-10-10T00:00:00Z", login: OWNER, body: "Brought in by: #7" },
 ], OWNER);
 ok(JSON.stringify(found) === JSON.stringify([
   { at: "2026-10-05T00:00:00Z", pull: 10, kind: "misread" }, { at: "2026-10-06T00:00:00Z", pull: 15, kind: "rule missing" }, { at: "2026-10-07T00:00:00Z", pull: 10, kind: "looks wrong" },
   { at: "2026-10-05T00:00:00Z", pull: 11, kind: "does not work" }, { at: "2026-10-05T00:00:00Z", pull: 14, kind: null },
-]), "a correction is the owner's labelled issue and each note of the owner's on it with a kind; a bug with none does not work; another's, an unlabelled one and a pull request are not one", JSON.stringify(found));
+  { at: "2026-10-05T00:00:00Z", pull: 7, kind: "does not work" },
+]), "a correction is the owner's labelled issue and each note of the owner's on it with a kind; a bug with none does not work; the pull request named in a note of the owner's where the body names none; another's, an unlabelled one and a pull request are not one", JSON.stringify(found));
 
 // ---- the measures ----
 ok(counted(0) === "0 (± 0)" && counted(9) === "9 (± 6)" && counted(30) === "30 (± 11)", "a count stands with twice its square root");
@@ -81,6 +85,9 @@ ok(measure(big, "2026-10").find(r => r.key === "mending").months === 1, "a count
 const grown = { kb: 500, files: 100, large: 3, over: { lines: 2, depth: 0, branches: 5 }, marks: { lines: 60, depth: 4, branches: 15 } };
 const out = lines({ rows, grown, first: { misread: "0 (± 0) of 207 merged, 0 for every ten" }, previous: "- corrections that a rule was missing, for every ten merged tasks: 9 (± 6) of 50 merged, 1.8 for every ten." });
 const text = out.join("\n");
+const again = lines({ rows, grown, previous: `**${HEADING} in 2026-09**\n${out.join("\n")}` }).join("\n");
+ok(/a rule was missing[^\n]*At the last report: [^\n]*for every ten, over the last \d months, still under 30\./.test(again) && !/At the last report:[^\n]*At the /.test(again),
+  "a report the script wrote is read back as the last report, indented as it writes it", again.split("\n").find(l => l.includes("a rule was missing")));
 ok(OUTCOMES.filter(([k]) => k !== "cost").every(([, name]) => text.includes(`- **${name}**`)) && out[1].startsWith("- **The product does what was asked**"), "the report leads with the five outcomes, in their order");
 ok(/\*\*It is fast\*\*: no direct measure yet/.test(text) && /\*\*A new user can use it\*\*: no direct measure yet/.test(text) && !/does what was asked\*\*: no direct/.test(text) && !/does not break\*\*: no direct/.test(text),
   "an outcome with no direct measure says so");
@@ -133,6 +140,10 @@ ok(JSON.stringify(got.corrections) === JSON.stringify([{ at: iso(11), pull: 20, 
 ok(got.sample.find(p => p.number === 20).after.join() === "neither,check" && calls.some(r => /pulls\/20\/commits/.test(r)),
   "a commit after ready with no finding before it, where a check failed on the commit before, counts as a failed check, and the first after ready, with no commit before it to read, as neither", JSON.stringify(got.sample));
 ok(!calls.some(r => /issues\/comments|pulls\/comments\?|issues\/events\?/.test(r)), "nothing is listed repository-wide but the pull requests and issues of the span", calls.join(" "));
+ok(calls.some(r => /pulls\?state=all&sort=updated&direction=desc/.test(r)) && !calls.some(r => /sort=created/.test(r)), "the pull requests are listed newest updated first, so one opened before the span and merged in it is read");
+const manifest = "| *owner's account* | `o` |\n";
+ok(/the task was misread[^\n]*: 1 \(± 2\)/.test(monthly({ repo: "someone/r", month: "2026-10", manifest, root, gh }).join("\n")) && /the task was misread[^\n]*: 0 \(± 0\)/.test(monthly({ repo: "someone/r", month: "2026-10", manifest: "", root, gh }).join("\n")),
+  "the owner's corrections are read by the account the manifest names, not the repository's");
 ok(gather({ repo: "o/r", owner: "o", to: Date.parse(iso(11)), pulls: fixtures.pulls, issues: [] }).sample.map(p => p.number).join() === "20",
   "the sample is of the merges before the span's end");
 

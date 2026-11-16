@@ -15,6 +15,7 @@ import { priced, reading as costOf, sessionOf } from "./core-cost.mjs";
 import { reading as shapeReading, rulesOf } from "./dose.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { FIRST, LABEL, MEASURES, MONTHS, SAMPLE, corrections, growth, lines, measure, same, windowOf } from "./outcomes.mjs";
+import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
 
 const CLOSES = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #(\d{1,9})\b/giu;
@@ -26,10 +27,11 @@ const CLOSES = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #(\d{1,9})\b/giu;
 export function read(repo, from, to, owner = repo.split("/")[0], gh = ghApi) {
   const iso = new Date(from).toISOString().replace(/\.\d{3}Z$/u, "Z");
   const pulls = [];
+  // (newest updated first: a pull request merged in the span was updated in it, however long before it was opened)
   for (let page = 1; page <= 200; page++) {
-    const rows = JSON.parse(gh(`repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`) || "[]");
+    const rows = JSON.parse(gh(`repos/${repo}/pulls?state=all&sort=updated&direction=desc&per_page=100&page=${page}`) || "[]");
     pulls.push(...rows);
-    if (rows.length < 100 || rows.every(p => String(p.created_at) < iso)) break;
+    if (rows.length < 100 || rows.every(p => String(p.updated_at) < iso)) break;
   }
   const issues = pagesOf(`repos/${repo}/issues?state=all&since=${iso}`, gh).filter(i => !i.pull_request);
   const notes = n => pagesOf(`repos/${repo}/issues/${n}/comments`, gh).map(c => ({ issue: n, at: c.created_at, login: c.user?.login, user: c.user, body: c.body ?? "" }));
@@ -90,10 +92,11 @@ export function firstOf(repo, root = ".") {
   try { return JSON.parse(fs.readFileSync(`${root}/${FIRST}`, "utf8")).repos?.[repo] ?? null; } catch { return null; }
 }
 
-// The lines for the state report of `repo` for `month`; one line that says why where GitHub did not answer.
+// The lines for the state report of `repo` for `month`, the owner's account its manifest's (`manifest`; null in the
+// core, whose account is its own); one line that says why where GitHub did not answer.
 export function report({ repo, month, manifest = null, root = ".", previous = null, share = null, gh = ghApi }) {
   let data;
-  try { data = read(repo, windowOf(month, MONTHS).from, windowOf(month).to, repo.split("/")[0], gh); }
+  try { data = read(repo, windowOf(month, MONTHS).from, windowOf(month).to, ownerOf(manifest ?? "") ?? repo.split("/")[0], gh); }
   catch { return [`- Not read: GitHub did not answer for the pull requests, issues and events of ${month} (the look's job needs \`issues: read\` and \`pull-requests: read\`).`]; }
   let grown = null;
   try { grown = growth(shapeReading(rulesOf(manifest, root).rules, root), root); } catch { grown = null; }

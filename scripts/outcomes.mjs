@@ -47,15 +47,18 @@ export const kindOf = body => seen(body).split("\n").map(l => KIND.exec(l.replac
 
 // The corrections, each { at, pull, kind }: `issues` as GitHub gives them (labels, body, created_at, user), `comments`
 // [{ issue, at, login, body }]. Each issue labelled `correction` that the owner's account filed is one, and each note of
-// the owner's account on one that declares a kind of its own; the pull request named in it, else in the issue's body.
+// the owner's account on one that declares a kind of its own; the pull request named in it, else in the issue's body,
+// else in the newest note of the owner's that names one.
 export function corrections(issues, comments, owner) {
   const out = [];
   for (const i of issues) {
     const labels = (i.labels ?? []).map(l => (typeof l === "string" ? l : l.name));
     if (!labels.includes(LABEL) || i.pull_request) continue;
-    const pull = broughtBy(i.body);
+    const notes = comments.filter(c => c.issue === i.number && same(c.login, owner));
+    // (the pull request named in the body, else in the newest note of the owner's that names one)
+    const pull = broughtBy(i.body) ?? notes.map(c => broughtBy(c.body)).filter(n => n !== null).at(-1) ?? null;
     if (same(i.user?.login, owner)) out.push({ at: i.created_at, pull, kind: kindOf(i.body) ?? (labels.includes("bug") ? "does not work" : null) });
-    for (const c of comments.filter(c => c.issue === i.number && same(c.login, owner))) {
+    for (const c of notes) {
       const kind = kindOf(c.body);
       if (kind) out.push({ at: c.at, pull: broughtBy(c.body) ?? pull, kind });
     }
@@ -146,7 +149,7 @@ export function growth(r, root = ".") {
 // The report's lines: `rows` [{ key, outcome, label, text, months }] as `measure` gives them, `grown` as growth gives
 // it, `first`: the first reading's texts by key, or null, `previous`: the last report's text, or null.
 export function lines({ rows, grown, share = null, first = null, previous = null }) {
-  const was = label => { const m = previous ? new RegExp(`^- ${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}: ([^\n]*?)\\.(?: At the |$)`, "mu").exec(previous) : null; return m ? ` At the last report: ${m[1]}.` : ""; };
+  const was = label => { const m = previous ? new RegExp(`^ *- ${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}: ([^\n]*?)\\.(?: At the |$)`, "mu").exec(previous) : null; return m ? ` At the last report: ${m[1]}.` : ""; };
   const line = r => `- ${r.label}: ${r.text}${r.months > 1 ? `, over the last ${r.months} months${r.small ? `, still under ${LEAST}` : ""}` : ""}.${first?.[r.key] ? ` At the first reading: ${first[r.key]}.` : ""}${was(r.label)}`;
   const out = [`The five outcomes the owner named, each led by its direct measure or said to have none yet, then what stands for it; last what the work cost. A count stands with the range chance alone gives it (±), and where it is under ${LEAST} the months before are added. None is a target (\`scripts/outcomes.mjs\`; #302).`];
   for (const [key, name] of OUTCOMES) {
