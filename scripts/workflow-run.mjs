@@ -42,6 +42,8 @@ function scalar(text) {
   return t;
 }
 
+// A key set as the mapping's own, even where it is __proto__, which a plain assignment would take as its prototype.
+const own = (map, key, value) => Object.defineProperty(map, key, { value, enumerable: true, writable: true, configurable: true });
 /** The workflow's YAML as plain values (keys as written: `on` stays the string "on"). */
 export function parseYaml(text) {
   const raw = text.replace(/\r\n/g, "\n").split("\n");
@@ -100,7 +102,7 @@ export function parseYaml(text) {
       const m = /^([\w.-]+|"[^"]*"|'[^']*'):(?:\s(.*)|$)/.exec(l.trimStart());
       if (!m) throw new Error(`a line this reader does not know: ${l.trim()}`);
       i++;
-      map[scalar(m[1])] = value(m[2] ?? "", indent);
+      own(map, scalar(m[1]), value(m[2] ?? "", indent));
     }
     const l = next();
     if (l !== null && indentOf(l) > indent) throw new Error(`a line indented where no value begins: ${l.trim()}`);

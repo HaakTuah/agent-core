@@ -15,7 +15,7 @@ import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
-import { pathsLetThrough } from "./workflow-run.mjs";
+import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { COST, MOVED_GLOB, NEW_GLOBS, READ_MOST, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
@@ -594,6 +594,13 @@ const manyEnv = Object.fromEntries(Array.from({ length: 2000 }, (_, k) => [`E${k
 const manySteps = Array.from({ length: 2000 }, (_, k) => ({ run: `echo ${k}` }));
 const envStarted = Date.now();
 ok(copiesOf({ "a.yml": { env: manyEnv, jobs: { j: { env: manyEnv, steps: manySteps } } } }) === "checks/copies.json" && Date.now() - envStarted < 3000, "a workflow's and a job's env: are read once, however many steps", `${Date.now() - envStarted} ms`);
+ok(notRead("copies", { "a.yml": stepped('node "$GITHUB_WORKSPACE/core/scripts/copies.mjs" c.json', { "working-directory": "app\\dir" }) }), "a folder with \"\\\" in it is not read as one");
+// (the review of b69d16f: a script given by an expression of GitHub's, or in a mapping too large to read whole, and a
+// key named __proto__, leave the run not read)
+ok(notRead("copies", { "a.yml": stepped("node ${{ inputs.script }} bad.json") }) && notRead("copies", { "a.yml": stepped("node ${{ needs.a.outputs.s }} bad.json") })
+  && notRead("copies", { "a.yml": { jobs: { j: { strategy: { matrix: { s: Array.from({ length: 100001 }, (_, k) => `v${k}`) } }, steps: [{ run: "echo x" }] } } } })
+  && notRead("copies", { "a.yml": { jobs: { j: { steps: [{ run: "node $__proto__ bad.json", env: parseYaml("__proto__: core/scripts/copies.mjs\n") }] } } } }),
+  "a script given by an expression of GitHub's, a mapping too large to read whole, and a key named __proto__ leave the run not read");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

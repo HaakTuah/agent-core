@@ -340,7 +340,8 @@ function runAt(words, i, dir, script) {
   // core's, a .mjs file or a path through a folder scripts, may be this one; one given by a variable alone, node --test
   // $RUN, is counted where the step names the path it holds (unaccounted))
   if (at.dynamic || at.windows || /\{|\$'/u.test(word.text.replace(ROOT, ""))) {
-    return /\.mjs\b|scripts|\bcore\b|\$\{?CORE/iu.test(word.text) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
+    // (an expression of GitHub's, ${{ … }}, may give any path: an input's default, a job's output)
+    return /\.mjs\b|scripts|\bcore\b|\$\{?CORE|\$\{\{/iu.test(word.text.replace(ROOT, "")) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
   }
   if (path.posix.basename(plainPath(word.text)).toLowerCase() !== name) return []; // (another script)
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
@@ -357,8 +358,9 @@ const folder = (...dirs) => {
   if (d === undefined) return { at: "." };
   if (typeof d !== "string") return { dynamic: true };
   const text = d;
-  if (/\$/u.test(text)) return { dynamic: true };
-  const at = path.posix.normalize(text.replace(ROOT, "").replace(/\\/gu, "/"));
+  // (one named only when the workflow runs, or holding a "\\", which Linux and Windows read as different folders)
+  if (/\$|\\/u.test(text)) return { dynamic: true };
+  const at = path.posix.normalize(text.replace(ROOT, ""));
   return at === ".." || at.startsWith("../") || at.startsWith("/") ? { dynamic: true } : { at };
 };
 
@@ -375,17 +377,19 @@ function givenNamings(objects, name) {
   let n = 0;
   for (const o of objects) {
     if (!o || typeof o !== "object") continue;
-    if (!GIVEN.has(o)) GIVEN.set(o, { lines: leaves(o), counts: new Map() });
+    if (!GIVEN.has(o)) { const lines = leaves(o); GIVEN.set(o, { lines, whole: lines.whole, counts: new Map() }); }
     const memo = GIVEN.get(o);
-    if (!memo.counts.has(name)) memo.counts.set(name, memo.lines.reduce((k, l) => k + lineNamings(l, name), 0));
+    // (a mapping too deep or too large to read whole counts as naming the script, so the step is not read)
+    if (!memo.counts.has(name)) memo.counts.set(name, memo.whole ? memo.lines.reduce((k, l) => k + lineNamings(l, name), 0) : 1);
     n += memo.counts.get(name);
   }
   return n;
 }
-// The text values a mapping or a list holds, at any depth (to a bound, past which nothing more is read).
-function leaves(o, depth = 0, out = []) {
-  if (depth > 50 || out.length > 1e5) return out;
+// The text values a mapping or a list holds, at any depth, `whole` false where a bound (depth, count) stopped it.
+function leaves(o, depth = 0, out = Object.assign([], { whole: true })) {
+  if (depth > 50 || out.length >= 1e5) { out.whole = false; return out; }
   for (const v of Array.isArray(o) ? o : Object.values(o)) {
+    if (out.length >= 1e5) { out.whole = false; break; }
     if (typeof v === "string") out.push(v);
     else if (typeof v === "number" || typeof v === "boolean") out.push(`${v}`);
     else if (v && typeof v === "object") leaves(v, depth + 1, out);
