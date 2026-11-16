@@ -23,6 +23,10 @@
 # reads, by NuGet's own record beside each package it brought (.nupkg.metadata), that it took none from elsewhere; a
 # source that asks for a sign-in has none here. A project for Windows alone restores here all the same
 # (EnableWindowsTargeting); one whose SDK the runner lacks restores in a workflow of its own, and runs the script there.
+# Before that, and before anything of the pull request's runs, core/scripts/lookup.mjs asks NuGet's registry of each
+# package the pull request brings into a lock file that no lock file of its base held (floor topic 15, "A new one is
+# looked up in its registry"), failing an id the registry does not know and one first published under 90 days ago, and
+# printing the rest for the review; it reaches NuGet's registry and GitHub's public API, with no token.
 # It first looks whether the pull request changes anything NuGet reads, so that a private repository pays for no
 # restore a pull request cannot have changed, while the check still reports on every pull request (core archive 201).
 # Two looks: git's own diff against the base, as the signature check looks, for a project file, a lock file, a .props,
@@ -80,6 +84,15 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      # (before anything of the pull request's runs here: the first look below may itself restore)
+      - name: Each package new to the project looked up in NuGet's registry (floor topic 15)
+        env:
+          CONFIG: ${{ inputs.config }}
+          ADVISORY: ${{ inputs.advisory }}
+        run: |
+          node "$CORE_AT"scripts/lookup.mjs "$CONFIG" --nuget && exit 0
+          [ "$ADVISORY" = true ] || exit 1
+          echo "Advisory: nothing fails for it yet."
       - name: Does the pull request change what NuGet reads?
         id: what
         env:

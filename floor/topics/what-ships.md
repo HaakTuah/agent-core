@@ -1,7 +1,7 @@
 # The floor, by topic: what runs on users' machines
 
-Read before a task adds or updates what ships or what builds it, and by a security review: the kinds `dependency`,
-`update` and `security-review`.
+Read before a task adds or updates what ships or what builds it, or takes up a package found bad, and by a security
+review: the kinds `dependency`, `update`, `alert` and `security-review`.
 
 **7. What runs on users' machines.**
 - Every package, tool and script at one exact version, never a range.
@@ -13,6 +13,14 @@ Read before a task adds or updates what ships or what builds it, and by a securi
     elsewhere, by the registry's own tool);
   - the diff read against the release notes, naming anything they do not explain.
 - A check that cannot run, or fails, holds the release back.
+- **A package found bad goes at once:** the session that learns that a version the project holds is malicious or
+  taken over (an advisory, the registry's notice, a review's finding) puts the project back on its last good version,
+  or takes the package out where none was, in a pull request; and tells the owner at once, privately as rule 9 reports
+  a weakness, naming every key and sign-in the build or a session could reach while that version was installed.
+  Replacing those is the owner's.
+  - It does not mean a weakness with a fix, which an update takes (`tasks/updates.md`), nor that the pull request
+    waits for the owner. Reason: the floor said this of a leaked secret and nothing of a bad package, and the first
+    hour is when it matters.
 - A page's content security policy is never weakened.
 - The project names what it ships and its policy.
 - **A program installed on a user's machine** asks for no more rights than a need its `SECURITY.md`

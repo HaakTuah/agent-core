@@ -58,3 +58,9 @@ The index, and how an item is written: `archive/instructions.md`.
      wants the core to read whatever stack is best for a project, not a project's stack fitted to what the core reads,
      and a format someone else defines read by a package, not by hand, how such a package reaches a project settled
      once in that record.
+
+248. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
+     fails a name it does not know and one first published under 90 days ago, a bad package has a procedure, and a
+     new one is taken in an order: a model sometimes names a package that does not exist and someone registers the
+     name, such a name is new and has no history, which a script can read, and the floor said what to do about a
+     leaked secret and nothing about a bad package, whose first hour is when it matters.

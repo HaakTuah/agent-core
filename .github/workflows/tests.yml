@@ -41,8 +41,8 @@ jobs:
   # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in four jobs
   # that run side by side, each under a time mark of its own: the core's checks from plain git and the sync on whole
   # scratch projects, with the hostile tests of the core's inputs, the starter kit with the check of the core's copy,
-  # the licence, NuGet and agent-tools checks, with the hostile tests of build files and packages, and the rest, each
-  # step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
+  # the licence, NuGet, lookup and agent-tools checks, with the hostile tests of build files and packages, and the
+  # rest, each step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
   # are sized by the steps' times on Windows, where one runner takes half as long again as another: the first two so
   # that each ends within its mark on the slow one too, the other two as they stood, which on the slow one may pass
   # their marks (#425), beside the upgrade job, which takes longer; #387, #411, #424)
@@ -103,6 +103,9 @@ jobs:
       - name: The exact-versions check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/exact-versions-test.mjs ')) }}
         run: node scripts/exact-versions-test.mjs
+      - name: The lookup of a new package, on recorded answers
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/lookup-test.mjs ')) }}
+        run: node scripts/lookup-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/agent-tools-test.mjs ')) }}
         run: node scripts/agent-tools-test.mjs

@@ -68,7 +68,7 @@ export const STAGES = {
       if (!fs.existsSync(at(dir, "package-lock.json"))) write(dir, "stage-npm/package-lock.json", "{}\n");
       const core = at(dir, ".github/workflows/licences.yml");
       if (fs.existsSync(core)) { write(dir, ".stage-licences/licences.yml", fs.readFileSync(core, "utf8")); fs.rmSync(core); }
-      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n");
+      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n      - run: node core/scripts/lookup.mjs checks/licences.json\n");
     },
     mend: dir => {
       write(dir, ".github/workflows/licences-own.yml", `${read(dir, ".github/workflows/licences-own.yml")}      - run: node core/scripts/exact-versions.mjs checks/licences.json\n`);
@@ -221,6 +221,19 @@ export const STAGES = {
       }
       const manifest = read(dir, "core-manifest.md"), want = /^Paths: .*$/m.exec(read(dir, "core/setup/template/core-manifest.md.tmpl"))[0];
       if (!/^Paths:.*\btasks\/.*\btools\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^Paths: .*$/m, want));
+    },
+  },
+  "16 November 2026, a new package looked up": {
+    // (an npm project that runs the licence and exact-versions checks from a workflow of its own, without the lookup)
+    stage: dir => {
+      if (!fs.existsSync(at(dir, "package-lock.json"))) write(dir, "stage-npm/package-lock.json", "{}\n");
+      const core = at(dir, ".github/workflows/licences.yml");
+      if (fs.existsSync(core)) { write(dir, ".stage-lookup/licences.yml", fs.readFileSync(core, "utf8")); fs.rmSync(core); }
+      write(dir, ".github/workflows/packages-own.yml", "name: packages-own\n\non:\n  pull_request:\n\njobs:\n  packages:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/exact-versions.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n");
+    },
+    mend: dir => {
+      write(dir, ".github/workflows/packages-own.yml", `${read(dir, ".github/workflows/packages-own.yml")}      - run: node core/scripts/lookup.mjs checks/licences.json\n`);
+      if (fs.existsSync(at(dir, ".stage-lookup"))) { write(dir, ".github/workflows/licences.yml", read(dir, ".stage-lookup/licences.yml")); fs.rmSync(at(dir, ".stage-lookup"), { recursive: true }); }
     },
   },
   "16 November 2026, a project in several repositories": {

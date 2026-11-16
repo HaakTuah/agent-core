@@ -1,7 +1,7 @@
 // Hostile tests for one input the core reads (floor topic 5, "Every named input has hostile tests"): what a package
 // brings, from a registry or installed, which its publisher writes: an npm package's own package.json and licence
-// files, installed or copied into a project, a NuGet package's file with its manifest (.nuspec) and content hash, and
-// Node's own tarball. Read by licence-installed.mjs, licence-scan.mjs, licences.mjs (licenceOk, on the licence npm
+// files, installed or copied into a project, a NuGet package's file with its manifest (.nuspec) and content hash,
+// Node's own tarball, and what a registry or GitHub answers of a package, read by lookup.mjs from answers made here. Read by licence-installed.mjs, licence-scan.mjs, licences.mjs (licenceOk, on the licence npm
 // copies from a package), nuget.mjs (manifestLicence), nuget-fetch.mjs (nuspecOf, contentHash, named, and fetchAll
 // from a folder source, so no network) and node.sh (its SHA-256 check, with a stand-in npm that hands it a tarball made
 // here). Each case is refused: a licence it cannot read is not allowed, a version it cannot read is no version, a path
@@ -22,6 +22,7 @@ import { licenceOk } from "./licences.mjs";
 import { quick, said, scratch } from "./hostile.mjs";
 import { manifestLicence } from "./nuget.mjs";
 import { contentHash, fetchAll, named, nuspecOf } from "./nuget-fetch.mjs";
+import { lookUp, npmFacts, repository } from "./lookup.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -165,6 +166,27 @@ if (process.platform !== "win32") {
     const r = spawnSync("bash", [script], { cwd: root, encoding: "utf8", timeout: 20000, env: { ...process.env, PATH: `${path.join(root, "bin")}:${process.env.PATH}`, TARBALL: tarball, TMPDIR: path.join(root, "tmp") } });
     ok(r.status === 0 && /NOT INSTALLED/u.test(r.stdout) && fs.readFileSync(path.join(root, "bin/node"), "utf8").includes("v0.0.1") && !fs.existsSync(path.join(root, "tmp/escape")) && !fs.existsSync(path.join(tmp, "escape")), `node.sh refuses Node's tarball with ${what}: nothing installed, the machine's node kept`);
   }
+}
+
+// What a registry or GitHub answers of a package (lookup.mjs): a publisher writes the repository it names and its own
+// name, so a folder or owner that leads up is not followed, an answer of another shape is a lookup that failed, and
+// whatever is printed stays on one line, never a command the workflow's log acts on.
+{
+  const pkg = { name: "hostile-moss", version: "1.0.0", path: "node_modules/hostile-moss", direct: true, brings: 0, lockPath: "package-lock.json" };
+  const now = Date.parse("2026-11-16T12:00:00Z"), old = new Date(now - 800 * 86400000).toISOString();
+  ok(repository({ url: "https://github.com/a/b", directory: "../../etc" })?.dir === "" && repository({ url: "https://github.com/../b" })?.owner === undefined && repository({ url: "https://github.com/a/b/../../c" })?.owner === undefined, "lookup: a repository's folder or owner that leads up is not followed");
+  let threw = 0;
+  for (const doc of [null, [], "text", { time: { created: 5 }, versions: {} }, { time: { created: "yesterday" }, versions: {} }]) { try { npmFacts(doc, "1.0.0"); } catch { threw++; } }
+  ok(threw === 5, "lookup: an answer that is no object, or whose first date is no date, is refused");
+  const asked = [];
+  const answer = (doc) => async (url) => { asked.push(url); return url.startsWith("https://registry.npmjs.org/") ? { status: 200, json: doc } : { status: 200, json: { archived: "yes", name: ["hostile-moss"] } }; };
+  const doc = { time: { created: old, "1.0.0": old, modified: "never" }, versions: { "1.0.0": { _npmUser: { name: `x\n::error::y%0A${"z".repeat(500)}` }, repository: { url: "https://github.com/evil-org/moss", directory: "a/../../../b" }, dist: { attestations: "anything" } } } };
+  const r = await lookUp([pkg], { get: answer(doc), now });
+  const line = r.reports[0] ?? "";
+  ok(r.failures.length === 0 && !/[\r\n]/u.test(line) && !line.includes("::error::y%0A") && line.length < 700, `lookup: a publisher's name is printed cut short, on one line, with nothing GitHub reads as a command (${line.slice(0, 120)})`);
+  ok(asked.includes("https://raw.githubusercontent.com/evil-org/moss/HEAD/package.json") && line.includes("archived or not: GitHub did not answer") && line.includes("not naming the package back"), "lookup: a folder that leads up is not fetched, and GitHub's answers of another shape say nothing");
+  const astray = await lookUp([{ ...pkg, name: "Hostile.Moss" }], { get: async () => ({ status: 200, json: { items: [{ "@id": "https://api.nuget.org.evil.invalid/page.json" }] } }), now, nuget: true });
+  ok(astray.failures.length === 1 && /outside the registry/u.test(astray.failures[0]), "lookup: a page of NuGet's versions placed outside its registry is not fetched");
 }
 
 console.log(failed ? `${failed} failing` : "ok   every hostile thing a package brings is refused");

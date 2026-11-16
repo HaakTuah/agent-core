@@ -507,6 +507,14 @@ export const STEPS = [
   { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
   { lead: "16 November 2026, corrections counted and the outcomes read", cost: COST.line,
     unread: "whether the repository holds a label is GitHub's, in no file: the labels check run at each sync reports the label `correction` missing, its mend `core/scripts/labels.mjs --make`; the cost line is held by the description check, and the bug form's line is a difference `core/scripts/fresh.mjs` lists" },
+  { lead: "16 November 2026, a new package looked up", cost: COST.workflow,
+    check: p => {
+      // (a project that calls the core's licences.yml or nuget.yml takes the lookup with the call; one that runs the
+      // checks from a workflow of its own, as a private repository does, adds the step beside the exact-versions check)
+      const own = Object.entries(p.workflows).filter(([, w]) => /core\/scripts\/exact-versions\.mjs/u.test(w.text ?? "") && !/core\/scripts\/lookup\.mjs/u.test(w.text ?? ""));
+      return own.length ? `In ${own.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\` on every pull request, its checkout given \`fetch-depth: 2\` so that the base is there (\`--nuget\` added, in a step of its own, where the project's packages come from NuGet).` : null;
+    },
+    partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
