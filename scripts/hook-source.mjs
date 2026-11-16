@@ -143,6 +143,14 @@ function quotedAt(s, i, q) {
   return [out, i + 1];
 }
 
+// A script's quoting read level after level, as scripts within scripts are, until reading it changes nothing (eight
+// levels at most): each level's text.
+function dequotings(script) {
+  const levels = [];
+  for (let level = script, n = 0; n < 8; n++) { const next = dequote(level); if (next === level) break; levels.push(next); level = next; }
+  return levels;
+}
+
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
 function scan(text, index, holds, found, tests, fetches, only = () => true) {
   for (let i = 0; i < text.length; i++) {
@@ -177,8 +185,10 @@ export function fromTree(command, holds, index = null, operand = false) {
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  // (a ${...}'s default is a word, not a command of its own: no file test stands at its start)
-  const found = new Set(), tests = !operand && !redefined(raw), fetches = !gitDefined(raw);
+  // (a ${...}'s default is a word, not a command of its own: no file test stands at its start; and a definition of test
+  // or git is looked for in the command as written and in every reading of its quoting, as alias g'it'=x defines git)
+  const forms = [raw, ...dequotings(raw), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, "")];
+  const found = new Set(), tests = !operand && !forms.some(redefined), fetches = !forms.some(gitDefined);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
     if ((ref !== null && MAIN.test(ref) && fetches && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || (fetches && fetched(before))))) return;
@@ -201,8 +211,7 @@ export function fromTree(command, holds, index = null, operand = false) {
     // (as written, Windows' separators read; with the shell's quoting read level after level, as scripts within scripts
     // are, until reading it changes nothing; with every backslash read and every quote taken out; and with cmd's and
     // PowerShell's escapes read)
-    const variants = [text];
-    for (let level = raw, n = 0; n < 8; n++) { const next = dequote(level); if (next === level) break; variants.push(next); level = next; }
+    const variants = [text, ...dequotings(raw)];
     const bare = raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, "");
     // (a closed backtick span holding a blank is the shell's command output, kept as one mark, not PowerShell's escape)
     const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");

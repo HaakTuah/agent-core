@@ -505,6 +505,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       // (#476's code review of a72dc88: a hook that redefines git fetches nothing)
       ["git() { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]], ["function git { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases; alias git=bash\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      // (#476's code review of 117c2d0: a definition read with its quoting read too)
+      ["runner() { bash \"${2#*:}\"; }; shopt -s expand_aliases; alias g'it'=runner;\ngit show origin/main:scripts/x.py", ["scripts/x.py"]], ["shopt -s expand_aliases; alias \"te\"st=bash\ntest -x scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
       ["bash 'scripts/$notify.sh'", ["scripts/$notify.sh"]], ["bash scripts/\\$notify.sh", ["scripts/$notify.sh"]],
       // (#476's fallback security review of 9dc381f: a shell's -c script starts a command only where the shell does)
