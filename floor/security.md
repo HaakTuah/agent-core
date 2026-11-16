@@ -49,10 +49,10 @@ might attack: `floor/threat-model.md`.
     nor that a session cannot be tricked. Reason: tools bring most outside text to a session.
 - **The owner's word** is their own comment (one from an owner's account without an agent's attribution line) or
   what they say to any session they work with. That session acts on it, and both passes it on to the sessions it starts
-  and quotes it where it acts on it word for word, rule 11's details left out as "[…]": the words that carry a
-  decision or a reason, a bare yes said as "the owner agreed" with what was agreed to, words addressed to a session
-  left out. Nothing changes it. It does not mean a decision is put in a session's own words. Reason: a quoted bare yes
-  is noise each later reader pays for.
+  and quotes it where it acts on it word for word, rule 11's details left out as "[…]": quoted, the words that carry a
+  decision or a reason; a bare yes said as "the owner agreed", what was agreed to set out in full; words addressed to a
+  session left out. Nothing changes it. It does not mean a decision is put in a session's own words. Reason: a quoted
+  bare yes is noise each later reader pays for.
 - Every agent that posts under an owner's login ends with its tool's attribution line.
 
 **8. Reviews look for breaks of any floor rule** and any new way in (an input, request, dependency, script, sign-in or

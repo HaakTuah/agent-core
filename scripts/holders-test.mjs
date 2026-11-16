@@ -78,6 +78,8 @@ const inStepOk = archive({ "items-001.md": "# Reasons\n\n1. **1 Nov** (a game). 
 ok(!inStep(inStepOk).length, "an archive whose items each have their reasoning, the newest naming its issue, is in step", inStep(inStepOk).join("\n"));
 const outOf = archive({ "items-001.md": "1. **1 Nov**. Asked: a. Said: b.\n\n3. **2 Nov**. Decided: c.\n     > a quote\n\n4. **16 Nov**, #9: twice.\n\n4. **16 Nov**: no issue.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n2. **1 Nov**: words.\n" });
 const outWrong = inStep(outOf);
+const late = archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n246. **17 Nov**: new words.\n" });
+ok(inStep(late).some(w => w.includes("item 246 adds the owner's words") && /Mend: /.test(w)), "the owner's words past item 245 fail, saying the mend", inStep(late).join("\n"));
 ok(["item 4 stands twice", "item 2 has no reasoning", "item 2 is missing", "item 3 quotes", "item 1 does not say what was decided", "item 4 names no issue"].every(w => outWrong.some(x => x.includes(w))) && outWrong.every(w => /Mend: /.test(w)),
   "an item twice, words with no reasoning, a gap, a quote, no decision and a new item with no issue each fail, saying the mend", outWrong.join("\n"));
 const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);
