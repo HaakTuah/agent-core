@@ -34,7 +34,6 @@ wanted").
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
 | #357 | builder | |
-| #386 | builder | #362, which changes the same file |
 | #394 | builder | |
 | #403 | builder | #299, whose rule its mends name |
 | #404 | builder | #299, whose rule it holds, and #403, or built with it |

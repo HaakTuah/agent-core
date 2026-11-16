@@ -31,6 +31,7 @@ import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
+import { Unread, call, calls, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
@@ -93,99 +94,11 @@ export function project(root) {
 // The most a file the steps read may hold: past any rule file, config, workflow, audit or baseline a project writes.
 export const READ_MOST = 64 << 20;
 
-// A workflow the core's reader cannot read (workflow-run.mjs reads the forms the core's own workflows use): a check that
-// would read it throws, naming it, so the step is reported as not read, never as done or as missing.
-export class Unread extends Error {}
-// (`mentions` says, from a workflow's text, whether the check would read it)
-const readable = (p, mentions) => {
-  const unread = Object.entries(p.workflows).filter(([, w]) => !w.yaml && mentions(w.text ?? "")).map(([f]) => `.github/workflows/${f}`);
-  if (unread.length) throw new Unread(`the core's reader cannot read ${unread.join(", ")}, in a form it does not know`);
-};
-
-// A project's calls to a workflow of the core's, by the workflow's name: each its job (uses and with); and the first.
-export const calls = (p, name) => (readable(p, text => text.toLowerCase().includes(`/.github/workflows/${name}@`.toLowerCase())), Object.values(p.workflows))
-  .flatMap(({ yaml }) => Object.values(yaml?.jobs ?? {}))
-  .filter(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/${name}@`.toLowerCase()));
-export const call = (p, name) => calls(p, name)[0] ?? null;
-// The input the project's call to the core's workflow passes (its `with:`), undefined where there is no call or it passes
-// none. One that names it only when the workflow runs (an expression) throws, so the check that needs it is reported not
-// read, never read as a path.
-const input = (p, name, key = "config") => {
-  const v = call(p, name)?.with?.[key];
-  if (v !== undefined && typeof v !== "string") throw new Unread(`the project's call to the core's ${name} passes its ${key} as no text`);
-  if (v?.includes("${{")) throw new Unread(`the project's call to the core's ${name} passes its ${key} as ${v}, which names it only when the workflow runs`);
-  return v;
-};
+// Where the project's run of each check finds its config, and its calls to the core's workflows: check-configs.mjs,
+// beside this file, whose `Unread` a step throws where it cannot read what it needs.
+export { KIT_CONFIGS, Unread, call, calls, configs, runsOwn } from "./check-configs.mjs";
 
 const PROJECT_FILES = /\.(cs|fs|vb)proj$/;
-// The paths the manifest's slots name for the progress file and the size marks, else the starter kit's.
-const slot = (manifest, name, kit) => new RegExp(`^\\|\\s*\\*${name}\\*\\s*\\|\\s*\`([^\`]+)\``, "m").exec(manifest)?.[1] ?? kit;
-const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
-
-// What a workflow of the project's runs: the `run:` values of its jobs' steps, a line continued by "\" joined to the
-// next, and a shell comment (a line's, or the end of one after a space) left out, so that a comment naming a script is
-// never read as running it (#364).
-const runs = w => Object.values(w.yaml?.jobs ?? {}).flatMap(job => (job?.steps ?? []).map(s => typeof s?.run === "string" ? s.run : ""))
-  .join("\n").split("\n").map(l => l.replace(/(^|[ \t])#.*$/, "")).join("\n").replace(/\\\r?\n/g, " ");
-const script = name => new RegExp(`(?<![\\w./-])(?:\\./)?core/scripts/${name.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}(?![\\w.-])`);
-// The project's own workflows that run a script of its copy of the core (`core/scripts/<name>`), as [file, workflow].
-export const runsOwn = (p, name) => (readable(p, text => text.includes(name)), Object.entries(p.workflows)).filter(([, w]) => script(name).test(runs(w)));
-// The first argument those workflows pass to it that is no option, quotes taken off; undefined where none passes one. One that names it
-// only when the workflow runs (a variable or an expression) throws, so the check that needs it is reported not read.
-// (each word after the script as the shell reads it: quoted, or bare up to a space or an operator; an option, which
-// starts with "-", is passed over)
-const WORD = /^[ \t]+(?:"([^"\n]*)"|'([^'\n]*)'|([^\s"'\\;&|<>]+))/;
-const passedTo = (own, name) => {
-  const at = new RegExp(`${script(name).source}["']?`, "g");
-  for (const [, w] of own) {
-    const text = runs(w);
-    for (const m of text.matchAll(at)) {
-      let rest = text.slice(m.index + m[0].length), word;
-      while ((word = WORD.exec(rest))) {
-        rest = rest.slice(word[0].length);
-        const passed = word[1] ?? word[2] ?? word[3];
-        if (passed.startsWith("-")) continue;
-        if (/[$%{]/.test(passed)) throw new Unread(`the project's own workflow passes the config of core/scripts/${name} as ${passed}, which names it only when the workflow runs`);
-        return passed;
-      }
-    }
-  }
-  return undefined;
-};
-// The configs of the project's licence and copies checks where the project holds them (#366), each as the check is run:
-// the config a call to the core's workflow passes, else the one a workflow of the project's own passes to the script
-// (of the licence check, the agent-tools check's first, which runs beside it), else, of the copies check, the one the
-// manifest's *copies check* slot names, else, of the licence check, the NuGet check's input, else the starter kit's
-// path; and the licence check's audit and the copies check's baseline as those configs name them, else the kit's.
-export const KIT_CONFIGS = { licences: "checks/licences.json", audit: "checks/licences-audit.json", copies: "checks/copies.json", baseline: "checks/copies-baseline.json" };
-const key = (p, file, name) => { try { const v = JSON.parse(p.read(file) ?? "null")?.[name]; return typeof v === "string" && v ? v : null; } catch { return null; } };
-// Each check's apart, so that one whose config cannot be read throws alone (Unread, above), never the other's.
-export function licenceConfigs(p) {
-  const licences = input(p, "licences.yml")
-    ?? (calls(p, "licences.yml").length ? undefined : passedTo(runsOwn(p, "agent-tools.mjs"), "agent-tools.mjs") ?? passedTo(runsOwn(p, "licences.mjs"), "licences.mjs"))
-    ?? input(p, "nuget.yml") ?? KIT_CONFIGS.licences;
-  return { licences, audit: key(p, licences, "audit") ?? KIT_CONFIGS.audit };
-}
-export function copiesConfigs(p) {
-  // (the slot's own cell: the backticked file that is neither the script nor a command)
-  const slotted = (/^\|\s*\*copies check\*\s*\|([^|\n]*)/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? []).map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !/^(\.\/)?core\//.test(v));
-  const copies = input(p, "copies.yml") ?? passedTo(runsOwn(p, "copies.mjs"), "copies.mjs") ?? slotted ?? KIT_CONFIGS.copies;
-  return { copies, baseline: key(p, copies, "baseline") ?? KIT_CONFIGS.baseline };
-}
-// The NuGet check's config: its own input where the project calls it, read first, so that it stands where the licence
-// check's cannot be read; else the licence check's.
-const nugetOf = (p, licences) => input(p, "nuget.yml") ?? licences();
-// All of them, with the NuGet check's as `nuget`; each path null where its check's config cannot be read (Unread), and
-// why under `unread`, so the reader can say what it did not compare. Any other error is thrown, never hidden.
-export function configs(p) {
-  const unread = [];
-  const or = (read, names) => { try { return read(p); } catch (e) { if (!(e instanceof Unread)) throw e; unread.push(e.message); return Object.fromEntries(names.map(n => [n, null])); } };
-  const licence = or(licenceConfigs, ["licences", "audit"]);
-  const nuget = or(q => ({ nuget: nugetOf(q, () => licence.licences) }), ["nuget"]);
-  return { ...licence, ...nuget, ...or(copiesConfigs, ["copies", "baseline"]), unread: [...new Set(unread)] };
-}
-const licenceConfig = p => licenceConfigs(p).licences;
-const nugetConfig = p => nugetOf(p, () => licenceConfig(p));
 
 // Whether a test of the project's own lies under its shape check's config's "tests", wherever they stand beside its code:
 // a file of the copy of the core (core/) is none.
@@ -447,9 +360,9 @@ export const STEPS = [
     check: p => {
       if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
-      const own = runsOwn(p, "licences.mjs");
-      return own.length && !own.some(([, w]) => script("exact-versions.mjs").test(runs(w)))
-        ? `The workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/exact-versions.mjs <its config>\` beside it, as the core's \`licences.yml\` does.` : null;
+      const own = runFiles(p, "licences.mjs"), beside = runFiles(p, "exact-versions.mjs");
+      return own.length && !own.some(f => beside.includes(f))
+        ? `The workflow that runs the licence check, ${own.join(", ")}, runs \`node core/scripts/exact-versions.mjs <its config>\` beside it, as the core's \`licences.yml\` does.` : null;
     },
     partly: "that the licence check passes with its new step is held by that check" },
   { lead: "12 November 2026, the security review shown on every pull request", cost: COST.workflow,
@@ -481,7 +394,7 @@ export const STEPS = [
     } },
   { lead: "13 November 2026, the NuGet check fails from the first day", cost: COST.workflow,
     check: p => {
-      return calls(p, "nuget.yml").some(job => job.with?.advisory === true || job.with?.advisory === "true")
+      return given(p, "nuget.yml", "advisory").some(({ value }) => value === true || value === "true")
         ? "The project's call to the core's `nuget.yml` no longer passes `advisory: true` (it stays only while a fault of the check's own is reported to the core)." : null;
     },
     partly: "whether its audit holds an entry of \"kind\": \"nuget\" for a package that ships is read by the NuGet check where it counts" },
@@ -503,7 +416,7 @@ export const STEPS = [
     // (the reading-size check passes and says so in a note, which no run of it turns red: this step reads that note,
     // from the project's own copy of the check, and gives its number)
     check: p => {
-      const marks = marksOf(p.manifest);
+      const marks = marksConfig(p);
       const script = path.join(p.root, "core", "scripts", "reading-size.mjs");
       if (!fs.existsSync(script) || p.read(marks) === null) throw new Unread(`no copy of the reading-size check, or no ${marks}, to read`);
       // (the check reads each file its marks name: one the steps' reader would not read is never handed to it; #423)
@@ -530,7 +443,7 @@ export const STEPS = [
     // (a mark of its own is one below the general mark, "each"; a file under a quarter of that has had no time to fill,
     // and its first trim, which sets the mark, comes once it passes it: the general mark holds there till then)
     check: p => {
-      const file = progressOf(p.manifest), marksAt = marksOf(p.manifest);
+      const file = progressOf(p.manifest), marksAt = marksConfig(p);
       const text = p.read(file);
       let marks = null;
       try { marks = JSON.parse(p.read(marksAt) ?? "null"); } catch { /* (read as missing, below) */ }
@@ -548,16 +461,16 @@ export const STEPS = [
   { lead: "16 November 2026, an agent's own tools listed", cost: COST.line,
     // (the agent-tools check's own reading, with a missing list read as an empty one: what it would fail once written.
     // The core's licences.yml runs the check itself; a project that runs the licence script from a workflow of its own
-    // runs it beside it, as of exact versions, and the config is the one that workflow passes: configs, above)
+    // runs it beside it, as of exact versions, and the config is the one that workflow passes: check-configs.mjs)
     check: p => {
-      const own = calls(p, "licences.yml").length ? [] : runsOwn(p, "licences.mjs");
-      const beside = own.some(([, w]) => script("agent-tools.mjs").test(runs(w)));
+      const own = calls(p, "licences.yml").length ? [] : runFiles(p, "licences.mjs");
+      const beside = own.some(f => runFiles(p, "agent-tools.mjs").includes(f));
       const file = licenceConfig(p);
       let config = null;
       try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
       const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
       const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...(({ problems, pins }) => [...problems, ...pins.map(([, problem]) => problem)])(toolsCheck(head, list, kitHooks(), file))];
-      if (own.length && !beside) wrong.push(`the workflow that runs the licence check, ${own.map(([f]) => `.github/workflows/${f}`).join(", ")}, runs \`node core/scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
+      if (own.length && !beside) wrong.push(`the workflow that runs the licence check, ${own.join(", ")}, runs \`node core/scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
       return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, the one its configuration pins where it can pin one, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
     } },
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,

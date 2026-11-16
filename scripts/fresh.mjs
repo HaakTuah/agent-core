@@ -30,7 +30,8 @@ import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
-import { KIT_CONFIGS, call as callOf, configs, plain, project } from "./steps.mjs";
+import { KIT_CONFIGS, Unread, packagesFolder } from "./check-configs.mjs";
+import { call as callOf, configs, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
@@ -40,6 +41,13 @@ const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the projec
 
 // The project's own files: neither the core's copy, at the path its manifest names (core-path.mjs), nor an install's.
 const ownFiles = p => { const at = corePath(p.root) || "core/"; return p.files.filter(f => !f.startsWith(at) && !f.split("/").includes("node_modules")); };
+
+// The folder of the signature check: as its calls pass it; where none calls it, or that cannot be read, the lock
+// file's, `lock` (the differences say why it was not read: configs, in check-configs.mjs).
+function signedIn(p, lock) {
+  try { const f = packagesFolder(p); if (f !== undefined) return f; } catch (e) { if (!(e instanceof Unread)) throw e; }
+  return lock && path.posix.dirname(lock);
+}
 
 // The starter kit's options for a project of the same kind as `p` (steps.mjs reads it), and the pin its manifest names.
 export function kind(p) {
@@ -51,7 +59,7 @@ export function kind(p) {
   const shallowest = re => own.filter(f => re.test(f)).sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0];
   const folderOf = f => path.posix.dirname(f);
   const lock = shallowest(/(^|\/)package-lock\.json$/);
-  const folder = call(p, "signatures.yml")?.with?.directory ?? (lock && folderOf(lock));
+  const folder = signedIn(p, lock);
   if (folder !== undefined) o.packages = String(folder).replace(/\/+$/, "") || ".";
   const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/);
   // (Dependabot's directory for NuGet where it names one, "/" being the root itself; else the solution's or project
@@ -96,7 +104,7 @@ const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undef
 export function differences(p, kit, older = []) {
   // (a check's config that a workflow names only when it runs is compared nowhere: said, so no comparison goes missing
   // unsaid)
-  const out = configs(p).unread.map(why => `a config not compared: ${plain(why, p.root)}`);
+  const out = configs(p).unread.map(why => plain(why, p.root));
   for (const [to, want] of kit) {
     if (SKIPPED.has(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
     const text = p.read(to);
@@ -143,16 +151,15 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null)
       .map(([to, text]) => [placed[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (older) return kit;
-    // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
+    // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
-    const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
     // (the licence config as the kit writes it, its "nuget" part in the NuGet check's own where that is another file, or
     // compared nowhere where the NuGet check's cannot be read)
     const { nuget, ...licence } = licences(o, () => false);
     const licenceFiles = nuget && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
-    return [...kit, [slot, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })]].filter(([to]) => to !== null);
+    return [...kit, [at.sizes, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];
