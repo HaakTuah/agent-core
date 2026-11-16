@@ -106,13 +106,16 @@ counter and its commands are in the pull request that adds this record (#487).
   MIT notices kept in the core's third-party notices (floor rule 10), the test that reads the list reading each
   file's licence too. The
   readers by hand that work (JavaScript, C#, Python) stay until the parser replaces each, a line each; Rust's reader
-  is the first built this way, and #426's .NET readers the next.
+  is the first built this way, and #426's .NET readers the next. No package comes into the core, the parser first,
+  until #488's points 1, 3 and 4 (how a package is looked up, the week's wait in the package manager, the registry
+  as the only source) have merged: this record picks the way, and #488 is the gate for its arrival.
 - **What a sync asks of a project:** for this record, nothing. The line that builds the first reader the picked way
   says what its sync asks; by this record, no install, no host to reach, and a reader's new findings listed in the
   check's baseline, as any new reading is ("Nothing locks a project").
 - **What is written by hand today** (#486, point 10). Counted on 16 November 2026: each stand-in's lines, and the
   issues labelled `bug` that name its script (of the 50 so labelled). In the order of what each is worth, each
-  replaced by itself, with a trial of its own, at the dose, as cleaning is (`tasks/cleaning.md`):
+  replaced by itself, with a trial of its own, at the dose, as cleaning is (`tasks/cleaning.md`), and each that brings
+  a package only once #488's gate stands:
   1. **What Node itself brings** (point 11): none of the 76 tests uses `node:test` or `node:assert`, and none of the
      51 scripts that read their arguments uses `util.parseArgs`. Replace each where its file is next changed; no
      package is needed.
