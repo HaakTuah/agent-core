@@ -3,7 +3,7 @@
 Read at the start of every task in a project whose host lets more than one person write to its repository (how to read
 it: the host's part, `modules/hosts.md`); in a project where one person holds every right, never, and nothing here
 changes it. Where the core says "the owner", such a project reads "an owner", save where it names the yeses of floor
-rule 14, which are the higher right's.
+rule 14, which are the higher right's, its approvals aside.
 
 **Who is an owner** (core archive 234; #250). By default the owners are the people the host lets write to the repository
 (on GitHub: the role `write`, `maintain` or `admin`), read from the host each time and kept in no list: any of them may

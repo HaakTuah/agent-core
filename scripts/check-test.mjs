@@ -89,9 +89,9 @@ git(dir, "reset", "-q", "--hard", "base");
 const term = ["Zq", "xv", "Wk"].join("");
 fs.writeFileSync(path.join(dir, "notes.md"), `A note naming ${term}.\n`);
 commit(dir, "a note with a listed term");
-r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
+r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term.toLowerCase()}\n` }, encoding: "utf8" });
 const said = `${r.stdout}${r.stderr}`;
-ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(said) && !said.includes(term) && mended(said), "a listed personal term fails the change, and the term is printed nowhere", said);
+ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(said) && !said.toLowerCase().includes(term.toLowerCase()) && mended(said), "a listed personal term, listed in other letters' case, fails the change, and the term is printed nowhere in any case", said);
 
 // another host: no .github/workflows, so the kit's calls are run
 git(dir, "reset", "-q", "--hard", "base");

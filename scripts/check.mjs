@@ -11,11 +11,11 @@
 // copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
 // not from that copy (modules/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
 // nothing in the project. The steps run the change's own code, so they get only the variables a program needs to start
-// and reach the network, named in KEPT, with a home folder of their own: no sign-in, key or credential file of the
-// caller's. What only the host can do (a review app's status, the dependency review, code scanning, a job started by a
+// and reach the network, named in KEPT, with a home folder of their own and git's rewrites of an address alone (they
+// still run as the caller's user: modules/hosts.md says where it runs). What only the host can do (a review app's status, the dependency review, code scanning, a job started by a
 // schedule) is not run here and is named: that is the host's part, and where a host has none, what stands in is in its
 // part (modules/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
-// the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it. It prints
+// the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
 // Git, bash and Node's own modules.
 //
@@ -43,10 +43,21 @@ export const HOST_OWN = {
 
 const env = plainEnv();
 // What the steps run with, since they run the change's own code (its copy's scripts, its packages' restore): only what
-// a program needs to start and reach the network, by name, with a home of its own in the scratch folder, so no sign-in,
-// key or credential file of the caller's reaches them (git's own settings kept, for a rewrite of the core's address).
-const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL|GIT_CONFIG_NOSYSTEM|GIT_CONFIG_GLOBAL|GIT_CONFIG_COUNT|GIT_CONFIG_(KEY|VALUE)_[0-9]+)$/i;
-const stepEnv = home => ({ ...Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name))), HOME: home, USERPROFILE: home });
+// a program needs to start and reach the network, by name, with a home folder of its own in the scratch folder, no
+// system git settings, and of git's settings given here only the rewrites of an address (url.*.insteadOf), so no token
+// in this environment or in git's settings reaches them. They still run as the caller's own user, so a pipeline runs
+// this where no sign-in is held (modules/hosts.md).
+const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
+function stepEnv(home) {
+  const kept = Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name)));
+  const rewrites = [];
+  for (let i = 0; i < Number(env.GIT_CONFIG_COUNT ?? 0); i++) {
+    const key = env[`GIT_CONFIG_KEY_${i}`] ?? "";
+    if (/^url\..+\.insteadof$/i.test(key)) rewrites.push([key, env[`GIT_CONFIG_VALUE_${i}`] ?? ""]);
+  }
+  const git = Object.fromEntries(rewrites.flatMap(([key, value], i) => [[`GIT_CONFIG_KEY_${i}`, key], [`GIT_CONFIG_VALUE_${i}`, value]]));
+  return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home };
+}
 let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
 const git = (cwd, ...a) => execFileSync("git", a, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const fail = (what, mend) => { console.error(`FAIL ${what} ${MEND}${mend}`); process.exit(1); };
@@ -175,9 +186,9 @@ function runner(p, tmp) {
   const uses = new Proxy({ "actions/checkout": checkout(tmp), "actions/setup-node": () => {} }, { get: (known, action) => known[action] ?? (() => false) });
   const github = context(p);
   const terms = process.env.PERSONAL_TERMS ?? "";
-  // (each listed term is printed as *** wherever a step prints it, as GitHub masks a secret's lines in a log)
+  // (each listed term is printed as *** wherever a step prints it, in any letters' case, as the check matches it)
   const listed = terms.split(/\r?\n/).map(t => t.trim()).filter(Boolean).sort((a, b) => b.length - a.length);
-  const mask = text => listed.reduce((t, term) => t.split(term).join("***"), text);
+  const mask = text => listed.reduce((t, term) => t.replace(new RegExp(term.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"), "gi"), "***"), text);
   const home = path.join(tmp, "home");
   fs.mkdirSync(home);
   return (file, id, job) => {
