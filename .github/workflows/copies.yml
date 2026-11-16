@@ -1,9 +1,10 @@
 # The copies check ("One fact, one place" in the core's roles/shared/how-to-work.md), for every project that takes the core:
 # a new copy of code, or of the rule files' prose, fails; the old ones its baseline lists are removed over time, and
 # against the branch a PR merges into the baseline may only shrink. With it, the pointer check (every pointer in the
-# rule files leads somewhere) and the reading-size check (the files every session reads keep to their marks, and a file
-# past the split mark is split before it is changed), with the marks the project names; and checks that need no
-# config: the workflow check (floor rule 2: no workflow names the trigger it forbids; nor gives a key twice in one
+# rule files leads somewhere; in an agent tool's files, what the base already held noted and passed, as the copies
+# check notes a copy there its baseline does not list yet) and the reading-size check (the files every session reads
+# keep to their marks, and a file past the split mark is split before it is changed), with the marks the project names;
+# and checks that need no config: the workflow check (floor rule 2: no workflow names the trigger it forbids; nor gives a key twice in one
 # mapping, which GitHub refuses, what the base already held noted and passed), the entry-files check (each
 # agent tool's entry file pulls in what AGENTS.md names, what the base already lacked noted and passed:
 # tasks/tools.md), and the manifest check, which
@@ -67,6 +68,8 @@ jobs:
         run: node "$CORE_AT"scripts/copies.mjs "$CONFIG"
       - name: Every pointer in the rule files leads somewhere
         if: ${{ !cancelled() }}
+        env:
+          POINTERS_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: node "$CORE_AT"scripts/pointers.mjs
       - name: The files every session reads keep to their marks
         if: ${{ !cancelled() }}

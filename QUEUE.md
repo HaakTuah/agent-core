@@ -43,7 +43,6 @@ it merges last.
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #486's record | |
 | #404 | builder | |
-| #405 | builder | |
 | #407 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
 | #492 | rule builder; it changes who may start the orchestrator, and what every role reads at its start | #397 and #467 |
@@ -52,8 +51,8 @@ it merges last.
 | #486, point 5 | builder | #486's record |
 | #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
-| #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
-| #460, point 4 (names in descriptions) | builder | #405, which changes `scripts/pointers.mjs` too |
+| #460, point 3 (a copy in a test) | builder | |
+| #460, point 4 (names in descriptions) | builder | |
 | #460, point 5 (a report's size) | builder | |
 | #460, point 6 (billed minutes) | builder | |
 | #390 | builder | |

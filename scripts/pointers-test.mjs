@@ -1,6 +1,6 @@
 // Checks the pointer check (pointers.mjs, beside this file) on a small project made for it: its rule files with either
-// line ending, a pointer that leads nowhere, and a project with no SECURITY.md yet. Run by the core's tests workflow
-// (.github/workflows/tests.yml).
+// line ending, a pointer that leads nowhere, a project with no SECURITY.md yet, and its agent tools' files. Run by the
+// core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/pointers-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -23,7 +23,7 @@ function run(files) {
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-    for (const f of ["pointers.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+    for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -61,6 +61,75 @@ r = run({ ...cites("As `core/modules/git.md`, \"Push after every commit\", says,
 ok(r.code === 0, "a pointer through a file that only points leads to the section or the point where it now stands, in the file it names or a folder's own files, and a rule it says went elsewhere is found there, its numbered points too, named with the rule or by the old file alone");
 r = run({ ...cites("As `core/modules/git.md`, \"Push once\", says, with `core/modules/git.md`, point 3, and `core/modules/roles.md`, point 9."), ...MOVED });
 ok(r.code === 1 && /"push once" is no heading or bold lead-in/i.test(r.out) && /point 3: no such numbered point/.test(r.out) && /point 9: no such numbered point/.test(r.out), "and one that stands in neither place still fails, named");
+// an agent tool's files (#405): a broken pointer the pull request's base held there is noted and fails nothing, one it
+// did not hold fails, and with no base each is noted
+const tools = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-tools-"));
+try {
+  const put = (f, body) => { fs.mkdirSync(path.join(tools, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(tools, f), body); };
+  const g = (...args) => execFileSync("git", args, { cwd: tools, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  for (const [f, body] of Object.entries(FILES)) put(f, body);
+  fs.mkdirSync(path.join(tools, "core/scripts"), { recursive: true });
+  for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(tools, "core/scripts", f));
+  const OLD = "# Steering\n\nAs \"Shipping it\" in `docs/developing.md` says.\n";
+  put(".kiro/steering/own.md", OLD);
+  g("init", "-q"); g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "base");
+  const base = g("rev-parse", "HEAD").trim();
+  const check = (env = {}) => { const r = spawnSync(process.execPath, [path.join(tools, "core/scripts/pointers.mjs")], { cwd: tools, encoding: "utf8", env: { ...process.env, POINTERS_BASE: "", ...env } }); return { status: r.status, out: r.stdout + r.stderr }; };
+  let t = check();
+  ok(t.status === 0 && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/own\.md:3: "shipping it" is no heading .*with no base to read against, so it fails nothing/m.test(t.out) && /1 old in an agent tool's file/.test(t.out), "with no base, a broken pointer in an agent tool's file is noted, and fails nothing", t.out);
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 0 && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/own\.md:3: .*the pull request's base held it/m.test(t.out), "one the pull request's base held is noted, and fails nothing", t.out);
+  put(".kiro/steering/own.md", `# Steering\n\nA line above it now.\n\n${OLD.split("\n\n")[1]}`);
+  put(".agents/rules/new.md", "# A rule\n\nAs `docs/gone.md` says.\n");
+  put("GEMINI.md", "# Gemini\n\nAs \"Building it\" in `docs/developing.md` says.\n");
+  g("add", "-A");
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 1 && mended(t.out) && /^FAIL: a broken pointer: \.agents\/rules\/new\.md:3: `docs\/gone\.md` is no tracked file or folder\. Mend: /m.test(t.out) && /^FAIL: a broken pointer: GEMINI\.md:3: "building it" is no heading/m.test(t.out)
+    && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/own\.md:5: .*the pull request's base held it/m.test(t.out) && !/FAIL.*own\.md/.test(t.out),
+    "one it did not hold fails, in a tool's folder or GEMINI.md, saying its mend, while the old one, its line moved, is still noted", t.out);
+  // (a new break in the same file as an old one fails; a tool's file SECURITY.md already names fails as before)
+  put(".kiro/steering/own.md", `${fs.readFileSync(path.join(tools, ".kiro/steering/own.md"), "utf8")}\nAnd \"Testing it\" in \`docs/developing.md\`.\n`);
+  put(".kiro/steering/listed.md", "# Listed\n\nAs \"Releasing it\" in `docs/developing.md` says.\n");
+  put("SECURITY.md", FILES["SECURITY.md"].replace("`docs/developing.md`;", "`docs/developing.md`, `.kiro/steering/listed.md`;"));
+  g("add", "-A");
+  t = check();
+  ok(t.status === 1 && /^FAIL: a broken pointer: \.kiro\/steering\/listed\.md:3: "releasing it"/m.test(t.out), "a tool's file that SECURITY.md names as a rule file fails as before, with no base", t.out);
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 1 && /^FAIL: a broken pointer: \.kiro\/steering\/own\.md:7: "testing it"/m.test(t.out) && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/own\.md:5: /m.test(t.out), "a new break in the same file as an old one fails, the old one still noted", t.out);
+  put(".kiro/steering/own.md", fs.readFileSync(path.join(tools, ".kiro/steering/own.md"), "utf8").replace(/\nAnd "Testing it".*\n/u, ""));
+  put("SECURITY.md", FILES["SECURITY.md"]);
+  g("rm", "-q", "-f", ".kiro/steering/listed.md"); g("add", "-A");
+  for (const bad of ["no-such-branch", "--output=x"]) {
+    t = check({ POINTERS_BASE: bad });
+    ok(t.status === 1 && mended(t.out) && t.out.includes(`FAIL: POINTERS_BASE ${bad} is not a commit here. Mend: fetch it`) && !fs.existsSync(path.join(tools, "x")), `a base that is no commit (${bad}) fails, saying to fetch it, and is never read as an option`, t.out);
+  }
+  put(".agents/rules/new.md", "# A rule\n\nAs `docs/developing.md` says.\n");
+  put("GEMINI.md", "# Gemini\n\nAs \"Running it\" in `docs/developing.md` says.\n");
+  g("add", "-A");
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 0 && /own\.md:5/.test(t.out), "and once those lead somewhere, it passes, the old one noted", t.out);
+  // (a file under a tool's folder whose link leads out of the project is not read: its pointers are no rule's)
+  if (process.platform !== "win32") {
+    const away = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-away-"));
+    fs.writeFileSync(path.join(away, "out.md"), "# Out\n\nAs `docs/nowhere.md` says.\n");
+    fs.symlinkSync(path.join(away, "out.md"), path.join(tools, ".kiro/steering/out.md"));
+    g("add", "-A");
+    t = check({ POINTERS_BASE: base });
+    fs.rmSync(away, { recursive: true, force: true });
+    ok(t.status === 0 && !/nowhere/.test(t.out), "a file in a tool's folder whose link leads out of the project is not read", t.out);
+    // (one whose link leads inside the project is read through it, at the base as in the work tree)
+    fs.rmSync(path.join(tools, ".kiro/steering/out.md"));
+    put("docs/linked.md", "# Linked\n\nAs `docs/nowhere-inside.md` says.\n");
+    fs.symlinkSync("../../docs/linked.md", path.join(tools, ".kiro/steering/inside.md"));
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a steering file that is a link inside");
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 0 && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/inside\.md:3: .*the pull request's base held it/m.test(t.out), "a tool's file that is a link inside the project is read through it at the base too, so what it held is noted", t.out);
+    fs.symlinkSync("../../docs", path.join(tools, ".kiro/steering/docs"));
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a link to a folder");
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 0 && !/EISDIR/.test(t.out), "a link to a folder in a tool's folder is passed over, failing nothing", t.out);
+  }
+} finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails
 const coreDir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-core-"));
 try {
@@ -71,7 +140,7 @@ try {
   put("tasks/a.md", "# A module\n\nAs floor rule 19 says (core archive 999).\n");
   put("archive/instructions/items-001.md", "# Items\n\n1. **1 November 2026**. Words.\n");
   fs.mkdirSync(path.join(coreDir, "scripts"));
-  for (const f of ["pointers.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
+  for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
   for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: coreDir, stdio: "ignore" });
   const c = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" });
   ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: tasks\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
@@ -92,5 +161,9 @@ try {
   ok(capital.status === 1 && /floor rule 16/i.test(capital.out) && /core archive 998/i.test(capital.out), "a citation opening a sentence, \"Floor rule\" or \"Core archive\", is read too", capital.out);
   const backwards = core("tasks/a.md", "# A module\n\nAs core archive 1 to 0 says.\n");
   ok(backwards.status === 1 && /core archive 1 to 0/.test(backwards.out), "a range written backwards leads nowhere, and is named", backwards.out);
+  put("tasks/a.md", "# A module\n\nNothing cited.\n");
+  // (the core's own agent tools' files are read too, and there a broken pointer fails)
+  const steering = core(".agents/rules/core.md", "# The core, for a tool\n\nAs \"Running it\" in `tasks/a.md` says.\n");
+  ok(steering.status === 1 && mended(steering.out) && /FAIL: a broken pointer: \.agents\/rules\/core\.md:3: "running it" is no heading/.test(steering.out), "in the core's own run an agent tool's file is read, and a broken pointer in it fails", steering.out);
 } finally { fs.rmSync(coreDir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);
