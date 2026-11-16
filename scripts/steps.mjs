@@ -25,6 +25,7 @@ import { importsOf, projectFilesByContent, readProject as readBuildFile } from "
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
+import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
@@ -309,12 +310,17 @@ moved.apart = (core = HERE) => Object.fromEntries(Object.keys(moved(core)).map(o
 // now, which join it: the copies check lets a config read more, never less, so the old pattern stays while the files
 // that point stand at the old paths.
 export const MOVED_GLOB = '"core/modules/*.md"', NEW_GLOBS = ['"core/floor/topics/*.md"', '"core/roles/*.md"', '"core/roles/shared/*.md"', '"core/tasks/*.md"', '"core/tools/*.md"'], MOVED_GLOBS = NEW_GLOBS.join(", ");
-// A dated record of the project's own, which stays as it stands: a file whose name opens with a day (2026-11-16...), or
-// one in a folder named archive, reports or records, wherever it lies.
-const dated = f => /(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.test(f) || /(^|\/)(archive|reports|records)\//u.test(f);
-// The project's own files of text that are no dated record: each may name a file of the core, and a check, a tool or a
-// session reads it as it stands now.
-const namers = p => p.files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f));
+// A dated record of the project's own, which stays as it stands: a file of prose (.md or .txt) whose name opens with a
+// day (2026-11-16...), or one in a folder named archive, reports or records, outside the folders a host or a tool reads.
+const dated = f => /\.(md|txt)$/u.test(f) && !/^\.(github|claude|codex|kiro|agents?)\//u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.test(f) || /(^|\/)(archive|reports|records)\//u.test(f));
+// The project's own files that may name a file of the core and that a check, a tool or a session reads as they stand
+// now: each rule file and each file a tool takes its instructions from, whatever its name or folder, and every other
+// file of text that is no dated record.
+function namers(p) {
+  let rules = [];
+  try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
+  return p.files.filter(f => !f.startsWith("core/") && (rules.includes(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+}
 // Of those, the files that name each old path: Map(old path -> [file]).
 function namedStill(p, map) {
   const found = new Map(), old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
@@ -326,7 +332,7 @@ const readsOldAlone = (p, f) => f.endsWith(".json") && (p.read(f) ?? "").include
 // Where two old paths now lead to one file, the word that it is named once; and, where a file a tool takes its
 // instructions from by pulling files in (Kiro's steering, Antigravity's rules) still names an old path, that the step
 // comes before any other task, since such a session reads each rule on one line's word until then.
-const once = (found, map) => [...found.keys()].filter(a => [...found.keys()].some(b => b < a && map[b] === map[a])).map(a => `where a file named \`core/${a}\` beside the other path that now leads to \`core/${map[a]}\`, it names that file once`);
+const once = (found, map) => [...found.keys()].filter(a => [...found.keys()].some(b => b < a && map[b] === map[a])).map(a => `a file that named \`core/${a}\` beside the other path that now leads to \`core/${map[a]}\` names that file once`);
 const first = found => ([...found.values()].flat().some(f => /^\.(kiro|agents?)\//u.test(f)) ? "Before any other task, since a tool whose entry file pulls the core's files in follows no further import, and its sessions read each rule on one line's word until this is done: in" : "In");
 // Where a project's own files still name an old path of the core's, a copies config of its own the old folder's pattern
 // alone, and its manifest's "Paths:" line the old folders: the mend, naming each file and each path's new one; null
@@ -503,7 +509,7 @@ export const STEPS = [
   { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/^Paths:.*\broles\//mu.test(p.manifest)) wrong.push('add `roles/` to the folders the "Paths:" line of `core-manifest.md` names, so that it reads "one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/"');
+      if (!/^Paths:.*\broles\//mu.test(p.manifest)) wrong.push('add `roles/` to the folders the "Paths:" line of `core-manifest.md` names, so that it reads as `core/README.md`, "The manifest\'s format", gives it');
       if (!/^@core\/roles\/builder\.md[ \t]*$/mu.test(p.read("AGENTS.md") ?? "")) wrong.push("add the line `@core/roles/builder.md` to the `@` lines of `AGENTS.md`, after the floor's, and to each entry file the project holds the line `core/scripts/entry-files.mjs` then names");
       return wrong.length ? `In one pull request, ${wrong.join("; and ")}.` : null;
     },

@@ -1,6 +1,6 @@
 {
   "paths": ["floor", "floor/topics", "modules", "roles", "roles/shared", "tasks", "tools"],
-  "exempt": ["tasks/game-design.md"],
+  "exempt": ["tasks/game-design.md", "modules/game-design.md"],
   "words": [
     { "pattern": "\\bgames?\\b", "say": "the project; what holds only for games goes in tasks/game-design.md" },
     { "pattern": "\\bplayers?\\b", "say": "its users" },
