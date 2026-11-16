@@ -1,7 +1,8 @@
 // The core's checks from plain git (modules/hosts.md, "One layer knows no host"; core archive 234; #250). Run from a
 // project's root, on a person's machine or in any host's pipeline, it runs each workflow of the core's that the project
 // calls, as GitHub would run it for a pull request into main (`--base`, the commit it merges into) or for a push to main
-// (none given), on the commit checked out: each step's own shell, through workflow-run.mjs, so that no check is written
+// (none given), on the commit checked out (for a pull request, merged into its base, as GitHub merges it, the base its first
+// parent): each step's own shell, through workflow-run.mjs, so that no check is written
 // twice. The calls are the base's (on a push, main's own), so a change cannot leave a check out by taking its call out:
 // the project's .github/workflows, or, where it has none, as on another host, the starter kit's in the base's copy,
 // each with the inputs the kit gives them (a template the kit fills in with more than the core's address and pin is
@@ -20,6 +21,7 @@
 // Git, bash and Node's own modules.
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
+//                               [--branch <the branch's name, where none is checked out>]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -72,7 +74,7 @@ function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   const run = runner(p, tmp);
-  const jobs = callers(p).filter(({ text }) => triggered(parseYaml(text).on, p))
+  const jobs = callers(p, tmp).filter(({ text }) => triggered(parseYaml(text).on, p))
     .flatMap(({ file, text }) => Object.entries(parseYaml(text).jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
     .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
   if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
@@ -90,13 +92,13 @@ function main() {
 // The options given, each checked.
 function options() {
   const args = process.argv.slice(2);
-  for (const a of args) if (a.startsWith("--") && !["--base", "--title", "--description"].includes(a)) fail(`${a} is no option of this check.`, "use --base, --title or --description, as the usage line at the top of scripts/check.mjs shows.");
+  for (const a of args) if (a.startsWith("--") && !["--base", "--title", "--description", "--branch"].includes(a)) fail(`${a} is no option of this check.`, "use --base, --title, --description or --branch, as the usage line at the top of scripts/check.mjs shows.");
   const opt = name => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1] ?? fail(`${name} is given no value.`, "give it one, as the usage line at the top of scripts/check.mjs shows."); };
-  return { base: opt("--base"), title: opt("--title"), description: opt("--description") };
+  return { base: opt("--base"), title: opt("--title"), description: opt("--description"), branch: opt("--branch") };
 }
 
 // The project at the commit checked out: its root, head, base, manifest's pin and owner, and the pull request's text.
-function project({ base: baseArg, title, description }) {
+function project({ base: baseArg, title, description, branch }) {
   let root;
   try { root = git(process.cwd(), "rev-parse", "--show-toplevel"); } catch { fail("this folder is in no git repository.", "run it from the project's root, in its clone."); }
   const show = (rev, file) => { try { return git(root, "show", `${rev}:${file}`); } catch { return null; } };
@@ -114,22 +116,27 @@ function project({ base: baseArg, title, description }) {
     try { body = fs.readFileSync(description, "utf8"); } catch { fail(`--description ${description} cannot be read.`, "give the path of a file that holds the pull request's description."); }
   }
   const owner = /^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/m.exec(manifest)?.[1] ?? "";
-  return { root, show, head, pin, base, owner, body, described: description !== null, title: title ?? git(root, "log", "-1", "--format=%s", head),
+  // (the branch's own name, which the personal-terms check reads too: given, or the one checked out)
+  let named = branch;
+  if (named === null) { try { named = git(root, "symbolic-ref", "--short", "-q", "HEAD"); } catch { named = ""; } }
+  return { root, show, head, pin, base, owner, body, described: description !== null, branch: named || "change", title: title ?? git(root, "log", "-1", "--format=%s", head),
     event: base ? "pull_request" : "push", changed: base ? git(root, "diff", "--name-only", `${base}...${head}`).split("\n").filter(Boolean) : [] };
 }
 
 // The project's calls to the core's workflows, as the base the change merges into holds them (on a push, main's own),
 // so a change cannot leave a check out by taking its call out: from its .github/workflows; where it has none, the
-// starter kit's, from the base's copy, pinned where the base's manifest pins the core.
-function callers({ root, show, head, base }) {
+// starter kit's, from the core itself at the pin the base's manifest holds (never from a copy a change could edit).
+function callers({ root, show, head, base }, tmp) {
   const at = base || head;
   const pin = new RegExp(`^Core: ${CORE_SOURCE} at ([0-9a-f]{40}), copied whole under core/`, "m").exec(show(at, "core-manifest.md") ?? "")?.[1] ?? "";
   const listed = dir => { try { return git(root, "ls-tree", "--name-only", `${at}:${dir}`).split("\n").filter(Boolean); } catch { return []; } };
   const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => ({ file: f, text: show(at, `.github/workflows/${f}`) }));
   if (own.some(c => Object.values(parseYaml(c.text).jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;
   const kit = [];
-  for (const f of listed("core/setup/template/workflows").filter(f => f.endsWith(".yml.tmpl"))) {
-    const text = show(at, `core/setup/template/workflows/${f}`).replaceAll("{{core}}", CORE).replaceAll("{{pin}}", pin);
+  const templates = coreFile(tmp, pin, "setup/template/workflows", true);
+  if (templates === null) fail(`the base's manifest pins the core at ${pin || "no commit"}, where the starter kit's calls cannot be read.`, "write the manifest's \"Core:\" line as the sync writes it, in the base the change merges into.");
+  for (const f of templates.split("\n").filter(f => f.endsWith(".yml.tmpl"))) {
+    const text = coreFile(tmp, pin, `setup/template/workflows/${f}`).replaceAll("{{core}}", CORE).replaceAll("{{pin}}", pin);
     const left = text.match(/\{\{[a-z]+\}\}/);
     if (left) console.log(`note the starter kit's ${f} is filled in with ${left[0]} by the kit, so it is not run: a project that needs it keeps the call it was written`);
     else kit.push({ file: f.replace(/\.tmpl$/, ""), text });
@@ -163,24 +170,25 @@ function context(p) {
   let repo = "local/project";
   try { repo = /[:/]([^/:]+\/[^/]+?)(?:\.git)?$/.exec(git(root, "remote", "get-url", "origin"))?.[1] ?? repo; } catch { /* (no origin) */ }
   const repository = { default_branch: defaultBranch, private: false, full_name: repo };
-  const pull = { number: 0, state: "open", draft: false, title, body, base: { sha: base, ref: "main" }, head: { sha: head, ref: "change", repo: { full_name: repo } }, user: { login: owner } };
+  const pull = { number: 0, state: "open", draft: false, title, body, base: { sha: base, ref: "main" }, head: { sha: head, ref: p.branch, repo: { full_name: repo } }, user: { login: owner } };
   return { event_name: p.event, repository: repo, actor: owner, server_url: "https://github.com", run_id: "0", token: "", sha: head,
-    base_ref: base ? "main" : "", head_ref: base ? "change" : "", ref: base ? "refs/pull/0/merge" : "refs/heads/main",
+    base_ref: base ? "main" : "", head_ref: base ? p.branch : "", ref: base ? "refs/pull/0/merge" : "refs/heads/main",
     event: base ? { action: "synchronize", pull_request: pull, repository } : { ref: "refs/heads/main", before: "", after: head, repository } };
 }
 
-// What runs a job that calls a workflow of the core's, in a scratch clone of the commit (the branch "change", its base
-// "main"), and gives the count of its failures.
+// What runs a job that calls a workflow of the core's, in a scratch clone of the commit (its base "main"; for a pull
+// request, at the merge of the two), and gives how many of its jobs ran and failed.
 function runner(p, tmp) {
   const bare = path.join(tmp, "project.git");
   git(tmp, "clone", "-q", "--bare", "--no-hardlinks", p.root, bare);
   git(tmp, "--git-dir", bare, "update-ref", "refs/heads/main", p.base || p.head);
   git(tmp, "--git-dir", bare, "update-ref", "refs/heads/change", p.head);
+  const at = p.base ? merged(p, tmp, bare) : p.head;
   let runs = 0;
   const workspace = () => {
     const ws = path.join(tmp, "ws", String(++runs));
     git(tmp, "clone", "-q", "--no-checkout", pathToFileURL(bare).href, ws);
-    git(ws, "checkout", "-q", "--detach", p.head);
+    git(ws, "checkout", "-q", "--detach", at);
     return ws;
   };
   // (the checkouts and Node's setup stand in here; any other action is the host's own, not run and said so)
@@ -213,11 +221,24 @@ function runner(p, tmp) {
   };
 }
 
-// A file of the core at a commit, from a clone of the core's address made once (never from the project's copy, which
+// A file of the core at a commit (with `list`, the names in a folder), from a clone of the core's address made once (never from the project's copy, which
 // the change under check may have edited: GitHub too runs a called workflow as the core holds it at the call's pin).
-function coreFile(tmp, sha, file) {
+function coreFile(tmp, sha, file, list = false) {
   if (!coreClone) { coreClone = path.join(tmp, "core.git"); git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); }
-  try { return git(tmp, "--git-dir", coreClone, "show", `${sha}:${file}`); } catch { return null; }
+  if (!/^[0-9a-f]{40}$/.test(sha)) return null;
+  try { return list ? git(tmp, "--git-dir", coreClone, "ls-tree", "--name-only", `${sha}:${file}`) : git(tmp, "--git-dir", coreClone, "show", `${sha}:${file}`); } catch { return null; }
+}
+
+// The commit a pull request's checks run on, as GitHub makes it: the head merged into its base, the base its first
+// parent and the head its second, so a check that reads its base from HEAD^1 finds it.
+function merged(p, tmp, bare) {
+  const ws = path.join(tmp, "merge");
+  git(tmp, "clone", "-q", "--no-checkout", pathToFileURL(bare).href, ws);
+  git(ws, "checkout", "-q", "--detach", p.base);
+  try { git(ws, "-c", "user.name=core-check", "-c", "user.email=core-check@example.invalid", "merge", "-q", "--no-ff", "--no-edit", p.head); } catch { fail("the change does not merge into its base without a conflict.", "bring the branch up to date with its base, resolve the conflict, commit, and run this check again."); }
+  const sha = git(ws, "rev-parse", "HEAD");
+  git(ws, "push", "-q", "origin", `${sha}:refs/heads/core-check-merge`); // (a branch, so each job's clone holds it)
+  return sha;
 }
 
 // The stand-in for actions/checkout: the job's own checkout is the scratch clone; the core is fetched from its address.

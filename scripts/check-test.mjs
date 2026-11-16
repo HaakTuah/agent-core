@@ -93,12 +93,32 @@ r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"),
 const said = `${r.stdout}${r.stderr}`;
 ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(said) && !said.toLowerCase().includes(term.toLowerCase()) && mended(said), "a listed personal term, listed in other letters' case, fails the change, and the term is printed nowhere in any case", said);
 
-// another host: no .github/workflows, so the kit's calls are run
+git(dir, "reset", "-q", "--hard", "base");
+fs.writeFileSync(path.join(dir, "notes.md"), "A plain note.\n");
+commit(dir, "a plain note");
+const terms = { ...env, PERSONAL_TERMS: `${term}\n` };
+r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base", "--branch", `fix-${term.toLowerCase()}`], { cwd: dir, env: terms, encoding: "utf8" });
+ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(`${r.stdout}${r.stderr}`), "a listed term in the branch's own name fails the change", `${r.stdout}${r.stderr}`);
+
+// a check that keeps a baseline reads the base: the change is checked on its merge into the base, as GitHub checks it
+git(dir, "reset", "-q", "--hard", "base");
+fs.writeFileSync(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { unlisted: { command: "npx", args: ["-y", "an-unlisted-server@1.0.0"] } } }, null, 2));
+commit(dir, "an agent's tool no list names");
+r = check(dir, "--base", "base");
+ok(r.status === 1 && /FAIL licences\.yml\/licences\/licences: its step "Every tool the agents load listed/.test(r.out) && mended(r.out), "a tool the agents load that no list names fails the agent-tools check on a pull request, its base read from the merge's first parent", r.out);
+
+// another host: no .github/workflows, so the kit's calls are run, read from the core itself
 git(dir, "reset", "-q", "--hard", "base");
 fs.rmSync(path.join(dir, ".github", "workflows"), { recursive: true, force: true });
 commit(dir, "on another host");
 r = check(dir);
 ok(r.status === 0 && r.out.includes("the starter kit's calls are run") && /ok {3}core\.yml\/core\/core/.test(r.out), "a project with no calls of its own is checked by the starter kit's", r.out);
+git(dir, "branch", "-q", "-f", "elsewhere");
+fs.rmSync(path.join(dir, "core", "setup", "template", "workflows"), { recursive: true, force: true });
+commit(dir, "the copy's starter kit calls taken out");
+r = check(dir, "--base", "elsewhere");
+ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && mended(r.out), "a change that takes the kit's calls out of its copy is still checked by the core's own", r.out);
+git(dir, "reset", "-q", "--hard", "elsewhere");
 
 // what it refuses
 r = check(dir, "--colour");
