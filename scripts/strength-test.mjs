@@ -122,6 +122,16 @@ const judgedNow = again([at(repeated, "Pending", 4, 5), at(kept, "Pending", 4, 9
 let calls = 0;
 const sameQueue = again([at(repeated, "Pending", 2), at(repeated, "Survived", 2, 9)], () => { calls++; return []; }, on(2));
 const otherKinds = again([at(repeated, "Pending", 2)], () => { calls++; return []; }, on(2, 3));
+// (and two faults that share a start and, cut short, an id, as a tool that faults a whole expression writes them: each
+// matched to its own by the whole of it, its end and what it became)
+const longLine = "if (someObject.someLongPropertyName.anotherProperty.length < limit) go();\nkeep();\n";
+const wide = (status, replacement, line = 1) => ({ ...mutant(line, 5, 67, status, replacement), mutatorName: "EqualityOperator" });
+const reportOf = (...mutants) => JSON.stringify({ files: { "a.js": { source: longLine, mutants } } });
+const shared = faultsOf(reportOf(wide("Pending", "someObject.someLongPropertyName.anotherProperty.length <= limit"), wide("Pending", "someObject.someLongPropertyName.anotherProperty.length >= limit"), { ...mutant(2, 1, 5, "Killed", "x"), mutatorName: "Other" }), null);
+const sharedAgain = order => again(shared, () => faultsOf(reportOf(...order), null), on(1, 2));
+const truth = [wide("Survived", "someObject.someLongPropertyName.anotherProperty.length <= limit"), wide("Killed", "someObject.someLongPropertyName.anotherProperty.length >= limit")];
+ok(shared[0].id === shared[1].id && [truth, [...truth].reverse()].every(order => { const got = sharedAgain(order); return got.filter(g => g.status === "Survived").length === 1 && got.filter(g => g.status === "Killed").length === 2 && got.find(g => g.status === "Survived").replacement.endsWith("<= limit"); }),
+  "two faults that share a start and, cut short, an id are each matched to their own by the whole of them, in whatever order the second report holds them");
 ok(kept4.filter(g => g.status === "Survived").length === 1 && kept4.length === 3
   && verdict({ faults: [f(repeated, "Survived")], still: kept4, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] }).fails
   && twoOnOne.filter(g => g.status === "Survived").length === 1 && twoOnOne.filter(g => g.status === "Killed").length === 2

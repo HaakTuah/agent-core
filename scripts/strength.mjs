@@ -120,8 +120,8 @@ export function idOf(file, source, m) {
 const aPlace = p => p && Number.isInteger(p.line) && p.line > 0 && Number.isInteger(p.column) && p.column > 0;
 const aMutant = m => m && typeof m.status === "string" && typeof m.mutatorName === "string" && aPlace(m.location?.start) && aPlace(m.location?.end);
 
-// The faults of a report, on the lines wanted (a Map of file to a Set; null for all): each { file, line, column, id,
-// status, mutatorName, replacement }. It throws a Refused where the report is not in the form.
+// The faults of a report, on the lines wanted (a Map of file to a Set; null for all): each { file, line, column, end,
+// id, status, mutatorName, replacement }. It throws a Refused where the report is not in the form.
 export function faultsOf(text, wanted, root = ".") {
   let r;
   try { r = parseBounded(text); } catch { refuse("the mutation tool's report could not be read as JSON", "have the tool write its report in the mutation-testing-elements schema (Stryker's \"json\" reporter writes it) to the path {report} stands for"); }
@@ -132,7 +132,7 @@ export function faultsOf(text, wanted, root = ".") {
     if (typeof f?.source !== "string" || !Array.isArray(f.mutants) || !f.mutants.every(aMutant)) refuse(`the mutation tool's report holds ${file} in a form the check does not read`, "have the tool write the mutation-testing-elements schema: each file a \"source\" and \"mutants\", each with \"mutatorName\", \"location\" and \"status\"");
     for (const m of f.mutants) {
       if (wanted && !wanted.get(file)?.has(m.location.start.line)) continue;
-      out.push({ file, line: m.location.start.line, column: m.location.start.column, id: idOf(file, f.source, m), status: m.status, mutatorName: m.mutatorName, original: originalOf(f.source.split(/\r?\n/u), m.location), replacement: m.replacement ?? "" });
+      out.push({ file, line: m.location.start.line, column: m.location.start.column, end: `${m.location.end.line}:${m.location.end.column}`, id: idOf(file, f.source, m), status: m.status, mutatorName: m.mutatorName, original: originalOf(f.source.split(/\r?\n/u), m.location), replacement: m.replacement ?? "" });
     }
   }
   return out;
@@ -230,14 +230,14 @@ export function undercut(now, was, still = []) {
     .map(([k, before]) => ({ kind: k, listed: nowT.get(k) ?? 0, before, held: held.get(k), unrun: unrun.get(k) ?? 0 }));
 }
 
-// What the lines a change left alone hold (`still`, found on the lines `first`, a Map of file to a Set), once the tool is
-// run a second time, with a budget of its own, on only the lines whose faults the first run left unrun (`measure`, a
-// Map of file to a Set of lines to the faults found there), so a survivor on a changed line is seldom passed, and an
-// entry seldom held, for want of a run (#408). Fault by fault, by its place (file, line and column) and id: one the
-// first run left unrun takes the second run's verdict on that same fault, where it gave one; any the first run judged
-// keeps its verdict, and none is counted twice. Where the lines left unrun are all the first run measured, a second
-// run would face the same queue, and none is made.
-const spot = f => `${f.file}:${f.line}:${f.column}\n${f.id}`;
+// What the lines a change left alone hold (`still`), once the tool is run a second time, with a budget of its own, on
+// only the lines whose faults the first run left unrun (`measure`, a Map of file to a Set of lines to the faults found
+// there), so a survivor on a changed line is seldom passed, and an entry seldom held, for want of a run (#408). Fault by
+// fault, by the whole of it (its place from start to end, what put it in and what it became, uncut): one the first run
+// left unrun takes the second run's verdict on that same fault, those alike taken in the report's order; any the first
+// run judged keeps its verdict, and none is counted twice. Where the lines left unrun are all those on which the first
+// run found any fault (`first`, a Map of file to a Set), a second run would face the same queue, and none is made.
+const spot = f => JSON.stringify([f.file, f.line, f.column, f.end, f.mutatorName, f.replacement, f.id]);
 export function again(still, measure, first) {
   const unrun = still.filter(f => f.status === "Pending");
   if (!unrun.length) return still;
@@ -245,8 +245,9 @@ export function again(still, measure, first) {
   for (const f of unrun) lines.set(f.file, (lines.get(f.file) ?? new Set()).add(f.line));
   const count = m => [...m.values()].reduce((n, at) => n + at.size, 0);
   if (count(lines) >= count(first)) return still;
-  const judged = new Map(measure(lines).filter(g => g.status !== "Pending").map(g => [spot(g), g]));
-  return still.map(f => (f.status === "Pending" ? judged.get(spot(f)) ?? f : f));
+  const judged = new Map();
+  for (const g of measure(lines).filter(g => g.status !== "Pending")) judged.set(spot(g), [...(judged.get(spot(g)) ?? []), g]);
+  return still.map(f => (f.status === "Pending" ? judged.get(spot(f))?.shift() ?? f : f));
 }
 
 // Of the entries a pull request that records a new whole run lists anew or above the base, those whose line stands
@@ -380,8 +381,11 @@ function onPullRequest(p, base) {
   const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
   const faults = measured(p, changed, baseline);
   const ids = baseline ? needed(faults, baseline, was, recordsWhole(baseline, was, touched)) : [];
-  const kinds = new Set(ids.map(kindOf)), ofKinds = lines => measured(p, lines, baseline).filter(f => kinds.has(kindOf(f.id)));
-  const around = ids.length ? watched(ids, read, changed) : new Map(), still = ids.length ? again(ofKinds(around), ofKinds, around) : [];
+  const kinds = new Set(ids.map(kindOf)), ofKinds = all => all.filter(f => kinds.has(kindOf(f.id)));
+  // (the lines on which the first run found any fault, of any kind: those a second run would face again)
+  const around = ids.length ? measured(p, watched(ids, read, changed), baseline) : [], found = new Map();
+  for (const f of around) found.set(f.file, (found.get(f.file) ?? new Set()).add(f.line));
+  const still = ids.length ? again(ofKinds(around), lines => ofKinds(measured(p, lines, baseline)), found) : [];
   const { lines, fails } = verdict({ faults, still, baseline, was, at: p.at, deleted, touched, texts: read });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(logged(l));
   summary(lines);
