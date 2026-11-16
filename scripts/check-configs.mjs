@@ -80,18 +80,27 @@ function uncommented(line) {
 export function commands(run) {
   const text = withoutHereDocuments(run.split(/\r?\n/u).map(uncommented)).join("\n").replace(/\\\n/gu, " ");
   const out = [];
-  let words = [], word = null;
+  let words = [], word = null, operand = false; // (operand: the next word is a redirection's file, no argument)
   const add = (s, dynamic = false) => { word ??= { text: "", dynamic: false }; word.text += s; word.dynamic ||= dynamic; };
-  const close = () => { if (word) words.push(word); word = null; };
-  const end = () => { close(); if (words.length) out.push(words); words = []; };
+  const close = () => { if (word && !operand) words.push(word); if (word) operand = false; word = null; };
+  const end = () => { close(); operand = false; if (words.length) out.push(words); words = []; };
   for (let i = 0; i < text.length; i++) {
-    if ("\n;&|()".includes(text[i])) end();
-    else if (" \t<>".includes(text[i])) close();
+    if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^\d+$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
+    else if ("\n;&|()".includes(text[i])) end();
+    else if (" \t".includes(text[i])) close();
     else i = part(text, i, add);
   }
   end();
   for (const ws of out) for (const w of ws) w.dynamic ||= /%\w+%/u.test(w.text);
   return out;
+}
+// A redirection at `i` (>, >>, <, 2>, &>, >&2, <<EOF …): `opens` is told, so the word it is written against, a file
+// descriptor's number, is no argument and the word after it is its file; it returns where its operator ends.
+function redirection(text, i, opens) {
+  opens();
+  let j = i + (text[i] === "&" ? 1 : 0);
+  while ("<>".includes(text[j + 1] ?? "x")) j++;
+  return text[j + 1] === "&" ? j + 1 : j;
 }
 // The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone); where
 // no such line follows, none is left out.
@@ -167,6 +176,8 @@ function located(word, dir) {
 const slashed = word => word.text.replace(/\\/gu, "/");
 const NODE = /(?:^|\/)node(?:\.exe)?$/iu;
 const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup", "sudo"]);
+// The shell's words that start a command's place without being one (if …; then node …), passed over as wrappers are.
+const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "{"]);
 // A shell given its commands as one word (`bash -c "…"`), whose commands are read as the step's own.
 // (its option that takes them: -c, alone or last in a cluster such as -ec, or PowerShell's -Command)
 const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu, INLINE = /^(?:-[a-z]*c|-command)$/iu;
@@ -189,7 +200,7 @@ function nodeRuns(words) {
 // -i); an option's value (sudo -u bot) it cannot tell from the command, and runsIn says so.
 function pastWrappers(words) {
   let i = 0;
-  while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text))) {
+  while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text) || KEYWORDS.has(words[i].text))) {
     const wrapper = WRAPPERS.has(words[i].text);
     for (i++; wrapper && words[i]?.text.startsWith("-"); i++);
   }
@@ -199,7 +210,7 @@ function pastWrappers(words) {
 function inline(words, i) {
   let k = i + 1;
   while (k < words.length && words[k].text.startsWith("-") && !INLINE.test(words[k].text)) k++;
-  return k + 1 < words.length && INLINE.test(words[k].text) ? { inner: words[k + 1].text } : {};
+  return k + 1 < words.length && INLINE.test(words[k].text) ? { inner: words[k + 1].text, filled: words[k + 1].dynamic } : {};
 }
 // How each script picks its config from its arguments, as it reads them: the first that does not start with "--"; of
 // the reading-size and exact-versions checks, the first whatever it is; of the NuGet check, never the value of its
@@ -224,15 +235,18 @@ const unfollowed = (words, script) => {
   return first && (WRAPPERS.has(first.text) || SHELL.test(first.text)) && words.some(w => slashed(w).includes(`scripts/${name}`))
     ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
 };
+// The runs read inside a shell's command string, each not read where the outer shell fills the string when it runs
+// (`bash -c "node … '$CONFIG'"`: the inner quotes keep nothing from it).
+const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `runs ${script} in a command string the workflow fills only when it runs` })) : runs);
 // Where a step's `run:`, in the folder `dir`, runs `script` (a path from the root, "core/scripts/copies.mjs") with
 // node: each as configAfter gives it.
 function runsIn(run, dir, script) {
   const found = [], name = path.posix.basename(script);
   let moved = false;
   for (const words of commands(run)) {
-    const { moves, inner, at: i } = nodeRuns(words);
+    const { moves, inner, filled, at: i } = nodeRuns(words);
     moved ||= !!moves;
-    if (inner !== undefined) found.push(...runsIn(inner, moved ? { dynamic: true } : dir, script));
+    if (inner !== undefined) found.push(...within(runsIn(inner, moved ? { dynamic: true } : dir, script), filled, script));
     else if (i === undefined && !moves) found.push(...unfollowed(words, script));
     const word = words[i ?? words.length];
     if (!word || !slashed(word).endsWith(`scripts/${name}`)) continue;
