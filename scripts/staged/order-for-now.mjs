@@ -1,5 +1,5 @@
 // A staged case (staged.mjs): an order for now, given on the task (roles/shared/inbox.md, "The owner's words are kept
-// once"; #303, point 6). On issue #1, a bug, the owner adds an order for the time being. Passed where the fix is pushed,
+// once" and "An order for now is not a rule"; #303, point 6; #252, part E). On issue #1, a bug, the owner adds an order for the time being. Passed where the fix is pushed,
 // the order is followed in it, and no pushed branch writes it into a rule file: those floor rule 3 names, and the copy.
 import { BUG, OWNER, build, changed, fixed, pushed, runAt, verdict } from "./scratch.mjs";
 

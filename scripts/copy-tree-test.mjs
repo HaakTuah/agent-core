@@ -52,6 +52,7 @@ write("floor/reports/nested.md", "a folder of that name deeper down stays\n");
 write("reportsx/near.md", "a name that only starts the same stays\n");
 write("reports/one.md", "the core's own\n");
 write("reports/deep/two.md", "the core's own\n");
+write("words/items-001.md", "the owner's own words\n");
 
 const before = commit("* -text\n");
 ok(copyTree(before, repo) === whole(before), "a pin from before the line: the whole tree");
@@ -64,6 +65,13 @@ ok(tree !== whole(pin), "  which is not the whole tree");
 ok(!paths(tree).some((p) => p.startsWith("reports/")), "  the folder at the top is out");
 ok(["floor/reports/nested.md", "reportsx/near.md", ".gitattributes"].every((p) => paths(tree).includes(p)), "  a folder of that name deeper down, a name that starts the same and .gitattributes stay");
 
+ok(paths(tree).includes("words/items-001.md"), "  and a folder its own line does not name stays");
+const both = commit("* -text\n/reports export-ignore\n/words export-ignore\n");
+const bothTree = copyTree(both, repo);
+ok(bothTree === archived(both) && !paths(bothTree).some((p) => p.startsWith("reports/") || p.startsWith("words/")), "a pin with both lines: neither folder, exactly as git archive copies (#252)", `${bothTree} against ${archived(both)}`);
+const wordsOnly = commit("* -text\n/words export-ignore\n");
+ok(copyTree(wordsOnly, repo) === archived(wordsOnly) && paths(copyTree(wordsOnly, repo)).includes("reports/one.md"), "a pin with the words line alone: that folder out, reports kept");
+
 // any other spelling of the line: the whole tree, so only a copy that still holds the folder can equal it
 for (const [what, attributes] of [
   ["two spaces", "/reports  export-ignore\n"],
@@ -75,6 +83,7 @@ for (const [what, attributes] of [
   ["a trailing slash", "/reports/ export-ignore\n"],
   ["another folder", "/floor export-ignore\n"],
   ["a Windows line ending", "/reports export-ignore\r\n"],
+  ["the words folder's, a space after it", "/words export-ignore \n"],
 ]) {
   const other = commit(`* -text\n${attributes}`);
   ok(copyTree(other, repo) === whole(other), `the line with ${what}: the whole tree`);

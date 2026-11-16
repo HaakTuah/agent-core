@@ -3,10 +3,11 @@
 *Hammurabi's Agentic Code: one floor, many laws.*
 
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
-alike (core archive 68). The owner's words behind each rule: `archive/instructions.md`. A project of another owner takes
-the core the same way, its *owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save
-in `archive/`, whose words stay the core's owner's: its stand-in weighs them as that owner's reasoning, after its own
-owner's words, and marks an answer that rests on them alone unsure (`roles/shared/inbox.md`; core archive 166).
+alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the owner's own
+words stay in this repository alone (`words/`; #252). A project of another owner takes the core the same way, its
+*owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save in `archive/`, whose
+reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and marks an answer that rests
+on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
@@ -54,8 +55,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
-   `reports/`, the dated reports of this repository's own changes, which stay here alone (`.gitattributes`; core archive
-   165). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   `reports/`, the dated reports of this repository's own changes, and `words/`, the owner's own words behind the
+   archive, which stay here alone (`.gitattributes`; core archive 165; #252). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -518,9 +519,9 @@ is public, and so is every word of an issue, so a report holds only what the lig
 
 The core is under the Apache License 2.0 (`LICENSE`), with its notice in `NOTICE`, which whoever hands the core on,
 changed or not, passes on with it, marking the files they changed (#257; core archive 221). It covers all of this
-repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/` and
-`reports/`: the owner's own words and records, all rights reserved. Both files travel in each project's copy under
-`core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
+repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/`,
+`words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
+project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
 adds or changes them (floor rule 10). Nothing of the core ships, so no project's audit or notices file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
