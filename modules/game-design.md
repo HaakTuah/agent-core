@@ -1,7 +1,8 @@
 # Game design
 
 Read before a task changes a rule, a feature or how the computer players play, before a task changes a game's screen,
-and before a polish-lane task. A feature is any move, rule or power a player can choose to use.
+and before a polish-lane task: the kinds `game-rule`, `screen` and `polish`. A feature is any move, rule or power a
+player can choose to use.
 
 - **The computer players never know who is a person** (core archive 87).
   - Nothing in the logic of the *computer players*, nor in *what they are shown*, says whether another player is a
@@ -105,7 +106,7 @@ and before a polish-lane task. A feature is any move, rule or power a player can
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
   thing) are `modules/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
-- **How a game answers a player** (core archive 234). In a game played through a screen, each point below binds as
+- **How a game answers a player** (core archive 237). In a game played through a screen, each point below binds as
   `modules/screens.md`'s points do ("Whom it binds, and when"), and each check it names is one of that module's, the
   project's own and off until its *screen checks* name it ("What holds it" there). It does not mean that a game with no
   screen is asked anything here. Reason: a game's feel is lost in changes no one times or pictures.

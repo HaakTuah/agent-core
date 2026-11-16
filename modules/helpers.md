@@ -1,7 +1,7 @@
 # Helpers: when they pay
 
 Read by a builder before it starts helpers, however started (core archive 126), and by any session before it writes a
-brief.
+brief: the kinds `helper` and `brief`.
 
 A helper pays only for work of one of these shapes (core archive 25):
 

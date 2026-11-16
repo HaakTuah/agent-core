@@ -176,6 +176,9 @@ jobs:
       - name: The copy of the core's check (core.yml), its own job on scratch projects
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
         run: node scripts/core-yml-test.mjs
+      - name: The core's checks from plain git (check.mjs), on scratch projects
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
+        run: node scripts/check-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
         run: node scripts/pure-sync-test.mjs
@@ -239,6 +242,12 @@ jobs:
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/entry-files.mjs --core
+      - name: The reading script, by role and by task
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        run: node scripts/reading-test.mjs
+      - name: Every module and role of the core says when it is read, in words the reading script matches
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        run: node scripts/reading.mjs --check
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/workflows.mjs

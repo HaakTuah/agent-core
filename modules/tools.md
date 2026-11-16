@@ -1,10 +1,12 @@
 # Agent tools
 
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
-run is due. Which tool takes which role: `modules/roles.md`, "Tools are preferences".
+run is due: the kind `tool`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
+which role: `modules/roles.md`, "Tools are preferences".
 
 **One door in: `AGENTS.md`** (core archive 232; #249). By default every rule a session must know is reachable from the
-project's `AGENTS.md` in plain sentences, its `@` lines naming the files read at the start of every task. A tool that
+project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task. A
+tool that
 reads a file of its own first gets a small entry file that pulls in each file those lines name, with its own part: the
 starter kit writes them (`CLAUDE.md`, `.kiro/steering/core.md`, `.agents/rules/core.md`), and a tool that reads
 `AGENTS.md` alone, as Codex does, needs none. Where a pull request adds a file to `AGENTS.md`'s `@` lines, its builder
@@ -12,6 +14,18 @@ adds it to each entry file in that pull request. It does not mean a project keep
 uses (it declares the one it deletes under "Differences"). Reason: the `@` lines are Claude Code's import, so another
 tool opened the files they name only by discipline. Held by `scripts/entry-files.mjs`, which fails an entry file that
 pulls in less than `AGENTS.md` names.
+
+**One script says what to read** (core archive 234; #304). By default a session of any agent tool finds what it reads
+by one command, which the project's `AGENTS.md` names: `scripts/reading.mjs`, given a role and a task (its issue, its
+kinds, or the paths changed so far), prints the role's start (`modules/roles.md`, "A file for each role") and the
+modules the task calls for, each module saying in its opening line when it is read, in words the script matches: a
+kind of task, a path, a tool. It does not mean a tool needs a way of its own to find them (where it has a hook at a
+session's start, the work-saved hook there calls the script and names what the branch's changed paths call for;
+where it has none, the door's sentence is all), nor that an entry file stops pulling in a builder's start, nor that
+the floor is ever left to a pick: `floor/security.md` is read whole by every session.
+Reason: each tool found the rules its own way, and a session left to judge what it needs read everything or missed
+one. Held, in part, by `scripts/reading.mjs --check`, which fails a module or a role's file that does not say when it
+is read; that a session then opens what is printed, by nothing yet.
 
 **Hooks save time; checks are the guarantee** (core archive 232). By default no rule is held by a hook alone: what a
 tool's hook holds is also held where the tool does not matter, by a check on the pull request, a staged case or the

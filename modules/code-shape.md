@@ -1,7 +1,8 @@
 # How code is put together
 
 Read when a system is designed, added or named, when code is ported or rewritten (core archive 226), and when a pull
-request deletes a test or weakens one (#253). How what already stands is brought to it: `modules/cleaning.md`.
+request deletes a test or weakens one (#253): the kinds `system`, `port` and `test`. How what already stands is brought
+to it: `modules/cleaning.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
 its systems, and the marks below, in the config of its *shape check* (`core/scripts/shape.mjs`), which runs on every
