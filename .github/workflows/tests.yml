@@ -171,6 +171,9 @@ jobs:
       - name: The copy of the core's check (core.yml), its own job on scratch projects
         if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/core-yml-test.mjs
+      - name: The core's checks from plain git (check.mjs), on scratch projects
+        if: ${{ !cancelled() && matrix.part != 'rest' }}
+        run: node scripts/check-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && matrix.part != 'rest' }}
         run: node scripts/pure-sync-test.mjs
