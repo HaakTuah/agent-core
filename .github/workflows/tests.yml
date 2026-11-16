@@ -39,9 +39,10 @@ concurrency:
 jobs:
   # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in three jobs
   # that run side by side, each under a time mark of its own: the starter kit and the sync on whole scratch projects,
-  # the licence, NuGet and agent-tools checks, and the rest, each step's condition naming the part it runs in, all on
-  # Linux, where one job runs them all; the parts are sized by the steps' times on Windows, about five minutes each,
-  # beside the upgrade job, which takes longer; #387, #411)
+  # the licence and NuGet checks with the starter kit's .NET project, which the NuGet check is run on, and the rest,
+  # the agent-tools check in it, each step's condition naming the part it runs in, all on Linux, where one job runs
+  # them all; the parts are sized by the steps' times on Windows, each to end about a sixth under its mark, beside the
+  # upgrade job, which takes longer; #387, #411, #304)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
@@ -99,7 +100,7 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/exact-versions-test.mjs ')) }}
         run: node scripts/exact-versions-test.mjs
       - name: The agent-tools check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/agent-tools-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/agent-tools-test.mjs ')) }}
         run: node scripts/agent-tools-test.mjs
       - name: The helper hook
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/helper-call-test.mjs ')) }}
@@ -210,7 +211,7 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-test.mjs ')) }}
         run: node scripts/init-test.mjs
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-dotnet-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-dotnet-test.mjs ')) }}
         run: node scripts/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/nuget-gate-test.mjs ')) }}
