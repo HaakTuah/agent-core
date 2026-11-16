@@ -110,13 +110,14 @@ export function perPull(issueComments, inline, owner) {
   return { codexCode: codex("code"), postedCode: posted("code"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
 }
 
-// The rules a pull request's findings name (the core's tasks/reviews.md, point 8; #254): each on
-// a line of its own that opens "Rule:", in a find of Codex's or a review posted by the owner's account, read as a key
-// the same however it is written: its backticks, bold and quotes, a closing stop and a leading "core/" left out, its
-// spaces made one, its case lowered and its control and format characters taken out. A quoted line names none.
+// The rules a pull request's findings name (the core's tasks/reviews.md, point 8; #254): each on a line of its own
+// that opens "Rule:", in a find of Codex's or a review posted by the owner's account, read as a key the same however it
+// is written: its backticks, bold and quotes, a closing stop, colon or comma (as rules.mjs's leadOf leaves them out of
+// a rule's own key) and a leading "core/" left out, its spaces made one, its case lowered and its control and format
+// characters taken out. A quoted line names none.
 const RULE = /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Rule:(?:\*\*)?[ \t]+(\S.*)$/u;
 export const ruleOf = text => String(text).slice(0, 300).replace(/[\p{Cc}\p{Cf}`*"\u201c\u201d]/gu, "").replace(/\s+/gu, " ").trim()
-  .replace(/[.;]+$/u, "").trim().replace(/^core\//u, "").toLowerCase();
+  .replace(/[.:,;]+$/u, "").trim().replace(/^core\//u, "").toLowerCase();
 export const rulesIn = body => lines(body).map(l => RULE.exec(l)?.[1]).filter(Boolean).map(ruleOf).filter(Boolean);
 export function rulesNamed(issueComments, inline, owner) {
   const finds = [...inline, ...issueComments].filter(c => codexFind(c));

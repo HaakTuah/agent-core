@@ -135,6 +135,8 @@ ok(["Codex's code review", "Codex's security review", "Design check posted"].eve
 ok(ruleOf("`floor/security.md: 1. Nothing secret in the repository`.") === "floor/security.md: 1. nothing secret in the repository"
   && ruleOf("**core/roles/shared/how-to-work.md:  \"One fact, one place\"**") === "roles/shared/how-to-work.md: one fact, one place" && ruleOf("x".repeat(400)).length === 300,
   "a rule is read as one key however it is written, its quotes, bold, backticks, stop, case and a leading core/ aside, and no longer than 300");
+ok(standing().has(ruleOf("`floor/security.md: Test data is never real:`")) && ruleOf("a.md: One,") === "a.md: one" && ruleOf("a.md: One:.") === "a.md: one",
+  "a closing colon or comma is left out as a rule's own key leaves it out, so a lead copied with it still names the rule");
 ok(ruleOf("a.md:\u001b[31m one\u0000\u202e two\u200b") === "a.md:[31m one two", "a key holds no control or format character, so none reaches a terminal or an issue");
 const stand = standing(), core = fileURLToPath(new URL("..", import.meta.url));
 ok(stand?.has("floor/security.md: 1. nothing secret in the repository") && stand.has("tasks/reviews.md: a finding seen twice becomes a check") && stand.has("agents.md: a check that fails says the mend") && [...stand].some(k => k.startsWith("security.md: ")) && !stand.has("agents.md: forged")
