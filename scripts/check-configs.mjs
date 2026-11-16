@@ -262,12 +262,10 @@ function configAfter(words, i, dir, script) {
 // reader read (a config, or one it says it cannot place), or by a line that is one command that runs no script, alone
 // (echo, cp, git: NO_RUNNER, with no pipe, redirection, here-document or second command); any other, in whatever form
 // of the shell's (timeout 60s node …, cat <<EOF | bash, pwsh -c node …), leaves the step's run of it not read.
-function unaccounted(run, script, runs) {
-  let named = 0, text = 0;
+function unaccounted(run, script, runs, given = 0) {
+  let named = given, text = 0;
   for (const line of run.split(/\r?\n/u).map(uncommented).join("\n").replace(/\\\n/gu, " ").split("\n")) {
-    // (a "\\" read both as "/" and as nothing, as Windows and a shell read it)
-    const bare = line.replace(/['"]/gu, ""), name = path.posix.basename(script);
-    const k = Math.max(namings(plainPath(bare), name), namings(plainPath(bare.replace(/\\/gu, "")), name));
+    const k = lineNamings(line, path.posix.basename(script));
     named += k;
     if (k && lone(line)) text += k;
   }
@@ -283,6 +281,12 @@ const lone = line => {
   const [words = [], more] = commands(line);
   return !more && NO_RUNNER.has(path.posix.basename(words[pastWrappers(words)]?.text ?? "").toLowerCase());
 };
+// How often a line names a script of that name, its quotes taken out and a "\\" read both as "/" and as nothing, as
+// Windows and a shell read it.
+function lineNamings(line, name) {
+  const bare = line.replace(/['"]/gu, "");
+  return Math.max(namings(plainPath(bare), name), namings(plainPath(bare.replace(/\\/gu, "")), name));
+}
 // A text with "\\" read as "/" and "/./" and "//" made one "/", so a path spelled any of those ways reads as one.
 const plainPath = text => text.replace(/\\/gu, "/").replace(/\/(?:\.?\/)+/gu, "/");
 // A line with what its quotes hold left out, read in one pass.
@@ -363,9 +367,31 @@ const folder = (...dirs) => {
 // steps run from the root, save where one names its own); an action the reader cannot read as { where, from,
 // unreadable }, its text.
 const STEPS_OF = new WeakMap(); // (each project's steps read once, however many checks ask)
-// The values a step's environment gives (its own env:, its job's, its workflow's), one a line, so that a script named
-// there is counted as named (unaccounted).
-const envOf = (step, envs) => [step?.env, ...envs].flatMap(e => (e && typeof e === "object" ? Object.values(e) : [])).map(v => String(v)).join("\n");
+// What a step is given beside its run: its env:, its job's and its workflow's, its job's matrix, so that a script named
+// there is counted as named (unaccounted). Each mapping is read once, its text values (at any depth, a mapping or a
+// list held as text only by its values) counted by name once, however many steps and checks ask.
+const GIVEN = new WeakMap();
+function givenNamings(objects, name) {
+  let n = 0;
+  for (const o of objects) {
+    if (!o || typeof o !== "object") continue;
+    if (!GIVEN.has(o)) GIVEN.set(o, { lines: leaves(o), counts: new Map() });
+    const memo = GIVEN.get(o);
+    if (!memo.counts.has(name)) memo.counts.set(name, memo.lines.reduce((k, l) => k + lineNamings(l, name), 0));
+    n += memo.counts.get(name);
+  }
+  return n;
+}
+// The text values a mapping or a list holds, at any depth (to a bound, past which nothing more is read).
+function leaves(o, depth = 0, out = []) {
+  if (depth > 50 || out.length > 1e5) return out;
+  for (const v of Array.isArray(o) ? o : Object.values(o)) {
+    if (typeof v === "string") out.push(v);
+    else if (typeof v === "number" || typeof v === "boolean") out.push(`${v}`);
+    else if (v && typeof v === "object") leaves(v, depth + 1, out);
+  }
+  return out;
+}
 function steps(p) {
   if (STEPS_OF.has(p)) return STEPS_OF.get(p);
   const out = [], seen = new Set();
@@ -385,7 +411,7 @@ function steps(p) {
   };
   const walk = (where, from, list, dirOf, envs = []) => {
     for (const step of Array.isArray(list) ? list : []) {
-      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), env: envOf(step, envs) });
+      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), given: [step?.env, ...envs] });
       if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from);
     }
   };
@@ -393,7 +419,9 @@ function steps(p) {
     const where = `.github/workflows/${f}`;
     if (!w.yaml) continue;
     for (const job of Object.values(w.yaml.jobs ?? {})) {
-      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]), [job?.env, w.yaml.env]);
+      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]), [job?.env, w.yaml.env, job?.strategy]);
+      // (a call to a workflow of the project's own: what it passes is read as the callee's steps would be given it)
+      if (typeof job?.uses === "string" && job.uses.startsWith("./")) out.push({ where, from: where, run: "", dir: { at: "." }, given: [job.with, job.strategy] });
     }
   }
   STEPS_OF.set(p, out);
@@ -408,7 +436,7 @@ export function runsOwn(p, name) {
   return steps(p).flatMap(s => {
     if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know`, unsure: true }] : [];
     const runs = runsIn(s.run, s.dir, script);
-    return [...runs, ...unaccounted(`${s.run}\n${s.env ?? ""}`, script, runs)].map(r => ({ where: s.where, from: s.from, ...r }));
+    return [...runs, ...unaccounted(s.run, script, runs, givenNamings(s.given ?? [], name))].map(r => ({ where: s.where, from: s.from, ...r }));
   });
 }
 // The workflows of the project's own that run the script, themselves or through an action they use, once each; where

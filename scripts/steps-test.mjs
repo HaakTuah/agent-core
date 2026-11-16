@@ -584,6 +584,16 @@ ok(["S=${S:-core/scripts/copies.mjs}\nnode $S bad.json", "x=`echo core/scripts/c
   .every(run => notRead("copies", { "a.yml": stepped(run) })) && notRead("copies", withEnv("node $S bad.json", { S: "core/scripts/copies.mjs" }))
   && copiesOf({ "a.yml": stepped("node --test $RUN\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json" && copiesOf({ "a.yml": stepped("node core/scripts/x/../copies.mjs c.json") }) === "c.json",
   "a naming however it ends, set in passing or in env:, in another case or spelling, and a run the reader cannot place, are not read; node --test $RUN is no run of it, and core/scripts/x/../copies.mjs is the copy's");
+// (the review of 35e05e0: what a step is given beside its run, read safely and once: an env: of any shape, a matrix, a
+// local workflow's call)
+ok(copiesOf(withEnv("node core/scripts/copies.mjs config/c.json", { S: { toString: "x", valueOf: "y" } })) === "config/c.json"
+  && notRead("copies", { "a.yml": { jobs: { j: { strategy: { matrix: { script: ["core/scripts/copies.mjs"] } }, steps: [{ run: "node ${{ matrix.script }} bad.json" }] } } } })
+  && notRead("copies", { "a.yml": { jobs: { c: { uses: "./.github/workflows/b.yml", with: { script: "core/scripts/copies.mjs" } } } }, "b.yml": stepped("node ${{ inputs.script }} bad.json") }),
+  "an env: of any shape is read without a throw; a matrix or a local workflow's call that names the script leaves its run not read");
+const manyEnv = Object.fromEntries(Array.from({ length: 2000 }, (_, k) => [`E${k}`, `v${k}`]));
+const manySteps = Array.from({ length: 2000 }, (_, k) => ({ run: `echo ${k}` }));
+const envStarted = Date.now();
+ok(copiesOf({ "a.yml": { env: manyEnv, jobs: { j: { env: manyEnv, steps: manySteps } } } }) === "checks/copies.json" && Date.now() - envStarted < 3000, "a workflow's and a job's env: are read once, however many steps", `${Date.now() - envStarted} ms`);
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
