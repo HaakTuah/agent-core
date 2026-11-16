@@ -52,3 +52,9 @@ The index, and how an item is written: `archive/instructions.md`.
 246. **14 to 16 November 2026**, #252. A project's copy carries each item's reasoning and not the owner's words, a bare
      yes is never quoted, an order for now is no rule, and rule text points to no item: a stand-in needs the reasoning,
      and every session paid at its start for pointers a builder never followed.
+
+247. **16 November 2026**, #486. How the core reads a language, and whether its own scripts get types, are choices of
+     the core's that are hard to undo, so a record picks them by a trial and a challenger, not by what grew: the owner
+     wants the core to read whatever stack is best for a project, not a project's stack fitted to what the core reads,
+     and a format someone else defines read by a package, not by hand, how such a package reaches a project settled
+     once in that record.
