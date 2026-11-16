@@ -12,7 +12,8 @@
 //
 // The config (left out: the one the manifest's *screen checks* row names, in backticks, else checks/screens.json; with
 // none, every check is off and nothing is read): { "baseline": "<path>", "checks": { "<check>": "reports" | "binds" } },
-// each check one of CHECKS. What was found (a file the project's tool writes): { "screens": [<the screens it ran>],
+// each check one of CHECKS (`settings`, a player's settings kept, is the one a game asks: game-design.md, beside the
+// module). What was found (a file the project's tool writes): { "screens": [<the screens it ran>],
 // "all": true where it ran every screen, "found": { "<check>: <screen>: <what>": true | { "count": <n> } } }. The
 // baseline holds, beside shape.mjs's "listed" and "grown", "checks": those whose findings it listed from a run over
 // every screen. A check turned on that it has not listed fails until --write lists it from such a run, so what stands
@@ -40,6 +41,7 @@ export const MENDS = {
   pictures: "build the state the finding names, or take its picture at the size it names; where the picture differs from its baseline on purpose, take the baseline picture again in this pull request and say why",
   timing: "make what the finding names answer within a tenth of a second, show work going on past a second and progress past ten, keep the layout from jumping while it loads, or bring the load within its limit",
   console: "mend the error, the failing request or the font or picture that does not load, which the finding names",
+  settings: "give the product the setting the finding names and keep it when the product is closed and opened again (the module that asks for the check names the settings: in a game, core/modules/game-design.md, \"A player's settings are remembered\": controls remapped, the size of text, less shake and flashing, each volume apart)",
 };
 export const CHECKS = Object.keys(MENDS);
 export const KIT = "checks/screens.json";
