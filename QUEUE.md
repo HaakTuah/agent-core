@@ -26,14 +26,15 @@ wanted").
 | #456 | rule builder; it changes the floor (rules 5 and 10), and its PR quotes the owner's yes on the issue | |
 | #457 | rule builder | |
 | #458 | rule builder | |
-| #459 | rule builder | |
+| #459, and #484, points 8 to 10 | rule builder; for #484, "Part of #484", or "Fixes #484" if last | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
 | #375 | rule builder | |
 | #376 | rule builder | #375, which changes the same files |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
-| #441 | builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
+| #484, points 1 to 5 | rule builder; "Part of #484", or "Fixes #484" if last | |
+| #441, with #484, points 6 and 7 | builder; for #484, "Part of #484", or "Fixes #484" if last; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built now, whose work-down takes in `scripts/look.mjs` |
 | #350 | builder | |
 | #355 | builder | |
