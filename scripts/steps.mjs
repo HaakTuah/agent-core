@@ -591,6 +591,7 @@ export const STEPS = [
         : 'In one small pull request, add `repositories.md` to the "Modules:" line of `core-manifest.md` where the project is, or may become, more than one repository, or else add it to the line "Not taken:" under it as "`repositories.md` (one repository, which no library carries the core into)".';
     } },
   { lead: "16 November 2026, what a game is for", cost: COST.read, unread: "whether a project is a game, and whether its *game page* says what the game is for, is a reading of what it builds; the page is written in the game's next pull request that adds a feature (`core/tasks/game-design.md`, \"Every game says what it is for, on one page\"), not at the sync, and the design check reads the feature against it there" },
+  { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
