@@ -34,7 +34,7 @@ wanted"). A line on points of #460 or #484 has its PR say "Part of" that issue, 
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
-| #441, with #484, points 6 and 7 | builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
+| #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built now, whose work-down takes in `scripts/look.mjs` |
 | #350 | builder | |
 | #355 | builder | |
