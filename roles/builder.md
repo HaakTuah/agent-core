@@ -5,7 +5,7 @@ no role.
 
 **Reads at its start:** `modules/work-flow.md`, `modules/git.md`, `modules/how-to-work.md`, `modules/inbox.md`.
 
-**Read by task, twice** (core archive 233; #304). By default the builder reads, at a task's start, what
+**Read by task, twice** (core archive 234; #304). By default the builder reads, at a task's start, what
 `scripts/reading.mjs builder --issue <its issue>` prints; before its PR is marked ready it runs that with `--changed`,
 reads each file it adds, checks the work against it and lists it on the description's line `Read for it:`. It does not
 mean it opens no other file. Reason: a module the change turned out to call for went unread until a review found it.

@@ -42,6 +42,7 @@ Not taken, each for its reason:
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
 the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
@@ -118,7 +119,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.
-- **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`; core archive 179, 181 and 233).
+- **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`; core archive 179, 181 and 234).
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
   whoever makes the change raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every

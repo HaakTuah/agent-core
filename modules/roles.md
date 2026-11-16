@@ -10,7 +10,7 @@ the fallback reviewer takes a review no other gives; the design check, the stand
 against the design and the owner's words; escalation takes what has beaten a builder twice. Any agent tool the owner
 has may take any of them.
 
-**A file for each role** (core archive 233; #304). By default what a role reads at its start is the floor's
+**A file for each role** (core archive 234; #304). By default what a role reads at its start is the floor's
 `security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
 session's) and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
 puts one that a single role needs in that role's file, and one that several roles share in one shared file their files

@@ -2,7 +2,7 @@
 # Nothing is lost ("Push after every commit" in the core's modules/git.md): Claude Code runs this when a session starts
 # ("start") and whenever a reply is about to end ("stop"). start reports work left uncommitted, unpushed or stashed,
 # and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
-# for (core archive 233), and whether the owner's stop switch is set (core archive 201);
+# for (core archive 234), and whether the owner's stop switch is set (core archive 201);
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
 # made never traps a session. It only reads the repository, with the git settings that run commands (fsmonitor, hooks)
 # turned off; the start asks origin for the switch with the user's own SSH and sign-in setup, never a prompt, and with

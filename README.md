@@ -24,7 +24,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   `reviews.md`, `review-guidelines.md`, `tools.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`,
   `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
   project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
-- **The roles** (`roles/`; core archive 233): one file for each role (the builder, the orchestrator, a reviewer, the
+- **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
   stand-in, the design session), read at that role's start with the shared files it names: `modules/roles.md`, "A file
   for each role".
 - **Reading by role and by task:** `scripts/reading.mjs` (under `core/` in a project) prints the files a session of a
@@ -151,6 +151,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The screen checks,** where a project with a screen turns one on: `screens.mjs`, run by the project's own
      workflow after its own tool, which holds what that tool found against a baseline in the shape check's form, which
      only shrinks (the *screen checks*; `modules/screens.md`, "What holds it"). The core runs it nowhere by itself.
+   - **The tests' strength:** `strength.mjs`, a step of the project's own job that runs its tests, with
+     `STRENGTH_BASE` the pull request's base: it runs the project's mutation tool (the *mutation tool*) on the lines
+     the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
+     has written its baseline, beside the shape check's, a fault that survives there unlisted fails
+     (`modules/code-shape.md`). `mutate.mjs` is the core's own tool, for code run by Node with tests that are files
+     run by `node`.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`); the two lines
@@ -323,6 +329,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` |
 | *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`modules/code-shape.md`); left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`modules/cleaning.md`; `scripts/dose.mjs` reads it); left out, the state read from the shape check's baseline |
+| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`modules/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`modules/cleaning.md`); left out, `docs/audits/` |
 | *large file* | how large a file is before it is never read whole |
 | *one at a time* | what never runs as parallel lanes |

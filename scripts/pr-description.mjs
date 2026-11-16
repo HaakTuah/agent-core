@@ -15,7 +15,7 @@
 // holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
 // own pull request), nothing is asked, so a pull request that stood before the line came is never turned red by it.
 // It asks in the same way, of a pull request opened since the copy on its base held READS_SINCE, the line that lists
-// what its changed paths called for ("One script says what to read" in modules/tools.md; core archive 233; #304): each
+// what its changed paths called for ("One script says what to read" in modules/tools.md; core archive 234; #304): each
 // file the reading script (reading.mjs, beside this file) gives for the paths the pull request changes, read from git
 // as the merge commit against its first parent, the base, stands in backticks on the description's line "Read for
 // it:". A renamed file counts by both its names, and the paths of the core's copy, in a project, by neither: a sync

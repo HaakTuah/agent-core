@@ -15,7 +15,7 @@ uses (it declares the one it deletes under "Differences"). Reason: the `@` lines
 tool opened the files they name only by discipline. Held by `scripts/entry-files.mjs`, which fails an entry file that
 pulls in less than `AGENTS.md` names.
 
-**One script says what to read** (core archive 233; #304). By default a session of any agent tool finds what it reads
+**One script says what to read** (core archive 234; #304). By default a session of any agent tool finds what it reads
 by one command, which the project's `AGENTS.md` names: `scripts/reading.mjs`, given a role and a task (its issue, its
 kinds, or the paths changed so far), prints the role's start (`modules/roles.md`, "A file for each role") and the
 modules the task calls for, each module saying in its opening line when it is read, in words the script matches: a

@@ -6,7 +6,7 @@ security reviewer, the fallback reviewer, the design check, the leanness check).
 **Reads at its start:** `modules/review-guidelines.md`, `modules/how-to-work.md`; with its brief, the project's own
 guidelines and its `SECURITY.md`.
 
-**It judges by what the change calls for** (core archive 233; #304). By default a reviewer judges a change by what it
+**It judges by what the change calls for** (core archive 234; #304). By default a reviewer judges a change by what it
 reads at its start; where the change's paths call for more, it runs `scripts/reading.mjs reviewer --changed <the pull
 request's base>`, with `--kind security-review` for a security review, and judges by each file that prints too. It
 does not mean a finding needs a file the script printed. Reason: a reviewer that read only its own guidelines passed a

@@ -23,8 +23,10 @@ import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tool
 import { CORE } from "./core-address.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
-import { parseConfig, where as shapeAt } from "./shape.mjs";
+import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
+import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -155,16 +157,55 @@ export function configs(p) {
 const licenceConfig = p => licenceConfigs(p).licences;
 const nugetConfig = p => nugetOf(p, () => licenceConfig(p));
 
+// Whether a test of the project's own lies under its shape check's config's "tests", wherever they stand beside its code:
+// a file of the copy of the core (core/) is none.
+function testsStand(p) {
+  let config;
+  try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
+  if (!config.tests.length) return false;
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+}
+
+// Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
+// step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
+const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
+const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
+const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
+function strengthRuns(p) {
+  readable(p, text => text.includes("strength.mjs"));
+  return Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
+    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && STRENGTH_RUN.test(step.run) && based(step.env, job.env, yaml.env))));
+}
+
+// Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the
+// strength check (core/modules/code-shape.md, "How strong the tests are is measured on the lines a pull request
+// changes").
+function strengthNamed(p) {
+  const tool = toolOf(p.manifest);
+  const row = "Add to the manifest's slots the row `| *mutation tool* | `<command>` |`, the command that runs the project's mutation tool (a tool of development only) on `{lines}` and writes its report in the mutation-testing-elements schema to `{report}`; or `| *mutation tool* | `none`: <why> |`, where no such tool exists for its language";
+  if (!tool) return `${row}. Until then the measure does not run, and nothing fails for it.`;
+  if (tool.none !== undefined && !tool.none) return "The manifest's row *mutation tool* says `none` with no reason: add the reason after it (`none`: <why>).";
+  if (tool.none !== undefined) return tool.none.startsWith("no tests yet") && testsStand(p) ? `The manifest's row *mutation tool* says \`none\`: no tests yet, as the starter kit wrote it, and the project has tests now: ${row.charAt(0).toLowerCase()}${row.slice(1)}.` : null;
+  if (strengthRuns(p)) return null;
+  return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
+}
+
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
-// that config names. Null where both stand; else the mend.
+// that config names, which names every reader of the check's ("reads"; shape-readers.mjs), so that it lists what each
+// finds. Null where all of it stands; else the mend.
 function shapeWritten(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
   const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
   let config;
   try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
-  return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
+  const baseline = p.read(config.baseline);
+  if (baseline === null) return `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.`;
+  let reads = [];
+  try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader: its mend writes it again) */ }
+  const missing = Object.keys(READERS).filter(r => !reads.includes(r)).map(r => READERS[r]);
+  return missing.length ? `The shape check's baseline \`${config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
 }
 
 // The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
@@ -402,6 +443,8 @@ export const STEPS = [
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
+  { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
+    partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
   { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,
     check: p => {
       const wrong = [];

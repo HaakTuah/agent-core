@@ -26,6 +26,7 @@ import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 import { KIT_CONFIGS, call as callOf, configs, plain, project } from "./steps.mjs";
 
@@ -146,7 +147,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     // compared nowhere where the NuGet check's cannot be read)
     const { nuget, ...licence } = licences(o, () => false);
     const licenceFiles = nuget && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
-    return [...kit, [slot, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]].filter(([to]) => to !== null);
+    return [...kit, [slot, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ reads: Object.keys(READERS), listed: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];

@@ -1,5 +1,5 @@
 // The caps on the core's rules (README.md, "Two layers"): what a role reads at its start stays under that role's cap, so
-// a new rule there replaces text rather than adding to it (core archive 134 and 233; #304). A role's start is what the
+// a new rule there replaces text rather than adding to it (core archive 134 and 234; #304). A role's start is what the
 // reading script gives for it (reading.mjs, beside this file): the floor's security.md, the role's own file under
 // roles/ and the files that names, with every module a tool's session reads at its start (a builder's own part); a
 // file read only when a task calls for it is held instead by the reviews' "content put where its readers must read

@@ -1,5 +1,5 @@
 // What a session reads, by its role and its task (modules/roles.md, "A file for each role"; modules/tools.md, "One
-// script says what to read"; core archive 233; #304). Given a role and a task (its issue, its kinds, or the paths
+// script says what to read"; core archive 234; #304). Given a role and a task (its issue, its kinds, or the paths
 // changed so far), it prints the files to read: at the start the floor (floor/security.md, whole, whatever the role),
 // the role's own file under roles/ and the files that file names on its line "Reads at its start:" (a role's file
 // named there brings what it names too), with the part of each tool given; then, of the other modules, those the task
