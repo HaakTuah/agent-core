@@ -40,6 +40,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 export const CODE = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"];
 export const OTHER = [".cs", ".fs", ".vb", ".py", ".go", ".rs", ".java", ".kt", ".scala", ".swift", ".dart", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
@@ -645,6 +646,18 @@ export function changedTogether(commits, measured) {
   return { commits: read, pairs: list.slice(0, 50), mostChanged };
 }
 
+// The project's root: the repository named, or the one this copy stands in, a project's whose library carries its core
+// in a submodule included (core-path.mjs).
+const rootOf = (repo, here) => (repo ? "" : projectAt(here).root) || execFileSync("git", [...SAFE, "rev-parse", "--show-toplevel"], { cwd: repo ?? here, encoding: "utf8" }).trim();
+
+// What is read where none is named: the whole repository, but the core's copy where this script stands in one (the path
+// from the root to it as git itself says it, since a path worked out from two folders' names can differ in spelling,
+// as a short name of Windows' does from the long one git gives; core-path.mjs), and another repository's core/.
+const specsOf = (repo, here) => {
+  const copy = repo ? "core/" : projectAt(here).prefix.replace(/scripts\/$/u, "");
+  return copy ? [".", `:!${copy}`] : ["."];
+};
+
 function main(argv) {
   const opts = { specs: [], suites: [], depth: 0, history: 500, json: null, repo: null };
   for (let k = 0; k < argv.length; k++) {
@@ -659,11 +672,7 @@ function main(argv) {
     else opts.specs.push(a);
   }
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const root = execFileSync("git", [...SAFE, "rev-parse", "--show-toplevel"], { cwd: opts.repo ?? here, encoding: "utf8" }).trim();
-  // where this script lies in the repository, as git itself says it (a path worked out from the two folders' names can
-  // differ in spelling, as a short name of Windows' does from the long one git gives)
-  const self = execFileSync("git", [...SAFE, "rev-parse", "--show-prefix"], { cwd: here, encoding: "utf8" }).trim();
-  const specs = opts.specs.length ? opts.specs : opts.repo || self.startsWith("core/") ? [".", ":!core/"] : ["."];
+  const root = rootOf(opts.repo, here), specs = opts.specs.length ? opts.specs : specsOf(opts.repo, here);
   const listed = execFileSync("git", [...SAFE, "ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
   const texts = {}, other = {};
   for (const f of listed) {

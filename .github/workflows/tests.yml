@@ -132,6 +132,9 @@ jobs:
       - name: The dose a codebase's state sets
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/dose-test.mjs ')) }}
         run: node scripts/dose-test.mjs
+      - name: What the checks do with what a project's files shape before they use it
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/guards-test.mjs ')) }}
+        run: node scripts/guards-test.mjs
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/select-test.mjs ')) }}
         run: node scripts/select-test.mjs
@@ -165,6 +168,9 @@ jobs:
       - name: The description check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pr-description-test.mjs ')) }}
         run: node scripts/pr-description-test.mjs
+      - name: How done will be judged
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/done-when-test.mjs ')) }}
+        run: node scripts/done-when-test.mjs
       - name: The security-review check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/security-review-test.mjs ')) }}
         run: node scripts/security-review-test.mjs
@@ -180,6 +186,9 @@ jobs:
       - name: The core-moved check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-moved-test.mjs ')) }}
         run: node scripts/core-moved-test.mjs
+      - name: Where the core's copy stands, as the manifest names it
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-path-test.mjs ')) }}
+        run: node scripts/core-path-test.mjs
       - name: Where the owner's inbox is, issues or the folder
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/inbox-test.mjs ')) }}
         run: node scripts/inbox-test.mjs

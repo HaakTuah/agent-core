@@ -405,6 +405,9 @@ export function commands(text, code = false, literal = false) {
  */
 const COMMAND = /command|cmd|script|exec|args|^run$/iu;
 const PROSE = /^(\$?comment|about|description|summary|how|used|why|notes?|help|message|text|title|label|keywords|author|contributors|maintainers|homepage|repository|bugs|funding|licen[cs]e|url)$/iu;
+// (each list joined a value at a time, never spread into one call, which a long list would overflow; the caller bounds
+// how deep a value nests, as the scan does with tooDeep, in guards.mjs)
+const add = (to, list) => { for (const x of list) to.push(x); };
 const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
 export function commandLines(v) {
   if (!v || typeof v !== "object") return typeof v === "string" ? [v] : [];
@@ -413,9 +416,9 @@ export function commandLines(v) {
     if (!Array.isArray(v) && PROSE.test(k)) continue;
     const listed = Array.isArray(x) && x.every((y) => typeof y === "string");
     if (!Array.isArray(v) && COMMAND.test(k) && typeof x === "string") programs.push(x);
-    else if (!Array.isArray(v) && COMMAND.test(k) && listed) args.push(...x);
-    else if (!Array.isArray(v) && COMMAND.test(k)) out.push(...strings(x)); // (package.json's "scripts": every one, a "help" too)
-    else out.push(...commandLines(x));
+    else if (!Array.isArray(v) && COMMAND.test(k) && listed) add(args, x);
+    else if (!Array.isArray(v) && COMMAND.test(k)) add(out, strings(x)); // (package.json's "scripts": every one, a "help" too)
+    else add(out, commandLines(x));
   }
   // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are,
   // each with any arguments beside them)

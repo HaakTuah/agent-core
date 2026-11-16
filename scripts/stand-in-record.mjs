@@ -14,6 +14,7 @@
 //   node core/scripts/stand-in-record.mjs [--open] [--repo owner/name] [--owner login]
 import { execFileSync } from "node:child_process";
 import { REPO } from "./core-cost.mjs";
+import { seen } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 // (no two runs that can take the same spaces or stars, so a line of any shape is read in time in step with its length)
@@ -23,7 +24,8 @@ const ANSWER = /stand-in['’]s verdict (matched|missed)\b/i;
 // The kind and sureness of a verdict, from a comment's first line, or null where the line holds none or quotes one
 // (">", as an answer to a verdict may open with it). "Not sure" is unsure.
 export function verdict(body) {
-  const first = String(body ?? "").split("\n").find(l => l.trim()) ?? "";
+  // (as the reader sees it: a line in an HTML comment or a fenced block of code is none)
+  const first = seen(body).split("\n").find(l => l.trim()) ?? "";
   const m = /^\s*>/.test(first) ? null : VERDICT.exec(first);
   if (!m) return null;
   const sure = /\b(?:unsure|not sure)\b/i.test(first) ? "unsure" : /\bsure\b/i.test(first) ? "sure" : "unmarked";

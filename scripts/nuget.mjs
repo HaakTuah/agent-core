@@ -92,8 +92,10 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, r
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
+import { oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 // Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
@@ -402,7 +404,7 @@ const DECLARATION = new RegExp(`^<\\?xml${XB}+version${XB}*=${XB}*(?:"1\\.[0-9]+
 const ATTRIBUTES = /^(?:[ \t\r\n]+[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?[ \t\r\n]*=[ \t\r\n]*(?:"[^"<\u0000\u0001]*"|'[^'<\u0000\u0001]*'))*[ \t\r\n]*$/u;
 const AMPERSAND = /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/u;
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
-const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
+const shown = oneLine;
 
 /** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {
@@ -471,7 +473,7 @@ export function sdkPacks(env = process.env, root = null) {
 export function lockPackages(text, lockPath) {
   const failures = [], split = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
+  try { lock = parseBounded(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
     return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies"). Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split };
   }
@@ -496,6 +498,19 @@ export function lockPackages(text, lockPath) {
   return { packages: [...packages.values()], failures: failures.map(shown), split: split.map(shown) };
 }
 
+/** Of the openings `next` holds, each with where it stands next in `text` (-2 where it is not yet looked for, -1 for
+ *  none left), the one nearest from `at`, as [where, opening], or undefined: each looked for again only once the reading
+ *  has passed it, so the text is read once however many of them it holds. */
+function nearest(text, at, next) {
+  let found;
+  for (const [open, i] of next) {
+    const now = i !== -1 && i < at ? text.indexOf(open, at) : i;
+    next.set(open, now);
+    if (now >= 0 && (!found || now < found[0])) found = [now, open];
+  }
+  return found;
+}
+
 /**
  * The licence a package's manifest (its .nuspec, as text) names: { expression } for an SPDX expression, { other }
  * (a word for what it has instead: "a licence file", "an address", "nothing") where a machine cannot read one.
@@ -515,8 +530,8 @@ export function manifestLicence(text) {
   // no manifest can hold is left where each stood: a comment holds no "--", and an instruction is named, never "xml")
   let plain = "", at = 0;
   const ends = { "<!--": "-->", "<![CDATA[": "]]>", "<?": "?>" };
-  for (;;) {
-    const found = Object.keys(ends).map((open) => [text.indexOf(open, at), open]).filter(([i]) => i >= 0).sort((a, b) => a[0] - b[0])[0];
+  for (const next = new Map(Object.keys(ends).map((open) => [open, -2]));;) {
+    const found = nearest(text, at, next);
     if (!found) { plain += text.slice(at); break; }
     const end = text.indexOf(ends[found[1]], found[0] + found[1].length);
     if (end < 0) return malformed;
@@ -576,7 +591,7 @@ export function manifestLicence(text) {
 }
 
 /** The project files among `tracked` that are the project's own: what the workflow restores, each from its lock file. */
-export const projectFiles = (tracked) => tracked.filter((f) => !f.startsWith("core/") && PROJECT.test(f));
+export const projectFiles = (tracked, copy = "core/") => tracked.filter((f) => !f.startsWith(copy) && PROJECT.test(f));
 
 /** What the restore's folder holds, as { id, version }: a folder for each package, one for each version in it. */
 function restoredPackages(packagesDir) {
@@ -613,9 +628,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (!heldIn.has(lock)) heldIn.set(lock, new Set(lockPackages(textAt(root, base, lock) ?? "", lock).packages.map((q) => key(q.id, q.version))));
     return heldIn.get(lock).has(k);
   };
-  const own = tracked.filter((f) => !f.startsWith("core/"));
+  const own = tracked.filter((f) => !f.startsWith(copyOf(root)));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
-  for (const f of projectFiles(tracked)) {
+  for (const f of projectFiles(tracked, copyOf(root))) {
     if (!locks.has(posix.join(posix.dirname(f), LOCK))) failures.push(`${f} has no ${LOCK} beside it that git knows. Mend: set RestorePackagesWithLockFile to true in it, restore, and commit the lock file (floor rule 15)`);
   }
   for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read. Mend: move the project to PackageReference`);
@@ -638,7 +653,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       let entries = "";
       try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
       tree = new Map();
-      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith("core/")) tree.set(m[3], { mode: m[1], id: m[2] }); }
+      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith(copyOf(root))) tree.set(m[3], { mode: m[1], id: m[2] }); }
     }
     return tree;
   };
@@ -767,7 +782,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     let manifest = {};
     const text = textOf(f);
     if (text === null) continue;
-    try { manifest = JSON.parse(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
+    try { manifest = parseBounded(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
     if (!fetched) {
       for (const [id, entry] of Object.entries(manifest?.tools ?? {})) if (typeof entry?.version === "string") toolsRead.add(key(id, entry.version));
       continue;
@@ -790,7 +805,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   if (config.audit) {
     const bytes = readProject(root, config.audit);
     if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`);
-    try { entries = JSON.parse(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    try { entries = parseBounded(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)
@@ -865,12 +880,12 @@ if (started(import.meta.url)) {
   const args = process.argv.slice(2), advisory = args.includes("--advisory");
   const here = fileURLToPath(new URL(".", import.meta.url));
   const project = () => {
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8" }).trim();
+    const root = projectAt(here).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8" }).trim();
     return { root, tracked: execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean) };
   };
   if (args.includes("--projects")) {
     let files;
-    try { files = projectFiles(project().tracked); } catch (e) { fail(e.message); }
+    try { const p = project(); files = projectFiles(p.tracked, copyOf(p.root)); } catch (e) { fail(e.message); }
     // (a line each, for a shell to read: a name that would be more than one line is refused, never cut)
     const odd = files.filter((f) => shown(f) !== f);
     if (odd.length) fail(`a project file whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
@@ -880,7 +895,7 @@ if (started(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), own = tracked.filter((f) => !f.startsWith("core/")), byContent = projectFilesByContent(root, own);
+      const { root, tracked } = project(), copy = copyOf(root), own = tracked.filter((f) => !f.startsWith(copy)), byContent = projectFilesByContent(root, own);
       files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => shown(f) !== f);

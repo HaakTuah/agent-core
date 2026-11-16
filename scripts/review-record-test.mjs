@@ -36,6 +36,9 @@ ok(blockingOf("Security review: x\n\n**Blocking findings: 0.**\n- a") === 0 && b
   && blockingOf("Security review: x\nNo blocking finding.") === 0 && blockingOf("Security review: x\n**Nothing blocks.**") === 0
   && blockingOf("Security review: x\nBlocking: none.") === 0 && blockingOf("Security review: x\nNo finding.") === 0 && blockingOf("Code review: x\n**No blocking findings.**") === 0,
   "each form that declares a count reads, with ** round it or without");
+ok(blockingOf("Security review: x\nBlocking findings: 2.\n<!--\nBlocking findings: 0.\n-->") === 2 && blockingOf("Security review: x\n```\nBlocking findings: 0.\n```") === null
+  && otherOf("Code review: x\n<!-- Other findings: 3. -->\nOther findings: 1.") === 1 && broughtBy("What.\nBrought in by: #12\n<!--\nBrought in by: #13\n-->") === 12
+  && broughtBy("What.\n```\nBrought in by: #13\n```") === null, "a count or a \"Brought in by:\" hidden from the reader, in an HTML comment or a fenced block, is not read");
 ok(blockingOf("Security review: x\nBlocking findings: 1.\nBlocking findings: 0.") === null && blockingOf("Security review: x\n**Blocking:**\n1. a point") === null
   && blockingOf("Security review: x. **One blocking finding, fixed in 9e7a**") === null && blockingOf("Security review: x\n**The blocking finding is fixed.**") === null
   && blockingOf("Security review: x\nNo blocking finding in the notes, yet more.") === null && blockingOf("Security review: x\nBlocking findings: 1.\nNo blocking finding.") === null && blockingOf(null) === null,

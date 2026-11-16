@@ -1,6 +1,6 @@
 # The stand-in
 
-Read at its start by the role `stand-in`: a fresh session called to give the owner's most likely answer.
+Read at its start by the role `stand-in`.
 
 **Reads at its start:** `roles/shared/inbox.md`, whose "The stand-in" says what else it gives.
 

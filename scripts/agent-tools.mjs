@@ -40,6 +40,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
+import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
@@ -51,7 +52,6 @@ const commit = v => typeof v === "string" && COMMIT.test(v);
 const takes = (v, none) => (v === undefined ? none : typeof v === "string" ? `the branch or tag ${show(v)}` : `the value ${show(v)}, which names no commit`);
 const KIT = fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url));
 const show = value => JSON.stringify(value) ?? String(value);
-const clean = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
 
 // The tools a project's files configure, as "kind name" keys, each with the file that configures it; and the problems
 // met reading them. `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
@@ -65,8 +65,8 @@ export function configured(read, skills) {
   const json = file => {
     const text = read(file);
     if (text === null) return null;
-    try { const v = JSON.parse(text); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* (below) */ }
-    problems.push(`${file} cannot be read as a JSON object. Mend: correct it to JSON, as the tool that reads it takes it`);
+    try { const v = parseBounded(text); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* (below) */ }
+    problems.push(`${file} cannot be read as a JSON object, nested no deeper than ${DEEPEST} objects and lists. Mend: correct it to JSON, as the tool that reads it takes it`);
     return null;
   };
   const markets = new Map(), plugins = [];
@@ -353,8 +353,8 @@ function sortLinks(root, base, links, fail, notes) {
 // The whole check, from the project's root: { fail, notes }.
 export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   let config;
-  try { config = JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
-    return { fail: [`${file} cannot be read (${clean(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
+  try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
+    return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
   const head = readProject(root);
   const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
@@ -390,8 +390,8 @@ if (started(import.meta.url)) {
   const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
   if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
   const { fail, notes } = run(process.cwd(), file, { core: args.includes("--core") });
-  for (const n of notes) console.log(`note ${clean(n)}`);
-  for (const f of fail) console.error(`FAIL: ${clean(f)}`);
+  for (const n of notes) console.log(`note ${logged(n)}`);
+  for (const f of fail) console.error(`FAIL: ${logged(f)}`);
   console.log(fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed");
   process.exitCode = fail.length ? 1 : 0;
 }

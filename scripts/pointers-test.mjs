@@ -23,7 +23,7 @@ function run(files) {
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-    for (const f of ["pointers.mjs", "rule-files.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+    for (const f of ["pointers.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -71,7 +71,7 @@ try {
   put("tasks/a.md", "# A module\n\nAs floor rule 19 says (core archive 999).\n");
   put("archive/instructions/items-001.md", "# Items\n\n1. **1 November 2026**. Words.\n");
   fs.mkdirSync(path.join(coreDir, "scripts"));
-  for (const f of ["pointers.mjs", "rule-files.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
+  for (const f of ["pointers.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
   for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: coreDir, stdio: "ignore" });
   const c = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" });
   ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: tasks\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);

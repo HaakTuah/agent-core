@@ -305,6 +305,25 @@ function globMatches(items, name) {
   return at.has(name.length);
 }
 
+// The shell a step runs in: its own, its job's default or the workflow's; bash alone, or none named.
+function shellOf(step, job, defaults, id) {
+  const shell = step.shell ?? job.defaults?.run?.shell ?? defaults;
+  if (shell !== undefined && shell !== "bash") throw new Error(`a shell this runner does not know: ${shell} (in ${id})`);
+  return shell;
+}
+
+// What a step wrote to GITHUB_ENV (the file `file`), NAME=value a line, set in `env`, the environment of every step after
+// it, as GitHub sets it; the file is emptied for the next step.
+function carryEnv(file, env, id) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/u).filter(Boolean)) {
+    const at = line.indexOf("=");
+    if (at <= 0) throw new Error(`a line of GITHUB_ENV in a form this runner does not read: ${line.slice(0, 80)} (in ${id})`);
+    env[line.slice(0, at)] = line.slice(at + 1);
+  }
+  fs.rmSync(file);
+}
+
 export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
   const defaults = wf.defaults?.run?.shell;
@@ -359,12 +378,12 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
       const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
       // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
       // the defaults', with --noprofile --norc -e -o pipefail)
-      const shell = step.shell ?? job.defaults?.run?.shell ?? defaults;
-      if (shell !== undefined && shell !== "bash") throw new Error(`a shell this runner does not know: ${shell} (in ${id})`);
+      const shell = shellOf(step, job, defaults, id);
       const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
         ...base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
         GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(github.repository), GITHUB_EVENT_NAME: str(github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
       const passed = r.status === 0;
+      carryEnv(path.join(tmp, "env"), ctx.env, id);
       result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
       if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
       if (!passed) { state.failed = true; result.passed = false; }

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { asked, calledFor, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { asked, calledFor, doneAsked, DONE_SINCE, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 import { lineMend } from "./reading.mjs";
 
 let failed = 0;
@@ -44,6 +44,11 @@ const read = [];
 ok(heldAt(cs, "2026-11-19T00:00:00Z", s => (read.push(s), s !== "a")) === true && read.join() === "b", "the line is asked where the copy's newest commit from before the pull request opened holds it, one file read");
 ok(heldAt(cs, "2026-11-17T12:00:00Z", s => s !== "a") === false && heldAt(cs, "2026-11-01T00:00:00Z", () => true) === false && heldAt([], "2026-11-19T00:00:00Z", () => true) === false,
   "not where that commit's copy lacks it, where the copy changed only after the pull request opened, or where nothing changed it");
+// how done will be judged (done-when.mjs): asked only of a pull request opened since the copy on its base held it
+const holds = "export const DONE_SINCE = \"x\";";
+ok(doneAsked("2026-11-18T00:00:00Z", holds) && doneAsked(DONE_SINCE, holds), "asked of a pull request opened on or after the day, its base's copy holding it");
+ok(!doneAsked("2026-11-16T23:59:59Z", holds) && !doneAsked("2026-11-18T00:00:00Z", "an older copy") && !doneAsked("2026-11-18T00:00:00Z", null) && !doneAsked("", holds),
+  "not of one opened before, one whose base's copy lacked it or could not be read, nor one with no day");
 const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
 ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time");

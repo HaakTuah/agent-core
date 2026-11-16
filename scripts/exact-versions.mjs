@@ -15,6 +15,7 @@
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
 import { posix } from "node:path";
+import { inProject, logged, parseBounded } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 const KINDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
@@ -65,7 +66,7 @@ function installed(packages, from, name) {
 export function check(lockfile, read) {
   const problems = [];
   let lock;
-  try { lock = JSON.parse(read(lockfile)); } catch (e) { return [`${lockfile}: cannot be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`]; }
+  try { lock = parseBounded(read(lockfile)); } catch (e) { return [`${lockfile}: cannot be read as JSON (${logged(e.message)}). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`]; }
   const packages = lock?.packages;
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
@@ -74,7 +75,7 @@ export function check(lockfile, read) {
     if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's. Mend: make it a folder inside the project, or take it out of the project's workspaces, then write the lock file anew with npm: its install, given --package-lock-only`); continue; }
     const file = posix.join(root, key, "package.json");
     let list;
-    try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: correct it to JSON`); continue; }
+    try { list = parseBounded(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${logged(e.message)}). Mend: correct it to JSON`); continue; }
     if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
     for (const kind of KINDS) {
       const deps = list?.[kind];
@@ -102,10 +103,12 @@ if (started(import.meta.url)) {
   const configPath = process.argv[2];
   if (!configPath) { console.error("usage: node core/scripts/exact-versions.mjs <the licence check's config>"); process.exit(2); }
   let lockfiles;
-  try { lockfiles = JSON.parse(readFileSync(configPath, "utf8")).lockfiles ?? []; } catch (e) { console.error(`FAIL: ${configPath} cannot be read (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the licence check's config, written as JSON`); process.exit(1); }
+  try { lockfiles = JSON.parse(readFileSync(configPath, "utf8")).lockfiles ?? []; } catch (e) { console.error(`FAIL: ${configPath} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`); process.exit(1); }
   if (!Array.isArray(lockfiles) || lockfiles.some((f) => typeof f !== "string")) { console.error(`FAIL: "lockfiles" in ${configPath} is no list of paths. Mend: write it as a list of the lock files' paths`); process.exit(1); }
+  const outside = lockfiles.filter((f) => !inProject(f));
+  if (outside.length) { console.error(`FAIL: ${logged(`"lockfiles" in ${configPath} names a path outside the project: ${outside.join(", ")}`)}. Mend: name each lock file by its path from the project's root, with no ".." that leads above it`); process.exit(1); }
   const problems = lockfiles.flatMap((f) => check(posix.normalize(f), (p) => readFileSync(p, "utf8")));
-  for (const p of problems) console.error(`FAIL: ${p}`);
+  for (const p of problems) console.error(`FAIL: ${logged(p)}`);
   console.log(problems.length ? `${problems.length} dependencies not at one exact version (floor rule 7)` : `ok   every dependency of ${lockfiles.length} lock file${lockfiles.length === 1 ? "" : "s"} is at the one exact version it installs`);
   process.exit(problems.length ? 1 : 0);
 }

@@ -24,25 +24,29 @@ import os from "node:os";
 import path from "node:path";
 import { fingerprint, ROOT, rules, rulesAt } from "./rules.mjs";
 import { started } from "./started.mjs";
+import * as carried from "./staged/carried.mjs";
 import * as finish from "./staged/finish.mjs";
+import * as noFloor from "./staged/no-floor.mjs";
 import * as noQuestion from "./staged/no-question.mjs";
 import * as oldContent from "./staged/old-content.mjs";
 import * as orderForNow from "./staged/order-for-now.mjs";
 import * as outsider from "./staged/outsider.mjs";
 import { OWNER, REPO, Unreadable, folderFit, memo, memoOf, seal, sealOf } from "./staged/scratch.mjs";
 import * as secret from "./staged/secret.mjs";
+import * as stackChoice from "./staged/stack-choice.mjs";
 import * as steps from "./staged/steps.mjs";
 import * as stop from "./staged/stop.mjs";
 
-export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps];
+export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps, stackChoice, carried, noFloor];
 export const RECORD = "reports/staged-cases.json";
 export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.
 export const MONTHS = 3;
-export const TOOL = "Claude Code";
-// The agent tools a run may name, each with its part in tools/ (tasks/tools.md, "Each tool's part"): a run of a
-// tool that has none is not recorded. Read case and spacing aside, so "claude code" is TOOL.
-export const TOOLS = [TOOL, "Codex", "Kiro", "Antigravity"];
+// The agent tools a run may name, each with its part in tools/ (tasks/tools.md, "Each tool's part"), in
+// staged-tools.json, beside this file, which core.yml reads too: a run of a tool that has none is not recorded. Read case
+// and spacing aside, so "claude code" is TOOL, the first.
+export const TOOLS = JSON.parse(fs.readFileSync(new URL("./staged-tools.json", import.meta.url), "utf8")).tools;
+export const TOOL = TOOLS[0];
 export const toolNamed = name => TOOLS.find(t => t.toLowerCase() === String(name ?? "").toLowerCase().replace(/\s+/gu, " ").trim()) ?? null;
 
 export const caseOf = name => CASES.find(c => c.name === name) ?? null;

@@ -13,21 +13,17 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #256 | rule builder | |
 | #252 | rule builder | |
-| #285 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
-| #305 | rule builder | |
 | #322 | rule builder | #305 |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
 | #309 | rule builder | |
 | #318 | rule builder | |
-| #310 | rule builder | #256 and #285 |
-| #311 | rule builder | #286 |
-| #325 | rule builder | #256, #305, #311 and #322 |
+| #310 | rule builder | #285 |
+| #325 | rule builder | #305, #311 and #322 |
 | #359 | rule builder | |
 | #314 | rule builder | |
 | #375 | rule builder | |
