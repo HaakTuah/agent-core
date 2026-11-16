@@ -29,15 +29,13 @@ import { started } from "./started.mjs";
 // Each role's cap, a whole number of KB: one line a role, spelled exactly so. The builder's is the one cap of before,
 // which held what every session read at its start, raised one step on 16 November 2026 for the builder's own file
 // (#304), its leanness check having found 108 bytes of room for the 1,038 that file needed; the others were first set
-// that day, each the whole KB next above its start. The builder's and the stand-in's were raised one step more the same
-// day for the questions before a larger feature in roles/shared/inbox.md (#305), their leanness check having found
-// 69 and 157 bytes of room for the 350 and 445 they were over.
+// that day, each the whole KB next above its start.
 export const CAPS = {
-  builder: 29 * 1024,
+  builder: 28 * 1024,
   design: 29 * 1024,
   orchestrator: 42 * 1024,
   reviewer: 22 * 1024,
-  "stand-in": 20 * 1024,
+  "stand-in": 19 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
 // project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):

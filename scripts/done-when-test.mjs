@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { closes, currentText, CURRENT, doneMends, entryFaults, entryOf, isFeature, joined, progressOf, provedFaults, queueAt, readItem, section } from "./done-when.mjs";
+import { closes, currentText, CURRENT, doneMends, entryFaults, entryOf, isFeature, joined, MOST, PAGES, progressOf, provedFaults, queueAt, readItem, section } from "./done-when.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0;
@@ -32,6 +32,8 @@ ok(faults("**Done when**\n- When a, b.\n- If c, then d. Proof: it works\n- Out o
 ok(faults("**Done when**\n- As a user I want a, so that b.\n- When a, b. Proof: a test\n- If c, then d. Proof: a test\n- Out of scope: e\n").some(f => /in none of the shapes/.test(f)), "a user story is in none of the shapes");
 ok(faults("**Done when**\n- When a, b. Proof: a test\n- If c, then d. Proof: a test\n").some(f => /0 "Out of scope:"/.test(f)), "no line out of scope is a fault");
 ok(faults("**Done when**\n- When a, b. Proof: a test\n").every(f => mended(`FAIL ${f}`)), "each fault says its mend");
+const hostile = faults("**Done when**\n- When a\u0000b\rc\u2028::set-env ##[group]x. Proof: none\n- If c, then d. Proof: a test\n- Out of scope: e\n").join("\n");
+ok(!/[\u0000\r\u2028]/u.test(hostile) && !hostile.includes("##[") && hostile.split("\n").every(l => !l.startsWith("::")), "a line an outsider wrote is shown with no control character and no command to the runner", hostile);
 
 // the evidence
 const e = entryOf(good);
@@ -55,8 +57,12 @@ ok(closes("Fixes #12. Closes: #3, resolves #4 and fixed #12; see #9").join() ===
 const issues = { "#5": { labels: ["feature"], body: "What it is.\n" }, "#6": { labels: ["feature"], body: good }, "#7": { labels: ["bug"], body: "A bug.\n" },
   "#9": { labels: ["enhancement"], body: "**Done when**\n- When ..., it .... Proof: ...\n" } };
 const read = item => issues[item] ?? null, queue = (...items) => ({ before: "| #1 | a | |\n", after: `| #1 | a | |\n${items.map(i => `| ${i} | b | |\n`).join("")}` });
-let r = doneMends({ body: "x", queue: queue("#5", "#6", "#7"), read });
-ok(r.mends.length === 1 && /#5, a feature's issue that joins the progress file, has no "Done when"/.test(r.mends[0]) && mended(`FAIL ${r.mends[0]}`), "of the issues that join, only a feature's with no entry fails, saying its mend", r.mends);
+issues["#10"] = { labels: ["feature"], body: "**Done when**\n- When ..., it .... Proof: ...\n- If ..., then it .... Proof: ...\n- Out of scope: ...\n" };
+let r = doneMends({ body: "x", queue: queue("#5", "#6", "#7", "#10"), read });
+ok(r.mends.length === 1 && /#5, a feature's issue that joins the progress file, has no "Done when"/.test(r.mends[0]) && mended(`FAIL ${r.mends[0]}`),
+  "of the issues that join, only a feature's with no heading fails, saying its mend; lines not in the form, the form's own left as they came, wait for its builder", r.mends);
+r = doneMends({ body: "Fixes #10\n", queue: null, read });
+ok(r.mends.length === 1 && /no "Done when" lines in the form, and nor has the description/.test(r.mends[0]), "its builder then writes them: the issue's lines not in the form do not count", r.mends);
 r = doneMends({ body: "x", queue: queue("#8"), read });
 ok(r.mends.length === 0 && /#8 could not be read, so nothing is asked/.test(r.notes[0]), "an issue that cannot be read is asked nothing, and that is said", r);
 r = doneMends({ body: "Fixes #6\n## Proved by use\n- Ran: a. Saw: b.\n", queue: null, read });
@@ -69,6 +75,11 @@ r = doneMends({ body: "Fixes #7\n", queue: null, read });
 ok(r.mends.length === 0 && r.notes.length === 0, "a bug's pull request with no entry is asked nothing", r);
 r = doneMends({ body: "Fixes #9\n", queue: queue("#9"), read });
 ok(r.mends.length === 0, "an issue of no feature, its template's heading left as it came, is asked nothing", r.mends);
+let calls = 0;
+r = doneMends({ body: Array.from({ length: 7000 }, (_, i) => `fix #${i + 1}`).join(" "), queue: queue(...Array.from({ length: 5 }, (_, i) => `#${i + 90000}`)), read: () => (calls++, null) });
+ok(calls === 0 && r.mends.length === 1 && new RegExp(`queues or closes 7005 items, more than the ${MOST}`).test(r.mends[0]) && mended(`FAIL ${r.mends[0]}`), "more items than the check reads fail before any is read, saying the mend", r.mends);
+r = doneMends({ body: Array.from({ length: MOST }, (_, i) => `Fixes #${i + 20}`).join("\n"), queue: null, read: () => (calls++, null) });
+ok(calls === MOST && r.mends.length === 0, "as many as it reads are each read once", calls);
 r = doneMends({ body: "Fixes #8\n", queue: queue(), read });
 ok(r.mends.length === 0 && r.notes.length === 1, "a closed issue that cannot be read is asked nothing, and that is said", r);
 
@@ -85,7 +96,35 @@ try {
   put("plan/QUEUE.md", "1. #1\n2. #2\n"); put("inbox/idea.md", "**What to read**\n`feature`\n"); git("add", "-A"); git("commit", "-qm", "head");
   const q = queueAt(dir, "core/");
   ok(q?.before === "1. #1\n" && q.after === "1. #1\n2. #2\n" && joined(q.before, q.after).join() === "#2", "the queue's file is read on the base and the head, where the base's manifest names it", q);
-  ok(isFeature(readItem("o/r", "inbox/idea.md", dir)) && readItem("o/r", "inbox/none.md", dir) === null, "an inbox file is read from the checkout, and one not there is none");
+  const path0 = process.env.PATH;
+  process.env.PATH = dir;
+  try { ok(readItem("o/r", "#1") === null, "an issue gh cannot be run to read is none"); } finally { process.env.PATH = path0; }
+  ok(isFeature(readItem("o/r", "inbox/idea.md", dir)) && readItem("o/r", "inbox/none.md", dir) === null, "an inbox file is read from the head's commit, and one not there is none");
+  // (a link committed as an inbox file is read as its own text, never followed out of the checkout)
+  const secret = path.join(dir, "..", `done-when-secret-${process.pid}.txt`);
+  fs.writeFileSync(secret, "**What to read**\n`feature`\nSECRET\n");
+  try {
+    fs.symlinkSync(secret, path.join(dir, "inbox", "link.md")); git("add", "-A"); git("commit", "-qm", "a link");
+    const got = readItem("o/r", "inbox/link.md", dir);
+    ok(got !== null && !got.body.includes("SECRET") && got.body === secret, "an inbox file that is a link is read as the link's own text", got);
+  } catch (e) { ok(/EPERM|symlink/i.test(String(e)), `no link could be made here (${e.code ?? e})`); } finally { fs.rmSync(secret, { force: true }); }
+  // an issue's notes, through a stand-in for gh: its current text found on the newest pages, and no more read than PAGES
+  const bin = path.join(dir, "bin"), log = path.join(dir, "calls.log");
+  fs.mkdirSync(bin);
+  const note = (login, body) => ({ user: { login }, body });
+  const pages = { 1: [note("o", `${CURRENT}\nthe oldest`), ...Array.from({ length: 99 }, () => note("x", "a"))], 2: Array.from({ length: 100 }, () => note("x", "b")),
+    3: [note("o", `${CURRENT}\nnewer`), ...Array.from({ length: 99 }, () => note("x", "c"))], 4: Array.from({ length: 100 }, () => note("x", "d")), 5: [note("x", "e")] };
+  fs.writeFileSync(path.join(dir, "routes.json"), JSON.stringify({ "repos/o/r/issues/7": { user: { login: "o" }, labels: [{ name: "feature" }], body: "the description", comments: 401 },
+    ...Object.fromEntries(Object.entries(pages).map(([p, v]) => [`repos/o/r/issues/7/comments?per_page=100&page=${p}`, v])) }));
+  fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\necho "$2" >> "${log}"\nexec node -e 'const r=require(process.argv[1])[process.argv[2]]; if (r === undefined) process.exit(1); console.log(JSON.stringify(r))' "${path.join(dir, "routes.json")}" "$2"\n`, { mode: 0o755 });
+  if (process.platform !== "win32") {
+    process.env.PATH = `${bin}${path.delimiter}${path0}`;
+    try {
+      const got = readItem("o/r", "#7"), read = fs.readFileSync(log, "utf8").trim().split("\n");
+      ok(got?.body === `${CURRENT}\nnewer` && got.labels.join() === "feature" && read.length === 1 + PAGES && read.at(-1).endsWith("page=3"),
+        `the current text is the author's newest such note, read from the newest pages, ${PAGES} at most`, { got, read });
+    } finally { process.env.PATH = path0; }
+  }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 // the idea forms: the core's own and the one the starter kit writes

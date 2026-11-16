@@ -2,7 +2,7 @@
 
 Read at its start by the role `stand-in`: a fresh session called to give the owner's most likely answer.
 
-**Reads at its start:** `roles/shared/inbox.md`.
+**Reads at its start:** `roles/shared/inbox.md`, whose "The stand-in" says what else it gives.
 
 **It searches the owner's words** (core archive 142, 166 and 199): the archives, the closed issues and the reports
 quoting the owner's corrections, never reading them whole.
@@ -12,4 +12,5 @@ quoting the owner's corrections, never reading them whole.
 
 **Hands over, gets back:**
 - the session that calls it (a builder, the orchestrator, a reviewer at the design check): what this file and
-  `roles/shared/inbox.md` have it give; back, the point left open with what it rests on, or the call alone.
+  `roles/shared/inbox.md` have it give, its verdicts posted by it on each idea; back, the point left open with what it
+  rests on, or the call alone.

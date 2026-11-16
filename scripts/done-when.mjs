@@ -8,13 +8,16 @@
 // Markdown heading or a line wholly in bold, as the issue forms write them; an item, a line starting "-", "*" or a
 // number, with the indented lines after it. It holds the form, not that the lines are right: that stays with the
 // design check. pr-description.mjs, beside this file, asks it, of the issues whose lines a pull request adds to the
-// *progress file* and of those it closes; its own test, done-when-test.mjs. Node's own modules only.
+// *progress file* and of those it closes, a dozen at most (MOST), each issue read through gh with the newest pages of
+// its notes and an inbox file through git, never followed as a link; its own test, done-when-test.mjs. Git, gh and
+// Node's own modules.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
 import { asked as toRead } from "./reading.mjs";
 
 export const HEADING = "Done when", PROVED = "Proved by use", KIND = "feature";
+// The most items one pull request may queue or close, each read with a call or a few: a handful in practice.
+export const MOST = 12;
 export const CURRENT = JSON.parse(fs.readFileSync(new URL("./labels.json", import.meta.url), "utf8")).headings.current;
 const SHAPE = /^(When|While|If)\b/u, PROOFS = /^(?:a test|a check|a picture|"?the owner tries this)/iu;
 const lines = text => String(text ?? "").split(/\r\n|\r|\n/u);
@@ -39,6 +42,9 @@ function itemOf(line) {
   return n && blank(l[n]) ? l.slice(n).trim() : null;
 }
 const plain = s => s.replace(/[*_`:]+/gu, "").trim().toLowerCase();
+// A line of an outsider's text as a failure shows it: its start, with no character that would start a line of the log
+// or a command to the runner ("::" at a line's start, "##[" anywhere).
+const shown = s => s.slice(0, 60).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, " ").replaceAll("##[", "# #[");
 
 // The items under a heading that starts with `name` (the first such), as one string each; null where no such heading.
 export function section(body, name) {
@@ -80,8 +86,8 @@ export function entryFaults(e, where, at = "") {
   const out = [];
   if (e.lines.length < 2 || e.lines.length > 6) out.push(mend(`holds ${e.lines.length} line${e.lines.length === 1 ? "" : "s"} in the three shapes, where two to six are asked`));
   if (e.lines.length && !e.lines.some(l => l.shape === "If")) out.push(mend("has no line for what happens when something goes wrong (one starting \"If\")"));
-  for (const l of e.lines) if (!l.proof || !PROOFS.test(l.proof)) out.push(mend(`line "${l.text.slice(0, 60)}" names no proof after "Proof:" of the four kinds`));
-  for (const o of e.other) out.push(mend(`line "${o.slice(0, 60)}" is in none of the shapes`));
+  for (const l of e.lines) if (!l.proof || !PROOFS.test(l.proof)) out.push(mend(`line "${shown(l.text)}" names no proof after "Proof:" of the four kinds`));
+  for (const o of e.other) out.push(mend(`line "${shown(o)}" is in none of the shapes`));
   if (e.scope.length !== 1) out.push(mend(`holds ${e.scope.length} "Out of scope:" lines, where one is asked`));
   return out;
 }
@@ -122,12 +128,14 @@ export const closes = body => [...new Set([...String(body ?? "").matchAll(/\b(?:
 // Returns { mends, notes }: the failures, each with its mend, and what was not asked and why.
 export function doneMends({ body, queue, read, at = "" }) {
   const mends = [], notes = [], own = entryOf(body);
+  // (each item read costs calls on the run's token, and anyone who opens a pull request writes what names them)
+  const items = new Set([...joined(queue?.before, queue?.after), ...closes(body)]);
+  if (items.size > MOST) return { mends: [`this pull request queues or closes ${items.size} items, more than the ${MOST} the description check reads. Mend: split it into pull requests that each queue or close ${MOST} or fewer (${at}tasks/done-when.md)`], notes };
   const get = item => { const got = read(item); if (!got) notes.push(`${item} could not be read, so nothing is asked of it`); return got; };
   for (const item of joined(queue?.before, queue?.after)) {
     const got = get(item);
-    if (!got || !isFeature(got)) continue;
-    const e = entryOf(got.body);
-    mends.push(...(e ? entryFaults(e, `${item}, a feature's issue that joins the progress file`, at) : [`${item}, a feature's issue that joins the progress file, has no "${HEADING}" in its current text. Mend: add to it a heading "${HEADING}" with ${FORM} (${at}tasks/done-when.md)`]));
+    // (the heading alone is asked here: lines missing or not in the form are its builder's to write, so nothing waits)
+    if (got && isFeature(got) && !entryOf(got.body)) mends.push(`${item}, a feature's issue that joins the progress file, has no "${HEADING}" in its current text. Mend: add to it a heading "${HEADING}", with ${FORM}, where they are known; where they are not, the heading alone, and its builder writes them (${at}tasks/done-when.md)`);
   }
   if (own) mends.push(...entryFaults(own, "the description", at));
   let entry = own;
@@ -135,8 +143,8 @@ export function doneMends({ body, queue, read, at = "" }) {
     const got = get(item);
     if (!got || !isFeature(got)) continue;
     const e = entryOf(got.body);
-    if (e) entry = e;
-    else if (!own) mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}", and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
+    if (e && !entryFaults(e, item).length) entry = e;
+    else if (!own) mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}" lines in the form, and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
   }
   if (entry) mends.push(...provedFaults(body, entry, at));
   return { mends, notes };
@@ -155,15 +163,29 @@ export function queueAt(dir, prefix) {
   return { before: git("show", `HEAD^1:${file}`) ?? "", after: git("show", `HEAD:${file}`) ?? "" };
 }
 
-// An item as { labels, body }, its body the current text: an issue by gh from `repo`, an inbox file from the checkout
-// at `dir`; null where it cannot be read.
+// The pages of an issue's notes read for its current text, newest first: an issue with more notes than these is read
+// from its newest PAGES hundred, so that its calls stay few however many notes anyone adds.
+export const PAGES = 3;
+
+// An item as { labels, body }, its body the current text: an issue by gh from `repo`, an inbox file as the head's
+// commit holds it in the checkout at `dir` (from git, so that a link is read as its own text and never followed out of
+// the checkout); null where it cannot be read.
 export function readItem(repo, item, dir = ".") {
-  if (item.startsWith("inbox/")) { try { return { labels: [], body: fs.readFileSync(path.join(dir, item), "utf8") }; } catch { return null; } }
+  if (item.startsWith("inbox/")) {
+    const r = spawnSync("git", ["show", `HEAD:${item}`], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 });
+    return r.status === 0 ? { labels: [], body: r.stdout } : null;
+  }
   const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; };
   try {
-    const n = item.slice(1), got = gh(`repos/${repo}/issues/${n}`), notes = got && gh(`repos/${repo}/issues/${n}/comments?per_page=100`);
-    if (!got || !Array.isArray(notes)) return null;
-    const author = String(got.user?.login ?? "");
-    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText({ author, body: got.body }, notes.map(c => ({ author: String(c.user?.login ?? ""), body: c.body }))) };
+    const n = item.slice(1), got = gh(`repos/${repo}/issues/${n}`);
+    if (!got) return null;
+    const author = String(got.user?.login ?? ""), last = Math.max(1, Math.ceil(Number(got.comments ?? 0) / 100)), notes = [];
+    for (let page = last; page >= 1 && page > last - PAGES; page--) {
+      const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
+      if (!Array.isArray(one)) return null;
+      notes.unshift(...one.map(c => ({ author: String(c.user?.login ?? ""), body: c.body })));
+      if (one.some(c => String(c.user?.login ?? "") === author && String(c.body ?? "").includes(CURRENT))) break;
+    }
+    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText({ author, body: got.body }, notes) };
   } catch { return null; }
 }

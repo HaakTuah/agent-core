@@ -194,4 +194,5 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind `tasks/done-when.md`, the heading "Done when" in the idea templates, the design check's reading of the
      lines in `tasks/reviews.md`, point 4, and its points in the review guidelines, the questions asked before a
-     larger feature is filed in `roles/shared/inbox.md`, and `scripts/done-when.mjs` in the description check.
+     larger feature is filed, pointed to from "Issues are the way in" in `roles/shared/inbox.md`, and
+     `scripts/done-when.mjs` in the description check.
