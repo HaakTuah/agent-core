@@ -28,13 +28,35 @@ const TESTED = /(?:^|[;&|({!]|(?:^|[\s=])\\?["']|(?:^|\s)(?:if|then|else|elif|wh
 // --show-toplevel), perhaps closed by a quote)
 const ROOTED = /[\u0001)]\\?["']?$/u;
 
-// (a quoted text holding a blank, as "scripts/my hook.sh": a name a word alone would split; each kind of quote is read
-// in a pass of its own, so a double-quoted name inside a single-quoted script, as bash -c '...' holds it, is found)
-const QUOTED = [/"([^"]*\s[^"]*)"/gu, /'([^']*\s[^']*)'/gu];
+// The quoted texts of a script, read left to right as the shell reads them: a single-quoted text is taken as written, a
+// double-quoted one with its backslashes read, and a backslash outside quotes keeps the next character; each quoted text
+// is read again as a script of its own, as bash -c '...' runs one, a few levels deep. Each is [its text, what stood
+// before it]; a text holding a blank is a name a word alone would split, as "scripts/my hook.sh".
+function quotedTexts(script, depth = 0, out = []) {
+  if (depth > 4) return out;
+  for (let i = 0; i < script.length; i++) {
+    const c = script[i];
+    if (c === "\\") { i++; continue; }
+    if (c !== "'" && c !== '"') continue;
+    let j = i + 1, body = "";
+    for (; j < script.length && script[j] !== c; j++) {
+      if (c === '"' && script[j] === "\\" && j + 1 < script.length) j++;
+      body += script[j];
+    }
+    if (j >= script.length) return out;
+    out.push([body, script.slice(Math.max(0, i - 200), i)]);
+    quotedTexts(body, depth + 1, out);
+    i = j;
+  }
+  return out;
+}
+// (a word whose blanks a backslash keeps, as scripts/my\ hook.sh)
+const ESCAPED = /(?:[^\s'"`;|&()<>{}$\\=,\u0001]|\\ )*\\ (?:[^\s'"`;|&()<>{}$\\=,\u0001]|\\ )*/gu;
 
 export function fromTree(command, holds) {
-  // (a backslash before a name's letter is Windows' separator; one before a quote or a "$" is the shell's escape)
-  const text = String(command).replace(/\\(?=[\w.%-])/gu, "/").replace(VARIABLE, "\u0001");
+  const raw = String(command).replace(VARIABLE, "\u0001");
+  // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
+  const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
   const found = new Set();
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
@@ -48,6 +70,7 @@ export function fromTree(command, holds) {
     if (at !== "." && holds(at)) found.add(at);
   };
   for (const m of text.matchAll(WORD)) take(m[0], text.slice(Math.max(0, m.index - 200), m.index));
-  for (const pattern of QUOTED) for (const m of text.replace(/\\"/gu, '"').matchAll(pattern)) take(m[1], text.replace(/\\"/gu, '"').slice(Math.max(0, m.index - 200), m.index), true);
+  for (const m of text.matchAll(ESCAPED)) take(m[0].replace(/\\ /gu, " "), text.slice(Math.max(0, m.index - 200), m.index));
+  for (const [body, before] of quotedTexts(raw)) if (/\s/u.test(body)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
   return [...found];
 }

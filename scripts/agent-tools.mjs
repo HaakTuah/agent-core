@@ -78,13 +78,13 @@ const show = value => JSON.stringify(value) ?? String(value);
 // The tools a project's files configure, as "kind name" keys, each with the file that configures it; the problems met
 // reading them; and `sources`, each hook that takes a file of the project from the working tree, with those files
 // (hook-source.mjs). `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
-// that hold a SKILL.md; `files(dir)` the names in a folder of the project (here .kiro/hooks).
-export function configured(read, skills, files = () => []) {
+// that hold a SKILL.md; `files(dir)` the names in a folder of the project (here .kiro/hooks); `holds(file)` whether the
+// project holds a file there, as read() would read it.
+export function configured(read, skills, files = () => [], holds = f => read(f) !== null) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [];
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const holds = f => read(f) !== null;
   const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds, servers };
   const json = file => {
     const text = read(file);
@@ -98,8 +98,10 @@ export function configured(read, skills, files = () => []) {
     const settings = json(file);
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
-    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); add(`plugin ${name}`, `plugin ${name}`); plugins.push(name); }
+    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
+  // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another)
+  for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, markets.get(name.slice(name.lastIndexOf("@") + 1))?.source ?? null]));
   addServers(state, ".mcp.json", json(".mcp.json")?.mcpServers, "");
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
@@ -116,7 +118,8 @@ function addServers(state, file, servers, tool) {
     const key = `server ${tool}${name}`, there = state.tools.get(key);
     if (there !== undefined && there !== file) { state.problems.push(`${file}: the tool server ${show(tool + name)} is configured in ${there} too, so the list cannot say which it holds. Mend: give one of the two another name, or take one out`); continue; }
     state.tools.set(key, file);
-    state.add(key, key);
+    // (a server is its whole entry: its command, arguments, address and all, so one the pull request changes is another)
+    state.add(key, canonical(["server", file, name, server ?? null]));
     state.servers.push([key, file, name, server]);
   }
 }
@@ -414,7 +417,13 @@ export function readProject(root, rev = null) {
   // is, and no file of the project's: floor rule 18)
   const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
   const read = rev ? f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; }
-    : f => { if (outside(f) || ignored(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+    : f => {
+      // (a file that is not there is known without asking git, so a hook's command, read word by word, costs no process)
+      if (outside(f)) return null;
+      let text;
+      try { text = fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; }
+      return ignored(f) ? null : text;
+    };
   // (the names in a folder of the project, at the commit or in the working tree, a link out of the checkout not followed)
   const names = dir => {
     if (rev) { const d = resolve(dir); return d?.type === "tree" ? tree(`${d.f}/`).map(e => e.f.slice(d.f.length + 1)) : []; }
@@ -422,7 +431,23 @@ export function readProject(root, rev = null) {
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
-  return { ...configured(read, skills, names), links };
+  return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null), links };
+}
+
+// Whether the commit `rev` holds a file at a path, as configured()'s `holds` asks it word by word of a hook's command:
+// from one listing of the commit, git asked once, and through read() only where a link stands on the path's way.
+function heldAt(root, rev, read) {
+  let blobs = null, links = null;
+  return f => {
+    if (blobs === null) {
+      let out = "";
+      try { out = execFileSync("git", ["ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
+      const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
+      blobs = new Set(entries.filter(([mode]) => mode !== "120000").map(([, at]) => at));
+      links = entries.filter(([mode]) => mode === "120000").map(([, at]) => at);
+    }
+    return links.some(at => f === at || f.startsWith(`${at}/`)) ? read(f) !== null : blobs.has(f);
+  };
 }
 
 // Whether the commit `rev` holds the path `at` as a link (git's mode 120000), not a file whose text names the same place.

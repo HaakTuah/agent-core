@@ -317,6 +317,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   passes(run(project({ ...kits, ".codex/config.toml": toml, ...codexListed })), "Codex's config.toml is read: its tool servers, its notify and its hooks, each listed");
   fails(run(project({ ".codex/config.toml": toml, ...listing() })), "each of them unlisted fails", 'the tool server "Codex search"', 'the hook "Codex notify: notify-send done"', 'the hook "Codex PreToolUse ^Bash$: echo checked"');
   fails(run(project({ ".codex/hooks.json": { hooks: { Stop: [{ hooks: [{ type: "command", command: "echo done" }] }] } }, ...listing() })), "a hook of .codex/hooks.json beside the kit's, not listed, fails", 'the hook "Codex Stop: echo done", configured in .codex/hooks.json');
+  // (a tool server or plug-in is its whole configuration: one the base held, changed, is no longer the one it held;
+  // #476's fallback security review)
+  const searchServer = command => `[mcp_servers.search]\ncommand = "${command}"\nargs = ["-y", "search@1.0.0"]\n`;
+  const heldServer = project({ ".codex/config.toml": searchServer("npx"), ...listing() });
+  passes(run(pr(heldServer, { "README.md": "a change of its own\n" })), "a tool server the base held unlisted, unchanged, is noted");
+  fails(run(pr(heldServer, { ".codex/config.toml": searchServer("bash") })), "and one whose command the pull request changes fails", 'the tool server "Codex search"');
+  fails(run(pr(project({ ".codex/config.toml": searchServer("npx") }), { ".codex/config.toml": searchServer("bash") })), "so too where no list is written yet", 'the tool server "Codex search", configured in .codex/config.toml, is new in this pull request');
+  const market = ref => ({ ...JSON.parse(KIT), enabledPlugins: { "helper@example-market": true }, extraKnownMarketplaces: { "example-market": { source: { source: "github", repo: "example/market", ref } } } });
+  fails(run(pr(project({ ".claude/settings.json": market("main") }), { ".claude/settings.json": market("other") })), "and a plug-in whose marketplace the pull request points elsewhere", 'the plug-in "helper@example-market"');
   // (a list written before the check read Kiro's and Codex's files: what they held stands, noted, and only a pull
   // request that adds one fails; #476's code review)
   const older = project({ ".codex/config.toml": "notify = [\"notify-send\", \"done\"]\n", ...listing() });
@@ -363,7 +372,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["powershell -File %CLAUDE_PROJECT_DIR%\\scripts\\a.sh", ["scripts/a.sh"]], ["git show HEAD:scripts/a.sh | bash", ["scripts/a.sh"]], ["node -r ./scripts/a.sh x", ["scripts/a.sh"]], ["cat scripts/../scripts/a.sh", ["scripts/a.sh"]],
     ["git show origin/main:scripts/a.sh | bash", []], ["git show refs/remotes/origin/main:scripts/a.sh | bash", []], ["[ -f \"$r/.kiro/hooks/work-saved.json\" ] || exit 0", []], ["test ! -e scripts/a.sh", []],
     ["bash /scripts/a.sh", []], ["echo ../scripts/a.sh", []], ["npx -y tool@1.0.0", []],
-    ["bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["bash -c 'x \"$CLAUDE_PROJECT_DIR/scripts/a b.sh\"'", ["scripts/a b.sh"]], ["[ -f \"scripts/a b.sh\" ] && echo", []],
+    ["bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["cd \"$CLAUDE_PROJECT_DIR\" && bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["echo \"it's done\"; bash 'scripts/a b.sh'", ["scripts/a b.sh"]],
+    ["jq -r '.x // \"none\"' f.json; bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["bash -c 'echo \\\"; bash \"scripts/a b.sh\"'", ["scripts/a b.sh"]], ["bash -c \"echo \\\"hi\\\" && bash \\\"scripts/a b.sh\\\"\"", ["scripts/a b.sh"]],
+    ["bash scripts/a\\ b.sh", ["scripts/a b.sh"]], ["bash -c 'x \"$CLAUDE_PROJECT_DIR/scripts/a b.sh\"'", ["scripts/a b.sh"]], ["[ -f \"scripts/a b.sh\" ] && echo", []],
     ["deno test -A scripts/a.sh", ["scripts/a.sh"]], ["\"$DENO\" test -A scripts/a.sh", ["scripts/a.sh"]], ["'go' test -v scripts/a.sh", ["scripts/a.sh"]], ["`which go` test -v scripts/a.sh", ["scripts/a.sh"]],
     ["./do test -x scripts/a.sh", ["scripts/a.sh"]], ["run-if test -r scripts/a.sh", ["scripts/a.sh"]], ["bash -c 'test -f scripts/a.sh'", []], ["if test -e scripts/a.sh; then :; fi", []], ["go test -v scripts/a.sh", ["scripts/a.sh"]], ["x; [ ! -f scripts/a.sh ] || bash scripts/a.sh", ["scripts/a.sh"]], ["if [[ -e scripts/a.sh ]]; then :; fi", []]];
   for (const [command, want] of reads) ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${command} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, holds)));
