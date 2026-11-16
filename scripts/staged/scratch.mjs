@@ -350,13 +350,17 @@ export const show = (dir, ref, file) => originGit(dir, "show", "--no-textconv", 
 
 // The files a ref of the origin changes against main as the case set it.
 export function changed(dir, ref) {
-  return String(originGit(dir, "diff", "--name-only", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref) ?? "").split("\n").filter(Boolean);
+  // (-z, so a name git would quote, one with a character past ASCII, comes back as it is)
+  return String(originGit(dir, "diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref) ?? "").split("\0").filter(Boolean);
 }
 
-// The lines a ref of the origin adds to a file against main as the case set it, each without its "+".
+// The lines a ref of the origin adds to a file against main as the case set it, each without its "+"; null where git
+// takes the file as binary (a NUL byte, UTF-16), whose lines it does not show. The name is taken literally, never as a
+// pattern, so ":(glob)…" names one file alone.
 export function added(dir, ref, file) {
-  const diff = String(originGit(dir, "diff", "-U0", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", file) ?? "");
-  return diff.split("\n").filter(l => l.startsWith("+") && !l.startsWith("+++")).map(l => l.slice(1));
+  const diff = (...how) => String(originGit(dir, "diff", ...how, "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", `:(literal)${file}`) ?? "");
+  if (/^-\t-\t/u.test(diff("--numstat"))) return null;
+  return diff("-U0").split("\n").filter(l => l.startsWith("+") && !l.startsWith("+++")).map(l => l.slice(1));
 }
 
 // The branches the session pushed: each origin branch that is new, or moved, since the case was set.

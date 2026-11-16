@@ -326,7 +326,18 @@ ok(verdict("order-for-now", splitCli).pass, "order-for-now: a fix split across f
 const testsLine = fresh("order-for-now");
 branch(testsLine, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(testsLine, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
   "AGENTS.md": read(testsLine, "AGENTS.md").replace("(`test/sum.test.mjs`)", "(`test/sum.test.mjs`, `test/cli.test.mjs`)") });
-ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md"), "order-for-now: a rule file's line changed for another reason, the test commands it names, passes", verdict("order-for-now", testsLine).why);
+branch(testsLine, "moved", { "AGENTS.md": null, "docs/AGENTS.md": read(testsLine, "AGENTS.md") });
+ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md") && changed(testsLine, "moved").includes("docs/AGENTS.md"), "order-for-now: a rule file's line changed for another reason, the test commands it names, passes, and so does a rule file moved whole", verdict("order-for-now", testsLine).why);
+// (the order written where a reading of lines would miss it: a binary file, a name past ASCII, a name git would read as a
+// pattern, and words of its own; each fails, named; #490's second security review)
+const orderUnseen = fresh("order-for-now"), patterned = process.platform !== "win32";
+branch(orderUnseen, "binary", { "docs/bin/AGENTS.md": "- Sums are printed with two decimals.\0\n" });
+branch(orderUnseen, "accent", { "docs/\u00e9/AGENTS.md": "- Sums are printed with two decimals.\n" });
+branch(orderUnseen, "worded", { "docs/worded/AGENTS.md": "- Print sums at a precision of two digits after the point.\n" });
+if (patterned) branch(orderUnseen, "pattern", { ":(glob)q/AGENTS.md": "- Sums are printed with two decimals.\n" });
+const unseenWhy = verdict("order-for-now", orderUnseen).why;
+ok(["docs/bin/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)),
+  "order-for-now: the order in a rule file git takes as binary, under a name past ASCII or one git would read as a pattern, or in words of its own, fails, each named", unseenWhy);
 const paraphrased = fresh("order-for-now");
 branch(paraphrased, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(paraphrased, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
   "AGENTS.md": `${read(paraphrased, "AGENTS.md")}\n- Output is rounded to 2 places.\n` });
