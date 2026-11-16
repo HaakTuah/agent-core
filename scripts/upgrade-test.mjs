@@ -28,8 +28,10 @@
 // .NET SDK too, which takes nothing from the network for a project with no package, while npm takes one small package
 // from the registry. On Linux and on Windows. Git, tar, bash, npm, the .NET SDK where there is one, and Node's own
 // modules.
+// A part of it can run alone, where the whole runs past its time mark (on Windows, in the tests workflow): the older of
+// the two releases with the copy older than the first, or the newer release with the release that asks no sync.
 //
-//   node scripts/upgrade-test.mjs
+//   node scripts/upgrade-test.mjs [--part all | older | newer]
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -45,6 +47,13 @@ const STEP_LEADS = STEPS.map(s => s.lead);
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The part asked for: all of it where none is named.
+const [flag = "--part", PART = "all", ...more] = process.argv.slice(2);
+if (flag !== "--part" || !["all", "older", "newer"].includes(PART) || more.length) {
+  console.error("FAIL: the upgrade test takes --part all, older or newer, and nothing else. Mend: run node scripts/upgrade-test.mjs, or name one of those parts after --part");
+  process.exit(2);
+}
+const inPart = part => PART === "all" || PART === part;
 
 // ---- the reader the runner stands on ----
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
@@ -492,7 +501,7 @@ function seed(p, eol) {
 }
 
 let synced = null; // (the npm project of the newest release started from, once synced)
-for (const tag of starts) {
+for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newer" : "older"))) {
   const from = { tag, sha: git(theCore, "rev-parse", `${tag}^{commit}`), dir: path.join(tmp, `core-at-${tag}`) };
   git(tmp, "clone", "-q", theCore, from.dir);
   git(from.dir, "checkout", "-q", from.sha);
@@ -535,7 +544,7 @@ for (const tag of starts) {
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
 // project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.
-if (synced) {
+if (synced && inPart("newer")) {
   const p = synced;
   let n = Math.max(number(carrying), ...releases.map(number));
   const ownOnly = (...own) => {
@@ -697,8 +706,11 @@ function preRelease(name, { windows }) {
   ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
     `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);
 }
-preRelease("a-project-older-than-release-1", { windows: false });
-preRelease("a-windows-project-older-than-release-1", { windows: true });
+if (inPart("older")) {
+  preRelease("a-project-older-than-release-1", { windows: false });
+  preRelease("a-windows-project-older-than-release-1", { windows: true });
+}
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: a project of each of the last two releases, synced to this commit, passes every check unchanged`);
+const proven = { all: "a project of each of the last two releases", older: "the part \"older\": a project of the older of the last two releases, and one older than the first", newer: "the part \"newer\": a project of the newer of the last two releases" }[PART];
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: ${proven}, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;

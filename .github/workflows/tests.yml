@@ -6,8 +6,9 @@
 # (scripts/init-dotnet-test.mjs). Another writes projects with the starter kit of each of the last two releases, syncs
 # them to the commit under test and runs every check of the core on them, taking one package from npm's registry
 # (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so its checkout fetches them, and
-# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them. The staged cases'
-# test, which writes a scratch project with the starter kit for each case it reads, runs after it in that job.
+# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them, and there in
+# two jobs, a part of it each. The staged cases' test, which writes a scratch project with the starter kit for each case
+# it reads, runs after it in that job, on Windows after the second part.
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
@@ -301,11 +302,18 @@ jobs:
           MUTATE_BUDGET: "240"
         run: node scripts/strength.mjs
 
+  # (on Windows the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
+  # of the two releases with the copy older than the first, and the newer release, which the staged cases' test
+  # follows; on Linux one job runs it whole; #304)
   upgrade:
+    name: upgrade (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - { os: ubuntu-latest, part: all }
+          - { os: windows-latest, part: older }
+          - { os: windows-latest, part: newer }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -325,10 +333,12 @@ jobs:
         run: node scripts/select.mjs .github/shape.json --env RUN
       - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
         if: ${{ env.RUN == 'all' || contains(env.RUN, ' scripts/upgrade-test.mjs ') }}
-        run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs
+        env:
+          PART: ${{ matrix.part }}
+        run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs --part "$PART"
       # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time)
       - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
-        if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' scripts/staged-test.mjs ')) }}
+        if: ${{ !cancelled() && matrix.part != 'older' && (env.RUN == 'all' || contains(env.RUN, ' scripts/staged-test.mjs ')) }}
         run: node scripts/shape.mjs .github/shape.json --suite staged -- node scripts/staged-test.mjs
 
   # (the one check the ruleset asks for by name: it passes only where the suites, and the upgrade test with the staged
