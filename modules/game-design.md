@@ -1,7 +1,7 @@
 # Game design
 
-Read before a task changes a rule, a feature or how the computer players play, and before a polish-lane task. A feature
-is any move, rule or power a player can choose to use.
+Read before a task changes a rule, a feature or how the computer players play, before a task changes a game's screen,
+and before a polish-lane task. A feature is any move, rule or power a player can choose to use.
 
 - **The computer players never know who is a person** (core archive 87).
   - Nothing in the logic of the *computer players*, nor in *what they are shown*, says whether another player is a
@@ -105,3 +105,40 @@ is any move, rule or power a player can choose to use.
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
   thing) are `modules/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
+- **How a game answers a player** (core archive 234). In a game played through a screen, by default each point below
+  binds the builder of a pull request that changes what it touches (an input's answer, an effect, what the game shows,
+  a setting, a sound), and the critique (`modules/screens.md`, point 18) reads it there. It does not mean that a game
+  no change touches is redone on demand: the polish lane and the checks' baselines bring what stands to it, task by
+  task. Each check named below is the project's, off until its *screen checks* name it, reporting first and keeping a
+  baseline that may not get worse (`modules/screens.md`, "What holds it").
+  - **Every action is answered within a tenth of a second.** By default what a player does shows on the screen within
+    a tenth of a second of the input, even where its outcome comes later: a press shows pressed, a move starts, an
+    order shows given. The builder of a change to how an input is handled makes it so. It does not mean the outcome
+    comes that soon, nor that a computer player answers at once: "The computer players never know who is a person"
+    stands as it is. Reason: past a tenth of a second a player stops feeling the game answer its hand. Held by the
+    timed run (`modules/screens.md`, point 7), from an input to the first change on the screen: the check `timing`.
+  - **An effect is sized to the event and returns to rest.** The trigger is a change that adds or changes an effect (a
+    shake, a flash, a burst): its builder keeps it short and in proportion to what happened, ends it with the screen at
+    rest, takes its length from the system's motion values (`modules/screens.md`, point 2), and spends no effect on
+    every routine action alike, so that the ones that matter stand out. It does not mean no effects, nor a routine
+    action left unanswered: the point above answers it. Reason: an effect on every action drowns those that tell a
+    player something happened. Held by the check `values`, for its length, in part; that it is in proportion only a
+    reader can judge, and the critique asks it ("Is each effect in proportion to what happened, and do routine actions
+    go without one?").
+  - **The display is judged over the busiest scene,** not an empty one. The builder of a change to what the game shows
+    takes its pictures (`modules/screens.md`, point 17) over the busiest scene a test can stage, as one of the states
+    the screen names, and makes what a player must read stay readable there under motion and effects. It does not mean
+    a picture of every scene: the busiest one the game's tests can stage. Reason: a builder judges the display on the
+    quiet screen it was built on, and the owner finds in play what the busy one hides. Held by the check `pictures`,
+    a missing one failing, read by the critique.
+  - **A player's settings are remembered.** By default a game lets a player remap the controls, set the size of text,
+    have less shake and less flashing, and set each volume apart, and keeps each setting after the game is closed and
+    opened again. The builder of a change that adds an input, text, an effect or a sound gives it its setting. It does
+    not mean a setting with nothing to act on (a game with one sound has one volume), nor that a game that stands gains
+    them all in one change: the check's baseline lists what is missing, and tasks bring it. Reason: these are the
+    settings players most often miss, and one lost at each launch is set again every time. Held by the check
+    `settings`: a game's own test that each setting is there and still there after the game is closed and opened again.
+  - **Nothing is told by sound alone.** The builder of a change that adds a sound that tells a player something (a
+    warning, a turn, a hit) gives it a sign on the screen at the same moment. It does not mean that a sound that tells
+    nothing, such as music, needs one. Reason: a player with the sound off, or who cannot hear, misses what only a sound
+    told. The critique asks it ("Is anything told by sound alone?"); no check holds it yet.

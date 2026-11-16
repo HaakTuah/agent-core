@@ -40,6 +40,7 @@ export const MENDS = {
   pictures: "build the state the finding names, or take its picture at the size it names; where the picture differs from its baseline on purpose, take the baseline picture again in this pull request and say why",
   timing: "make what the finding names answer within a tenth of a second, show work going on past a second and progress past ten, keep the layout from jumping while it loads, or bring the load within its limit",
   console: "mend the error, the failing request or the font or picture that does not load, which the finding names",
+  settings: "give the game the setting the finding names (controls remapped, the size of text, less shake and flashing, each volume apart) and keep it when the game is closed and opened again (core/modules/game-design.md, \"A player's settings are remembered\")",
 };
 export const CHECKS = Object.keys(MENDS);
 export const KIT = "checks/screens.json";

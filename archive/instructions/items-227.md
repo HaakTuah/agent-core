@@ -233,3 +233,31 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      is said" in `modules/code-shape.md`, the two lines on them in `modules/review-guidelines.md`, the tests' whole run
      in `modules/cleaning.md`, `scripts/strength.mjs` and the core's own tool `scripts/mutate.mjs`, and the slot
      *mutation tool*.
+
+234. **15 November 2026** (games with a screen; in a chat with a session the owner works with, not the design session,
+     as that session recorded it on issue #286, labelled `by:chat`, under "What it is", saying the owner agreed to it;
+     and as the owner then told the orchestrator, who passed it on word for word to the builder of this rule). The
+     session researched what practice holds a screen to and set out fourteen additions with what holds each; this is
+     the thirteenth, and item 230 holds the others. It set out five rules for a game played through a screen: every
+     action answered within a tenth of a second, its outcome free to come later, and the computer players' answer left
+     as "The computer players never know who is a person" has it; an effect sized to its event, returning to rest, and
+     not spent on every routine action; the display judged over the busiest scene, not an empty one; a player's
+     settings remembered (controls remapped, the size of text, less shake and less flashing, separate volumes); and
+     nothing told by sound alone. What holds them: a timed script from an input to the first change on the screen; a
+     picture of the busiest scene a test can stage, read by the critique of item 230; a test that each setting is still
+     there after the game is closed and opened again; and the lengths of effects as values of the one system; each
+     reporting first, with a baseline that may not get worse, and off in a project until it turns it on; that an effect
+     is in proportion to its event only a reader can judge, the critique asking it. The owner agreed to all fourteen as
+     set out, having asked:
+
+     > What are we lacking from our ruleset, that we can prescribe and get superior output in our projects, without
+     > having to manually iterate and re-prompt o so many times? Mistakes and wrong calls, the models are capable of
+     > avoiding or detecting themselves, but which the processs just doesn't automatically prompt them to do?
+
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "How a game answers a player" in `modules/game-design.md` and its five points, the game's questions of the
+     critique and the settings check in `modules/screens.md`, and the check `settings` of `scripts/screens.mjs`.
