@@ -418,7 +418,8 @@ export function testPasses(dir, ref) {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return false;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     // (each run from the committed source, copied afresh from what was written out once: a program that changes its
-    // own files changes them for no later run)
+    // own files changes them for no later run; one that leaves a process behind to rewrite the next run's copy still
+    // could, as spawnSync kills no grandchild, and such code too would stand in the session's diff)
     const files = fs.readdirSync(tmp, { recursive: true }).map(String).filter(f => fs.lstatSync(path.join(tmp, f)).isFile()).map(f => [f, fs.readFileSync(path.join(tmp, f))]);
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
     // (three runs, each a process of its own: the bug's own case and two drawn afresh, how many numbers too, so no
