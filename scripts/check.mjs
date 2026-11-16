@@ -53,7 +53,8 @@ function stepEnv(home) {
   const rewrites = [];
   for (let i = 0; i < Number(env.GIT_CONFIG_COUNT ?? 0); i++) {
     const key = env[`GIT_CONFIG_KEY_${i}`] ?? "";
-    if (/^url\..+\.insteadof$/i.test(key)) rewrites.push([key, env[`GIT_CONFIG_VALUE_${i}`] ?? ""]);
+    // (a rewrite that carries a sign-in, "url.https://user:token@host/.insteadOf", is left out)
+    if (/^url\..+\.insteadof$/i.test(key) && !/:\/\/[^/]*@/.test(key)) rewrites.push([key, env[`GIT_CONFIG_VALUE_${i}`] ?? ""]);
   }
   const git = Object.fromEntries(rewrites.flatMap(([key, value], i) => [[`GIT_CONFIG_KEY_${i}`, key], [`GIT_CONFIG_VALUE_${i}`, value]]));
   return { ...kept, ...git, GIT_CONFIG_COUNT: String(rewrites.length), GIT_CONFIG_NOSYSTEM: "1", HOME: home, USERPROFILE: home };
