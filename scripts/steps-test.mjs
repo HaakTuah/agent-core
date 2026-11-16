@@ -621,6 +621,13 @@ ok(['node "$CORE"/scripts/copies.mj? c.json', "node $CORE/scripts/copie[s].mjs c
 ok(["node copies.mj? c.json", "node ./copies.* c.json", "node * c.json", "node $D/copies.mj? c.json"].every(run => notRead("copies", { "a.yml": stepped(run, { "working-directory": "core/scripts" }) }))
   && ["node --test **/*.test.mjs", 'node --test "**/*.test.mjs"', "node --test test/**/*.mjs", "node --test scripts/*.test.mjs"].every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"),
   "a glob that can match the script's name, in its folder, is not read; one that cannot is no run of it");
+// (the review of 8b78d8e: a glob after a cd or in a folder named only when it runs is not read, never a throw; a glob
+// of many stars is read in one pass; braces, classes and ** may match)
+ok(["cd app && node core/scripts/c*.mjs c.json", "pushd x; node ../core/scripts/copies.mj? c.json", "node core/scripts/{cop*,x}.mjs c.json", "node core/scripts/[[:alpha:]]opies.mjs c.json", "node core/**/s*/c*.mjs c.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })) && notRead("copies", { "a.yml": stepped("node s*/c*.mjs c.json", { "working-directory": "${{ inputs.d }}" }) }),
+  "a glob after a cd, in a folder named only when it runs, or with braces, a class or ** that may match, is not read");
+const stars = Date.now();
+ok(notRead("copies", { "a.yml": stepped(`node core/scripts/${"*".repeat(40)}x c.json\nnode core/${"*".repeat(40)}/copies.mjs c.json`) }) && Date.now() - stars < 1500, "a glob of many stars is read in one pass", `${Date.now() - stars} ms`);
 const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenStarted = Date.now();

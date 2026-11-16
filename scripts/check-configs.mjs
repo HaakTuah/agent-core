@@ -349,23 +349,31 @@ const literal = x => !/[$`'"\\]/u.test(x);
 // cannot match it (*.test.mjs, test/**) is no run of it, one that can (copies.mj?, * under core/scripts) is not read.
 function globbed(word, dir, folder, own, name, script) {
   if (!globMatches(own, name)) return [];
-  const where = folder === null ? dir.at : path.posix.join(dir.at, folder);
-  if (!dir.moved && !dir.dynamic && literal(where) && !globMatches(where, path.posix.dirname(script))) return [];
+  if (!dir.moved && !dir.dynamic) {
+    const where = folder === null ? dir.at : path.posix.join(dir.at, folder);
+    if (literal(where) && !globMatches(where, path.posix.dirname(script))) return [];
+  }
   return [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }];
 }
-// Whether a glob (*, ?, [...], {a,b}) can match a name, case left aside, read in one pass.
+// Whether a glob can match a name, case left aside. Only a plain one (letters, "*", "?", "[…]") is ever told no:
+// braces, "**" or a class it does not read whole ([[:alpha:]]) may match. "*" stands for any run, "/" included, and a
+// class for any one character, so the answer errs to "may", never "no" where one is (one pass of two pointers, so no
+// glob makes it slow).
 function globMatches(glob, name) {
-  let re = "";
-  for (let i = 0; i < glob.length; i++) {
-    const c = glob[i];
-    if (c === "*" && glob[i + 1] === "*") { re += ".*"; i++; } // (** crosses folders)
-    else if (c === "*") re += "[^/]*";
-    else if (c === "?") re += "[^/]";
-    else if (c === "[") { const e = glob.indexOf("]", i + 2); if (e < 0) re += "\\["; else { re += `[${glob.slice(i + 1, e).replace(/^!/u, "^").replace(/[\\\]]/gu, "\\$&")}]`; i = e; } }
-    else if (c === "{") { const e = glob.indexOf("}", i); if (e < 0) re += "\\{"; else { re += `(?:${glob.slice(i + 1, e).split(",").map(a => a.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})`; i = e; } }
-    else re += c.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  // (what stands before its first wildcard must begin the name, whatever follows: test/** never matches core/scripts)
+  const lead = /^[^*?[{]*/u.exec(glob)[0].toLowerCase();
+  if (!name.toLowerCase().startsWith(lead)) return false;
+  if (/[{}]|\*\*|\[\[|\[[^\]]*$/u.test(glob)) return true;
+  const g = glob.toLowerCase().replace(/\[[^\]]*\]/gu, "?"), s = name.toLowerCase();
+  let i = 0, j = 0, star = -1, from = 0;
+  while (j < s.length) {
+    if (i < g.length && (g[i] === "?" || g[i] === s[j])) { i++; j++; }
+    else if (i < g.length && g[i] === "*") { star = i++; from = j; }
+    else if (star >= 0) { i = star + 1; j = ++from; }
+    else return false;
   }
-  try { return new RegExp(`^${re}$`, "iu").test(name); } catch { return true; } // (a glob it cannot read may match)
+  while (g[i] === "*") i++;
+  return i === g.length;
 }
 // A run whose script is named only when the workflow runs (a variable, an expression of GitHub's, braces, a glob,
 // $'…', a "\\"): no run of this script where its folder plainly is no folder scripts (node --test tests/*.mjs) or its
