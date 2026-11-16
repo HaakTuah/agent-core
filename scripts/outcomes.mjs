@@ -10,7 +10,7 @@
 //     reads it), the one way a pull request is named; a bug labelled `correction` with no kind line is of the kind
 //     "does not work". Only the owner's account is read (floor rule 4);
 //   - merged tasks: the pull requests merged, Dependabot's left out; the time from an issue's first label `queued` to
-//     its closing as done, of the SAMPLE newest so closed; the merges a correction named, or a revert undid, within two
+//     its closing as done, of the LEAST newest so closed; the merges a correction named, or a revert undid, within two
 //     weeks; the merges that
 //     close a bug or a correction (unplanned mending); a bug's time from its filing to its closing as done, which is
 //     when its fix reached the default branch;
@@ -181,7 +181,7 @@ export function measure(data, month) {
 // The words a measure's value is written in, all that outcomesFrom lets through beside numbers and marks.
 const WORDS = new Set(("of merged for every ten none h days answers output tokens priced not corrected open hours the newest in pull requests a "
   + "review finding failed check neither measuring again or builder's own and bringing branch up to date kb files them over lines depth branches "
-  + "months last still under it read all core's share").split(" "));
+  + "months last still under it read all").split(" "));
 const NAMES = new Set([...MEASURES.map(m => m.label), "the code's size", "functions over each mark"]);
 const VALUE = /^[\p{L}\d ±%().,;:'-]{1,300}$/u;
 

@@ -7,11 +7,12 @@
 //   node scripts/outcomes-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
 import { FIRST, HEADING, KINDS, LABEL, LEAST, MEASURES, MONTHS, OUTCOMES, corrections, counted, kindOf, lines, measure, outcomesFrom, windowOf } from "./outcomes.mjs";
-import { gather, read, report as monthly } from "./outcomes-read.mjs";
+import { CALLS, firstOf, gather, read, report as monthly, spending } from "./outcomes-read.mjs";
 import { body, countsFrom } from "./state-report.mjs";
 
 let failed = 0, count = 0;
@@ -147,6 +148,25 @@ ok(/the task was misread[^\n]*: 1 \(± 2\)/.test(monthly({ repo: "someone/r", mo
   "the owner's corrections are read by the account the manifest names, not the repository's");
 ok(gather({ repo: "o/r", owner: "o", to: Date.parse(iso(11)), pulls: fixtures.pulls, issues: [] }).sample.map(p => p.number).join() === "20",
   "the sample is of the merges before the span's end");
+
+// ---- the budget ----
+let spent = 0;
+const counting = route => { spent++; return gh(route); };
+const small = read("o/r", Date.parse(iso(1)), Date.parse("2026-11-01T00:00:00Z"), "o", counting, { calls: 4, ms: 60e3 });
+ok(spent <= 4 && small.sample.length === 0 && small.merged.length === 2, "a run spends no more calls than its budget: the listings first, the items one by one only while it lasts", `${spent} calls, ${small.sample.length} sampled`);
+ok(/^- Not read: the pull requests and issues of the months to 2026-10 took more than the \d+ calls/.test(monthly({ repo: "o/r", month: "2026-10", manifest: "", root, gh: () => { throw new RangeError("spent"); } })[0]),
+  "where the listings alone pass the budget, nothing is read, and the line says why");
+const spend = spending(() => "[]", { calls: 2, ms: 60e3 });
+spend(); spend();
+ok(!spend.left() && (() => { try { spend(); return false; } catch (e) { return e instanceof RangeError; } })() && CALLS <= 200, "the budget refuses the call past it");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "outcomes-"));
+fs.mkdirSync(path.join(tmp, "reports"));
+fs.writeFileSync(path.join(tmp, FIRST), "[".repeat(20000) + "]".repeat(20000));
+const deep = firstOf("o/r", tmp);
+fs.writeFileSync(path.join(tmp, FIRST), JSON.stringify({ repos: { "o/r": { misread: "1 (± 2)", bad: { x: 1 }, long: "x".repeat(400) } } }));
+ok(deep === null && JSON.stringify(firstOf("o/r", tmp)) === JSON.stringify({ misread: "1 (± 2)" }), "a first reading too deep is refused, and only short texts are taken from it");
+ok(!monthly({ repo: "o/r", month: "2026-10", manifest: "| *owner's account* | `o` |\n", root: tmp, gh }).join("\n").includes("At the first reading"), "a project's own file is never read as the first reading");
+fs.rmSync(tmp, { recursive: true, force: true });
 
 // ---- the command ----
 const run = args => spawnSync(process.execPath, [path.join(root, "scripts/outcomes-read.mjs"), ...args], { encoding: "utf8" });

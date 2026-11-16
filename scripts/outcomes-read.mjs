@@ -13,8 +13,9 @@ import fs from "node:fs";
 import { blockingOf, codexFind, otherOf, postedKind } from "./review-record.mjs";
 import { priced, reading as costOf, sessionOf } from "./core-cost.mjs";
 import { reading as shapeReading, rulesOf } from "./dose.mjs";
+import { parseBounded } from "./guards.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
-import { FIRST, LABEL, MEASURES, MONTHS, SAMPLE, corrections, growth, lines, measure, same, windowOf } from "./outcomes.mjs";
+import { FIRST, LABEL, LEAST, MEASURES, MONTHS, SAMPLE, corrections, growth, lines, measure, same, windowOf } from "./outcomes.mjs";
 import { ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
 
@@ -23,8 +24,22 @@ const CLOSES = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #(\d{1,9})\b/giu;
 // What is read of `repo` from `from` to `to` (ms), through gh, as the measures take it: the pull requests and issues of
 // the span, listed, and item by item only what the measures need, so that the calls stay bounded however busy the
 // repository is (the look's token has an hourly limit): the notes on each issue labelled `correction`, the events of
-// the SAMPLE newest issues closed as done (for when each joined the queue), and the sample's own reads.
-export function read(repo, from, to, owner = repo.split("/")[0], gh = ghApi) {
+// the LEAST newest issues closed as done (for when each joined the queue), and the sample's own reads.
+//
+// The look's job stops after five minutes, and its token has an hourly limit: a run of `read` spends at most CALLS of
+// gh's calls and SECONDS of time (`budget`); the span's two listings must fit in it, or nothing is read, and the
+// items one by one are read only while it lasts, each line saying how many it read.
+export const CALLS = 150, SECONDS = 90;
+export const spending = (gh, budget = { calls: CALLS, ms: SECONDS * 1000 }) => {
+  const until = Date.now() + budget.ms;
+  let left = budget.calls;
+  const spend = (...a) => { if (left <= 0 || Date.now() > until) throw new RangeError("the budget is spent"); left--; return gh(...a); };
+  spend.left = () => left > 0 && Date.now() <= until;
+  return spend;
+};
+
+export function read(repo, from, to, owner = repo.split("/")[0], ghRaw = ghApi, budget = undefined) {
+  const gh = spending(ghRaw, budget);
   const iso = new Date(from).toISOString().replace(/\.\d{3}Z$/u, "Z");
   const pulls = [];
   // (newest updated first: a pull request merged in the span was updated in it, however long before it was opened)
@@ -43,17 +58,29 @@ const labelsOf = i => (i.labels ?? []).map(l => (typeof l === "string" ? l : l.n
 const newest = (list, key, n = SAMPLE) => [...list].sort((a, b) => String(b[key]).localeCompare(String(a[key]))).slice(0, n);
 
 // The data the measures read, from what GitHub gave: `notes(n)` and `events(n)` read an item's comments and events,
-// and `gh` the sample's commits and checks; the sample is the SAMPLE newest merged tasks before `to` (ms), as the
-// queue's time is read of the SAMPLE newest issues closed as done before it.
+// and `gh` the sample's commits and checks; the sample is the SAMPLE newest merged tasks before `to` (ms), and the
+// queue's time is read of the LEAST newest issues closed as done before it.
 export function gather({ repo, owner, to = Infinity, pulls, issues, notes = () => [], events = () => [], gh = null }) {
   const labelled = new Map(issues.map(i => [i.number, labelsOf(i)]));
   const { merged, reverts } = merges(repo, pulls, labelled);
   const done = issues.filter(i => i.state === "closed" && i.state_reason === "completed");
-  const queued = newest(done.filter(i => Date.parse(i.closed_at) < to), "closed_at").map(i => ({ joined: events(i.number).filter(e => e.event === "labeled" && e.label === "queued").map(e => e.at).sort()[0], done: i.closed_at })).filter(q => q.joined);
   const bugs = done.filter(i => labelled.get(i.number).includes("bug")).map(i => ({ at: i.created_at, closed: i.closed_at }));
-  const comments = issues.filter(i => labelled.get(i.number).includes(LABEL)).flatMap(i => notes(i.number));
-  const sample = newest(merged.filter(p => Date.parse(p.when) < to), "when").map(p => sampled(p, { repo, owner, gh, notes, events }));
+  // (item by item while the budget lasts: the corrections' notes first, then the queue's events of the LEAST newest
+  // issues closed as done, one call each, then the sample, several each)
+  const comments = whileLeft(issues.filter(i => labelled.get(i.number).includes(LABEL)), i => notes(i.number), gh).flat();
+  const queued = whileLeft(newest(done.filter(i => Date.parse(i.closed_at) < to), "closed_at", LEAST), i => ({ joined: events(i.number).filter(e => e.event === "labeled" && e.label === "queued").map(e => e.at).sort()[0], done: i.closed_at }), gh).filter(q => q.joined);
+  const sample = whileLeft(newest(merged.filter(p => Date.parse(p.when) < to), "when"), p => sampled(p, { repo, owner, gh, notes, events }), gh);
   return { merged, reverts, queued, bugs, sample, corrections: corrections(issues, comments, owner) };
+}
+
+// Each of `items` read by `one` while the budget of `gh` (spending's) lasts; an item the budget ran out within is left out.
+function whileLeft(items, one, gh) {
+  const out = [];
+  for (const item of items) {
+    if (gh?.left && !gh.left()) break;
+    try { out.push(one(item)); } catch (e) { if (e instanceof RangeError) break; throw e; }
+  }
+  return out;
 }
 
 // The merged tasks, Dependabot's left out, each with whether it closes a bug or a correction (`labelled`: each issue's
@@ -85,11 +112,15 @@ function sampled(p, { repo, owner, gh, notes, events }) {
   });
   return { ...p, events: [...mine.map(c => c.at), ...own.map(e => e.at), ...commits.map(c => c.at)].filter(Boolean), after };
 }
-const failedOn = (repo, sha, gh) => { try { return JSON.parse(gh(`repos/${repo}/commits/${sha}/check-runs?per_page=100`)).check_runs?.some(r => r.conclusion === "failure") ?? false; } catch { return false; } };
+const failedOn = (repo, sha, gh) => { try { return JSON.parse(gh(`repos/${repo}/commits/${sha}/check-runs?per_page=100`)).check_runs?.some(r => r.conclusion === "failure") ?? false; } catch (e) { if (e instanceof RangeError) throw e; return false; } };
 
-// The first reading's texts for `repo`, by key, from the core's file; null where it holds none for it.
+// The first reading's texts for `repo`, by key, from the core's own file (a project's copy holds no reports/, and a file
+// of a project's is never read for it); null where it holds none for it, or none in its form.
 export function firstOf(repo, root = ".") {
-  try { return JSON.parse(fs.readFileSync(`${root}/${FIRST}`, "utf8")).repos?.[repo] ?? null; } catch { return null; }
+  try {
+    const got = parseBounded(fs.readFileSync(`${root}/${FIRST}`, "utf8")).repos?.[repo];
+    return got && typeof got === "object" ? Object.fromEntries(Object.entries(got).filter(([, v]) => typeof v === "string" && v.length <= 300)) : null;
+  } catch { return null; }
 }
 
 // The lines for the state report of `repo` for `month`, the owner's account its manifest's (`manifest`; null in the
@@ -97,10 +128,10 @@ export function firstOf(repo, root = ".") {
 export function report({ repo, month, manifest = null, root = ".", previous = null, share = null, gh = ghApi }) {
   let data;
   try { data = read(repo, windowOf(month, MONTHS).from, windowOf(month).to, ownerOf(manifest ?? "") ?? repo.split("/")[0], gh); }
-  catch { return [`- Not read: GitHub did not answer for the pull requests, issues and events of ${month} (the look's job needs \`issues: read\` and \`pull-requests: read\`).`]; }
+  catch (e) { return [e instanceof RangeError ? `- Not read: the pull requests and issues of the months to ${month} took more than the ${CALLS} calls and ${SECONDS} seconds a run may spend.` : `- Not read: GitHub did not answer for the pull requests, issues and events of ${month} (the look's job needs \`issues: read\` and \`pull-requests: read\`).`]; }
   let grown = null;
   try { grown = growth(shapeReading(rulesOf(manifest, root).rules, root), root); } catch { grown = null; }
-  return lines({ rows: measure(data, month), grown, share, first: firstOf(repo, root), previous });
+  return lines({ rows: measure(data, month), grown, share, first: manifest ? null : firstOf(repo, root), previous });
 }
 
 // How the code grows in the project at `root` (its manifest's shape check, or the core's AGENTS.md where it has no
@@ -121,7 +152,7 @@ if (started(import.meta.url)) {
   } else if (month) console.log(report({ repo, month }).join("\n"));
   else {
     const w = { from: Date.parse(`${from}T00:00:00Z`), to: Date.parse(`${to}T00:00:00Z`) };
-    const data = read(repo, w.from, w.to);
+    const data = read(repo, w.from, w.to, undefined, ghApi, { calls: 20000, ms: 3600e3 }); // (a session's one reading of history, no job's run)
     if (given) data.corrections = JSON.parse(fs.readFileSync(given, "utf8"));
     const rows = MEASURES.map(m => ({ key: m.key, outcome: m.outcome, direct: m.direct, label: m.label, text: m.of(data, w).text, months: 1 }));
     const grown = dir ? grownAt(dir) : null;
