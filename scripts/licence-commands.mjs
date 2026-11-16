@@ -10,8 +10,7 @@
 // take the newest a range allows, another registry or npm config, npm install without its lockfile, a word that is no
 // npm command where npm stands as one (atCommand), a command running on past 16 KB. Other fetchers (curl, wget, pip,
 // pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER, and Windows' and .NET's: WINDOWS_FETCHER.
-// No module but guards.mjs, beside this file.
-import { DEEPEST, tooDeep } from "./guards.mjs";
+// Node's own modules only (none).
 
 // npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own,
 // or none); and options known to take a value. A word that is no command, straight after an option, is read as that
@@ -406,23 +405,20 @@ export function commands(text, code = false, literal = false) {
  */
 const COMMAND = /command|cmd|script|exec|args|^run$/iu;
 const PROSE = /^(\$?comment|about|description|summary|how|used|why|notes?|help|message|text|title|label|keywords|author|contributors|maintainers|homepage|repository|bugs|funding|licen[cs]e|url)$/iu;
+// (each list joined a value at a time, never spread into one call, which a long list would overflow; the caller bounds
+// how deep a value nests, as the scan does with tooDeep, in guards.mjs)
+const add = (to, list) => { for (const x of list) to.push(x); };
 const strings = (v) => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : []);
 export function commandLines(v) {
-  if (tooDeep(v)) throw new Error(`it nests deeper than ${DEEPEST} objects and lists, so its commands cannot be read`);
-  return linesOf(v);
-}
-function linesOf(v) {
   if (!v || typeof v !== "object") return typeof v === "string" ? [v] : [];
-  // (each list joined a value at a time, never spread into one call, which a long list would overflow)
   const programs = [], args = [], out = [];
-  const add = (to, list) => { for (const x of list) to.push(x); };
   for (const [k, x] of Object.entries(v)) {
     if (!Array.isArray(v) && PROSE.test(k)) continue;
     const listed = Array.isArray(x) && x.every((y) => typeof y === "string");
     if (!Array.isArray(v) && COMMAND.test(k) && typeof x === "string") programs.push(x);
     else if (!Array.isArray(v) && COMMAND.test(k) && listed) add(args, x);
     else if (!Array.isArray(v) && COMMAND.test(k)) add(out, strings(x)); // (package.json's "scripts": every one, a "help" too)
-    else add(out, linesOf(x));
+    else add(out, commandLines(x));
   }
   // (one program with its arguments, as a task or a launch writes them; several, each its own line, as scripts are,
   // each with any arguments beside them)

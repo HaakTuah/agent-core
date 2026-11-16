@@ -92,3 +92,11 @@ export function seen(markdown) {
   }
   return out.join("\n");
 }
+
+/** JSON's text parsed, as JSON.parse parses it, and refused, as text that is no JSON is, where it nests deeper than
+ *  DEEPEST: what reads it after, by recursion or by printing it, then never runs out of stack. */
+export function parseBounded(text) {
+  const value = JSON.parse(text);
+  if (tooDeep(value)) throw new SyntaxError(`it nests deeper than ${DEEPEST} objects and lists`);
+  return value;
+}

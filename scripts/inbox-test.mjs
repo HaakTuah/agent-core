@@ -25,6 +25,7 @@ ok(answer(on).yes && answer({ ...on, permissions: { push: true } }).yes, "issues
 ok(!answer({ ...on, has_issues: false }).yes && /switched off/.test(answer({ ...on, has_issues: false }).why), "issues switched off: no, saying so");
 ok(!answer({ has_issues: true, permissions: { pull: true } }).yes && /may not write/.test(answer({ has_issues: true, permissions: { pull: true } }).why), "no right to write them: no");
 ok(!answer(null).yes && !answer("x").yes, "no answer: no");
+ok(["false", "true", 1, {}].every((right) => !answer({ has_issues: true, permissions: { admin: right, maintain: right, push: right, triage: right } }).yes), "a right given as anything but a real true: no");
 
 // an app's token (GitHub's job's own), whose `permissions` read no write whatever the job grants (#338): asked again
 const app = { has_issues: true, permissions: { admin: false, maintain: false, push: false, triage: false, pull: false } };

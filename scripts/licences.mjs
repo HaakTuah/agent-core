@@ -328,11 +328,13 @@ export function loadConfig(path) {
 }
 
 /** The config's paths, each held to the project: one rooted, or with a ".." that leads above the project's root, is
- *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it. */
+ *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it: the
+ *  config, where none is. */
 function within(config, root) {
   const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), config.audit, config.notices].filter((p) => p !== undefined);
   const out = named.filter((p) => !inProject(p) || (root !== undefined && leadsOut(root, join(root, p))));
   if (out.length) throw new Error(`the config names a path outside the project: ${out.map((p) => logged(p)).join(", ")}. Mend: name each file by its path from the project's root, with no ".." that leads above it, and make it a file of the project's own, reached through no link that leads out of it`);
+  return config;
 }
 
 /** Whether a lock file names an entry as npm writes one: "" for the project itself, else folders joined by "/", none
@@ -391,8 +393,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join
  * { failures, reports, summary }.
  */
 export function check(config, root, base = null, baseConfig = null) {
-  within(config, root);
-  config = normalised(config);
+  config = normalised(within(config, root));
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the

@@ -497,6 +497,19 @@ export function lockPackages(text, lockPath) {
   return { packages: [...packages.values()], failures: failures.map(shown), split: split.map(shown) };
 }
 
+/** Of the openings `next` holds, each with where it stands next in `text` (-2 where it is not yet looked for, -1 for
+ *  none left), the one nearest from `at`, as [where, opening], or undefined: each looked for again only once the reading
+ *  has passed it, so the text is read once however many of them it holds. */
+function nearest(text, at, next) {
+  let found;
+  for (const [open, i] of next) {
+    const now = i !== -1 && i < at ? text.indexOf(open, at) : i;
+    next.set(open, now);
+    if (now >= 0 && (!found || now < found[0])) found = [now, open];
+  }
+  return found;
+}
+
 /**
  * The licence a package's manifest (its .nuspec, as text) names: { expression } for an SPDX expression, { other }
  * (a word for what it has instead: "a licence file", "an address", "nothing") where a machine cannot read one.
@@ -516,16 +529,8 @@ export function manifestLicence(text) {
   // no manifest can hold is left where each stood: a comment holds no "--", and an instruction is named, never "xml")
   let plain = "", at = 0;
   const ends = { "<!--": "-->", "<![CDATA[": "]]>", "<?": "?>" };
-  // (where each opening stands next, looked for again only once the reading has passed it, so the text is read once
-  // however many of them it holds: -1 for none left)
-  const next = new Map(Object.keys(ends).map((open) => [open, -2]));
-  for (;;) {
-    let found;
-    for (const [open, i] of next) {
-      const now = i !== -1 && i < at ? text.indexOf(open, at) : i;
-      next.set(open, now);
-      if (now >= 0 && (!found || now < found[0])) found = [now, open];
-    }
+  for (const next = new Map(Object.keys(ends).map((open) => [open, -2]));;) {
+    const found = nearest(text, at, next);
     if (!found) { plain += text.slice(at); break; }
     const end = text.indexOf(ends[found[1]], found[0] + found[1].length);
     if (end < 0) return malformed;

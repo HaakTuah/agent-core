@@ -1,8 +1,8 @@
 // Tests what a pull request waits on (wait.mjs, beside this file): the time the checks of one push took, from the
 // first one's start to the last one's end, a check skipped or not ended counting nothing; the median; the last merged
-// pull requests read through a stand-in for gh, a head that is no commit's whole name left out; the line the state report gives, against the mark or with none; and a
-// run told no repository, refused with its mend (mend.mjs). Run by the core's tests workflow
-// (.github/workflows/tests.yml).
+// pull requests read through a stand-in for gh, a head that is no commit's whole name left out; the line the state
+// report gives, against the mark or with none; and a run told no repository, or one named by dots, refused with its
+// mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/wait-test.mjs
 import { spawnSync } from "node:child_process";

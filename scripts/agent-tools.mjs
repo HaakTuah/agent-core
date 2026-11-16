@@ -40,7 +40,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
-import { DEEPEST, logged, tooDeep } from "./guards.mjs";
+import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
@@ -65,13 +65,8 @@ export function configured(read, skills) {
   const json = file => {
     const text = read(file);
     if (text === null) return null;
-    try {
-      const v = JSON.parse(text);
-      // (one nested past what any tool's settings hold is refused before it is read, by recursion or by printing it)
-      if (tooDeep(v)) { problems.push(`${file} nests deeper than ${DEEPEST} objects and lists, so it is not read. Mend: write its settings as the tool that reads them does, nested no deeper`); return null; }
-      if (v && typeof v === "object" && !Array.isArray(v)) return v;
-    } catch { /* (below) */ }
-    problems.push(`${file} cannot be read as a JSON object. Mend: correct it to JSON, as the tool that reads it takes it`);
+    try { const v = parseBounded(text); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* (below) */ }
+    problems.push(`${file} cannot be read as a JSON object, nested no deeper than ${DEEPEST} objects and lists. Mend: correct it to JSON, as the tool that reads it takes it`);
     return null;
   };
   const markets = new Map(), plugins = [];
@@ -358,10 +353,9 @@ function sortLinks(root, base, links, fail, notes) {
 // The whole check, from the project's root: { fail, notes }.
 export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   let config;
-  try { config = JSON.parse(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
+  try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
-  if (tooDeep(config)) return { fail: [`${file} nests deeper than ${DEEPEST} objects and lists, so it is not read. Mend: write the licence check's config as the starter kit does, nested no deeper`], notes: [] };
   const head = readProject(root);
   const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
   let list = listed(config, file);

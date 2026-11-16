@@ -610,6 +610,11 @@ user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/Ap
 ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
 
+{
+  // (read once, however many comments it holds: past a second here, it would read the text again for each)
+  const from = Date.now(), many = expression(nuspec(`${"<!-- a note -->".repeat(50000)}<license type="expression">MIT</license>`));
+  ok(many === "MIT" && Date.now() - from < 5000, "a manifest of many comments is read in one pass", `${many}, ${Date.now() - from} ms`);
+}
 ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);

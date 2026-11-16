@@ -7,6 +7,7 @@
 //   node scripts/init-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
@@ -154,7 +155,17 @@ if (p.status === 0) {
   ok(wideRun.status === 1 && /checks\/cópies\.json reads \d+ files fewer than HEAD's config read/u.test(wideRun.stderr) && mended(wideRun.stderr), "a config named outside plain ASCII is held to the base's too", wideRun.stdout + wideRun.stderr);
   fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), code: [":(bogus)x"] }));
   const badSpec = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
+  // (a pathspec above the project, whose failure names no place on this machine; a baseline outside it, refused)
+  fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), code: ["../elsewhere"] }));
+  const aboveSpec = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env, encoding: "utf8" });
+  const outside = ["../baseline.json", path.join(os.tmpdir(), "baseline.json")].map((baseline) => {
+    fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), baseline }));
+    return spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: p.dir, env, encoding: "utf8" });
+  });
   fs.writeFileSync(cfgP, cfgPWas);
+  ok(aboveSpec.status === 1 && mended(aboveSpec.stderr) && !aboveSpec.stderr.includes(p.dir) && !aboveSpec.stderr.includes(fs.realpathSync(p.dir))
+    && outside.every((r) => r.status === 1 && mended(r.stderr) && /the config's "baseline", .*, lies outside the project/u.test(r.stderr)) && !fs.existsSync(path.join(p.dir, "..", "baseline.json")),
+    "a pathspec above the project fails naming no place on this machine, and a baseline outside the project is refused, never written, each saying its mend", `${aboveSpec.stderr}${outside.map((r) => r.stderr).join("")}`);
   ok(secWas.includes("**the rule files:** `docs/threat-model.md`;") && offList.status === 1 && /files fewer than HEAD's config read: docs\/threat-model\.md \(prose\)/u.test(offList.stderr) && mended(offList.stderr)
     && badSpec.status === 1 && /git cannot read the pathspecs :\(bogus\)x: .*\. Mend: write each as a plain git pathspec, .* in the config's "code" or "prose"/u.test(badSpec.stderr) && mended(badSpec.stderr),
     "against the base, a rule file taken off SECURITY.md's list fails, and a pathspec git cannot read fails, each saying its mend", `${offList.stderr}${badSpec.stderr}`);

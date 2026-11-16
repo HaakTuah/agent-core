@@ -108,5 +108,27 @@ const fine = project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: { ver
 ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(run(fine).stdout) && run(forged).status === 1 && /^FAIL: "node_modules\/mossgrip-lib": /.test(run(forged).stderr) && mended(run(forged).stderr) && run(none).status === 1 && mended(run(none).stderr) && run().status === 1 && mended(run().stderr),
   "as a program: it passes and says what it read, fails with each failure on a line, and fails where there is no lock file, the folder named or the current one");
 
+// What a package folder reached through a link out of the project holds is not read; a value of any depth is read
+// without running out of stack, or refused past the bound, saying the mend.
+{
+  const away = path.join(tmp, "elsewhere");
+  fs.mkdirSync(away);
+  fs.writeFileSync(path.join(away, "package.json"), JSON.stringify({ name: "mossgrip-lib", version: "1.0.0", license: "MIT" }));
+  const dir = project({ [A]: { version: "1.0.0", license: "MIT" } }, {});
+  fs.mkdirSync(path.join(dir, "node_modules"), { recursive: true });
+  fs.symlinkSync(away, path.join(dir, A), "junction");
+  const linked = said(dir);
+  ok(/node_modules\/mossgrip-lib.*reached through a link that leads out of the project, so it is not read\. Mend: /u.test(linked), "a package folder reached through a link out of the project is not read, and the failure says its mend", linked);
+  let typed = "MIT";
+  for (let i = 0; i < 20000; i++) typed = { type: typed };
+  ok(lockForm(typed) === "MIT", "a type within a type is followed however deep it nests");
+  const deep = `{"version":"1.0.0","license":${"[".repeat(20000)}"MIT"${"]".repeat(20000)}}`;
+  const nested = said(project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: deep }));
+  ok(/its package\.json cannot be read as JSON, nested no deeper than 200 objects and lists\. Mend: /u.test(nested), "a package.json nested past the bound is not read, and the failure says its mend", nested.slice(0, 400));
+  const lockDeep = project({}, {});
+  fs.writeFileSync(path.join(lockDeep, "package-lock.json"), `{"lockfileVersion":3,"packages":{"":{"x":${"[".repeat(20000)}1${"]".repeat(20000)}}}}`);
+  ok(/^threw: cannot read package-lock\.json as JSON, nested no deeper than 200 .*Mend: /u.test(said(lockDeep)), "a lock file nested past the bound is refused, saying its mend", said(lockDeep).slice(0, 300));
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the licences read back from the packages`);
 process.exitCode = failed ? 1 : 0;

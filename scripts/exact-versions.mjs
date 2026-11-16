@@ -15,7 +15,7 @@
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
 import { posix } from "node:path";
-import { DEEPEST, inProject, logged, tooDeep } from "./guards.mjs";
+import { inProject, logged, parseBounded } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 const KINDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
@@ -66,8 +66,7 @@ function installed(packages, from, name) {
 export function check(lockfile, read) {
   const problems = [];
   let lock;
-  try { lock = JSON.parse(read(lockfile)); } catch (e) { return [`${lockfile}: cannot be read as JSON (${logged(e.message)}). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`]; }
-  if (tooDeep(lock)) return [`${lockfile}: nests deeper than ${DEEPEST} objects and lists, as no lock file npm writes does. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`];
+  try { lock = parseBounded(read(lockfile)); } catch (e) { return [`${lockfile}: cannot be read as JSON (${logged(e.message)}). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`]; }
   const packages = lock?.packages;
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
@@ -76,8 +75,7 @@ export function check(lockfile, read) {
     if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's. Mend: make it a folder inside the project, or take it out of the project's workspaces, then write the lock file anew with npm: its install, given --package-lock-only`); continue; }
     const file = posix.join(root, key, "package.json");
     let list;
-    try { list = JSON.parse(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${logged(e.message)}). Mend: correct it to JSON`); continue; }
-    if (tooDeep(list)) { problems.push(`${file}: nests deeper than ${DEEPEST} objects and lists, so it is not read. Mend: write its dependencies and overrides as npm does, each name to one version`); continue; }
+    try { list = parseBounded(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${logged(e.message)}). Mend: correct it to JSON`); continue; }
     if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
     for (const kind of KINDS) {
       const deps = list?.[kind];

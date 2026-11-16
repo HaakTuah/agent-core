@@ -249,6 +249,9 @@ export function pinsAlone(file, pinned = USES) {
 // whether a posted review holds what comment-only.mjs printed on this head: comments and steps' names alone
 const ALONE = /^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/mu;
 export const commentsAlone = (body, sha) => typeof body === "string" && ALONE.test(body) && new RegExp(`^\\s*checked head ${sha}(?![0-9a-f])`, "mu").test(body);
+// whether a completed review says no finding is open: only false, or null, which Codex gives where it found nothing;
+// true, or a value of any other type, is read as one open
+const noneOpen = (review) => review.has_unresolved_findings === false || review.has_unresolved_findings === null;
 function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, reviewComments, commits, changed, bound, pure, cut, mends }) {
   const short = sha.slice(0, 7);
   // what a review of an earlier commit wants, where a merge from main after it is not the one git makes (#323)
@@ -262,9 +265,7 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   if (review !== null && typeof review === "object" && review.status === "completed") {
     const at = typeof review.commit_sha === "string" && SHA.test(review.commit_sha) ? review.commit_sha : undefined;
     const on = at === undefined ? "" : at === sha ? ` (on ${short})` : ` (on ${at.slice(0, 7)}, earlier than the head ${short}${bind && stand(at) ? ", only updates from main since" : ""})`;
-    // (only false, or null, which Codex gives where it found nothing, says no finding is open: true, or a value of any
-    // other type, is read as one open)
-    if (review.has_unresolved_findings === false || review.has_unresolved_findings === null) {
+    if (noneOpen(review)) {
       // a review of an earlier commit stands only where nothing but updates from main follow it; otherwise a posted
       // review names the head, or a commit only such updates follow (a pure sync needs none, its review waited for)
       if (pure || !bind || (at !== undefined && stand(at))) return { sha, done: true, why: `Codex's security review has run${on}` };

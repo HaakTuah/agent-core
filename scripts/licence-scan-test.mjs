@@ -1,11 +1,15 @@
 // Checks the licence check (licences.mjs, beside this file) on a whole project, with its scan (licence-scan.mjs): the
 // staged project (licence-scan-stage.mjs) passes as it is, passes each allowed form, and fails each form of something
 // off its list or left out of its audit but a fetch (licence-fetch-test.mjs has those), for the reason it names; and
-// the owner's yes (licence-yes.mjs), on a package and on an audit entry. Run by the core's tests workflow
-// (.github/workflows/tests.yml).
+// the owner's yes (licence-yes.mjs), on a package and on an audit entry; every path the config names, and every file
+// the scan reads, held to the project; and JSON of any depth or length read without running out of stack. Run by the
+// core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/licence-scan-test.mjs
 import { LOCK, append, done, entry, handAudited, json, ok, run, write } from "./licence-scan-stage.mjs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { mended } from "./mend.mjs";
 
 // (each failure as the check prints it, one a config's fault throws too: each says its mend)
@@ -183,6 +187,43 @@ for (const [what, change, why] of [
   ]) { const f = run(change); ok(f.some((m) => why.test(m)) && mendSaid(f), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
   const twice = run((dir) => { shipped("LGPL-3.0-only", [yes({ ships: false })])(dir); json("package-lock.json", (j) => { j.packages["node_modules/bark-x/node_modules/mossgrip-lib"] = { ...j.packages["node_modules/mossgrip-lib"] }; j.packages["node_modules/bark-x"] = { version: "1.0.0", resolved: "https://registry.npmjs.org/bark-x/-/bark-x-1.0.0.tgz", license: "MIT", dependencies: { "mossgrip-lib": "1.0.0" } }; j.packages[""].dependencies["bark-x"] = "1.0.0"; })(dir); write("package.json", JSON.stringify({ name: "bark", dependencies: { "mossgrip-lib": "1.0.0", "bark-x": "1.0.0" } }))(dir); });
   ok(twice.length === 1, "a package a lockfile holds twice fails once", twice.join("\n"));
+}
+
+// Every path the config names, and every file the scan reads, lies inside the project.
+{
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "licences-elsewhere-"));
+  try {
+    fs.writeFileSync(path.join(elsewhere, "audit.json"), JSON.stringify({ entries: [] }));
+    fs.writeFileSync(path.join(elsewhere, "notice.js"), "/*! Copyright 2020 Mossgrip | GPL-3.0 */\n");
+    const outside = /names a path outside the project/u;
+    for (const [what, change] of [
+      ["a lockfile named by a path above the project", json("licences.json", (j) => { j.lockfiles = ["../package-lock.json"]; })],
+      ["an audit named by a rooted path", json("licences.json", (j) => { j.audit = path.join(elsewhere, "audit.json"); })],
+      ["notices named by a path above the project", json("licences.json", (j) => { j.notices = "site/../../NOTICE"; })],
+      ["an .npmrc named by a rooted path", json("licences.json", (j) => { j.ignoreScriptsIn = ["/.npmrc"]; })],
+    ]) { const f = run(change); ok(f.some((m) => outside.test(m)) && mendSaid(f), `refuses ${what}, saying its mend`, f.join("\n") || "(it passed)"); }
+    // (a link to a file needs a right on Windows that is not always there: where it cannot be made, these are not tried)
+    let links = true;
+    try { fs.symlinkSync(path.join(elsewhere, "notice.js"), path.join(elsewhere, "probe")); } catch { links = false; }
+    if (links) {
+      const linkedAudit = run((dir) => { fs.rmSync(path.join(dir, "audit.json")); fs.symlinkSync(path.join(elsewhere, "audit.json"), path.join(dir, "audit.json")); });
+      ok(linkedAudit.some((m) => outside.test(m)), "refuses an audit reached through a link that leads out of the project", linkedAudit.join("\n"));
+      const linkedFile = run((dir) => fs.symlinkSync(path.join(elsewhere, "notice.js"), path.join(dir, "site", "tools", "linked.js")));
+      ok(linkedFile.length === 0, "reads a tracked link as the path it names, never the file it leads to", linkedFile.join("\n"));
+    }
+  } finally { fs.rmSync(elsewhere, { recursive: true, force: true }); }
+}
+
+// A JSON file of any depth or length is read without running out of stack: past the bound, it fails, saying its mend,
+// unless an entry audits it by hand.
+{
+  const deep = `${"[".repeat(20000)}"npx mossgrip-cli@1.2.3"${"]".repeat(20000)}`;
+  const nested = run(write("site/tools/deep.json", deep));
+  ok(nested.some((m) => /site\/tools\/deep\.json: it nests deeper than 200/u.test(m)) && mendSaid(nested), "fails on JSON nested past the bound, saying its mend", nested.join("\n"));
+  const audited = run((dir) => { write("site/tools/deep.json", deep)(dir); handAudited("site/tools/deep.json")(dir); });
+  ok(audited.length === 0, "passes JSON nested past the bound that an entry audits by hand", audited.join("\n"));
+  const long = run(write("site/tools/long.json", JSON.stringify({ command: Array.from({ length: 150000 }, (_, k) => `arg${k}`) })));
+  ok(long.length === 0, "reads a command's list of any length", long.join("\n"));
 }
 
 done();
