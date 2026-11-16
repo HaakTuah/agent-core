@@ -239,6 +239,12 @@ jobs:
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/entry-files.mjs --core
+      - name: The reading script, by role and by task
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        run: node scripts/reading-test.mjs
+      - name: Every module and role of the core says when it is read, in words the reading script matches
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        run: node scripts/reading.mjs --check
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/workflows.mjs

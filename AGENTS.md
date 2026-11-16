@@ -9,10 +9,12 @@ The shared core of the owner's agent-built projects: a floor every project takes
 ## The core this repository takes
 
 The floor whole, and every module but those "Not taken" below gives its reason for (core archive 209 and 213).
-`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. Read whole at the start
-of every task (Claude Code imports them):
+`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. A builder reads these
+whole at the start of every task (Claude Code imports them); what else a task calls for, and what another role reads,
+`node scripts/reading.mjs <role> --issue <its line's issue>` prints (`modules/tools.md`, "One script says what to read"):
 
 @floor/security.md
+@roles/builder.md
 @modules/how-to-work.md
 @modules/inbox.md
 @modules/work-flow.md
@@ -25,8 +27,8 @@ the core in "Sessions", since this repository is the core and holds no copy.
 Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a session of any
 other tool, `modules/other-builders.md` and its tool's part (`modules/tools.md`), which its entry file pulls in.
 
-Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
-`modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
+Read when a task calls for it, each saying when in its opening line: `floor/topics.md`, `floor/threat-model.md`,
+`modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
 `modules/kiro.md`, `modules/antigravity.md`, `modules/github-calls.md`, `modules/orchestrating.md`,
 `modules/updates.md`, `modules/choices.md`, `modules/code-shape.md` and `modules/cleaning.md`.
 
@@ -44,13 +46,13 @@ the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the co
 the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
-that change the same file, and all that add to what every session reads at its start, whose cap they share, in the
+that change the same file, and all that add to what a role reads at its start, whose caps they share, in the
 queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`modules/roles.md`,
-`modules/orchestrating.md`); the *hard work*: a new or changed rule; the *size marks*: the cap of
-`scripts/size.mjs`, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of
-`.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+`modules/orchestrating.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
+`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
@@ -117,12 +119,15 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.
-- **The size cap keeps the rules lean and decides nothing else** (`scripts/size.mjs`; core archive 179 and 181): no rule
-  is moved from where it belongs, cut short or left out to fit, nor is another rule's reason, name or example cut to
-  make room. It rises, one step of a whole KB, only as "A mark on what every session reads" in
-  `modules/review-guidelines.md` says of any such mark (core archive 182): here those files are what every session
-  reads at its start, the core's part of the starter kit's list (core archive 201), and `.github/workflows/size.yml`
-  fails a raise of more than one step, and one in a PR with no "Leanness check:" comment.
+- **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`; core archive 179, 181 and 234).
+  By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
+  whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
+  whoever makes the change raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every
+  session reads" in `modules/review-guidelines.md` says of any such mark (core archive 182 and 201). It does not mean
+  a rule is moved from where it belongs, cut short or left out to fit, nor another rule's reason, name or example cut
+  to make room. Reason: each start is paid at every task, and a cap that decided where a rule stands would hide it
+  from who must keep it. Held by `scripts/size.mjs`, and `.github/workflows/size.yml`, which fails a raise of more
+  than one step, and one in a PR with no "Leanness check:" comment.
 - **A release is cut on the owner's word** (core archive 195 and 196): another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, never by a session's own choice: the owner's standing word is that it may each time the
@@ -275,5 +280,5 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 Every reviewer reads `modules/review-guidelines.md` whole and judges the change by it, with the floor. Here, a rule that
 changes what any project must do without saying so in the PR is a departure from the PR's description, and blocks; so
 does one that reads true only for some of the kinds of project "Rules are written for any project" names, and a raise of
-the size cap in a PR with no "Leanness check:" comment that found too little room. A finding: a new rule whose "What
+a size cap in a PR with no "Leanness check:" comment that found too little room. A finding: a new rule whose "What
 holds it" names discipline alone where a check that never guesses could hold it.

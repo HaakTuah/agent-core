@@ -233,3 +233,55 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      is said" in `modules/code-shape.md`, the two lines on them in `modules/review-guidelines.md`, the tests' whole run
      in `modules/cleaning.md`, `scripts/strength.mjs` and the core's own tool `scripts/mutate.mjs`, and the slot
      *mutation tool*.
+
+234. **15 November 2026** (the core; in chats with a session the owner works with, not the design session, as that
+     session recorded them on issue #304, labelled `by:chat`, whose description is its current text). Of what the rules
+     a session reads at its start cost on every task:
+
+     > Don't we just avoid the token issue by ensuring the agent only ever read the ones relevant to them?
+
+     And, when the session said that the choice of what to read must be made by a machine (an entry names its modules,
+     or a hook tells a session which modules its changed files call for):
+
+     > Yes, this is important! And doesn't this also address a bit our concern from earlier, that not models from all
+     > providers will be able to correctly navigate our ruleset, and work on the project? That it isn't agnostic to
+     > whether it is claude, kiro, antigravity, or whatever?
+
+     The owner agreed to the session's five points: what is read at the start of a task is split by role, a builder
+     reading the builder's part and what only another role needs moving to where that role reads it, with the cap set
+     for each role; each module says in one line when it is read, in words a script can match (the paths a change
+     touches, the labels of its issue, the kind of task), and an issue names the modules its task calls for; one
+     script, given a role and a task, prints the files to read, and nothing else is needed to find them; any agent tool
+     gets the same list, the script needing only that a tool can read a file and run a command, with a hook calling it
+     where a tool has hooks; and it runs twice, at the start of a task and again before the pull request is marked
+     ready, on the paths in fact changed, the session reading what that names and checking its work against it, a
+     reviewer running the same. The owner agreed besides to two things being looked into, each with a short report and
+     no rule: whether a module can be packaged as a skill a tool loads by itself, and whether each tool's own rule file
+     can be written from the one source. Asking whether every role needs to read the others' rules:
+
+     > Would it be better with a folder called roles, and a file for each? […] Does a bug-fixer need to read what a
+     > feature builder does?
+
+     The owner agreed to the session's point: `roles/` holds one file for each role (the builder, the orchestrator, a
+     reviewer, the stand-in, the design session); what a role reads at its start is the floor, its own file and the
+     shared files its file names; a role's file holds only what that role alone needs, a rule several roles share
+     staying in one place and pointed to; the file says in a line each what the role hands each neighbouring role and
+     what it gets back, nothing of how the neighbour works; and the modules read by task stay apart from the roles.
+     Proposing the same split across the board:
+
+     > I feel this could be done across the board, by just mapping out every possible path each could take, and then
+     > splitting all up that way? Folders as a principle over collections in files that must be read.
+
+     The session proposed units in place of a file for each path, since one file a path would put the same rule in
+     many files, and three limits: `floor/security.md` stays whole and is read by every session, `floor/topics.md`
+     split by topic with its words unchanged; two things always read together are one file, and no unit is cut so
+     small that opening it costs more than it saves; and the staged cases are run with the split reading and pass as
+     they do with the whole reading, before the split merges. The owner agreed to it so. That split is built in a pull
+     request of its own. To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "A file for each role" in `modules/roles.md` and the files of `roles/`; "One script says what to read" in
+     `modules/tools.md`, with `scripts/reading.mjs`, each module's opening line and the line "Read for it:" of a pull
+     request's description; and a cap for each role in `scripts/size.mjs`.

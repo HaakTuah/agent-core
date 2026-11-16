@@ -1,6 +1,7 @@
 # Reviews
 
-Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.md`.
+Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`): the kind `review`. What
+reviewers judge by: `modules/review-guidelines.md`.
 
 **Which:**
 - Floor rule 8's security review (point 3).

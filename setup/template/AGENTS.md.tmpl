@@ -7,19 +7,20 @@ The owner decides; builders like you build it. A session of any tool but Claude 
 
 ## The core
 
-This project takes the shared rules in `core/` by `core-manifest.md`, whose slots and names fill the core's words. Read
-these whole at the start of every task (Claude Code, Kiro and Antigravity pull them in through their entry files; any
-other tool: open each file named):
+This project takes the shared rules in `core/` by `core-manifest.md`, whose slots and names fill the core's words. A
+builder reads these whole at the start of every task (Claude Code, Kiro and Antigravity pull them in through their
+entry files; any other tool: open each file named):
 
 @core-manifest.md
 @core/floor/security.md
+@core/roles/builder.md
 @core/modules/how-to-work.md
 @core/modules/inbox.md
 @core/modules/work-flow.md
 @core/modules/git.md
 
-The other files of the core are read when a task needs them, each module saying when, among them `core/floor/topics.md`
-(when: the floor's opening says).
+What else a task calls for, and what another role reads, one command prints:
+`node core/scripts/reading.mjs <role> --issue <its issue>`.
 
 ## Where things are
 
@@ -33,7 +34,7 @@ The other files of the core are read when a task needs them, each module saying 
 A session handed a brief starts from it instead (`core/modules/other-builders.md`).
 
 1. Take the main lane's next entry in `docs/PROGRESS.md`. Its issue is the spec; a stage with no issue, its text there.
-2. Read only what that entry names.
+2. Read what that command prints for it, as a builder, and what that entry names.
 
 ## Commands
 

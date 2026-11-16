@@ -26,7 +26,7 @@ function holderOf(key, value, root) {
   const m = FORM.exec(String(value));
   if (!m) return `${FILE}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule; a staged case names its rules in its own file`;
   const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
-  if (kind === "check" && /^(?:scripts|\.github|setup|floor|modules)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
+  if (kind === "check" && /^(?:scripts|\.github|setup|floor|modules|roles)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
   return { kind, by: what, part: Boolean(m[5]) };
 }
 
