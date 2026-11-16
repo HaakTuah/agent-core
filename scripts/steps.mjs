@@ -21,6 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { CORE } from "./core-address.mjs";
+import { progressOf } from "./done-when.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
@@ -92,7 +93,6 @@ const input = (p, name, key = "config") => {
 const PROJECT_FILES = /\.(cs|fs|vb)proj$/;
 // The paths the manifest's slots name for the progress file and the size marks, else the starter kit's.
 const slot = (manifest, name, kit) => new RegExp(`^\\|\\s*\\*${name}\\*\\s*\\|\\s*\`([^\`]+)\``, "m").exec(manifest)?.[1] ?? kit;
-const progressOf = manifest => slot(manifest, "progress file", "docs/PROGRESS.md");
 const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 
 // What a workflow of the project's runs: the `run:` values of its jobs' steps, a line continued by "\" joined to the

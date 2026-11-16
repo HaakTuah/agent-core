@@ -29,6 +29,7 @@
 //   PR_BODY="$(...)" node core/scripts/pr-description.mjs "+Part three"     the two, and that one as well
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { doneMends, queueAt, readItem } from "./done-when.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -39,6 +40,8 @@ const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", 
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
+// The day from which how done will be judged is asked (tasks/done-when.md; #305), as the two lines above are.
+export const DONE_SINCE = "2026-11-17T00:00:00Z";
 
 // What a description says it waits on: its last line that starts with "Waits on:", as { said, kind }, kind null where
 // the line is in none of the forms; null where there is no such line.
@@ -127,6 +130,12 @@ if (started(import.meta.url)) {
         else console.log(`ok   the description lists what its changed paths call for (${called.length} file${called.length === 1 ? "" : "s"})`);
       }
     } else console.log(`ok   the line that lists what the changed paths call for is not asked here: ${why}`);
+    if (created >= DONE_SINCE && then?.includes("export const DONE_SINCE")) {
+      const at = coreAt(process.cwd()) ?? "", done = doneMends({ body: process.env.PR_BODY, queue: queueAt(process.cwd(), at), read: item => readItem(repo, item), at });
+      for (const note of done.notes) console.log(`ok   ${note}`);
+      if (done.mends.length) mends.push(...done.mends);
+      else console.log("ok   how done will be judged: the entries this pull request queues or closes are in the form, and proved");
+    } else console.log(`ok   how done will be judged is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);
