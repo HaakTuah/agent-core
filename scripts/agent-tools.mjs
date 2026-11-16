@@ -41,8 +41,10 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
+import { fromTree } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
+import { parseToml } from "./toml.mjs";
 
 const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
 const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
@@ -50,18 +52,24 @@ const COMMIT = /^[0-9a-f]{40}$/u; // (a full commit, as git writes it and Claude
 const commit = v => typeof v === "string" && COMMIT.test(v);
 // (how a "ref" or "sha" that pins nothing reads: none, a branch or tag, or what is no text at all)
 const takes = (v, none) => (v === undefined ? none : typeof v === "string" ? `the branch or tag ${show(v)}` : `the value ${show(v)}, which names no commit`);
-const KIT = fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url));
+// (the starter kit's hooks: each file it writes in a project, by the template it writes it from, beside this copy)
+const KITS = { ".claude/settings.json": "claude-settings.json.tmpl", ".kiro/hooks/work-saved.json": "kiro-hook.json.tmpl", ".codex/hooks.json": "codex-hooks.json.tmpl" };
+const KIT_DIR = fileURLToPath(new URL("../setup/template/", import.meta.url));
+// (what an entry's "from" may say: that its hook takes a file of the project from the working tree, as the base held it)
+const TREE = "the working tree";
 const show = value => JSON.stringify(value) ?? String(value);
 
-// The tools a project's files configure, as "kind name" keys, each with the file that configures it; and the problems
-// met reading them. `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
-// that hold a SKILL.md.
-export function configured(read, skills) {
-  // (each tool's name, as the list writes it, and what it is: for a hook its event, matcher and the whole hook, its type,
-  // command, timeout and all, which is what the kit's hooks and the base's are compared by)
-  const tools = new Map(), ids = new Map(), problems = [];
+// The tools a project's files configure, as "kind name" keys, each with the file that configures it; the problems met
+// reading them; and `sources`, each hook that takes a file of the project from the working tree, with those files
+// (hook-source.mjs). `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
+// that hold a SKILL.md; `files(dir)` the names in a folder of the project (here .kiro/hooks).
+export function configured(read, skills, files = () => []) {
+  // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
+  // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [];
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, add, shapes: new Map(), clashed: new Set() };
+  const holds = f => read(f) !== null;
+  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds, servers };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -76,10 +84,65 @@ export function configured(read, skills) {
     readHooks(state, file, settings);
     for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); add(`plugin ${name}`, `plugin ${name}`); plugins.push(name); }
   }
-  const servers = json(".mcp.json")?.mcpServers ?? {};
-  for (const name of Object.keys(servers)) { tools.set(`server ${name}`, ".mcp.json"); add(`server ${name}`, `server ${name}`); }
+  addServers(state, ".mcp.json", json(".mcp.json")?.mcpServers, "");
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
-  return { tools, ids, problems, pins: pinsOf(plugins, markets, servers) };
+  readKiro(state, json, files);
+  readCodex(state, json, read);
+  return { tools, ids, problems, sources, pins: pinsOf(plugins, markets, servers) };
+}
+
+// The tool servers of one file's "mcpServers" (or Codex's "mcp_servers"), into configured()'s `state`, each named
+// with its tool before it where it is not Claude Code's, as "Kiro docs"; one name configured in two files is refused,
+// since the list could not say which of the two it holds.
+function addServers(state, file, servers, tool) {
+  if (!servers || typeof servers !== "object" || Array.isArray(servers)) return;
+  for (const [name, server] of Object.entries(servers)) {
+    const key = `server ${tool}${name}`, there = state.tools.get(key);
+    if (there !== undefined && there !== file) { state.problems.push(`${file}: the tool server ${show(tool + name)} is configured in ${there} too, so the list cannot say which it holds. Mend: give one of the two another name, or take one out`); continue; }
+    state.tools.set(key, file);
+    state.add(key, key);
+    state.servers.push([key, file, name, server]);
+  }
+}
+
+// What Kiro configures in the project (tools/kiro.md; kiro.dev, its pages on hooks and on tool servers, read on 16
+// November 2026): each JSON file directly under .kiro/hooks, { "version", "hooks": [ { "name", "trigger", "matcher",
+// "action": { "type", "command" }, "timeout", "confirm" } ] }, a command hook named by its trigger, matcher and command,
+// as "Kiro Stop: <command>"; and the tool servers of .kiro/settings/mcp.json's "mcpServers", as "Kiro <name>".
+function readKiro(state, json, files) {
+  for (const name of files(".kiro/hooks").filter(n => n.endsWith(".json")).sort()) {
+    const file = `.kiro/hooks/${name}`, hooks = json(file)?.hooks;
+    for (const hook of Array.isArray(hooks) ? hooks : []) {
+      const action = hook?.action, runs = action?.type === "command" && typeof action.command === "string";
+      const confirm = hook?.confirm, options = Array.isArray(confirm?.options) ? confirm.options : [];
+      const commands = [runs ? action.command : null, confirm?.confirmCommand, ...options.map(o => o?.run)].filter(c => typeof c === "string");
+      const matcher = typeof hook?.matcher === "string" && hook.matcher ? hook.matcher : "";
+      addHook(state, file, { tool: "Kiro", event: String(hook?.trigger), matcher, hook, runs, text: runs ? action.command : JSON.stringify(hook), commands });
+    }
+  }
+  addServers(state, ".kiro/settings/mcp.json", json(".kiro/settings/mcp.json")?.mcpServers, "Kiro ");
+}
+
+// What Codex configures in the project (tools/codex.md; its pages on hooks and on its config, read on 16 November
+// 2026): the hooks of .codex/hooks.json, and those written inline in .codex/config.toml under "hooks", both as Claude
+// Code's are, each named "Codex <event> <matcher>: <command>"; config.toml's "notify", the program Codex starts at
+// each turn's end, as the hook "Codex notify: <its words>"; and config.toml's "mcp_servers", as "Codex <name>".
+function readCodex(state, json, read) {
+  readHooks(state, ".codex/hooks.json", json(".codex/hooks.json"), "Codex");
+  const text = read(".codex/config.toml");
+  if (text === null) return;
+  let config;
+  try { config = parseToml(text); } catch (e) {
+    state.problems.push(`.codex/config.toml cannot be read as TOML (${e.message}). Mend: correct it to TOML, as Codex reads it`);
+    return;
+  }
+  readHooks(state, ".codex/config.toml", config, "Codex");
+  const notify = config.notify;
+  if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
+    const words = notify.join(" ");
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: words, commands: [words] });
+  }
+  addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
 }
 
 // The marketplaces one settings file declares, each by its name with its source and file, into `markets`: read
@@ -90,22 +153,32 @@ function declaredMarkets(settings, file, markets) {
   for (const [name, m] of Object.entries(declared)) markets.set(name, { source: m?.source, file });
 }
 
-// The hooks one settings file configures, into configured()'s `state`.
-function readHooks(state, file, settings) {
-  for (const [event, groups] of Object.entries(settings?.hooks ?? {})) {
+// The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's
+// written the same way (Codex's).
+function readHooks(state, file, settings, tool = "") {
+  const all = settings?.hooks;
+  for (const [event, groups] of Object.entries(all && typeof all === "object" && !Array.isArray(all) ? all : {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
-      const matcher = typeof group?.matcher === "string" && group.matcher ? ` ${group.matcher}` : "";
-      // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let
-      // two hooks share a name)
-      if (matcher.includes(": ")) state.problems.push(`${file}: the ${show(event)} hooks' matcher ${show(group.matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
-      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) addHook(state, file, event, group, matcher, hook);
+      const matcher = typeof group?.matcher === "string" && group.matcher ? group.matcher : "";
+      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
+        const runs = hook?.type === "command" && typeof hook.command === "string";
+        addHook(state, file, { tool, event, matcher, given: group?.matcher, hook, runs, text: runs ? hook.command : JSON.stringify(hook), commands: runs ? [hook.command] : [] });
+      }
     }
   }
 }
-function addHook(state, file, event, group, matcher, hook) {
-  const runs = hook?.type === "command" && typeof hook.command === "string";
-  const name = `hook ${event}${matcher}: ${runs ? hook.command : JSON.stringify(hook)}`;
-  const id = canonical(["hook", event, group.matcher ?? "", hook]);
+// One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
+// id, all of it; and the files of the project its `commands` take from the working tree.
+function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands }) {
+  const name = `hook ${tool ? `${tool} ` : ""}${event}${matcher ? ` ${matcher}` : ""}: ${text}`;
+  // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same)
+  const id = canonical(tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
+  // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let two
+  // hooks share a name)
+  if (matcher.includes(": ") && !state.clashed.has(`matcher ${file} ${event} ${matcher}`)) {
+    state.clashed.add(`matcher ${file} ${event} ${matcher}`);
+    state.problems.push(`${file}: the ${show(event)} hooks' matcher ${show(matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
+  }
   // (a command and a hook of another type whose text reads as that command share a name, and the list could not tell
   // them apart; two command hooks of one command, a timeout apart, are one name for the list, each kept)
   const kinds = state.shapes.get(name) ?? new Set();
@@ -114,14 +187,16 @@ function addHook(state, file, event, group, matcher, hook) {
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
+  const taken = commands.flatMap(c => fromTree(c, state.holds));
+  if (taken.length) state.sources.set(name, [...new Set([...(state.sources.get(name) ?? []), ...taken])]);
 }
 
 // The pins of the plug-ins turned on and the tool servers, by their "kind name" keys, where their configuration gives
-// one (pluginPin() and serverPin(), below).
+// one (pluginPin() and serverPin(), below); `servers` holds each as [key, file, name, its entry].
 function pinsOf(plugins, markets, servers) {
   const pins = new Map();
   for (const name of plugins) { const p = pluginPin(name, markets); if (p) pins.set(`plugin ${name}`, p); }
-  for (const name of Object.keys(servers)) { const p = serverPin(name, servers[name]); if (p) pins.set(`server ${name}`, p); }
+  for (const [key, file, name, server] of servers) { const p = serverPin(file, name, server); if (p) pins.set(key, p); }
   return pins;
 }
 
@@ -164,12 +239,12 @@ function pluginPin(name, markets) {
 }
 // (npx's own options, read before the package it runs; one it does not know here leaves the server to the review)
 const NPX_FLAGS = new Set(["-y", "--yes", "-q", "--quiet"]);
-function serverPin(name, server) {
+function serverPin(file, name, server) {
   const args = npxArgs(server);
   if (!args) return null;
   const spec = npxPackage(args);
   if (spec === null) return null;
-  return npmPin(spec, undefined, `.mcp.json, in the arguments of ${show(name)},`, pkg => `in those arguments as "${pkg}@" and one exact version, such as ${pkg}@1.2.3`, server);
+  return npmPin(spec, undefined, `${file}, in the arguments of ${show(name)},`, pkg => `in those arguments as "${pkg}@" and one exact version, such as ${pkg}@1.2.3`, server);
 }
 // The arguments npx is given, where a stdio server is started by npx, as on Windows through cmd /c too; else null.
 function npxArgs(server) {
@@ -197,20 +272,22 @@ function npxPackage(args) {
   return spec ?? args[i];
 }
 
-// The hooks the starter kit writes, each by what it is (configured()'s ids): the core's, listed by it. `text` is the
-// kit's settings as a copy holds them.
-const kitText = () => { try { return fs.readFileSync(KIT, "utf8"); } catch { return null; } };
-export function kitHooks(text = kitText()) {
-  return text === null ? [] : [...configured(f => (f === ".claude/settings.json" ? text : null), () => []).ids.values()].flatMap(set => [...set]);
+// The hooks the starter kit writes, Claude Code's, Kiro's and Codex's, each by what it is (configured()'s ids): the
+// core's, listed by it. `template(name)` gives the text of one of the kit's templates as a copy holds it, or null.
+const kitTemplate = name => { try { return fs.readFileSync(path.join(KIT_DIR, name), "utf8"); } catch { return null; } };
+export function kitHooks(template = kitTemplate) {
+  const read = f => (Object.hasOwn(KITS, f) ? template(KITS[f]) : null);
+  const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
+  return [...configured(read, () => [], files).ids.values()].flatMap(set => [...set]);
 }
 
-// The list a config holds: { keys, versions, problems }, keys the "kind name" of each well-formed entry, versions its
-// version by the same key; null where the config
-// holds no "agentTools".
+// The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
+// its version by the same key, from the keys of the hooks whose entry says "from": "the working tree" (the baseline of
+// those that stood before the check read where a hook's command comes from); null where the config holds no "agentTools".
 export function listed(config, file) {
   if (!config || !Object.hasOwn(config, "agentTools")) return null;
-  const list = config.agentTools, keys = new Set(), versions = new Map(), problems = [];
-  if (!Array.isArray(list)) return { keys, versions, problems: [`${file}: "agentTools" is no list. Mend: write it as a list of entries, each { "kind", "name", "publisher", "version" }`] };
+  const list = config.agentTools, keys = new Set(), versions = new Map(), from = new Set(), problems = [];
+  if (!Array.isArray(list)) return { keys, versions, from, problems: [`${file}: "agentTools" is no list. Mend: write it as a list of entries, each { "kind", "name", "publisher", "version" }`] };
   list.forEach((entry, i) => {
     const at = `${file}: "agentTools" entry ${i + 1}${typeof entry?.name === "string" ? ` (${show(entry.name)})` : ""}`;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) { problems.push(`${at} is no entry. Mend: write it as { "kind", "name", "publisher", "version" }`); return; }
@@ -221,10 +298,15 @@ export function listed(config, file) {
     const version = entry.version;
     if (version === undefined ? PINNED.has(entry.kind) : !(exact(version) || /^[0-9a-f]{40}$/u.test(version)))
       bad.push(`${version === undefined ? "it gives no version" : `its version ${show(version)} is not one exact version`}. Mend: write the one it is taken at, such as 1.2.3, or the full 40-character commit`);
+    if (Object.hasOwn(entry, "from") && (entry.from !== TREE || entry.kind !== "hook"))
+      bad.push(`its "from" is ${show(entry.from)}, where only a hook's entry may say "from", and only ${show(TREE)}. Mend: take "from" out of the entry`);
     for (const b of bad) problems.push(`${at}: ${b}`);
-    if (!bad.length) { keys.add(`${entry.kind} ${entry.name}`); versions.set(`${entry.kind} ${entry.name}`, version); }
+    if (bad.length) return;
+    keys.add(`${entry.kind} ${entry.name}`);
+    versions.set(`${entry.kind} ${entry.name}`, version);
+    if (entry.from === TREE) from.add(`${entry.kind} ${entry.name}`);
   });
-  return { keys, versions, problems };
+  return { keys, versions, from, problems };
 }
 
 // A value as JSON with every object's keys in order, so that a hook is the same whichever order its keys are written in.
@@ -232,11 +314,13 @@ const canonical = value => JSON.stringify(value, (_, v) => (v && typeof v === "o
 
 const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice(0, at)]} ${show(key.slice(at + 1))}`; };
 
-// What breaks the rule in a project: { problems, unlisted, pins }, the first held against the list where there is one,
-// the second the tools configured that neither the list nor the core lists (where there is no list, so that a caller
-// may hold them against a base), the third each listed tool whose configuration pins it otherwise than its entry, or
-// fetches it at no fixed version, as [key, problem]. `head` is configured()'s answer, `list` listed()'s or null, `kit`
-// kitHooks()'s.
+// What breaks the rule in a project: { problems, unlisted, pins, sources, marked }, the first held against the list
+// where there is one, the second the tools configured that neither the list nor the core lists (where there is no
+// list, so that a caller may hold them against a base), the third each listed tool whose configuration pins it
+// otherwise than its entry, or fetches it at no fixed version, as [key, problem], the fourth, as [key, problem], each
+// hook that takes a file of the project from the working tree and whose entry does not say so, and the fifth those
+// whose entry says so ("from": "the working tree"), as [key, what is said of it], the baseline, which the caller holds
+// to what its base held. `head` is configured()'s answer, `list` listed()'s or null, `kit` kitHooks()'s.
 export function check(head, list, kit, file) {
   const { tools, ids } = head;
   const problems = [...(list?.problems ?? [])];
@@ -252,7 +336,14 @@ export function check(head, list, kit, file) {
     if (p.loose) pins.push([k, `${describe(k)} is fetched at no fixed version: ${p.where} ${p.loose}. Mend: ${p.mend}, and list that same version under "agentTools" in ${file}, in this pull request`]);
     else if (p.pin !== v) pins.push([k, `${describe(k)} is listed at ${show(v)} in ${file}, but ${p.where} pins it at ${show(p.pin)}. Mend: make the two the same, the list's version or the pin, whichever is the one meant, in this pull request`]);
   }
-  return { problems, unlisted: list ? [] : unlisted, pins };
+  const sources = [], marked = [];
+  for (const [k, paths] of head.sources ?? []) {
+    const said = `${describe(k)}, configured in ${tools.get(k)}, takes ${paths.map(show).join(", ")} from the working tree, which the branch it runs on can change, where floor rule 3 has what an agent tool starts by itself run from its copy on main`;
+    if (list?.from?.has(k)) marked.push([k, said]);
+    else sources.push([k, `${said}. Mend: have it fetch what it runs from main, as the starter kit's hooks do (git show refs/remotes/origin/main:<the file>), in this pull request`]);
+  }
+  for (const k of list?.from ?? []) if (tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but it takes no file of the project from the working tree. Mend: take "from" out of its entry, in this pull request`);
+  return { problems, unlisted: list ? [] : unlisted, pins, sources, marked };
 }
 
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer, and `links`, each link on the
@@ -297,18 +388,14 @@ export function readProject(root, rev = null) {
   const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
   const read = rev ? f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; }
     : f => { if (outside(f) || ignored(f)) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
-  const skills = () => {
-    if (rev) {
-      const dir = resolve(".claude/skills");
-      if (dir?.type !== "tree") return [];
-      const names = tree(`${dir.f}/`).map(e => e.f.slice(dir.f.length + 1));
-      return names.filter(n => resolve(`.claude/skills/${n}/SKILL.md`)?.type === "blob");
-    }
-    if (outside(".claude/skills")) return [];
-    const dir = path.join(root, ".claude/skills");
-    try { return fs.readdirSync(dir).filter(n => !outside(`.claude/skills/${n}/SKILL.md`) && fs.existsSync(path.join(dir, n, "SKILL.md")) && !ignored(`.claude/skills/${n}/SKILL.md`)); } catch { return []; }
+  // (the names in a folder of the project, at the commit or in the working tree, a link out of the checkout not followed)
+  const names = dir => {
+    if (rev) { const d = resolve(dir); return d?.type === "tree" ? tree(`${d.f}/`).map(e => e.f.slice(d.f.length + 1)) : []; }
+    if (outside(dir)) return [];
+    try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
-  return { ...configured(read, skills), links };
+  const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
+  return { ...configured(read, skills, names), links };
 }
 
 // Whether the commit `rev` holds the path `at` as a link (git's mode 120000), not a file whose text names the same place.
@@ -338,6 +425,28 @@ function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes
   }
 }
 
+// Each hook that takes a file of the project from the working tree into `fail` or `notes`. One that stood in the base,
+// the same hook taking the same files, is noted, and so is each where there is no base: unmarked where the base did
+// not mark it either (the list unwritten, or written before the check read where a hook's command comes from), and
+// marked "from": "the working tree" in its entry, which lists it in the baseline. A new one fails, marked or not, and
+// so does one whose mark the pull request took out while it stands: the baseline only shrinks. In the core's own
+// repository none may stand.
+function sortSources({ sources, marked }, { head, baseProject, baseList, core, file }, fail, notes) {
+  const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []);
+  const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && head.sources.get(k).every(p => baseProject.sources.get(k)?.includes(p));
+  const how = `have it fetch what it runs from main, as the starter kit's hooks do (git show refs/remotes/origin/main:<the file>)`;
+  for (const [k, problem] of sources) {
+    if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
+    else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(TREE)}`);
+    else fail.push(problem);
+  }
+  for (const [k, said] of marked) {
+    if (core) fail.push(`${said}, and in the core's own repository none may stand. Mend: ${how}, and take "from" out of its entry, in this pull request`);
+    else if (!baseProject || stood(k)) notes.push(`${said}: its entry lists it in the baseline ("from": ${show(TREE)}), to be worked down`);
+    else fail.push(`${said}, and its entry says "from": ${show(TREE)}, but the base held no such hook, and the baseline lists only what stood before. Mend: ${how}, and take "from" out of its entry, in this pull request`);
+  }
+}
+
 // Each link out of the checkout into `fail`, save one the base held as it stands, into `notes`: what stood before turns
 // nothing red.
 function sortLinks(root, base, links, fail, notes) {
@@ -357,7 +466,8 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
   const head = readProject(root);
-  const kit = [...kitHooks(), ...(base ? kitHooks(textAt(root, base, path.relative(root, KIT).split(path.sep).join("/"))) : [])];
+  const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
+  const kit = [...kitHooks(), ...(base ? kitHooks(atBase) : [])];
   let list = listed(config, file);
   const baseConfig = configAtBase(root, base, file);
   // (a list the base held is no longer missing: taking it out does not bring back the time before it was written)
@@ -366,11 +476,12 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
       return { fail: [`${file}: "agentTools" is gone, which the base held. Mend: put the list back as the base held it, changing only the entries this pull request's task names`], notes: [] };
     }
   }
-  if (!list && core) list = { keys: new Set(), problems: [] };
-  const { problems, unlisted, pins } = check(head, list, kit, file);
+  if (!list && core) list = { keys: new Set(), versions: new Map(), from: new Set(), problems: [] };
+  const checked = check(head, list, kit, file), { problems, unlisted, pins } = checked;
   const fail = [...head.problems, ...problems], notes = [];
-  const baseProject = base ? readProject(root, base) : null;
-  sortPins(pins, { head, list, baseProject, baseList: base ? listed(baseConfig, file) : null, core }, fail, notes);
+  const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
+  sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
+  sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
   sortLinks(root, base, head.links, fail, notes);
   if (!unlisted.length) return { fail, notes };
   if (!base) {
