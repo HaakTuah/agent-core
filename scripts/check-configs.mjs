@@ -43,7 +43,13 @@ const passed = (p, name, key = "config") => given(p, name, key).map(({ where, va
   return { where, value: inside(value, `${where}'s call to the core's ${name}`) };
 });
 // A path as the project's root reads it: "./" and a slash at its end left out, and any "." or ".." in it taken.
-const tidy = f => path.posix.normalize(f.replace(/\/+$/u, "")).replace(/^\.\//u, "");
+const tidy = f => path.posix.normalize(trimSlashes(f)).replace(/^\.\//u, "");
+// A path with the "/" at its end left out, walked back over (no regex, so no run of "/" makes it slow).
+function trimSlashes(f) {
+  let end = f.length;
+  while (end > 0 && f[end - 1] === "/") end--;
+  return f.slice(0, end);
+}
 // A file a call or a config names, as a path from the root: one that leads out of the project, starts at the
 // machine's root, or is spelled for Windows, is no file of the project's, and not read.
 // (the core's workflows run on Linux, where a "\\" is part of a file's name, and a drive letter names no file of the
@@ -85,7 +91,8 @@ export function commands(run) {
   const close = () => { if (word && !operand) words.push(word); if (word) operand = false; word = null; };
   const end = () => { close(); operand = false; if (words.length) out.push(words); words = []; };
   for (let i = 0; i < text.length; i++) {
-    if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^(?:\d+|\{\w+\})$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
+    if (text[i] === "(" && word && /[?*+@!]$/u.test(word.text)) i = extglob(text, i, add); // (?(…), @(…): a glob of bash's)
+    else if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^(?:\d+|\{\w+\})$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
     else if ("\n;&|()".includes(text[i])) end();
     else if (" \t".includes(text[i])) close();
     else i = part(text, i, add);
@@ -143,6 +150,14 @@ function hereDocument(line) {
   }
   return null;
 }
+// An extended glob's (…), at `i`, to its closing ")" on that line: added to the word, filled when it runs (a glob that
+// may match); it returns where it ends.
+function extglob(text, i, add) {
+  let depth = 0, j = i;
+  for (; j < text.length && text[j] !== "\n"; j++) { if (text[j] === "(") depth++; else if (text[j] === ")" && --depth === 0) break; }
+  add(text.slice(i, Math.min(j + 1, text.length)), true);
+  return Math.min(j, text.length - 1);
+}
 // One part of a word, at `i`: given to `add` as what it spells, and whether it is filled only when the workflow runs;
 // it returns where the part ends.
 const expressionEnd = (text, i) => { const e = text.indexOf("}}", i); return e < 0 ? text.length : e + 2; };
@@ -175,7 +190,7 @@ function located(word, dir) {
   if (word.text.includes("\\")) return { windows: true };
   // (the root's name is filled only where the word lets the shell fill it: in single quotes it is text)
   const text = word.text, rooted = word.dynamic && ROOT.test(text), rest = rooted ? text.replace(ROOT, "") : text;
-  if (word.dynamic && /\$|`|%\w+%|[{*?[]/u.test(rest)) return { dynamic: true }; // (a variable, braces or a glob)
+  if (word.dynamic && /\$|`|%\w+%|[{*?[(]/u.test(rest)) return { dynamic: true }; // (a variable, braces or a glob, an extended one too)
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
   return { at: at === ".." || at.startsWith("../") ? null : at.replace(/^\.\//u, "") };
@@ -336,7 +351,7 @@ function runAt(words, i, dir, script) {
   const word = words[i];
   if (!word) return [];
   const name = path.posix.basename(script).toLowerCase(), at = located(word, dir.dynamic ? "." : dir.at);
-  if (at.dynamic || at.windows || /[{*?[]|\$'/u.test(word.text.replace(ROOT, ""))) return unplaced(word, dir, name, script);
+  if (at.dynamic || at.windows || /[{*?[(]|\$'/u.test(word.text.replace(ROOT, ""))) return unplaced(word, dir, name, script);
   if (path.posix.basename(plainPath(word.text)).toLowerCase() !== name) return []; // (another script)
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   if (dir.dynamic) return [{ unread: `runs ${word.text} in a folder named only when the workflow runs`, unsure: true }];
@@ -360,9 +375,9 @@ function globbed(word, dir, folder, own, name, script) {
 // never "no" where one is (one pass of two pointers, so no glob makes it slow).
 function globMatches(glob, name) {
   // (what stands before its first wildcard must begin the name, whatever follows: test/** never matches core/scripts)
-  const lead = /^[^*?[{]*/u.exec(glob)[0].toLowerCase();
+  const lead = /^(?:[^*?[{(+@!]|[+@!](?!\())*/u.exec(glob)[0].toLowerCase();
   if (!name.toLowerCase().startsWith(lead)) return false;
-  if (/[{}[\]]|\*\*/u.test(glob)) return true; // (braces, a class or ** may match: none is read)
+  if (/[{}[\]()]|\*\*/u.test(glob)) return true; // (braces, a class, an extended glob's (…) or ** may match: none is read)
   const g = glob.toLowerCase(), s = name.toLowerCase();
   let i = 0, j = 0, star = -1, from = 0;
   while (j < s.length) {
@@ -380,7 +395,7 @@ function globMatches(glob, name) {
 // core's (a .mjs file, a folder scripts or core, an expression), not read; one given by a variable alone (node --test
 // $RUN) is counted where the step names the path it holds (unaccounted).
 function unplaced(word, dir, name, script) {
-  const plain = x => !/[$`{}\\'"*?[]/u.test(x), text = word.text.replace(ROOT, "").replace(/\/+$/u, "");
+  const plain = x => !/[$`{}\\'"*?[()]/u.test(x), text = trimSlashes(word.text.replace(ROOT, ""));
   const cut = text.lastIndexOf("/"), folder = cut < 0 ? null : text.slice(0, cut), own = text.slice(cut + 1);
   if (!dir.moved && !dir.dynamic && folder !== null && plain(folder) && !/(?:^|\/)scripts$/iu.test(path.posix.join(dir.at, folder))) return [];
   if (plain(own) && own.toLowerCase() !== name) return [];
