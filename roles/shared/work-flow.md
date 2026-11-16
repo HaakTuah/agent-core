@@ -40,7 +40,7 @@ owner creates from any device to stop its agents and deletes to let them go on.
   up (core archive 143).
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
-  difference it reports), between tasks: a task ends under the copy it began with, save the floor (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened (core archive 178). Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).
+  difference it reports), between tasks, a floor change at once: a task ends under the copy it began with (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened (core archive 178). Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).
 
 ## Git and GitHub
 

@@ -75,7 +75,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    - **It asks whether the approach was known** (core archive 241; #322). By default, of a pull request that does the
      *hard work*, the design check asks whether its approach was known before it was built, or found by a trial queued
      before it (`tasks/planning.md`, "Finding out is a task of its own"), and where neither, reports so as a finding
-     that does not block, naming what a trial would have measured. It does not mean a trial is asked for after the
+     that does not block, naming what a trial would have measured. Nothing changes it. It does not mean a trial is asked for after the
      work is built. Reason: a pull request that measures and builds at once was among the longest open. Held by no
      check: the design check's brief carries it.
 5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,

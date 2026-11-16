@@ -6,10 +6,11 @@ file*, changes their order or names a milestone, as the orchestrator and the des
 - **Milestones, named in order.** By default whoever writes the *progress file* (the orchestrator or the design session)
   names the project's milestones, each an issue of its own that says the state the owner can use and try there and what
   is judged there, and shows them in the file in order, each as a heading that begins "Milestone" and names its issue,
-  over the lines that lead to it; the file holds nothing more, as
-  `roles/shared/inbox.md` says. The first is the thinnest whole: the product's main thing from start to finish, plain and working. The
-  one condition that changes it: where the *milestone* slot names another unit, such as the core's batch and its
-  release, that is the milestone, and the file needs no heading for it. It does not mean dates, deadlines or estimates
+  over the lines that lead to it; the file holds nothing more, as `roles/shared/inbox.md` says. The first is the
+  thinnest whole: the product's main thing from start to finish, plain and working. The one condition that changes it:
+  where the *milestone* slot names another unit, such as the core's batch and its release, that is the milestone, the
+  file needs no heading for it, and it is reached when that unit is (in the core, when the release is cut), which
+  then stands where a pull request reaching a milestone stands in the rules below. It does not mean dates, deadlines or estimates
   for a milestone, a milestone as a gate that stops work, nor that a project with none named yet fails anything.
   Reason: nothing said when a whole product is tried and judged, and a first version that is thin and whole tests the
   riskiest guess first. Held by the description check (`scripts/pr-description.mjs`, with `scripts/milestones.mjs`),
@@ -39,14 +40,16 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   makes the trial its pull request, which closes nothing, and the build follows from its report in the line's next
   pull request. It does not mean a trial for a task whose approach is known, nor a document of its own beyond the
   report. Reason: measured on 11 to 15 November 2026, the longest tenth of the pull requests held about four fifths of
-  all open hours in two projects, each with the measuring and the building in one. Held by the design check, which asks
-  of a pull request that does the *hard work* whether its approach was known before it was built (`tasks/reviews.md`,
-  point 4), in part.
-- **A task finishes under the release it began with.** By default a session syncs the core only between its tasks
-  (`roles/shared/work-flow.md`, "Sessions"), and a task in flight finishes under the rules of the copy it began with,
-  though its branch takes a newer copy when it is brought up to date with `main`. The one condition that changes it:
-  where that newer copy changes the floor (`core/floor/`), its builder reads the floor again and meets it before the
-  pull request merges. It does not mean that a check the newer copy brings is skipped, which runs as the base holds it
+  all open hours in two projects, each with the measuring and the building in one. Held by no check: the design check
+  asks of a pull request that does the *hard work* whether its approach was known before it was built
+  (`tasks/reviews.md`, point 4).
+- **A task finishes under the copy of the core it began with.** By default a session syncs the core only between its
+  tasks (`roles/shared/work-flow.md`, "Sessions"), and a task in flight finishes under the rules of the copy it began
+  with, though its branch takes a newer copy when it is brought up to date with `main`. The one condition that changes
+  it: where the core has moved and the move changes the floor (`floor/` differs between the copy's pin and the core
+  it would sync to), seen at a session's start, on an orchestrator's wake or when a branch takes a newer copy, the
+  session that sees it syncs at once, a task in flight or not, and the builder of each task in flight (told by the
+  orchestrator, where one runs) reads the floor again and meets it before its pull request merges. It does not mean that a check the newer copy brings is skipped, which runs as the base holds it
   ("Nothing locks a project", in the core's `AGENTS.md`), nor that the rest of the rules are read again. Reason: a task
   whose rules move under it is read and built twice, and the floor alone guards what cannot wait. Held by none: no
   check sees what a session read.
