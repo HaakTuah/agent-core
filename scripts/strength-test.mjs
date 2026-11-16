@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "./strength.mjs";
+import { again, baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -104,6 +104,17 @@ const unrunOld = verdict({ faults: [], still: [{ ...f(kept, "Pending") }], basel
 const notMeasured = verdict({ faults: [f(repeated, "Survived")], still: [f(repeated, "Pending")], baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] });
 ok(unrunOld.fails && !notMeasured.fails && notMeasured.lines.some(l => l.startsWith("Not measured:") && l.includes("Readings taken")) && same(unsure([f(repeated, "Survived")], entry, [f(repeated, "Killed")]), []),
   "a pull request that lowers an entry while a fault of its kind was not run fails, since only debt measured gone leaves the list; a survivor that passes only for want of a run is said not to be measured", notMeasured.lines.join("\n"));
+// (#408: the tool run a second time, with a budget of its own, on the lines whose faults the first left unrun alone)
+const told = [], asked = lines => [...lines].map(([file, at]) => [file, [...at]]);
+const second = again([f(repeated, "Pending"), { ...f(repeated, "Survived"), line: 7 }], lines => { told.push(asked(lines)); return [f(repeated, "Survived")]; });
+const measuredAgain = verdict({ faults: [f(repeated, "Survived")], still: second, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] });
+const stillUnrun = again([f(repeated, "Pending")], () => [f(repeated, "Pending")]);
+ok(same(told, [[["a.js", [2]]]]) && second.length === 2 && second.every(g => g.status === "Survived") && measuredAgain.fails && !measuredAgain.lines.some(l => l.startsWith("Not measured:"))
+  && again([f(repeated, "Killed")], () => { throw new Error("run again"); }).length === 1 && verdict({ faults: [f(repeated, "Survived")], still: stillUnrun, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] }).lines.some(l => l.startsWith("Not measured:")),
+  "a fault left unrun on the lines a change left alone is run again, on its line alone, and what that run finds takes its place: a survivor that grows the debt then fails; where it stays unrun, it is said not measured, and with nothing unrun the tool is not run again", measuredAgain.lines.join("\n"));
+ok(unrunOld.lines.some(l => l.startsWith("FAIL") && l.includes("did not run (its budget)") && l.includes("larger budget") && l.includes("MUTATE_BUDGET")) && mended(unrunOld.lines.join("\n")) && !dropped([f(kept, "Survived")]).lines.some(l => l.includes("larger budget"))
+  && same(undercut(b({}), baseKept, [f(kept, "Pending")]).map(k => k.unrun), [1]),
+  "where an entry is held up only by faults the tool did not run, the failure says so and names a larger budget in its mend; where the faults ran and survive, it does not", unrunOld.lines.join("\n"));
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });
