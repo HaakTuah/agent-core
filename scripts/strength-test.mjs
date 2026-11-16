@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, counted, faultsOf, idOf, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
+import { baselineOf, counted, faultsOf, heldBy, idOf, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -53,6 +53,10 @@ ok(same(joinedUnsaid(...runs, false), []) && same(joinedUnsaid(...runs, true), [
   "with no reason, only in the pull request that records a new whole run and changes no code or test, or writes the first baseline: one that changes code cannot take in its own survivors so");
 const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", gone = moved(new Map([[old, { count: 1 }], ["survivor: a.js: kept(); [! -> ]", { count: 1 }]]), () => "kept();\nif (y === 1) return;\n");
 const renamed = { ...f("survivor: a.js: if (y === 1) return; [=== -> !==]", "Survived") }, other = { ...f("survivor: a.js: if (y === 1) return; [=== -> ==]", "Survived") };
+const repeated = "survivor: a.js: return true; [true -> false]", file = "function f() {\n  return true;\n}\nfunction g() {\n  return true;\n}\n";
+const held = heldBy(new Map([[repeated, { count: 1 }]]), () => file, new Map([["a.js", new Set([4, 5, 6])]]));
+ok(held.get(repeated) === 1 && unlisted([f(repeated, "Survived")], new Map([[repeated, { count: 1 }]]), new Map(), held).length === 1 && heldBy(new Map([[repeated, { count: 1 }]]), () => file, new Map([["a.js", new Set([2, 5])]])).size === 0,
+  "a changed line that repeats a listed line left unchanged cannot use that line's entry; where every such line changed, it may");
 ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1,
   "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once; another fault there is the change's own");
 

@@ -156,12 +156,32 @@ export function moved(listedMap, texts) {
   return out;
 }
 
-// The survivors no entry of the baseline claims: each id's count against the count listed; then, of what is left, a
+// What of each entry the lines a change left alone still hold (`texts`, a function of a file to its text; `changed`, a
+// Map of file to the Set of changed lines): for each unchanged line of the entry's text, as many as the fault's
+// replaced text stands in it, at least one, up to the count listed. A repeated line on a changed line cannot use them.
+export function heldBy(listedMap, texts, changed) {
+  const out = new Map();
+  for (const [id, n] of listedMap) {
+    const parts = partsOf(id), text = parts && texts(parts.file);
+    if (!text) continue;
+    const original = (/^\[(.*) -> .*\]$/u.exec(parts.what)?.[1] ?? "").replace(/…$/u, "");
+    let held = 0;
+    text.split(/\r?\n/u).forEach((l, i) => {
+      if (changed.get(parts.file)?.has(i + 1) || collapse(l, 100) !== parts.line) return;
+      held += Math.max(1, original ? collapse(l, 1e9).split(original).length - 1 : 1);
+    });
+    if (held) out.set(id, Math.min(held, n.count ?? 0));
+  }
+  return out;
+}
+
+// The survivors no entry of the baseline claims: each id's count, less what unchanged lines hold of it (heldBy()),
+// against the count listed; then, of what is left, a
 // survivor claims an entry of `gone` (moved()) of the same file and the same fault, where one is left.
-export function unlisted(faults, listedMap, gone = new Map()) {
+export function unlisted(faults, listedMap, gone = new Map(), held = new Map()) {
   const counts = new Map(), left = [], free = new Map(gone);
   for (const f of faults.filter(f => SURVIVED.includes(f.status))) counts.set(f.id, [...(counts.get(f.id) ?? []), f]);
-  for (const [id, all] of counts) left.push(...all.slice(listedMap.get(id)?.count ?? 0));
+  for (const [id, all] of counts) left.push(...all.slice(Math.max(0, (listedMap.get(id)?.count ?? 0) - (held.get(id) ?? 0))));
   return left.filter(f => {
     const mine = partsOf(f.id), fit = [...free].find(([id, c]) => c > 0 && partsOf(id)?.file === mine?.file && partsOf(id)?.what === mine?.what);
     if (fit) free.set(fit[0], fit[1] - 1);
@@ -201,7 +221,7 @@ const placed = f => `${f.file}:${f.line}`;
 const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replacement === "" ? "taken out" : `made "${collapse(f.replacement, 40)}"`}`;
 
 // What the check says of a pull request's run, and whether it fails: { lines, fails }.
-export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map() }) {
+export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map(), held = new Map() }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
   if (!baseline && was) {
@@ -213,7 +233,7 @@ export function verdict({ faults, baseline, was, at, deleted, touched = true, go
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
     return { lines, fails: false };
   }
-  const news = unlisted(faults, baseline.listed, gone), unsaid = joinedUnsaid(baseline, was, touched);
+  const news = unlisted(faults, baseline.listed, gone, held), unsaid = joinedUnsaid(baseline, was, touched);
   if (c.pending) lines.push(`${c.pending} faults on the changed lines were not run (the tool's budget): they are not held here, and the next whole run reads them.`);
   for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, and ${at} does not list it. Mend: write a test that fails on it and run the check again; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const id of unsaid) lines.push(`FAIL: ${at} lists "${id}" where the base did not, with no reason under "grown". Mend: take it out and write a test that catches the fault, or give its reason under "grown" (the fault changes nothing the program does), say so in the pull request, and have a fresh session say there that it found no other way`);
@@ -254,8 +274,9 @@ function onPullRequest(p, base) {
   const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
   const record = new Set([p.at, p.config.baseline]);
   const touched = git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && !record.has(f) && path.posix.extname(f) !== ".md");
-  const gone = baseline ? moved(baseline.listed, f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null)) : new Map();
-  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone });
+  const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
+  const gone = baseline ? moved(baseline.listed, read) : new Map(), held = baseline ? heldBy(baseline.listed, read, changed) : new Map();
+  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone, held });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
   return fails ? 1 : 0;
