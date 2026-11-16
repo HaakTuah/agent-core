@@ -7,6 +7,7 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
 - Every PR that changes the project, its tests, tools, config or a rule file also gets its code review.
   - Docs alone get no code review unless another provider built them.
 - The *design-checked PRs* also get the design check, and a PR its users will see the stand-in's notes.
+- A PR that changes a screen also gets the critique (`modules/screens.md`, point 18).
 
 1. **Ask** the code reviewer (`modules/roles.md`) as its part (`modules/codex.md`, `modules/copilot.md`) or the project
    says.
@@ -26,6 +27,8 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
 3. **Security** (core archive 47 to 51, 174, 177).
    - A *security reviewer* the session calls reviews the finished work once, aimed at the ways in it touches, and again
      only if a later commit touches one.
+     - Where the change touches a product's accounts, roles or a server (floor topic 19), its brief names the OWASP Top
+       10 in its newest edition, by year, and asks for the change read against each entry (core archive 227).
    - Where one starts by itself (Codex's app; floor rule 8), such a later commit, or a security finding's fix, gets the
      fallback reviewer's check.
    - One not begun in about 5 minutes or finished in about 30 is the fallback reviewer's, over the whole diff, where the
@@ -57,5 +60,6 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
    update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
    - After three rounds, what is still open goes to escalation (`modules/roles.md`); a PR it cannot settle stays
      unmerged.
-7. **The fallback reviewer's brief:** the diff, the task's text, the *review reference*, the review guidelines (the
-   core's and the project's) and the project's `SECURITY.md` and threat model with the floor, and nothing else.
+7. **The fallback reviewer's brief,** written as `modules/helpers.md` says, hands it the diff, the task's text, the
+   *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
+   model with the floor, and nothing else.

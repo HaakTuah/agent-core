@@ -1,4 +1,4 @@
-# The owner's words behind the core: items 218 onward
+# The owner's words behind the core: items 218 to 226
 
 How they are kept, and where each item lives: `archive/instructions.md`.
 
@@ -331,26 +331,3 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind the core's own files named in "A release that brings nothing a project takes asks no sync of it" in
      `README.md`, "How a project takes the core", point 1, and `OWN_FILES` in `scripts/releases.mjs`.
-
-228. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
-     design session, as that session recorded it on issue #253, labelled `by:chat`, under "What it is", saying the
-     owner agreed to it). The session set out what a search the owner had asked for found, and what it would build from
-     it, this among it: a measure of how strong a project's tests are, whether they would fail if a fault were put into
-     the code on purpose, run on the lines a pull request changes; reported first, failing nothing; then held with a
-     baseline, as one of the measures of how code is put together, that may not get worse, the state the codebase is in
-     setting how fast it must improve; the tool named in the manifest, a tool of development only, under the floor's
-     rules for dependencies and licences, or the measure left out where none exists for the project's language; a pull
-     request that deletes a test or weakens what one asserts saying so under "Readings taken", which a reviewer checks;
-     and the whole-codebase run belonging to the scheduled audit, outside the suite. The owner agreed:
-
-     > What do we implement from this […]? Go ahead with making us better?
-
-     To the orchestrator, passed on word for word to the builder of this rule:
-
-     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
-     > it: quote this in those pull requests.
-
-     Behind "How strong the tests are is measured on the lines a pull request changes" and "A test taken out or weakened
-     is said" in `modules/code-shape.md`, the two lines on them in `modules/review-guidelines.md`, the tests' whole run
-     in `modules/cleaning.md`, `scripts/strength.mjs` and the core's own tool `scripts/mutate.mjs`, and the slot
-     *mutation tool*.

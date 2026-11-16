@@ -7,10 +7,10 @@ what you will be asked; it holds no rule of its own, and where it points, the ru
 ## What the core does for your project
 
 It is the set of rules and checks your agents work by, so that you write none of them and every project that takes it
-works alike. It sits in your repository as an exact copy under `core/`, pinned to one commit of this repository and
-never edited by hand, beside a few files of your own: a manifest, your rule files and the workflows that call the core's
-checks (`README.md`, "How a project takes the core"). Your agents work in branches and pull requests; `main` changes only
-by a merged pull request whose checks have passed, never by a push (floor rule 12). Nothing in the repository, a pull
+works alike. It sits in your repository as a copy under `core/`, beside a few files of your own: a manifest, your rule
+files and the workflows that call the core's checks (`README.md`, "How a project takes the core", says how the copy is
+kept and pinned). Your agents work in branches and pull requests; `main` changes only by a merged pull request whose
+checks have passed, never by a push (floor rule 12). Nothing in the repository, a pull
 request or a log holds a secret or anything personal about you (floor rules 1 and 11).
 
 ## What it will ask of you
@@ -57,10 +57,11 @@ git writes into each commit too, and its failure says how a session takes it out
 ## The settings that are yours
 
 The settings the core cannot make for you: the ruleset on `main`, the Actions setting that pins every action to a
-commit, the secret that lists the terms to keep out, the security reviewer's app, secret scanning where your plan has
-it, how your own profile and git name appear in commits, and how the machines your agents run on are set up. Each, and
-why, stands in `README.md`, "Setting up (the owner's part)"; none of them fails a check or blocks work where you leave
-it unset. A project starting out gets the list printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
+commit, the secret that lists the terms to keep out, the security reviewer's app, secret scanning in a private
+repository, where it may be billed (a session switches it on in a public one), how your own profile and git name appear
+in commits, and how the machines your agents run on are set up. Each, and why, stands in `README.md`, "Setting up (the
+owner's part)"; none of them fails a check or blocks work where you leave it unset. A project starting out gets the list
+printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
 
 ## Telling the core something
 

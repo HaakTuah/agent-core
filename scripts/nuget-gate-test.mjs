@@ -4,7 +4,8 @@
 // changes a file it names (a file an Import brings in among them, as the project's copy of the core's script lists
 // them), and, where none changed, wherever NuGet finds a lock file that no longer holds what its
 // project asks for, however the project asks (in an import, two imports on a line, through a property, a link, a name
-// outside plain ASCII), or a package downloaded beside it; and not to where only other files change. No package is
+// outside plain ASCII), or a package downloaded beside it; and not to where only other files change, a project's
+// NuGet.Config that maps its packages to their sources included. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
 // its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
 // .NET SDK (never on GitHub's runners) only the first look is tried. On Linux and on Windows. Git, bash, jq, the .NET
@@ -13,18 +14,14 @@
 //   node scripts/nuget-gate-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { runWorkflow } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
+import { root, scratchDir, tally } from "./scratch-core.mjs";
 
-let failed = 0, count = 0;
-const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } };
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { ok, done } = tally();
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/nuget.yml"), "utf8");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-gate-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("nuget-gate-test-");
 const home = path.join(tmp, "home");
 fs.mkdirSync(path.join(home, "AppData", "Roaming"), { recursive: true });
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|ACTIONS_|CI$|NUGET_|DOTNET_CLI_HOME$)|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)));
@@ -103,6 +100,11 @@ if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
 else {
   skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
   skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
+  // (a NuGet.Config that maps every package to the registry, against a confusion of sources: the empty source the look
+  // restores from is mapped to none, which NuGet names as its own error, NU1100, not as a package not found; #380)
+  const MAPPED = '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />\n  </packageSources>\n  <packageSourceMapping>\n    <packageSource key="nuget.org">\n      <package pattern="*" />\n    </packageSource>\n  </packageSourceMapping>\n</configuration>\n';
+  skips("a pull request that changes only a doc, in a project whose NuGet.Config maps its packages to their sources", { "README.md": "# A project\n\nMore.\n" }, { start: { "NuGet.Config": MAPPED } });
+  restores("one that adds a package only in an imported file, in such a project", { "build/deps.xml": ADDS }, { start: { "NuGet.Config": MAPPED } });
   restores("one that adds a package only in a file a project file imports", { "build/deps.xml": ADDS });
   restores("one that adds it in the second of two imports on a line", { "build/two.xml": ADDS }, { start: { "src/App/App.csproj": project('  <Import Project="..\\..\\build\\deps.xml" /><Import Project="..\\..\\build\\two.xml" />\n'), "build/two.xml": EMPTY } });
   restores("one that asks for a package by a text file a build file reads, which no listing can name", { "build/flag.txt": "yes\n" }, { start: { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" } });
@@ -156,5 +158,4 @@ if (sdk) {
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check's own steps`);
-process.exitCode = failed ? 1 : 0;
+done("the NuGet check's own steps");

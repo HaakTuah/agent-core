@@ -27,7 +27,7 @@ import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
-import { call as callOf, plain, project } from "./steps.mjs";
+import { KIT_CONFIGS, call as callOf, configs, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
@@ -88,7 +88,9 @@ const named = u => u.row !== undefined ? `the row "${u.row}"` : u.para !== undef
 // it lacks of the kit's, and, of what an earlier kit wrote (`older`, each a kit as `kit` is), what it still holds that
 // the kit no longer writes, the wording the core has left.
 export function differences(p, kit, older = []) {
-  const out = [];
+  // (a check's config that a workflow names only when it runs is compared nowhere: said, so no comparison goes missing
+  // unsaid)
+  const out = configs(p).unread.map(why => `a config not compared: ${plain(why, p.root)}`);
   for (const [to, want] of kit) {
     if (SKIPPED.has(to) || p.differences.some(l => l.includes(`"${to}"`))) continue;
     const text = p.read(to);
@@ -126,9 +128,13 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const built = files(o, pin, modules, read);
     const gone = new Set(FILES.filter(([t]) => lacking.has(t)).map(([, to]) => to));
     // (the manifest's "Differences" is the project's own to fill: of it, the kit asks only the heading, not its "None.")
-    // (the choice records and the shape check's config at the paths the manifest names for them)
-    const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest) };
-    const kit = built.filter(([to]) => !gone.has(to))
+    // (the choice records and the shape check's config at the paths the manifest names for them; the checks' configs
+    // at the paths the project holds them, as its workflows and manifest name them: configs, in steps.mjs. One a
+    // workflow names only when it runs is compared nowhere here, the other check's still are: steps.mjs reports it not
+    // read)
+    const at = configs(p);
+    const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
+    const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null)
       .map(([to, text]) => [placed[to] ?? to, to === "core-manifest.md" ? text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences") : text]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project names for them, each read by its keys
@@ -136,10 +142,11 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     const { skip, past, ...marks } = sizes({});
     const json = v => `${JSON.stringify(v, null, 2)}\n`;
     const slot = /^\|\s*\*size marks\*\s*\|\s*`([^`]+)`/m.exec(p.manifest)?.[1] ?? "checks/sizes.json";
-    let copies = null;
-    try { copies = JSON.parse(p.read("checks/copies.json") ?? "null"); } catch { /* (the kit's path, below) */ }
-    const licenceAt = call(p, "nuget.yml")?.with?.config ?? call(p, "licences.yml")?.with?.config ?? "checks/licences.json";
-    return [...kit, [slot, json(marks)], [licenceAt, json(licences(o, () => false))], [typeof copies?.baseline === "string" ? copies.baseline : "checks/copies-baseline.json", json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]];
+    // (the licence config as the kit writes it, its "nuget" part in the NuGet check's own where that is another file, or
+    // compared nowhere where the NuGet check's cannot be read)
+    const { nuget, ...licence } = licences(o, () => false);
+    const licenceFiles = nuget && at.nuget !== at.licences ? [[at.licences, json(licence)], [at.nuget, json({ nuget })]] : [[at.licences, json({ ...licence, ...(nuget ? { nuget } : {}) })]];
+    return [...kit, [slot, json(marks)], ...licenceFiles, [at.baseline, json({ windows: {} })], [shapeBaseline(p), json({ listed: {} })]].filter(([to]) => to !== null);
   } catch (e) {
     if (!older) throw e;
     return [];

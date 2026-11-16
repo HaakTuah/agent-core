@@ -43,6 +43,7 @@ const CHECKS = {
   "scripts/general.mjs": "scripts/general-test.mjs",
   "scripts/own-modules.mjs": "scripts/own-modules-test.mjs",
   "scripts/manifest-reads.mjs": "scripts/manifest-reads-test.mjs",
+  "scripts/holders.mjs": "scripts/holders-test.mjs",
   "scripts/shape.mjs": "scripts/shape-test.mjs",
   "scripts/strength.mjs": "scripts/strength-test.mjs",
   ".github/workflows/core.yml": "scripts/core-yml-test.mjs",

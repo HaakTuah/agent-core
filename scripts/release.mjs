@@ -4,10 +4,13 @@
 // is what the core's owner hands on to another owner's project, on purpose. Run in the core's own repository alone: in
 // a project's copy it refuses, since a project cuts no release. Without --cut it says what the release would be and
 // what it would ask of a project (the sync notes it carries, each with roughly what it costs a project where it is not
-// done yet: steps.mjs, beside this file), and cuts nothing. The owner tags nothing by hand: the
-// release workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands
-// it the commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has
-// moved on from that commit, or where a check on it has not passed. Git and Node's own modules only.
+// done yet: steps.mjs, beside this file) and how a copy older than release-1 would take it, and cuts nothing; with
+// --cut it says the same, and how such a copy takes it once it is cut. The owner tags nothing by hand: the release
+// workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands it the
+// commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has moved on
+// from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
+// beside this file), where one failed in its last run as that commit's record holds it. Git and Node's own modules
+// only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
 //   node scripts/release.mjs --cut --at <sha> --runs <file>
@@ -22,6 +25,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -48,6 +52,10 @@ export const costed = entry => {
   const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
   return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps.mjs"}.`;
 };
+
+// What the core's owner tells a project whose copy is older than release-1 when handing a release on (#365): its own
+// sync script knows no release and, run with no SHA, takes the core's newest main, so it syncs once with this SHA.
+export const older = (name, sha) => `A project whose copy is older than release-1 syncs to ${name} once with its full SHA, \`node core/scripts/sync.mjs ${sha}\`: its own sync script, run with none, takes the core's main (setup/sync-notes.md, at its top).`;
 
 // This repository's own release workflow: its runs on a commit are no check of that commit.
 export const OWN = ".github/workflows/release.yml";
@@ -88,6 +96,16 @@ function after(flag, argv) {
   return argv[i + 1];
 }
 
+// Why the release `name` at `sha` is not cut, or null: the staged cases hold it (`staged`, from atRelease), or a check
+// on that commit has not passed, as the list of the runs there (`runs`, a file) says.
+function whyNot(name, sha, staged, runs) {
+  if (staged.held) return `${name} is not cut: ${staged.held}.`;
+  let list = null;
+  try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
+  const reasons = held(list);
+  return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
+}
+
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
   if (!inTheCore()) return fail("run it in the core's own repository: a project cuts no release");
@@ -108,14 +126,15 @@ function main(argv) {
       : asks.length
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);
-    if (!cut) { console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    let list = null;
-    try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
-    const reasons = held(list);
-    if (reasons.length) return fail(`${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}`);
+    const staged = atRelease(sha, before, rev => inBare(dir, rev));
+    console.log(staged.said);
+    if (!cut) { console.log(older(name, sha)); console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
+    const stop = whyNot(name, sha, staged, runs);
+    if (stop) return fail(stop);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);
     console.log(`${name} is cut.`);
+    console.log(older(name, sha));
   } catch (e) {
     fail(e.stderr?.toString().trim() || e.message);
   } finally {
