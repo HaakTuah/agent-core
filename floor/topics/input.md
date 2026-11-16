@@ -9,14 +9,14 @@ Read before a task touches what anyone but the user at hand can shape, and by a 
 - It is never run, never fetched as an address, never setting a key or an address the app talks to.
 - The project names its inputs in its `SECURITY.md`, under this rule's number, each as an item of its own (`- `) that
   names, after the words "hostile tests:", the file or folder that holds them, in backticks.
-- **Every named input has hostile tests** (core archive 227): too long, the wrong type, markup, a file path, a number
+- **Every named input has hostile tests:** too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused with nothing of it used. Whoever adds an input, or changes the code
   that reads one, writes its tests in that pull request; an input named without them is a task of its own, which the
   sync's step "16 November 2026, hostile tests for every named input" reports.
   - It does not mean every field tried with every case, only each input with each case its shape allows, nor that a
     pull request waits on tests an input lacked before it. Reason: a check never tried with what an attacker sends
     holds nothing.
-- **A failure refuses** (core archive 227): where a check cannot be made (who is asking, whether it is allowed, whether
+- **A failure refuses:** where a check cannot be made (who is asking, whether it is allowed, whether
   it is well formed), the answer is no; an error a user sees names nothing of the program's insides (no stack, path,
   query or version).
   - It does not mean the program stops: it refuses that one request and goes on. Reason: a check that errors open

@@ -9,7 +9,7 @@ Read by a session of the tool `codex`, and by whoever hands Codex a task or asks
   for one by a comment, which it answers with a code review: a later commit's security check is the fallback
   reviewer's (point 3). Through its plug-in, below, it is asked again for one where a later commit touches a way in
   (point 3).
-- It cannot push there, so it builds nothing (core archive 169).
+- It cannot push there, so it builds nothing.
 
 **Through its plug-in in Claude Code** (`/codex:setup` says if it is ready; an offer of its to install Codex is the
 owner's to accept: floor rule 18):

@@ -3,10 +3,11 @@
 *Hammurabi's Agentic Code: one floor, many laws.*
 
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
-alike (core archive 68). The owner's words behind each rule: `archive/instructions.md`. A project of another owner takes
-the core the same way, its *owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save
-in `archive/`, whose words stay the core's owner's: its stand-in weighs them as that owner's reasoning, after its own
-owner's words, and marks an answer that rests on them alone unsure (`roles/shared/inbox.md`; core archive 166).
+alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the owner's own
+words stay in this repository alone (`words/`; #252). A project of another owner takes the core the same way, its
+*owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save in `archive/`, whose
+reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and marks an answer that rests
+on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
@@ -44,7 +45,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   "content put where its readers must read past it" (`roles/shared/review-guidelines.md`). What a cap decides, and when one
   may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
-  (`scripts/holders.json`); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
+  (`scripts/holders.json`, which names too the archive's items behind each); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
   in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
@@ -54,8 +55,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
-   `reports/`, the dated reports of this repository's own changes, which stay here alone (`.gitattributes`; core archive
-   165). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   `reports/`, the dated reports of this repository's own changes, and `words/`, the owner's own words behind the
+   archive, which stay here alone (`.gitattributes`; core archive 165; #252). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -91,7 +92,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the core's owner names when handing the release on and `scripts/release.mjs` prints with each release, and from then
    on its new script takes the releases by itself (#365).
 
-   **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 227). By
+   **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 245). By
    default every release past a project's pin is synced. Where the pin is the release just before the newest and nothing
    the project takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes
    nothing, and `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every
@@ -519,9 +520,9 @@ is public, and so is every word of an issue, so a report holds only what the lig
 
 The core is under the Apache License 2.0 (`LICENSE`), with its notice in `NOTICE`, which whoever hands the core on,
 changed or not, passes on with it, marking the files they changed (#257; core archive 221). It covers all of this
-repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/` and
-`reports/`: the owner's own words and records, all rights reserved. Both files travel in each project's copy under
-`core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
+repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/`,
+`words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
+project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
 adds or changes them (floor rule 10). Nothing of the core ships, so no project's audit or notices file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
