@@ -404,9 +404,11 @@ ok(["node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json", 'node "${{ g
     ["$GITHUB_WORKSPACE", { shell: "cmd" }], ["$env:GITHUB_WORKSPACE", { shell: "bash" }], ["$GITHUB_WORKSPACE"], ["$GITHUB_WORKSPACE", {}, { "runs-on": "${{ matrix.os }}" }],
     ["$GITHUB_WORKSPACE", { shell: "python" }], ["$GITHUB_WORKSPACE", { shell: ["bash"] }]].every(a => rooted(...a) === null),
     "a root named as another shell names it, or where the step's shell cannot be told, is not read as the root");
-  ok(rooted("$Env:github_workspace", { shell: "pwsh" }) === "config/c.json" && rooted("%github_workspace%", { shell: "cmd" }) === "config/c.json"
+  ok(rooted("$ENV:GITHUB_WORKSPACE", { shell: "pwsh" }) === "config/c.json" && rooted("%github_workspace%", { shell: "cmd" }) === "config/c.json"
+    && rooted("${{ GITHUB.Workspace }}", { shell: "bash" }) === "config/c.json"
     && rooted("$GITHUB_WORKSPACE", { shell: "/bin/bash -e {0}" }) === "config/c.json" && rooted("$env:GITHUB_WORKSPACE", { shell: "powershell.exe" }) === "config/c.json"
-    && rooted("$github_workspace", { shell: "bash" }) === null, "PowerShell's and cmd's root read in any case, bash's as written, and a shell named by its path");
+    && rooted("$github_workspace", { shell: "bash" }) === null && rooted("$env:github_workspace", { shell: "pwsh" }, { "runs-on": "ubuntu-latest" }) === null,
+    "a root's name read in any case only where its shell reads it so (cmd's, PowerShell's env: drive, GitHub's expression), and a shell named by its path");
   const manyLabels = Date.now(), labelled = { jobs: { j: { "runs-on": [...Array.from({ length: 5000 }, (_, k) => `l${k}`), "ubuntu-latest"],
     steps: [...Array.from({ length: 19000 }, () => ({ run: "echo x" })), { run: "node core/scripts/copies.mjs $GITHUB_WORKSPACE/config/c.json" }] } } };
   ok(copiesOf({ "a.yml": labelled }) === "config/c.json" && Date.now() - manyLabels < 1500, "a job's many labels, over many steps, are read once", `${Date.now() - manyLabels} ms`);

@@ -184,9 +184,11 @@ function doubleQuoted(text, i, add) {
 // The root of the checkout as a workflow names it, at a path's start, read as the project's root: GitHub's expression
 // in any shell, a variable only in the shell that fills it (bash's $GITHUB_WORKSPACE is text to cmd, and empty to
 // PowerShell); in a shell the reader does not know, the expression alone.
-const ROOTS = { bash: "\\$GITHUB_WORKSPACE|\\$\\{GITHUB_WORKSPACE\\}|", pwsh: "\\$env:GITHUB_WORKSPACE|", cmd: "%GITHUB_WORKSPACE%|" };
-// (PowerShell and cmd read a variable's name in any case; bash only as written)
-const ROOT_OF = new Map([null, ...Object.keys(ROOTS)].map(k => [k, new RegExp(`^(?:${ROOTS[k] ?? ""}\\$\\{\\{\\s*github\\.workspace\\s*\\}\\})/`, k === "bash" ? "u" : "iu")]));
+// (a name in any case only where its shell reads it so: PowerShell's env: drive, though a variable's name only on
+// Windows, so not; cmd's, which runs only on Windows; GitHub's expression)
+const anyCase = text => text.replace(/[a-z]/giu, c => `[${c.toLowerCase()}${c.toUpperCase()}]`);
+const ROOTS = { bash: "\\$GITHUB_WORKSPACE|\\$\\{GITHUB_WORKSPACE\\}|", pwsh: `\\$${anyCase("env")}:GITHUB_WORKSPACE|`, cmd: `%${anyCase("github_workspace")}%|` };
+const ROOT_OF = new Map([null, ...Object.keys(ROOTS)].map(k => [k, new RegExp(`^(?:${ROOTS[k] ?? ""}\\$\\{\\{\\s*${anyCase("github")}\\.${anyCase("workspace")}\\s*\\}\\})/`, "u")]));
 const rootOf = shell => ROOT_OF.get(shell ?? null) ?? ROOT_OF.get(null);
 // The shell a step runs in, as one of ROOTS' names, or null where the reader cannot tell: its own `shell:`, else its
 // job's or its workflow's default, else the runner's (PowerShell on Windows, bash elsewhere), where its labels say it.
