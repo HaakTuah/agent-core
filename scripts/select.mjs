@@ -95,10 +95,11 @@ export function selection({ changed, texts, tests, reach, failed = [], config })
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
     if (none(f)) continue;
-    if (isTest(f)) { if (tests.has(f)) add(f, "added or changed"); continue; }
+    if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
+    if (isTest(f) && !(f in texts)) continue; // (a test taken out runs nothing)
     if (!(f in texts)) return all(`${f} is no code the readers follow, or is gone, so what reaches it cannot be told`);
     for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
-    for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`);
+    if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
   }
   return { all: false, why: by, tests: [...by.keys()].sort() };
 }

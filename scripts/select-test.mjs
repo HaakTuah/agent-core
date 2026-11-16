@@ -43,8 +43,10 @@ const texts = {
   "test/lazy.test.js": "import '../src/lazy.js';\n",
   "test/replay.test.js": "import '../src/view.js';\n",
   "test/kit.test.js": "// copies the whole project\n",
+  "test/helper.js": "export const fixture = 1;\n",
+  "test/uses-helper.test.js": "import { fixture } from './helper.js';\n",
 };
-const tests = new Set(Object.keys(texts).filter(f => f.startsWith("test/")));
+const tests = new Set(Object.keys(texts).filter(f => f.startsWith("test/") && f !== "test/helper.js"));
 const reach = survey(texts, config, tests).reach, linked = links(texts, tests, reach), reaches = reached(tests, linked);
 ok(reaches.get("test/view.test.js").has("src/rules.js") && reaches.get("test/run.test.js").has("src/tool.js") && reaches.get("test/lazy.test.js").has("src/rules.js"),
   "a test reaches what its imports reach, file to file, a file a script starts by its name and a dynamic import's", JSON.stringify([...reaches].map(([t, f]) => [t, [...f]])));
@@ -61,6 +63,8 @@ ok(same(s.tests, ["test/kit.test.js", "test/replay.test.js", "test/run.test.js"]
 s = pick(["test/rules.test.js", "QUEUE.md", "docs/guide.md"], ["test/lazy.test.js", "test/gone.test.js"]);
 ok(same(s.tests, ["test/lazy.test.js", "test/replay.test.js", "test/rules.test.js"]) && s.why.get("test/rules.test.js") === "added or changed" && s.why.get("test/lazy.test.js") === "failed last time",
   "a test changed runs, one that failed last time runs, a file no test reads runs nothing, and a test that is gone is none", JSON.stringify([...s.why]));
+s = pick(["test/helper.js"]);
+ok(same(s.tests, ["test/replay.test.js", "test/uses-helper.test.js"]), "a helper among the tests runs each test that imports it", JSON.stringify(s.tests));
 s = pick(["QUEUE.md"]);
 ok(same(s.tests, ["test/replay.test.js"]), "a change to the files no test reads runs the proof alone", JSON.stringify(s.tests));
 s = pick(["test/old.test.js"]);
@@ -85,7 +89,7 @@ put("src/tool.js", "export const tool = 3;\n"); put("QUEUE.md", "# Queue\n\n- on
 git("add", "-A"); git("commit", "-q", "-m", "change");
 const envFile = path.join(dir, "env"), summary = path.join(dir, "summary");
 let r = run(["--env", "RUN"], { SELECT_BASE: "HEAD^1", GITHUB_ENV: envFile, GITHUB_STEP_SUMMARY: summary });
-ok(r.status === 0 && /2 of 6 tests/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN= test/replay.test.js test/run.test.js \n" && fs.readFileSync(summary, "utf8").includes("test/run.test.js: reaches src/tool.js"),
+ok(r.status === 0 && /2 of 8 tests/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN= test/replay.test.js test/run.test.js \n" && fs.readFileSync(summary, "utf8").includes("test/run.test.js: reaches src/tool.js"),
   "against the base, it says what it ran and why, on the job's summary too, and writes the tests for the steps after it, each between spaces", `${r.out}\n${fs.existsSync(envFile) ? fs.readFileSync(envFile, "utf8") : ""}`);
 if (process.platform !== "win32") { // (a name with a line's end in it cannot be made on Windows)
   put("test/odd\nNODE_OPTIONS=x.test.js", "import '../src/tool.js';\n"); git("add", "test/odd\nNODE_OPTIONS=x.test.js"); git("commit", "-q", "-m", "an odd name");
@@ -96,7 +100,7 @@ if (process.platform !== "win32") { // (a name with a line's end in it cannot be
 }
 fs.writeFileSync(envFile, "");
 r = run(["--env", "RUN"], { GITHUB_ENV: envFile });
-ok(r.status === 0 && /the whole suite, 6 tests: no base is told/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=all\n", "with no base told, as on main, the whole suite runs", r.out);
+ok(r.status === 0 && /the whole suite, 8 tests: no base is told/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=all\n", "with no base told, as on main, the whole suite runs", r.out);
 put("failed.txt", "test/rules.test.js\n");
 r = run(["checks/shape.json", "--failed", "failed.txt"], { SELECT_BASE: "HEAD^1" });
 ok(r.status === 0 && /test\/rules\.test\.js: failed last time/.test(r.out), "the tests that failed last time are read from the file named", r.out);
