@@ -17,18 +17,18 @@
     "floor/threat-model.md: What is protected": "describes",
     "floor/threat-model.md: Lower stakes": "describes",
     "floor/threat-model.md: The ways in": "describes",
-    "floor/topics.md: 2. The workflows": "check: scripts/workflows.mjs, in part",
-    "floor/topics.md: 7. What runs on users' machines": [
+    "floor/topics/workflows.md: 2. The workflows": "check: scripts/workflows.mjs, in part",
+    "floor/topics/what-ships.md: 7. What runs on users' machines": [
       "check: scripts/exact-versions.mjs, in part",
       "check: .github/workflows/signatures.yml, in part",
       "check: scripts/versions.mjs, in part"
     ],
-    "floor/topics.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
-    "floor/topics.md: 15. Dependencies": [
+    "floor/topics/licences.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
+    "floor/topics/dependencies.md: 15. Dependencies": [
       "check: scripts/licences.mjs, in part",
       "check: scripts/agent-tools.mjs, in part"
     ],
-    "floor/topics.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
+    "floor/topics/dependencies.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
     "tools/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
     "tasks/code-shape.md: How strong the tests are is measured on the lines a pull request changes": "check: scripts/strength.mjs, in part",
     "tasks/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds, in part",

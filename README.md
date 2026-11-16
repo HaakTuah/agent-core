@@ -15,7 +15,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 - **The floor** (`floor/`): what keeps the owner from harm and loss, taken whole by every project. If a project dropped
   a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
-  `security.md`, whose opening says what it and `topics.md` hold and when each is read, and `threat-model.md`, the
+  `security.md`, whose opening says what it and the folder `topics/` hold and when each is read, and `threat-model.md`, the
   shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying in
   its opening line when it is read, in words a script matches: a kind of task, a path, a tool (a tool's part: when that
@@ -458,7 +458,7 @@ is public, and so is every word of an issue, so a report holds only what the lig
   company or its people; its name only if the project is public), anything secret, any person's name, or how to get
   past a check, a hook or a rule.
 - **A weakness is never an issue.** It goes to the Security tab's "Report a vulnerability", which only the owner sees
-  ("Reporting a weakness" in `floor/topics.md`). An agent that finds one in the core files it there by that reporting's
+  ("Reporting a weakness" in `floor/topics/weaknesses.md`). An agent that finds one in the core files it there by that reporting's
   own call alone, with no secret or personal detail and nothing of its project in it, and where the call fails tells its
   own owner in its session's last message, who reports it (floor rule 9).
 - **An agent that files** says it is an agent, with its "Found while:" line, and ends with its tool's attribution line

@@ -27,7 +27,7 @@ the core in "Sessions", since this repository is the core and holds no copy.
 Read at the start of every task too: by Claude, `tools/claude.md` (`CLAUDE.md` imports it); by a session of any
 other tool, `tools/other-builders.md` and its tool's part (`tasks/tools.md`), which its entry file pulls in.
 
-Read when a task calls for it, each saying when in its opening line: `floor/topics.md`, `floor/threat-model.md`,
+Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`, `floor/threat-model.md`,
 `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`, `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`,
 `tools/kiro.md`, `tools/antigravity.md`, `tasks/github-calls.md`, `roles/orchestrator.md`,
 `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md` and `tasks/cleaning.md`.

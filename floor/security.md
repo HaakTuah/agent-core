@@ -2,7 +2,7 @@
 
 What protects the owner's accounts, repositories, systems, money, privacy and rights, and what cannot be undone. Every
 project takes it whole; nothing of its own loosens it. This file holds the rules any task can break, read at the start
-of every task; `floor/topics.md` holds the rest, read before a task touches one of its topics (workflows, input,
+of every task; `floor/topics/` holds the rest, a file a topic, read before a task touches it (workflows, input,
 dependencies, alerts, licences, accounts). A project's `SECURITY.md` adds under the same numbers what only it has. Who
 might attack: `floor/threat-model.md`.
 

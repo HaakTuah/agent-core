@@ -67,5 +67,5 @@ printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
 
 A fault, an idea or a question about the core itself is an issue on this repository, and so is a rule that did not fit
 your project, so that the core may learn from it (`README.md`, "Reporting to the core"). A weakness is never an issue,
-which anyone can read: it goes to this repository's Security tab, "Report a vulnerability" (`floor/topics.md`,
+which anyone can read: it goes to this repository's Security tab, "Report a vulnerability" (`floor/topics/weaknesses.md`,
 "Reporting a weakness").

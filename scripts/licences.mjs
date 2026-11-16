@@ -1,7 +1,7 @@
-// The licence check (floor rule 10, in floor/topics.md beside this folder), for every project that takes the core:
+// The licence check (floor rule 10, in floor/topics/licences.md beside this folder), for every project that takes the core:
 // every package its lockfiles install, the ones packages pull in included, and every entry of its audit (what no
 // lockfile holds: a script loaded from elsewhere, a font, an image, a tool a script installs), each held to its list.
-// What ships is held to floor rule 10's list, read from floor/topics.md itself, so the list stands in one place; a tool
+// What ships is held to floor rule 10's list, read from floor/topics/licences.md itself, so the list stands in one place; a tool
 // that only runs, to the tools' list: every licence the Open Source Initiative approves (OSI below), one on the same
 // terms, and everything what ships may be under. CC-BY is allowed only for what is named as data or assets, OFL only
 // for fonts, as the floor says. No licence, or an expression it cannot read, fails. Node's own modules only, so the
@@ -100,22 +100,22 @@ export function baseOf(root) {
 }
 
 /** Floor rule 10's list for what ships, read from its own words: { any, data, fonts, publicDomain }. */
-export function floorList(file = new URL("../floor/topics.md", import.meta.url)) {
+export function floorList(file = new URL("../floor/topics/licences.md", import.meta.url)) {
   const text = readFileSync(file, "utf8").replace(/\s+/gu, " ");
   const found = /\*\*10\. Licences.*? is under (.+?); never copyleft/u.exec(text);
-  if (!found) throw new Error("floor/topics.md: rule 10's list for what ships (\"is under ...; never copyleft\") is not there. Mend: take the floor's topics.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)");
+  if (!found) throw new Error("floor/topics/licences.md: rule 10's list for what ships (\"is under ...; never copyleft\") is not there. Mend: take the floor's topics/licences.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)");
   const lists = { any: [], data: [], fonts: [], publicDomain: false };
   for (const piece of found[1].split(", ")) {
     const [, ids, purpose] = /^(?:or )?(.+?)(?: \(for ([^)]+)\))?$/u.exec(piece);
     if (ids === "the public domain") { lists.publicDomain = true; continue; }
     const key = { undefined: "any", "data and assets": "data", fonts: "fonts" }[purpose];
-    if (!key) throw new Error(`floor/topics.md, rule 10: a purpose it does not know: "${purpose}". Mend: take the floor's topics.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
+    if (!key) throw new Error(`floor/topics/licences.md, rule 10: a purpose it does not know: "${purpose}". Mend: take the floor's topics/licences.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
     for (const id of ids.split(" and ")) {
-      if (!/^[A-Za-z0-9][A-Za-z0-9.+-]*$/u.test(id)) throw new Error(`floor/topics.md, rule 10: "${id}" is not a licence id. Mend: take the floor's topics.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
+      if (!/^[A-Za-z0-9][A-Za-z0-9.+-]*$/u.test(id)) throw new Error(`floor/topics/licences.md, rule 10: "${id}" is not a licence id. Mend: take the floor's topics/licences.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
       lists[key].push(id);
     }
   }
-  if (lists.any.length < 5) throw new Error("floor/topics.md, rule 10: its list for what ships reads as almost empty. Mend: take the floor's topics.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)");
+  if (lists.any.length < 5) throw new Error("floor/topics/licences.md, rule 10: its list for what ships reads as almost empty. Mend: take the floor's topics/licences.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)");
   return lists;
 }
 
@@ -133,8 +133,8 @@ export function policy(config = {}) {
   const dataExtra = [...floor.data, ...pd.data];
   const never = [...tools, ...dataExtra, ...floor.fonts].filter((id) => NEVER.test(id));
   const copyleft = [...shipped, ...dataExtra, ...floor.fonts].filter((id) => COPYLEFT.test(id));
-  if (never.length) throw new Error(`on a list, though floor rule 10 never allows it: ${never.join(", ")}. Mend: take the floor's topics.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
-  if (copyleft.length) throw new Error(`copyleft on the list for what ships: ${copyleft.join(", ")}. Mend: take the floor's topics.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
+  if (never.length) throw new Error(`on a list, though floor rule 10 never allows it: ${never.join(", ")}. Mend: take the floor's topics/licences.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
+  if (copyleft.length) throw new Error(`copyleft on the list for what ships: ${copyleft.join(", ")}. Mend: take the floor's topics/licences.md back as the core holds it (in a project, node core/scripts/sync.mjs <the pin>, which writes core/ whole)`);
   const widen = (base, extra) => new Set([...base, ...extra]);
   const sets = {
     shipped: { any: shipped, data: widen(shipped, dataExtra), font: widen(shipped, floor.fonts) },
