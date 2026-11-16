@@ -21,9 +21,9 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   finish. The one condition that changes it: where lines still lead to it, the file's writer puts them under it first.
   It does not mean that the milestone's issue closes before its last line merges, nor that a heading is taken out to
   drop a milestone without its issue closed first, saying why. Reason: the owner learns that a whole is ready to try
-  from the pull request that made it so. Held by the description check (`scripts/pr-description.mjs`, with
-  `scripts/milestones.mjs`), which fails a pull request that closes a milestone's issue and leaves its heading or does
-  not name it under "What the owner can try", or takes out a heading whose issue stays open.
+  from the pull request that made it so. Held by the same check, which fails a pull request that closes a milestone's
+  issue and leaves its heading or does not name it under "What the owner can try", or takes out a heading whose issue
+  stays open.
 - **The owner's notes are gathered at a milestone.** By default, once a pull request that reaches a milestone merges,
   the session the owner gives its notes on it to takes them in one sitting and files each as an issue: a correction,
   naming the merged pull request it corrects, or a task, which is queued as any other line. The one condition that
