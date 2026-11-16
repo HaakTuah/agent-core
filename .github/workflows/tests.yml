@@ -41,8 +41,9 @@ jobs:
   # that run side by side, each under a time mark of its own: the core's checks from plain git and the sync on whole
   # scratch projects, the starter kit with the check of the core's copy, the licence, NuGet and agent-tools checks, and
   # the rest, each step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
-  # are sized by the steps' times on Windows, where one runner takes half as long again as another, so that each ends
-  # within its mark on the slow one, beside the upgrade job, which takes longer; #387, #411, #424)
+  # are sized by the steps' times on Windows, where one runner takes half as long again as another: the first two so
+  # that each ends within its mark on the slow one too, the other two as they stood, with less room than that, beside
+  # the upgrade job, which takes longer; #387, #411, #424)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
