@@ -44,6 +44,9 @@ export const READ_LINE = "Read for it:";
 export const UNITS = ["roles/shared", "tasks", "tools", "floor/topics"];
 // Of those, the folders of the modules: the units a project takes or leaves out by name, each name standing once.
 export const MODULES = ["roles/shared", "tasks", "tools"];
+// What a path any project may hold is of, whatever its folders: a lock file of any package manager is an update. The
+// patterns stand here once, and each file an update calls names the kind alone.
+export const KINDS_BY_PATH = ["*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "*-shrinkwrap.json", "go.sum"].map(pattern => ({ path: pattern, kind: "update" }));
 // The floor's threat model, read with a security review, whose words are not changed to say so.
 export const FLOOR_WHEN = { "floor/threat-model.md": { kinds: ["security-review"], paths: [] } };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
@@ -116,8 +119,8 @@ export function leftOut(manifest) {
   const line = /\bModules:\s*([^\n]*)/u.exec(text)?.[1].trim() ?? "", taken = new Set(/^all\b/iu.test(line) ? [] : names(line));
   return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "").filter(n => !taken.has(n)) : []);
 }
-// The core's roles and modules without the modules a project leaves out.
-export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => !out.has(path.posix.basename(f)))) });
+// The core's roles and units without the modules a project leaves out; a topic of the floor is never left out.
+export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => f.startsWith("floor/") || !out.has(path.posix.basename(f)))) });
 
 // The kinds a project gives its own paths, [{ path, kind }], from its config's text ({ "paths": { "<path>": "<kind>" } }).
 export const OWN = ["checks/reading.json", ".github/reading.json"];
@@ -142,6 +145,7 @@ const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.s
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
 export function calledByPaths(lib, paths, own = []) {
   const out = new Map(), kinds = new Map();
+  for (const p of paths) for (const r of KINDS_BY_PATH) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}`);
   for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}, of the kind ${r.kind} by the project's reading config`);
   for (const [f, w] of [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)]) {
     if (!w) continue;

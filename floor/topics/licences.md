@@ -1,8 +1,7 @@
 # The floor, by topic: licences
 
 Read before a task adds or updates a package, a font, an image, a sound or a data set, and by a security review: the
-kinds `licence`, `update`, `dependency` and `security-review`; the paths `go.sum`, `*-shrinkwrap.json`, `*-lock.yaml`,
-`*-lock.json`, `*.lock.json`, `*.lockb` and `*.lock`.
+kinds `licence`, `update`, `dependency` and `security-review`.
 
 **10. Licences: free to use, kept that way** (core archive 41).
 - What ships, or is built into it (every package, the ones it pulls in included, and every font, image, sound and data

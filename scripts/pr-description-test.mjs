@@ -56,16 +56,16 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), text); };
-  for (const part of ["floor", "modules", "roles"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+  for (const part of ["floor", "tasks", "roles"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
   put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `screens.md`.\nNot taken: `game-design.md` (no game).\n"); put("checks/reading.json", `${JSON.stringify({ paths: { "src/screens/": "polish" } })}\n`); put("src/screens/a.js", "1\n");
   git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
   ok(calledFor(tmp) === null, "where no core stands, what a change calls for cannot be read");
   put("src/screens/a.js", "2\n"); put("checks/reading.json", "{}\n"); put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `updates.md`.\nNot taken: `game-design.md` (no game), `screens.md` (none).\n"); put("core/CLAUDE.md", "x\n"); put(".github/workflows/caf\u00e9.yml", "on: push\n");
   git("add", "-A"); git("commit", "-q", "-m", "a change that empties its own reading config");
   const called = calledFor(project);
-  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/floor/topics.md", "core/tasks/screens.md"]) && /of the kind polish/.test(called[1].why),
+  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why),
     "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries: a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
-  ok(/does not list `core\/modules\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics.md`, `core/tasks/screens.md`", called, "cmd") === null, "and the line is held to them");
+  ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`", called, "cmd") === null, "and the line is held to them");
   git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
 }

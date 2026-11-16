@@ -1,9 +1,6 @@
 # Moved: the floor, by topic
 
-This file only points: the floor's rules for particular work stand in `floor/topics/`, a file a topic, their words
-unchanged (core archive 233; #304). A project's rule files name the topic's own file (`setup/sync-notes.md`, "16
-November 2026, the rules in folders that say who reads them or when"). It goes at the second release after 16 November
-2026, when no starter kit of the releases a sync is proven from names this path.
+`floor/topics/` holds these rules now, a file a topic.
 
 Now in `floor/topics/workflows.md`: **2. The workflows**.
 Now in `floor/topics/input.md`: **5. Untrusted input is checked before it is used**.

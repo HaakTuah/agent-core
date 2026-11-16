@@ -1,8 +1,7 @@
 # The floor, by topic: what runs on users' machines
 
 Read before a task adds or updates what ships or what builds it, and by a security review: the kinds `dependency`,
-`update` and `security-review`; the paths `*.lock`, `*.lockb`, `*.lock.json`, `*-lock.json`,
-`*-lock.yaml`, `*-shrinkwrap.json` and `go.sum`.
+`update` and `security-review`.
 
 **7. What runs on users' machines** (core archive 37, 65 and 151).
 - Every package, tool and script at one exact version, never a range.

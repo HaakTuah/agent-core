@@ -1,8 +1,7 @@
 # The floor, by topic: dependencies
 
 Read before a task adds or updates a dependency or a tool of an agent's own, and by a security review: the kinds
-`dependency`, `update`, `tool` and `security-review`; the paths `.github/dependabot.yml`, `.node-version`, `*.lock`,
-`*.lockb`, `*.lock.json`, `*-lock.json`, `*-lock.yaml`, `*-shrinkwrap.json` and `go.sum`.
+`dependency`, `update`, `tool` and `security-review`; the path `.github/dependabot.yml`.
 
 **15. Dependencies** (core archive 76).
 - Installed from the lock file (`npm ci` or its like), except where a PR adds or updates a package.

@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { FLOOR, FLOOR_WHEN, READ_LINE, START, asked, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "./reading.mjs";
+import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, READ_LINE, START, asked, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "./reading.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -34,8 +34,8 @@ ok(eq(readsOf(role, START), ["tasks/a.md", "roles/builder.md", "tasks/b.md"]) &&
 // a changed path against a pattern
 ok(matches(".github/workflows/", ".github/workflows/tests.yml") && !matches(".github/workflows/", "docs/.github/workflows/x.yml") && !matches(".claude/", ".claude.md") && matches(".claude/", ".claude/settings.json"), "a folder holds every path under it, from the root");
 ok(matches("CLAUDE.md", "CLAUDE.md") && matches("CLAUDE.md", "tools/CLAUDE.md") && !matches("CLAUDE.md", "NOT-CLAUDE.md") && matches("package*lock.json", "app/package-lock.json") && matches("package*lock.json", "packages.lock.json") && !matches("package*lock.json", "package.json"), "a name with no folder is a file's name wherever it lies, * for any run of its letters");
-ok(["Cargo.lock", "svc/yarn.lock", "bun.lockb", "packages.lock.json", "app/package-lock.json", "pnpm-lock.yaml", "npm-shrinkwrap.json", "svc/go.sum"].every(f => FLOOR_WHEN["floor/topics/workflows.md"].paths.some(p => matches(p, f))) && ["clock.json", "block.js", "padlock.md", "go.sum.txt", "package.json"].every(f => !FLOOR_WHEN["floor/topics/workflows.md"].paths.some(p => matches(p, f))),
-  "a lock file of any kind calls for the floor's topics, and a file whose name only ends like one does not");
+ok(["Cargo.lock", "svc/yarn.lock", "bun.lockb", "packages.lock.json", "app/package-lock.json", "pnpm-lock.yaml", "npm-shrinkwrap.json", "svc/go.sum"].every(f => KINDS_BY_PATH.some(r => r.kind === "update" && matches(r.path, f))) && ["clock.json", "block.js", "padlock.md", "go.sum.txt", "package.json"].every(f => !KINDS_BY_PATH.some(r => r.kind === "update" && matches(r.path, f))),
+  "a lock file of any kind is an update, and a file whose name only ends like one is not");
 ok(matches(".github/dependabot.yml", ".github/dependabot.yml") && !matches(".github/dependabot.yml", "x/.github/dependabot.yml") && matches("src/**/*.css", "src/a/b/c.css") && matches("src/*.css", "src/a.css") && !matches("src/*.css", "src/a/b.css") && !matches("a.b", "aXb") && matches("./a/", "a/b"), "a path with a folder is from the root, * within a folder and ** across them, and a dot is a dot");
 
 // a small core
@@ -84,6 +84,8 @@ ok(eq(files(reading(taken(lib, leftOut(listOf)), { role: "builder", kinds: ["pol
   "so a kind or a path calls only the modules the project takes, and the start is the same");
 ok(eq([...kindsOf(lib).keys()].filter(k => !Object.values(FLOOR_WHEN).some(f => f.kinds.includes(k))), ["polish", "review", "screen", "update", "workflow"]) && eq(kindsOf(lib).get("update"), ["tasks/updates.md", "floor/topics/workflows.md"]), "the kinds are those the modules name, each with its files");
 
+ok(["tasks/updates.md", "floor/topics/dependencies.md", "floor/topics/licences.md", "floor/topics/what-ships.md"].every(f => calledByPaths(library(root, ""), ["app/package-lock.json"]).some(c => c.file === f && c.why === "the path app/package-lock.json")) && calledByPaths(library(root, ""), ["a/clock.json"]).length === 0,
+  "in the core as it stands a changed lock file calls the updates' module and the floor's topics an update touches, by its kind, and a name that only ends like one calls nothing");
 // the check that every module and role says when
 const fault = change => { const t = { ...texts, ...change }; return faults(gather(f => t[f] ?? null, folder => Object.keys(t).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/"))), f => f in t || f === FLOOR); };
 ok(eq(fault({}), []), "a core whose modules and roles each say when has no fault");

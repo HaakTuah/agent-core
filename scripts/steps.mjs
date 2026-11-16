@@ -286,14 +286,14 @@ function hostileTests(p) {
 }
 
 // The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the
-// files that point from the old paths say it themselves: each opens "This file only points" and names where its rules
-// stand, in backticks.
+// files that point from the old paths say it themselves: each says, under its title, which file or folder "holds these
+// rules now", in backticks.
 export function moved(core = HERE) {
   const out = {};
   for (const old of [...(fs.existsSync(path.join(core, "modules")) ? fs.readdirSync(path.join(core, "modules")).filter(f => f.endsWith(".md")).map(f => `modules/${f}`) : []), "floor/topics.md"]) {
     let text = "";
     try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { continue; }
-    const to = /^This file only points:[^`]*`([^`]+)`/mu.exec(text)?.[1];
+    const to = /^`([^`]+)` holds these rules now/mu.exec(text)?.[1];
     if (to) out[old] = to;
   }
   return out;
@@ -303,7 +303,7 @@ export function moved(core = HERE) {
 function movedPaths(p) {
   const map = moved(), found = new Map();
   const old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.]/gu, "\\.")).join("|")})(?![\\w/-])`, "gu");
-  for (const f of p.files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f))) {
+  for (const f of Object.keys(map).length === 0 ? [] : p.files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f))) {
     for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
   }
   const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""} (in ${files.map(f => `\`${f}\``).join(", ")})`);
