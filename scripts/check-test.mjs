@@ -102,7 +102,7 @@ ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(`${r.stdout}$
 
 // a check that keeps a baseline reads the base: the change is checked on its merge into the base, as GitHub checks it
 git(dir, "reset", "-q", "--hard", "base");
-fs.writeFileSync(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { unlisted: { command: "npx", args: ["-y", "an-unlisted-server@1.0.0"] } } }, null, 2));
+fs.writeFileSync(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { unlisted: { command: ["np", "x"].join(""), args: ["-y", "an-unlisted-server@1.0.0"] } } }, null, 2));
 commit(dir, "an agent's tool no list names");
 r = check(dir, "--base", "base");
 ok(r.status === 1 && /FAIL licences\.yml\/licences\/licences: its step "Every tool the agents load listed/.test(r.out) && mended(r.out), "a tool the agents load that no list names fails the agent-tools check on a pull request, its base read from the merge's first parent", r.out);

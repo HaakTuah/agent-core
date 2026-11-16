@@ -37,7 +37,7 @@
     "modules/git.md: Nothing waits silently": "check: scripts/pr-description.mjs, in part",
     "modules/git.md: Push after every commit": "check: scripts/work-saved.sh, in part",
     "modules/git.md: Updates, Dependabot and CodeQL": "describes",
-    "modules/hosts.md: One layer knows no host": "check: scripts/check-test.mjs, in part",
+    "modules/hosts.md: One layer knows no host": "check: .github/workflows/tests.yml, in part",
     "modules/helpers.md: A brief is written as a rule is": "check: scripts/general.mjs, in part",
     "modules/how-to-work.md: Read little, print little": "check: scripts/reading-size.mjs, in part",
     "modules/how-to-work.md: One fact, one place": [

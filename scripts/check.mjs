@@ -26,10 +26,11 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { plainEnv } from "./releases.mjs";
+import { started } from "./started.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "./workflow-run.mjs";
 
 // The core's workflows a project calls that only the host can run, each with why: check-test.mjs holds that every
@@ -67,7 +68,7 @@ const fail = (what, mend) => { console.error(`FAIL ${what} ${MEND}${mend}`); pro
 const call = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i");
 
 // It runs only as a command; check-test.mjs imports it for HOST_OWN alone.
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (started(import.meta.url)) main();
 
 function main() {
   const p = project(options());
