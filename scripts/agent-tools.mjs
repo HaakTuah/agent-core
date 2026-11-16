@@ -158,8 +158,10 @@ function readCodex(state, json, read) {
   readHooks(state, ".codex/config.toml", config, "Codex");
   const notify = config.notify;
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
-    const words = notify.join(" ");
-    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: words, commands: [words] });
+    // (its words are a program and its arguments, each one whole, so each is read as a single-quoted word of a command:
+    // "scripts/my hook.py" stays one path)
+    const quoted = notify.map(w => `'${w.replace(/'/gu, "'\\''")}'`).join(" ");
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted] });
   }
   addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
 }
