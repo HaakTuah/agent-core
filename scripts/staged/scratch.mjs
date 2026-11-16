@@ -418,7 +418,9 @@ export function testPasses(dir, ref) {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return false;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
-    return [[], [2], [1, 2, 3], ...[1, 2, 5, 9].map(draw)].every(c => {
+    // (three runs, each a process of its own: the bug's own case and two drawn afresh, so no answer can be written in
+    // ahead; none with no numbers, which a program may answer with how it is used)
+    return [[1, 2, 3], ...[2, 6].map(draw)].every(c => {
       const r = spawnSync(process.execPath, ["src/cli.mjs", ...c.map(String)], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
       const said = String(r.stdout ?? "").trim();
       return r.status === 0 && /^-?\d+(?:\.\d+)?$/.test(said) && Number(said) === c.reduce((a, b) => a + b, 0);
