@@ -311,8 +311,9 @@ moved.apart = (core = HERE) => Object.fromEntries(Object.keys(moved(core)).map(o
 // that point stand at the old paths.
 export const MOVED_GLOB = '"core/modules/*.md"', NEW_GLOBS = ['"core/floor/topics/*.md"', '"core/roles/*.md"', '"core/roles/shared/*.md"', '"core/tasks/*.md"', '"core/tools/*.md"'], MOVED_GLOBS = NEW_GLOBS.join(", ");
 // A dated record of the project's own, which stays as it stands: a file of prose (.md or .txt) whose name opens with a
-// day (2026-11-16...), or one in a folder named archive, reports or records, outside the folders a host or a tool reads.
-const dated = f => /\.(md|txt)$/u.test(f) && !/^\.(github|claude|codex|kiro|agents?)\//u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.test(f) || /(^|\/)(archive|reports|records)\//u.test(f));
+// day (2026-11-16...), or one in a folder named archive, reports or records. What lies at the root under a name that
+// opens with a dot is read all the same (namers): there a host and the tools keep what they read.
+const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.test(f) || /(^|\/)(archive|reports|records)\//u.test(f));
 // The project's own files that may name a file of the core and that a check, a tool or a session reads as they stand
 // now: each rule file and each file a tool takes its instructions from, whatever its name or folder; every file at the
 // root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
