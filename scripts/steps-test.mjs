@@ -369,7 +369,8 @@ ok(at.licences === "config/licences.json" && at.audit === "config/audit.json" &&
   "the configs are read where the project's own workflow and its manifest's slot name them, and the audit and baseline as those configs name them", JSON.stringify(at));
 ok(runsOwn(ownP, "licences.mjs").length === 1 && !runsOwn(ownP, "exact-versions.mjs").length, "a workflow runs a script only where a step's run: value runs it, a comment that names it read as none");
 const dotted = { files: [], read: () => null, manifest: "", workflows: { "a.yml": { text: "x", yaml: { jobs: { j: { steps: [{ run: "node ./core/scripts/licences.mjs a.json\nnode vendor/core/scripts/copies.mjs b.json" }] } } } } } };
-ok(runsOwn(dotted, "licences.mjs").length === 1 && !runsOwn(dotted, "copies.mjs").length, "a script started as ./core/scripts/ is run; one under another folder's core/scripts/ is not the copy's");
+ok(runsOwn(dotted, "licences.mjs").length === 1 && runsOwn(dotted, "copies.mjs").every(r => r.unsure) && runsOwn(dotted, "copies.mjs").length === 1,
+  "a script started as ./core/scripts/ is run; one under another folder's core/scripts/ is not the copy's, and not read");
 // (the argument read as the shell reads it: past an option, through a line's continuation, quoted, and after a quoted
 // script; and a slot read in its own cell, past the script and any command)
 const passing = (run, manifest = "") => configs({ ...dotted, manifest, workflows: { "a.yml": { text: "x", yaml: { jobs: { j: { steps: [{ run }] } } } } } }).copies;
@@ -509,17 +510,17 @@ try { companion.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mj
 ok(companionThrew instanceof Unread, "a companion run the reader cannot place is not read as the core's", String(companionThrew));
 // (the review of 9358ea5: a word that only holds the script's name is no run, an expression ends the reading, and
 // env's -S joined to its value is read)
-ok(["time echo \"node core/scripts/copies.mjs config/c.json\"",   "sudo chmod +x ${{ github.workspace }}/core/scripts/copies.mjs", "time echo ${{ github.workspace }}/core/scripts/copies.mjs"]
+ok(["time echo \"node core/scripts/copies.mjs config/c.json\"", "sudo chmod +x ${{ github.workspace }}/core/scripts/copies.mjs", "time echo ${{ github.workspace }}/core/scripts/copies.mjs"]
   .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "a word that only holds the script's name, quoted or filled by an expression, is no run");
 ok(["env -S'node core/scripts/copies.mjs config/c.json'", "env --split-string='node core/scripts/copies.mjs config/c.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })), "env's -S joined to the commands it splits is read as giving them");
-ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs '$GITHUB_WORKSPACE/config/c.json'") }) === "$GITHUB_WORKSPACE/config/c.json" && copiesOf({ "a.yml": stepped("node '$GITHUB_WORKSPACE/core/scripts/copies.mjs' c.json") }) === "checks/copies.json",
+ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs '$GITHUB_WORKSPACE/config/c.json'") }) === "$GITHUB_WORKSPACE/config/c.json" && notRead("copies", { "a.yml": stepped("node '$GITHUB_WORKSPACE/core/scripts/copies.mjs' c.json") }),
   "the root's name in single quotes is text, never the root");
 // (the review of 1dd5dbf: a shell's file and that file's arguments are never its own commands; a command that runs no
 // script names it as text; env -S read only as env's; the exact-versions step asks of companions only where the licence
 // check runs)
 ok(["bash -e ./run.sh -c 'node core/scripts/copies.mjs other.json'", "bash -x script.sh -c 'node core/scripts/copies.mjs other.json'", "pwsh -File x.ps1 -Command 'node core/scripts/copies.mjs other.json'"]
   .every(line => notRead("copies", { "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }))
-  && ["echo Then run node core/scripts/copies.mjs your.json", "cp node core/scripts/copies.mjs /tmp", "echo env -S 'node core/scripts/copies.mjs x'"]
+  && ["echo Then run node core/scripts/copies.mjs your.json", "echo env -S 'node core/scripts/copies.mjs x'"]
     .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"),
   "a shell's file given arguments that name the script is not read, never read as the file's; a command that runs no script gives no run");
 const longEnv = Date.now();
@@ -534,7 +535,7 @@ ok(["sh -euo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "bash -e
   .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "a shell's options, clustered, abbreviated or with --, leave its -c string read");
 // (the commands that fetch or install, npx and curl, built from pieces, so that the licence check reads no tool here)
 const NPX = ["np", "x"].join(""), CURL = ["cu", "rl"].join("");
-ok(["sha256sum core/scripts/copies.mjs", "jq . core/scripts/copies.mjs", "gh pr comment -b 'run node core/scripts/copies.mjs x'", `${CURL} -d 'node core/scripts/copies.mjs' x`, "Write-Host core/scripts/copies.mjs"]
+ok(["sha256sum core/scripts/copies.mjs", "jq . core/scripts/copies.mjs", `${CURL} -d 'node core/scripts/copies.mjs' x`, "Write-Host core/scripts/copies.mjs"]
   .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "more commands that run no script name it as text");
 ok(["env -C app node ../core/scripts/copies.mjs c.json", "env --chdir=app node ../core/scripts/copies.mjs c.json", "sudo -D app node ../core/scripts/copies.mjs c.json"].every(run => notRead("copies", { "a.yml": stepped(run) })),
   "a wrapper that runs the command in another folder leaves the run not read");
@@ -565,6 +566,13 @@ ok(["awk 'BEGIN{system(\"node core/scripts/copies.mjs bad.json\")}'", "git -c al
   "a command that can run another, a second naming beside a read run, a path joined to a variable and a folder pushed are not read");
 const quotes = Date.now();
 ok(copiesOf({ "a.yml": stepped(`echo core/scripts/copies.mjs ${"\"\\".repeat(80000)}`) }) === "checks/copies.json" && Date.now() - quotes < 1500, "quotes are read in one pass", `${Date.now() - quotes} ms`);
+// (the review of 3085de7: a naming of scripts/<name> by any path, in any case or with quotes, ./ or // inside, is
+// counted; commands that can set up a run are no text)
+ok(["node my_scripts/copies.mjs x.json\ntimeout 60 node core/scripts/copies.mjs bad.json", "node ~/work/p/core/scripts/copies.mjs bad.json", "node Core/scripts/copies.mjs bad.json",
+  "node core/scripts/\"copies.mjs\" good.json\ntimeout 60 node core/scripts/copies.mjs bad.json", "node core/scripts/./copies.mjs bad.json\ntimeout 60 node core/scripts/copies.mjs x.json",
+  "gh alias set r '!node core/scripts/copies.mjs bad.json'\ngh r", "export NODE_OPTIONS='--import=./core/scripts/copies.mjs'\nnode x.mjs bad.json", "cp core/scripts/copies.mjs x.mjs\nnode x.mjs bad.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a naming by any other path, case, quote or ./ in it, and a command that sets up a run, leave the run not read");
+ok(copiesOf({ "a.yml": stepped("node core/scripts//copies.mjs config/c.json") }) === "config/c.json", "a path with // in it is read as the copy's");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
