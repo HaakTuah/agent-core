@@ -41,8 +41,6 @@ wanted").
 | #337 | builder | |
 | #357 | builder | |
 | #362 | builder | |
-| #370 | builder | |
-| #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
 | #386 | builder | #362, which changes the same file |
 | #393 | builder | |
 | #394 | builder | |

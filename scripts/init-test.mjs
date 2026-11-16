@@ -213,6 +213,39 @@ if (p.status === 0) {
     && narrowedCode.status === 1 && /\.github\/workflows\/[^ ]+\.yml \(code\)/u.test(narrowedCode.out) && mended(narrowedCode.out)
     && mendedRun.status === 0,
     "against the base, a baseline moved or a file left out of the config fails, saying its mend, and the mend passes; a config widened passes", `${same.out}${moved.out}${narrowed.out}${narrowedCode.out}${widened.out}${mendedRun.stdout}${mendedRun.stderr}`);
+  // (a file the base's config read, renamed out of every spec, is held by its new name, and the mend as worded passes;
+  // a file deleted is no narrowing; #371)
+  const baseRun = (config = ".github/copies.json") => { const r = spawnSync(process.execPath, ["scripts/copies.mjs", config], { cwd: core, env: { ...env, COPIES_BASE: "main" }, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+  git(core, "mv", "roles/shared/how-to-work.md", "elsewhere.md");
+  const renamedOut = baseRun();
+  git(core, "mv", "elsewhere.md", "roles/shared/how-to-work.md");
+  git(core, "rm", "-q", "roles/shared/how-to-work.md");
+  const deleted = baseRun();
+  git(core, "reset", "-q", "--hard", "main");
+  ok(renamedOut.status === 1 && /reads 1 files fewer than main's config read: elsewhere\.md \(prose\)\. Mend: take the config back/u.test(renamedOut.out) && mended(renamedOut.out) && deleted.status === 0,
+    "against the base, a file its config read and renamed out of every spec fails, by its new name, with its mend; one deleted passes", `${renamedOut.out}${deleted.out}`);
+  // (a config moved with the call that names it is held to the one the base called: narrowed or its baseline moved,
+  // it fails with its mend; moved whole, it passes; one beside a config still called is a first, held to nothing; #370)
+  const tests = path.join(core, ".github/workflows/tests.yml"), testsWas = fs.readFileSync(tests, "utf8"), cfgMain = JSON.parse(cfgWas);
+  const moveTo = (config, keepCall = false) => {
+    fs.writeFileSync(path.join(core, ".github/copies-two.json"), JSON.stringify(config));
+    git(core, "add", ".github/copies-two.json");
+    if (!keepCall) fs.writeFileSync(tests, testsWas.replaceAll(".github/copies.json", ".github/copies-two.json"));
+    const r = baseRun(".github/copies-two.json");
+    git(core, "reset", "-q", "--hard", "main");
+    return r;
+  };
+  const movedNarrow = moveTo({ ...cfgMain, prose: cfgMain.prose.filter(x => x !== "CLAUDE.md") });
+  fs.copyFileSync(path.join(core, ".github/copies-baseline.json"), path.join(core, ".github/moved.json"));
+  const movedBaseline = moveTo({ ...cfgMain, baseline: ".github/moved.json" });
+  fs.rmSync(path.join(core, ".github/moved.json"));
+  const movedWhole = moveTo(cfgMain), beside = moveTo({ ...cfgMain, prose: ["README.md"] }, true);
+  const calledInPlace = /\.github\/copies-two\.json, called in place of \.github\/copies\.json \(the config main's workflows call\),/u;
+  const backMoved = /Mend: take the config back as main holds it \(git checkout main -- \.github\/copies\.json\), and name it in the call again/u;
+  ok(movedNarrow.status === 1 && calledInPlace.test(movedNarrow.out) && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(movedNarrow.out) && backMoved.test(movedNarrow.out) && mended(movedNarrow.out)
+    && movedBaseline.status === 1 && calledInPlace.test(movedBaseline.out) && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(movedBaseline.out) && mended(movedBaseline.out)
+    && movedWhole.status === 0 && beside.status === 0,
+    "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, it passes", `${movedNarrow.out}${movedBaseline.out}${movedWhole.out}${beside.out}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;

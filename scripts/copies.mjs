@@ -4,9 +4,9 @@
 // copies, which are removed over time and never added to. A listed window gone or in fewer places fails too, so the
 // baseline only shrinks. A copy may move (cut from one place, pasted in another), since its places do not grow: moving
 // is how a fact reaches its better home. Against the base the config holds too: the baseline stays at the base's path,
-// and every file the base's config, and the base's SECURITY.md where it is asked, would read in the tree as it stands
-// is read still, as the same kind (#348); a path may be added. (A file moved out of what any spec reads is not
-// counted.) It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
+// and every file the base's config, and the base's SECURITY.md where it is asked, read is read still, as the same kind,
+// one renamed by its new name (#348, #371); a path may be added; and a config moved, with the call that names it, is
+// held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
 // none of them. Node's own modules only, so the check needs no install. It runs from the project's root, whatever the
 // directory it is started from.
 //
@@ -19,6 +19,7 @@
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
 // to add the project's rule files: those floor rule 3 names and those its SECURITY.md adds (rule-files.mjs, beside it).
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -39,7 +40,7 @@ try {
 }
 const ROOT = where[0], CORE = where[1].replace(/scripts\/$/u, "");
 const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template/copies.json.tmpl`;
-const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
 if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
 // (the config's path from the root, as git names it at the base: git says it, as it says the root, so no spelling of a
@@ -141,12 +142,50 @@ function find(files, units, size, joiner, minChars) {
   return { copies, dup };
 }
 
-// An empty list checks nothing: git ls-files would list every file.
-const ls = specs => {
+// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below).
+const ls = (specs, env = process.env) => {
   if (!specs.length) return [];
-  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
+  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
   catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${String(e.stderr || e.message).trim().split(/\r?\n/u)[0]}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
 };
+// The files pathspecs read in a commit's tree, as git lists them there: from an index of that tree, written to a
+// folder of its own and taken away after, so that every pathspec reads as it does in the tree as it stands.
+function lsAt(commit, specs) {
+  if (!specs.length) return [];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "copies-")), env = { ...process.env, GIT_INDEX_FILE: path.join(dir, "index") };
+  try {
+    execFileSync("git", ["read-tree", commit], { env, stdio: "ignore" });
+    return ls(specs, env);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+// What became of a commit's files in the tree as git holds it now: { to: each renamed file's new name, gone: those deleted }.
+function renamed(commit) {
+  const to = new Map(), gone = new Set(), parts = git(["diff", "-M", "--name-status", "-z", "--cached", commit, "--"]).split("\0");
+  for (let i = 0; i + 1 < parts.length;) {
+    const status = parts[i];
+    if (/^[RC]/u.test(status)) { if (status[0] === "R") to.set(parts[i + 1], parts[i + 2]); i += 3; }
+    else { if (status === "D") gone.add(parts[i + 1]); i += 2; }
+  }
+  return { to, gone };
+}
+// A config of this check's at a path of a commit (an object that names its baseline), or null.
+function configAt(commit, at) {
+  try { const c = JSON.parse(git(["show", `${commit}:${at}`])); return c && typeof c === "object" && !Array.isArray(c) && typeof c.baseline === "string" ? c : null; } catch { return null; }
+}
+// The paths of JSON files the workflows name, at a commit or (null) in the tree as it stands, each as a word of their text.
+function namedJson(commit) {
+  const files = (commit ? lsAt(commit, [".github/workflows"]) : ls([".github/workflows"])).filter(f => /\.ya?ml$/iu.test(f));
+  const text = files.map(f => { try { return commit ? git(["show", `${commit}:${f}`]) : fs.readFileSync(f, "utf8"); } catch { return ""; } }).join("\n");
+  return new Set([...text.matchAll(/[^\s"'`:,;=()[\]{}]+\.json(?![^\s"'`,;)\]}])/gu)].map(m => m[0].replace(/^\.\//u, "")));
+}
+// The base's config, each as { at, config }: the one at this config's path; where the base holds none there, each its
+// workflows named that the tree's workflows name no more (a config moved with its call); else none.
+function heldTo(commit) {
+  const here = configAt(commit, CONFIG_AT);
+  if (here) return [{ at: CONFIG_AT, config: here }];
+  const now = namedJson(null);
+  return [...namedJson(commit)].filter(at => !now.has(at)).map(at => ({ at, config: configAt(commit, at) })).filter(h => h.config);
+}
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
@@ -175,23 +214,31 @@ counted(base.windows, BASELINE);
 const from = process.env.COPIES_BASE;
 if (from) {
   try { git(["rev-parse", "--verify", `${from}^{commit}`]); } catch { console.error(`FAIL: COPIES_BASE ${from} is not a commit here. Mend: fetch it (git fetch origin ${from}) before the check runs`); process.exit(1); }
-  // The config is held to the base's too, so that the check never reads less than it did there: the baseline stays
-  // where the base keeps it (one moved would be held to nothing), and every file the base's config read is read still,
-  // as code or prose as it was, of the files the tree holds now (one left out would let its copies be dropped from the
-  // baseline). A config the base does not hold is the check's first on that branch, held to nothing. Any widening
-  // passes.
-  let was = null;
-  try { was = JSON.parse(git(["show", `${from}:${CONFIG_AT}`])); } catch { /* no config on that branch yet */ }
-  if (was && typeof was === "object" && !Array.isArray(was)) {
-    const back = `Mend: take the config back as ${from} holds it (git checkout ${from} -- ${CONFIG_AT}), then widen it if need be: a path may be added, never taken out`;
-    if (was.baseline !== BASELINE) fail(`${CONFIG_AT} moves the baseline from ${was.baseline} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
-    const specs = v => Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : [];
-    const lost = (kind, before, now) => { const keep = new Set(ls(now)); return ls(before).filter(f => !keep.has(f)).map(f => `${f} (${kind})`); };
+  // The config is held to the base's too, so that the check never reads less than it did there (#348): the baseline
+  // stays where the base keeps it (one moved would be held to nothing), and every file the base's config read is read
+  // still, as code or prose as it was: each the base's specs read in the tree as it stands, and each they read at the
+  // base, followed through a rename, a file deleted being no narrowing (#371). The base's config is the one at this
+  // path, or, where the base holds none here, each config its workflows named that the tree's workflows name no more,
+  // so that a config moved with its call is held all the same (#370). A config beside one still called, or where the
+  // base called none, is the check's first on that branch, held to nothing. Any widening passes.
+  const held = heldTo(from);
+  if (held.length) {
+    const at = held.map(h => h.at).join(" and "), moved = held[0].at !== CONFIG_AT;
+    const who = moved ? `${CONFIG_AT}, called in place of ${at} (the config ${from}'s workflows call),` : CONFIG_AT;
+    const back = `Mend: take the config back as ${from} holds it (git checkout ${from} -- ${at})${moved ? ", and name it in the call again" : ""}, then widen it if need be: a path may be added, never taken out`;
+    if (!held.some(h => h.config.baseline === BASELINE)) fail(`${who} moves the baseline from ${held.map(h => h.config.baseline).join(" and ")} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
+    const specs = key => held.flatMap(h => Array.isArray(h.config[key]) ? h.config[key].filter(x => typeof x === "string" && x) : []);
+    const moves = renamed(from);
+    const lost = (kind, before, now) => {
+      const keep = new Set(ls(now));
+      const read = new Set([...ls(before), ...lsAt(from, before).filter(f => !moves.gone.has(f)).map(f => moves.to.get(f) ?? f)]);
+      return [...read].filter(f => !keep.has(f)).map(f => `${f} (${kind})`);
+    };
     // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
     let wasRules = [];
-    if (was.proseFromSecurity === true) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }); } catch { /* the base read none */ }
-    const less = lost("code", specs(was.code), CODE_SPECS).concat(lost("prose", specs(was.prose).concat(wasRules), proseSpecs));
-    if (less.length) fail(`${CONFIG_AT} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
+    if (held.some(h => h.config.proseFromSecurity === true)) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }); } catch { /* the base read none */ }
+    const less = lost("code", specs("code"), CODE_SPECS).concat(lost("prose", specs("prose").concat(wasRules), proseSpecs));
+    if (less.length) fail(`${who} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
   }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
