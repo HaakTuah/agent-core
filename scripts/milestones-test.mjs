@@ -66,6 +66,12 @@ ok(limited.mends.length === 1 && /rate limit/.test(limited.mends[0]), "a read th
 const many = Array.from({ length: MOST + 1 }, (_, i) => `## Milestone #${100 + i}\n- #${200 + i}\n`).join("");
 const flood = run(file, `${file}${many}`);
 ok(flood.mends.length === 1 && /more than the 12/.test(flood.mends[0]) && flood.asked.length === 0, "a pull request that adds more headings than the check reads fails before any is read", flood);
+const most = run(file, `${file}${many.split("## ").slice(2).map(m => `## ${m}`).join("")}`);
+ok(most.mends.length === 0 && most.asked.length === MOST, "as many as the check reads are each read once, and pass", most);
+const away = run(`${file}${many}`, file);
+ok(away.mends.length === 1 && /adds or takes out 13/.test(away.mends[0]) && away.asked.length === 0, "taking out more headings than the check reads fails too, the two counted together", away);
+const both = run(`${file}${many.split("## ").slice(1, 7).map(m => `## ${m}`).join("")}`, `${file}${many.split("## ").slice(7).map(m => `## ${m}`).join("")}`);
+ok(both.mends.length === 1 && /adds or takes out 13/.test(both.mends[0]), "six taken out and seven added are thirteen", both);
 
 // what stood before fails nothing
 const old = "## Milestone: the first whole\n- #1\n## Milestone #5\n";
@@ -78,7 +84,7 @@ const all = [empty, unnamed, kept, dropped, shut, limited, flood].flatMap(r => r
 ok(all.length > 0 && all.every(m => mended(`FAIL ${m}`)), "every failure says its mend", all.filter(m => !mended(`FAIL ${m}`)));
 
 // the text under a heading
-ok(under("# A\nx\n## What the owner can try (now)\ny #3\n## Next\nz\n", "What the owner can try") === "y #3" && under("no heading", "What the owner can try") === null, "the text under a heading runs to the next");
+ok(under("## What the owner can try\n#4", "What the owner can try") === "#4" && under("# A\nx\n## What the owner can try (now)\ny #3\n## Next\nz\n", "What the owner can try") === "y #3" && under("no heading", "What the owner can try") === null, "the text under a heading runs to the next");
 
 // asked only of a pull request opened since the copy on its base held it
 const holds = "export const PLAN_SINCE = \"x\";";
