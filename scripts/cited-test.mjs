@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { after, citedFrom, citedIn, count, HEADING, lines, matchers, OPENERS, plain, report, roleOf, ROLES, startRules, texts } from "./cited.mjs";
+import { after, citedFrom, citedIn, count, HEADING, lines, matchers, mergedIn, OPENERS, plain, report, roleOf, ROLES, startRules, texts } from "./cited.mjs";
 import { mended } from "./mend.mjs";
 import { rules, rulesOf } from "./rules.mjs";
 import { body, countsFrom } from "./state-report.mjs";
@@ -61,6 +61,22 @@ const gh = route => { asked.push(route); const key = Object.keys(routes).find(k 
 const read = texts("o/n", "2026-10", gh);
 ok(read.pulls === 1 && read.comments === 3 && read.items.map(i => i.role).join() === "builder,builder,reviewer,reviewer",
   "the month's merged pull requests and comments are read, each as its role: none of another month, another account's or Codex's receipt", JSON.stringify(read));
+routes.pulls.push(pull(5, "2026-10-01T00:00:00Z", "the first second"));
+routes["issues/comments"].push(comment("2026-10-01T00:00:00Z", "Code review: the first second"), comment("2026-11-01T00:00:00Z", "Code review: the month after"));
+const edges = texts("o/n", "2026-10", gh);
+ok(edges.pulls === 2 && edges.comments === 4, "from the month's first second, and to the month after's first left out", JSON.stringify(edges));
+routes.pulls.pop(); routes["issues/comments"].splice(-2);
+// (a page of 100 asks for the next, until a page is short or holds only what was last updated before the month)
+const pages = { 1: Array.from({ length: 100 }, (_, i) => pull(100 + i, i ? "2026-09-30T00:00:00Z" : "2026-10-31T23:59:59Z")).map(p => ({ ...p, updated_at: "2026-10-02T00:00:00Z" })),
+  2: Array.from({ length: 100 }, (_, i) => ({ ...pull(300 + i, i ? null : "2026-10-02T00:00:00Z"), updated_at: i ? "2026-09-01T00:00:00Z" : "2026-10-02T00:00:00Z" })),
+  3: [pull(500, "2026-10-09T00:00:00Z")] };
+const paged = [];
+const merged = mergedIn("o/n", "2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z", r => { const n = /[?&]page=(\d+)/u.exec(r)[1]; paged.push(n); return JSON.stringify(pages[n] ?? []); });
+ok(merged.map(p => p.number).join() === "100,300,500" && paged.join() === "1,2,3", "the merged pull requests are read page by page, to a page that holds none updated in the month", `${merged.map(p => p.number)} ${paged}`);
+const all100 = Array.from({ length: 100 }, (_, i) => ({ ...pull(600 + i, "2026-10-10T00:00:00Z"), updated_at: "2026-09-01T00:00:00Z" }));
+const paged2 = [];
+mergedIn("o/n", "2026-10-01T00:00:00Z", "2026-11-01T00:00:00Z", r => { paged2.push(r); return JSON.stringify(paged2.length === 1 ? all100 : []); });
+ok(paged2.length === 1, "and stop at a full page whose every one was last updated before the month");
 ok(asked.some(r => r.includes("issues/comments?since=2026-10-01T00:00:00Z")) && after("2026-12") === "2027-01" && after("2026-09") === "2026-10", "the comments are asked for from the month's first day, and the month after is the next");
 const counted = count(read.items, m), starts = new Map(ROLES.map(r => [r, new Set(r === "builder" ? all.map(x => x.key) : [])]));
 const out = lines({ month: "2026-10", pulls: read.pulls, comments: read.comments, counted, starts });
