@@ -46,6 +46,7 @@ import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
+import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
@@ -206,7 +207,7 @@ function main(args) {
   const repo = job && /^[\w.-]+\/[\w.-]+$/.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY
     : repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
   const owner = ownerOf(manifest ?? "") ?? repo?.split("/")[0] ?? "";
-  const scripts = manifest === null ? "scripts" : "core/scripts";
+  const scripts = manifest === null ? "scripts" : `${pathIn(manifest)}scripts`;
   const say = line => { console.log(line); if (job && process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`); };
 
   // whether issues can be read and written here, as inbox.mjs asks it: no answer, nothing is done

@@ -39,7 +39,7 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_CREATED: ${{ github.event.pull_request.created_at }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GH_TOKEN: ${{ github.token }} # (read only: the commits and the copy's file on the base, for the day it gained the line)
+          GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, for the day it gained a line, and the issues a pull request queues or closes)
         run: |
           # (a diff that cannot be read counts as a change: each heading is asked for, never waived)
           parts=""

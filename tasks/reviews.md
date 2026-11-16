@@ -1,6 +1,7 @@
 # Reviews
 
-Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`): the kind `review`. What
+Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`), and by the session that takes
+the monthly state report, for point 8: the kind `review`. What
 reviewers judge by: `roles/shared/review-guidelines.md`.
 
 **Which:**
@@ -65,6 +66,12 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      not read shows where the form is not kept, and no check fails a pull request for it.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would (core archive 22).
+   - **It goes down the lines** (core archive 240; #305). By default, where the pull request's entry has "Done when"
+     lines (`tasks/done-when.md`), the design check asks of each whether it is met, with its proof and its "Ran:" and
+     "Saw:", whether the "If" case is tested, and whether anything outside the out of scope's line changed, and
+     reports each gap as blocking, and no preference. It does not mean it judges the lines' choice, which the
+     stand-in ruled on. Reason: a reading against the lines finds what the builder missed, one of taste what the
+     reviewer prefers. Held by no check: the design check's brief carries it.
 5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
    as floor rule 9 allows). A review from anyone else is advisory (core archive 130).
@@ -75,3 +82,19 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
    *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
    model with the floor, and nothing else.
+8. **A finding seen twice becomes a check** (core archive 219; #254). By default a kind of finding stays a point a
+   review holds a change to, and needs nothing more. Once the findings of a second pull request name the same rule
+   that stands (the core's, or the project's own in its `AGENTS.md` or `SECURITY.md`), which
+   `core/scripts/review-record.mjs` lists under "Found twice" from their lines `Rule:` ("A finding
+   names its rule" in `roles/shared/review-guidelines.md`), the session that takes the monthly state report, which
+   names the step, files for each rule listed that no open issue takes an issue naming the breach the findings share:
+   for a rule of the project's own, in the project, for a check that reads that breach exactly; for one of the core's,
+   in the core (`README.md`, "Reporting to the core"; in the core, its own), for such a check or, where none can read
+   it exactly, a staged case (`scripts/staged/`). The issue stays open until one holds it; each is a test for a rule
+   that stands, which needs no word of the owner's where the *owner's account* files it, and one another account files
+   is answered as "Reporting to the core" says. It does not mean that a finding seen once waits for anything, that
+   reviews stop raising the point before its holder merges, that a plain bug, which names no rule, is counted, nor that
+   anything fails a pull request. Reason: a correction that keeps coming up costs a round of review each time, while a
+   check says it at the moment it matters, to any tool. Held by `core/scripts/review-record.mjs`, which lists exactly
+   the rules two pull requests' findings name, and by the monthly state report the scheduled look opens; no check
+   reads that the issues are filed.

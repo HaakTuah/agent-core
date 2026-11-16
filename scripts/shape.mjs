@@ -67,6 +67,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, cycles, resolve } from "./code-shape.mjs";
+import { inProject, logged } from "./guards.mjs";
 import { FIRST_READS, PACKAGE_FILES, READERS, index, isCode, isPackageFile, linked, reading, shared } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
@@ -466,6 +467,7 @@ export function standingAt(commit, config) {
 // A config or a baseline is read and written only as a file of the project's own: never through a link, at the file
 // or at a folder on its way, which could lead outside the project (floor rule 13).
 export function notLinked(file, root = ".") {
+  if (!inProject(file)) refuse(`${file} lies outside the project`, "name it by its path from the project's root, with no \"..\" that leads above it: the check reads and writes only the project's own files");
   const parts = file.split("/");
   for (let i = 1; i <= parts.length; i++) {
     const found = tolerant(() => fs.lstatSync(path.join(root, ...parts.slice(0, i))));
@@ -692,7 +694,7 @@ function unwritten(self, base) {
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
   const news = unclaimed(current, stoodAt({ standing: () => standingAt(base.name, config) }, config), config.marks);
   const fail = byKind(news, found, current, config, `; a file of tests is not held to the marks once the project's own config names it under "tests"`);
-  for (const line of fail.flat()) console.error(line);
+  for (const line of fail.flat()) console.error(logged(line));
   if (fail.length) return 1;
   console.log(`ok   nothing new in how the code is put together against ${base.name}, by the starter kit's config: ${yet}`);
   return 0;
@@ -712,9 +714,9 @@ function check(config, at, self, found, base, named) {
   if (!fs.existsSync(notLinked(config.baseline))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
     base: base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config) } });
-  for (const note of v.notes) console.log(`note ${note}`);
+  for (const note of v.notes) console.log(`note ${logged(note)}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
-  for (const line of v.fail.flat()) console.error(line);
+  for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;
   console.log(`ok   nothing new in how the code is put together: ${plural(found.read.functions, "function")} and ${plural(found.read.imports, "import")} read, ${plural(v.listed, "old breach", "old breaches")} listed in ${config.baseline}, to be cleaned`);
   return 0;
@@ -737,5 +739,5 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${e.message}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
 }

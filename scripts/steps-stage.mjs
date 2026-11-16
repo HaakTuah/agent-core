@@ -223,4 +223,14 @@ export const STAGES = {
       if (!/^Paths:.*\btasks\/.*\btools\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^Paths: .*$/m, want));
     },
   },
+  "16 November 2026, a project in several repositories": {
+    asked: true,
+    // (a list of modules written before the module came, which neither takes it nor leaves it out; the mend leaves it out
+    // with its reason, as the step words it for a project in one repository)
+    stage: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/`repositories\.md`, /g, "").replace(/^Not taken: .*`repositories\.md`.*\r?\n/m, "")),
+    mend: dir => {
+      const manifest = read(dir, "core-manifest.md"), reason = "`repositories.md` (one repository, which no library carries the core into)";
+      write(dir, "core-manifest.md", /^Not taken: /m.test(manifest) ? manifest.replace(/^(Not taken: .*?)\.?$/m, `$1, ${reason}.`) : manifest.replace(/^(Floor: .*)$/m, `$1\nNot taken: ${reason}.`));
+    },
+  },
 };

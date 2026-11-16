@@ -173,7 +173,7 @@ try {
   git("config", "commit.gpgsign", "false"); // the machine's own git settings sign and hook nothing here
   git("config", "core.hooksPath", path.join(dir, ".no-hooks"));
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["code-shape.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["code-shape.mjs", "started.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   fs.mkdirSync(path.join(dir, "src"));
   for (let k = 0; k < 3; k++) {
     fs.writeFileSync(path.join(dir, "src/a.mjs"), `import { b } from './b.mjs';\nexport const a = ${k};\n`);

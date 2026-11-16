@@ -2,7 +2,9 @@
 // (workflow-run.mjs, beside this file), so that its shell is tested here before it runs in any project: on a scratch
 // project whose copy and calls are as they should be, and on each fault the check names (a default branch of another
 // name, a difference from the floor or the review guidelines, a manifest without its one pin or one owner's account, a
-// pin off the core's main, a call pinned where its workflow differs or written in another form). The copy's own faults
+// pin off the core's main, a call pinned where its workflow differs or written in another form), and on where the copy
+// stands (tasks/repositories.md): at another path the manifest names, and carried by a library, its files committed or
+// a submodule, with the floor's own copy it keeps until every tool has passed the staged cases. The copy's own faults
 // (an edit, a file added, a link, a submodule, one whose id is the copy's own tree; the executable bit no difference)
 // are pure-sync-test.mjs's, which runs this job on each; a report whose name git quotes is left out here as the copy
 // leaves it out, while a top-level name that only ends in a tab and "reports" is kept, as the copy keeps it. A scratch core of two commits on its main and one off it,
@@ -61,17 +63,22 @@ const CALLS = (terms = B, core = A) => `name: core\non:\n  pull_request:\njobs:\
 let n = 0;
 // The check's verdict on a project whose copy is the core at `at` (B unless said), with the files given in place of the
 // usual ones.
-function check(files = {}, { branch = "main", at = B, without = null } = {}) {
+// `under` is the folder the copy is written to, and `floor` one a copy of the core's floor/ is written to besides; `then`
+// changes the project before its commit.
+function check(files = {}, { branch = "main", at = B, without = null, under = "core", floor = null, then = null, base = env } = {}) {
   const dir = path.join(tmp, `project-${++n}`);
-  fs.mkdirSync(path.join(dir, "core"), { recursive: true });
+  fs.mkdirSync(path.join(dir, under), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", at], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  const archive = (...paths) => execFileSync("git", ["archive", at, ...paths], { cwd: theCore, env, maxBuffer: 1 << 28 });
+  execFileSync("tar", ["-x", "-f", "-", "-C", under], { cwd: dir, input: archive() });
+  if (floor) { fs.mkdirSync(path.join(dir, floor), { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", floor, "--strip-components=1"], { cwd: dir, input: archive("floor") }); }
   for (const [f, text] of Object.entries({ "core-manifest.md": MANIFEST(), ".github/workflows/core.yml": CALLS(), ...files })) write(dir, f, text);
-  if (without) fs.rmSync(path.join(dir, "core", without));
+  if (without) fs.rmSync(path.join(dir, under, without));
+  if (then) then(dir);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "a project");
   const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: branch, private: false }, pull_request: { base: { sha: "" } } } };
-  const [job] = runWorkflow(workflow, { github, base: env, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
+  const [job] = runWorkflow(workflow, { github, base, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 const passes = (what, ...args) => { const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
@@ -102,6 +109,58 @@ if (D) {
   passes("a copy of a commit with a top-level name that only ends in a tab and \"reports\", which the copy keeps", { "core-manifest.md": MANIFEST(D) }, { at: D });
   fails("and that copy without it", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(D) }, { at: D, without: tabbed });
 } else console.log("note a name holding a tab cannot be made here (Windows), so that case is not tried");
+// where the copy stands (tasks/repositories.md): the path the manifest's line names, and a core a library carries
+const AT = (path, pin = B) => MANIFEST(pin).replace("copied whole under core/", `copied whole under ${path}`);
+const CARRIED = (lib, under, floorCopy = "floor-copy/") => MANIFEST().replace(/^Core: .*$/m, `Core: ${CORE}, carried by ${lib} under ${under} (never edited here).${floorCopy ? `\nFloor copy: ${floorCopy}` : ""}`);
+const LIBRARY = { "lib/core-manifest.md": MANIFEST(), "AGENTS.md": "# A project\n\n@floor-copy/security.md\n@lib/core/roles/builder.md\n" };
+passes("a copy at the path the manifest names", { "core-manifest.md": AT("vendor/the-core/") }, { under: "vendor/the-core" });
+fails("a copy elsewhere than the path the manifest names", "vendor/the-core/ is no folder of this commit", { "core-manifest.md": AT("vendor/the-core/") });
+fails("a path where an install writes", "where no checkout holds the files", { "core-manifest.md": AT("node_modules/the-core/") }, { under: "node_modules/the-core" });
+fails("a path with a segment that climbs out, after a plain one", "has no one \"Core:", { "core-manifest.md": AT("core/../evil/") }, { under: "core" });
+fails("a path that climbs out of the repository", "has no one \"Core:", { "core-manifest.md": AT("../core/") });
+passes("a core a library carries, its files committed, with the floor's own copy", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY }, { under: "lib/core", floor: "floor-copy" });
+fails("without the floor's own copy, while no tool has passed the staged cases carried and no-floor", "not every agent tool has passed", { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
+fails("with a floor's copy that differs from the floor at the pin", "floor-copy/ differs from the floor of the core at its pin", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY, "floor-copy/security.md": "edited\n" }, { under: "lib/core", floor: "floor-copy" });
+fails("with a floor's copy that AGENTS.md does not name", "AGENTS.md does not name floor-copy/security.md", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY, "AGENTS.md": "# A project\n\n@lib/core/floor/security.md\n" }, { under: "lib/core", floor: "floor-copy" });
+fails("with a floor's copy named that is not there", "floor-copy/, the floor's own copy core-manifest.md names, is no folder", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY }, { under: "lib/core" });
+fails("a carried core whose path is not the library's", "the library's manifest under lib/core/", { "core-manifest.md": CARRIED("lib/", "lib/other/"), ...LIBRARY }, { under: "lib/core", floor: "floor-copy" });
+fails("a carried core whose copy differs from the core at the library's pin", "lib/core/ differs from the core at its pin", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY, "lib/core/README.md": "edited\n" }, { under: "lib/core", floor: "floor-copy" });
+fails("a library that is not in this commit", "the library lib, which core-manifest.md says carries the core, is no folder or submodule", { "core-manifest.md": CARRIED("lib/", "lib/core/") }, { floor: "floor-copy" });
+fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one", { "core-manifest.md": CARRIED("lib/", "lib/core/"), "lib/core-manifest.md": "# Core manifest\n" }, { under: "lib/core", floor: "floor-copy" });
+{
+  // (a submodule: the library's commit pinned here, fetched by the check from the https address .gitmodules gives it,
+  // here a library of the test's own reached through a rewrite, and held to the core at the library's pin)
+  const libRepo = path.join(tmp, "the-library"), address = "https://example.invalid/the-library";
+  fs.mkdirSync(path.join(libRepo, "core"), { recursive: true });
+  git(libRepo, "init", "-q", "-b", "main");
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: libRepo, input: execFileSync("git", ["archive", B], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  write(libRepo, "core-manifest.md", MANIFEST());
+  git(libRepo, "add", "-A"); git(libRepo, "commit", "-q", "-m", "the library");
+  git(libRepo, "config", "uploadpack.allowAnySHA1InWant", "true");
+  const good = git(libRepo, "rev-parse", "HEAD");
+  write(libRepo, "core/README.md", "edited\n"); git(libRepo, "commit", "-q", "-am", "an edited copy");
+  const edited = git(libRepo, "rev-parse", "HEAD");
+  const n = Number(env.GIT_CONFIG_COUNT), reach = { ...env, GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(libRepo)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: address };
+  const sub = (sha, url = address) => ({ base: reach, floor: "floor-copy", then: dir => { fs.mkdirSync(path.join(dir, "lib")); write(dir, ".gitmodules", `[submodule "lib"]\n\tpath = lib\n\turl = ${url}\n`); git(dir, "update-index", "--add", "--cacheinfo", `160000,${sha},lib`); } });
+  const files = { "core-manifest.md": CARRIED("lib/", "lib/core/"), "AGENTS.md": LIBRARY["AGENTS.md"] };
+  passes("a core a submodule carries, its commit fetched with no token and its copy the core at the library's pin, with the floor's own copy", files, sub(good));
+  fails("a submodule whose commit holds a copy that differs from the core", "lib/core/ differs from the core at its pin", files, sub(edited));
+  fails("a submodule with no https address", "could not be fetched at the commit pinned here", files, sub(good, slash(libRepo)));
+  fails("a floor's copy beside a submodule, that differs from the floor at the library's pin", "floor-copy/ differs from the floor", { ...files, "floor-copy/security.md": "edited\n" }, sub(good));
+}
+{
+  // (the staged cases' record on the core's main: a tool counts as passed by its own runs alone)
+  const record = tools => ({ runs: tools.map(tool => ({ at: "2026-11-16", tool, cases: { carried: { verdict: "pass" }, "no-floor": { verdict: "pass" } } })) });
+  const onMain = (tools, what) => { write(theCore, "reports/staged-cases.json", `${JSON.stringify(record(tools))}\n`); git(theCore, "add", "-A"); git(theCore, "commit", "-q", "-m", what); };
+  const all = JSON.parse(fs.readFileSync(path.join(root, "scripts/staged-tools.json"), "utf8")).tools;
+  onMain(all.slice(0, 1), "one tool passed");
+  fails("a carried core with no floor's copy, where only one tool has passed and the others never ran the cases", `${all[1]} (carried)`, { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
+  write(theCore, "reports/staged-cases.json", `${JSON.stringify({ runs: record(all).runs.map((r, i) => (i ? r : { ...r, cases: { ...r.cases, carried: { verdict: "pass", wrong: "the session read the floor from a copy the case left" } } })) })}\n`);
+  git(theCore, "add", "-A"); git(theCore, "commit", "-q", "-m", "a pass found wrong");
+  fails("where one tool's last pass was found wrong, which proves nothing", `${all[0]} (carried)`, { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
+  onMain(all, "every tool passed");
+  passes("and once every tool the core names has passed both, it needs no floor's copy", { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
+}
 passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check`);

@@ -47,9 +47,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # nothing after the checkout needs the token
+      - name: Where the core's copy stands, for the copies, pointer, size and shape checks (core-manifest.md's "Core:" line; the core's tasks/repositories.md)
+        id: core-at
+        run: |
+          at=$(sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\4 \2#p' core-manifest.md 2>/dev/null | head -n 1)
+          set -- ${at:-core/}; [ -z "${2:-}" ] || [ -e "$1scripts" ] || git submodule update --init --depth 1 -- "${2%/}" || { echo "FAIL the library ${2%/}, a submodule that carries the core, could not be fetched here. Mend: commit the library's files in this repository, or make the submodule one this workflow can fetch with no token."; exit 1; }; echo "CORE_AT=$1" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+          node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The base branch's latest commit, for its baseline and marks (not the whole history)
         if: github.event_name == 'pull_request'
         env:
@@ -59,31 +64,31 @@ jobs:
         env:
           COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           CONFIG: ${{ inputs.config }}
-        run: node core/scripts/copies.mjs "$CONFIG"
+        run: node "$CORE_AT"scripts/copies.mjs "$CONFIG"
       - name: Every pointer in the rule files leads somewhere
         if: ${{ !cancelled() }}
-        run: node core/scripts/pointers.mjs
+        run: node "$CORE_AT"scripts/pointers.mjs
       - name: The files every session reads keep to their marks
         if: ${{ !cancelled() }}
         env:
           SIZES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           SIZES: ${{ inputs.sizes }}
-        run: node core/scripts/reading-size.mjs "$SIZES"
+        run: node "$CORE_AT"scripts/reading-size.mjs "$SIZES"
       - name: No workflow names the forbidden trigger or gives a key twice
         if: ${{ !cancelled() }}
         env:
           WORKFLOWS_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node core/scripts/workflows.mjs
+        run: node "$CORE_AT"scripts/workflows.mjs
       - name: Each agent tool's entry file pulls in every file AGENTS.md names
         if: ${{ !cancelled() }}
         env:
           ENTRY_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node core/scripts/entry-files.mjs
+        run: node "$CORE_AT"scripts/entry-files.mjs
       - name: The manifest takes or leaves out each module and fills each slot they use (reports, never fails)
         if: ${{ !cancelled() }}
-        run: node core/scripts/manifest-reads.mjs
+        run: node "$CORE_AT"scripts/manifest-reads.mjs
       - name: Nothing new in how the code is put together
         if: ${{ !cancelled() }}
         env:
           SHAPE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node core/scripts/shape.mjs
+        run: node "$CORE_AT"scripts/shape.mjs

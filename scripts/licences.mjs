@@ -32,9 +32,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inProject, leadsOut, logged, parseBounded } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 // Every licence the Open Source Initiative approves, as the SPDX licence list marks them (isOsiApproved, deprecated ids
 // left out; the list of 28 October 2026). Left out: BSD-ask-to-endorse, newer than the SPDX list the pinned dependency
@@ -261,6 +263,22 @@ export function scriptsOff(npmrc) {
   return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
+/** A file of the project's own at `f`, from its root `root`, as text: one reached through a link that leads out of the
+ *  project is refused, never read. */
+function ownText(root, f) {
+  if (leadsOut(root, join(root, f))) throw new Error(`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link`);
+  return readFileSync(join(root, f), "utf8");
+}
+
+/** What every npm config file of the project sets that is not allowed: each line, or the file, where a link leads it
+ *  out of the project, which is not read. */
+function npmrcFailures(root) {
+  return npmrcFiles(root).flatMap((f) => {
+    if (leadsOut(root, join(root, f))) return [`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link, or take it out`];
+    return registryOverrides(readFileSync(join(root, f), "utf8")).map((l) => `${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
+  });
+}
+
 /** Every npm config file under `root` (`.npmrc`, or any name ending in it), but in `node_modules` and `.git`. */
 function npmrcFiles(root, dir = "") {
   return readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
@@ -313,6 +331,7 @@ export function loadConfig(path) {
     if (!Array.isArray(s.served)) throw new Error('the config\'s "scan" does not say what reaches users. Mend: add "served", the folders whose files reach users, or "served": [] if none does');
     if (!config.audit) throw new Error('the config\'s "scan" needs an "audit" to hold what it finds. Mend: name the audit\'s file in "audit"');
   }
+  within(config);
   config = normalised(config);
   const beside = (config.lockfiles ?? []).map((f) => posix.join(posix.dirname(f), "package.json"));
   const loose = config.ships.filter((m) => !beside.includes(m));
@@ -322,6 +341,16 @@ export function loadConfig(path) {
   if (odd.length) throw new Error(`"data" or "fonts" names what is no npm package name: ${odd.join(", ")}. Mend: name each package as npm does`);
   acceptedList(config.accepted, "accepted", ACCEPTED_NPM, "<name>@<version>", { entries: true });
   if ((config.accepted ?? []).some((a) => a.entry !== undefined) && !config.audit) throw new Error('the config\'s "accepted" names an audit entry, and the config names no "audit". Mend: name the audit\'s file in "audit", or take that yes out');
+  return config;
+}
+
+/** The config's paths, each held to the project: one rooted, or with a ".." that leads above the project's root, is
+ *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it: the
+ *  config, where none is. */
+function within(config, root) {
+  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), config.audit, config.notices].filter((p) => p !== undefined);
+  const out = named.filter((p) => !inProject(p) || (root !== undefined && leadsOut(root, join(root, p))));
+  if (out.length) throw new Error(`the config names a path outside the project: ${out.map((p) => logged(p)).join(", ")}. Mend: name each file by its path from the project's root, with no ".." that leads above it, and make it a file of the project's own, reached through no link that leads out of it`);
   return config;
 }
 
@@ -358,9 +387,12 @@ export function lockRead(packages, workspaces) {
 }
 
 /** Every package each lockfile installs, with its licence, whether it ships, and the name its registry address gives. */
-function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join(root, f), "utf8")) {
+function lockfilePackages(root, lockPath, ships, text = (f) => ownText(root, f)) {
   const base = posix.dirname(lockPath) === "." ? "" : posix.dirname(lockPath);
-  const read = (p) => JSON.parse(text(posix.join(base, p)));
+  const read = (p) => {
+    const f = posix.join(base, p), t = text(f);
+    try { return parseBounded(t); } catch (e) { throw new Error(`${f} cannot be read as JSON (${e.message}). Mend: write it as npm does, the lock file anew with npm, never by hand: its install, given --package-lock-only`); }
+  };
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
@@ -381,7 +413,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join
  * { failures, reports, summary }.
  */
 export function check(config, root, base = null, baseConfig = null) {
-  config = normalised(config);
+  config = normalised(within(config, root));
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the
@@ -424,7 +456,7 @@ export function check(config, root, base = null, baseConfig = null) {
   }
   let entries = [];
   if (config.audit) {
-    try { entries = JSON.parse(readFileSync(join(root, config.audit), "utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    try { entries = parseBounded(readFileSync(join(root, config.audit), "utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
     // (an entry held at the base as it stands: the same name, version and licence)
     let before = [];
@@ -466,9 +498,7 @@ export function check(config, root, base = null, baseConfig = null) {
   }
   const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? []) : undefined;
   if (scanned) failures.push(...scanned.failures);
-  for (const f of npmrcFiles(root)) {
-    for (const l of registryOverrides(readFileSync(join(root, f), "utf8"))) failures.push(`${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
-  }
+  failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
@@ -494,21 +524,21 @@ export function actionLists(config) {
 }
 
 if (started(import.meta.url)) {
-  const fail = (msg) => { console.error(`FAIL: ${msg}`); process.exit(1); };
+  const fail = (msg) => { console.error(`FAIL: ${logged(msg)}`); process.exit(1); };
   const configPath = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!configPath) fail("no config was named. Mend: name it: node core/scripts/licences.mjs <config> [--action]");
   let config, root;
   try {
     config = loadConfig(configPath);
-    root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
+    root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
   } catch (e) { fail(e.message); }
   if (process.argv.includes("--action")) {
     for (const line of actionLists(config)) console.log(line);
   } else {
     let result;
     try { const base = baseOf(root); result = check(config, root, base, configAt(root, base, configPath)); } catch (e) { fail(e.message); }
-    for (const r of result.reports) console.log(`REPORT: ${r}`);
-    for (const f of result.failures) console.error(`FAIL: ${f}`);
+    for (const r of result.reports) console.log(`REPORT: ${logged(r)}`);
+    for (const f of result.failures) console.error(`FAIL: ${logged(f)}`);
     console.log(result.summary);
     process.exit(result.failures.length ? 1 : 0);
   }
