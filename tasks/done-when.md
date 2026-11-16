@@ -1,7 +1,7 @@
 # Done when
 
 Read when a task builds or changes something a project's users will notice, and when such a task's issue is filed or
-queued (core archive 240; #305): the kind `feature`. An issue is of that kind where it says so, by a label `feature`
+queued (#305): the kind `feature`. An issue is of that kind where it says so, by a label `feature`
 or under "What to read"; the idea template asks its filer to.
 
 - **An entry says how done will be judged.** By default a feature's issue holds, under the heading "Done when", two to
