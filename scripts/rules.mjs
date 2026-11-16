@@ -1,5 +1,5 @@
 // The rules of the floor and the modules, as a machine reads them (AGENTS.md, "Every rule says what holds it"; #235,
-// part D): each paragraph or item of a list in floor/*.md and modules/*.md whose text opens with a bold lead is a rule,
+// part D): each paragraph or item of a list in the floor's files, the roles' and the modules' whose text opens with a bold lead is a rule,
 // named by its file and that lead ("floor/security.md: 1. Nothing secret in the repository"). Its text runs to the next
 // rule at its own depth or above, a heading, or a line that leaves its item, so an item's own items are part of it as
 // well as rules of their own. What holds each is named in holders.json, beside this file (holders.mjs); a staged case

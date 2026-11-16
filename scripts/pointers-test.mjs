@@ -53,8 +53,8 @@ r = run(cites("As floor rule 19 says (core archive 999)."));
 ok(r.code === 0 && /note .*floor rule 19: no such rule in the floor/.test(r.out) && /note .*core archive 999: no such item in the archive/.test(r.out), "in a project, a floor rule or an archive item that is not there is listed, each named, and fails nothing: a sync never fails a project over a citation of its own");
 ok(/read and not found/.test(r.out) && !/\(2 in forms it cannot read/.test(r.out), "and it is listed as read and not found, not as a form it cannot read", r.out);
 // a file that only points: a pointer through it leads to what stands where it names
-const MOVED = { "core/modules/git.md": "# Moved: Git\n\n`roles/shared/git.md` holds these rules now.\n", "core/roles/shared/git.md": "# Git\n\n- **Push after every commit,** always.\n\n1. One.\n2. Two.\n",
-  "core/floor/topics.md": "# Moved: the floor, by topic\n\n`floor/topics/` holds these rules now, a file a topic.\n", "core/floor/topics/licences.md": "# Licences\n\n**10. Licences.** Text.\n\n## Reporting\n\nText.\n" };
+const MOVED = { "core/modules/git.md": "# Moved: Git\n\n[`roles/shared/git.md`](../roles/shared/git.md) holds these rules now: read it whole.\n", "core/roles/shared/git.md": "# Git\n\n- **Push after every commit,** always.\n\n1. One.\n2. Two.\n",
+  "core/floor/topics.md": "# Moved: the floor, by topic\n\n[`floor/topics/`](topics/) holds these rules now, a file a topic: read the one the task touches.\n", "core/floor/topics/licences.md": "# Licences\n\n**10. Licences.** Text.\n\n## Reporting\n\nText.\n" };
 r = run({ ...cites("As `core/modules/git.md`, \"Push after every commit\", says, with `core/modules/git.md`, point 2, and \"Reporting\" in `core/floor/topics.md`, and `core/floor/topics.md`, rule 10."), ...MOVED });
 ok(r.code === 0, "a pointer through a file that only points leads to the section or the point where it now stands, in the file it names or a folder's own files");
 r = run({ ...cites("As `core/modules/git.md`, \"Push once\", says, with `core/modules/git.md`, point 3."), ...MOVED });
@@ -81,9 +81,9 @@ try {
   ok(nineteen.status === 1 && mended(nineteen.out) && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor\. Mend: point it at/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** Text.\n");
   // (a file that points from a path the rules left is read too: the path it names and its import line)
-  const points = core("modules/a.md", "# Moved: A module\n\n`tasks/a.md` holds these rules now: read it whole.\n\n@../tasks/a.md\n");
+  const points = core("modules/a.md", "# Moved: A module\n\n[`tasks/a.md`](../tasks/a.md) holds these rules now: read it whole.\n\n@../tasks/a.md\n");
   ok(points.status === 0, "in the core's own run a file at a path the rules left is read: the path it names and its import line, each leading to a file", points.out);
-  const astray = core("modules/a.md", "# Moved: A module\n\n`tasks/gone.md` holds these rules now: read it whole.\n\n@../tasks/gone.md\n");
+  const astray = core("modules/a.md", "# Moved: A module\n\n[`tasks/gone.md`](../tasks/gone.md) holds these rules now: read it whole.\n\n@../tasks/gone.md\n");
   ok(astray.status === 1 && mended(astray.out) && /modules\/a\.md:3: `tasks\/gone\.md` is no tracked file or folder/.test(astray.out) && /modules\/a\.md:5: the import line @\.\.\/tasks\/gone\.md leads to no tracked file/.test(astray.out), "and one whose path or import line leads nowhere fails, each named", astray.out);
   fs.rmSync(path.join(coreDir, "modules"), { recursive: true });
   const capital = core("tasks/a.md", "# A module\n\nFloor rule 16 says so (Core archive 998).\n");

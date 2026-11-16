@@ -346,9 +346,10 @@ function upgrade(p, from, ownChanges, expect) {
   for (const lead of asked) STAGES[lead].mend(p.dir);
   if (asked.length) {
     git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "what the release asks of every project");
-    // (the mend is a pull request of the project's own: it passes every check, read against the project before it)
-    const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended });
-    ok(!failures(onMend), `${p.name}: the pull request that makes those mends passes every check (${started(onMend).length} jobs)`, failures(onMend));
+    // (the mend is a pull request of the project's own: it passes the copies workflow, where the checks that read a
+    // config or a rule file against the pull request's base run; the other workflows read nothing a mend changes)
+    const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended, only: "copies.yml" });
+    ok(!failures(onMend) && onMend.some(([, r]) => r.ran), `${p.name}: the pull request that makes those mends passes the copies workflow's checks, read against the project before it`, failures(onMend));
   }
   r = steps();
   ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);

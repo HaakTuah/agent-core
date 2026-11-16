@@ -84,7 +84,7 @@ const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseli
 // The files every session reads at its start, as the AGENTS.md template imports them: the reading-size check's marks,
 // and of the core's own (those under core/) what the core's cap counts (size.mjs).
 export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/roles/shared/how-to-work.md",
-  "core/roles/shared/inbox.md", "core/roles/shared/work-flow.md", "core/roles/shared/git.md", "core/tools/claude.md", "core/tools/other-builders.md"];
+  "core/roles/shared/inbox.md", "core/roles/shared/work-flow.md", "core/tools/claude.md", "core/tools/other-builders.md"];
 const KB = 1024;
 
 // A project's name as it may stand in a rule file's heading: letters, digits and blanks, and the few marks a name

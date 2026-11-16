@@ -1,5 +1,5 @@
 // What this session has spent so far, as the one line a PR's description ends with ("Work from main" in
-// roles/shared/git.md): the tokens of every answer in Claude Code's own record of the session and of the helpers it
+// roles/shared/work-flow.md): the tokens of every answer in Claude Code's own record of the session and of the helpers it
 // started, each answer counted once. That record can lose answers while the session goes on, so the script keeps a
 // tally of its own beside it, `session-cost/<the session's id>.json` in Claude Code's folder: every answer it has
 // counted, by its id, with its four counts and its model's family. Each run adds what the record holds now, and the

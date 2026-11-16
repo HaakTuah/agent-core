@@ -8,7 +8,7 @@
 //   [text](path)               a tracked file or folder, relative to the file it is in (a web address is not checked)
 //   @path.md                   a line that is an import and nothing else: a tracked file, relative to the file it is in
 //   `path`, "Section"          a heading, or a bold lead-in, in that file ("Section" in `path` and `path` ("Section") too);
-//                              through a file that only points ("`<path>` holds these rules now"), in what it names
+//                              through a file of the core's that only points (at a path its rules left), in what it names
 //   `path`, rule 3             a numbered point in that file (point, points 4 and 9, rules 1 to 4)
 //   "Section", point 6         a numbered point in that section (point 6 of "Section" too)
 //   ("Section"), point 6       with no file: the file the pointer is in; a lone point: its own section's list
@@ -66,11 +66,13 @@ function parse(file) {
 }
 // "Reviews" leads to "Reviews: only a 10 passes", "Status" to "Status (3 November 2026): ...".
 const sectionIn = (file, title) => parse(file).anchors.find(a => a.title === title || /^[:,( ]/.test(a.title.slice(title.length)) && a.title.startsWith(title));
-// A file that only points, as each file at a path the core's rules left does in a line "`<path>` holds these rules
-// now": a pointer through it leads to what stands there, in the file named or, for a folder, in the folder's own files.
-// The file itself comes first, for what it still names by itself.
+// A file that only points: each file of the core's at a path its rules left (under modules/, and floor/topics.md) says
+// in a line which file or folder "holds these rules now", as a link whose text is the path from the core's root. A
+// pointer through it leads to what stands there, in the file named or, for a folder, in the folder's own files. The
+// file itself comes first, for what it still names by itself; no other file is followed, whatever it says.
 function standsIn(file) {
-  const to = /^`([^`\s]+)` holds these rules now\b/mu.exec(parse(file).lines.join("\n"))?.[1];
+  const left = file.startsWith(`${HOME}modules/`) || file === `${HOME}floor/topics.md`;
+  const to = left ? /^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now\b/mu.exec(parse(file).lines.join("\n"))?.[1] : undefined;
   if (!to) return [file];
   const at = HOME + to;
   return [file, ...(to.endsWith("/") ? tracked.filter(f => f.startsWith(at) && f.endsWith(".md") && !f.slice(at.length).includes("/")) : tracked.filter(f => f === at))];
@@ -114,7 +116,7 @@ for (const rf of RULES) {
   // (a line that is an import and nothing else, "@<a path to a Markdown file>", leads to that file from the folder it
   // is in, as a tool that follows such a line reads it; in a project one that leads nowhere is listed, never failed)
   lines.forEach((l, i) => {
-    const to = /^@((?:\.{1,2}\/)*[\w.-]+(?:\/[\w.-]+)*\.md)\s*$/u.exec(l)?.[1];
+    const to = l.length < 400 ? /^@([\w./-]+\.md)\s*$/u.exec(l)?.[1] : undefined;
     if (!to) return;
     count++;
     if (!files.has(posix.normalize(posix.join(posix.dirname(rf), to)))) (CORE ? broken : unread).push(`${rf}:${i + 1}: the import line @${to} leads to no tracked file`);

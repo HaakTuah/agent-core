@@ -39,7 +39,7 @@ same rules.
 
 **A change of tool loses nothing** (core archive 232). The state of a task is in the repository and never only in a
 session: its branch, pushed after every commit, its pull request's description with the note where to pick up, its
-line in the *progress file* and what it waits on (`roles/shared/git.md`). Where a builder's tool stops (its usage spent,
+line in the *progress file* and what it waits on (`roles/shared/work-flow.md`). Where a builder's tool stops (its usage spent,
 say), a fresh builder of any tool picks up from the branch (`roles/orchestrator.md`, "A stalled lane"). It does not
 mean that the tool that stopped hands over by itself. Reason: when one provider's usage ran out, everything held only
 in its sessions stopped with them. Held, in part, by `scripts/stalled.mjs`, which the look and the orchestrator run.

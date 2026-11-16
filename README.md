@@ -20,7 +20,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 - **The modules** (`roles/shared/`, `tasks/`, `tools/`): everything else the projects share, one file per thing a reader
   looks up, in a folder whose name says who reads it or when, each saying in its opening line when it is read, in words
   a script matches: a kind of task, a path, a tool. `roles/shared/` holds what more than one role reads at its start
-  (`how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, `review-guidelines.md`); `tools/` each agent tool's part,
+  (`how-to-work.md`, `inbox.md`, `work-flow.md`, which holds the rules on git since the two were always read together,
+  and `review-guidelines.md`); `tools/` each agent tool's part,
   read when that tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and
   `other-builders.md` for every tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`,
   `reviews.md`, `tools.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md`, `cleaning.md`; for a
@@ -161,7 +162,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      (`tasks/code-shape.md`). `mutate.mjs` is the core's own tool, for code run by Node with tests that are files
      run by `node`.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
-     description lacks one of the headings `roles/shared/git.md` names (or those the project gives it), the line that says
+     description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`); the two lines
      only of a pull request opened since the project's copy held them.
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
@@ -305,7 +306,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    difference is the project's owner's to give, the owner's word quoted in the PR that lists it; until it is given the
    module's rule holds, and the work goes on by it (or, where its letter would defeat its purpose, by "Principles over
    rules"). None is against the floor, against what a floor rule rests on (who reviews a change and who may merge it, in
-   `tasks/reviews.md`, `tasks/roles.md` and `roles/shared/git.md`: no session reviews its own work), or against the
+   `tasks/reviews.md`, `tasks/roles.md` and `roles/shared/work-flow.md`: no session reviews its own work), or against the
    review guidelines. `core.yml` fails a manifest whose differences name the floor or the review guidelines: a tripwire
    for the plain case, while what holds the rule is the reviews every change to the manifest gets, as a protected file.
    The pointer check fails a difference whose rule the core has since renamed or removed, so it is read again at that

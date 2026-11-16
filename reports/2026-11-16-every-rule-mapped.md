@@ -1,9 +1,11 @@
 # Every rule, mapped to who needs it and when (16 November 2026)
 
-The map point 8 of `#304` asks for before anything moves: every rule of the modules and of the floor's topics, with who
-reads it (the role) and when (the start, a kind of task, a topic, a tool). It changes no rule. It is written from the
+The map point 8 of `#304` asks for: every rule of the modules and of the floor's topics, with who reads it (the role)
+and when (the start, a kind of task, a topic, a tool). It changes no rule. Which file each reader needs was worked out
+first, as the table of old paths to new that the move was made by; this report is that map written out from the
+result, in the new paths, each file's old path beside it, and was committed after the move. It is written from the
 rule listing (`scripts/rules.mjs`) and from what each file's opening line says, as `scripts/reading.mjs` reads it, so
-it says what the script does and not what a session remembers: 243 rules in 35 files, called by 24 kinds of task.
+it says what the script does and not what a session remembers: 243 rules in 34 files, called by 24 kinds of task.
 
 ## What the map decided
 
@@ -18,8 +20,10 @@ it says what the script does and not what a session remembers: 243 rules in 35 f
   whole collection (10,748 bytes).
 - **Two things always read together are one file.** The orchestrator's module was read by the orchestrator alone, at
   its start, with its role's file: the two are one file now, `roles/orchestrator.md`, and "The builders", which the
-  orchestrator alone acts on, joined it from the module on roles. A tool's part stays one file a tool. The four files
-  a builder reads at every start stay four: each is looked up on its own.
+  orchestrator alone acts on, joined it from the module on roles. The rules on git, which no role and no task read
+  without the flow of a task, are one file with it, `roles/shared/work-flow.md`. A tool's part stays one file a tool.
+  How to work and the inbox stay files of their own: a reviewer reads the one without the other, the stand-in the
+  other without the one.
 - **No unit cut so small that opening it costs more than it saves.** A rule whose reader is narrower than its file's
   stays where it is when it is a line or two, and the map says why beside it; the stand-in's own two rules had already
   left for `roles/stand-in.md`. No module of `tasks/` is split further: each is called whole by its kinds.
@@ -28,15 +32,16 @@ it says what the script does and not what a session remembers: 243 rules in 35 f
 
 | Role | Before (bytes) | After (bytes) |
 | --- | --- | --- |
-| builder | 28,322 | 28,328 |
-| design | 28,826 | 28,837 |
-| orchestrator | 42,802 | 42,668 |
+| builder | 28,322 | 28,307 |
+| design | 28,826 | 28,816 |
+| orchestrator | 42,802 | 42,647 |
 | reviewer | 22,095 | 22,091 |
 | stand-in | 19,131 | 19,134 |
 
 The starts hardly move, as the count of 14 November foretold (`reports/2026-11-14-start-reading-counted-by-role.md`):
-the few bytes are the longer paths the files name each other by. What the split saves is in what a task calls for:
-the floor's topics one at a time, and each unit found by its folder.
+a few bytes either way, the longer paths the files name each other by against the title and opening line that went
+with a join. What the split saves is in what a task calls for: the floor's topics one at a time, and each unit found
+by its folder.
 
 ## The map
 
@@ -171,16 +176,6 @@ Read by the stand-in, at its start. 3 rules:
 - It searches the owner's words
 - Hands over, gets back
 
-### `roles/shared/git.md`
-
-Read by builder, design, orchestrator, at the start. 5 rules:
-
-- Work from `main`
-- Each PR has the headings
-- Nothing waits silently
-- Push after every commit
-- Updates, Dependabot and CodeQL
-
 ### `roles/shared/how-to-work.md`
 
 Read by builder, design, orchestrator, reviewer, at the start. 17 rules:
@@ -237,7 +232,7 @@ Read by reviewer, at the start. 9 rules:
 
 ### `roles/shared/work-flow.md`
 
-Read by builder, design, orchestrator, at the start. 6 rules:
+Read by builder, design, orchestrator, at the start. 11 rules:
 
 - Review in the background
 - The next task
@@ -245,6 +240,11 @@ Read by builder, design, orchestrator, at the start. 6 rules:
 - The polish lane: only a project used through a screen; it stays with the lanes it is one of, which a builder reads together to pick its next work (560 bytes).
 - The owner's stop switch
 - Sessions
+- Work from `main`
+- Each PR has the headings
+- Nothing waits silently
+- Push after every commit
+- Updates, Dependabot and CodeQL
 
 ### `tasks/choices.md`
 

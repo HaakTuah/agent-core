@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nothing is lost ("Push after every commit" in the core's roles/shared/git.md): Claude Code runs this when a session starts
+# Nothing is lost ("Push after every commit" in the core's roles/shared/work-flow.md): Claude Code runs this when a session starts
 # ("start") and whenever a reply is about to end ("stop"). start reports work left uncommitted, unpushed or stashed,
 # and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
 # for (core archive 234), and whether the owner's stop switch is set (core archive 201);
@@ -51,7 +51,7 @@ if [ ${#issues[@]} -gt 0 ]; then
   msg="Work not yet on GitHub in ${PWD##*/}: $(IFS=';'; printf '%s' "${issues[*]}" | sed 's/;/; /g')."
   if [ "$mode" = stop ]; then
     printf '%s' "$input" | grep -q '"stop_hook_active"[[:space:]]*:[[:space:]]*true' && exit 0
-    echo "$msg Commit and push it to the task's branch before ending (\"Push after every commit\" in the core's roles/shared/git.md), or say in your last message why it must stay." >&2
+    echo "$msg Commit and push it to the task's branch before ending (\"Push after every commit\" in the core's roles/shared/work-flow.md), or say in your last message why it must stay." >&2
     exit 2
   fi
   echo "$msg"

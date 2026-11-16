@@ -15,7 +15,7 @@ import { NOTES } from "./releases.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
-import { COST, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
+import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -381,6 +381,31 @@ missedOwn = notDone(ownDir);
 const toolsMend = missedOwn.find(m => m.lead === "16 November 2026, an agent's own tools listed")?.mend ?? "";
 ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.json` beside it") && !/`(reads|takes)`/.test(toolsMend), "where it does not run the agent-tools check, the step's mend names the config the licence check is passed (#364)", toolsMend);
 
+// the step of the rules' move, on a project of its own making: a config that stands outside checks/, a copies config
+// written a pattern a line, a file a tool pulls the core's files in by, two old paths that are now one file, and a
+// dated record, which is left as it stands
+{
+  const moveDir = path.join(tmp, "moved-project"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(moveDir, f)), { recursive: true }); fs.writeFileSync(path.join(moveDir, f), text); };
+  const step = STEPS.find(x => x.lead === "16 November 2026, the rules in folders that say who reads them or when");
+  put("core-manifest.md", "# Core manifest\n\nPaths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/; any other is ours.\n");
+  put("AGENTS.md", "# A project\n\n@core/modules/work-flow.md\n@core/modules/git.md\n");
+  put("config/sizes.json", `${JSON.stringify({ read: ["core/modules/how-to-work.md"] })}\n`);
+  put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB}\n  ]\n}\n`);
+  put("docs/2026-01-05-what-was-read.md", "Read that day: `core/modules/inbox.md`.\n");
+  put("docs/reports/first.md", "Read: `core/modules/inbox.md`.\n");
+  execFileSync("git", ["init", "-q"], { cwd: moveDir });
+  let said = step.check(project(moveDir)) ?? "";
+  ok(said.startsWith("In one pull request") && said.includes("`core/modules/how-to-work.md` is now `core/roles/shared/how-to-work.md` (in `config/sizes.json`)") && said.includes(`after the pattern ${MOVED_GLOB} add the patterns`) && said.includes("(in `config/copies.json`)")
+    && said.includes("where a file named `core/modules/work-flow.md` beside the other path that now leads to `core/roles/shared/work-flow.md`, it names that file once") && !said.includes("inbox"),
+    "the step names an old path in a config wherever it stands, a copies config that reads the old folder alone, and two old paths that are now one file; a dated record it leaves as it stands", said);
+  put(".kiro/steering/core.md", "#[[file:core/modules/how-to-work.md]]\n");
+  said = step.check(project(moveDir)) ?? "";
+  ok(said.startsWith("Before any other task, since a tool whose entry file pulls the core's files in follows no further import"), "where a file a tool pulls the core's files in by still names an old path, the step comes before any other task, and says why", said);
+  fs.rmSync(path.join(moveDir, ".kiro"), { recursive: true });
+  put("AGENTS.md", "# A project\n\n@core/roles/shared/work-flow.md\n"); put("config/sizes.json", `${JSON.stringify({ read: ["core/roles/shared/how-to-work.md"] })}\n`);
+  put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB},\n    ${NEW_GLOBS.join(",\n    ")}\n  ]\n}\n`);
+  ok(step.check(project(moveDir)) === null, "and it is done once each is named by its new path and the copies config reads the new folders beside the old, however its patterns are laid out", step.check(project(moveDir)) ?? "");
+}
 // the files that point from the paths the rules left: each names a file or a folder the core holds, and what one says
 // stands elsewhere than the rest of it stands there
 const coreRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

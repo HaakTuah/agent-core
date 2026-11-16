@@ -11,6 +11,5 @@ What `AGENTS.md` names on its `@` lines, which Antigravity takes as plain text, 
 @[how-to-work.md](../../roles/shared/how-to-work.md)
 @[inbox.md](../../roles/shared/inbox.md)
 @[work-flow.md](../../roles/shared/work-flow.md)
-@[git.md](../../roles/shared/git.md)
 @[other-builders.md](../../tools/other-builders.md)
 @[antigravity.md](../../tools/antigravity.md)

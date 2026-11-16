@@ -4,7 +4,7 @@ Read at its start by the role `orchestrator`: the session the owner starts to ha
 sessions.
 
 **Reads at its start:** `tasks/roles.md`, `tasks/helpers.md`, `roles/shared/inbox.md`, `roles/shared/how-to-work.md`,
-`roles/shared/git.md`, `roles/shared/work-flow.md`.
+`roles/shared/work-flow.md`.
 
 **Hands over, gets back:**
 - a builder: a line and its brief, the owner's word in it word for word; back, word when its pull request is ready and

@@ -19,9 +19,8 @@ script says what to read"):
 @roles/shared/how-to-work.md
 @roles/shared/inbox.md
 @roles/shared/work-flow.md
-@roles/shared/git.md
 
-The last two are read so that whoever builds here finishes the pull request (core archive 209). Two things in them
+The last is read so that whoever builds here finishes the pull request (core archive 209). Two things in it
 have nothing to act on here: the polish lane, since no one uses the core through a screen, and the sync of a copy of
 the core in "Sessions", since this repository is the core and holds no copy.
 
@@ -117,8 +116,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
   the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
-  push after every commit as `roles/shared/git.md` says, then ready, its reviews, their findings fixed and the merge as
-  `roles/shared/work-flow.md` says (point 1). A PR that changes a rule says what it changes in every project.
+  push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
+  says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.

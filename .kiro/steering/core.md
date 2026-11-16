@@ -11,6 +11,5 @@ Kiro reads `AGENTS.md` by itself but not the files its `@` lines name, so they a
 #[[file:roles/shared/how-to-work.md]]
 #[[file:roles/shared/inbox.md]]
 #[[file:roles/shared/work-flow.md]]
-#[[file:roles/shared/git.md]]
 #[[file:tools/other-builders.md]]
 #[[file:tools/kiro.md]]

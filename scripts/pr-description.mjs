@@ -1,4 +1,4 @@
-// The description check ("Each PR has the headings" in roles/shared/git.md), for every project that takes the core, on every
+// The description check ("Each PR has the headings" in roles/shared/work-flow.md), for every project that takes the core, on every
 // PR that is not a draft: it fails a description without a heading for each part the project names, by default "What
 // the owner can try" and "Readings taken". A part is there when a line of the description is a heading (one to six #)
 // that starts with its words, whatever the case, with no letter or digit right after them and whatever marks before
@@ -8,7 +8,7 @@
 // the project's report is a file of its own, with where that file is, so the check never guesses whether something
 // was. It holds that the parts are there, not that they are true or whole: that stays with the reviews. Dependabot's
 // own PRs are not asked (the workflow leaves them out by their author).
-// It asks too the line that says what it waits on ("Nothing waits silently" in roles/shared/git.md; core archive 218), in one
+// It asks too the line that says what it waits on ("Nothing waits silently" in roles/shared/work-flow.md; core archive 218), in one
 // of the forms waitsOn reads, as the scheduled look reads it (look.mjs, beside this file), of a pull request opened
 // (PR_CREATED) on or after WAITS_SINCE where the copy on its base (BASE_SHA) already held it then: the newest commit
 // from before then that changed this file there, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY),
