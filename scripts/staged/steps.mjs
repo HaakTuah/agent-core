@@ -80,6 +80,7 @@ export const UNPLANTED = {
   "13 November 2026, MS-PL waits for the owner's yes": "it needs the licence check's report on an installed package under MS-PL, which a scratch project with no network cannot install",
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
   "16 November 2026, what a screen is held to": "it needs a project people use through a screen, whose next pull request changing one writes the direction first, and this case's project is a private tool with no screen",
+  "16 November 2026, what a game is for": "it needs a game, whose next pull request adding a feature writes its page first, and this case's project is a private tool that is no game",
 };
 
 export function set(dir, opts = {}) {

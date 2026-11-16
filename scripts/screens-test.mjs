@@ -69,7 +69,7 @@ const game = parseConfig(config({ settings: "binds" }), "c");
 v = verdict({ config: game, at: "c", self: "s", found: parseFound(found(["options"], { "settings: options: text size lost on reopening": true }), "f", game), baseline: { listed: new Map(), grown: {}, checks: new Set(["settings"]) } });
 ok(v.fail.length === 1 && v.fail[0].includes("keep it when the product is closed and opened again") && mended(v.fail[0]), "a game's settings check: a setting missing or lost fails with its own mend", v.fail.join("\n"));
 const first = parseConfig(config({ "first-choice": "binds" }), "c");
-v = verdict({ config: first, at: "c", self: "s", found: parseFound(found(["start"], { "first-choice: start: 95 seconds to the first real choice, past its target of 60": true }), "f", first), baseline: { listed: new Map(), grown: {}, checks: new Set(["first-choice"]) } });
+v = verdict({ config: first, at: "c", self: "s", found: parseFound(found(["start"], { "first-choice: start: past its target": true }), "f", first), baseline: { listed: new Map(), grown: {}, checks: new Set(["first-choice"]) } });
 ok(v.fail.length === 1 && v.fail[0].includes("the first real choice the finding names") && v.fail[0].includes("Teaching has an order") && mended(v.fail[0]), "a game's first-choice check: the first real choice past its target fails with its own mend", v.fail.join("\n"));
 
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...base, checks: new Set(["rendered"]) } });

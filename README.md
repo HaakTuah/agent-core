@@ -360,7 +360,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`tasks/screens.md`, point 9); left out, the module's own |
 | *desktop platforms* | the desktop platforms a program of the project's is made for (`tasks/screens.md`, point 15); left out, none |
 | *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`tasks/screens.md`, "What holds it"); left out, `checks/screens.json` where it stands, and otherwise every check off |
-| *game page* | the page that says what each of its games is for, its target for the first real choice and what a player must remember (`tasks/game-design.md`, "Every game says what it is for, on one page"); left out, `docs/game.md`, written by the builder of a game's first stage |
+| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"): one for each game, or one with a section for each; left out, `docs/game.md` |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
 
 ## The manifest's format

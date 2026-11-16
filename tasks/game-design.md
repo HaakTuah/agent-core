@@ -14,11 +14,12 @@ player can choose to use.
   for each game, whether remembering what has been played is part of the skill. Where it is not, the game shows what has
   been played to every player, people and *computer players* alike, in *what they are shown*; where it is, the computer
   players remember no better than a person at their setting could. The trigger is a change that lets something played
-  leave the view (a card discarded, a move made): its builder writes the decision on the page where none stands, and
-  holds the change to it. It does not mean a computer player forgets on purpose what the game shows to all. Reason: a
-  computer player with perfect memory among people who forget cheats in effect, and one that forgets what all can see
-  plays weak. Held, in part, by the game's own test that compares *what they are shown* with what the game shows a
-  person.
+  leave the view (a card discarded, a move made): where the page holds no decision, its builder writes one from the
+  owner's past words (the *settling references*), or the stand-in's reading where they say none, marked so until the
+  owner's words replace it, and holds the change to it. It does not mean a computer player forgets on purpose what the
+  game shows to all. Reason: a computer player with perfect memory among people who forget cheats in effect, and one
+  that forgets what all can see plays weak. Held, in part, by the game's own test that compares *what they are shown*
+  with what the game shows a person, where it has one.
 - **Using a feature must pay, measured three ways** (core archive 85, 86, 89 and 114).
   - For every feature, the *use-against-ignore measurement* plays *measured players* that use it where it fits, as they
     play, against copies that always use it and copies that never do, the rule itself unchanged, and *where the numbers
@@ -90,7 +91,7 @@ player can choose to use.
   it, so no outcome is decided by chance alone.
 - **Chance comes before the choice where it can** (core archive 240). By default a draw comes before the choice that
   answers it, so the player decides knowing it; where it must come after, a lever ("Levers, not luck") lets the player
-  prepare for it or answer it. The trigger is a change that adds or moves a draw: its builder places it so, and says in
+  answer it once it is known. The trigger is a change that adds or moves a draw: its builder places it so, and says in
   the change which of the two holds. It does not mean no chance after a choice, nor a lever that takes the risk away
   ("No solutions, only trade-offs"). Reason: chance after a choice no lever answers turns a good decision into a coin
   toss. The design check reads it; no check holds it.
@@ -117,11 +118,11 @@ player can choose to use.
 - **Every stage is a game** (core archive 204). A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **The first stage is the loop alone** (core archive 240). By default a game built in stages has as its first stage
-  only what the player does from minute to minute and its win, as the *game page* says them. The trigger is a game whose
-  loop cannot yet be played from start to finish: whoever writes its *progress file* (`roles/shared/inbox.md`) queues
-  nothing else before it. It does not mean the loop is final: a later stage may change it, measured as any change is.
-  Reason: what a game is for is proven only in play, and what is built before the loop plays rests on a guess. The
-  queue's order shows it; no check reads it.
+  only what the player does from minute to minute and its win, as the *game page* says them. The trigger is a change to
+  a game whose loop cannot yet be played from start to finish: its builder builds only toward that loop, and a feature
+  beyond it waits for it, as the change says. It does not mean the loop is final: a later stage may change it, measured
+  as any change is. Reason: what a game is for is proven only in play, and what is built before the loop plays rests on
+  a guess. The design check reads it; no check holds it.
 - **No stopgaps** (core archive 107). The work serves the finished game, so nothing is built for the meantime: where a
   change comes before a feature it would want, the game stays as it is until that feature comes, and the change says so.
   - A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
