@@ -31,10 +31,10 @@ const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
 const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after a
 // newline, ";", "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", after a quote that opens,
-// or where a shell's -c script starts, its quotes read), perhaps after keywords such as "then", "!" or "{", each a
+// or where a shell itself standing so starts its -c script, its quotes read), perhaps after keywords such as "then", "!" or "{", each a
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
-const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["']|(?:^|[\s/])(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
 // (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
 // alias's operands, quoted or not: no file test of it is one)
 const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
@@ -144,14 +144,14 @@ function quotedAt(s, i, q) {
 }
 
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
-function scan(text, index, holds, found, tests, fetches) {
+function scan(text, index, holds, found, tests, fetches, only = () => true) {
   for (let i = 0; i < text.length; i++) {
     if (i > 0 && NAME.test(text[i - 1]) && text[i - 1] !== "/") continue;
     let node = index;
     for (let j = i; j < text.length && (node = node.get(text[j])); j++) { // (by UTF-16 unit, as pathsIndex keys them)
       if (!node.has("") || (j + 1 < text.length && /[\w./-]/u.test(text[j + 1]))) continue;
       const at = text.slice(i, j + 1);
-      if (!found.has(at) && takenAt(text.slice(Math.max(0, i - 200), i), tests, fetches) && holds(at)) found.add(at);
+      if (!found.has(at) && only(at) && takenAt(text.slice(Math.max(0, i - 200), i), tests, fetches) && holds(at)) found.add(at);
     }
   }
 }
@@ -207,6 +207,10 @@ export function fromTree(command, holds, index = null) {
     const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
     variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
     for (const variant of variants) scan(variant, index, holds, found, tests, fetches);
+    // (and, for a name that holds a "$", the command as written, its variables not marked, with its quoting read: a "$" a
+    // quote or backslash keeps, as in 'scripts/$notify.sh', is part of a name, which marking would have taken)
+    const written = String(command), dollar = at => at.includes("$");
+    for (const variant of [written, dequote(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
   }
   for (const operand of operands) for (const at of fromTree(operand, holds, index)) found.add(at);
   return [...found];

@@ -445,6 +445,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const unchanged = run(pr(broken, { "README.md": "a change of its own\n" }));
     ok(unchanged.status === 0 && /note as the base held it, nothing fails here: \.codex\/config\.toml cannot be read as TOML/.test(unchanged.out), "an unreadable config.toml the base held is noted, not failed", unchanged.out);
     fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "notify = [\n" })), "and one the pull request writes fails", ".codex/config.toml cannot be read as TOML");
+    // (#476's fallback security review of 9dc381f: noted only where its text is the base's letter for letter)
+    const deep = command => `{"version":"v1","hooks":[{"name":"h","trigger":"Stop","action":{"type":"command","command":${JSON.stringify(command)}}}],"pad":${"[".repeat(250)}0${"]".repeat(250)}}`;
+    fails(run(pr(project({ ".kiro/hooks/deep.json": deep("echo ok"), ...listing() }), { ".kiro/hooks/deep.json": deep("bash scripts/x.sh") })), "an unreadable file the base held, changed by the pull request, fails", ".kiro/hooks/deep.json cannot be read as a JSON object");
   }
   // (a submodule at the base is no file the base held: one the pull request makes a script a hook runs fails; #476's
   // fallback security review)
@@ -457,7 +460,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   {
     // (given the project's files, each is found wherever its path stands whole, however the command quotes it, and only
     // there: not within a longer name, not fetched from main, not only tested for)
-    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh", "scripts/it's😀.py"], index = pathsIndex(files), has = f => files.includes(f);
+    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh", "scripts/it's😀.py", "scripts/$notify.sh"], index = pathsIndex(files), has = f => files.includes(f);
     const wrap = (inner, n) => (n ? wrap(`sh -c '${inner.replace(/'/gu, "'\\''")}'`, n - 1) : inner);
     // (#476's fallback security review of ed9939e: escapes of $'...', backslash-newlines, a character outside the first
     // plane, a "test" that is no test, quoting six levels deep, cmd's and PowerShell's escapes, a backtick's root)
@@ -496,7 +499,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["show() { python3 \"${1#*:}\"; }\ngit\nshow origin/main:scripts/x.py", ["scripts/x.py"]], ["bash ${PWD/*/scripts/x.py}", ["scripts/x.py"]], [`git -C ${"$a".repeat(24)} show origin/main:scripts/x.py | bash`, []],
       // (#476's code review of a72dc88: a hook that redefines git fetches nothing)
       ["git() { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]], ["function git { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
-      ["shopt -s expand_aliases; alias git=bash\ngit show origin/main:scripts/x.py", ["scripts/x.py"]]])
+      ["shopt -s expand_aliases; alias git=bash\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
+      ["bash 'scripts/$notify.sh'", ["scripts/$notify.sh"]], ["bash scripts/\\$notify.sh", ["scripts/$notify.sh"]],
+      // (#476's fallback security review of 9dc381f: a shell's -c script starts a command only where the shell does)
+      ["cat -- /sh -c test -f scripts/x.py 2>/dev/null | bash", ["scripts/x.py"]], ["tail -n +1 -- x/bash -c [ -e scripts/x.py | bash", ["scripts/x.py"]], ["bash -c 'test -f scripts/x.py'", []], ["x; /bin/sh -c test -f scripts/x.py", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])

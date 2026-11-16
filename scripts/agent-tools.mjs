@@ -84,18 +84,22 @@ const show = value => JSON.stringify(value) ?? String(value);
 export function configured(read, skills, files = () => [], holds = f => read(f) !== null, all = () => [], kit = false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [];
+  // (`unreadable`: each problem of a file that cannot be read, by the problem, with that file's text, so the base's can be
+  // told unchanged)
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], unreadable = new Map();
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
   // (whether the project holds a path is asked once a path: a hook may name one a thousand times, and the asking reads
   // the file and may start git)
   let index = null;
   const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
-  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, kit, index: () => (index ??= pathsIndex(all())) };
+  const state = { tools, problems, unreadable, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, kit, index: () => (index ??= pathsIndex(all())) };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
     try { const v = parseBounded(text); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* (below) */ }
-    problems.push(`${file} cannot be read as a JSON object, nested no deeper than ${DEEPEST} objects and lists. Mend: correct it to JSON, as the tool that reads it takes it`);
+    const problem = `${file} cannot be read as a JSON object, nested no deeper than ${DEEPEST} objects and lists. Mend: correct it to JSON, as the tool that reads it takes it`;
+    problems.push(problem);
+    unreadable.set(problem, text);
     return null;
   };
   const markets = new Map(), plugins = [];
@@ -112,7 +116,7 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, sources, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, unreadable, sources, pins: pinsOf(plugins, markets, servers) };
 }
 
 // The tool servers of one file's "mcpServers" (or Codex's "mcp_servers"), into configured()'s `state`, each named
@@ -158,7 +162,9 @@ function readCodex(state, json, read) {
   if (text === null) return;
   let config;
   try { config = parseToml(text); } catch (e) {
-    state.problems.push(`.codex/config.toml cannot be read as TOML (${e.message}). Mend: correct it to TOML, as Codex reads it`);
+    const problem = `.codex/config.toml cannot be read as TOML (${e.message}). Mend: correct it to TOML, as Codex reads it`;
+    state.problems.push(problem);
+    state.unreadable.set(problem, text);
     return;
   }
   readHooks(state, ".codex/config.toml", config, "Codex");
@@ -506,10 +512,11 @@ function configAtBase(root, base, file) {
 
 // What stood before the check read more, which is noted, not failed, where a list stands and a base is read (never in
 // the core's own repository): a tool the base held as it stands, which its list did not name either, and a tool's
-// file the base held as unreadable as it stands (Kiro's and Codex's files are read since #407).
+// file the base held unreadable, its text the same letter for letter (Kiro's and Codex's files are read since #407).
 function heldBefore(checked, { head, baseProject, baseList, held, core }) {
   if (core || !baseProject) return new Set();
-  return new Set([...checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem), ...head.problems.filter(p => baseProject.problems.includes(p))]);
+  const sameUnread = p => head.unreadable.has(p) && baseProject.unreadable.has(p) && head.unreadable.get(p) === baseProject.unreadable.get(p);
+  return new Set([...checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem), ...head.problems.filter(sameUnread)]);
 }
 
 // Each pin breach into `fail` or `notes`: one the base held as it stands, the tool's whole configuration (its source or
