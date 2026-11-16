@@ -96,12 +96,13 @@ export function reached(tests, linked) {
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
-export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), failed = [], config }) {
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), unread = [], failed = [], config }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
   const reaches = reached(tests, links(texts, tests, reach));
   // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
-  const blind = new Set([...reaches].filter(([, files]) => [...files].some(f => unsure.has(f))).map(([t]) => t));
+  // (and, where pytest runs a conftest.py the config does not read, each test of Python, whose fixtures may come from it)
+  const blind = new Set([...reaches].filter(([t, files]) => [...files].some(f => unsure.has(f)) || (t.endsWith(".py") && unread.some(c => c.endsWith("conftest.py")))).map(([t]) => t));
   const ctx = { texts, tests, scripts, add, reaches, ...m, whole: t => m.whole(t) || blind.has(t) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
@@ -127,6 +128,8 @@ function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest
 }
 
 const pick = ({ reach, scripts, unsure }) => ({ reach, scripts, unsure });
+// The conftest.py files git holds that the config's pathspecs leave out: pytest runs them all the same.
+const unreadConftests = texts => git(["ls-files", "-z", "--", ":(glob)**/conftest.py"]).split("\0").filter(f => f && !(f in texts));
 
 // The paths a pull request changes against its base, renames as a path gone and a path added.
 const changedSince = base => git(["diff", "-z", "--name-only", "--no-renames", base, "HEAD"]).split("\0").filter(Boolean);
@@ -178,7 +181,7 @@ function main(argv) {
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = !config ? { all: true, why: `the shape check's config (${at}) cannot be read, so what each test reaches cannot be told` }
     : !base ? { all: true, why: "no base is told (SELECT_BASE), as on main, on a schedule and before a release" }
-    : selection({ changed: changedSince(base), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), failed, config });
+    : selection({ changed: changedSince(base), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), unread: unreadConftests(now.texts), failed, config });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
   // sets another variable for the steps after it)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });

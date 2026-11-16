@@ -180,7 +180,7 @@ function manifests(texts) {
     let p = null;
     try { p = JSON.parse(text); } catch { /* not a package's */ }
     if (!isObject(p)) continue;
-    if (typeof p.name === "string") packages.set(p.name, { dir: path.posix.dirname(file), main: typeof p.main === "string" ? p.main : null });
+    if (typeof p.name === "string") packages.set(p.name, { dir: path.posix.dirname(file), main: typeof p.main === "string" ? p.main : null, exports: p.exports !== undefined || p.imports !== undefined });
     const names = k => Object.keys(isObject(p[k]) ? p[k] : {});
     for (const d of ["dependencies", "peerDependencies", "optionalDependencies"].flatMap(names)) { ships.add(d); declared.add(d); }
     for (const d of names("devDependencies")) declared.add(d);
@@ -256,6 +256,8 @@ function oneImport(ctx, from, imp) {
   const spec = alias === undefined ? imp.spec : `./${path.posix.relative(path.posix.dirname(from.file), path.posix.join(ctx.config.aliases[alias], imp.spec.slice(alias.length))) || "."}`;
   const to = resolve(from.file, spec, ctx.files, ctx.packages);
   if (!to) { outside(ctx, from, imp.spec, alias !== undefined); return; }
+  // (a package of the project's own that maps its entrances, "exports" or "imports", may load another file than this)
+  if (!isRelative(spec) && ctx.packages.get(packageOf(spec))?.exports) ctx.unsure.add(from.file);
   if (to !== from.file) ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
   if (imp.kind !== "dynamic" && !imp.types && to !== from.file) ctx.graph.set(from.file, (ctx.graph.get(from.file) ?? new Set()).add(to));
   between(ctx, from, to);
@@ -282,7 +284,8 @@ function foreign(ctx, from, imp, r) {
 // An import whose target only running the code tells: in JavaScript, by its tokens (a string or a regular expression
 // is never code), a dynamic import or require of anything but one plain string, or a glob of files (import.meta.glob,
 // require.context); in Python, outside a comment, an import by a name built at run time.
-const PY_COMPUTED = /\b(?:import_module|__import__)\s*\(\s*(?!["'][^"']*["']\s*[,)])/u;
+// (by any name, a plain string too: what it names is resolved against roots on Python's path the readers do not know)
+const PY_COMPUTED = /\b(?:import_module|__import__)\s*\(/u;
 const after = (toks, k, ...vs) => vs.every((v, j) => toks[k + 1 + j]?.v === v && toks[k + 1 + j].t !== "str");
 const plainString = (toks, k) => toks[k]?.t === "str" && toks[k].v !== "`" && [")", ","].includes(toks[k + 1]?.v);
 function computed(r, text) {
