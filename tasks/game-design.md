@@ -4,13 +4,13 @@ Read before a task changes a rule, a feature or how the computer players play, b
 and before a polish-lane task: the kinds `game-rule`, `screen` and `polish`. A feature is any move, rule or power a
 player can choose to use.
 
-- **The computer players never know who is a person** (core archive 87).
+- **The computer players never know who is a person.**
   - Nothing in the logic of the *computer players*, nor in *what they are shown*, says whether another player is a
     person; they judge every player by behaviour alone, so the game tests everyone alike.
-  - The game makes no tells that give a person away, such as computer players that answer at once (core archive 114).
-- **The computer players never cheat** (core archive 87 and 114). They hold nothing a player in their place could not
+  - The game makes no tells that give a person away, such as computer players that answer at once.
+- **The computer players never cheat.** They hold nothing a player in their place could not
   see or know: no sight through what hides the game from a player, no knowledge it was not given.
-- **What must be remembered is decided once for each game** (core archive 242). By default the *game page* says, once
+- **What must be remembered is decided once for each game.** By default the *game page* says, once
   for each game, whether remembering what has been played is part of the skill. Where it is not, the game shows what has
   been played to every player, people and *computer players* alike, in *what they are shown*; where it is, the computer
   players remember no better than a person at their setting could. The trigger is a change that lets something played
@@ -20,7 +20,7 @@ player can choose to use.
   game shows to all. Reason: a computer player with perfect memory among people who forget cheats in effect, and one
   that forgets what all can see plays weak. Held, in part, by the game's own test that compares *what they are shown*
   with what the game shows a person, where it has one.
-- **Using a feature must pay, measured three ways** (core archive 85, 86, 89 and 114).
+- **Using a feature must pay, measured three ways.**
   - For every feature, the *use-against-ignore measurement* plays *measured players* that use it where it fits, as they
     play, against copies that always use it and copies that never do, the rule itself unchanged, and *where the numbers
     go* shows how often each used it, how often it worked and who came out ahead, by more than chance (its threshold a
@@ -28,10 +28,10 @@ player can choose to use.
   - If those that use it where it fits do not beat both those that never and those that always do, the change says why:
     the feature does not matter, and is reworked or cut, or they play it badly, fixed in the same change; or, in a game
     built in stages and not yet feature complete, what it needs to pay comes in a later stage, which the change names,
-    none left unpaid once the game is complete (core archive 173); its counterweight never waits ("No stopgaps").
+    none left unpaid once the game is complete; its counterweight never waits ("No stopgaps").
   - One too rare to move whole games is judged per use, each use played on with and without it.
-  - Every feature is measured against players who play its counter (core archive 143).
-- **Standing measures from the simulations, for every game** (core archive 242). By default every game reports, from the
+  - Every feature is measured against players who play its counter.
+- **Standing measures from the simulations, for every game.** By default every game reports, from the
   whole games its *measured players* play, five measures at *where the numbers go*: the win rate by seat or starting
   place; how often the leader at a third of the game goes on to win; the spread of a game's length; the time a player
   spends knocked out or with no real choice; and the share of turns with only one sensible move. Each stands against a
@@ -41,16 +41,16 @@ player can choose to use.
   that the leader is held back, or whoever is behind helped, by breaking the rules for them ("Different data, same
   rules"). Reason: a leader who runs away, a seat with an edge and players with nothing to decide show in these numbers
   long before the owner finds them in play. The simulation's report shows it, failing nothing; no check holds it yet.
-- **No feature only people use** (core archive 87, 88 and 89). Every feature a person can use, the *computer players*
+- **No feature only people use.** Every feature a person can use, the *computer players*
   use too, where it pays and with success at least sometimes: one only people use goes untested and hands them an edge
   no rule intended.
   - A feature is not finished until the *measured players* use it so, by the point above's numbers.
-- **No rule untaught** (core archive 84 and 90).
+- **No rule untaught.**
   - Every rule a player needs is in *where rules are taught*, added or changed in the same change as the rule.
   - When a rule acts on a player, the game shows it where and when that player could know it.
   - Whatever the game shows, a last-known position or an old report among it, and every mistake a player makes in
-    testing, are held to `tasks/screens.md`, point 13 (core archive 112 and 114); a player may still lie.
-- **Teaching has an order** (core archive 242). By default a game teaches one new thing at a time, in play, not in text:
+    testing, are held to `tasks/screens.md`, point 13; a player may still lie.
+- **Teaching has an order.** By default a game teaches one new thing at a time, in play, not in text:
   first where a mistake costs nothing, then under pressure, then combined with what came before. The trigger is a change
   that adds or changes a rule a player must learn, or what comes before the first real choice (one that changes how the
   game goes, not a menu's): its builder places what it teaches in that order and measures the time from opening the game
@@ -59,26 +59,26 @@ player can choose to use.
   in secret: a game is made easier or harder by its setup ("Strong computer players"). Reason: a player handed several
   new things at once, or text before the first choice, learns none of them. Held, in a game with a screen, by the check
   `first-choice` (`tasks/screens.md`, "What holds it"), for the time; the design check reads the order.
-- **A loss explains itself** (core archive 242). By default, after a round a player has lost, the game lets that player
+- **A loss explains itself.** By default, after a round a player has lost, the game lets that player
   see what beat them: the moves, causes or numbers that decided it. The builder of a change to how a round ends, or to
   what decides it, makes it so. It does not mean the game tells a player what to do next time. Reason: a loss a player
   cannot explain reads as unfair, and the owner finds it in play and sends it back. In a game with a screen the critique
   asks it ("After a loss, can the player see what beat them?"); no check holds it.
-- **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
+- **Strong computer players.** The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule.
   - Stronger never means samey: where there are several, each keeps its own style, checked before and after a change to
     their play.
-- **Don't prohibit; give it its real cost** (core archive 91 and 92), so the player keeps its agency. An action a player
+- **Don't prohibit; give it its real cost,** so the player keeps its agency. An action a player
   could realistically take is never forbidden because it seems unwise; the game's own rules make it as costly, risky and
   rare as it really was, so the rare exception stays possible, as Hannibal crossed the Alps.
-- **No solutions, only trade-offs** (core archive 91 and 93). Every feature helps in some situations and costs in
-  others: none is always right or always wrong to use, nor makes a player safe (core archive 143), as the measurement
+- **No solutions, only trade-offs.** Every feature helps in some situations and costs in
+  others: none is always right or always wrong to use, nor makes a player safe, as the measurement
   above checks.
-- **Reality first** (core archive 102 and 104). Where the real world, or the history a game is set in, is interesting
+- **Reality first.** Where the real world, or the history a game is set in, is interesting
   enough on its own, the game takes it as it was and invents nothing in its place; invention fills only what reality
   leaves silent, or what play cannot bear, and only after trying to keep both.
-- **Effects from causes, as deep as pays** (core archive 102 to 104). Every effect comes from a cause, and the deeper
+- **Effects from causes, as deep as pays.** Every effect comes from a cause, and the deeper
   and better grounded the cause, the more compelling the outcome, even where a player never sees every link:
   - a quantity follows what drives it, never a flat share;
   - what goes wrong for a player comes from a cause it could reason about, chance standing in only for causes too small
@@ -86,28 +86,27 @@ player can choose to use.
   - nothing appears or vanishes without a cause it could name.
   - Depth stops where more simulation no longer pays for what it costs to build and run.
   - Depth underneath costs a player no attention; what a player must follow is kept readable by teaching and showing it,
-    never by making the simulation shallower (core archive 114).
-- **Levers, not luck** (core archive 110 and 111). Where chance enters, players have levers to prepare for it or answer
+    never by making the simulation shallower.
+- **Levers, not luck.** Where chance enters, players have levers to prepare for it or answer
   it, so no outcome is decided by chance alone.
-- **Chance comes before the choice where it can** (core archive 242). By default a draw comes before the choice that
+- **Chance comes before the choice where it can.** By default a draw comes before the choice that
   answers it, so the player decides knowing it; where it must come after, a lever ("Levers, not luck") lets the player
   answer it once it is known. The trigger is a change that adds or moves a draw: its builder places it so, and says in
   the change which of the two holds. It does not mean no chance after a choice, nor a lever that takes the risk away
   ("No solutions, only trade-offs"). Reason: chance after a choice no lever answers turns a good decision into a coin
   toss. The design check reads it; no check holds it.
-- **Different data, same rules** (core archive 105). No rule checks which player, faction or character it is: what sets
+- **Different data, same rules.** No rule checks which player, faction or character it is: what sets
   one apart lives in its data and starting conditions, which every rule reads alike; only presentation and voice may
   name one.
-- **The order of resolution never decides** (core archive 105). When two act at the same moment, the outcome does not
+- **The order of resolution never decides.** When two act at the same moment, the outcome does not
   depend on which the game settles first: they share, or a seeded draw decides.
-- **Everything new belongs** (core archive 105). Every new feature feels balanced, cohesive and purposeful, and fits the
-  rest of the game: it reads and changes quantities other systems use, never keeping its own beside them (core archive
-  114), each through what the system that owns it offers (`tasks/code-shape.md`, where the *computer players* are a
+- **Everything new belongs.** Every new feature feels balanced, cohesive and purposeful, and fits the
+  rest of the game: it reads and changes quantities other systems use, never keeping its own beside them, each through what the system that owns it offers (`tasks/code-shape.md`, where the *computer players* are a
   system of their own, of the domain `computer-players`).
-- **Every game says what it is for, on one page** (core archive 242), its *game page*: what the player does from minute
+- **Every game says what it is for, on one page,** its *game page*: what the player does from minute
   to minute, what winning is, two or three kinds of experience it aims at, in the owner's words, the target of "Teaching
-  has an order" and the decision of "What must be remembered is decided once for each game". By default the builder of a
-  game's first stage writes it; for a game that stands with none, the builder of its next change that adds a feature,
+  has an order" and what "What must be remembered is decided once for each game" asks it to decide. By default the
+  builder of a game's first stage writes it; for a game that stands with none, the builder of its next change that adds a feature,
   quoting the owner's past words (the *settling references*), and where they name no experience, the stand-in's reading,
   marked so until the owner's words replace it (`roles/shared/inbox.md`). The builder of a change that adds a feature
   says in the feature's entry (its issue, or the task that names it) which of those experiences it serves, and the
@@ -115,55 +114,55 @@ player can choose to use.
   hold a player (daily rewards, streaks, timers that punish leaving), or a model's verdict on whether it is fun, which
   stays the owner's own play. Reason: a feature that serves none of the aims the owner set is still built, and the owner
   finds it only in play. The design check reads it; no check holds it yet.
-- **Every stage is a game** (core archive 204). A game built in stages ends each stage in one someone can play from
+- **Every stage is a game.** A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
-- **The first stage is the loop alone** (core archive 242). By default a game built in stages has as its first stage
+- **The first stage is the loop alone.** By default a game built in stages has as its first stage
   only what the player does from minute to minute and its win, as the *game page* says them. The trigger is a change to
   a game whose loop cannot yet be played from start to finish: its builder builds only toward that loop, and a feature
   beyond it waits for it, as the change says. It does not mean the loop is final: a later stage may change it, measured
   as any change is. Reason: what a game is for is proven only in play, and what is built before the loop plays rests on
   a guess. The design check reads it; no check holds it.
-- **No stopgaps** (core archive 107). The work serves the finished game, so nothing is built for the meantime: where a
+- **No stopgaps.** The work serves the finished game, so nothing is built for the meantime: where a
   change comes before a feature it would want, the game stays as it is until that feature comes, and the change says so.
   - A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
     work if need be.
   - It speaks of what the game offers its players, not of how its code is rebuilt: a named bridge that a stage of a
     large refactor leaves, with the task that removes it queued, is none (`tasks/cleaning.md`).
-- **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets that neither
+- **Numbers are first guesses until play tunes them.** A number a change sets that neither
   reality nor its causes fix (a time, a cost, a chance) is a first guess, listed in the change and tuned by measured
   play, never just picked.
   - While the systems that change its effect are still being built it stays untuned, and a tuning pass takes them
     together once they stand.
   - Anything that makes the game unplayable for testing is fixed at once.
-- **Code decides facts; models phrase them,** in a game with language-model players or characters (core archive 105).
+- **Code decides facts; models phrase them,** in a game with language-model players or characters.
   - The game's code decides what is true and what each seat learns; a model adds only voice, personality and judgement
     within its own seat.
   - A model is called only where its judgement can change what happens; the obvious, the routine and the mechanical are
-    the code's (core archive 112).
-- **In a game played online, everything new works online** (core archive 106), the same on every screen, with the
+    the code's.
+- **In a game played online, everything new works online,** the same on every screen, with the
   protocol's version raised when its messages change.
-- **Players always play the newest version** (core archive 109, 115 and 117).
+- **Players always play the newest version.**
   - Opening the game starts its newest version; where it cannot load itself anew, the game says a newer one is out, with
     one click to play it.
   - A version that only fixes or looks different takes over by itself as soon as it interrupts no game in play (between
     rounds, at a turn of the game's clock, or at the next launch); one that changes play waits until the game in play
     ends or the game is next opened.
   - A saved game opened in a newer version carries on in the newer rules, and its log marks where they changed.
-- **Same seed, same game** (core archive 112 and 114). A game replays exactly from its seed within one version of its
+- **Same seed, same game.** A game replays exactly from its seed within one version of its
   rules, and where people or language models play, from its log of every input and every model answer, the model and its
   prompts counting as part of the version:
   - a change that should change no play proves it by the same seeds and logs;
   - an optimization that changes decisions proves, on fresh seeds, that nothing a player would notice did (skill,
-    styles, feel and look, within noise; core archive 143);
+    styles, feel and look, within noise);
   - one that changes play says what it changes and starts a new version.
   - A game whose rules changed while it was played replays exactly only from the change on.
 - **The polish lane** also takes its finds from whole games watched at top speed, on a phone and on desktop, and proves
   play unchanged by "Same seed, same game".
-- **Readable by every player** (core archive 112, 204 and 205). *What they are shown* tells the *computer players* what
+- **Readable by every player.** *What they are shown* tells the *computer players* what
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
   thing) are `tasks/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
-- **How a game answers a player** (core archive 237). In a game played through a screen, each point below binds as
+- **How a game answers a player.** In a game played through a screen, each point below binds as
   `tasks/screens.md`'s points do ("Whom it binds, and when"), and each check it names is one of that module's, the
   project's own and off until its *screen checks* name it ("What holds it" there). It does not mean that a game with no
   screen is asked anything here. Reason: a game's feel is lost in changes no one times or pictures.
@@ -199,7 +198,7 @@ player can choose to use.
     warning, a turn, a hit) gives it a sign on the screen at the same moment. It does not mean that a sound that tells
     nothing, such as music, needs one. Reason: a player with the sound off, or who cannot hear, misses what only a sound
     told. The critique asks it ("Is anything told by sound alone?"); no check holds it yet.
-  - **Sound has jobs** (core archive 242). By default a sound that tells a player something does one of three jobs: it
+  - **Sound has jobs.** By default a sound that tells a player something does one of three jobs: it
     confirms an action, warns, or marks a change of state, with one voice for each job across the game, and the music
     never covers them. The builder of a change that adds a sound or music gives each sound its job and voice and keeps
     the music under them. It does not mean a verdict on how a sound sounds, which stays the owner's taste, nor a job for

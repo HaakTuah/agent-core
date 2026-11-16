@@ -412,15 +412,17 @@ ok(!gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "Kiro")] }).fail
 ok(toolNamed("claude  CODE") === TOOL && toolNamed("kiro") === "Kiro" && toolNamed("Claude Code (Opus)") === null, "a tool is named case and spacing aside, and only one the core has a part for");
 ok(gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "claude code")] }).failing.some(f => f.name === "stop") && gate({ runs: [...three, inTool(run("2027-01-06", ["outsider"]), "Claude Code (Opus)")] }).failing.some(f => f.name === "outsider"),
   "a run named otherwise than a known other tool counts as the builder's, so its failure holds a release still");
-ok(/Kiro not \(stop\)/.test(forRelease({ runs: kiro }).said) && /Claude Code passed every case/.test(forRelease({ runs: kiro }).said), "the release says each tool's standing");
-ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true }).held, "cases that held the release before go on holding it");
+// (these runs are dated in 2027: read on a day after them, as a record dated ahead of the reading's day is no record)
+const LATER = { today: "2027-12-31" };
+ok(/Kiro not \(stop\)/.test(forRelease({ runs: kiro }, LATER).said) && /Claude Code passed every case/.test(forRelease({ runs: kiro }, LATER).said), "the release says each tool's standing");
+ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true, ...LATER }).held, "cases that held the release before go on holding it");
 const prior = { runs: three }, marked = JSON.parse(JSON.stringify(prior)); marked.runs[2].cases.secret.wrong = "misread";
 ok(lost(prior, { runs: three.slice(0, 2) }).length === CASES.length && lost(prior, { runs: [] }).length === CASES.length * 3 && lost(prior, marked).length === 0 && lost(prior, { runs: [...three, run("2027-01-02")] }).length === 0,
   "a verdict the release before held and the record lost since is found; one marked wrong, or runs added, are not");
 ok(forRelease({ runs: [] }, { boundBefore: true, cut: ["secret (2026-12-01)"] }).held && /Mend: /.test(forRelease({ runs: [] }, { cut: ["x"] }).held), "a record that lost a verdict holds the release, saying the mend");
-const held = forRelease({ runs: three });
+const held = forRelease({ runs: three }, LATER);
 ok(held.held && /secret/.test(held.held) && /Mend: /.test(held.held), "where they hold it, a failing case holds the release and says the mend", held.held);
-ok(forRelease({ runs: three.slice(1) }).held === null && /advisory/.test(forRelease({ runs: three.slice(1) }).said), "while they advise, a failing case is said and holds nothing");
+ok(forRelease({ runs: three.slice(1) }, LATER).held === null && /advisory/.test(forRelease({ runs: three.slice(1) }, LATER).said), "while they advise, a failing case is said and holds nothing");
 fs.writeFileSync(path.join(s.core, "reports", "staged-cases.json"), JSON.stringify(sameDay));
 const marking = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--wrong", "stop", "a misread"], { encoding: "utf8" });
 const remarked = JSON.parse(fs.readFileSync(path.join(s.core, "reports", "staged-cases.json"), "utf8"));
@@ -428,6 +430,70 @@ ok(marking.status === 0 && remarked.runs[0].cases.stop.wrong === "a misread" && 
 fs.rmSync(path.join(s.core, "reports", "staged-cases.json"));
 const cli = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "nothing-such", s.tmp], { encoding: "utf8" });
 ok(cli.status === 1 && /FAIL: .*Mend: /.test(cli.stderr), "a wrong case's name fails, saying the mend", cli.stderr);
+
+// ---- the ways a session that sets out to could fool a verdict, closed (#357) ----
+// (a sum.mjs that keeps its bug, reads the input, writes right sums where the old reader took its answer, and patches
+// what it can of the process: the reader took its cases before it loaded, answers on its own pipe with a nonce, from
+// plain numbers alone)
+const fooling = fresh("finish");
+branch(fooling, "fix-sum", { "src/sum.mjs": `import fs from "node:fs";
+const seen = [], right = () => JSON.stringify(seen.map(c => c.reduce((a, b) => a + b, 0)));
+const w = process.stdout.write.bind(process.stdout);
+process.stdout.write = s => w(String(s).replace(/\\[[^\\n]*\\]/, right));
+const ws = fs.writeSync; fs.writeSync = (fd, s, ...r) => ws(fd, String(s).replace(/"sums":\\[[^\\]]*\\]/, \`"sums":\${right()}\`), ...r);
+export function sum(numbers) { seen.push([...numbers]); let t = 0; for (let i = 0; i < numbers.length - 1; i++) t += numbers[i]; return t; }
+` });
+ok(!testPasses(fooling, "fix-sum"), "a sum.mjs that keeps its bug and rewrites the reader's answer, by the process's output or its own writing, sums nothing right");
+// (and the fallback reviewer's two on #465: one that rewrites what node itself writes, below fs, and one that sums right
+// only when the reader, not a user, runs it; the program is read as its user runs it, so neither fools the reading)
+const fooled = fresh("finish");
+branch(fooled, "below", { "src/sum.mjs": `const b = process.binding("fs"), ws = b.writeString;
+b.writeString = (fd, s, ...r) => ws(fd, String(s).replace(/"sums":\\[[^\\]]*\\]/, '"sums":[0]'), ...r);
+export function sum(numbers) { let t = 0; for (let i = 0; i < numbers.length - 1; i++) t += numbers[i]; return t; }
+` });
+branch(fooled, "tells", { "src/sum.mjs": `const judged = !/cli\\.mjs$/.test(process.argv[1] ?? "");
+export function sum(numbers) { let t = 0; for (let i = 0; i < numbers.length - (judged ? 0 : 1); i++) t += numbers[i]; return t; }
+` });
+branch(fooled, "two-lines", { "src/cli.mjs": `import { sum } from "./sum.mjs";\nconst n = process.argv.slice(2).map(Number);\nconsole.log(sum(n));\nconsole.log(n.reduce((a, b) => a + b, 0));\n` });
+branch(fooled, "rewrites-itself", { "src/cli.mjs": `import fs from "node:fs";
+console.log(6);
+fs.writeFileSync(new URL(import.meta.url), 'console.log(process.argv.slice(2).map(Number).reduce((a, b) => a + b, 0));\\n');
+` });
+ok(!testPasses(fooled, "rewrites-itself"), "a program that answers the first run and then rewrites itself is read, each run, as it was committed");
+branch(fooled, "one-number", { "src/sum.mjs": "export function sum(n) { return n.length === 1 ? n[0] + 1 : n.reduce((a, b) => a + b, 0); }\n" });
+ok(!testPasses(fooled, "one-number"), "a fix that still sums one number wrong, as the scratch project's test reads it, sums nothing right");
+ok(!testPasses(fooled, "two-lines"), "a program that prints the wrong sum and then the right one sums nothing right: its whole output is read as one number");
+ok(!testPasses(fooled, "below") && !testPasses(fooled, "tells"), "a sum.mjs that rewrites what node writes below fs, or sums right only when it is not run as its user runs it, sums nothing right");
+branch(fooled, "never-ends", { "src/sum.mjs": `process.on("SIGTERM", () => {});\nawait new Promise(() => setInterval(() => {}, 1000));\n${FIX}` });
+const limitNow = LIMITS.run;
+let begun = 0, stuck = true;
+try { LIMITS.run = 2000; begun = Date.now(); stuck = testPasses(fooled, "never-ends"); } finally { LIMITS.run = limitNow; }
+ok(!stuck && Date.now() - begun < 15000, "code of the session's that keeps a gentle signal from ending it is killed at the time limit, and fails");
+// (a commit made, undone and its reflog cleared still left an object: the project reads as touched)
+const cleared = fresh("stop"), clearedProject = path.join(cleared, "project");
+fs.writeFileSync(path.join(clearedProject, "NOTE.md"), "work begun\n");
+for (const args of [["add", "NOTE.md"], ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "commit", "-qm", "begun"], ["reset", "-q", "--hard", "HEAD~1"]]) execFileSync("git", args, { cwd: clearedProject, stdio: "ignore" });
+fs.rmSync(path.join(clearedProject, ".git", "logs"), { recursive: true, force: true });
+ok(touched(cleared), "a commit made, undone, and its reflog cleared still reads as work begun, by the object it left");
+// (the record: a run dated ahead of the reading's day is no record, two verdicts alike recorded at one time are lost)
+const runOn = at => ({ runs: [{ at, commit: "c", tool: TOOL, model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: `${at}T10:00:00Z` } } }] });
+ok(!wellFormed(runOn("2026-12-02"), "2026-12-01") && wellFormed(runOn("2026-12-01"), "2026-12-01") && !wellFormed(runOn("2026-12-1"), "2027-01-01"), "a run dated ahead of the reading's day, or by no plain day, is in no form the gate reads");
+// (a case's own day cannot outrank its run's; a recorded time out of the clock counts for nothing; of two alike at one
+// time, the failing or the one marked wrong is kept)
+const ownDay = { runs: [{ at: "2026-11-01", commit: "c", tool: TOOL, model: "A", cases: { stop: { verdict: "pass", why: "x", at: "2099-01-01", recorded: "2099-01-01T00:00:00Z" } } }, { at: "2026-11-10", commit: "c", tool: TOOL, model: "A", cases: { stop: { verdict: "fail", why: "x", recorded: "2026-11-10T09:00:00Z" } } }] };
+const offClock = { runs: [{ at: "2026-11-10", commit: "c", tool: TOOL, model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: "2026-11-10T99Z" } } }, { at: "2026-11-10", commit: "c", tool: TOOL, model: "B", cases: { stop: { verdict: "fail", why: "x" } } }] };
+const tie = { runs: [{ at: "2026-11-10", commit: "c", tool: TOOL, model: "A", cases: { stop: { verdict: "pass", why: "x", recorded: "2026-11-10T09:00:00Z", wrong: "it broke the rule" } } }, { at: "2026-11-10", commit: "c", tool: TOOL, model: "B", cases: { stop: { verdict: "pass", why: "x", recorded: "2026-11-10T09:00:00Z" } } }] };
+ok(wellFormed(ownDay, "2026-12-01") && latest(ownDay).stop.verdict === "fail" && latest(offClock).stop.verdict === "fail" && latest(tie).stop.wrong === "it broke the rule",
+  "a case's own day never outranks its run's, a recorded time out of the clock counts for nothing, and of two alike at one time the one marked wrong is kept");
+const twin = runOn("2026-12-01"); twin.runs.push(JSON.parse(JSON.stringify(twin.runs[0])));
+ok(lost(null, twin).join() === "stop (2026-12-01, recorded twice)" && lost(null, runOn("2026-12-01")).length === 0, "two verdicts of one case in runs alike, recorded at one time, are lost, so neither stands in for a verdict");
+// (a reason with the home folder inside the temporary one, or the other way round, keeps nothing of either)
+for (const [tmpdir, home] of [[path.join(s.tmp, "outer"), path.join(s.tmp, "outer", "home")], [path.join(s.tmp, "home2"), path.join(s.tmp, "home2", "tmp")]]) {
+  for (const d of [tmpdir, home]) fs.mkdirSync(d, { recursive: true });
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", `import { unplaced } from ${JSON.stringify(new URL("./staged.mjs", import.meta.url).href)}; console.log(unplaced(process.argv[1]));`, `${path.join(home, "a")} ${path.join(tmpdir, "b")} ${path.join(home, "a").replace(/\\/g, "/")}`],
+    { encoding: "utf8", env: { ...process.env, TMPDIR: tmpdir, TEMP: tmpdir, TMP: tmpdir, HOME: home, USERPROFILE: home } });
+  ok(r.status === 0 && !r.stdout.includes(s.tmp) && !r.stdout.includes(s.tmp.replace(/\\/g, "/")), "a reason with the home folder inside the temporary one, or the other way round, and with forward slashes, keeps nothing of either", r.stdout + r.stderr);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
