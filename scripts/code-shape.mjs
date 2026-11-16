@@ -315,13 +315,44 @@ export function imports(toks) {
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
     if (tok.t !== "id" || !notMember(toks, k)) continue;
-    if (tok.v === "require" && isP(toks[k + 1], "(") && toks[k + 2]?.t === "str" && isP(toks[k + 3], ")")) found.push({ spec: toks[k + 2].v, kind: "require", names: [] });
-    else if (tok.v === "import" && isP(toks[k + 1], "(") && toks[k + 2]?.t === "str") found.push({ spec: toks[k + 2].v, kind: "dynamic", names: [] });
-    else if (tok.v === "import" && toks[k + 1]?.t === "str") found.push({ spec: toks[k + 1].v, kind: "import", names: [] });
-    else if (tok.v === "import" && !isP(toks[k + 1], ".") && !isP(toks[k + 1], "(")) { const f = fromClause(toks, k + 1); if (f) found.push({ ...f, kind: "import", types: typesOnly(toks, k + 1) }); }
-    else if (tok.v === "export" && (isP(toks[k + 1], "{") || isP(toks[k + 1], "*") || isId(toks[k + 1], "type"))) { const f = fromClause(toks, k + 1); if (f) found.push({ ...f, kind: "export", types: typesOnly(toks, k + 1) }); }
+    const hit = importAt(toks, k);
+    if (hit) found.push(hit);
   }
   return found;
+}
+
+// What the word at k imports, by its kind: null where it is none of them.
+function importAt(toks, k) {
+  const v = toks[k].v;
+  if (v === "require") return requireCall(toks, k);
+  if (v === "import") return importStatement(toks, k);
+  if (v === "export") return exportClause(toks, k);
+  return null;
+}
+
+function requireCall(toks, k) {
+  const named = isP(toks[k + 1], "(") && toks[k + 2]?.t === "str" && isP(toks[k + 3], ")");
+  return named ? { spec: toks[k + 2].v, kind: "require", names: [] } : null;
+}
+
+// An import( call, an import of a module for its effects alone, or an import with a clause.
+function importStatement(toks, k) {
+  const next = toks[k + 1];
+  if (isP(next, "(")) return toks[k + 2]?.t === "str" ? { spec: toks[k + 2].v, kind: "dynamic", names: [] } : null;
+  if (next?.t === "str") return { spec: next.v, kind: "import", names: [] };
+  if (isP(next, ".")) return null;
+  return clauseEntry(toks, k, "import");
+}
+
+function exportClause(toks, k) {
+  const next = toks[k + 1];
+  return isP(next, "{") || isP(next, "*") || isId(next, "type") ? clauseEntry(toks, k, "export") : null;
+}
+
+// The import or export whose clause starts after the word at k; null where its clause names no module.
+function clauseEntry(toks, k, kind) {
+  const f = fromClause(toks, k + 1);
+  return f ? { ...f, kind, types: typesOnly(toks, k + 1) } : null;
 }
 
 // Whether an import or export clause takes types alone, which TypeScript erases before the code runs: `import type`,
@@ -343,21 +374,45 @@ function typesOnly(toks, k) {
 // clause ends (its braces close, or an = shows a declaration) with no `from` after it, so a statement with no semicolon
 // never lends its `from` to the one before it.
 function fromClause(toks, k) {
-  const names = [];
-  let braces = false;
+  const clause = { names: [], braces: false };
   for (let j = k; j < toks.length && j < k + 400; j++) {
     const tok = toks[j];
-    if (isP(tok, ";") || isP(tok, "=") || (isP(tok, "}") && !isId(toks[j + 1], "from"))) return null;
-    if (isId(tok, "from") && !braces && toks[j + 1]?.t === "str") return { spec: toks[j + 1].v, names };
-    if (isP(tok, "{")) braces = true;
-    else if (isP(tok, "}")) braces = false;
-    else if (isP(tok, "*")) names.push("*");
-    else if (tok.t === "id" && braces && !isId(toks[j - 1], "as") && tok.v !== "type" && tok.v !== "as") names.push(tok.v);
-    else if (tok.t === "id" && braces && tok.v === "type" && (isP(toks[j + 1], ",") || isP(toks[j + 1], "}"))) names.push(tok.v);
-    else if (tok.t === "id" && !braces && j === k && tok.v !== "type") names.push("default");
-    else if (tok.t === "id" && !braces && isP(toks[j - 1], ",") && !isP(toks[j - 2], "}") && !isId(toks[j - 2], "type")) names.push("default");
+    if (clauseEnds(toks, j)) return null;
+    if (isId(tok, "from") && !clause.braces && toks[j + 1]?.t === "str") return { spec: toks[j + 1].v, names: clause.names };
+    takeInClause(toks, j, k, clause);
   }
   return null;
+}
+
+// Whether the clause ends at j with no `from` after it: a ; or =, or braces that close with none next.
+function clauseEnds(toks, j) {
+  const tok = toks[j];
+  return isP(tok, ";") || isP(tok, "=") || (isP(tok, "}") && !isId(toks[j + 1], "from"));
+}
+
+// The token at j of a clause started at k: where its braces open or close, or a name it takes.
+function takeInClause(toks, j, k, clause) {
+  const tok = toks[j];
+  if (isP(tok, "{")) clause.braces = true;
+  else if (isP(tok, "}")) clause.braces = false;
+  else if (isP(tok, "*")) clause.names.push("*");
+  else if (tok.t === "id") {
+    const name = clause.braces ? nameInBraces(toks, j) : nameBeforeBraces(toks, j, k);
+    if (name) clause.names.push(name);
+  }
+}
+
+// The name an id inside the braces gives (`type` itself where it stands as a name), null for a keyword.
+function nameInBraces(toks, j) {
+  const tok = toks[j];
+  if (tok.v === "type") return isP(toks[j + 1], ",") || isP(toks[j + 1], "}") ? tok.v : null;
+  return !isId(toks[j - 1], "as") && tok.v !== "as" ? tok.v : null;
+}
+
+// "default" for the id that starts a clause started at k (not `type`), or follows a , that no braces or `type` precede.
+function nameBeforeBraces(toks, j, k) {
+  const first = j === k && toks[j].v !== "type";
+  return first || (isP(toks[j - 1], ",") && !isP(toks[j - 2], "}") && !isId(toks[j - 2], "type")) ? "default" : null;
 }
 
 // Whether a file is a module: it imports, exports or requires (module.exports too); one that does none of these, a
@@ -376,14 +431,26 @@ export function globals(toks) {
     const tok = toks[k];
     if (tok.t === "punct" && "([{".includes(tok.v)) depth++;
     else if (tok.t === "punct" && ")]}".includes(tok.v)) depth = Math.max(0, depth - 1);
-    else if (depth === 0 && tok.t === "id" && ["function", "class", "var", "let", "const"].includes(tok.v) && notMember(toks, k)) {
-      const next = isP(toks[k + 1], "*") ? toks[k + 2] : toks[k + 1];
-      const before = toks[k - 1];
-      const expression = tok.v === "function" || tok.v === "class" ? before && !isP(before, ";") && !isP(before, "}") && !isId(before, "export") && !isId(before, "async") : false;
-      if (next?.t === "id" && !expression) names.add(next.v);
+    else if (depth === 0) {
+      const name = declaredAt(toks, k);
+      if (name) names.add(name);
     }
   }
   return [...names];
+}
+
+// The name the declaration at k gives, null where none starts there (a function or class as an expression has none).
+function declaredAt(toks, k) {
+  const tok = toks[k];
+  if (tok.t !== "id" || !["function", "class", "var", "let", "const"].includes(tok.v) || !notMember(toks, k)) return null;
+  const next = isP(toks[k + 1], "*") ? toks[k + 2] : toks[k + 1];
+  return next?.t === "id" && !isExpression(toks, k) ? next.v : null;
+}
+
+function isExpression(toks, k) {
+  const tok = toks[k], before = toks[k - 1];
+  if (tok.v !== "function" && tok.v !== "class") return false;
+  return before && !isP(before, ";") && !isP(before, "}") && !isId(before, "export") && !isId(before, "async");
 }
 
 // Whether the token at k is a point where the code branches, by its tokens alone: an if, a loop (for, while; a do's
@@ -420,35 +487,47 @@ const countBranch = (toks, k, block, stack, lang) => { if (block?.fn && lang.bra
 export function functions(toks, lang = JS) {
   const found = [], stack = [];
   const openAt = new Map();
-  const top = () => { for (let s = stack.length - 1; s >= 0; s--) if (stack[s].v === "{") return stack[s]; return null; };
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
-    countBranch(toks, k, top(), stack, lang);
+    countBranch(toks, k, innerBrace(stack), stack, lang);
     if (tok.t !== "punct") continue;
     if (tok.v === "(" || tok.v === "[") stack.push({ v: tok.v, k });
-    else if (tok.v === "{") {
-      const kind = lang.kind(toks, k, openAt);
-      const parent = top();
-      const entry = { v: "{", k, kind, fn: parent?.fn ?? null, cd: kind === "function" ? 0 : parent?.cd ?? 0 };
-      if (kind === "function") {
-        entry.fn = { name: lang.name(toks, k, openAt), line: tok.line, lines: 1, depth: 0, branches: 0 };
-        found.push(entry.fn);
-      } else if (kind === "control") {
-        entry.cd++;
-        if (entry.fn) entry.fn.depth = Math.max(entry.fn.depth, entry.cd);
-      }
-      stack.push(entry);
-    } else if (OPEN[tok.v]) {
-      let s = stack.length - 1;
-      while (s >= 0 && stack[s].v !== OPEN[tok.v]) s--;
-      if (s < 0) continue;
-      const entry = stack[s];
-      stack.length = s;
-      openAt.set(k, entry.k);
-      if (entry.kind === "function") entry.fn.lines = tok.line - toks[entry.k].line + 1;
-    }
+    else if (tok.v === "{") stack.push(openBlock(toks, k, innerBrace(stack), openAt, lang, found));
+    else if (OPEN[tok.v]) closeBracket(toks, k, stack, openAt);
   }
   return found;
+}
+
+// The innermost { still open, null where none is.
+function innerBrace(stack) {
+  for (let s = stack.length - 1; s >= 0; s--) if (stack[s].v === "{") return stack[s];
+  return null;
+}
+
+// The entry of the block a { at k opens, a function's added to `found`: its depth of control blocks counts from the
+// function it lies in.
+function openBlock(toks, k, parent, openAt, lang, found) {
+  const kind = lang.kind(toks, k, openAt);
+  const entry = { v: "{", k, kind, fn: parent?.fn ?? null, cd: kind === "function" ? 0 : parent?.cd ?? 0 };
+  if (kind === "function") {
+    entry.fn = { name: lang.name(toks, k, openAt), line: toks[k].line, lines: 1, depth: 0, branches: 0 };
+    found.push(entry.fn);
+  } else if (kind === "control") {
+    entry.cd++;
+    if (entry.fn) entry.fn.depth = Math.max(entry.fn.depth, entry.cd);
+  }
+  return entry;
+}
+
+// A closing bracket at k ends the open one it matches (none: it is passed over); a function's lines are told then.
+function closeBracket(toks, k, stack, openAt) {
+  let s = stack.length - 1;
+  while (s >= 0 && stack[s].v !== OPEN[toks[k].v]) s--;
+  if (s < 0) return;
+  const entry = stack[s];
+  stack.length = s;
+  openAt.set(k, entry.k);
+  if (entry.kind === "function") entry.fn.lines = toks[k].line - toks[entry.k].line + 1;
 }
 
 // The token a block's header ends on, a return type in TypeScript passed over: the ) of `f(a): T {`.
@@ -486,20 +565,28 @@ export function typeParameters(toks, open) {
 }
 
 function functionName(toks, k, openAt) {
-  const end = headerEnd(toks, k, openAt);
-  let start = end; // the first token of the header's parameters
-  if (isP(toks[end], "=>")) start = isP(toks[end - 1], ")") && openAt.has(end - 1) ? openAt.get(end - 1) : end - 1;
-  else if (openAt.has(end)) start = typeParameters(toks, openAt.get(end));
-  let j = start - 1;
+  const end = headerEnd(toks, k, openAt), arrow = isP(toks[end], "=>");
+  let j = parametersStart(toks, end, openAt) - 1;
   if (isId(toks[j], "async")) j--;
   const tok = toks[j];
-  if (tok?.t === "id" && tok.v !== "function" && !isP(toks[end], "=>")) return tok.v;
-  if (isId(tok, "function") || isP(toks[end], "=>")) {
-    let b = isId(tok, "function") ? j - 1 : j;
-    if (isId(toks[b], "async")) b--;
-    if ((isP(toks[b], "=") || isP(toks[b], ":")) && (toks[b - 1]?.t === "id" || toks[b - 1]?.t === "str")) return toks[b - 1].v;
-  }
+  if (tok?.t === "id" && tok.v !== "function" && !arrow) return tok.v;
+  if (isId(tok, "function") || arrow) return boundName(toks, j) ?? "(anonymous)";
   return "(anonymous)";
+}
+
+// The first token of the header's parameters, the header ending on `end`.
+function parametersStart(toks, end, openAt) {
+  if (isP(toks[end], "=>")) return isP(toks[end - 1], ")") && openAt.has(end - 1) ? openAt.get(end - 1) : end - 1;
+  return openAt.has(end) ? typeParameters(toks, openAt.get(end)) : end;
+}
+
+// The name a function is given by `name = function`, `name: () =>` and the like, the word before its keyword or
+// parameters at j; undefined where none is.
+function boundName(toks, j) {
+  let b = isId(toks[j], "function") ? j - 1 : j;
+  if (isId(toks[b], "async")) b--;
+  if ((isP(toks[b], "=") || isP(toks[b], ":")) && (toks[b - 1]?.t === "id" || toks[b - 1]?.t === "str")) return toks[b - 1].v;
+  return undefined;
 }
 
 // JavaScript's and TypeScript's blocks and branches, as functions() reads them.
@@ -515,7 +602,7 @@ export function resolve(from, spec, files, packages) {
     return tries.find(t => files.has(t)) ?? null;
   };
   if (spec.startsWith("./") || spec.startsWith("../") || spec === "." || spec === "..") return tryFile(path.posix.join(path.posix.dirname(from), spec));
-  const name = spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
+  const name = packageName(spec);
   const pkg = packages.get(name);
   if (!pkg) return null;
   const rest = spec.slice(name.length);
@@ -558,62 +645,126 @@ const folderOf = (file, depth) => { const parts = path.posix.dirname(file).split
 const quantile = (sorted, q) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0;
 const addEdge = (graph, a, b) => { if (!graph.has(a)) graph.set(a, new Set()); graph.get(a).add(b); };
 
-// Every measure of the files given ({ path: text }), with the history's commits (lists of the paths each touched,
-// newest first) and the suites' runs.
-export function measure(texts, { depth = 0, commits = [], suites = [], other = {} } = {}) {
-  const files = new Set(Object.keys(texts));
+// The packages the files declare, by name: { dir, main } of each package.json that has a name.
+function packagesOf(texts) {
   const packages = new Map();
   for (const [file, text] of Object.entries(texts)) if (path.posix.basename(file) === "package.json") {
     try { const p = JSON.parse(text); if (typeof p.name === "string") packages.set(p.name, { dir: path.posix.dirname(file), main: typeof p.main === "string" ? p.main : null }); } catch { /* not a package's */ }
   }
+  return packages;
+}
+
+// A package's name in an import's spec: its first part, or its first two where it is scoped.
+const packageName = spec => spec.startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
+
+// Every measure of the files given ({ path: text }), with the history's commits (lists of the paths each touched,
+// newest first) and the suites' runs.
+export function measure(texts, { depth = 0, commits = [], suites = [], other = {} } = {}) {
+  const files = new Set(Object.keys(texts));
   const code = [...files].filter(f => CODE.includes(path.posix.extname(f))).sort();
-  const fileGraph = new Map(), withTypes = new Map(), folderGraph = new Map(), folderEdges = new Map(), offered = new Map(), external = new Map();
-  const fns = [], scripts = [], unresolved = [];
-  let total = 0, crossing = 0;
+  const book = {
+    files, packages: packagesOf(texts), depth, fileGraph: new Map(), withTypes: new Map(), folderGraph: new Map(),
+    folderEdges: new Map(), offered: new Map(), external: new Map(), unresolved: [], total: 0, crossing: 0,
+  };
+  const fns = [], scripts = [];
   for (const file of code) {
     const toks = tokens(texts[file], jsxIn(file));
     for (const fn of told(toks)) fns.push({ file, ...fn });
     if (!isModule(toks)) scripts.push({ file, names: globals(toks) });
-    for (const imp of imports(toks)) {
-      total++;
-      const to = resolve(file, imp.spec, files, packages);
-      if (!to && /^\.\.?(\/|$)/.test(imp.spec)) { if (!/\.[A-Za-z0-9]+$/.test(imp.spec) || CODE.includes(path.posix.extname(imp.spec))) unresolved.push(`${file}: ${imp.spec}`); continue; }
-      if (!to) { const name = imp.spec.startsWith("@") ? imp.spec.split("/").slice(0, 2).join("/") : imp.spec.split("/")[0]; external.set(name, (external.get(name) ?? 0) + 1); continue; }
-      if (imp.kind !== "dynamic") addEdge(withTypes, file, to);
-      if (imp.kind !== "dynamic" && !imp.types) addEdge(fileGraph, file, to);
-      if (!offered.has(to)) offered.set(to, { by: new Set(), names: new Set() });
-      offered.get(to).by.add(file);
-      for (const n of imp.names) offered.get(to).names.add(n);
-      const a = folderOf(file, depth), b = folderOf(to, depth);
-      if (a !== b) {
-        crossing++;
-        if (imp.kind !== "dynamic" && !imp.types) addEdge(folderGraph, a, b);
-        const key = `${a}\u0000${b}`;
-        folderEdges.set(key, (folderEdges.get(key) ?? 0) + 1);
-      }
-    }
+    for (const imp of imports(toks)) noteImport(book, file, imp);
   }
+  return {
+    files: { code: code.length, other },
+    imports: importsSummary(book),
+    cycles: { files: cycles(book.fileGraph), folders: cycles(book.folderGraph), filesWithTypes: cycles(book.withTypes) },
+    hubs: hubsOf(book.offered),
+    globals: globalsSummary(scripts),
+    functions: functionsSummary(fns),
+    changedTogether: changedTogether(commits, new Set(code)),
+    suites,
+  };
+}
+
+// An import of `file` set in the book: counted, and either where it leads in the repository or what it leaves out.
+function noteImport(book, file, imp) {
+  book.total++;
+  const to = resolve(file, imp.spec, book.files, book.packages);
+  if (to) noteEdges(book, file, to, imp);
+  else noteLeftOut(book, file, imp.spec);
+}
+
+// An import that leads to no file: a relative one that should have (named a file, or none by its extension) is listed
+// as unresolved; a package from outside is counted by name.
+function noteLeftOut(book, file, spec) {
+  if (/^\.\.?(\/|$)/.test(spec)) {
+    if (!/\.[A-Za-z0-9]+$/.test(spec) || CODE.includes(path.posix.extname(spec))) book.unresolved.push(`${file}: ${spec}`);
+    return;
+  }
+  const name = packageName(spec);
+  book.external.set(name, (book.external.get(name) ?? 0) + 1);
+}
+
+// The edges an import from `file` to the file `to` adds: between files, with the imports of types alone left out of
+// the graphs of what runs (a dynamic import makes none), and between folders.
+function noteEdges(book, file, to, imp) {
+  const runs = imp.kind !== "dynamic";
+  if (runs) addEdge(book.withTypes, file, to);
+  if (runs && !imp.types) addEdge(book.fileGraph, file, to);
+  if (!book.offered.has(to)) book.offered.set(to, { by: new Set(), names: new Set() });
+  book.offered.get(to).by.add(file);
+  for (const n of imp.names) book.offered.get(to).names.add(n);
+  const a = folderOf(file, book.depth), b = folderOf(to, book.depth);
+  if (a === b) return;
+  book.crossing++;
+  if (runs && !imp.types) addEdge(book.folderGraph, a, b);
+  const key = `${a}\u0000${b}`;
+  book.folderEdges.set(key, (book.folderEdges.get(key) ?? 0) + 1);
+}
+
+function importsSummary(book) {
+  const { total, crossing, offered, external, unresolved } = book;
+  return {
+    total, crossingAFolder: crossing, intoTheRepository: [...offered.values()].reduce((s, o) => s + o.by.size, 0),
+    external: Object.fromEntries([...external].sort((a, b) => b[1] - a[1])), unresolved,
+    foldersBothWays: foldersBothWays(book.folderEdges),
+  };
+}
+
+// The pairs of folders that import each other, the pair that does so least often last.
+function foldersBothWays(folderEdges) {
   const bothWays = [];
   for (const [key, n] of folderEdges) {
     const [a, b] = key.split("\u0000"), back = folderEdges.get(`${b}\u0000${a}`);
     if (back && a < b) bothWays.push({ folders: [a, b], imports: [n, back] });
   }
+  return bothWays.sort((x, y) => Math.min(...y.imports) - Math.min(...x.imports));
+}
+
+// The files more than one file imports, most imported first, with the names each gives them.
+function hubsOf(offered) {
   const hubs = [...offered].map(([file, o]) => ({ file, importedBy: o.by.size, names: [...o.names].sort() }))
     .sort((x, y) => y.importedBy - x.importedBy || x.file.localeCompare(y.file));
+  return hubs.filter(h => h.importedBy > 1);
+}
+
+// The scripts' ({ file, names }) global names, and those more than one of them declares.
+function globalsSummary(scripts) {
   const declared = new Map();
   for (const s of scripts) for (const n of s.names) declared.set(n, [...(declared.get(n) ?? []), s.file]);
+  const inMoreThanOne = [...declared].filter(([, f]) => f.length > 1).map(([name, f]) => ({ name, files: f.sort() }))
+    .sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name));
+  return { scripts: scripts.length, names: scripts.reduce((s, x) => s + x.names.length, 0), inMoreThanOne };
+}
+
+function functionsSummary(fns) {
   const lengths = fns.map(f => f.lines).sort((a, b) => a - b);
   const byLength = [...fns].sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file) || a.line - b.line);
   const byDepth = [...fns].sort((a, b) => b.depth - a.depth || b.lines - a.lines || a.file.localeCompare(b.file));
+  const lines = { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 };
   return {
-    files: { code: code.length, other },
-    imports: { total, crossingAFolder: crossing, intoTheRepository: [...offered.values()].reduce((s, o) => s + o.by.size, 0), external: Object.fromEntries([...external].sort((a, b) => b[1] - a[1])), unresolved, foldersBothWays: bothWays.sort((x, y) => Math.min(...y.imports) - Math.min(...x.imports)) },
-    cycles: { files: cycles(fileGraph), folders: cycles(folderGraph), filesWithTypes: cycles(withTypes) },
-    hubs: hubs.filter(h => h.importedBy > 1),
-    globals: { scripts: scripts.length, names: scripts.reduce((s, x) => s + x.names.length, 0), inMoreThanOne: [...declared].filter(([, f]) => f.length > 1).map(([name, f]) => ({ name, files: f.sort() })).sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name)) },
-    functions: { count: fns.length, lines: { median: quantile(lengths, 0.5), p90: quantile(lengths, 0.9), max: lengths.at(-1) ?? 0 }, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length, depth4OrMore: fns.filter(f => f.depth >= 4).length, ...branching(fns), longest: byLength.slice(0, 20), deepest: byDepth.filter(f => f.depth > 0).slice(0, 20) },
-    changedTogether: changedTogether(commits, new Set(code)),
-    suites,
+    count: fns.length, lines, over50Lines: fns.filter(f => f.lines > 50).length, over100Lines: fns.filter(f => f.lines > 100).length,
+    depth4OrMore: fns.filter(f => f.depth >= 4).length, ...branching(fns), longest: byLength.slice(0, 20),
+    deepest: byDepth.filter(f => f.depth > 0).slice(0, 20),
   };
 }
 
@@ -659,6 +810,20 @@ const specsOf = (repo, here) => {
 };
 
 function main(argv) {
+  const opts = parseArguments(argv);
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const root = rootOf(opts.repo, here), specs = opts.specs.length ? opts.specs : specsOf(opts.repo, here);
+  const listed = execFileSync("git", [...SAFE, "ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
+  const { texts, other } = readFiles(root, listed);
+  const log = execFileSync("git", [...SAFE, "log", "--no-merges", "-n", String(opts.history), "--format=%x00", "--name-only", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+  const commits = log.split("\0").slice(1).map(c => c.split("\n").map(s => s.trim()).filter(Boolean));
+  const suites = opts.suites.map(command => runSuite(root, command));
+  const m = measure(texts, { depth: opts.depth, commits, suites, other });
+  if (opts.json) fs.writeFileSync(opts.json, JSON.stringify(m, null, 2) + "\n");
+  print(m);
+}
+
+function parseArguments(argv) {
   const opts = { specs: [], suites: [], depth: 0, history: 500, json: null, repo: null };
   for (let k = 0; k < argv.length; k++) {
     const a = argv[k];
@@ -671,9 +836,11 @@ function main(argv) {
     else if (a.startsWith("--")) fail(`unknown option ${a}`);
     else opts.specs.push(a);
   }
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const root = rootOf(opts.repo, here), specs = opts.specs.length ? opts.specs : specsOf(opts.repo, here);
-  const listed = execFileSync("git", [...SAFE, "ls-files", "-z", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
+  return opts;
+}
+
+// The text of each code file listed, and the count of files in other languages by extension.
+function readFiles(root, listed) {
   const texts = {}, other = {};
   for (const f of listed) {
     const ext = path.posix.extname(f);
@@ -682,16 +849,13 @@ function main(argv) {
     }
     else if (OTHER.includes(ext)) other[ext] = (other[ext] ?? 0) + 1;
   }
-  const log = execFileSync("git", [...SAFE, "log", "--no-merges", "-n", String(opts.history), "--format=%x00", "--name-only", "--", ...specs], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
-  const commits = log.split("\0").slice(1).map(c => c.split("\n").map(s => s.trim()).filter(Boolean));
-  const suites = opts.suites.map(command => {
-    const start = process.hrtime.bigint();
-    const r = spawnSync(command, { cwd: root, shell: true, stdio: "ignore" });
-    return { command, seconds: Math.round(Number(process.hrtime.bigint() - start) / 1e8) / 10, passed: r.status === 0 };
-  });
-  const m = measure(texts, { depth: opts.depth, commits, suites, other });
-  if (opts.json) fs.writeFileSync(opts.json, JSON.stringify(m, null, 2) + "\n");
-  print(m);
+  return { texts, other };
+}
+
+function runSuite(root, command) {
+  const start = process.hrtime.bigint();
+  const r = spawnSync(command, { cwd: root, shell: true, stdio: "ignore" });
+  return { command, seconds: Math.round(Number(process.hrtime.bigint() - start) / 1e8) / 10, passed: r.status === 0 };
 }
 
 function print(m) {
