@@ -118,17 +118,6 @@ function hereDocuments(lines) {
   }
   return found;
 }
-// Where a here-document that names the copy's script is fed to a command that may run it (source /dev/stdin <<EOF,
-// bash <<EOF), a run that cannot be known, as { unread, unsure }; one fed to a command that runs no script (cat <<EOF)
-// is data.
-function fedRuns(run, script) {
-  const lines = run.split(/\r?\n/u).map(uncommented);
-  return hereDocuments(lines).flatMap(({ opens, body }) => {
-    const command = commands(lines[opens])[0] ?? [], word = command[pastWrappers(command)]?.text ?? "";
-    if (NO_RUNNER.has(path.posix.basename(word).toLowerCase()) || !body.some(l => l.replace(/\\/gu, "/").includes(script))) return [];
-    return [{ unread: `runs ${script} in a here-document fed to ${word || "a command"}, which the reader does not follow`, unsure: true }];
-  });
-}
 // The first of the sorted line numbers `list` past `n`, or -1.
 function next(list, n) {
   let low = 0, high = list.length;
@@ -225,7 +214,7 @@ function pastWrappers(words) {
 }
 // The commands a shell at word `i` is given as one word, in its plain forms only, as { inner, filled, elsewhere }
 // (elsewhere: run in another folder); {} where the reader finds none, and then a naming of the script in the line is
-// said not read (unfollowed), never passed over. sh: its options before the string, one of them holding c (-c, -ec,
+// said not read (unaccounted), never passed over. sh: its options before the string, one of them holding c (-c, -ec,
 // -ce), -o and a cluster ending in o taking a value.
 function inline(words, i) {
   if (/pwsh|powershell/iu.test(words[i].text)) return powershell(words, i);
@@ -256,10 +245,10 @@ function powershell(words, i) {
 // "--packages", and none where it is run "--projects" or "--imports", which list files and read no config.
 const PICKS = { "reading-size.mjs": { first: true }, "exact-versions.mjs": { first: true }, "nuget.mjs": { valued: ["--packages"], none: ["--projects", "--imports"] } };
 // The config a run passes the script at word `i`, as that script picks it (PICKS), as { config }, a path from the
-// root; { unread } with why it cannot be known; null where the run reads no config.
+// root; { unread } with why it cannot be known; { none } where the run reads no config.
 function configAfter(words, i, dir, script) {
   const pick = PICKS[path.posix.basename(script)] ?? {}, args = words.slice(i + 1);
-  if (args.some(a => pick.none?.includes(a.text))) return null;
+  if (args.some(a => pick.none?.includes(a.text))) return { none: true };
   const k = pick.first ? 0 : args.findIndex((a, n) => !a.text.startsWith("--") && !(n > 0 && pick.valued?.includes(args[n - 1].text)));
   const arg = k < 0 ? words.length : i + 1 + k;
   if (arg >= words.length) return { unread: `runs ${script} with no config` };
@@ -267,24 +256,37 @@ function configAfter(words, i, dir, script) {
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
-// Where a command the reader did not read as a run of the script names the copy's script all the same (timeout 60s
-// node …, sudo -u bot node …, env -S '…', a shell line it cannot parse), a run that cannot be known (never one that is
-// not there), as { unread, unsure }; else nothing. A command that runs no script (echo, cp, git: NO_RUNNER) names it as
-// text.
-function unfollowed(words, script) {
-  const command = words[pastWrappers(words)]?.text ?? "";
-  if (NO_RUNNER.has(path.posix.basename(command).toLowerCase())) return [];
-  return words.some(w => mentions(slashed(w), script)) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : [];
-}
-// Whether a text names the copy's script by its path: where it starts, or after a blank, a quote, "/" or "=", and up
-// to its end, a blank or a quote (one pass of indexOf, so no text makes it slow).
-function mentions(text, script) {
-  for (let at = text.indexOf(script); at >= 0; at = text.indexOf(script, at + 1)) {
-    const end = at + script.length;
-    if ((at === 0 || /[\s'"/=]/u.test(text[at - 1])) && (end === text.length || /[\s'"]/u.test(text[end]))) return true;
+// Where a step names the copy's script more often than the reader accounts for, a run that cannot be known (never
+// one that is not there), as [{ unread, unsure }]; else []. Each naming of it by its path is accounted for by a run the
+// reader read (a config, or one it says it cannot place), or by a line that is one command that runs no script, alone
+// (echo, cp, git: NO_RUNNER, with no pipe, redirection, here-document or second command); any other, in whatever form
+// of the shell's (timeout 60s node …, cat <<EOF | bash, pwsh -c node …), leaves the step's run of it not read.
+function unaccounted(run, script, runs) {
+  let named = 0, text = 0;
+  for (const line of run.split(/\r?\n/u).map(uncommented).join("\n").replace(/\\\n/gu, " ").split("\n")) {
+    const k = namings(line.replace(/\\/gu, "/"), script);
+    named += k;
+    if (k && lone(line)) text += k;
   }
-  return false;
+  return named > runs.filter(r => !r.unsure).length + text ? [{ unread: `names ${script} in a way the reader does not follow`, unsure: true }] : [];
 }
+// Whether a line is one command that runs no script, and nothing more.
+const lone = line => {
+  if (/[|;&<>`]|\$\(/u.test(line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/gu, ""))) return false; // (outside quotes)
+  const [words = [], more] = commands(line);
+  return !more && NO_RUNNER.has(path.posix.basename(words[pastWrappers(words)]?.text ?? "").toLowerCase());
+};
+// How often a text names the copy's script by its path: where it starts, or after a blank, a quote or "=", or after
+// the root's name, "./" or "../" (one pass of indexOf, so no text makes it slow).
+function namings(text, script) {
+  let n = 0;
+  for (let at = text.indexOf(script); at >= 0; at = text.indexOf(script, at + 1)) {
+    const end = at + script.length, before = text.slice(Math.max(0, at - 40), at);
+    if ((at === 0 || /[\s'"=]$/u.test(before) || LEADS.test(before)) && (end === text.length || /[\s'";|&)<>]/u.test(text[end]))) n++;
+  }
+  return n;
+}
+const LEADS = /(?:^|[\s'"=])(?:\.\.?|\$\{?GITHUB_WORKSPACE\}?|\$\{\{\s*github\.workspace\s*\}\}|\$env:GITHUB_WORKSPACE|%GITHUB_WORKSPACE%)(?:\/\.\.?)*\/$/u;
 // (env's and sudo's options that run the command in another folder: env -C app, --chdir=app, sudo -D app)
 const CHDIR_OPTION = /^(?:-C|-D|--chdir(?:=.*)?|--working-directory(?:=.*)?)$/u;
 const NO_RUNNER = new Set(["sha256sum", "sha1sum", "md5sum", "shasum", "jq", "rg", "gh", "curl", "wget", "write-host", "write-output", "echo", "printf", "cp", "mv", "rm", "ln", "chmod", "chown", "git", "cat", "head", "tail", "ls", "test", "[", "grep", "sed", "awk", "touch", "mkdir", "tee", "wc", "diff", "stat", "readlink", "realpath", "basename", "dirname", "which", "type", "true", "false", ":", "export", "set", "unset", "cd"]);
@@ -294,28 +296,26 @@ const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `ru
 // Where a step's `run:`, in the folder `dir`, runs `script` (a path from the root, "core/scripts/copies.mjs") with
 // node: each as configAfter gives it.
 function runsIn(run, dir, script) {
-  const found = fedRuns(run, script);
+  const found = [];
   let moved = false;
   for (const words of commands(run)) {
     const { moves, inner, filled, elsewhere, shifted, at: i } = nodeRuns(words);
     moved ||= !!moves;
     if (inner !== undefined) found.push(...within(runsIn(inner, moved || elsewhere ? { dynamic: true } : dir, script), filled, script));
-    else if (i === undefined) found.push(...(moves ? [] : unfollowed(words, script)));
     else found.push(...runAt(words, i, moved || shifted ? { dynamic: true, moved: true } : dir, script));
   }
   return found;
 }
 // The run of a command whose node is given the word at `i`, as runsIn gives it: where that word is no script of the
-// copy's, a run the reader could not place (unfollowed); after a cd, or in a folder named only when it runs, which
+// copy's, nothing (unaccounted says so where it names the copy's); after a cd, or in a folder named only when it runs, which
 // copy it runs cannot be known.
 function runAt(words, i, dir, script) {
   const word = words[i];
-  if (!word || !slashed(word).endsWith(`scripts/${path.posix.basename(script)}`)) return unfollowed(words, script);
+  if (!word || !slashed(word).endsWith(`scripts/${path.posix.basename(script)}`)) return [];
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   const at = dir.dynamic ? { dynamic: true } : located(word, dir.at);
   if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs`, unsure: true }];
-  const config = at.at === script ? configAfter(words, i, dir, script) : null;
-  return config ? [config] : [];
+  return at.at === script ? [configAfter(words, i, dir, script)] : [];
 }
 
 // A step's folder, from the root: its own `working-directory`, else its job's or its workflow's default.
@@ -376,7 +376,8 @@ export function runsOwn(p, name) {
   const script = `${copyOf(p)}scripts/${name}`;
   return steps(p).flatMap(s => {
     if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know`, unsure: true }] : [];
-    return runsIn(s.run, s.dir, script).map(r => ({ where: s.where, from: s.from, ...r }));
+    const runs = runsIn(s.run, s.dir, script);
+    return [...runs, ...unaccounted(s.run, script, runs)].map(r => ({ where: s.where, from: s.from, ...r }));
   });
 }
 // The workflows of the project's own that run the script, themselves or through an action they use, once each; where
@@ -386,7 +387,7 @@ export const runFiles = (p, name) => runsOwn(p, name).map(r => {
   if (r.unsure) throw new Unread(`${r.where} ${r.unread}`);
   return r.from;
 }).filter((f, k, all) => all.indexOf(f) === k);
-const fromRuns = (p, name) => runsOwn(p, name).map(r => {
+const fromRuns = (p, name) => runsOwn(p, name).filter(r => !r.none).map(r => {
   if (r.unread) throw new Unread(`${r.where} ${r.unread}`);
   return { where: r.where, value: r.config };
 });

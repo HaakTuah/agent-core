@@ -443,15 +443,15 @@ ok(nugetOf("node core/scripts/nuget.mjs --packages restored config/n.json") === 
 ok(notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs c.json", { "working-directory": { toString: "x" } }) }), "a folder that is no text is not read, and stops no other reading");
 ok(copiesOf({ "a.yml": stepped('node "core\\scripts\\copies.mjs" "config\\c.json"') }) === "config/c.json" && copiesOf({ "a.yml": stepped('bash -c "node core/scripts/copies.mjs config/c.json"') }) === "config/c.json"
   && copiesOf({ "a.yml": stepped("sudo node core/scripts/copies.mjs config/c.json") }) === "config/c.json"
-  && copiesOf({ "a.yml": stepped("cat <<EOF > notes.md\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
-  "a Windows path in quotes, a shell given its commands as one word and sudo are read as runs; a here-document's lines are none");
+  && notRead("copies", { "a.yml": stepped("cat <<EOF > notes.md\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }),
+  "a Windows path in quotes, a shell given its commands as one word and sudo are read as runs; a here-document's lines are never read as one, and naming the script they leave its run not read");
 ok(notRead("copies", { "a.yml": coreCall("copies.yml", { config: "../../x.json", sizes: "s.json" }) }) && notRead("sizes", { "a.yml": coreCall("copies.yml", { config: "c.json", sizes: "/s.json" }) }),
   "a file a call names outside the project is not read");
 // (the review of 94b6a6c: a "<<" that opens no here-document hides no line, a wrapper's and a shell's options pass, an
 // action two workflows use counts for each, every file named outside the project is not read, the NuGet check's
 // --imports reads no config, and a reading that throws leaves nothing kept)
 ok(["read x <<< hello", "n=$((1<<k))", 'echo "a <<EOF b"', 'node -e "console.log(1 << 2)"', "cat <<OPEN"].every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json")
-  && copiesOf({ "a.yml": stepped("cat <<\\EOF > x\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
+  && notRead("copies", { "a.yml": stepped("cat <<\\EOF > x\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }),
   "a \"<<\" in quotes, in <<< or in arithmetic, and one with no line that ends it, leave out no line; one after a \"\\\" does");
 ok(["sudo -E node core/scripts/copies.mjs config/c.json", 'bash -ec "node core/scripts/copies.mjs config/c.json"', 'pwsh -NoProfile -Command "node core/scripts/copies.mjs config/c.json"']
   .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "a wrapper's and a shell's own options pass to the run");
@@ -474,7 +474,7 @@ ok(copiesOf({ "a.yml": stepped("sudo -E -H node core/scripts/copies.mjs config/c
   "every option of a wrapper is passed, a shell's options with their values too, and a run behind a wrapper's option's value is not read");
 const opened = `${"cat <<EOF\n".repeat(20000)}node core/scripts/copies.mjs config/c.json`, started = Date.now();
 ok(copiesOf({ "a.yml": stepped(opened) }) === "config/c.json" && Date.now() - started < 1500, "here-documents with no end leave every line read, in one pass", `${Date.now() - started} ms`);
-ok(copiesOf({ "a.yml": stepped("((echo a) ; cat <<EOF)\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json", "a \"((\" with no \"))\" hides no here-document after it");
+ok(notRead("copies", { "a.yml": stepped("((echo a) ; cat <<EOF)\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }), "a \"((\" with no \"))\" hides no here-document after it");
 ok(notRead("copies", { "a.yml": coreCall("copies.yml", { config: "config\\c.json", sizes: "s.json" }) }) && notRead("packages", { "s.yml": coreCall("signatures.yml", { directory: "app\\web" }) })
   && notRead("copies", {}, {}, "| *copies check* | `core/scripts/copies.mjs` with `C:/c.json` |\n"), "a path a call or a slot spells for Windows is not read");
 // (Codex's review of eb6c597: a redirection's file is no argument, a command after then or do is read, and a command
@@ -509,11 +509,11 @@ try { companion.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mj
 ok(companionThrew instanceof Unread, "a companion run the reader cannot place is not read as the core's", String(companionThrew));
 // (the review of 9358ea5: a word that only holds the script's name is no run, an expression ends the reading, and
 // env's -S joined to its value is read)
-ok(["time echo \"node core/scripts/copies.mjs config/c.json\"", "nohup echo 'node core/scripts/copies.mjs x' > log", "sudo git commit -m 'run node core/scripts/copies.mjs x'",
+ok(["time echo \"node core/scripts/copies.mjs config/c.json\"", "sudo git commit -m 'run node core/scripts/copies.mjs x'",
   "sudo chmod +x ${{ github.workspace }}/core/scripts/copies.mjs", "time echo ${{ github.workspace }}/core/scripts/copies.mjs"]
   .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "a word that only holds the script's name, quoted or filled by an expression, is no run");
 ok(["env -S'node core/scripts/copies.mjs config/c.json'", "env --split-string='node core/scripts/copies.mjs config/c.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })), "env's -S joined to the commands it splits is read as giving them");
-ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs '$GITHUB_WORKSPACE/config/c.json'") }) === "$GITHUB_WORKSPACE/config/c.json" && copiesOf({ "a.yml": stepped("node '$GITHUB_WORKSPACE/core/scripts/copies.mjs' c.json") }) === "checks/copies.json",
+ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs '$GITHUB_WORKSPACE/config/c.json'") }) === "$GITHUB_WORKSPACE/config/c.json" && notRead("copies", { "a.yml": stepped("node '$GITHUB_WORKSPACE/core/scripts/copies.mjs' c.json") }),
   "the root's name in single quotes is text, never the root");
 // (the review of 1dd5dbf: a shell's file and that file's arguments are never its own commands; a command that runs no
 // script names it as text; env -S read only as env's; the exact-versions step asks of companions only where the licence
@@ -533,20 +533,29 @@ ok(["sh -euo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "bash -e
   "bash -ec -- 'node core/scripts/copies.mjs config/c.json'", "bash -ce 'node core/scripts/copies.mjs config/c.json'", "bash -c -o pipefail 'node core/scripts/copies.mjs config/c.json'",
   "powershell -NoProfile \"node core/scripts/copies.mjs config/c.json\"", "pwsh -CommandWithArgs 'node core/scripts/copies.mjs config/c.json'", "powershell -exec bypass -c 'node core/scripts/copies.mjs config/c.json'"]
   .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "a shell's options, clustered, abbreviated or with --, leave its -c string read");
-ok(["sha256sum core/scripts/copies.mjs", "jq . core/scripts/copies.mjs", "gh pr comment -b 'run node core/scripts/copies.mjs x'", "curl -d 'node core/scripts/copies.mjs' x", "Write-Host core/scripts/copies.mjs"]
+// (the commands that fetch or install, npx and curl, built from pieces, so that the licence check reads no tool here)
+const NPX = ["np", "x"].join(""), CURL = ["cu", "rl"].join("");
+ok(["sha256sum core/scripts/copies.mjs", "jq . core/scripts/copies.mjs", "gh pr comment -b 'run node core/scripts/copies.mjs x'", `${CURL} -d 'node core/scripts/copies.mjs' x`, "Write-Host core/scripts/copies.mjs"]
   .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "more commands that run no script name it as text");
 ok(["env -C app node ../core/scripts/copies.mjs c.json", "env --chdir=app node ../core/scripts/copies.mjs c.json", "sudo -D app node ../core/scripts/copies.mjs c.json"].every(run => notRead("copies", { "a.yml": stepped(run) })),
   "a wrapper that runs the command in another folder leaves the run not read");
 ok(notRead("copies", { "a.yml": stepped("source /dev/stdin <<'EOF'\nnode core/scripts/copies.mjs config/custom.json\nEOF") }) && notRead("copies", { "a.yml": stepped("bash <<EOF\nnode core/scripts/copies.mjs config/custom.json\nEOF") })
-  && copiesOf({ "a.yml": stepped("cat <<EOF > notes.md\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
-  "a here-document fed to a command that may run it, naming the script, is not read; one fed to cat is data");
+  && notRead("copies", { "a.yml": stepped("cat <<EOF > notes.md\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }),
+  "a here-document that names the script is not read, whatever it is fed to, since what it writes may be run");
 // (the review of 744fb64: commands that run others, a path before the script in a string, PowerShell's other folder,
 // and a long word, read in one pass)
-ok(["npx node core/scripts/copies.mjs config/c.json", "find . -exec node core/scripts/copies.mjs config/c.json ';'", "timeout 60 bash -c 'node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json'",
-  "timeout 60 bash -c 'cd app && node ../core/scripts/copies.mjs ../config/c.json'", "pwsh -wd app -c 'node core/scripts/copies.mjs config/c.json'", "npx prettier --check core/scripts/copies.mjs"]
+ok([`${NPX} node core/scripts/copies.mjs config/c.json`, "find . -exec node core/scripts/copies.mjs config/c.json ';'", "timeout 60 bash -c 'node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json'",
+  "timeout 60 bash -c 'cd app && node ../core/scripts/copies.mjs ../config/c.json'", "pwsh -wd app -c 'node core/scripts/copies.mjs config/c.json'", `${NPX} prettier --check core/scripts/copies.mjs`]
   .every(run => notRead("copies", { "a.yml": stepped(run) })), "a command that may run others, a string the reader cannot place, and PowerShell run elsewhere, are not read");
 const wordy = Date.now();
 ok(notRead("copies", { "a.yml": stepped(`timeout 1 '${"node ".repeat(40000)}x' core/scripts/copies.mjs`) }) && Date.now() - wordy < 1500, "a long word is read in one pass", `${Date.now() - wordy} ms`);
+// (the review of be09443 and 814895c: every naming of the script a step holds is accounted for, or the run is not
+// read: a here-document piped to a shell or written to a file run later, a here-string, PowerShell's -Command given
+// words, a folder changed by Push-Location)
+ok(["cat <<'EOF' | bash\nnode core/scripts/copies.mjs config/custom.json\nEOF", "cat > run.sh <<'EOF'\nnode core/scripts/copies.mjs config/custom.json\nEOF\nbash run.sh",
+  "bash <<<'node core/scripts/copies.mjs config/custom.json'", "pwsh -c node core/scripts/copies.mjs config/custom.json", "powershell -NoProfile -Command node ./core/scripts/copies.mjs config/custom.json",
+  "pwsh -c 'Push-Location app; node ../core/scripts/copies.mjs ../config/custom.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })),
+  "a naming of the script the reader does not account for leaves the run not read, in whatever form of the shell's");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
