@@ -21,10 +21,10 @@ might attack: `floor/threat-model.md`.
   Reason: a lock on one tool shut out an owner who had only that tool.
 - They are what runs by itself or with credentials (`.github/`, `.claude/`, an agent tool's own folder such as .kiro or
   .codex, the cloud setup script, any file of the credentialed GitHub calls builders run); the rule files
-  (`SECURITY.md`, the threat model, the core manifest, the core's copies the manifest names, and any other file a tool
-  takes its instructions from, wherever it lies: an `AGENTS.md` or `CLAUDE.md` in any folder, a GEMINI.md or
-  REVIEW.md, a folder .agents or .agent; core archive 180 and 241); and the checks on the work (the copies and licence
-  checks and their configs).
+  (`SECURITY.md`, the threat model, the core manifest, the copy of the core where its `Core:` line says, the floor's
+  own copy, and any other file a tool takes its instructions from, wherever it lies: an `AGENTS.md` or `CLAUDE.md` in
+  any folder, a GEMINI.md or REVIEW.md, a folder .agents or .agent; core archive 180 and 241); and the checks on the
+  work (the copies and licence checks and their configs).
 - **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines: the owner's word
   that asked for the change, quoted there, is that yes for the change as asked; one beyond it waits for a new yes.
   Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through

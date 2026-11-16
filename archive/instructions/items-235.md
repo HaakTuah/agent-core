@@ -225,4 +225,4 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Behind `tasks/repositories.md`, the manifest's `Core:` line in its two forms and its line `Floor copy:`
      (`scripts/core-path.mjs`), what `core.yml` and the work-saved hook read of them, the staged cases `carried` and
-     `no-floor`, and "the core's copies the manifest names" in floor rule 3.
+     `no-floor`, and "the copy of the core where its `Core:` line says" and "the floor's own copy" in floor rule 3.
