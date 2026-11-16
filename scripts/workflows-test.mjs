@@ -74,7 +74,7 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, import.meta.url)), path.join(tmp, "core/scripts", f));
+  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, import.meta.url)), path.join(tmp, "core/scripts", f));
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));

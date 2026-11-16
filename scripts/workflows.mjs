@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { twice } from "./yaml-keys.mjs";
+import { projectAt } from "./core-path.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -93,7 +94,7 @@ export function repeated(files, before) {
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-  process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+  process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
   const show = file => { try { return git(["show", `${base}:${file}`]); } catch { return null; } };

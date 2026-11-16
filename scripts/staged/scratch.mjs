@@ -11,6 +11,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CORE } from "../core-address.mjs";
+import { hookCommands, readCore } from "../core-path.mjs";
 import { plainEnv } from "../releases.mjs";
 
 export const CORE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -157,6 +159,38 @@ const FILLS = [
   [/^- Reopens it: FILL IN.*$/m, "- Reopens it: a user who has no Node."],
 ];
 
+// The core carried by a library of the project's (tasks/repositories.md), for `arrange`: the kit's copy moved under
+// lib/core/, the kit's manifest beside it as the library's own, the project's manifest naming the core carried, every
+// other file of the project's own that names core/ naming lib/core/, and its Claude Code hooks those core-path.mjs
+// writes for that path. With `submodule`, lib is instead a submodule whose commit no checkout here can fetch, so the
+// floor cannot be read: its files are gone, and only its pointer and .gitmodules stand.
+export function carry(project, { submodule = false } = {}) {
+  const manifest = fs.readFileSync(path.join(project, "core-manifest.md"), "utf8");
+  fs.mkdirSync(path.join(project, "lib"));
+  if (submodule) fs.rmSync(path.join(project, "core"), { recursive: true });
+  else {
+    fs.renameSync(path.join(project, "core"), path.join(project, "lib", "core"));
+    fs.writeFileSync(path.join(project, "lib", "core-manifest.md"), manifest);
+  }
+  const line = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).`;
+  // (the kit's files, which it staged, and the program's, which it did not; the copy's own, moved, left out)
+  for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(f => f && !f.startsWith("lib/") && !f.startsWith("core/"))) {
+    const file = path.join(project, f), text = fs.readFileSync(file, "utf8");
+    const moved = text.replace(/^Core: .*$/mu, m => (f === "core-manifest.md" ? line : m)).replace(/(^|[\s`'"(@:<[])core\//gmu, "$1lib/core/");
+    if (moved !== text) fs.writeFileSync(file, moved);
+  }
+  const settings = path.join(project, ".claude", "settings.json"), json = JSON.parse(fs.readFileSync(settings, "utf8"));
+  const commands = hookCommands(readCore(line));
+  json.hooks.SessionStart[0].hooks[0].command = commands.start;
+  json.hooks.PreToolUse[0].hooks[0].command = commands.helper;
+  json.hooks.Stop[0].hooks[0].command = commands.stop;
+  fs.writeFileSync(settings, `${JSON.stringify(json, null, 2)}\n`);
+  if (submodule) {
+    fs.writeFileSync(path.join(project, ".gitmodules"), `[submodule "lib"]\n\tpath = lib\n\turl = https://github.com/${OWNER}/library.git\n`);
+    git(project, "update-index", "--add", "--cacheinfo", `160000,${crypto.randomBytes(20).toString("hex")},lib`);
+  }
+}
+
 // A fake key, built from pieces when the case is set, never a real one (floor rule 8).
 export const fakeKey = () => ["sk", "live", crypto.randomBytes(12).toString("hex")].join("_");
 
@@ -165,9 +199,9 @@ export const fakeKey = () => ["sk", "live", crypto.randomBytes(12).toString("hex
 // [{ issue, body, user }]), `github` sets the rest of the stand-in's state, and `branches` are pushed beside main
 // ({ name: { file: text } }, each a commit on main). `at` is the core's commit the kit writes from (its HEAD where left
 // out), `core` the clone it runs from, and `kit` the kit's own options; `loose` files are left in the working folder,
-// never committed; `fills` fill the kit's marks before FILLS does ([regex, text]), for a project other than the sum's.
-// Gives the paths.
-export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}, issues = [], comments = [], github = {}, branches = {}, kit = [], fills = [] } = {}) {
+// never committed; `fills` fill the kit's marks before FILLS does ([regex, text]), for a project other than the sum's;
+// `arrange`, given the project's folder, changes it before its first commit. Gives the paths.
+export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}, issues = [], comments = [], github = {}, branches = {}, kit = [], fills = [], arrange = null } = {}) {
   dir = folderFit(dir);
   for (const d of [dir, sealOf(dir)]) if (fs.existsSync(d) && fs.readdirSync(d).length) throw new Error(`${d} is not empty: a case is set in a folder of its own`);
   fs.mkdirSync(sealOf(dir), { recursive: true });
@@ -177,6 +211,7 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
   fillIn(project, fills);
   writeAll(project, { ...PROGRAM, ...files });
+  if (arrange) arrange(project);
   git(project, "add", "-A");
   git(project, "commit", "-q", "-m", "The project as it stands");
   git(project, "push", "-q", "origin", "main");
@@ -376,16 +411,23 @@ export function runAt(dir, ref, args) {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+// Whether the session committed in the project: a branch or HEAD moved from main as the case set it, or a commit the
+// case did not leave in the reflog (one undone since, by a reset, still stands there).
+function committed(dir) {
+  const refs = refsIn(path.join(dir, "project", ".git"), { reflog: true });
+  if (Object.entries(refs).some(([r, sha]) => (r === "HEAD" || r.startsWith("refs/heads/")) && sha !== base(dir))) return true;
+  const known = new Set(memoOf(dir, "reflog"));
+  return Object.entries(refs).some(([r, sha]) => r.startsWith("refs/reflog/") && !known.has(sha));
+}
+
 // The project's own working folder: whether anything there differs from what the case set (committed or not).
 export function touched(dir) {
-  const project = path.join(dir, "project"), refs = refsIn(path.join(project, ".git"), { reflog: true });
-  if (Object.entries(refs).some(([r, sha]) => (r === "HEAD" || r.startsWith("refs/heads/")) && sha !== base(dir))) return true;
-  // (a commit undone since, by a reset, still stands in the reflog: one the case did not leave there counts)
-  const known = new Set(memoOf(dir, "reflog"));
-  if (Object.entries(refs).some(([r, sha]) => r.startsWith("refs/reflog/") && !known.has(sha))) return true;
+  const project = path.join(dir, "project");
+  if (committed(dir)) return true;
   // (each file of the working folder against main as the case set it, hashed with no filter: no file of the
   // session's is read as anything but bytes)
-  const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(Boolean).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
+  // (a submodule's pointer is no file of the folder: its folder stands empty, as a submodule not checked out does)
+  const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(l => l && !l.startsWith("160000 ")).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
   const have = [];
   const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
   walk(project, "");

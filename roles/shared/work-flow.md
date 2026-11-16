@@ -40,7 +40,7 @@ owner creates from any device to stop its agents and deletes to let them go on.
   up (core archive 143).
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
-  difference it reports); where checks cost money, not on a day a sync PR was already opened (core archive 178). Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).
+  difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened (core archive 178). Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).
 
 ## Git and GitHub
 
@@ -50,7 +50,7 @@ The calls from a cloud session: `tasks/github-calls.md`.
 - **Each PR has the headings** "What the owner can try" (with whether the README is current) and "Readings taken" (core
   archive 16 and 153), and ends, above its attribution line, with the line `scripts/session-cost.mjs` prints, never
   worked out by hand (core archive 164).
-- **An exemption leaves a mark** (core archive 241; #302): where a rule lets a PR leave a thing out, its builder says so
+- **An exemption leaves a mark** (core archive 244; #302): where a rule lets a PR leave a thing out, its builder says so
   in its description in a word, so what is missing can be counted; where the cost script prints nothing, "No cost line:
   the script printed none." It does not mean a thing left out is wrong. Reason: the cost line stood on 58% to 74% of
   PRs, and nothing told one left out by the rule from one forgotten.

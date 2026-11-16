@@ -13,6 +13,22 @@ input=$(cat 2>/dev/null || true)
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 g() { git --no-optional-locks -c core.fsmonitor=false -c core.hooksPath=/dev/null "$@"; }
 g rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+# Where the core stands, as main's manifest names it (the core's tasks/repositories.md; scripts/core-path.mjs reads the
+# line alike): core/ as a rule, nothing in the core's own repository. At the start, a floor that cannot be read there
+# stops the session, and the floor's own copy, where a repository whose core a library carries keeps one, is held to it.
+at=""
+if [ "$mode" = start ]; then
+  manifest=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show refs/remotes/origin/main:core-manifest.md 2>/dev/null || true)
+  at=$(printf '%s\n' "$manifest" | sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by ([A-Za-z0-9_][A-Za-z0-9._-]*/)+) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\3#p' | head -n 1)
+  [ -z "$at" ] && [ -n "$manifest" ] && at=core/ # (a manifest whose line reads in neither form: the usual path)
+  if [ -n "$at" ] && [ ! -f "${at}floor/security.md" ]; then
+    echo "STOP: the floor cannot be read at ${at}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the core's files into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."
+  fi
+  copy=$(printf '%s\n' "$manifest" | sed -n -E 's#^Floor copy: (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\1#p' | head -n 1)
+  if [ -n "$copy" ] && [ -d "${at}floor" ] && ! diff -r -q "${at}floor" "$copy" >/dev/null 2>&1; then
+    echo "The floor's own copy under $copy differs from the floor under ${at}floor/, the core's that the library carries. Mend: copy ${at}floor/ over it, whole, in a pull request of its own."
+  fi
+fi
 # (a note, never a block: the helper hook is started by node, so without it there the hook stops nothing)
 if [ "$mode" = start ] && ! command -v node >/dev/null 2>&1; then
   echo "The helper hook is off here: Node is not on the path, and Claude Code starts that hook with node (the core's README.md, \"On Windows\")."
@@ -25,8 +41,14 @@ fi
 if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
   reading=scripts/reading.mjs
   # (neither read fetches what a clone made without its files lacks, nor asks for a sign-in)
-  GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g cat-file -e refs/remotes/origin/main:core-manifest.md 2>/dev/null && reading=core/scripts/reading.mjs
-  r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show "refs/remotes/origin/main:$reading" 2>/dev/null) && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
+  [ -n "$at" ] && reading=${at}scripts/reading.mjs
+  r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show "refs/remotes/origin/main:$reading" 2>/dev/null)
+  # (where a library's submodule carries the core, from the library's commit main pins, in the submodule's repository)
+  lib=$(printf '%s\n' "$manifest" | sed -n -E 's#^Core: [^ ]+, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+) under .*#\1#p' | head -n 1)
+  if [ -z "$r" ] && [ -n "$lib" ] && pin=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects rev-parse "refs/remotes/origin/main:${lib%/}" 2>/dev/null); then
+    r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g -C "$lib" --no-replace-objects show "$pin:${reading#"$lib"}" 2>/dev/null)
+  fi
+  [ -n "$r" ] && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
 fi
 issues=()
 dirty=$(g status --porcelain 2>/dev/null)

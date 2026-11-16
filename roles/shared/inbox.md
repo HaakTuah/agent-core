@@ -7,7 +7,7 @@ Read at the start of every task.
     it, and any departing from an owner's answer (core archive 199).
   - "Readings taken" lists the unsure first, and a departure with that answer's date, named when the owner is told of
     the merge.
-  - **A correction is marked** (core archive 241; #302). The owner's correction is built like any change; whoever
+  - **A correction is marked** (core archive 244; #302). The owner's correction is built like any change; whoever
     records the owner's word that merged work is wrong, and a builder whose bug a merged PR brought in, labels the
     issue `correction` and writes in it, or a note on it, "Brought in by: #N" and "Correction:" with its kind:
     `misread`, `looks wrong`, `does not work` or `rule missing`. It does not mean it waits. Reason: built like any

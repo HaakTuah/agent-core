@@ -150,6 +150,8 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
 - the console check: no error in the console, no request that fails, no font or picture that does not load;
 - the settings check, where another module the project takes asks it: each of a user's settings there, and still
   there after the product is closed and opened again;
+- the first-choice check, where another module the project takes asks it: the time from opening the product to its
+  first real choice, against the target that module names;
 - the walk by the Tab key, a script that records where focus goes, and the list of the words on every screen, both
   for a reader to judge;
 - the critique (point 18).

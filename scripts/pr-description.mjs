@@ -26,6 +26,8 @@
 // (tasks/done-when.md; #305): a feature's issue it adds to the *progress file* has the heading "Done when", lines the
 // description holds are in the form, and one that closes a feature's issue says what it ran and saw for each line, as
 // done-when.mjs, beside this file, reads them, at most a dozen items read through gh; one it cannot read is asked
+// nothing. And, of one opened since the copy on its base held PLAN_SINCE, the milestones of the *progress file*
+// (tasks/planning.md; #322), as milestones.mjs, beside this file, reads them, where the manifest takes that module.
 // nothing.
 // It asks in the same way, of a pull request opened since the copy on its base held COST_SINCE, the line the cost script
 // prints (session-cost.mjs, beside this file), or in its place the mark NO_COST, so that a line left out by the rule can
@@ -38,6 +40,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
+import { isPart, milestoneMends } from "./milestones.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -65,6 +68,9 @@ export function costMend(body) {
 // Whether it is asked of a pull request opened at `created` (as GitHub gives it), `then` the copy on its base when it
 // opened, or null where that could not be read: only where both are on or after the day it came.
 export const doneAsked = (created, then) => String(created) >= DONE_SINCE && Boolean(then?.includes("export const DONE_SINCE"));
+// The day from which the milestones are asked (tasks/planning.md; #322), in the same way.
+export const PLAN_SINCE = "2026-11-17T00:00:00Z";
+export const planAsked = (created, then) => String(created) >= PLAN_SINCE && Boolean(then?.includes("export const PLAN_SINCE"));
 
 // What a description says it waits on: its last line that starts with "Waits on:", as { said, kind }, kind null where
 // the line is in none of the forms; null where there is no such line.
@@ -117,10 +123,9 @@ export function asked(arg) {
 
 // The parts, of those asked for, that the description has no heading for.
 export function missing(body, parts = PARTS) {
-  // a heading's words: what follows the #, without marks before the first letter or digit (bold, a sign), blanks as one
-  const words = text => text.replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/gu, " ").trim().toLowerCase();
-  const headings = String(body ?? "").split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean).map(words);
-  return parts.filter(part => { const p = words(part); return !headings.some(h => h === p || h.startsWith(p) && /^[^\p{L}\p{N}]/u.test(h.slice(p.length))); });
+  // a heading's words: what follows the #, read as milestones.mjs, beside this file, reads a part's heading
+  const headings = String(body ?? "").split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean);
+  return parts.filter(part => !headings.some(h => isPart(h, part)));
 }
 
 if (started(import.meta.url)) {
@@ -153,14 +158,26 @@ if (started(import.meta.url)) {
         else console.log(`ok   the description lists what its changed paths call for (${called.length} file${called.length === 1 ? "" : "s"})`);
       }
     } else console.log(`ok   the line that lists what the changed paths call for is not asked here: ${why}`);
-    const at = coreAt(process.cwd()) ?? "", queue = doneAsked(created, then) ? queueAt(process.cwd(), at) : null;
-    if (queue && !takesIt(queue.manifest, at)) console.log("ok   how done will be judged is not asked here: the manifest leaves done-when.md out");
+    const at = coreAt(process.cwd()) ?? "", queue = doneAsked(created, then) || planAsked(created, then) ? queueAt(process.cwd(), at) : null;
+    // (one read of each item for both checks, so that a run reads a dozen at most between them)
+    const owner = queue ? ownerAt(queue.manifest, at, repo) : null, seen = new Map();
+    const read = item => { if (!seen.has(item)) seen.set(item, readItem(repo, item, ".", owner)); return seen.get(item); };
+    if (queue && !doneAsked(created, then)) console.log(`ok   how done will be judged is not asked here: ${why}`);
+    else if (queue && !takesIt(queue.manifest, at)) console.log("ok   how done will be judged is not asked here: the manifest leaves done-when.md out");
     else if (queue) {
-      const owner = ownerAt(queue.manifest, at, repo), done = doneMends({ body: process.env.PR_BODY, queue, read: item => readItem(repo, item, ".", owner), at });
+      const done = doneMends({ body: process.env.PR_BODY, queue, read, at });
       for (const note of done.notes) console.log(`ok   ${note}`);
       if (done.mends.length) mends.push(...done.mends);
       else console.log("ok   how done will be judged: the entries this pull request queues or closes are in the form, and proved");
     } else console.log(`ok   how done will be judged is not asked here: ${doneAsked(created, then) ? "the change could not be read against its base" : why}`);
+    if (queue && !planAsked(created, then)) console.log(`ok   the milestones are not asked here: ${why}`);
+    else if (queue && !takesIt(queue.manifest, at, "planning.md")) console.log("ok   the milestones are not asked here: the manifest leaves planning.md out");
+    else if (queue) {
+      const plan = milestoneMends({ body: process.env.PR_BODY, queue, read, at, already: new Set(seen.keys()) });
+      for (const note of plan.notes) console.log(`ok   ${note}`);
+      if (plan.mends.length) mends.push(...plan.mends);
+      else console.log("ok   the milestones of the progress file are in their form, and each one reached is named");
+    } else console.log(`ok   the milestones are not asked here: ${planAsked(created, then) ? "the change could not be read against its base" : why}`);
     if (created >= COST_SINCE && then?.includes("export const COST_SINCE")) { const mend = costMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log("ok   the description has its cost line, or the mark that the script printed none"); }
     else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
   }
