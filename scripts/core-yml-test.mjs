@@ -7,7 +7,8 @@
 // a submodule, with the floor's own copy it keeps until every tool has passed the staged cases. The copy's own faults
 // (an edit, a file added, a link, a submodule, one whose id is the copy's own tree; the executable bit no difference)
 // are pure-sync-test.mjs's, which runs this job on each; a report whose name git quotes is left out here as the copy
-// leaves it out, while a top-level name that only ends in a tab and "reports" is kept, as the copy keeps it. A scratch core of two commits on its main and one off it,
+// leaves it out, and so is the folder of the owner's words (#252), while a top-level name that only ends in a tab and
+// "reports" is kept, as the copy keeps it. A scratch core of two commits on its main and one off it,
 // reached through the core's address by a git rewrite, so no call reaches the network. On Linux and on Windows. Git,
 // tar, bash and Node's own modules.
 //
@@ -105,6 +106,8 @@ passes("a copy of an older commit of the core's main, each call at it", { "core-
 fails("a call pinned past the manifest's pin, where its workflow differs from the one at the pin", `personal-terms.yml at ${B} differs`, { "core-manifest.md": MANIFEST(A), ".github/workflows/core.yml": CALLS(B, A) }, { at: A });
 passes("a copy of a commit whose report git quotes the name of, the reports left out as the copy leaves them", { "core-manifest.md": MANIFEST(C) }, { at: C });
 fails("at that commit, a copy that differs outside the reports", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(C), "core/README.md": "edited\n" }, { at: C });
+passes("a copy without the owner's words, which the core keeps to itself too (#252)", {}, { then: dir => ok(!fs.existsSync(path.join(dir, "core", "words")), "  (the copy holds no words/)") });
+fails("a copy that holds the owner's words all the same", "core/ differs from the core at its pin", { "core/words/items-001.md": "the owner's words\n" });
 if (D) {
   passes("a copy of a commit with a top-level name that only ends in a tab and \"reports\", which the copy keeps", { "core-manifest.md": MANIFEST(D) }, { at: D });
   fails("and that copy without it", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(D) }, { at: D, without: tabbed });

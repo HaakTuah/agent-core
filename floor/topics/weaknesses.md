@@ -5,16 +5,16 @@ Read before a task takes up a security alert or a weakness, and by a security re
 
 **9. Security alerts and reported weaknesses.**
 - The Security tab's alerts are seen only by the owner; no agent gets a token to read them; the owner passes on what
-  needs fixing (core archive 35).
+  needs fixing.
 - **In a PR's own change:** a blocking finding holds the merge until fixed; any other is fixed in the PR, or filed and
   fixed next if it lies outside the change.
   - A CodeQL false alarm, explained in the PR and confirmed by its security reviewer, may merge, with no suppression
-    comment; where the ruleset blocks on it, the owner dismisses it (core archive 130).
+    comment; where the ruleset blocks on it, the owner dismisses it.
 - **In merged code, if it reaches what the threat model protects:** reported privately (an agent: as "Reporting a
   weakness" says, never in a file, PR, issue or comment) and fixed first, in a PR that says what it hardens, never how
   to attack it.
 - **Any other weakness in merged code:** a `bug` issue, fixed with priority.
-- **Secret scanning with push protection is switched on** in each repository that has it (core archive 227; floor rule
+- **Secret scanning with push protection is switched on** in each repository that has it (floor rule
   1): at the sync that brings this, and when a repository is made, in a public repository, where GitHub gives it free, a
   session whose sign-in may change the repository's settings switches it on; otherwise it files an issue for the owner,
   labelled `needs-owner`, naming the setting, and nothing waits on it.
@@ -30,4 +30,4 @@ Read before a task takes up a security alert or a weakness, and by a security re
 - An agent files by that reporting's own call alone (`POST repos/<owner>/<repo>/security-advisories/reports`), only to
   its project's own repository or the core's, whichever the weakness is in, with no secret or personal detail and, to
   the core, nothing of its project.
-  - Where the call fails it tells its own owner in its session's last message, never an issue (core archive 164).
+  - Where the call fails it tells its own owner in its session's last message, never an issue.

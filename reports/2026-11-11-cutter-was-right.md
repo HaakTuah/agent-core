@@ -2,7 +2,7 @@
 
 `reports/2026-11-11-silent-cuts-restored.md` put back six lines the cut-down of 10 November had removed without naming
 them. The owner, the same evening: "Do we actually need any of this stuff. I think the cutter were spot on on msot of
-these, except about removing the use other providers first. Your expert take?"
+these, except about removing the use other providers first. Your take?"
 
 Judged by what they say rather than by whether the cut-down listed them, none is needed, and they go again:
 

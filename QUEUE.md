@@ -1,19 +1,22 @@
 # The core's queue
 
-The order this repository's open issues are built in, and nothing else (`AGENTS.md`, "The queue"). Each line is an
-issue, who builds it and what it waits on; the issue holds the rest, its conditions too. The first line that waits on
-nothing is next, and a line leaves in the pull request that closes its issue.
+The order this repository's open issues are built in (`AGENTS.md`, "The queue"). The first line that
+waits on nothing is next.
 
-**Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's word
-on the issue; *the owner*, no session takes it up before the owner's own word. **The owner's yes** that floor rule 3
-asks for is the one given when the line's issue was queued, relayed into its pull request (`AGENTS.md`, "Queued means
-wanted").
+**Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
+the owner's own word. A line on points of #460, #484, #486 or #488 has its PR say "Part of" that issue, or "Fixes" it if
+it merges last.
 
 ## In order
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #252 | rule builder | |
+| #486, points 2 to 4 (the choice record) | rule builder, hard work with a challenger; it reopens `CHOICES.md`'s first choice | |
+| #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
+| #375 | rule builder | |
+| #376 | rule builder | #375, which changes the same files |
+| #488, points 3 to 5 and 7 | builder | #488's points 1 and 2 |
+| #481 | rule builder; it changes `AGENTS.md` and the README's table of slots | |
 | #303 | rule builder | |
 | #306 | rule builder | |
 | #307 | rule builder | |
@@ -23,38 +26,40 @@ wanted").
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10), and its pull request quotes the owner's yes on the issue | |
-| #457 | rule builder | |
+| #456 | rule builder; it changes the floor (rules 5 and 10) | |
+| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #486's record | |
 | #458 | rule builder | |
-| #459 | rule builder | |
+| #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
-| #375 | rule builder | |
-| #376 | rule builder | #375, which changes the same files |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
-| #441 | builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built now, whose work-down takes in `scripts/look.mjs` |
-| #350 | builder | |
+| #484, points 1 to 5 | rule builder | |
+| #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
+| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, whose work-down takes in `scripts/look.mjs` |
+| #477 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
-| #426 | builder | |
-| #394 | builder | |
-| #404 | builder | #403, or built with it |
+| #426 | builder; a .NET reader it files waits on #486's record | |
+| #404 | builder | |
 | #405 | builder | |
 | #407 | builder | |
-| #397 | rule builder; it changes the review guidelines (its pull request quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
-| #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", the last to merge "Fixes #460" | |
-| #460, point 2 (the author's address) | builder; "Part of #460", the last to merge "Fixes #460" | #376, which changes the jobs its step joins |
-| #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/copies.mjs` too |
-| #460, point 4 (names in descriptions) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/pointers.mjs` too |
-| #460, point 5 (a report's size) | builder; "Part of #460", the last to merge "Fixes #460" | |
-| #460, point 6 (billed minutes) | builder; "Part of #460", the last to merge "Fixes #460" | |
+| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
+| #492 | rule builder; it changes who may start the orchestrator, and what every role reads at its start | #397 and #467 |
+| #485 | rule builder; it changes the floor (rules 7 and 10) | |
+| #486, point 1 | rule builder | |
+| #486, point 5 | builder | #486's record |
+| #460, point 1 | builder | |
+| #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
+| #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
+| #460, point 4 (names in descriptions) | builder | #405, which changes `scripts/pointers.mjs` too |
+| #460, point 5 (a report's size) | builder | |
+| #460, point 6 (billed minutes) | builder | |
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
-| #416 | builder | #441, which changes `tasks/game-design.md` and `scripts/screens.mjs` too |
-| #477 | builder | |
+| #416 | builder | #441, which changes the same files |
+| #412 | builder | #481, of which it is one case |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
