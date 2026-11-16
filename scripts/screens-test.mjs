@@ -67,7 +67,7 @@ ok(v.fail[0]?.includes("from the one system the direction names"), "a new findin
 
 const game = parseConfig(config({ settings: "binds" }), "c");
 v = verdict({ config: game, at: "c", self: "s", found: parseFound(found(["options"], { "settings: options: text size lost on reopening": true }), "f", game), baseline: { listed: new Map(), grown: {}, checks: new Set(["settings"]) } });
-ok(v.fail.length === 1 && v.fail[0].includes("keep it when the game is closed and opened again") && mended(v.fail[0]), "a game's settings check: a setting missing or lost fails with its own mend", v.fail.join("\n"));
+ok(v.fail.length === 1 && v.fail[0].includes("keep it when the product is closed and opened again") && mended(v.fail[0]), "a game's settings check: a setting missing or lost fails with its own mend", v.fail.join("\n"));
 
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...base, checks: new Set(["rendered"]) } });
 ok(v.fail.length === 1 && v.fail[0].includes("never listed what the values check finds") && mended(v.fail[0]), "a check turned on that the baseline has never listed fails, with its mend, and its findings are not read as new", v.fail.join("\n"));
