@@ -26,111 +26,90 @@ const strip = line => { // a comment after a value: " #" outside quotes
   }
   return line.trimEnd();
 };
-// A quoted value, single or double, whose closing quote must be there.
-function quoted(t) {
-  if (!t.endsWith(t[0]) || t.length < 2) throw new Error(`a quoted value not ended: ${t}`);
-  return t[0] === "'" ? t.slice(1, -1).replace(/''/g, "'") : JSON.parse(t);
-}
-function flowSequence(t) {
-  if (!t.endsWith("]")) throw new Error(`a flow sequence not ended: ${t}`);
-  const inner = t.slice(1, -1).trim();
-  return inner ? inner.split(",").map(scalar) : [];
-}
-// A value that is none of the quoted forms or a flow sequence: a literal, a number or plain text.
-function plain(t) {
+function scalar(text) {
+  const t = text.trim();
+  if (t.startsWith("'")) { if (!t.endsWith("'") || t.length < 2) throw new Error(`a quoted value not ended: ${t}`); return t.slice(1, -1).replace(/''/g, "'"); }
+  if (t.startsWith('"')) { if (!t.endsWith('"') || t.length < 2) throw new Error(`a quoted value not ended: ${t}`); return JSON.parse(t); }
+  if (t.startsWith("[")) {
+    if (!t.endsWith("]")) throw new Error(`a flow sequence not ended: ${t}`);
+    const inner = t.slice(1, -1).trim();
+    return inner ? inner.split(",").map(scalar) : [];
+  }
+  if (t.startsWith("{") || t.startsWith("&") || t.startsWith("*") || t.startsWith("!")) throw new Error(`a YAML form this reader does not know: ${t}`);
   if (t === "true" || t === "false") return t === "true";
   if (t === "" || t === "null" || t === "~") return null;
   if (/^-?\d+$/.test(t)) return Number(t);
   return t;
-}
-function scalar(text) {
-  const t = text.trim();
-  if (t.startsWith("'") || t.startsWith('"')) return quoted(t);
-  if (t.startsWith("[")) return flowSequence(t);
-  if (t.startsWith("{") || t.startsWith("&") || t.startsWith("*") || t.startsWith("!")) throw new Error(`a YAML form this reader does not know: ${t}`);
-  return plain(t);
 }
 
 // A key set as the mapping's own, even where it is __proto__, which a plain assignment would take as its prototype.
 const own = (map, key, value) => Object.defineProperty(map, key, { value, enumerable: true, writable: true, configurable: true });
 /** The workflow's YAML as plain values (keys as written: `on` stays the string "on"). */
 export function parseYaml(text) {
-  const r = { raw: text.replace(/\r\n/g, "\n").split("\n"), i: 0 };
-  return yamlNext(r) === null ? {} : yamlNode(r, indentOf(yamlNext(r)));
-}
+  const raw = text.replace(/\r\n/g, "\n").split("\n");
+  let i = 0;
+  const indentOf = l => l.length - l.trimStart().length;
+  const blank = l => l.trim() === "" || l.trim().startsWith("#");
+  const next = () => { while (i < raw.length && blank(raw[i])) i++; return i < raw.length ? raw[i] : null; };
 
-// The reader `r` holds the lines and the one it stands at.
-const indentOf = l => l.length - l.trimStart().length;
-const blank = l => l.trim() === "" || l.trim().startsWith("#");
-const yamlNext = r => { while (r.i < r.raw.length && blank(r.raw[r.i])) r.i++; return r.i < r.raw.length ? r.raw[r.i] : null; };
-const isItem = l => l.trimStart().startsWith("- ") || l.trim() === "-";
+  function block(header, parent) { // a block scalar: | or > with its chomping
+    const style = header[0], chomp = header.includes("-") ? "strip" : header.includes("+") ? "keep" : "clip";
+    const lines = [];
+    let at = null;
+    while (i < raw.length) {
+      const l = raw[i];
+      if (l.trim() === "") { lines.push(""); i++; continue; }
+      const n = indentOf(l);
+      if (n <= parent) break;
+      at ??= n;
+      if (n < at) break;
+      lines.push(l.slice(at));
+      i++;
+    }
+    while (chomp !== "keep" && lines.length && lines.at(-1) === "") lines.pop();
+    let out = style === "|" ? lines.join("\n")
+      : lines.reduce((acc, l, k) => (k === 0 ? l : l === "" ? `${acc}\n` : acc.endsWith("\n") ? acc + l : `${acc} ${l}`), "");
+    if (chomp !== "strip" && lines.length) out += "\n";
+    return out;
+  }
 
-// The lines of a block scalar, each without the indent of the first, up to the first indented no more than the parent.
-function blockLines(r, parent) {
-  const lines = [];
-  let at = null;
-  while (r.i < r.raw.length) {
-    const l = r.raw[r.i];
-    if (l.trim() === "") { lines.push(""); r.i++; continue; }
+  function value(rest, indent) { // what follows "key:" or "- "
+    const r = strip(rest);
+    if (/^[|>][-+]?$/.test(r)) return block(r, indent);
+    if (r !== "") return scalar(r);
+    const l = next();
+    if (l === null) return null;
     const n = indentOf(l);
-    if (n <= parent) break;
-    at ??= n;
-    if (n < at) break;
-    lines.push(l.slice(at));
-    r.i++;
+    if (n > indent || (n === indent && l.trimStart().startsWith("- "))) return node(n);
+    return null;
   }
-  return lines;
-}
 
-const fold = lines => lines.reduce((acc, l, k) => (k === 0 ? l : l === "" ? `${acc}\n` : acc.endsWith("\n") ? acc + l : `${acc} ${l}`), "");
-
-function yamlBlock(r, header, parent) { // a block scalar: | or > with its chomping
-  const style = header[0], chomp = header.includes("-") ? "strip" : header.includes("+") ? "keep" : "clip";
-  const lines = blockLines(r, parent);
-  while (chomp !== "keep" && lines.length && lines.at(-1) === "") lines.pop();
-  let out = style === "|" ? lines.join("\n") : fold(lines);
-  if (chomp !== "strip" && lines.length) out += "\n";
-  return out;
-}
-
-function yamlValue(r, rest, indent) { // what follows "key:" or "- "
-  const v = strip(rest);
-  if (/^[|>][-+]?$/.test(v)) return yamlBlock(r, v, indent);
-  if (v !== "") return scalar(v);
-  const l = yamlNext(r);
-  if (l === null) return null;
-  const n = indentOf(l);
-  if (n > indent || (n === indent && l.trimStart().startsWith("- "))) return yamlNode(r, n);
-  return null;
-}
-
-function yamlSequence(r, indent) {
-  const list = [];
-  for (let l = yamlNext(r); l !== null && indentOf(l) === indent && isItem(l); l = yamlNext(r)) {
-    const content = l.trimStart().slice(2);
-    if (/^[\w.-]+:(\s|$)/.test(content)) { // a mapping that starts on the dash's line
-      r.raw[r.i] = " ".repeat(indent + 2) + content;
-      list.push(yamlNode(r, indent + 2));
-    } else { r.i++; list.push(yamlValue(r, content, indent)); }
+  function node(indent) {
+    const first = next();
+    if (first.trimStart().startsWith("- ") || first.trim() === "-") {
+      const list = [];
+      for (let l = next(); l !== null && indentOf(l) === indent && (l.trimStart().startsWith("- ") || l.trim() === "-"); l = next()) {
+        const content = l.trimStart().slice(2);
+        if (/^[\w.-]+:(\s|$)/.test(content)) { // a mapping that starts on the dash's line
+          raw[i] = " ".repeat(indent + 2) + content;
+          list.push(node(indent + 2));
+        } else { i++; list.push(value(content, indent)); }
+      }
+      return list;
+    }
+    const map = {};
+    for (let l = next(); l !== null && indentOf(l) === indent && !l.trimStart().startsWith("- "); l = next()) {
+      const m = /^([\w.-]+|"[^"]*"|'[^']*'):(?:\s(.*)|$)/.exec(l.trimStart());
+      if (!m) throw new Error(`a line this reader does not know: ${l.trim()}`);
+      i++;
+      own(map, scalar(m[1]), value(m[2] ?? "", indent));
+    }
+    const l = next();
+    if (l !== null && indentOf(l) > indent) throw new Error(`a line indented where no value begins: ${l.trim()}`);
+    return map;
   }
-  return list;
-}
 
-function yamlMapping(r, indent) {
-  const map = {};
-  for (let l = yamlNext(r); l !== null && indentOf(l) === indent && !l.trimStart().startsWith("- "); l = yamlNext(r)) {
-    const m = /^([\w.-]+|"[^"]*"|'[^']*'):(?:\s(.*)|$)/.exec(l.trimStart());
-    if (!m) throw new Error(`a line this reader does not know: ${l.trim()}`);
-    r.i++;
-    own(map, scalar(m[1]), yamlValue(r, m[2] ?? "", indent));
-  }
-  const l = yamlNext(r);
-  if (l !== null && indentOf(l) > indent) throw new Error(`a line indented where no value begins: ${l.trim()}`);
-  return map;
-}
-
-function yamlNode(r, indent) {
-  return isItem(yamlNext(r)) ? yamlSequence(r, indent) : yamlMapping(r, indent);
+  return next() === null ? {} : node(indentOf(next()));
 }
 
 // ---- GitHub's expressions ----
