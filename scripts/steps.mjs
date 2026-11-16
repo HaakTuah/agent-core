@@ -200,7 +200,7 @@ function testsTracked(p) {
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
-// its job or the workflow (core/modules/tests.md, "A pull request runs the tests its change can reach"); null where it
+// its job or the workflow (core/tasks/tests.md, "A pull request runs the tests its change can reach"); null where it
 // does or the project has no tests yet; else the mend.
 const SELECT_RUN = /(^|[\s;&|])node\s+core\/scripts\/select\.mjs(?=\s|$)/mu;
 function selectionRuns(p) {
