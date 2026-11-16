@@ -5,8 +5,9 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
 **Which:**
 - Floor rule 8's security review (point 3).
 - Every PR that changes the project, its tests, tools, config or a rule file also gets its code review.
-  - Docs alone get no code review unless another provider built them.
+  - Docs alone get no code review unless another tool built them.
 - The *design-checked PRs* also get the design check, and a PR its users will see the stand-in's notes.
+- A PR that changes a screen also gets the critique (`modules/screens.md`, point 18).
 
 1. **Ask** the code reviewer (`modules/roles.md`) as its part (`modules/codex.md`, `modules/copilot.md`) or the project
    says.
@@ -59,5 +60,6 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
    update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
    - After three rounds, what is still open goes to escalation (`modules/roles.md`); a PR it cannot settle stays
      unmerged.
-7. **The fallback reviewer's brief:** the diff, the task's text, the *review reference*, the review guidelines (the
-   core's and the project's) and the project's `SECURITY.md` and threat model with the floor, and nothing else.
+7. **The fallback reviewer's brief,** written as `modules/helpers.md` says, hands it the diff, the task's text, the
+   *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
+   model with the floor, and nothing else.

@@ -41,6 +41,52 @@ r = hook("stop", project, '{"stop_hook_active": true}');
 ok(r.status === 0, "a second stop in a row goes through", `${r.status} ${r.stderr}`);
 r = hook("start", project);
 ok(r.status === 0 && /not committed/.test(r.stdout), "at a session's start it reports and stops nothing", `${r.status} ${r.stdout}`);
+// the starter kit's hooks for Kiro and Codex (modules/tools.md), run from a folder inside the project, as those tools
+// start a command where the session works, with no CLAUDE_PROJECT_DIR: each finds the project's root by git
+const kit = name => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8"));
+const kiroStop = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "Stop").action.command;
+const codex = kit("codex-hooks.json.tmpl").hooks, codexOf = event => codex[event][0].hooks[0].command;
+fs.mkdirSync(path.join(project, "sub"), { recursive: true });
+const nested = path.join(project, "sub", "other");
+git(tmp, "init", "-q", "-b", "main", nested);
+fs.mkdirSync(path.join(nested, "core", "scripts"), { recursive: true });
+fs.writeFileSync(path.join(nested, "core", "scripts", "work-saved.sh"), "echo NESTED-RAN; echo NESTED-RAN >&2; exit 2\n");
+git(nested, "add", "-A"); git(nested, "commit", "-q", "-m", "a script of another repository's"); git(nested, "update-ref", "refs/remotes/origin/main", "HEAD");
+const inNested = cmd => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: nested, env: rest }); };
+const kiroStart = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "SessionStart").action.command;
+const kitHooks = [kiroStart, kiroStop, codexOf("SessionStart"), codexOf("Stop")];
+ok(kitHooks.every(c => { const x = inNested(c); return x.status === 0 && !/NESTED-RAN/.test(`${x.stdout}${x.stderr}`); }),
+  "in a repository that holds no such hook file, as one cloned inside the project, neither Kiro's two hooks nor Codex's two run its script");
+const unguarded = kiroStop.replace('[ -f "$r/.kiro/hooks/work-saved.json" ] || exit 0; ', "");
+ok(unguarded !== kiroStop && /NESTED-RAN/.test(inNested(unguarded).stderr), "and without the guard, the same hook would have run it: the test bites");
+fs.rmSync(nested, { recursive: true, force: true });
+// the core's own hooks, which a project carries in its copy under core/: they run in no repository with a manifest
+const own = file => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8"));
+const ownHooks = [...own(".kiro/hooks/work-saved.json").hooks.map(h => h.action.command), ...["SessionStart", "Stop"].map(e => own(".codex/hooks.json").hooks[e][0].hooks[0].command)];
+const taker = path.join(tmp, "taker");
+git(tmp, "init", "-q", "-b", "main", taker);
+for (const [f, t] of [["core-manifest.md", "# Core manifest\n"], [".codex/hooks.json", "{}\n"], [".kiro/hooks/work-saved.json", "{}\n"], ["scripts/work-saved.sh", "echo TAKER-RAN; echo TAKER-RAN >&2; exit 2\n"]]) {
+  fs.mkdirSync(path.dirname(path.join(taker, f)), { recursive: true }); fs.writeFileSync(path.join(taker, f), t);
+}
+git(taker, "add", "-A"); git(taker, "commit", "-q", "-m", "a project with scripts of its own"); git(taker, "update-ref", "refs/remotes/origin/main", "HEAD");
+const inTaker = cmd => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: taker, env: rest }); };
+ok(ownHooks.every(c => !/TAKER-RAN/.test(`${inTaker(c).stdout}${inTaker(c).stderr}`)), "the core's own Kiro and Codex hooks run nothing in a project, which holds a manifest, though its hook files stand");
+fs.rmSync(path.join(taker, "core-manifest.md"));
+ok(/TAKER-RAN/.test(inTaker(ownHooks[0]).stderr), "and without the manifest the same hook runs main's script: the test bites");
+for (const [name, to] of [["kiro-hook.json.tmpl", ".kiro/hooks/work-saved.json"], ["codex-hooks.json.tmpl", ".codex/hooks.json"]]) {
+  fs.mkdirSync(path.dirname(path.join(project, to)), { recursive: true });
+  fs.copyFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), path.join(project, to));
+}
+git(project, "add", ".kiro", ".codex"); git(project, "commit", "-q", "-m", "the kit's hooks for Kiro and Codex"); git(project, "push", "-q");
+const other = (cmd, input = "{}") => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input, encoding: "utf8", cwd: path.join(project, "sub"), env: rest }); };
+r = other(kiroStop);
+ok(r.status === 2 && /1 file\(s\) not committed, such as note\.txt/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
+r = other(kiroStart);
+ok(r.status === 0 && /not committed/.test(r.stdout), "Kiro's start hook reports and stops nothing", `${r.status} ${r.stdout}`);
+r = other(codexOf("Stop"), '{"stop_hook_active": true}');
+ok(r.status === 0, "Codex's stop hook lets a second stop in a row through", `${r.status} ${r.stderr}`);
+r = other(codexOf("SessionStart"));
+ok(r.status === 0 && /not committed/.test(r.stdout), "Codex's start hook reports and stops nothing", `${r.status} ${r.stdout}`);
 // with no node on the path, the start says in a line that the helper hook is off, and stops nothing
 const noNode = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => d && !["node", "node.exe"].some(n => fs.existsSync(path.join(d, n)))).join(path.delimiter);
 const pathKey = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";

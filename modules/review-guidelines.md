@@ -19,9 +19,10 @@ the floor. Changes only on the owner's word (core archive 56).
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
 - a size mark raised without its reason in the PR (one on what every session reads: below);
-- an entry that joins the shape check's baseline under "grown" without its reason in the PR and a fresh session's
-  word there that it found no other way (`modules/code-shape.md`, "Never worse");
-- a test weakened or skipped, or changed beyond what the task forces (core archive 36);
+- an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
+  and a fresh session's word there that it found no other way (`modules/code-shape.md`, "Never worse");
+- a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
+  with a reason that holds (core archive 36; `modules/code-shape.md`, #253);
 - against the pillars of `modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
   pointed to.
 
@@ -49,6 +50,16 @@ A finding, not blocking:
   - Whoever proposes a trim names that other statement and what it covers. In doubt the words stay.
 - Blocking: a trim that fails this; and a raise with no "Leanness check:" comment in the PR giving that session's
   answer, save for growth a sync of the core brought.
+
+**A brief written in a pull request** (a template of the starter kit that hands work, or a brief a module, script or
+workflow holds; core archive 229): blocking where it misses one of the four things "A brief is written as a rule is"
+in `modules/helpers.md` names, or gives its reader a title or stakes that are not real.
+
+**A screen changed** (`modules/screens.md`; core archive 230):
+- Blocking: a pull request that changes a screen with no critique on it (point 18), or with no pictures of point 17
+  where its session could take them; where it could not, the pull request says why and the issue filed for the tool.
+- A finding: no three lines of the builder's (point 16), and a difference between them and the critique's answers to
+  its first two questions.
 
 **A rule file changed:**
 - Blocking: a rule that departs from the owner's archived words it cites.

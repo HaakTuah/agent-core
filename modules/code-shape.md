@@ -1,7 +1,7 @@
 # How code is put together
 
-Read when a system is designed, added or named, and when code is ported or rewritten (core archive 226). How what
-already stands is brought to it: `modules/cleaning.md`.
+Read when a system is designed, added or named, when code is ported or rewritten (core archive 226), and when a pull
+request deletes a test or weakens one (#253). How what already stands is brought to it: `modules/cleaning.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
 its systems, and the marks below, in the config of its *shape check* (`core/scripts/shape.mjs`), which runs on every
@@ -79,6 +79,29 @@ one declared entrance.
   that one with no rules of its own invents some. Reason: rules that never import the display are tested, ported and
   run by a machine without it. Held by the shape check once the rules and the display are named systems; until then
   by discipline alone.
+- **How strong the tests are is measured on the lines a pull request changes** (#253). By default the job that runs a
+  project's tests runs its *mutation tool* on those lines through `core/scripts/strength.mjs`, which shows on the pull
+  request how many of the faults put in on purpose a test caught, and fails nothing. The project names the tool in its
+  manifest, a tool of development only, under the floor's rules for dependencies and licences, that writes its report
+  in an open form, the mutation-testing-elements schema; a project with no such tool for its language, or with no
+  tests yet, says `none` there with its reason, and the measure is left out. The one condition that changes it: once
+  the project's baseline stands, a fault that survives on a changed line and the baseline does not list fails, and the
+  session writes a test that catches it; only where the fault changes nothing the program does, it lists it with that
+  reason, as "Never worse" says of any entry. The baseline lists what survives a whole run, which is the audit's,
+  outside the suite and in a pull request that changes no code or test (`modules/cleaning.md`): a debt worked down at
+  the dose. It does not mean that a pull request runs the whole codebase, that a score is the aim, or that the tests
+  that stand are rewritten on demand; a listed fault whose line the change rewrote stays listed, and any other fault on
+  a changed line is the change's own. Reason: the projects lean on their suites as the proof that a
+  change kept behaviour, and nothing measured whether a test fails where the code is wrong. Held by the strength
+  check, which counts each kind of fault a file holds against what the baseline lists of it and fails a survivor past
+  it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason.
+- **A test taken out or weakened is said.** By default a pull request keeps its tests and what they assert. The
+  trigger is a pull request that deletes a test or weakens what one asserts (an assertion loosened or taken out, a
+  case skipped): its builder says so under "Readings taken", with why, and the reviewer checks that the reason holds.
+  It does not mean that a test which proves nothing must stay. Reason: a measure on changed lines cannot see a test
+  weakened elsewhere, and a test made to pass is the cheapest way to green. No check holds it yet, since none can
+  tell a weakened assertion without guessing: the reviews read it (`modules/review-guidelines.md`), the strength check
+  names each test file a pull request deletes, and `core/scripts/holders.mjs` lists it until something holds it.
 - **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
   of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the
   audit's reader judges whether one function should serve both. It does not mean that such code is joined by rule:
@@ -87,8 +110,7 @@ one declared entrance.
   that nothing saw. Held by the copies check's report.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
-the audit's reader judges the others. The time a user waits on, and how strong the tests are, get their own measures
-as their rules come (#318, #253).
+the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
 
 **What the check reads.** JavaScript and TypeScript, JSX among them, C# and Python, each by a reader of its own
 (`core/scripts/shape-readers.mjs`); in C# what a file takes from another is read from its using directives alone. Of

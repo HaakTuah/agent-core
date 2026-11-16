@@ -9,10 +9,10 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 import { mended, unmended } from "./mend.mjs";
+import { scratchDir, tally } from "./scratch-core.mjs";
 import { cut, fetchAll as fetchedAll, fileAddress, named, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
 import { REGISTRY, check as checked } from "./nuget.mjs";
 
@@ -23,11 +23,9 @@ const heard = (result) => { unsaid.push(...unmended((result.failures ?? []).map(
 const fetchAll = async (...args) => heard(await fetchedAll(...args));
 const check = (...args) => heard(checked(...args));
 
-let failed = 0, count = 0;
-const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 800).replace(/\n/g, "\n     ")}`}`); } };
+const { ok, done } = tally();
 const throws = fn => { try { fn(); return false; } catch { return true; } };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-fetch-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("nuget-fetch-test-");
 
 // a zip, as a package file is one: each [name, text, deflated]
 function zip(files) {
@@ -241,5 +239,4 @@ else {
 }
 
 ok(unsaid.length === 0 && mended(`FAIL: ${twice.failures.join("\nFAIL: ")}`), "each failure read in this test says its mend", unsaid.join("\n"));
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the fetch before the NuGet check's restore`);
-process.exitCode = failed ? 1 : 0;
+done("the fetch before the NuGet check's restore");

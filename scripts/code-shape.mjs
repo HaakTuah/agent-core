@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
 
 export const CODE = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"];
-const OTHER = [".cs", ".py", ".go", ".rs", ".java", ".kt", ".swift", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
+export const OTHER = [".cs", ".fs", ".vb", ".py", ".go", ".rs", ".java", ".kt", ".scala", ".swift", ".dart", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
 const REGEX_AFTER = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
 const CONTROL = new Set(["if", "for", "while", "switch", "catch", "with"]);
 const CONTROL_BARE = new Set(["else", "try", "finally", "do"]);
@@ -52,8 +52,9 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const BULK = 30; // a commit that touches more of the measured files than this is a move or a sweep, not a sign
 const OPEN = { ")": "(", "]": "[", "}": "{" };
 
-// The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line }. Comments and white space are
-// dropped; a template literal is a "str" token for each run of its text, with the code of each ${ } between them. With
+// The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line, at }, `at` where it starts in the
+// text (for a template's runs, where the run ends). Comments and white space are dropped; a template literal is a
+// "str" token for each run of its text, with the code of each ${ } between them. With
 // `jsx` (jsxIn, below), an element of JSX is a "jsx" token at its <, with the code of each { } in it between ( and );
 // where one never closes, the list's `lost` is true, and its functions cannot be told.
 export function tokens(src, jsx = false) {
@@ -80,7 +81,7 @@ class Lexer {
     if (this.i < 0) this.i = this.n;
   }
 
-  push(t, v, l = this.line) { this.prev = { t, v, line: l }; this.out.push(this.prev); }
+  push(t, v, l = this.line) { this.prev = { t, v, line: l, at: this.i }; this.out.push(this.prev); }
   lines(a, b) { for (let k = a; k < b; k++) if (this.src[k] === "\n") this.line++; }
 
   // What `read` reads, one level deeper; past NEST, nothing more of the file, which is lost.
@@ -197,8 +198,8 @@ class Lexer {
   // A sign, its own token (=> one of two signs); a ( says whether it opens a condition, and the ) that closes it too.
   punct(c) {
     if (this.src.startsWith("=>", this.i)) { this.push("punct", "=>"); this.i += 2; return; }
-    this.i++;
     this.sign(c);
+    this.i++;
   }
 
   sign(c) {

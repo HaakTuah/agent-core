@@ -1,13 +1,14 @@
 // Tests of the records of the choices that are hard to undo (choices.mjs): where a project keeps them, what a record
-// holds, when their pass is due, and the scheduled look's reader of it. Node's own modules only.
+// holds, when their pass is due, a sign written in a measure, and the scheduled look's readers of them. git and Node's
+// own modules.
 //
 //   node scripts/choices-test.mjs
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DAYS, KIT, MOST, TITLE, due, look, parse, records, where } from "./choices.mjs";
+import { DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, due, look, parse, records, report, signs, tripped, trippedBody, where } from "./choices.mjs";
 import { DUE } from "./look.mjs";
 
 let failed = 0, count = 0;
@@ -32,7 +33,7 @@ ok(found.read === "2026-11-15" && found.open === 0, "the day of the last pass is
 ok(parse("## Choice: a\nReopens it:\n").records[0].sign === false, "an empty sign names none");
 ok(parse("Read whole: FILL IN: today\n## Choice: a\nReopens it: FILL IN: the sign\n").open === 2 && parse("Read whole: soon\n").read === null && parse("Read whole: 2026-13-45\n").read === null,
   "a line still to fill in is counted, and a day that is no day is none");
-ok(parse("## Choice: a\u0007b\n").records[0].name === "a b", "a name is printed with no control characters");
+ok(parse("## Choice: a\u0007b\n").records[0].name === "a b" && parse("## Choice: a\u202eb\u200bc\n").records[0].name === "a b c", "a name is printed with no control characters, nor any that reorder or hide text");
 const kitText = fs.readFileSync(path.join(here, "..", "setup", "template", "choices.md.tmpl"), "utf8");
 ok(parse(kitText).records.length === 0 && parse(kitText).open > 0 && due(parse(kitText), at("2030-01-01")) === null,
   "the starter kit's file, its record still to fill in, holds no record yet, so no pass is due in a new project");
@@ -91,6 +92,71 @@ r = run(kit);
 ok(r.status === 1 && /Mend: name a regular file inside the project/.test(r.stderr), "where the records cannot be read, it fails and says the mend", r.stderr);
 r = run(path.join(here, ".."));
 ok(r.status === 0 && /`CHOICES\.md`: \d+ records, read whole on \d{4}-\d\d-\d\d/.test(r.stdout) && !/names no sign/.test(r.stdout), "the core's own records each name their sign and the day of their pass", r.stdout + r.stderr);
+
+// ---- a sign written in a measure ----
+const lines = parse("## Choice: a\n- Reopens it: past 150 files.\n- Trips when: `files > 150`, `cycles>=1`, `constructor > 1`, `rm -rf /`, `files > 1e9`\n## Choice: b\nTrips when: when it feels slow\n## Choice: c\n").records;
+ok(JSON.stringify(lines[0].conditions) === JSON.stringify([{ measure: "files", op: ">", limit: 150 }, { measure: "cycles", op: ">=", limit: 1 }])
+  && JSON.stringify(lines[0].unknown) === JSON.stringify(["constructor > 1", "rm -rf /", "files > 1e9"]),
+  "a line \"Trips when:\" gives each condition in backticks that names a measure, an operator and a number; anything else is only quoted back, never run", JSON.stringify(lines[0]));
+ok(lines[1].conditions.length === 0 && lines[1].unknown.join() === "when it feels slow" && lines[2].conditions.length === 0 && lines[2].unknown.length === 0,
+  "a line with no condition in backticks is quoted back as naming none, and a record with no such line names none");
+const reads = { listed: 4, read: 200, found: { read: { files: 151, functions: 150, imports: 50, unnamed: 0 }, entries: new Map([["cycle: a.js -> b.js", true], ["function: a.js#f", {}]]) } };
+ok(JSON.stringify(Object.fromEntries(Object.entries(MEASURES).map(([k, [, of]]) => [k, of(reads)]))) === JSON.stringify({ files: 151, functions: 150, imports: 50, listed: 4, debt: 2, cycles: 1, unnamed: 0 }),
+  "each measure is read from what the shape check reads");
+const thin = { ...reads, listed: 1, read: 3000 };
+ok(MEASURES.debt[1](thin) > 0 && tripped(parse("## Choice: a\nTrips when: `debt > 0`\n"), thin).length === 1 && /reads 0\.033 the share/.test(trippedBody("d.md", tripped(parse("## Choice: a\nTrips when: `debt > 0`\n"), thin), parse(""), "")),
+  "a share is compared exact, and only shown rounded: one breach in 3000 trips debt > 0");
+ok(JSON.stringify(tripped(parse("## Choice: a\nTrips when: `files > 150`, `files > 151`, `debt <= 2`\n"), reads).map(c => `${c.measure}${c.op}${c.limit}=${c.value}`)) === JSON.stringify(["files>150=151", "debt<=2=2"]),
+  "a condition trips where the number read holds it, and only then");
+const measuredProject = fs.mkdtempSync(path.join(os.tmpdir(), "choices-measured-"));
+const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: measuredProject, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const putIn = (f, t) => { fs.mkdirSync(path.dirname(path.join(measuredProject, f)), { recursive: true }); fs.writeFileSync(path.join(measuredProject, f), t); };
+const sign = cond => `Read whole: 2026-11-15\n\n## Choice: one \`folder\` @someone\n\n- Reopens it: the folder grows.\n- Trips when: ${cond}\n`;
+g("init", "-q", "-b", "main");
+putIn("src/a.js", "import { b } from \"./b.js\";\nexport const a = () => b;\n");
+putIn("src/b.js", "export const b = 1;\n");
+putIn("docs/choices.md", sign("`files > 1`, `unknown > 2`"));
+const pendingSigns = signs({ manifest: "", root: measuredProject });
+ok(pendingSigns.title === TRIPPED && pendingSigns.body === null && /no config here/.test(pendingSigns.unread ?? ""), "with no config of the shape check, a measure cannot be read: the look leaves its issue as it stands", JSON.stringify(pendingSigns));
+putIn("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }));
+spawnSync(process.execPath, [path.join(here, "shape.mjs"), "checks/shape.json", "--first"], { cwd: measuredProject, encoding: "utf8" });
+g("add", "-A"); g("commit", "-q", "-m", "a project");
+const trip = signs({ manifest: "", root: measuredProject });
+ok(/`docs\/choices\.md`/.test(trip.body ?? "") && /- `one 'folder' @someone`: `files > 1`, and it reads 2 files of code the shape check reads\./.test(trip.body) && /`unknown > 2`/.test(trip.body)
+  && /needs-owner in place of queued/.test(trip.body) && /`core\/modules\/choices\.md`/.test(trip.body) && /`node core\/scripts\/choices\.mjs`/.test(trip.body) && trip.owner === undefined,
+  "where a condition holds, the look keeps an issue naming the choice in a code span, the condition, the number read, what names no measure, and what its session does; its labels are the session's to change", trip.body);
+putIn("docs/choices.md", sign("`files > 2`"));
+ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "once no condition holds (the sign written anew), the look closes the issue");
+putIn("docs/choices.md", sign("`cycles > 0`"));
+putIn("src/b.js", "import { a } from \"./a.js\";\nexport const b = 1;\nexport const c = () => a;\n");
+ok(/`cycles > 0`, and it reads 2 imports that lie on a cycle/.test(signs({ manifest: "", root: measuredProject }).body ?? ""), "a cycle the code holds now trips a sign that names cycles");
+ok(/trips when: cycles > 0 \(2 now: it holds\)/.test(report(records("", measuredProject), at("2026-11-16"), { ...reads, found: { ...reads.found, entries: new Map([["cycle: x", true], ["cycle: y", true]]) } })),
+  "the script prints each condition with the number it reads, and whether it holds");
+putIn("docs/choices.md", sign("`fiels > 150`"));
+const typo = signs({ manifest: "", root: measuredProject });
+ok(/names what is no measure the look reads/.test(typo.body ?? "") && /`fiels > 150`/.test(typo.body) && /mended in a pull request/.test(typo.body) && !/fresh record/.test(typo.body),
+  "a line \"Trips when:\" that names no measure keeps the issue open the day it stands, with its mend, so a typo is never a sign silently unread", typo.body);
+putIn("docs/choices.md", sign("`cycles > 0`"));
+putIn("checks/shape.json", "{");
+ok(signs({ manifest: "", root: measuredProject }).body === null && /the shape check could not be read/.test(signs({ manifest: "", root: measuredProject }).unread ?? ""), "a config that cannot be read leaves the issue as it stands");
+putIn("docs/choices.md", "## Choice: a\n- Reopens it: x.\n");
+ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "records that name no measure are not read against the shape check at all");
+putIn("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["lib"] }));
+putIn("docs/choices.md", sign("`files > 0`"));
+ok(signs({ manifest: "", root: measuredProject }).body === null && /reads no file of code here/.test(signs({ manifest: "", root: measuredProject }).unread ?? ""),
+  "where the shape check reads no file of code (a project in another language), a measure is said unread, never a sign that silently cannot trip");
+fs.rmSync(measuredProject, { recursive: true, force: true });
+const many = parse(Array.from({ length: 5000 }, (_, i) => `## Choice: c${i}\nTrips when: \`files > 1\`, \`nothing > 1\`\n`).join(""));
+const long = trippedBody("docs/choices.md", tripped(many, reads), many, "core/");
+ok(long.length < 20000 && long.split("\n").filter(l => l.startsWith("- `c")).length === 2 * LISTED && /- and 4970 more: `node core\/scripts\/choices\.mjs` lists them/.test(long),
+  "however many a file holds, the issue lists a few of each and counts the rest, far under GitHub's limit on a body", `${long.length}`);
+const wide = parse(Array.from({ length: 40 }, (_, i) => `## Choice: ${"n".repeat(118)}${i}\nTrips when: \`files > 1\`, ${Array.from({ length: 40 }, () => `\`${"x".repeat(118)}\``).join(", ")}\n`).join(""));
+const widest = trippedBody("docs/choices.md", tripped(wide, reads), wide, "core/");
+ok(widest.length < 30000 && /, and 37 more/.test(widest), "nor does a file of long names and long lines of what names no measure take the body past it", `${widest.length}`);
+ok(DUE.includes(signs), "the scheduled look reads the signs too");
+const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
+ok(!ownSigns.unread && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),
+  "the core's own records name a measure the look reads, and every condition they write reads (whether one holds is the look's to say, never a test's: a sign that trips fails no pull request)", JSON.stringify(ownSigns));
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);

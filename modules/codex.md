@@ -1,9 +1,14 @@
 # Codex's part
 
+Read by a session of Codex, and by whoever hands Codex a task or asks it for a review.
+
 **On GitHub,** its login `chatgpt-codex-connector[bot]`:
 - Its code review is asked by a comment `@codex review` alone: it answers every mention of itself, even in backticks, so
   other text says "the Codex mention".
-- Its security review runs by itself (`modules/reviews.md`, point 3).
+- Its security review runs by itself (`modules/reviews.md`, point 3). Where its app starts it so, it is never asked
+  for one by a comment, which it answers with a code review: a later commit's security check is the fallback
+  reviewer's (point 3). Through its plug-in, below, it is asked again for one where a later commit touches a way in
+  (point 3).
 - It cannot push there, so it builds nothing (core archive 169).
 
 **Through its plug-in in Claude Code** (`/codex:setup` says if it is ready; an offer of its to install Codex is the
@@ -15,3 +20,15 @@ owner's to accept: floor rule 18):
   branch against the default branch. Its answer, posted on the PR, is its code review of Claude's work, or, focused as
   `modules/reviews.md`, point 3, says, its security review.
 - Its model is its plan's; its effort high at most.
+
+**As a project's own agent,** its command line or app (from its documentation on AGENTS.md, read on 15 November 2026;
+`modules/tools.md`):
+- It reads `AGENTS.md` (or an AGENTS.override.md beside it) in each folder from the repository's root down to the one
+  it works in, and pulls in no file those name, so it opens each itself (`modules/other-builders.md`); it needs no
+  entry file.
+- Handed a task: the brief as its first message, or `codex exec "<the brief>"`; for a review with no app, the fresh
+  session `modules/tools.md` names under "Each tool's part".
+- Its hooks run at a session's start and at its stop, Claude Code's way (exit 2 and a reason keep it going), from a
+  repository's `.codex/hooks.json` once the owner trusts that folder in Codex: the starter kit's runs the work-saved
+  hook's copy merged into `main` at both (its documentation on hooks, read on 15 November 2026).
+- Its folder .codex, where it is the project's, is protected (floor rule 3).

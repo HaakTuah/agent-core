@@ -118,8 +118,9 @@ function shareGot(config, at, root) {
 }
 
 // The project at `root` as the dose reads it: null where it has no config of the shape check yet; else its config,
-// what the baseline lists, what the check reads, the state and the last audit. It throws where the config or the
-// baseline cannot be read, with the mend the shape check gives.
+// what the baseline lists, what the check reads (`found`, the survey's own: its counts and what stands today), the state
+// and the last audit. It throws where the config or the baseline cannot be read, with the mend the shape check gives.
+// The measures a choice's sign may name are read from it (choices.mjs, MEASURES).
 export function reading(rules, root = ".") {
   const at = where(rules);
   if (!fs.existsSync(notLinked(at, root))) return null;
@@ -127,7 +128,7 @@ export function reading(rules, root = ".") {
   const baseline = parseBaseline(fs.readFileSync(notLinked(config.baseline, root), "utf8"), config.baseline, "run the shape check, which says how");
   const now = standing(config, root), found = survey(now.texts, config, now.tests);
   const counts = { listed: baseline.listed.size, read: found.read.functions + found.read.imports };
-  return { at, config, baseline, ...counts, state: stateOf(counts, named(rules)), named: named(rules) };
+  return { at, config, baseline, found, ...counts, state: stateOf(counts, named(rules)), named: named(rules) };
 }
 
 const percent = (n, of) => `${of > 0 ? Math.round(1000 * n / of) / 10 : 0}%`;
@@ -142,7 +143,7 @@ export function cleaningBody(r, { changes, commits }, got, home) {
     `**The cleaning lane's share while it is so:** ${SHARE[r.state]}. What it got: ${share}. No check holds the share: it is shown, and the orchestrator hands out lanes by it.`, "",
     `**Clean first** (where change meets tangle: what the baseline lists of a file, times its changes in the newest ${commits} commits git holds here), after the files the queue's next entries will touch:`,
     ...first.map(f => `- \`${f.file.replace(/`/gu, "'")}\`: ${f.entries} listed, changed ${f.changes} times`), "",
-    `**How** (\`${home}modules/cleaning.md\`): each a small pull request of its own that proves behaviour unchanged by the tests, takes its entries out of the baseline (\`node ${home}scripts/shape.mjs --write\`) and changes nothing a user sees; where the tests cannot prove it, they come first. \`node ${home}scripts/dose.mjs\` gives this list as it stands.`].join("\n");
+    `**How** (\`${home}modules/cleaning.md\`): each a small pull request of its own that proves behaviour unchanged by the tests, takes its entries out of the baseline (\`node ${home}scripts/shape.mjs --write\`) and changes nothing a user sees; where the tests cannot prove it, they come first. A fault the tests' strength baseline lists is cleaning too: a test that catches it, and the entry taken out with \`node ${home}scripts/strength.mjs --lower <its file>\`. \`node ${home}scripts/dose.mjs\` gives this list as it stands.`].join("\n");
 }
 
 // The audit task's text, or null where none is due.
@@ -151,7 +152,7 @@ export function auditBody(r, at, home) {
   if (!due) return null;
   return { owner: due.owner, body: [`An audit by a reader is due: ${due.why}.`, "", stateLine(r), "",
     ...(due.owner ? [`**For the owner to see:** the project is in debt and its baseline is no smaller than at the last audit (${auditOf(r.baseline.audited).listed} then). Nothing fails and no work waits: the share the cleaning lane gets is the owner's to change.`, ""] : []),
-    `**How** (\`${home}modules/cleaning.md\`, "The audit's reader"): a fresh session that built none of what it reads answers the fixed questions, each with its evidence and on the one scale, from \`node ${home}scripts/code-shape.mjs\` and the code itself, and changes nothing; the session that takes this task writes its answers as a report beside the last one's and records the audit with \`node ${home}scripts/dose.mjs --audited\`, in one pull request.`].join("\n") };
+    `**How** (\`${home}modules/cleaning.md\`, "The audit's reader"): a fresh session that built none of what it reads answers the fixed questions, each with its evidence and on the one scale, from \`node ${home}scripts/code-shape.mjs\` and the code itself, and changes nothing; the session that takes this task writes its answers as a report beside the last one's and records the audit with \`node ${home}scripts/dose.mjs --audited\`, in one pull request. Where the project names a *mutation tool*, the same pull request holds the tests' whole run, outside the suite: \`node ${home}scripts/strength.mjs --whole\` writes their strength baseline, whose number the reader reads beside the last one's.`].join("\n") };
 }
 
 // The rules a project's dose is read from, and where its copy of the core lies: its manifest, else the core's own
