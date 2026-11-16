@@ -8,7 +8,8 @@
 // way names it, outside a comment, by its name ("scripts/build.mjs", as a script is started by its path), or where it
 // is the __init__.py of a package a file of Python on that way lies in, which Python runs on each import. A test the
 // config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
-// a changed file is no code the readers read and no test, a file that is gone, or anything the config does not name
+// a changed file is no code the readers read and no test, a file that is gone, C# (whose types are reached by their
+// full names too, with no using directive), a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
 // a schedule, before a release) and where the shape check's config cannot be read. A fault the whole suite finds that
 // the selection left out is a fault of this map, mended at once.
@@ -91,10 +92,10 @@ export function reached(tests, linked) {
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
-export function selection({ changed, texts, tests, reach, failed = [], config }) {
+export function selection({ changed, texts, tests, reach, scripts = new Set(), failed = [], config }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
-  const ctx = { texts, tests, add, reaches: reached(tests, links(texts, tests, reach)), ...m };
+  const ctx = { texts, tests, scripts, add, reaches: reached(tests, links(texts, tests, reach)), ...m };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -105,16 +106,20 @@ export function selection({ changed, texts, tests, reach, failed = [], config })
 }
 
 // What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
-function oneChange(f, { texts, tests, add, reaches, whole, none, isTest }) {
+function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest }) {
   if (none(f)) return null;
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
   // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
   // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
+  // (C# reaches a type by its full name with no using directive, and a script of the global space by no import at all)
+  if (f.endsWith(".cs") || scripts.has(f)) return `${f} is C#, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
   if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
   return null;
 }
+
+const pick = ({ reach, scripts }) => ({ reach, scripts });
 
 // The paths a pull request changes against its base, renames as a path gone and a path added.
 const changedSince = base => git(["diff", "-z", "--name-only", "--no-renames", base, "HEAD"]).split("\0").filter(Boolean);
@@ -166,7 +171,7 @@ function main(argv) {
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
   const s = !config ? { all: true, why: `the shape check's config (${at}) cannot be read, so what each test reaches cannot be told` }
     : !base ? { all: true, why: "no base is told (SELECT_BASE), as on main, on a schedule and before a release" }
-    : selection({ changed: changedSince(base), texts: now.texts, tests: now.tests, reach: survey(now.texts, config, now.tests).reach, failed, config });
+    : selection({ changed: changedSince(base), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), failed, config });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
   // sets another variable for the steps after it)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });

@@ -318,7 +318,8 @@ function wrappedOnce(ctx) {
 // What the check finds in the files given ({ path: text }, the files that declare packages among them): `entries`, a
 // Map of each breach's id to { kind, group, n }, n its numbers where it has any; `read`, the counts of what it read;
 // `unnamed`, the files of code in no system; `readers`, the reader of each file (shape-readers.mjs); and `reach`, each
-// file's imports of the project's own files, dynamic ones and those of types among them (select.mjs). `tests` is the
+// file's imports of the project's own files, dynamic ones and those of types among them, and `scripts`, the files that
+// share the global space, which import nothing (select.mjs). `tests` is the
 // set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
@@ -334,7 +335,7 @@ export function survey(texts, config, tests = new Set()) {
   read.unnamed = ctx.unnamed.length;
   read.tests = tests.size;
   read.screens = new Set([...ctx.entries.keys()].filter(id => id.startsWith("screen: ")).map(fileOf)).size;
-  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach };
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()) };
 }
 
 // ---- the baseline ----

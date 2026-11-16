@@ -73,6 +73,12 @@ const py = { "pkg/__init__.py": "raise RuntimeError('broken')\n", "pkg/rules.py"
 const pyConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["pkg", "tests"], tests: ["tests/"] })), pyTests = new Set(["tests/test_rules.py"]);
 s = selection({ changed: ["pkg/__init__.py"], texts: py, tests: pyTests, reach: survey(py, pyConfig, pyTests).reach, config: pyConfig });
 ok(!s.all && same(s.tests, ["tests/test_rules.py"]), "a Python package's __init__.py, which runs on every import under it, reaches the tests that import the package", JSON.stringify(s));
+const cs = { "src/Rules.cs": "namespace App;\npublic static class Rules { public static bool Allowed() => true; }\n", "tests/RulesTest.cs": "namespace Tests;\nclass RulesTest { void T() { App.Rules.Allowed(); } }\n", "web/app.js": "function draw() {}\n" };
+const csConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests", "web"], tests: ["tests/"] })), csTests = new Set(["tests/RulesTest.cs"]), csFound = survey(cs, csConfig, csTests);
+for (const f of ["src/Rules.cs", "web/app.js"]) {
+  s = selection({ changed: [f], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, config: csConfig });
+  ok(s.all && s.why.includes(f), `${f === "web/app.js" ? "a script of the global space, which no import names," : "C#, whose types a test reaches by their full names with no using,"} runs the whole suite`, JSON.stringify(s));
+}
 s = selection({ changed: ["package.json"], texts: { ...texts, "package.json": "{\"dependencies\":{\"x\":\"1.0.0\"}}" }, tests, reach, config });
 ok(s.all && /package\.json/.test(s.why), "a package's manifest, read beside the code, runs the whole suite: it links to no file, and may reach every test", JSON.stringify(s));
 for (const [changed, what] of [[["package.json"], "a file of no code the readers follow"], [["src/gone.js"], "a file of code that is gone"], [["src/rules.js", "config/app.json"], "data beside code"]]) {
