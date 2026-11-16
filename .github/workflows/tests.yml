@@ -331,7 +331,7 @@ jobs:
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
         run: node scripts/select.mjs .github/shape.json --env RUN
-      - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
+      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
         if: ${{ env.RUN == 'all' || contains(env.RUN, ' scripts/upgrade-test.mjs ') }}
         env:
           PART: ${{ matrix.part }}

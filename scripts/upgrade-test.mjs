@@ -711,6 +711,6 @@ if (inPart("older")) {
   preRelease("a-windows-project-older-than-release-1", { windows: true });
 }
 
-const proven = { all: "a project of each of the last two releases", older: "the part \"older\": a project of the older of the last two releases, and one older than the first", newer: "the part \"newer\": a project of the newer of the last two releases" }[PART];
+const proven = { all: "a project of each of the last two releases", older: `the part "older": ${starts.length > 1 ? "a project of the older of the last two releases, and one" : "a project"} older than the first`, newer: "the part \"newer\": a project of the newer of the last two releases" }[PART];
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions: ${proven}, synced to this commit, passes every check unchanged`);
 process.exitCode = failed ? 1 : 0;
