@@ -56,7 +56,6 @@
     "modules/reviews.md: A review already running is waited for": "check: scripts/code-review-wait.mjs, in part",
     "modules/reviews.md: Security": "check: scripts/security-review.mjs, in part",
     "modules/reviews.md: What a posted review stands for": "check: scripts/security-review.mjs",
-    "modules/roles.md: The orchestrator": "describes",
     "modules/screens.md: One system": "check: scripts/screens.mjs, in part",
     "modules/screens.md: Real content and every state": "check: scripts/screens.mjs, in part",
     "modules/screens.md: Motion with a purpose": "check: scripts/screens.mjs, in part",
@@ -72,6 +71,21 @@
     "modules/updates.md: Node": "check: scripts/node.sh",
     "modules/updates.md: CodeQL": "check: .github/workflows/codeql.yml",
     "modules/work-flow.md: Review in the background": "check: GitHub's ruleset on the default branch, in part",
-    "modules/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part"
+    "modules/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part",
+    "modules/roles.md: The roles, by what they do": "describes",
+    "modules/tools.md: One door in: `AGENTS.md`": "check: scripts/entry-files.mjs",
+    "modules/tools.md: Hooks save time; checks are the guarantee": "check: scripts/holders.mjs, in part",
+    "modules/tools.md: A change of tool loses nothing": "check: scripts/stalled.mjs, in part",
+    "modules/tools.md: Proven by the staged cases, tool by tool": "check: scripts/staged.mjs, in part",
+    "modules/kiro.md: What it reads": "describes",
+    "modules/kiro.md: Handed a task": "describes",
+    "modules/kiro.md: Hooks": "describes",
+    "modules/kiro.md: Its folder": "describes",
+    "modules/antigravity.md: What it reads": "describes",
+    "modules/antigravity.md: Handed a task": "describes",
+    "modules/antigravity.md: Hooks": "describes",
+    "modules/antigravity.md: Its folders": "describes",
+    "modules/codex.md: As a project's own agent": "describes",
+    "modules/kiro.md: Its includes": "check: scripts/entry-files.mjs"
   }
 }

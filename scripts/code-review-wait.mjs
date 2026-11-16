@@ -106,7 +106,7 @@ if (started(import.meta.url)) {
   const read = (file) => JSON.parse(readFileSync(file, "utf8"));
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
-  try { rules = ruleFiles(); } catch { rules = []; }
+  try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
   const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false", mergesFile ? read(mergesFile) : undefined);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

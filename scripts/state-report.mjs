@@ -127,7 +127,7 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
       if (rows.length < 100 || rows.every(p => String(p.updated_at) < from)) break;
     }
     for (const p of pulls) p.files = pagesOf(`repos/${repo}/pulls/${p.number}/files`, gh).map(f => f.filename);
-    merged = share(pulls, ruleFiles());
+    merged = share(pulls, ruleFiles(undefined, undefined, { tools: true }));
   } catch { /* (not read) */ }
   return { pin, behind, steps, merged };
 }

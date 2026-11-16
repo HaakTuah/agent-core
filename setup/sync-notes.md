@@ -6,8 +6,7 @@ of its own for a change to hold: a row of its manifest, a line of a rule file, a
 `core/scripts/steps.mjs`, where each entry has a step that tells it done exactly, and every difference from what the
 starter kit writes today (`core/scripts/fresh.mjs`); an orchestrator gives each a lane (`core/modules/orchestrating.md`). Each is done in a PR of its own once the sync PR is merged (a pure sync holds the
 copy alone: floor rule 8), or filed for the *progress file*'s queue where it is large; none waits for the owner beyond what
-the floor names. One that changes a protected file (floor rule 3: a rule file, the manifest, a workflow, a check's
-config or audit) is the trusted builder's, never a task given to another provider's. Each entry says how to tell it is done, and its step reads it, so a
+the floor names. Each entry says how to tell it is done, and its step reads it, so a
 project unsure where it stands runs `node core/scripts/steps.mjs`, and one already done asks nothing.
 
 **A copy older than release-1 syncs once with the release's full SHA:** `node core/scripts/sync.mjs <the release's full
