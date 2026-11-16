@@ -633,6 +633,8 @@ const classes = Date.now();
 ok(["core/scripts/copie[]s].mjs", "core/scripts/copie[!]a].mjs", "core/scripts/[a[:alpha:]]opies.mjs", "core/scripts/[^[:digit:]]opies.mjs", `core/scripts/${"[a".repeat(100000)}]x`]
   .every(f => notRead("copies", { "a.yml": stepped(`node ${f} c.json`) })) && notRead("copies", { "a.yml": stepped("node copies.mj? c.json", { "working-directory": "core/scripts/" }) }) && Date.now() - classes < 3000,
   "a class in any form may match, read in one pass; a folder named with a \"/\" at its end is that folder", `${Date.now() - classes} ms`);
+ok(configs(inMemory({ "a.yml": stepped("node core/scripts/reading-size.mjs config/sizes*.json") })).sizes === null && notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs config/c?.json") })
+  && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs 'config/c*.json'") }) === "config/c*.json", "a config given as an unquoted glob is not read; a quoted one is a file's name");
 const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenStarted = Date.now();

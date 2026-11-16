@@ -175,7 +175,7 @@ function located(word, dir) {
   if (word.text.includes("\\")) return { windows: true };
   // (the root's name is filled only where the word lets the shell fill it: in single quotes it is text)
   const text = word.text, rooted = word.dynamic && ROOT.test(text), rest = rooted ? text.replace(ROOT, "") : text;
-  if (word.dynamic && /\$|`|%\w+%|\{/u.test(rest)) return { dynamic: true };
+  if (word.dynamic && /\$|`|%\w+%|[{*?[]/u.test(rest)) return { dynamic: true }; // (a variable, braces or a glob)
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
   return { at: at === ".." || at.startsWith("../") ? null : at.replace(/^\.\//u, "") };
