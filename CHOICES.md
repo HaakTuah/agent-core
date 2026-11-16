@@ -126,11 +126,16 @@ counter and its commands are in the pull request that adds this record (#487).
      - `scripts/yaml-keys.mjs` (155 lines, no bug), the key read twice that every project's workflow check fails:
        replace with a YAML package carried in the copy, one that reports a key given twice;
      - `scripts/workflow-run.mjs` (395 lines, no bug), which reads the host's workflow format, its expressions and
-       its steps for the core's upgrade test alone: replace its YAML with a package in the core's tests alone, and
+       its steps for the core's upgrade test alone: replace its YAML (`parseYaml`, `scalar` and the block scalars'
+       `block`, about 80 lines) with a package in the core's tests alone, and
        keep its runner until a trial shows a tool that only runs can run the upgrade test where the sessions work;
-     - the reader of shell commands in `scripts/check-configs.mjs` (661 lines in all, no bug): replace its Bash with
-       the parser's Bash grammar (1.4 MB, the tree-sitter organisation's); keep its PowerShell until a grammar of a
-       known publisher exists;
+     - the YAML of `scripts/comment-only.mjs` (`readYaml` and `node`, 135 of its 294 lines, 3 bugs naming the
+       script), which proves a change to what runs by itself is only comments: replace with the YAML package carried
+       in the copy, once its trial shows it keeps each comment's place;
+     - the readers of shell commands: in `scripts/check-configs.mjs` (661 lines in all, no bug), and the commands of
+       npm scripts and files in `scripts/licence-commands.mjs` (432 lines, no bug): replace their Bash with the
+       parser's Bash grammar (1.4 MB, the tree-sitter organisation's); keep the PowerShell until a grammar of a known
+       publisher exists;
      - the matching of file patterns, written three times (`check-configs.mjs`, `workflow-run.mjs`, `select.mjs`,
        about 70 lines together, no bug): replace with one, on Node's own `path.matchesGlob` where its tests show it
        matches the host's filters;
@@ -152,8 +157,10 @@ counter and its commands are in the pull request that adds this record (#487).
      with a schema each and one checker of schemas, a tool that only runs where its trial shows it says the mend.
   - **Weighed like the rest:** the licence checks for npm and NuGet (`scripts/licences.mjs`, 545 lines, 4 bugs;
     `scripts/nuget.mjs`, 928, 7; `scripts/licence-scan.mjs`, 239, 1; `scripts/licence-installed.mjs`, 179, 1;
-    `scripts/licence-commands.mjs`, 432, none): replace the reading underneath (the lock files, how a licence is
-    written out) with packages or each system's own tool, each by a trial, and keep the policy on top (the floor's
+    `scripts/licence-commands.mjs`, 432, none, its shell commands taken with the second group): replace the reading
+    underneath (the lock files, how a licence is written out, and the HTML of `scripts/licence-scan.mjs`'s
+    `executable` and `attributesOf`, 52 lines that read a page's script tags and their attributes) with packages or
+    each system's own tool, each by a trial, and keep the policy on top (the floor's
     list, the owner's yes, the week's wait, the same publisher, failures that say the mend) the core's own. With 12
     bugs between them, the most of any stand-in, they go with the second group.
   - **Kept:** the finding of copies (`scripts/copies.mjs`, 314 lines, 9 bugs), since what a copy is the core's own
