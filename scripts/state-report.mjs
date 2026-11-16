@@ -21,6 +21,7 @@ import { CORE } from "./core-address.mjs";
 import { classify } from "./core-cost.mjs";
 import { pinOf } from "./core-moved.mjs";
 import { reading, rulesOf } from "./dose.mjs";
+import { baselineOf } from "./strength.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { report as holdersReport } from "./holders.mjs";
 import { ruleFiles } from "./rule-files.mjs";
@@ -49,7 +50,14 @@ export function copies(root, manifest) {
 // `manifest` is null, the core's own AGENTS.md): { at, count, state }, the old breaches it lists and the state the
 // codebase is in; null where the project has not taken the check or it cannot be read.
 export function shape(root, manifest) {
-  try { const r = reading(rulesOf(manifest, root).rules, root); return r && { at: r.config.baseline, count: r.listed, state: r.state }; } catch { return null; }
+  try { const r = reading(rulesOf(manifest, root).rules, root); return r && { at: r.config.baseline, count: r.listed, state: r.state, strength: strength(root, r.config) }; } catch { return null; }
+}
+
+// The tests' strength baseline, beside the shape check's (strength.mjs): { at, count }, the faults no test catches it
+// lists; null where it stands nowhere or cannot be read.
+function strength(root, config) {
+  const at = baselineOf(config);
+  try { return { at, count: Object.values(JSON.parse(fs.readFileSync(path.join(root, at), "utf8")).listed).reduce((n, e) => n + (e.count ?? 0), 0) }; } catch { return null; }
 }
 
 // The lines of the measures against their baselines: each with its count at the last report, where that report gave it.
@@ -58,6 +66,7 @@ function measured({ core, measures, shape: shaped, previous }) {
   const lines = [];
   if (measures) lines.push(`- copies: ${measures.count} old copies in its baseline (\`${measures.at}\`)${was("copies")}.`);
   if (shaped) lines.push(`- how the code is put together: ${shaped.count} old breaches in its baseline (\`${shaped.at}\`)${was("how the code is put together")}; the codebase is ${shaped.state}.`);
+  if (shaped?.strength) lines.push(`- how strong the tests are: ${shaped.strength.count} faults no test catches in its baseline (\`${shaped.strength.at}\`)${was("how strong the tests are")}.`);
   if (lines.length) return lines;
   return [core ? "- None: in the core's own repository no baseline may stand." : "- None: no measure keeps a baseline here yet."];
 }

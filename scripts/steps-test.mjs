@@ -69,6 +69,39 @@ for (const [name, dir] of Object.entries(dirs)) {
   const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: texts("modules"), floorTexts: texts("floor") });
   ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
 }
+// (a named tool is done only where a workflow on pull requests runs the check with its base)
+{
+  const dir = dirs["an-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  const step = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), flow = path.join(dir, ".github/workflows/strength.yml");
+  fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |"));
+  const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return step.check(project(dir)); };
+  const comment = said("      # TODO: node core/scripts/strength.mjs\n      - run: echo later\n");
+  const bare = said("      - run: node core/scripts/strength.mjs\n");
+  const runs = said("      - run: node core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
+  ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
+  fs.writeFileSync(manifest, was); fs.rmSync(flow);
+}
+// (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
+{
+  const dir = dirs["an-npm-project"], test = path.join(dir, "src", "first.test.js");
+  fs.mkdirSync(path.dirname(test), { recursive: true });
+  fs.writeFileSync(test, "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const said = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  ok(said?.mend.includes("has tests now"), "the starter kit's mutation-tool row, none for no tests yet, is reported once the project's own code holds a test", JSON.stringify(said));
+  execFileSync("git", ["rm", "-q", "--cached", "src/first.test.js"], { cwd: dir });
+  fs.rmSync(test);
+  // (a test folder the config names beside its code, not inside it: its tests count too)
+  const config = path.join(dir, "checks/shape.json"), was = fs.readFileSync(config, "utf8"), apart = path.join(dir, "test", "a.js");
+  fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(was), code: ["src"], tests: ["test"] }, null, 2)}\n`);
+  fs.mkdirSync(path.dirname(apart), { recursive: true }); fs.writeFileSync(apart, "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const beside = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  ok(beside?.mend.includes("has tests now"), "and once a test stands in a folder of tests the config names apart from its code", JSON.stringify(beside));
+  execFileSync("git", ["rm", "-q", "--cached", "test/a.js"], { cwd: dir });
+  fs.rmSync(path.join(dir, "test"), { recursive: true }); fs.writeFileSync(config, was);
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+}
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
 const dir = dirs["a-dotnet-project"];

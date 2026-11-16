@@ -30,6 +30,7 @@
     ],
     "floor/topics.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
     "modules/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
+    "modules/code-shape.md: How strong the tests are is measured on the lines a pull request changes": "check: scripts/strength.mjs, in part",
     "modules/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds, in part",
     "modules/git.md: Work from `main`": "check: GitHub's ruleset on the default branch",
     "modules/git.md: Each PR has the headings": "check: scripts/pr-description.mjs, in part",
