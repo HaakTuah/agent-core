@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, verdict, watched } from "./strength.mjs";
+import { baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -99,6 +99,11 @@ const moved = (listed, faults, still) => verdict({ faults, still, baseline: b(li
 ok(!moved(split, [fB(inA)], [fB(inB)]).fails && moved(split, [fB(inA)], [fB(inB), fB(inB)]).fails && moved({ [inB]: { count: 1 }, [inA]: { count: 2 } }, [fB(inA)], [fB(inB)]).fails && moved(split, [fB(inA)], [fB(inB), { ...fB(inB), status: "Pending" }]).fails
   && mended(moved(split, [fB(inA)], [fB(inB), fB(inB)]).lines.join("\n")),
   "debt a split carried to another file, listed there and as much fewer where it left, passes; where the old file still holds it, or the new lists more than the run found, it fails, with its mend", moved(split, [fB(inA)], [fB(inB)]).lines.join("\n"));
+
+const unrunOld = verdict({ faults: [], still: [{ ...f(kept, "Pending") }], baseline: b({}), was: baseKept, at: "s.json", deleted: [] });
+const notMeasured = verdict({ faults: [f(repeated, "Survived")], still: [f(repeated, "Pending")], baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] });
+ok(unrunOld.fails && !notMeasured.fails && notMeasured.lines.some(l => l.startsWith("Not measured:") && l.includes("Readings taken")) && same(unsure([f(repeated, "Survived")], entry, [f(repeated, "Killed")]), []),
+  "a pull request that lowers an entry while a fault of its kind was not run fails, since only debt measured gone leaves the list; a survivor that passes only for want of a run is said not to be measured", notMeasured.lines.join("\n"));
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });

@@ -164,8 +164,9 @@ export const kindOf = id => { const p = partsOf(id); return p ? `${p.file}\n${p.
 export const totals = listedMap => [...listedMap].reduce((t, [id, n]) => t.set(kindOf(id), (t.get(kindOf(id)) ?? 0) + (n.count ?? 0)), new Map());
 const tally = faults => faults.reduce((t, f) => t.set(kindOf(f.id), (t.get(kindOf(f.id)) ?? 0) + 1), new Map());
 // What the lines a change left alone hold: those found surviving (`known`), a fault the tool left unrun there counting
-// as caught, as one on a changed line does, so that a budget that runs out turns nothing red; and, where debt is to be
-// set against another file's (movedOut()), those not known to be caught (`holding`).
+// as caught, as one on a changed line does, so that a budget that runs out turns no rewrite red (unsure() says so);
+// and, where a pull request lowers a kind (undercut(), movedOut()), those not known to be caught (`holding`), since
+// only debt measured gone may leave the list.
 const known = still => still.filter(f => SURVIVED.includes(f.status));
 const holding = still => still.filter(f => [...SURVIVED, "Pending"].includes(f.status));
 const whatOf = kind => kind.slice(kind.lastIndexOf("\n") + 1);
@@ -207,12 +208,20 @@ export function unlisted(faults, listedMap, still = []) {
   return over.filter((f, i, all) => all.findIndex(g => g.id === f.id) === i);
 }
 
+// The kinds whose survivors on the changed lines pass only because faults on the lines left alone were not run: not
+// measured, and said so. Each [kind, how many not run].
+export function unsure(faults, listedMap, still = []) {
+  const run = unlisted(faults, listedMap, still), strict = unlisted(faults, listedMap, holding(still).map(f => ({ ...f, status: "Survived" })));
+  const kinds = new Set(strict.map(f => kindOf(f.id)).filter(k => !run.some(f => kindOf(f.id) === k)));
+  return [...kinds].map(k => [k, still.filter(f => f.status === "Pending" && kindOf(f.id) === k).length]);
+}
+
 // The kinds a pull request's baseline (`now`) lists fewer of than the base (`was`) did, below what the lines it left
-// alone still hold (`still`): [{ kind, listed, before, held }]. Debt dropped from the list while it survives would turn
-// the change that next moves it red.
+// alone may still hold (`still`, a fault not run counting as held): [{ kind, listed, before, held }]. Debt dropped
+// from the list while it survives would turn the change that next moves it red.
 export function undercut(now, was, still = []) {
   if (!was) return [];
-  const nowT = totals(now.listed), held = tally(known(still));
+  const nowT = totals(now.listed), held = tally(holding(still));
   return [...totals(was.listed)].filter(([k, n]) => (nowT.get(k) ?? 0) < n && (held.get(k) ?? 0) > (nowT.get(k) ?? 0))
     .map(([k, before]) => ({ kind: k, listed: nowT.get(k) ?? 0, before, held: held.get(k) }));
 }
@@ -309,7 +318,8 @@ export function verdict({ faults, still = [], baseline, was, at, deleted, touche
   const news = unlisted(faults, baseline.listed, still), unsaid = joinedUnsaid(baseline, was, touched, texts, [...faults, ...still], still), cut = undercut(baseline, was, still);
   const unrun = still.filter(f => f.status === "Pending").length;
   if (c.pending) lines.push(`${c.pending} faults on the changed lines were not run (the tool's budget): they are not held here, and the next whole run reads them.`);
-  if (unrun) lines.push(`${unrun} faults on lines this pull request left alone, of a kind it adds to or lowers, were not run (the tool's budget): they are not held here, as those on the changed lines are not, and the next whole run reads them.`);
+  if (unrun) lines.push(`${unrun} faults on lines this pull request left alone, of a kind it adds to or lowers, were not run (the tool's budget): a survivor on a changed line is not failed for them, and an entry is not lowered past them.`);
+  for (const [k, n] of unsure(faults, baseline.listed, still)) lines.push(`Not measured: the fault ${k.split("\n").reverse().join(" in ")} survives on a changed line, and whether that adds to its debt turns on ${n} faults not run on lines this pull request left alone. The pull request says so under "Readings taken", and the next whole run reads it.`);
   for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, past what ${at} lists of that fault in ${f.file} with what the lines this pull request left alone still hold. Mend: write a test that fails on it and run the check again; where the fault only moved here from another file this pull request changes (a split), list "${f.id}" in ${at} under "listed" and that fault as many fewer in the file it left; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const id of unsaid) lines.push(`FAIL: ${at} lists "${id}" where the base did not, with no reason under "grown". Mend: take it out and write a test that catches the fault; where the fault only moved from another file this pull request changes, list it there as many fewer; or give its reason under "grown" (the fault changes nothing the program does), say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const k of cut) lines.push(`FAIL: ${at} lists ${k.listed} of the fault ${k.kind.split("\n").reverse().join(" in ")}, where the base listed ${k.before}, and ${k.held} still survive on lines this pull request left alone. Mend: list them again as the base did (a cleaning run, node core/scripts/strength.mjs --lower <file>, lowers an entry only to what still survives), or first write the tests that catch them`);
