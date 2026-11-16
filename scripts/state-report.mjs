@@ -1,6 +1,6 @@
 // The state report (roles/orchestrator.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
-// (floor rule 14): each measure that keeps a baseline against the last report, in the core the rules of the floor and
+// (floor rule 14): led by the five outcomes and what the work cost (outcomes.mjs, beside this file; #302), each measure that keeps a baseline against the last report, in the core the rules of the floor and
 // the modules by what holds them, those with none listed (holders.mjs, beside this file), which rules each role cited in
 // the month before (cited.mjs, beside this file), what the look keeps open past a week, and the step that files a check
 // for each rule the reviews found twice (review-record.mjs). In a project it ends with its counts for the core,
@@ -21,6 +21,7 @@ import path from "node:path";
 import { HEADING as CITED, citedFrom, mergedIn } from "./cited.mjs";
 import { CORE } from "./core-address.mjs";
 import { classify } from "./core-cost.mjs";
+import { HEADING as OUTCOMES, outcomesFrom } from "./outcomes.mjs";
 import { pinOf } from "./core-moved.mjs";
 import { reading, rulesOf } from "./dose.mjs";
 import { baselineOf } from "./strength.mjs";
@@ -101,10 +102,14 @@ const heldNow = () => { try { return holdersReport(); } catch { return null; } }
 // `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
 // `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
 // here where left out, and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
-// null where they were not counted.
-export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, scripts }) {
+// null where they were not counted; `outcomes`: the lines outcomes-read.mjs gives for the month before, which the report
+// leads with (#302), null where they were not read.
+export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, outcomes = null, scripts }) {
   const lines = [
     `The state of ${core ? "the core" : "this project"} for ${month}, as the scheduled look reads it on its first run of the month (\`${scripts}/state-report.mjs\`). It reports and asks nothing: whatever is due already has its task. A session that reads it files as a task anything it shows that has none, and closes it.`,
+    "",
+    `**${OUTCOMES} in ${before(month)}**`,
+    ...(outcomes ?? [`- Not read: \`${scripts}/outcomes-read.mjs\` was not run for ${before(month)}.`]),
     "",
     "**The measures against their baselines**",
     ...measured({ core, measures, shape: shaped, previous, wait }),
@@ -150,9 +155,10 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
 // A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
 // whole-line form that holds numbers and fixed words alone, and written anew from what it holds, so no other text of
 // the project's reaches the core's report, and after them the rules its roles cited (cited.mjs's citedFrom, which lets
-// through the core's own rule names alone, `known`); null where none is in its form. The commit its copy holds is kept
+// through the core's own rule names alone, `known`), and, of a public project (`open`), its outcomes (outcomes.mjs's
+// outcomesFrom, which lets through its own measures' names and words alone); null where none is in its form. The commit its copy holds is kept
 // only where `named` (the owner's public project).
-export function countsFrom(text, named, known = new Set(rules().map(r => r.key))) {
+export function countsFrom(text, named, known = new Set(rules().map(r => r.key)), open = named) {
   const part = String(text ?? "").split(`**${COUNTS}**`)[1] ?? "";
   const out = [];
   for (const line of part.split(/\r?\n/)) {
@@ -165,6 +171,8 @@ export function countsFrom(text, named, known = new Set(rules().map(r => r.key))
   }
   const cited = citedFrom(text, known);
   if (cited) out.push(cited);
+  const outcomes = open ? outcomesFrom(text) : null; // (a private project's outcomes are not carried: #450's security review)
+  if (outcomes) out.push(outcomes);
   return out.length ? out.join("; ") : null;
 }
 
@@ -204,7 +212,7 @@ function projects(named) {
     let counts = "its counts could not be read here: a session started in it reads its newest state report and passes back the lines under its heading";
     try {
       const report = reportOf(pagesOf(`repos/${name}/issues?state=all&labels=by%3Alook`, gh), r.owner);
-      const read = report && countsFrom(report.body, own && !r.private);
+      const read = report && countsFrom(report.body, own && !r.private, undefined, !r.private);
       if (read) counts = `from its report of ${report.title.slice(-7)}: ${read}`;
       else if (!report) counts = "it has no state report yet";
     } catch { /* (the default above) */ }

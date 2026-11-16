@@ -172,12 +172,17 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
-     what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`); the two lines
-     only of a pull request opened since the project's copy held them.
+     what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
+     line, or in its place "No cost line: the script printed none."; the lines only of a pull request opened since
+     the project's copy held them.
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
      loses answers.
+   - **The outcomes:** `outcomes.mjs` and `outcomes-read.mjs`, which the monthly state report leads with: the five
+     outcomes the owner named, each by its direct measure or said to have none yet, then what the work cost, read
+     through gh from the pull requests, issues and the label `correction` (`roles/shared/inbox.md`, "A correction is
+     marked"; `tasks/cleaning.md`). The look's job runs them with the permissions it has; they add no job.
    - **Its calls to the core's workflows:** its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`,
      `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` and, if it has versions Dependabot cannot see,
      `versions.yml` keep their triggers and call the core's of the same name

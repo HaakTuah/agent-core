@@ -58,7 +58,8 @@ A finding, not blocking:
 
 **A brief written in a pull request** (a template of the starter kit that hands work, or a brief a module, script or
 workflow holds; core archive 229): blocking where it misses one of the four things "A brief is written as a rule is"
-in `tasks/helpers.md` names, or gives its reader a title or stakes that are not real.
+in `tasks/helpers.md` names, or gives its reader a title or stakes that are not real; and where it, a rule or an entry
+makes a process measure its goal (`tasks/cleaning.md`).
 
 **A screen changed** (`tasks/screens.md`; core archive 230):
 - Blocking: a pull request that changes a screen with no critique on it (point 18), or with no pictures of point 17

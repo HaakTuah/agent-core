@@ -9,6 +9,8 @@
 //     without its "Found while:" line; an agent's comment on an open issue or pull request that opens with no line of
 //     the list; and, in an item of the owner's voice (by:owner, by:chat, by:design), a heading that names a view and is
 //     not "The session's view (not a decision)";
+//   - an open issue labelled `correction` that the owner's account filed without the lines that name the pull request
+//     it corrects and its kind, in its body or a note of that account (outcomes.mjs, beside this file, counts them);
 //   - a queued issue whose newest verdict is the stand-in's sure yes, with no note in the owner's voice after it,
 //     that lacks the mark `stand-in-yes`, and one that keeps the mark after such a note;
 //   - a queued issue with SEVERAL notes in the owner's voice newer than its current text (its description, or its
@@ -24,6 +26,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { seen } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
+import { KINDS, LABEL, kindOf } from "./outcomes.mjs";
+import { broughtBy } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
 import { VERDICT, byAgent, verdict } from "./stand-in-record.mjs";
 import { started } from "./started.mjs";
@@ -72,6 +76,18 @@ export function toMake(have) {
   });
 }
 
+// The corrections to mend, as check gives them: each open issue labelled `correction` that the owner's account filed
+// (`mine`) and that lacks, in its body and that account's notes on it, the line naming the pull request it corrects, or
+// its kind where it is no bug.
+function unmarked(issues, comments, mine, names) {
+  const lacks = i => {
+    const texts = [i.body, ...comments.filter(c => c.issue === i.number && mine(c.user)).map(c => c.body)];
+    return !texts.some(t => broughtBy(t) !== null) || (!names(i).includes("bug") && !texts.some(t => kindOf(t)));
+  };
+  const items = issues.filter(i => mine(i.user) && names(i).includes(LABEL) && lacks(i)).map(i => `#${i.number}`);
+  return items.length ? [{ what: `On each open issue labelled ${LABEL} (core/roles/shared/inbox.md, "A correction is marked"), the lines that name what it corrects, "Brought in by: #<the merged pull request>", and its kind, "Correction: " and one of ${KINDS.join(", ")} (a bug's kind is does not work where it says none): edit the issue, or add a note of the owner's account that holds them`, items }] : [];
+}
+
 // What is to be mended, each { what, items }. `issues`: the open issues, not pull requests, as GitHub gives them;
 // `comments`: comments on open issues and pull requests, each with `issue` (its number); `notes`: for each queued
 // issue's number, all its comments; `owner`: the owner's account; `have`: the repository's labels.
@@ -114,7 +130,7 @@ export function check({ issues, comments = [], notes = new Map(), owner, have, s
       const at = current ? current.updated_at ?? current.created_at : i.created_at;
       return all.filter(c => String(c.created_at) > String(at) && ownVoiceNote(c.body)).length >= SEVERAL;
     }).map(i => `#${i.number}`));
-  return out;
+  return [...out, ...unmarked(issues, comments, mine, names)];
 }
 
 export const report = (found, repo) => found.length

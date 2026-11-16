@@ -70,6 +70,7 @@ export const PLANTED = {
   "15 November 2026, labels and openers": dir => { const have = new Set(github(dir).labels.map(l => l.name)); return LABELS.every(l => have.has(l.name)); },
   "16 November 2026, choices that are hard to undo": dir => anyBranch(dir, b => { const t = show(dir, b, "docs/choices.md") ?? ""; return /^Read whole: \d{4}-\d\d-\d\d/m.test(t) && /^## Choice: (?!FILL IN)\S/m.test(t) && /Reopens it: (?!FILL IN)\S/.test(t); }),
   "16 November 2026, secret scanning with push protection": dir => scanning(dir),
+  "16 November 2026, corrections counted and the outcomes read": dir => github(dir).labels.some(l => l.name === "correction"),
   "16 November 2026, the daily look": dir => anyBranch(dir, b => workflows(dir, b).includes("look.yml") && !workflows(dir, b).some(f => /\/core-moved\.yml@/.test(show(dir, b, `.github/workflows/${f}`) ?? ""))),
 };
 // Held by the case as a whole: it asks that every step be taken, which is the case.

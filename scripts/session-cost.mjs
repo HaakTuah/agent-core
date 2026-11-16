@@ -5,8 +5,8 @@
 // counted, by its id, with its four counts and its model's family. Each run adds what the record holds now, and the
 // line is the tally's, so it never drops within a session while the tally stands (a tally lost, or answers that came
 // and went between two runs, and it is a floor again). Where it cannot tell (another tool, no session id, no record
-// and no tally), it prints nothing and exits 0, so no session works this out by hand or writes that it could not. It
-// reads the record and writes the tally, nothing else: no prompt, answer or path leaves it, only ids, counts and the
+// and no tally), it prints nothing and exits 0, so no session works this out by hand: the description says "No cost
+// line: the script printed none." in its place (pr-description.mjs, beside this file; #302). It reads the record and writes the tally, nothing else: no prompt, answer or path leaves it, only ids, counts and the
 // models' families; a tally no run has touched for 90 days is removed. Node's own modules only.
 //
 //   node core/scripts/session-cost.mjs
