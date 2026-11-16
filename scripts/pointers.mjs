@@ -67,17 +67,19 @@ function parse(file) {
 // "Reviews" leads to "Reviews: only a 10 passes", "Status" to "Status (3 November 2026): ...".
 const sectionIn = (file, title) => parse(file).anchors.find(a => a.title === title || /^[:,( ]/.test(a.title.slice(title.length)) && a.title.startsWith(title));
 // A file that only points: each file of the core's at a path its rules left (under modules/, and floor/topics.md) says
-// in a line which file or folder "holds these rules now", as a link whose text is the path from the core's root. A
-// pointer through it leads to what stands there, in the file named or, for a folder, in the folder's own files. The
-// file itself comes first, for what it still names by itself; no other file is followed, whatever it says.
-function standsIn(file) {
-  const left = file.startsWith(`${HOME}modules/`) || file === `${HOME}floor/topics.md`;
-  const to = left ? /^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now\b/mu.exec(parse(file).lines.join("\n"))?.[1] : undefined;
-  if (!to) return [file];
-  const at = HOME + to;
-  return [file, ...(to.endsWith("/") ? tracked.filter(f => f.startsWith(at) && f.endsWith(".md") && !f.slice(at.length).includes("/")) : tracked.filter(f => f === at))];
+// in a line which file or folder "holds these rules now", as a link whose text is the path from the core's root, and in
+// a line "Now in [`<path>`](..): **<lead>**." which rule stands elsewhere than the rest. A pointer through it leads to
+// what stands there: for a rule it names so, the file that rule went to; else the file named or, for a folder, the
+// folder's own files. No other file is followed, whatever it says, and a file that names nothing is read as itself.
+function standsIn(file, title) {
+  if (!file.startsWith(`${HOME}modules/`) && file !== `${HOME}floor/topics.md`) return [file];
+  const text = parse(file).lines.join("\n");
+  const apart = [...text.matchAll(/^Now in \[`([^`\s]+)`\]\([^)\s]+\): \*\*([^*]+?)\*\*\.$/gmu)].filter(m => plain(m[2]) === title).map(m => m[1]);
+  const to = apart.length ? apart : [/^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now\b/mu.exec(text)?.[1]].filter(Boolean);
+  const there = to.flatMap(t => (t.endsWith("/") ? tracked.filter(f => f.startsWith(HOME + t) && f.endsWith(".md") && !f.slice((HOME + t).length).includes("/")) : tracked.filter(f => f === HOME + t)));
+  return there.length ? there : [file];
 }
-const section = (file, title) => { for (const at of standsIn(file)) { const a = sectionIn(at, title); if (a) return { ...a, file: at }; } return undefined; };
+const section = (file, title) => { for (const at of standsIn(file, title)) { const a = sectionIn(at, title); if (a) return { ...a, file: at }; } return undefined; };
 // (a floor rule is found by its bold number at a line's start, "**3.", in any of the floor's files; a list item is none)
 const hasRule = n => FLOOR.some(f => parse(f).lines.some(l => l.startsWith(`**${n}. `)));
 const hasPoint = (file, from, to, n) => parse(file).lines.slice(from, to).some(l => new RegExp(`^\\s*(\\*\\*)?${n}\\.\\s`).test(l));

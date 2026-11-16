@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
-import { FILES, GAME_ROWS, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
+import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, sizes, startOf, TEMPLATES } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
@@ -73,6 +73,9 @@ ok(template("security-review.yml.tmpl").includes("on:\n  pull_request:\n    type
 ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \* \* \*'.*\n  workflow_dispatch:\n/m.test(template("look.yml.tmpl")) && template("look.yml.tmpl").includes("    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n"), "the daily look runs daily or by hand, in a job that may read the repository, its pull requests, checks and statuses, and write issues");
 const fromFolder = name => fs.readFileSync(path.join(root, TEMPLATES, name), "utf8");
 const whole = files({ owner: "someone", name: "P", packages: "tools" }, A, ["git.md"], fromFolder).map(([, text]) => text).join("\n");
+ok(JSON.stringify(startOf(Object.fromEntries(files({ owner: "someone", name: "P" }, A, ["git.md"], fromFolder)))) === JSON.stringify(READ)
+  && JSON.stringify(startOf({ "AGENTS.md": "@core/floor/security.md\n@core/modules/git.md\n", "CLAUDE.md": "@AGENTS.md\n@core/modules/claude.md\n" })) === JSON.stringify([...READ.filter(f => !f.startsWith("core/")), "core/floor/security.md", "core/modules/git.md", "core/modules/claude.md", "core/modules/other-builders.md"]),
+  "the start files the kit measures are those its own entry files name: for the kit as it stands the list it holds, and for a kit from before the rules moved the paths that kit names");
 const dependabot = o => files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/dependabot.yml")[1];
 const ecosystems = text => (text.match(/package-ecosystem: "/g) ?? []).length;
 ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    directory: "/"\n') && ecosystems(dependabot({ nuget: "." })) === 2 && dependabot({ nuget: "src" }).includes('directory: "/src"\n') && ecosystems(dependabot({})) === 1 && !dependabot({}).includes("nuget"), "a project whose packages come from NuGet gets Dependabot's updates for them, for its folder, beside the actions' own, and one that named no installer gets the actions' alone");

@@ -53,10 +53,12 @@ r = run(cites("As floor rule 19 says (core archive 999)."));
 ok(r.code === 0 && /note .*floor rule 19: no such rule in the floor/.test(r.out) && /note .*core archive 999: no such item in the archive/.test(r.out), "in a project, a floor rule or an archive item that is not there is listed, each named, and fails nothing: a sync never fails a project over a citation of its own");
 ok(/read and not found/.test(r.out) && !/\(2 in forms it cannot read/.test(r.out), "and it is listed as read and not found, not as a form it cannot read", r.out);
 // a file that only points: a pointer through it leads to what stands where it names
-const MOVED = { "core/modules/git.md": "# Moved: Git\n\n[`roles/shared/git.md`](../roles/shared/git.md) holds these rules now: read it whole.\n", "core/roles/shared/git.md": "# Git\n\n- **Push after every commit,** always.\n\n1. One.\n2. Two.\n",
+const MOVED = { "core/modules/roles.md": "# Moved: Who does what\n\n[`tasks/roles.md`](../tasks/roles.md) holds these rules now: read it whole.\n\nNow in [`roles/orchestrator.md`](../roles/orchestrator.md): **The builders**.\n",
+  "core/tasks/roles.md": "# Who does what\n\n**The roles.** Text.\n", "core/roles/orchestrator.md": "# The orchestrator\n\n**The builders** are picked so:\n1. One.\n2. Two.\n",
+  "core/modules/git.md": "# Moved: Git\n\n[`roles/shared/git.md`](../roles/shared/git.md) holds these rules now: read it whole.\n", "core/roles/shared/git.md": "# Git\n\n- **Push after every commit,** always.\n\n1. One.\n2. Two.\n",
   "core/floor/topics.md": "# Moved: the floor, by topic\n\n[`floor/topics/`](topics/) holds these rules now, a file a topic: read the one the task touches.\n", "core/floor/topics/licences.md": "# Licences\n\n**10. Licences.** Text.\n\n## Reporting\n\nText.\n" };
-r = run({ ...cites("As `core/modules/git.md`, \"Push after every commit\", says, with `core/modules/git.md`, point 2, and \"Reporting\" in `core/floor/topics.md`, and `core/floor/topics.md`, rule 10."), ...MOVED });
-ok(r.code === 0, "a pointer through a file that only points leads to the section or the point where it now stands, in the file it names or a folder's own files");
+r = run({ ...cites("As `core/modules/git.md`, \"Push after every commit\", says, with `core/modules/git.md`, point 2, and \"Reporting\" in `core/floor/topics.md`, and `core/floor/topics.md`, rule 10; and `core/modules/roles.md`, \"The builders\", point 2, with \"The roles\" in `core/modules/roles.md`."), ...MOVED });
+ok(r.code === 0, "a pointer through a file that only points leads to the section or the point where it now stands, in the file it names or a folder's own files, and a rule it says went elsewhere is found there, its numbered points too");
 r = run({ ...cites("As `core/modules/git.md`, \"Push once\", says, with `core/modules/git.md`, point 3."), ...MOVED });
 ok(r.code === 1 && /"push once" is no heading or bold lead-in/i.test(r.out) && /point 3: no such numbered point/.test(r.out), "and one that stands in neither place still fails, named");
 // the core's own run: there it fails
