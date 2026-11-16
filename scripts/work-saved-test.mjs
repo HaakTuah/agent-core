@@ -59,6 +59,19 @@ ok(kitHooks.every(c => { const x = inNested(c); return x.status === 0 && !/NESTE
 const unguarded = kiroStop.replace('[ -f "$r/.kiro/hooks/work-saved.json" ] || exit 0; ', "");
 ok(unguarded !== kiroStop && /NESTED-RAN/.test(inNested(unguarded).stderr), "and without the guard, the same hook would have run it: the test bites");
 fs.rmSync(nested, { recursive: true, force: true });
+// the core's own hooks, which a project carries in its copy under core/: they run in no repository with a manifest
+const own = file => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8"));
+const ownHooks = [own(".kiro/hooks/work-saved.json").hooks[0].action.command, ...["SessionStart", "Stop"].map(e => own(".codex/hooks.json").hooks[e][0].hooks[0].command)];
+const taker = path.join(tmp, "taker");
+git(tmp, "init", "-q", "-b", "main", taker);
+for (const [f, t] of [["core-manifest.md", "# Core manifest\n"], [".codex/hooks.json", "{}\n"], [".kiro/hooks/work-saved.json", "{}\n"], ["scripts/work-saved.sh", "echo TAKER-RAN; echo TAKER-RAN >&2; exit 2\n"]]) {
+  fs.mkdirSync(path.dirname(path.join(taker, f)), { recursive: true }); fs.writeFileSync(path.join(taker, f), t);
+}
+git(taker, "add", "-A"); git(taker, "commit", "-q", "-m", "a project with scripts of its own"); git(taker, "update-ref", "refs/remotes/origin/main", "HEAD");
+const inTaker = cmd => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: taker, env: rest }); };
+ok(ownHooks.every(c => !/TAKER-RAN/.test(`${inTaker(c).stdout}${inTaker(c).stderr}`)), "the core's own Kiro and Codex hooks run nothing in a project, which holds a manifest, though its hook files stand");
+fs.rmSync(path.join(taker, "core-manifest.md"));
+ok(/TAKER-RAN/.test(inTaker(ownHooks[0]).stderr), "and without the manifest the same hook runs main's script: the test bites");
 for (const [name, to] of [["kiro-hook.json.tmpl", ".kiro/hooks/work-saved.json"], ["codex-hooks.json.tmpl", ".codex/hooks.json"]]) {
   fs.mkdirSync(path.dirname(path.join(project, to)), { recursive: true });
   fs.copyFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), path.join(project, to));
