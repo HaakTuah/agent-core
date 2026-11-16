@@ -169,7 +169,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167).
+     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167). A path filter
+     sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
+     that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
+     not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly

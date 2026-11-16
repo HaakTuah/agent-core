@@ -249,12 +249,59 @@ const outputsOf = file => {
 // Whether a trigger's `paths:` filter lets a change through, as GitHub's cheat sheet reads one: `*` (no slash), `**`
 // (any folders, none included, where `**/` begins it), `?` and `+` (zero or one, and one or more, of the character
 // before), `[...]`, `\` before a character taking it as itself, and `!` before a pattern taking out what it matches;
-// the last pattern a file matches decides, and the workflow starts where any changed file is let through.
+// the last pattern a file matches decides, and the workflow starts where any changed file is let through. A `?` or `+`
+// with nothing before it to repeat, and a `[` or `]` that closes no class, is taken as itself: every pattern is read.
 export function pathsLetThrough(patterns, changed) {
-  const re = glob => new RegExp(`^${glob.replace(/\\.|\*\*\/|\*\*|\*|\[[^\]]*\]|[.^${}()|\\]/g, t =>
-    t.length === 2 && t[0] === "\\" ? `\\${t[1]}` : t === "**/" ? "(?:.*/)?" : t === "**" ? ".*" : t === "*" ? "[^/]*" : t.startsWith("[") ? t : `\\${t}`)}$`);
-  const rules = patterns.map(p => (p.startsWith("!") ? [false, re(p.slice(1))] : [true, re(p)]));
-  return changed.some(f => rules.reduce((let_, [keep, r]) => (r.test(f) ? keep : let_), false));
+  const rules = patterns.map(p => (p.startsWith("!") ? [false, globItems(p.slice(1))] : [true, globItems(p)]));
+  return changed.some(f => rules.reduce((let_, [keep, items]) => (globMatches(items, f) ? keep : let_), false));
+}
+
+// A pattern as items, each one character's test with how often it may stand (`min` 0 or 1, `many`), or the folders
+// `**/` stands for; the matcher walks them over a name keeping every position it could have reached at once, so no
+// pattern makes it go back, and its work grows with the pattern's length times the name's, never more.
+function globItems(glob) {
+  const items = [];
+  const one = test => items.push({ test, min: 1, many: false, single: true });
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i], last = items[items.length - 1];
+    if (c === "\\" && i + 1 < glob.length) { const x = glob[++i]; one(ch => ch === x); }
+    else if (glob.startsWith("**/", i)) { items.push({ folders: true }); i += 2; }
+    else if (glob.startsWith("**", i)) { items.push({ test: () => true, min: 0, many: true }); i += 1; }
+    else if (c === "*") items.push({ test: ch => ch !== "/", min: 0, many: true });
+    else if (c === "[" && glob.indexOf("]", i + 2) > i) {
+      const end = glob.indexOf("]", i + 2), set = glob.slice(i + 1, end);
+      one(ch => [...set.matchAll(/(.)-(.)|(.)/gsu)].some(([, a, b, x]) => (x === undefined ? ch >= a && ch <= b : ch === x)));
+      i = end;
+    } else if ((c === "?" || c === "+") && last?.single) {
+      last.single = false;
+      if (c === "?") last.min = 0; else last.many = true;
+    } else one(ch => ch === c);
+  }
+  return items;
+}
+
+function globMatches(items, name) {
+  let at = new Set([0]);
+  for (const item of items) {
+    const next = new Set();
+    if (item.folders) {
+      let from = name.length;
+      for (const p of at) { next.add(p); if (p < from) from = p; }
+      for (let j = from; j < name.length; j++) if (name[j] === "/") next.add(j + 1);
+    } else {
+      for (const p of at) if (item.min === 0) next.add(p);
+      for (const p of [...at].sort((a, b) => a - b)) {
+        for (let j = p; j < name.length && item.test(name[j]); j++) {
+          if (next.has(j + 1) && item.many) break;
+          next.add(j + 1);
+          if (!item.many) break;
+        }
+      }
+    }
+    at = next;
+    if (!at.size) return false;
+  }
+  return at.has(name.length);
 }
 
 export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
