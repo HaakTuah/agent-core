@@ -453,7 +453,8 @@ is public, and so is every word of an issue, so a report holds only what the lig
 
 - **It says:** which rule, hook, check or script of the core (its file, and its section or line); the commit of the core
   the project holds; what happened; what was expected; and the kind of project, no closer than this: public or private,
-  the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer.
+  the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer. A bug names, where it is
+  known, the core's merged pull request that brought it in, on the form's last line, "Brought in by: #N".
 - **It never says:** anything of the project itself (its code, file names, logs, paths, what it does, who uses it, its
   company or its people; its name only if the project is public), anything secret, any person's name, or how to get
   past a check, a hook or a rule.
