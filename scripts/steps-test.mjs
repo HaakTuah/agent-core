@@ -469,8 +469,9 @@ ok(configs(flaky).copies === "config/b.json", "a reading that throws keeps nothi
 // (the review of eb6c597: every option of a wrapper passed, and a run behind one it cannot follow said not read; a
 // here-document's end found in one pass; a "((" with no "))" opens two subshells; a path spelled for Windows in a call or a slot not read)
 ok(copiesOf({ "a.yml": stepped("sudo -E -H node core/scripts/copies.mjs config/c.json") }) === "config/c.json"
-  && notRead("copies", { "a.yml": stepped("sudo -u bot node core/scripts/copies.mjs config/c.json") }) && notRead("copies", { "a.yml": stepped("bash -o pipefail -c 'node core/scripts/copies.mjs config/c.json'") }),
-  "every option of a wrapper is passed, and a run behind an option's value or a shell's option the reader cannot follow is not read");
+  && notRead("copies", { "a.yml": stepped("sudo -u bot node core/scripts/copies.mjs config/c.json") }) && copiesOf({ "a.yml": stepped("bash -o pipefail -c 'node core/scripts/copies.mjs config/c.json'") }) === "config/c.json"
+  && copiesOf({ "a.yml": stepped("pwsh -ExecutionPolicy Bypass -Command 'node core/scripts/copies.mjs config/c.json'") }) === "config/c.json",
+  "every option of a wrapper is passed, a shell's options with their values too, and a run behind a wrapper's option's value is not read");
 const opened = `${"cat <<EOF\n".repeat(20000)}node core/scripts/copies.mjs config/c.json`, started = Date.now();
 ok(copiesOf({ "a.yml": stepped(opened) }) === "config/c.json" && Date.now() - started < 1500, "here-documents with no end leave every line read, in one pass", `${Date.now() - started} ms`);
 ok(copiesOf({ "a.yml": stepped("((echo a) ; cat <<EOF)\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json", "a \"((\" with no \"))\" hides no here-document after it");
@@ -506,6 +507,12 @@ const companion = STEPS.find(s => s.lead === "12 November 2026, exact versions")
 let companionThrew = null;
 try { companion.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json\ncd tools && node scripts/exact-versions.mjs l.json") }, { "package-lock.json": "{}" })); } catch (e) { companionThrew = e; }
 ok(companionThrew instanceof Unread, "a companion run the reader cannot place is not read as the core's", String(companionThrew));
+// (the review of 9358ea5: a word that only holds the script's name is no run, an expression ends the reading, and
+// env's -S joined to its value is read)
+ok(["time echo \"node core/scripts/copies.mjs config/c.json\"", "nohup echo 'node core/scripts/copies.mjs x' > log", "sudo git commit -m 'run node core/scripts/copies.mjs x'",
+  "sudo chmod +x ${{ github.workspace }}/core/scripts/copies.mjs", "time echo ${{ github.workspace }}/core/scripts/copies.mjs"]
+  .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "a word that only holds the script's name, quoted or filled by an expression, is no run");
+ok(["env -S'node core/scripts/copies.mjs config/c.json'", "env --split-string='node core/scripts/copies.mjs config/c.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })), "env's -S joined to the commands it splits is read as giving them");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

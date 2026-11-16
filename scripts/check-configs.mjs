@@ -207,10 +207,12 @@ function pastWrappers(words) {
   }
   return i;
 }
-// The commands a shell at word `i` is given as one word, past its other options, as { inner }; {} where it is given none.
+// The commands a shell at word `i` is given as one word, past its other options and their values, as { inner }; {}
+// where it is given none.
 function inline(words, i) {
   let k = i + 1;
-  while (k < words.length && words[k].text.startsWith("-") && !INLINE.test(words[k].text)) k++;
+  // (an option's value, -o pipefail or -ExecutionPolicy Bypass, passed over with it)
+  while (k < words.length && !INLINE.test(words[k].text) && (words[k].text.startsWith("-") || words[k].text.startsWith("+") || words[k - 1].text.startsWith("-") || words[k - 1].text.startsWith("+"))) k++;
   return k + 1 < words.length && INLINE.test(words[k].text) ? { inner: words[k + 1].text, filled: words[k + 1].dynamic } : {};
 }
 // How each script picks its config from its arguments, as it reads them: the first that does not start with "--"; of
@@ -230,20 +232,26 @@ function configAfter(words, i, dir, script) {
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
 // Where a command the reader did not read as a run of the script still runs it with node past where the reader
-// stopped (timeout 60s node …, sudo -u bot node …), or, behind a wrapper or a shell, holds such a run in one word
-// (env -S '…'), a run that cannot be known (never one that is not there), as { unread, unsure }; else nothing.
-const unfollowed = (words, script, from) => {
-  const first = words.find(w => !/^\w+=/u.test(w.text) && !KEYWORDS.has(w.text));
-  const led = !!first && (WRAPPERS.has(first.text) || SHELL.test(first.text));
-  return hides(words, script, from, led) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : [];
+// stopped (timeout 60s node …, sudo -u bot node …), or gives env such a run to split (env -S '…'), a run that cannot
+// be known (never one that is not there), as { unread, unsure }; else nothing. A word that only holds the script's
+// name, quoted (echo "node core/scripts/…", git commit -m '…'), is no run.
+const unfollowed = (words, script, from) =>
+  (hides(words, script, from) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : []);
+// The commands env is given to split, after its -S (or --split-string), as one word or joined to the option.
+const SPLIT = /^(?:-S|--split-string)(?:=?)(.*)$/su;
+const splitBy = (words, j) => {
+  const at = SPLIT.exec(words[j].text);
+  if (!at || !words.slice(0, j).some(w => w.text === "env")) return null;
+  return at[1] || words[j + 1]?.text || null;
 };
-// Whether, past `from`, a node word is followed (past node's own options) by the copy's script, by its path, or, with
-// `deep`, a word holds such a run itself.
-function hides(words, script, from, deep) {
+// Whether, past `from`, a node word is followed (past node's own options) by the copy's script, by its path, or env
+// is given such a run to split (each a shorter text than the word that holds it, so the reading ends).
+function hides(words, script, from) {
   const names = w => !!w && slashed(w).replace(ROOT, "").replace(/^\.\//u, "") === script;
   return words.some((w, j) => {
     if (j <= from) return false;
-    if (deep && /\s/u.test(w.text) && w.text.includes(path.posix.basename(script))) return commands(w.text).some(inner => hides(inner, script, -1, true));
+    const split = splitBy(words, j);
+    if (split !== null) return commands(split).some(inner => hides(inner, script, -1));
     if (!NODE.test(w.text)) return false;
     let k = j + 1;
     for (; k < words.length && words[k].text.startsWith("-"); k++) if (VALUED.has(words[k].text)) k++;
