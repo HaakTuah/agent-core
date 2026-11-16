@@ -179,8 +179,13 @@ async function registry(p, get, nuget) {
   if (r.status !== 200) throw new Error(`it answered ${r.status}`);
   return nugetFacts(r.json, async (item) => {
     if (Array.isArray(item?.items)) return item.items;
-    if (typeof item?.["@id"] !== "string" || !item["@id"].startsWith(NUGET)) throw new Error("a page of its versions lies outside the registry");
-    const page = await get(item["@id"]);
+    // (a page's address is built here from the bounds the index gives, and the index must name that same page: no
+    // address an answer gives is fetched, floor rule 5)
+    const bound = (v) => (typeof v === "string" && /^[0-9A-Za-z.+-]{1,100}$/u.test(v) ? v.toLowerCase() : null);
+    const lower = bound(item?.lower), upper = bound(item?.upper);
+    const at = lower && upper ? `${NUGET}${encodeURIComponent(p.name.toLowerCase())}/page/${lower}/${upper}.json` : null;
+    if (!at || String(item?.["@id"]).toLowerCase() !== at) throw new Error("a page of its versions lies outside the registry, or is named in a form it does not know");
+    const page = await get(at);
     if (page.status !== 200 || !Array.isArray(page.json?.items)) throw new Error(`a page of its versions answered ${page.status}`);
     return page.json.items;
   });

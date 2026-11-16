@@ -30,7 +30,7 @@ const answers = {
   "https://api.github.com/repos/invented-org/tidy-moss-format": { status: 200, json: { archived: true } },
   "https://raw.githubusercontent.com/invented-org/tidy-moss-format/HEAD/package.json": { status: 200, json: { name: "tidy-moss-format" } },
   "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.core/index.json": { status: 200, json: { items: [
-    { "@id": "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.core/page/0.1.0/1.0.0.json" },
+    { "@id": "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.core/page/0.1.0/1.0.0.json", lower: "0.1.0", upper: "1.0.0" },
     { items: [{ catalogEntry: { version: "2.0.0", published: ago(20), authors: "Invented Authors", projectUrl: "https://github.com/invented-org/moss-core" } }] },
   ] } },
   "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.core/page/0.1.0/1.0.0.json": { status: 200, json: { items: [
@@ -38,7 +38,7 @@ const answers = {
     { catalogEntry: { version: "1.0.0", published: ago(500) } },
   ] } },
   "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.young/index.json": { status: 200, json: { items: [{ items: [{ catalogEntry: { version: "1.0.0", published: ago(40) } }] }] } },
-  "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.astray/index.json": { status: 200, json: { items: [{ "@id": "https://elsewhere.invalid/page.json" }] } },
+  "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.astray/index.json": { status: 200, json: { items: [{ "@id": "https://elsewhere.invalid/page.json", lower: "1.0.0", upper: "2.0.0" }] } },
   "https://api.github.com/repos/invented-org/moss-core": { status: 200, json: { archived: false } },
 };
 const asked = [];

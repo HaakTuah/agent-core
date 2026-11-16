@@ -185,8 +185,16 @@ if (process.platform !== "win32") {
   const line = r.reports[0] ?? "";
   ok(r.failures.length === 0 && !/[\r\n]/u.test(line) && !line.includes("::error::y%0A") && line.length < 700, `lookup: a publisher's name is printed cut short, on one line, with nothing GitHub reads as a command (${line.slice(0, 120)})`);
   ok(asked.includes("https://raw.githubusercontent.com/evil-org/moss/HEAD/package.json") && line.includes("archived or not: GitHub did not answer") && line.includes("not naming the package back"), "lookup: a folder that leads up is not fetched, and GitHub's answers of another shape say nothing");
-  const astray = await lookUp([{ ...pkg, name: "Hostile.Moss" }], { get: async () => ({ status: 200, json: { items: [{ "@id": "https://api.nuget.org.evil.invalid/page.json" }] } }), now, nuget: true });
-  ok(astray.failures.length === 1 && /outside the registry/u.test(astray.failures[0]), "lookup: a page of NuGet's versions placed outside its registry is not fetched");
+  const pages = [{ "@id": "https://api.nuget.org.evil.invalid/page.json", lower: "1.0.0", upper: "2.0.0" },
+    { "@id": "https://api.nuget.org/v3/registration5-gz-semver2/hostile.moss/page/1.0.0/../../../../evil.json", lower: "1.0.0", upper: "../../evil" },
+    { "@id": "https://api.nuget.org/v3/registration5-gz-semver2/hostile.moss/page/1.0.0/2.0.0.json", lower: "1.0.0", upper: ["2.0.0"] }];
+  for (const item of pages) {
+    asked.length = 0;
+    const astray = await lookUp([{ ...pkg, name: "Hostile.Moss" }], { get: async (url) => { asked.push(url); return { status: 200, json: { items: [item] } }; }, now, nuget: true });
+    ok(astray.failures.length === 1 && /outside the registry/u.test(astray.failures[0]) && asked.length === 1, `lookup: a page of NuGet's versions an answer places elsewhere, or names in another form, is not fetched (${item["@id"]})`);
+  }
+  const future = await lookUp([pkg], { get: answer({ ...doc, time: { created: "9999-01-01T00:00:00Z" } }), now });
+  ok(future.failures.length === 1 && /under the 90 days/u.test(future.failures[0]), "lookup: a first date in the future is no age that passes");
 }
 
 console.log(failed ? `${failed} failing` : "ok   every hostile thing a package brings is refused");
