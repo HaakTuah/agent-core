@@ -13,7 +13,10 @@ import { CORE } from "./core-address.mjs";
 import { carriedAt, corePath, floorCopyIn, hookCommands, readCore } from "./core-path.mjs";
 import { mended } from "./mend.mjs";
 import { pathIn } from "./reading.mjs";
+import { runWorkflow } from "./workflow-run.mjs";
 
+// (each required input a workflow takes, given a plain value: only its first steps run here)
+const inputsOf = text => Object.fromEntries([...String(/workflow_call:\n\s+inputs:\n([\s\S]*?)\n(?:\s{0,4}\S|$)/u.exec(text)?.[1] ?? "").matchAll(/^ {6}([\w-]+):\n((?: {8}.*\n?)*)/gmu)].filter(m => /required: true/u.test(m[2])).map(m => [m[1], "x"]));
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 const A = "a".repeat(40);
@@ -109,6 +112,41 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);
   ok(/^STOP: the floor cannot be read at lib\/core\/floor\/security\.md.*Mend: /m.test(said) && !/hook of main's pin ran/.test(said), "where the submodule is not checked out, the start stops the session, saying the mend", said);
+}
+
+// The first step of each workflow a project calls that runs the core's scripts: where the core's copy stands, read from
+// the manifest; a submodule that carries it fetched, or a failure that says the mend where it cannot be
+{
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(k))),
+    GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (cwd, ...args) => execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  let k = 0;
+  const projectWith = (manifest, submodule = false) => {
+    const dir = path.join(tmp, `calls-${++k}`);
+    git(tmp, "init", "-q", "-b", "main", dir);
+    fs.writeFileSync(path.join(dir, "core-manifest.md"), manifest);
+    if (submodule) {
+      fs.mkdirSync(path.join(dir, "lib"));
+      fs.writeFileSync(path.join(dir, ".gitmodules"), `[submodule "lib"]\n\tpath = lib\n\turl = ${path.join(tmp, "no-such-library").replace(/\\/g, "/")}\n`);
+      git(dir, "update-index", "--add", "--cacheinfo", `160000,${A},lib`);
+    }
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "a project");
+    return dir;
+  };
+  const github = { event_name: "pull_request", repository: "someone/project", base_ref: "main", event: { repository: { default_branch: "main", private: false }, pull_request: { number: 1, base: { sha: "" } } } };
+  const usual = projectWith(copied()), unfetched = projectWith(carried(), true);
+  const workflows = fileURLToPath(new URL("../.github/workflows/", import.meta.url));
+  for (const f of ["copies.yml", "core-moved.yml", "licences.yml", "look.yml", "pr-description.yml", "signatures.yml", "versions.yml"]) {
+    const text = fs.readFileSync(path.join(workflows, f), "utf8");
+    // (the daily look's jobs run on a schedule alone)
+    const on = /schedule/.test(/^ {4}if: .*$/mu.exec(text)?.[0] ?? "") ? { ...github, event_name: "schedule" } : github;
+    const job = dir => runWorkflow(text, { inputs: inputsOf(text), github: on, base: env, temp: tmp, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, until: "core-at" })[0];
+    const ran = job(usual), stopped = job(unfetched);
+    const step = r => r.steps.find(x => /Where the core's copy stands/.test(x.name)) ?? { passed: false, out: "no such step" };
+    ok(step(ran).passed, `${f}: its first step reads core/ from a project in one repository`, step(ran).out);
+    ok(!step(stopped).passed && mended(step(stopped).out) && /the library lib, a submodule that carries the core, could not be fetched here/.test(step(stopped).out), `${f}: where the submodule that carries the core cannot be fetched, it fails, saying the mend`, step(stopped).out);
+  }
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on where the core's copy stands`);
