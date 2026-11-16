@@ -32,6 +32,7 @@ wanted").
 | #376 | rule builder | #375, which changes the same files |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
+| #469 | rule builder; it changes what every role reads at its start | |
 | #350 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
