@@ -189,7 +189,7 @@ if (from) {
     const lost = (kind, before, now) => { const keep = new Set(ls(now)); return ls(before).filter(f => !keep.has(f)).map(f => `${f} (${kind})`); };
     // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
     let wasRules = [];
-    if (was.proseFromSecurity === true) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }, d => { try { return git(["ls-tree", "-r", "--name-only", "-z", from, "--", d]).split("\0").filter(Boolean); } catch { return []; } }); } catch { /* the base read none */ }
+    if (was.proseFromSecurity === true) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }); } catch { /* the base read none */ }
     const less = lost("code", specs(was.code), CODE_SPECS).concat(lost("prose", specs(was.prose).concat(wasRules), proseSpecs));
     if (less.length) fail(`${CONFIG_AT} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
   }

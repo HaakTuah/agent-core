@@ -49,17 +49,24 @@ const codex = kit("codex-hooks.json.tmpl").hooks, codexOf = event => codex[event
 fs.mkdirSync(path.join(project, "sub"), { recursive: true });
 const nested = path.join(project, "sub", "other");
 git(tmp, "init", "-q", "-b", "main", nested);
-const inNested = (cmd) => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: nested, env: rest }); };
-r = inNested(kit("kiro-hook.json.tmpl").hooks[0].action.command);
-ok(r.status === 0 && !r.stderr && !r.stdout, "in a repository that holds no such hook file, as one cloned inside the project, Kiro's hook runs nothing", `${r.status} ${r.stderr}`);
+fs.mkdirSync(path.join(nested, "core", "scripts"), { recursive: true });
+fs.writeFileSync(path.join(nested, "core", "scripts", "work-saved.sh"), "echo NESTED-RAN; echo NESTED-RAN >&2; exit 2\n");
+git(nested, "add", "-A"); git(nested, "commit", "-q", "-m", "a script of another repository's"); git(nested, "update-ref", "refs/remotes/origin/main", "HEAD");
+const inNested = cmd => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: nested, env: rest }); };
+const kitHooks = [kiroStop, codexOf("SessionStart"), codexOf("Stop")];
+ok(kitHooks.every(c => { const x = inNested(c); return x.status === 0 && !/NESTED-RAN/.test(`${x.stdout}${x.stderr}`); }),
+  "in a repository that holds no such hook file, as one cloned inside the project, neither Kiro's hook nor Codex's two runs its script");
+const unguarded = kiroStop.replace('[ -f "$r/.kiro/hooks/work-saved.json" ] || exit 0; ', "");
+ok(unguarded !== kiroStop && /NESTED-RAN/.test(inNested(unguarded).stderr), "and without the guard, the same hook would have run it: the test bites");
 fs.rmSync(nested, { recursive: true, force: true });
 for (const [name, to] of [["kiro-hook.json.tmpl", ".kiro/hooks/work-saved.json"], ["codex-hooks.json.tmpl", ".codex/hooks.json"]]) {
   fs.mkdirSync(path.dirname(path.join(project, to)), { recursive: true });
   fs.copyFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), path.join(project, to));
 }
+git(project, "add", ".kiro", ".codex"); git(project, "commit", "-q", "-m", "the kit's hooks for Kiro and Codex"); git(project, "push", "-q");
 const other = (cmd, input = "{}") => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input, encoding: "utf8", cwd: path.join(project, "sub"), env: rest }); };
 r = other(kiroStop);
-ok(r.status === 2 && /not committed/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
+ok(r.status === 2 && /1 file\(s\) not committed, such as note\.txt/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
 r = other(codexOf("Stop"), '{"stop_hook_active": true}');
 ok(r.status === 0, "Codex's stop hook lets a second stop in a row through", `${r.status} ${r.stderr}`);
 r = other(codexOf("SessionStart"));
