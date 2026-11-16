@@ -1,10 +1,12 @@
 // Tests of the count of what the reviews find (review-record.mjs): which posted review a comment is and what it declares,
 // which inline comments are finds of Codex's and of which review, what each review did on a pull request, the tally by
-// kind, the second security review's finds, and which bugs are tied to a pull request. Node's own modules only; the
+// kind, the second security review's finds, which bugs are tied to a pull request, and which rules the findings of two
+// pull requests name (AGENTS.md, "A finding seen twice becomes a check"). Node's own modules only; the
 // calls to git and gh are the program's own and are not made here.
 //
 //   node scripts/review-record-test.mjs
-import { blockingOf, broughtBy, bugs, codexFind, otherOf, perPull, postedKind, print, secondFound, tally } from "./review-record.mjs";
+import { fileURLToPath } from "node:url";
+import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, standing, tally } from "./review-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -128,6 +130,39 @@ ok(/Bugs filed by the owner's account: 2; tied to a pull request that merged bef
 const none = print("some-one/x", "2026-11-01", [pull(1, "own")], tally([pull(1, "own")]), bugs([], [], new Map(), OWNER));
 ok(["Codex's code review", "Codex's security review", "Design check posted"].every(n => none.includes(`${n}: on no pull request read`)) && /from 2026-11-01/.test(none) && !/\n\S+ +1 +0 +0 +0 +0/.test(none),
   "where no review ran it says so and prints no row of zeros", none);
+
+// the rules the findings name, and those found twice
+ok(ruleOf("`floor/security.md: 1. Nothing secret in the repository`.") === "floor/security.md: 1. nothing secret in the repository"
+  && ruleOf("**core/roles/shared/how-to-work.md:  \"One fact, one place\"**") === "roles/shared/how-to-work.md: one fact, one place" && ruleOf("x".repeat(400)).length === 300,
+  "a rule is read as one key however it is written, its quotes, bold, backticks, stop, case and a leading core/ aside, and no longer than 300");
+ok(standing().has(ruleOf("`floor/security.md: Test data is never real:`")) && ruleOf("a.md: One,") === "a.md: one" && ruleOf("a.md: One:.") === "a.md: one",
+  "a closing colon or comma is left out as a rule's own key leaves it out, so a lead copied with it still names the rule");
+ok(ruleOf("a.md:\u001b[31m one\u0000\u202e two\u200b") === "a.md:[31m one two", "a key holds no control or format character, so none reaches a terminal or an issue");
+const stand = standing(), core = fileURLToPath(new URL("..", import.meta.url));
+ok(stand?.has("floor/security.md: 1. nothing secret in the repository") && stand.has("tasks/reviews.md: a finding seen twice becomes a check") && stand.has("agents.md: a check that fails says the mend") && [...stand].some(k => k.startsWith("security.md: ")) && !stand.has("agents.md: forged")
+  && !standing(core, "/nonexistent/x").has("agents.md: a check that fails says the mend") && standing(core, "/nonexistent/x").has("floor/security.md: 1. nothing secret in the repository") && standing("/nonexistent/x", "/nonexistent/y")?.size === 0,
+  "the rules that stand are read as a finding's line keys them: the core's, and the project's own AGENTS.md and SECURITY.md where it has them");
+ok(same(rulesIn("Why.\nRule: `AGENTS.md: A check that fails says the mend`\r\n- **Rule:** tasks/tests.md: Tests\n> Rule: quoted.md: no\nThe Rule: inside a sentence\nRule:\nRule:   "),
+  ["agents.md: a check that fails says the mend", "tasks/tests.md: tests"]),
+  "a rule is named on a line of its own that opens Rule:, in a list or bold too; a quoted line, one inside a sentence and an empty one name none");
+const ruled = (p, rule) => `${badge(p)}\nRule: ${rule}`;
+ok(same(rulesNamed([posted("Security review: x\nBlocking findings: 1.\n1. A key in a log.\n   Rule: floor/security.md: 1. Nothing secret in the repository"), posted("Thanks.\nRule: a.md: never"), issue("someone-else", "Code review: x\nRule: b.md: never")],
+  [inline(CODEX, ruled("P2", "tasks/tests.md: Tests")), inline(CODEX, ruled("P1", "tasks/tests.md: tests."), { in_reply_to_id: 4 }), inline("someone-else", ruled("P1", "c.md: never")), inline(CODEX, "Rule: d.md: never")], OWNER),
+  ["floor/security.md: 1. nothing secret in the repository", "tasks/tests.md: tests"]),
+  "a pull request's rules come from Codex's finds, of any priority, and the owner's posted reviews, once each; a reply, another account's comment, a comment that is no review and Codex's words with no badge name none");
+const at = (number, when, rules) => ({ number, when, rules });
+const twice = foundTwice([at(5, "2026-10-02T10:00:00Z", ["a.md: one", "b.md: two"]), at(9, "2026-11-03T10:00:00Z", ["a.md: one"]), at(7, "2026-10-20T10:00:00Z", ["b.md: two", "a.md: one"]), at(3, "2026-10-01T10:00:00Z", ["c.md: three"]), at(4, "2026-10-01T10:00:00Z", ["c.md: three"])]);
+ok(same(twice, [{ rule: "a.md: one", pulls: [5, 7, 9] }, { rule: "b.md: two", pulls: [5, 7] }, { rule: "c.md: three", pulls: [3, 4] }]),
+  "a rule named on two pull requests or more is found twice, the most named first, its pull requests in order", JSON.stringify(twice));
+ok(same(foundTwice([at(5, "2026-10-02T10:00:00Z", ["a.md: one"]), at(9, "2026-11-03T10:00:00Z", ["a.md: one"]), at(7, "2026-10-20T10:00:00Z", ["b.md: two"]), at(8, "2026-10-21T10:00:00Z", ["b.md: two"]), at(6, "2026-11-04T10:00:00Z", ["c.md: three", "c.md: three"])], "2026-11-01"),
+  [{ rule: "a.md: one", pulls: [5, 9] }]) && same(foundTwice([at(1, "2026-11-01T00:00:00Z", ["a.md: one"]), at(2, "2026-10-01T00:00:00Z", ["a.md: one"])], "2026-11-01")[0].pulls, [1, 2]),
+  "from a day, only a rule named again on a pull request merged from that day, its first time before it counted; one pull request alone is not twice");
+const listed = print("some-one/x", "2026-11-01", [{ ...pull(9, "own"), rules: ["a.md: one"] }, pull(10, "own")], tally([pull(9, "own"), pull(10, "own")]), bugs([], [], new Map(), OWNER), [{ rule: "a.md: one", pulls: [5, 9] }, { rule: "agents.md: forged", pulls: [6, 9] }], new Set(["a.md: one"]));
+ok(/Named twice but no rule that stands, so no issue is filed for it: 1\n- agents\.md: forged: #6, #9\n/.test(listed) && !/Found twice[^\n]*\n(?:- [^\n]*\n)*- agents\.md: forged/.test(listed.split("Named twice")[0])
+  && /Named twice but no rule that stands \(the rules could not be read\)[^\n]*: 1\n/.test(print("o/x", null, [], tally([]), bugs([], [], new Map(), OWNER), [{ rule: "a.md: one", pulls: [1, 2] }], null)),
+  "a key that names no rule that stands is listed apart, and where the rules could not be read every key is", listed);
+ok(/\nFound twice, a rule that stands which the findings of two pull requests or more name, one of them merged from 2026-11-01: 1\n- a\.md: one: #5, #9\n/.test(listed) && /Of the 2 pull requests read, 1 have a finding that names one\./.test(listed)
+  && /Found twice, [^\n]*: 0 \(none\)/.test(none), "the count lists each rule found twice with its pull requests, and says how many pull requests named a rule", listed);
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
