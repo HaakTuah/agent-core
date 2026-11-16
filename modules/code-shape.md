@@ -1,7 +1,8 @@
 # How code is put together
 
 Read when a system is designed, added or named, when code is ported or rewritten (core archive 226), and when a pull
-request deletes a test or weakens one (#253). How what already stands is brought to it: `modules/cleaning.md`.
+request deletes a test or weakens one (#253). How what already stands is brought to it: `modules/cleaning.md`. What the
+tests cost, their time marks among it: `modules/tests.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
 its systems, and the marks below, in the config of its *shape check* (`core/scripts/shape.mjs`), which runs on every
@@ -60,12 +61,6 @@ one declared entrance.
   piece, so the checks read what depends on what and the audit's reader judges what no number shows. Reason: on 15
   November 2026 three codebases held 19, 54 and 79 functions with more than 30 branch points, the worst in the files
   changed most. Held by the shape check.
-- **The tests have a time mark.** By default each suite a project names in the config's "suites" has a mark in
-  seconds, set with room above what it takes today so that a slow runner fails nothing, and is started through the
-  check (`--suite`), which fails one that passes and took longer. Each system's tests can be started alone. The
-  builder whose change takes a suite past its mark makes it faster or splits it. It does not mean that a long
-  measurement joins a suite, nor that a suite's own failure is the mark's. Reason: every session waits on the tests.
-  Held by the shape check and the audit's fifth question.
 - **A port or a rewrite states what it keeps.** By default a change that moves code proves behaviour unchanged. A port,
   or a part that is rewritten, states in its pull request what it keeps and what it is free to change. What it keeps
   is what the program owes: its rules, what it saves, what its users see. How the old code got there is not owed: the

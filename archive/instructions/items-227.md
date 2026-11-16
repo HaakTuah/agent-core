@@ -1,4 +1,4 @@
-# The owner's words behind the core: items 227 onward
+# The owner's words behind the core: items 227 to 234
 
 How they are kept, and where each item lives: `archive/instructions.md`.
 
@@ -233,3 +233,43 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      is said" in `modules/code-shape.md`, the two lines on them in `modules/review-guidelines.md`, the tests' whole run
      in `modules/cleaning.md`, `scripts/strength.mjs` and the core's own tool `scripts/mutate.mjs`, and the slot
      *mutation tool*.
+
+234. **15 November 2026** (every project with tests, the core among them; in a chat with a session the owner works
+     with, not the design session, as that session recorded it on issue #275, labelled `by:chat`, under "What it is",
+     saying the owner agreed to it). The session set out how the tests would earn their time: each measured (its time,
+     when it last failed for a real reason, what it alone catches of the faults put in on purpose, how often it fails
+     for no reason), a script keeping the numbers and the audit's report showing them; a pull request running the
+     tests its changed files can reach, with new tests and those that failed last time, and saying what it ran, the
+     whole suite running where it already ran, so that no job is added, and a fault the whole suite finds that the
+     selection skipped mended in the map at once; the tests a project names as its proof that behaviour was kept never
+     selected out, their names in a slot; a test keeping its place by one of three (it alone catches a fault, it guards
+     a rule the project states, it has failed for a real reason), any other proposed for removal or merging by a
+     script and decided by a reader, never by coverage alone, in small pull requests that leave the tests' strength no
+     worse; the suite's time and each part's a measure with a baseline that may not get worse, the codebase's state
+     setting how fast they come down; a test that fails for no reason mended or removed, never retried in silence; a
+     new test saying what rule or fault it guards and setting up only what it needs; and, reaching a project, reported
+     first, the selection a step of the release with its check and its mend, nothing stopping a project and nothing
+     asked of its owner. The owner had asked:
+
+     > It seems my tests are way out of whack. How will they be made optimal, to only test what absolutely gives
+     > value and then never grow into monsters again? […] So the tests are maybe some of the biggest bottlenecks on
+     > development right now
+
+     and agreed to those seven points. The same day, having watched a suite of a desktop program open the program's
+     window for test after test, the owner asked whether the core says clearly:
+
+     > Test everything without such things first? Only add if it has to for utility?
+
+     The session answered that the core implies it in three places and states it in none, and set out an eighth point:
+     a test opens a screen, a window or a device only where that is what it guards, everything else tested beneath it,
+     and the share of a suite's tests that open one counted, with the time they take, as a measure with a baseline,
+     those that stand listed and worked down, none turning a check red. The owner agreed to it. To the orchestrator,
+     passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `modules/tests.md` but its last two rules, the line on it in "The smallest setup that tests the rule" in
+     `modules/how-to-work.md`, the audit's record in `modules/cleaning.md`, `scripts/select.mjs`,
+     `scripts/test-record.mjs`, the shape check's count of the tests that open a screen and the selection's lists in
+     its config, and `scripts/mutate.mjs --every`.

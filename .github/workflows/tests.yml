@@ -12,7 +12,7 @@
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
 # The suites together, each of their three parts on Windows, and the upgrade test, are each held to a time mark (the
-# "suites" of .github/shape.json, by scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
+# "suites" of .github/shape.json, by scripts/shape.mjs; modules/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
 # says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; modules/tests.md,
 # "A pull request runs the tests its change can reach"); the checks of the core itself, each a step of its own after

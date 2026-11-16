@@ -21,7 +21,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
+  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md` and `cleaning.md`; for a
   project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
 - **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
   stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
@@ -147,7 +147,14 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
      has written its baseline, beside the shape check's, a fault that survives there unlisted fails
      (`modules/code-shape.md`). `mutate.mjs` is the core's own tool, for code run by Node with tests that are files
-     run by `node`.
+     run by `node`, which with `--every` names each test that catches a fault.
+   - **What the tests cost** (`modules/tests.md`): `select.mjs`, a step of the same job before the tests, with
+     `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
+     selected out, and the whole suite where a changed file's reach cannot be told or no base is told; the job runs
+     those it names. At the audit, `test-record.mjs` reads each test's time, its failures and what it alone catches;
+     each month the state report gives what a push waits on (`wait.mjs`) beside its mark. The shape check counts the
+     tests that open a screen, holds the suites' and a push's time marks, and reads the selection's lists from its
+     config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
@@ -177,7 +184,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167). A path filter
+     pin moved (`modules/tests.md`, "A pull request runs the tests its change can reach"; core archive 167). A path filter
      sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
      that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
      not).
@@ -314,7 +321,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
 | *copies check* | the check that fails a new copy, and its config for `scripts/copies.mjs` |
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` |
-| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`modules/code-shape.md`); left out, `checks/shape.json`, which the starter kit writes |
+| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`modules/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`modules/tests.md`); left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`modules/cleaning.md`; `scripts/dose.mjs` reads it); left out, the state read from the shape check's baseline |
 | *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`modules/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`modules/cleaning.md`); left out, `docs/audits/` |

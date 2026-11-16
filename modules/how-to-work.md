@@ -44,7 +44,7 @@ and 57).
 - **A project's own rules add to the core's** (core archive 161): one that replaces a module's yields unless its
   manifest lists it under "Differences", on its owner's word; never against the floor, who reviews or merges, or the
   review guidelines.
-- **The smallest setup that tests the rule** (core archive 12): each test sets up only what it needs, and runs only
-  where a change can affect it (core archive 9); long measurements run outside the suite and CI.
+- **The smallest setup that tests the rule** (core archive 12): each test sets up only what it needs; what the tests
+  cost and when they run: `modules/tests.md`.
 - **Rule files state rules,** briefly, with at most a pointer to the archive (core archive 74); a new rule replaces text
   rather than adding to it.
