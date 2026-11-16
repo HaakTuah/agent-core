@@ -275,7 +275,7 @@ ok(due({ at: "2026-12-02T00:00:00Z", record: { runs: [] }, root: s.core }).lengt
 ok(due({ at: "2026-12-02T00:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core }).length === 0, "none is due in the month of its run, its rules unchanged");
 ok(due({ at: "2027-01-01T05:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core }).every(d => /no run in 2027-01/.test(d.why)), "each is due again in the next month");
 const changedRule = { runs: [run("2026-12-01")] };
-changedRule.runs[0].cases.stop.rules = { "modules/work-flow.md: The owner's stop switch": "000000000000" };
+changedRule.runs[0].cases.stop.rules = { "roles/shared/work-flow.md: The owner's stop switch": "000000000000" };
 const d1 = due({ at: "2026-12-02T00:00:00Z", record: changedRule, root: s.core });
 ok(d1.length === 1 && d1[0].name === "stop" && /changed since its last run/.test(d1[0].why), "a case whose rule changed since its run is due again at once", JSON.stringify(d1));
 ok(dueIssue({ manifest: "# Core manifest", at: "2026-12-02T00:00:00Z" }) === null, "in a project nothing is due");
@@ -292,7 +292,7 @@ ok(forRelease(null).held && /Mend: /.test(forRelease(null).held) && forRelease({
   "a record in the commit that cannot be read, or a run in no form the gate reads, holds the release, saying the mend");
 ok(gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", true, "stop")] }).failing.some(f => f.name === "stop"), "a passing verdict found wrong counts as failing");
 
-// ---- tool by tool (modules/tools.md, "Proven by the staged cases, tool by tool") ----
+// ---- tool by tool (tasks/tools.md, "Proven by the staged cases, tool by tool") ----
 const inTool = (r, tool) => ({ ...r, tool });
 const kiro = [run("2026-12-01"), inTool(run("2026-12-03", ["stop"]), "Kiro")];
 let t = tools({ runs: kiro });

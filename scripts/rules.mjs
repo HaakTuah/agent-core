@@ -1,5 +1,5 @@
 // The rules of the floor and the modules, as a machine reads them (AGENTS.md, "Every rule says what holds it"; #235,
-// part D): each paragraph or item of a list in floor/*.md and modules/*.md whose text opens with a bold lead is a rule,
+// part D): each paragraph or item of a list in the floor's files, the roles' and the modules' whose text opens with a bold lead is a rule,
 // named by its file and that lead ("floor/security.md: 1. Nothing secret in the repository"). Its text runs to the next
 // rule at its own depth or above, a heading, or a line that leaves its item, so an item's own items are part of it as
 // well as rules of their own. What holds each is named in holders.json, beside this file (holders.mjs); a staged case
@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const FOLDERS = ["floor", "modules", "roles"];
+export const FOLDERS = ["floor", "floor/topics", "roles", "roles/shared", "tasks", "tools"];
 
 // A line that opens a rule: its depth (the spaces before its marker, or -1 for a paragraph) and its lead.
 const OPENS = /^( *)(?:(?:[-*]|\d+\.) +)?\*\*(.+?)\*\*/u;
@@ -71,7 +71,7 @@ export function rules(root = ROOT, { agents = false } = {}) {
 export function rulesAt(root, commit, { agents = false } = {}) {
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "pipe"] });
   const files = git("ls-tree", "-r", "--name-only", "--end-of-options", commit, "--", ...FOLDERS).split("\n")
-    .filter(f => /^(?:floor|modules|roles)\/[^/]+\.md$/u.test(f)).sort();
+    .filter(f => FOLDERS.includes(path.posix.dirname(f)) && f.endsWith(".md")).sort();
   if (agents && git("ls-tree", "--name-only", "--end-of-options", commit, "--", "AGENTS.md").trim()) files.unshift("AGENTS.md");
   return files.flatMap(f => rulesOf(f, git("show", `${commit}:${f}`)));
 }

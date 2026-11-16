@@ -32,3 +32,5 @@ Whether the work went on, and by which reading.
 The kinds of task it is, each in backticks (`node scripts/reading.mjs --kinds` lists them), or a module by its path. Left empty, the builder's start reading and what its changed paths call for.
 
 Found while: for an agent, the role and the task it was on, as "fixing #241 (a builder session)"; a person leaves this line out.
+
+Brought in by: the merged pull request whose change brought the bug in, as "#N" and nothing after it on the line; left out where it is not known, and said so later in a comment once it is.

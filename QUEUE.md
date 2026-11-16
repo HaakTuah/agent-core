@@ -17,27 +17,21 @@ wanted").
 | #256 | rule builder | |
 | #252 | rule builder | |
 | #296 | builder | |
-| #250 | rule builder | |
-| #275 | rule builder | |
-| #321 | rule builder | #275, or built with it |
 | #285 | rule builder | |
-| #286 | rule builder | |
-| #299 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
-| #304 | rule builder, on Fable at high for this batch (its note of 15 November) | |
-| #305 | rule builder | #304 |
-| #322 | rule builder | #304 and #305 |
-| #306 | rule builder | #304 |
+| #305 | rule builder | |
+| #322 | rule builder | #305 |
+| #306 | rule builder | |
 | #307 | rule builder | |
-| #308 | rule builder | #304 |
-| #309 | rule builder | #304 |
-| #318 | rule builder | #304 |
+| #308 | rule builder | |
+| #309 | rule builder | |
+| #318 | rule builder | |
 | #310 | rule builder | #256 and #285 |
 | #311 | rule builder | #286 |
 | #325 | rule builder | #256, #305, #311 and #322 |
 | #359 | rule builder | |
-| #314 | rule builder | #304 |
+| #314 | rule builder | |
 | #375 | rule builder | |
 | #376 | rule builder | #375, which changes the same files |
 | #361 | rule builder, points 1 and 2 only | |

@@ -1,4 +1,4 @@
-// The stalled lanes (modules/orchestrating.md, "A stalled lane"; core archive 200): run in a project's clone on every
+// The stalled lanes (roles/orchestrator.md, "A stalled lane"; core archive 200): run in a project's clone on every
 // wake of its orchestrator, it reads the repository's open pull requests (gh, page by page) and the time of each one's
 // newest commit, and prints those whose branch has had no push for longer than the given hours (HOURS unless --hours
 // says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock. Pull requests

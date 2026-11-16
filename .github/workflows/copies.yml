@@ -1,4 +1,4 @@
-# The copies check ("One fact, one place" in the core's modules/how-to-work.md), for every project that takes the core:
+# The copies check ("One fact, one place" in the core's roles/shared/how-to-work.md), for every project that takes the core:
 # a new copy of code, or of the rule files' prose, fails; the old ones its baseline lists are removed over time, and
 # against the branch a PR merges into the baseline may only shrink. With it, the pointer check (every pointer in the
 # rule files leads somewhere) and the reading-size check (the files every session reads keep to their marks, and a file
@@ -6,9 +6,9 @@
 # config: the workflow check (floor rule 2: no workflow names the trigger it forbids; nor gives a key twice in one
 # mapping, which GitHub refuses, what the base already held noted and passed), the entry-files check (each
 # agent tool's entry file pulls in what AGENTS.md names, what the base already lacked noted and passed:
-# modules/tools.md), and the manifest check, which
+# tasks/tools.md), and the manifest check, which
 # reports and never fails (every module the manifest's list neither takes nor leaves out, every slot a taken module uses
-# that no row fills); and the shape check (the core's modules/code-shape.md: nothing new of a function past a mark, an
+# that no row fills); and the shape check (the core's tasks/code-shape.md: nothing new of a function past a mark, an
 # import across a boundary nobody declared, a cycle or a tie to one platform, what stood before listed in a baseline
 # that only shrinks), which holds a project that has not written its config yet to the starter kit's own, with the
 # pull request's base as its baseline. A project calls it (workflow_call) on every pull request and push to main, docs-only changes
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false # nothing after the checkout needs the token
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The base branch's latest commit, for its baseline and marks (not the whole history)
         if: github.event_name == 'pull_request'
         env:

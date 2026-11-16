@@ -1,7 +1,7 @@
 # The daily job of a project that takes the core: once a day, the core-moved check (core/scripts/core-moved.mjs: one
 # issue open while the core is past the project's copy, as core-moved.yml says) and then the scheduled look
 # (core/scripts/look.mjs: the issues it keeps of what has stopped, what is due and what is overdue, and once a month the
-# state report; modules/orchestrating.md, "The scheduled look"). One job, so a project gains no billed minute over the
+# state report; roles/orchestrator.md, "The scheduled look"). One job, so a project gains no billed minute over the
 # core-moved job it ran before. A project calls it (workflow_call) from a daily schedule of its own (it runs on a
 # schedule or when started by hand, and on no other event), pinned to a full commit SHA, from a job that grants
 # `contents: read`, `issues: write`, `pull-requests: read`, `checks: read` and `statuses: read`, as the starter kit's
@@ -38,7 +38,7 @@ jobs:
           persist-credentials: false # gh below takes its token from GH_TOKEN, nothing from the checkout
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: One issue while the core is ahead of the project's copy
         env:
           GH_TOKEN: ${{ github.token }}

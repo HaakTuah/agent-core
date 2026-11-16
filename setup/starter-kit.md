@@ -30,6 +30,6 @@ becomes which file, and when: the list `FILES` in `scripts/init.mjs`.
 In a template, `{{owner}}` is the owner's GitHub login, `{{project}}` the project's name, `{{core}}` the core's
 address, `{{pin}}` the commit of the core the project starts from, `{{modules}}` the modules it takes, `{{declined}}`
 the line naming the module a project that is no game leaves out, `{{games}}` a game's own rows of the manifest, one for
-each slot `modules/game-design.md` uses (`GAME_ROWS` in `scripts/init.mjs`), `{{npm}}` the folder of its npm packages
+each slot `tasks/game-design.md` uses (`GAME_ROWS` in `scripts/init.mjs`), `{{npm}}` the folder of its npm packages
 and `{{nuget}}` the folder of its .NET solution. A line that holds `FILL IN:` is the project's own to write; the script
 lists them when it is done.

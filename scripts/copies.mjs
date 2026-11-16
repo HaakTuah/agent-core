@@ -1,4 +1,4 @@
-// The copies check ("One fact, one place" in the core's modules/how-to-work.md): fails when the same run of code (8
+// The copies check ("One fact, one place" in the core's roles/shared/how-to-work.md): fails when the same run of code (8
 // lines that are more than brackets, 240 characters at least) or of the rule files' prose (12 words) stands in two
 // places, unless the baseline lists every window of it (a run of lines or words) in as many places, as one of the old
 // copies, which are removed over time and never added to. A listed window gone or in fewer places fails too, so the
@@ -199,7 +199,7 @@ if (from) {
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => !(h in old) || n > old[h]) : [];
   if (raised.length) { console.error(`FAIL: ${BASELINE} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
 }
-// Near-copies (modules/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
+// Near-copies (tasks/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
 // numbers are set aside, and are no exact copy. Reported, never failed: code that only looks alike is no second copy
 // of a fact, and whether one function should serve both is a reader's call, the audit's.
 const KEPT = new Set(("if else for while do switch case default break continue return function class const let var new try catch finally throw import export from async await yield typeof "

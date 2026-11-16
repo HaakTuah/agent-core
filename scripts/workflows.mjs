@@ -1,4 +1,4 @@
-// The workflow check (floor rule 2, floor/topics.md), for every project that takes the core, on every PR: it fails a
+// The workflow check (floor rule 2, floor/topics/workflows.md), for every project that takes the core, on every PR: it fails a
 // workflow (.github/workflows/), or an action of the project's own (an action.yml anywhere in it, or any YAML file
 // under .github/actions/), in which the word pull_request_target stands anywhere at all, a comment included. It searches the
 // whole text for the word and reads no YAML for it, so no way of writing a key, a comment or a line break hides it; the two

@@ -13,7 +13,7 @@
 // of the core (any other sync is reviewed like any PR, and merges after it); core/ is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
 // call to a core workflow is pinned to a commit of the core's main.
-// It prints the head it checked, for the merge call's `sha` (`modules/github-calls.md`), so nothing pushed after the
+// It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
 // check can merge. Git and Node's own modules only; it changes nothing.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";

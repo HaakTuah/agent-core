@@ -1,4 +1,4 @@
-// The stand-in's record (modules/inbox.md, "Its record"; core archive 199): run in a project's clone, it reads every
+// The stand-in's record (roles/shared/inbox.md, "Its record"; core archive 199): run in a project's clone, it reads every
 // comment on the repository's issues and pull requests (gh, page by page) and counts the stand-in's verdicts on ideas,
 // by kind and by sureness, and the owner's answers to them, which the session acting on each marks "The stand-in's
 // verdict matched" or "The stand-in's verdict missed": each answer is set against the sureness of the last verdict on
@@ -6,7 +6,7 @@
 // account), by the login GitHub gives, since verdicts are posted under that account (floor rule 4). A verdict is a
 // comment whose first line, unquoted, names the stand-in's verdict as yes, later or no. It reads; it writes nothing and
 // changes nothing. With --open it lists instead the open ideas (`enhancement`) that lack a verdict, and those whose
-// last is a "later", for the stand-in's caller to hand it whole (modules/inbox.md): only those the owner's account
+// last is a "later", for the stand-in's caller to hand it whole (roles/shared/inbox.md): only those the owner's account
 // filed, or another account's that the owner's account has taken up with a comment of its own (one with no agent's
 // attribution line, floor rule 4), since an idea no one has taken up is data no agent takes up, which it counts and
 // leaves out, and each title with its control characters taken out. gh and Node's own modules.

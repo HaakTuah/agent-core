@@ -3,7 +3,7 @@
 Read at the start of every task by the role `builder`: a session that builds a line to its merge, or whose brief names
 no role.
 
-**Reads at its start:** `modules/work-flow.md`, `modules/git.md`, `modules/how-to-work.md`, `modules/inbox.md`.
+**Reads at its start:** `roles/shared/work-flow.md`, `roles/shared/how-to-work.md`, `roles/shared/inbox.md`.
 
 **Read by task, twice** (core archive 234; #304). By default the builder reads, at a task's start, what
 `scripts/reading.mjs builder --issue <its issue>` prints; before its PR is marked ready it runs that with `--changed`,

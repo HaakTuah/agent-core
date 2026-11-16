@@ -8,7 +8,7 @@
 // (core archive 201). A line quoted with ">", the owner's own words as the archive keeps them, is not read. Without
 // --base those folders are not read, and it says so.
 // The config's second list, "phrases", is the phrases a rule may not use ("A rule is written to one pattern" in
-// AGENTS.md; core archive 214), nor a brief (modules/helpers.md, "A brief is written as a rule is"; core archive 229).
+// AGENTS.md; core archive 214), nor a brief (tasks/helpers.md, "A brief is written as a rule is"; core archive 229).
 // It reports each one that stands in the files it names and in the Markdown files of the folders it names, a
 // template's (.md.tmpl) included, so the starter kit's templates too. It fails one in a line a change adds against
 // --base to any file there or under those folders, save a template of another kind (a workflow's) in a folder of

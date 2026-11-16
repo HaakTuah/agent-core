@@ -28,7 +28,7 @@ const text = [
   "```", "**Not a rule** in a fence.", "```", "",
   "- **A last item** (core archive 1).",
 ].join("\n");
-const r = rulesOf("modules/x.md", text);
+const r = rulesOf("tasks/x.md", text);
 ok(JSON.stringify(r.map(x => x.lead)) === JSON.stringify(["1. A rule of a paragraph", "A rule inside it", "2. The next one", "Numbered", "Its own item", "The second numbered", "A last item"]),
   "a rule is each paragraph or item that opens with a bold lead, its stop or colon left out; none in running text or a fence", JSON.stringify(r.map(x => x.lead)));
 ok(r[0].text.includes("and its own point") && r[0].text.includes("Running text") && !r[0].text.includes("2. The next one"), "a paragraph's rule runs to the next paragraph that opens one, its items in it");
@@ -42,22 +42,22 @@ ok(rules(root, { agents: true }).some(x => x.key === "AGENTS.md: Nothing locks a
 // ---- what holds each, and what fails ----
 const project = (holdersJson, extra = {}) => {
   const dir = fs.mkdtempSync(path.join(tmp, "p-"));
-  fs.mkdirSync(path.join(dir, "modules")); fs.mkdirSync(path.join(dir, "scripts"));
-  fs.writeFileSync(path.join(dir, "modules", "x.md"), text);
+  fs.mkdirSync(path.join(dir, "tasks")); fs.mkdirSync(path.join(dir, "scripts"));
+  fs.writeFileSync(path.join(dir, "tasks", "x.md"), text);
   fs.writeFileSync(path.join(dir, "scripts", "a-check.mjs"), "");
   fs.writeFileSync(path.join(dir, "scripts", "holders.json"), typeof holdersJson === "string" ? holdersJson : JSON.stringify({ holders: holdersJson }));
   for (const [f, t] of Object.entries(extra)) fs.writeFileSync(path.join(dir, f), t);
   return dir;
 };
-const aCase = { name: "a-case", holds: ["modules/x.md: The second numbered", "modules/x.md: A last item"], inPart: ["modules/x.md: A last item"] };
-const good = holders(project({ "modules/x.md: 1. A rule of a paragraph": "check: scripts/a-check.mjs", "modules/x.md: A rule inside it": ["check: GitHub's ruleset, in part", "audit, in part"], "modules/x.md: Numbered": "describes", "modules/x.md: Its own item": "audit" }), [aCase]);
+const aCase = { name: "a-case", holds: ["tasks/x.md: The second numbered", "tasks/x.md: A last item"], inPart: ["tasks/x.md: A last item"] };
+const good = holders(project({ "tasks/x.md: 1. A rule of a paragraph": "check: scripts/a-check.mjs", "tasks/x.md: A rule inside it": ["check: GitHub's ruleset, in part", "audit, in part"], "tasks/x.md: Numbered": "describes", "tasks/x.md: Its own item": "audit" }), [aCase]);
 const c = counts(good);
-ok(!good.wrong.length && c.check === 1 && c.case === 1 && c.audit === 1 && c.part === 2 && c.describes === 1 && JSON.stringify(c.none) === JSON.stringify(["modules/x.md: 2. The next one"]),
+ok(!good.wrong.length && c.check === 1 && c.case === 1 && c.audit === 1 && c.part === 2 && c.describes === 1 && JSON.stringify(c.none) === JSON.stringify(["tasks/x.md: 2. The next one"]),
   "each rule is counted by its holders, a staged case's own among them; one held only in part counts as in part; one with none is listed", JSON.stringify({ ...c, wrong: good.wrong }));
-const hooked = counts(holders(project({ "modules/x.md: 1. A rule of a paragraph": "check: scripts/work-saved.sh, in part", "modules/x.md: A rule inside it": ["check: scripts/helper-call.mjs", "describes"], "modules/x.md: Numbered": ["check: scripts/work-saved.sh", "check: scripts/a-check.mjs, in part"] }, { "scripts/work-saved.sh": "", "scripts/helper-call.mjs": "" }), []));
-ok(JSON.stringify(hooked.hooked) === JSON.stringify(["modules/x.md: 1. A rule of a paragraph", "modules/x.md: A rule inside it"]) && hooked.none.includes("modules/x.md: A rule inside it") && hooked.check === 0 && hooked.part === 1,
-  "a rule whose only holders are hooks is listed as held by none, and one a check holds beside a hook is counted by the check (modules/tools.md)", JSON.stringify(hooked));
-const bad = holders(project({ "modules/x.md: Gone": "check: scripts/a-check.mjs", "modules/x.md: Numbered": "check: scripts/missing.mjs", "modules/x.md: A last item": "case: a-case", "modules/x.md: The second numbered": "reviews" }), []);
+const hooked = counts(holders(project({ "tasks/x.md: 1. A rule of a paragraph": "check: scripts/work-saved.sh, in part", "tasks/x.md: A rule inside it": ["check: scripts/helper-call.mjs", "describes"], "tasks/x.md: Numbered": ["check: scripts/work-saved.sh", "check: scripts/a-check.mjs, in part"] }, { "scripts/work-saved.sh": "", "scripts/helper-call.mjs": "" }), []));
+ok(JSON.stringify(hooked.hooked) === JSON.stringify(["tasks/x.md: 1. A rule of a paragraph", "tasks/x.md: A rule inside it"]) && hooked.none.includes("tasks/x.md: A rule inside it") && hooked.check === 0 && hooked.part === 1,
+  "a rule whose only holders are hooks is listed as held by none, and one a check holds beside a hook is counted by the check (tasks/tools.md)", JSON.stringify(hooked));
+const bad = holders(project({ "tasks/x.md: Gone": "check: scripts/a-check.mjs", "tasks/x.md: Numbered": "check: scripts/missing.mjs", "tasks/x.md: A last item": "case: a-case", "tasks/x.md: The second numbered": "reviews" }), []);
 ok(bad.wrong.length === 4 && bad.wrong.every(w => /Mend: /.test(w)), "a key that names no rule, a check not there, a staged case named here and a holder in no form each fail, saying the mend", bad.wrong.join("\n"));
 ok(holders(project("{ not json"), []).wrong.length === 1, "holders.json that cannot be read fails");
 ok(report(root).length >= 1 && /^- Of \d+ rules/.test(report(root)[0]), "the state report's lines begin with the counts");
@@ -65,7 +65,7 @@ ok(report(root).length >= 1 && /^- Of \d+ rules/.test(report(root)[0]), "the sta
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
-const failing = project({ "modules/x.md: Gone": "audit" });
+const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
 for (const f of ["holders.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");

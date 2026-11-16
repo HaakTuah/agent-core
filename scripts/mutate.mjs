@@ -1,4 +1,4 @@
-// The core's own mutation tool (modules/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
+// The core's own mutation tool (tasks/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
 // AGENTS.md names, and one any project whose code is JavaScript run by Node, and whose tests are files run by
 // `node <file>`, may name too. It puts faults into the code on purpose, one at a time: an equality or comparison
 // turned (=== to !==, < to <=), and or or swapped, true and false swapped, a ! dropped, + and - swapped; and for each
@@ -15,17 +15,20 @@
 // node_modules) is shared with the working copies by links, not copied, so a test that writes there writes to it; a
 // workspace's own package is linked to the copy's.
 //
-//   node core/scripts/mutate.mjs --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]
+//   node core/scripts/mutate.mjs --report <file> [--budget <seconds>] [--every] [<file>[:<first>-<last>],...]
 //       the faults on those lines, or with no file named every file of the config's "code" that is no test (the
 //       whole run, outside the suite); the config is the one the shape check reads (shape.mjs, where()). The budget,
-//       where none is given, is MUTATE_BUDGET's, else none.
+//       where none is given, is MUTATE_BUDGET's, else none. Each fault caught names the tests that failed on it
+//       ("killedBy"); with --every, all of them, each fault run against every test that names its file, so that what
+//       a test alone catches can be counted (test-record.mjs; tasks/tests.md), at a cost of more runs.
 // Reads the project; writes the report and its working copies, which it takes away. git and Node's own modules.
 import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { tokens } from "./code-shape.mjs";
-import { notLinked, parseConfig, standing, where } from "./shape.mjs";
+import { links, reached } from "./select.mjs";
+import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 const LONGEST = 60; // seconds: a test slower as it stands (a whole upgrade) is no test a fault is run against
@@ -107,6 +110,22 @@ export function testsOf(file, tests) {
   const stem = path.posix.basename(file).replace(/\.[^.]+$/u, ""), name = path.posix.basename(file).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const named = new RegExp(`(^|[^\\w-])${name}`, "u"), own = t => new RegExp(`(^|/)${stem.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}[-.]test\\.`, "u").test(t);
   return Object.keys(tests).filter(t => named.test(tests[t])).sort((x, y) => Number(own(y)) - Number(own(x)) || x.localeCompare(y));
+}
+
+// For --every: each file's tests that reach it, through a barrel or a wrapper too, as the selection maps them
+// (select.mjs), so that every test that would catch a fault runs against it.
+function reachersOf(texts, tests, config) {
+  const out = new Map();
+  for (const [t, files] of reached(tests, links(texts, tests, survey(texts, config, tests).reach))) for (const f of files) if (f !== t) out.set(f, [...(out.get(f) ?? []), t]);
+  return out;
+}
+
+// Each fault on the lines wanted, with the tests it runs against: those that name its file, and with --every those
+// that reach it too.
+function jobsOf({ wanted, texts, tests, testTexts, config, every }) {
+  const reaching = every ? reachersOf(texts, tests, config) : null;
+  const testsFor = file => (reaching ? [...new Set([...testsOf(file, testTexts), ...(reaching.get(file) ?? [])])] : testsOf(file, testTexts));
+  return [...wanted].flatMap(([file, lines]) => faults(texts[file], lines).map(f => ({ ...f, file, text: texts[file], tests: testsFor(file) })));
 }
 
 // The tests running now, each stopped with what it started where the run is stopped (`stopAll`).
@@ -204,7 +223,7 @@ function linkInstalled(installed, to, dir) {
 // Each fault's status, in working copies side by side: Killed, Survived, NoCoverage, Timeout or Pending. Each test is
 // run once as it stands before a fault is first run against it (`asIs`, shared): one that fails there, or runs past
 // LONGEST, is left out.
-async function judge(jobs, copies, budget) {
+async function judge(jobs, copies, budget, every = false) {
   const until = Date.now() + budget * 1000, asIs = new Map(), left = new Set();
   const checked = (test, dir) => {
     if (!asIs.has(test)) asIs.set(test, run(test, dir, LONGEST).then(r => (r.result === "passed" ? Math.max(10, Math.ceil(3 * r.took + 5)) : (left.add(test), 0))));
@@ -212,7 +231,8 @@ async function judge(jobs, copies, budget) {
   };
   const one = async (job, dir) => {
     const target = path.join(dir, job.file), mutated = job.text.slice(0, job.at) + job.replacement + job.text.slice(job.at + job.length);
-    let ran = false;
+    let ran = false, status = null;
+    job.killedBy = [];
     for (const test of job.tests) {
       const limit = await checked(test, dir);
       if (!limit) continue;
@@ -220,9 +240,12 @@ async function judge(jobs, copies, budget) {
       fs.writeFileSync(target, mutated);
       const { result } = await run(test, dir, limit);
       fs.writeFileSync(target, job.text);
-      if (result !== "passed") return result === "timeout" ? "Timeout" : "Killed";
+      if (result === "passed") continue;
+      job.killedBy.push(test);
+      status ??= result === "timeout" ? "Timeout" : "Killed";
+      if (!every) return status;
     }
-    return ran ? "Survived" : "NoCoverage";
+    return status ?? (ran ? "Survived" : "NoCoverage");
   };
   let next = 0;
   const worker = async dir => {
@@ -241,9 +264,10 @@ export function report(texts, jobs) {
   for (const [i, j] of jobs.entries()) {
     files[j.file] ??= { language: "javascript", source: texts[j.file], mutants: [] };
     const start = placeOf(j.text, j.at), end = placeOf(j.text, j.at + j.length);
-    files[j.file].mutants.push({ id: String(i + 1), mutatorName: j.mutatorName, replacement: j.replacement, location: { start, end }, status: j.status });
+    files[j.file].mutants.push({ id: String(i + 1), mutatorName: j.mutatorName, replacement: j.replacement, location: { start, end }, status: j.status, ...(j.killedBy?.length ? { killedBy: j.killedBy } : {}) });
   }
-  return { schemaVersion: "1", thresholds: { high: 80, low: 60 }, files };
+  const named = [...new Set(jobs.flatMap(j => j.killedBy ?? []))].sort();
+  return { schemaVersion: "1", thresholds: { high: 80, low: 60 }, files, ...(named.length ? { testFiles: Object.fromEntries(named.map(t => [t, { tests: [{ id: t, name: t }] }])) } : {}) };
 }
 
 // The working copies taken away, as the run ends or is stopped.
@@ -258,7 +282,7 @@ async function main(argv) {
   const at = argv.indexOf("--report"), out = at >= 0 ? argv[at + 1] : null;
   const b = argv.indexOf("--budget"), budget = Number(b >= 0 ? argv[b + 1] : process.env.MUTATE_BUDGET || Infinity);
   if (!out || !(budget > 0)) refuse("the mutation tool was not told where to write its report, or its budget is no number of seconds", "run node scripts/mutate.mjs --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]");
-  const named = argv.filter((a, i) => i !== at && i !== at + 1 && i !== b && i !== b + 1);
+  const every = argv.includes("--every"), named = argv.filter((a, i) => i !== at && i !== at + 1 && i !== b && i !== b + 1 && a !== "--every");
   const rules = [path.join(".", "core-manifest.md"), path.join(".", "AGENTS.md")].map(f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null)).find(t => t !== null);
   const configAt = where(rules);
   try { notLinked(configAt); } catch (e) { refuse(String(e.message).split(". Mend: ")[0], "make the shape check's config a plain file of the project's own"); }
@@ -270,10 +294,10 @@ async function main(argv) {
   const stop = () => { stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
-    const jobs = [...wanted].flatMap(([file, lines]) => faults(texts[file], lines).map(f => ({ ...f, file, text: texts[file], tests: testsOf(file, testTexts) })));
+    const jobs = jobsOf({ wanted, texts, tests, testTexts, config, every });
     const width = Math.max(1, Math.min(os.cpus().length, jobs.length));
     for (let i = 0; i < width; i++) copies.push(copyOf(path.join(scratch, String(i))));
-    const left = await judge(jobs, copies, budget);
+    const left = await judge(jobs, copies, budget, every);
     fs.writeFileSync(out, `${JSON.stringify(report(texts, jobs))}\n`);
     const count = s => jobs.filter(j => j.status === s).length;
     if (left.length) console.log(`left out, failing or past ${LONGEST} s as they stand: ${left.join(", ")}`);

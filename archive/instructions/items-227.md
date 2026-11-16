@@ -285,3 +285,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "A file for each role" in `modules/roles.md` and the files of `roles/`; "One script says what to read" in
      `modules/tools.md`, with `scripts/reading.mjs`, each module's opening line and the line "Read for it:" of a pull
      request's description; and a cap for each role in `scripts/size.mjs`.
+
+     Behind, too, since the split was built: the folders the rules stand in (`roles/shared/`, `tasks/`, `tools/` and
+     `floor/topics/`, the floor's words unchanged), the orchestrator's rules in `roles/orchestrator.md`, and the files
+     that point from the paths the rules left, until the second release after it.

@@ -1,4 +1,4 @@
-// Tests the entry-files check (entry-files.mjs; modules/tools.md, "One door in"): on small texts made here, then as it
+// Tests the entry-files check (entry-files.mjs; tasks/tools.md, "One door in"): on small texts made here, then as it
 // runs, in a scratch repository and on the starter kit's templates and the core's own entry files. Its tests workflow
 // runs it on every pull request here. Git and Node's own modules.
 //
@@ -17,11 +17,11 @@ const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); els
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = path.join(root, "scripts/entry-files.mjs");
 const reader = files => f => (f in files ? files[f] : null);
-const AGENTS = "# p\n\nRead these (Claude Code imports them):\n\n@core-manifest.md\n@core/floor/security.md\n\nMore text, `core/modules/roles.md` named in passing.\n";
+const AGENTS = "# p\n\nRead these (Claude Code imports them):\n\n@core-manifest.md\n@core/floor/security.md\n\nMore text, `core/tasks/roles.md` named in passing.\n";
 const KIRO = "---\ninclusion: always\n---\n#[[file:core-manifest.md]]\n#[[file:core/floor/security.md]]\n";
 const AG = "---\ntrigger: always_on\n---\n@[m](../../core-manifest.md)\n@[s](../../core/floor/security.md)\n";
 
-ok(lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@AGENTS.md\n@core/modules/claude.md\n", ".kiro/steering/core.md": KIRO, ".agents/rules/core.md": AG })).length === 0,
+ok(lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@AGENTS.md\n@core/tools/claude.md\n", ".kiro/steering/core.md": KIRO, ".agents/rules/core.md": AG })).length === 0,
   "entry files that pull in each file AGENTS.md names, each in its tool's form, lack nothing");
 const ranged = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": KIRO.replace("security.md]]", "security.md:1]]") }));
 ok(ranged.length === 1 && ranged[0].missing.join() === "core/floor/security.md", "a Kiro include with a line range pulls in part of a file, so the file is still lacking");
@@ -30,7 +30,7 @@ ok(lacking(reader({ "AGENTS.md": AGENTS })).length === 0 && lacking(reader({ "CL
 let l = lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@core-manifest.md\n" }));
 ok(l.length === 1 && l[0].file === "CLAUDE.md" && l[0].missing.join() === "core/floor/security.md",
   "a CLAUDE.md that imports neither AGENTS.md nor each of its files lacks the one it leaves out");
-l = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n#[[file:core/modules/roles.md]]\n" }));
+l = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n#[[file:core/tasks/roles.md]]\n" }));
 ok(l.length === 1 && l[0].missing.join() === "core/floor/security.md", "a file named in passing is no @ line, and a steering file that leaves one out lacks it");
 l = lacking(reader({ "AGENTS.md": AGENTS, ".agents/rules/core.md": "---\ntrigger: always_on\n---\n@[m](core-manifest.md)\n@[s](../../core/floor/security.md)\n" }));
 ok(l.length === 1 && l[0].missing.join() === "core-manifest.md", "an Antigravity rule's path is read from the rule's own folder, so one written from the root lacks it");
@@ -47,17 +47,17 @@ ok(l.length === 1 && l[0].missing.join() === "core/floor/security.md", "a line i
 const v0 = verdict(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": KIRO.replace("inclusion: always", "inclusion: manual") }));
 ok(v0.fails.length === 1 && v0.fails[0].includes("is not loaded at a session's start") && mended(`FAIL: ${v0.fails[0]}`), "its failure says so, with the mend");
 
-const head = reader({ "AGENTS.md": `${AGENTS}@core/modules/git.md\n`, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" });
+const head = reader({ "AGENTS.md": `${AGENTS}@core/roles/shared/git.md\n`, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" });
 const base = reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" });
 
 let v = verdict(head, base);
-ok(v.fails.length === 1 && v.fails[0].includes("core/modules/git.md") && v.notes.length === 1 && v.notes[0].includes("core/floor/security.md"),
+ok(v.fails.length === 1 && v.fails[0].includes("core/roles/shared/git.md") && v.notes.length === 1 && v.notes[0].includes("core/floor/security.md"),
   "against a base, only what the pull request leaves out fails; what the base already lacked is noted (nothing locks a project)");
 v = verdict(head);
 ok(v.fails.length === 2 && v.notes.length === 0, "with no base, as in the core's own repository, everything fails");
 ok(v.fails.every(f => f.includes("Mend: add the line #[[file:")), "each failure names the line to add, in the tool's own form");
-const added = ENTRY.find(e => e.file === ".agents/rules/core.md").line("core/modules/git.md");
-ok(lacking(reader({ "AGENTS.md": `${AGENTS}@core/modules/git.md\n`, ".agents/rules/core.md": `${AG}${added}\n` })).length === 0, "the line a mend names is one the check then reads");
+const added = ENTRY.find(e => e.file === ".agents/rules/core.md").line("core/roles/shared/git.md");
+ok(lacking(reader({ "AGENTS.md": `${AGENTS}@core/roles/shared/git.md\n`, ".agents/rules/core.md": `${AG}${added}\n` })).length === 0, "the line a mend names is one the check then reads");
 
 // as it runs: in a scratch repository, a failure with its mend; against its base, a note and a pass
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "entry-files-"));
@@ -76,9 +76,9 @@ try {
   ok(own.status === 1 && mended(own.out) && own.out.includes("#[[file:core/floor/security.md]]"), "run as the core's own (--core), it fails, saying its mend");
   r = run({ ENTRY_BASE: "HEAD" });
   ok(r.status === 0 && r.out.includes("note") && r.out.includes("core/floor/security.md"), "run against a base that lacked it too, it is noted and passes");
-  write("AGENTS.md", `${AGENTS}@core/modules/git.md\n`);
+  write("AGENTS.md", `${AGENTS}@core/roles/shared/git.md\n`);
   r = run({ ENTRY_BASE: "HEAD" });
-  ok(r.status === 1 && mended(r.out) && r.out.includes("#[[file:core/modules/git.md]]"), "against its base, a file the pull request adds to AGENTS.md and to no entry file fails, saying its mend");
+  ok(r.status === 1 && mended(r.out) && r.out.includes("#[[file:core/roles/shared/git.md]]"), "against its base, a file the pull request adds to AGENTS.md and to no entry file fails, saying its mend");
   write("AGENTS.md", AGENTS);
   write(".kiro/steering/core.md", KIRO);
   ok(run().status === 0, "once the line is added, it passes");
@@ -88,7 +88,7 @@ try {
 const kit = name => fs.readFileSync(path.join(root, "setup/template", name), "utf8");
 const kitAgents = kit("AGENTS.md.tmpl"), kitFiles = { "AGENTS.md": kitAgents, "CLAUDE.md": kit("CLAUDE.md.tmpl"), ".kiro/steering/core.md": kit("kiro-steering.md.tmpl"), ".agents/rules/core.md": kit("antigravity-rule.md.tmpl") };
 ok(/^@core-manifest\.md$/mu.test(kitAgents) && lacking(reader(kitFiles)).length === 0, "the starter kit's entry files pull in every file its AGENTS.md names");
-ok(kitFiles[".kiro/steering/core.md"].includes("#[[file:core/modules/kiro.md]]") && kitFiles[".agents/rules/core.md"].includes("(../../core/modules/antigravity.md)"),
+ok(kitFiles[".kiro/steering/core.md"].includes("#[[file:core/tools/kiro.md]]") && kitFiles[".agents/rules/core.md"].includes("(../../core/tools/antigravity.md)"),
   "and each its own tool's part");
 const own = f => (fs.existsSync(path.join(root, f)) ? fs.readFileSync(path.join(root, f), "utf8") : null);
 ok(lacking(own).length === 0 && ENTRY.every(e => own(e.file) !== null), "the core's own entry files stand and pull in every file its AGENTS.md names");

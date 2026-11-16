@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The Node every project's cloud machines run, the same as its CI's ("Node" in modules/updates.md): the exact version in
+# The Node every project's cloud machines run, the same as its CI's ("Node" in tasks/updates.md): the exact version in
 # the core's `.node-version` (`core/.node-version` in a project, which its workflows' setup-node reads too), with that
 # version's checksums here. A project's cloud setup runs this file from the project's root, as its copy of the core on
 # its own `main` holds it (`git show <main>:core/scripts/node.sh`), never a branch's. Where the machine's node is

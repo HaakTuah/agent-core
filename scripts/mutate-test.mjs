@@ -100,7 +100,18 @@ try {
   const staged = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
   const edge = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
   ok(staged.status === 0 && edge?.status === "Killed", "a test staged and not yet committed is run in the working copies", staged.stdout + staged.stderr + JSON.stringify(edge));
-  git("rm", "-q", "-f", "test/b-test.mjs");
+  // (with --every, each fault runs against every test that names its file, and names each that caught it)
+  write("test/d-test.mjs", "import { big } from '../src/a.mjs';\nif (big(10)) process.exit(1);\n");
+  write("src/barrel.mjs", "export { big } from './a.mjs';\n");
+  write("test/e-test.mjs", "import { big } from '../src/barrel.mjs';\nif (big(10)) process.exit(1);\n");
+  git("add", "test/d-test.mjs", "src/barrel.mjs", "test/e-test.mjs");
+  spawnSync(process.execPath, [SCRIPT, "--report", out, "--every", "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
+  const all = JSON.parse(fs.readFileSync(out, "utf8")), both = all.files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
+  spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
+  const first = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
+  ok(both?.status === "Killed" && same([...both.killedBy].sort(), ["test/b-test.mjs", "test/d-test.mjs", "test/e-test.mjs"]) && "test/e-test.mjs" in all.testFiles && first?.killedBy?.length === 1,
+    "a fault names the tests that caught it: with --every all of them, one through a barrel too, else the first", JSON.stringify({ both, first }));
+  git("rm", "-q", "-f", "test/b-test.mjs", "test/d-test.mjs", "src/barrel.mjs", "test/e-test.mjs");
   const outside = spawnSync(process.execPath, [SCRIPT, "--report", out, "test/a-test.mjs"], { cwd: dir, encoding: "utf8" });
   const bare = spawnSync(process.execPath, [SCRIPT], { cwd: dir, encoding: "utf8" });
   ok(outside.status === 1 && mended(outside.stderr) && bare.status === 1 && mended(bare.stderr), "a file outside the code, and a run told no report, are refused with their mend", outside.stderr + bare.stderr);

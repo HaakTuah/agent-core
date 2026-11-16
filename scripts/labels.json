@@ -1,5 +1,5 @@
 {
-  "_": "Who wrote an item and what state it is in, and how an agent's comment opens (modules/inbox.md, \"Labels and openers say who wrote what\"; core archive 217): the one list, which scripts/labels.mjs reads and makes and scripts/inbox.mjs writes as two lines where labels cannot be set. A label is a filing aid, never proof.",
+  "_": "Who wrote an item and what state it is in, and how an agent's comment opens (roles/shared/inbox.md, \"Labels and openers say who wrote what\"; core archive 217): the one list, which scripts/labels.mjs reads and makes and scripts/inbox.mjs writes as two lines where labels cannot be set. A label is a filing aid, never proof.",
   "state": {
     "queued": { "color": "0e8a16", "description": "Wanted: a line in the queue's order, or a bug, which needs no line." },
     "needs-owner": { "color": "d93f0b", "description": "Only the owner can answer this. Nothing else waits on it." },

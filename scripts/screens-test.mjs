@@ -1,10 +1,10 @@
 // Tests the screen checks' baseline (screens.mjs, beside this file): the config and the findings it refuses, what is
 // new against the baseline and what a listed entry covers, a check that reports against one that binds, each check's
-// own mend, an entry mended but still listed, the baseline lowered only on the screens run, and whole runs in a
-// scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that joins the
-// baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline moved, a
-// config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each failure
-// is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// own mend (a game's settings too), an entry mended but still listed, the baseline lowered only on the screens run, and
+// whole runs in a scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that
+// joins the baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline
+// moved, a config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each
+// failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/screens-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -64,6 +64,10 @@ v = verdict({ config: c, at: "c", self: "s", found: parseFound(found(["home"], {
 ok(v.fail[0]?.includes("--write") && v.fail.includes("  values: home: #f00 in the button") && !v.fail.includes("  values: cart: #0f0") && mended(v.fail.join("\n")), "a listed entry of a binding check that a run of its screen no longer finds fails until --write lowers the baseline; one of a screen not run stays", v.fail.join("\n"));
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: base });
 ok(v.fail[0]?.includes("from the one system the direction names"), "a new finding's mend is its check's own, which a session acts on with no rule file open", v.fail[0]);
+
+const game = parseConfig(config({ settings: "binds" }), "c");
+v = verdict({ config: game, at: "c", self: "s", found: parseFound(found(["options"], { "settings: options: text size lost on reopening": true }), "f", game), baseline: { listed: new Map(), grown: {}, checks: new Set(["settings"]) } });
+ok(v.fail.length === 1 && v.fail[0].includes("keep it when the product is closed and opened again") && mended(v.fail[0]), "a game's settings check: a setting missing or lost fails with its own mend", v.fail.join("\n"));
 
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...base, checks: new Set(["rendered"]) } });
 ok(v.fail.length === 1 && v.fail[0].includes("never listed what the values check finds") && mended(v.fail[0]), "a check turned on that the baseline has never listed fails, with its mend, and its findings are not read as new", v.fail.join("\n"));

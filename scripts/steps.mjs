@@ -25,6 +25,7 @@ import { importsOf, projectFilesByContent, readProject as readBuildFile } from "
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
+import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
@@ -180,7 +181,7 @@ function strengthRuns(p) {
 }
 
 // Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the
-// strength check (core/modules/code-shape.md, "How strong the tests are is measured on the lines a pull request
+// strength check (core/tasks/code-shape.md, "How strong the tests are is measured on the lines a pull request
 // changes").
 function strengthNamed(p) {
   const tool = toolOf(p.manifest);
@@ -198,6 +199,26 @@ function strengthNamed(p) {
 function keysOnce(p) {
   const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
+}
+
+// The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a
+// config taken out leaves the tests counted; the copy of the core aside.
+function testsTracked(p) {
+  let specs;
+  try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
+  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+}
+
+// Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
+// its job or the workflow (core/tasks/tests.md, "A pull request runs the tests its change can reach"); null where it
+// does or the project has no tests yet; else the mend.
+const SELECT_RUN = /(^|[\s;&|])node\s+core\/scripts\/select\.mjs(?=\s|$)/mu;
+function selectionRuns(p) {
+  if (!testsTracked(p)) return null;
+  readable(p, text => text.includes("select.mjs"));
+  const selects = Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
+    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, job.env, yaml.env].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""))));
+  return selects ? null : "No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add a step before them `node core/scripts/select.mjs --env RUN`, with `SELECT_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first, or `HEAD^1` with `fetch-depth: 2`), and have the job run only the test files `RUN` names, each between spaces, or its whole suite where it says `all` (`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi`); name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node core/scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
 }
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
@@ -295,15 +316,78 @@ function hostileTests(p) {
   return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
 }
 
+// The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the
+// files that point from the old paths say it themselves: each says, under its title, which file or folder "holds these
+// rules now", as a link whose text is the path from the core's root, in backticks.
+export function moved(core = HERE) {
+  const out = {};
+  for (const old of [...(fs.existsSync(path.join(core, "modules")) ? fs.readdirSync(path.join(core, "modules")).filter(f => f.endsWith(".md")).map(f => `modules/${f}`) : []), "floor/topics.md"]) {
+    let text = "";
+    try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { continue; }
+    const to = /^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now/mu.exec(text)?.[1];
+    if (to) out[old] = to;
+  }
+  return out;
+}
+// What a file at an old path says stands elsewhere than the rest of it, in its lines "Now in [`<path>`](..): **<lead>**.":
+// { old path: [{ lead, to }] }.
+moved.apart = (core = HERE) => Object.fromEntries(Object.keys(moved(core)).map(old => {
+  let text = "";
+  try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { /* (gone since it was listed) */ }
+  return [old, [...text.matchAll(/^Now in \[`([^`\s]+)`\]\([^)\s]+\): \*\*([^*]+?)\*\*\.$/gmu)].map(m => ({ to: m[1], lead: m[2] }))];
+}).filter(([, parts]) => parts.length));
+// The folder of the modules as a copies config's pattern names it, and the patterns of the folders the rules stand in
+// now, which join it: the copies check lets a config read more, never less, so the old pattern stays while the files
+// that point stand at the old paths.
+export const MOVED_GLOB = '"core/modules/*.md"', NEW_GLOBS = ['"core/floor/topics/*.md"', '"core/roles/*.md"', '"core/roles/shared/*.md"', '"core/tasks/*.md"', '"core/tools/*.md"'], MOVED_GLOBS = NEW_GLOBS.join(", ");
+// A dated record of the project's own, which stays as it stands: a file of prose (.md or .txt) whose name opens with a
+// day (2026-11-16...), or one in a folder named archive, reports or records. What lies at the root under a name that
+// opens with a dot is read all the same (namers): there a host and the tools keep what they read.
+const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.test(f) || /(^|\/)(archive|reports|records)\//u.test(f));
+// The project's own files that may name a file of the core and that a check, a tool or a session reads as they stand
+// now: each rule file and each file a tool takes its instructions from, whatever its name or folder; every file at the
+// root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
+// other file of text that is no dated record.
+function namers(p) {
+  let rules = [];
+  try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
+  return p.files.filter(f => !f.startsWith("core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+}
+// Of those, the files that name each old path: Map(old path -> [file]).
+function namedStill(p, map) {
+  const found = new Map(), old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
+  for (const f of namers(p)) for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
+  return found;
+}
+// A copies config that reads the old folder and not yet each folder the rules stand in, however its patterns are laid out.
+const readsOldAlone = (p, f) => f.endsWith(".json") && (p.read(f) ?? "").includes(MOVED_GLOB) && !NEW_GLOBS.every(g => (p.read(f) ?? "").includes(g));
+// Where two old paths now lead to one file, the word that it is named once; and, where a file a tool takes its
+// instructions from by pulling files in (Kiro's steering, Antigravity's rules) still names an old path, that the step
+// comes before any other task, since such a session reads each rule on one line's word until then.
+const once = (found, map) => [...found.keys()].filter(a => [...found.keys()].some(b => b < a && map[b] === map[a])).map(a => `a file that named \`core/${a}\` beside the other path that now leads to \`core/${map[a]}\` names that file once`);
+const first = found => ([...found.values()].flat().some(f => /^\.(kiro|agents?)\//u.test(f)) ? "Before any other task, since a tool whose entry file pulls the core's files in follows no further import, and its sessions read each rule on one line's word until this is done: in" : "In");
+// Where a project's own files still name an old path of the core's, a copies config of its own the old folder's pattern
+// alone, and its manifest's "Paths:" line the old folders: the mend, naming each file and each path's new one; null
+// where none does.
+function movedPaths(p) {
+  const map = moved(), found = Object.keys(map).length > 0 ? namedStill(p, map) : new Map(), said = files => files.map(f => `\`${shown(f)}\``).join(", ");
+  const apart = from => (moved.apart()[from] ?? []).map(a => `, but its "${a.lead}" is now in \`core/${a.to}\``).join("");
+  const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""}${apart(from)} (in ${said(files)})`).concat(once(found, map));
+  const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f)) : [];
+  if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
+  if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
+  return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/modules/other-builders.md` at the start of every task");
+      if (!/core\/(?:modules|tools)\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/tools/other-builders.md` at the start of every task");
       if (/^\|\s*\*Codex's checks\*\s*\|/m.test(p.manifest)) wrong.push("the manifest's row *Codex's checks* is renamed *other builders' checks*");
       return wrong.length ? `${wrong.join("; ")}.` : null;
     },
-    partly: "that no builder is given `core/modules/codex.md`, and the names in the size marks, are read by the review" },
+    partly: "that no builder is given `core/tools/codex.md`, and the names in the size marks, are read by the review" },
   { lead: "12 November 2026, who reviews", cost: COST.read, unread: "whether a project's reviewers differ from the core's is its own choice, which no file states" },
   { lead: "12 November 2026, the core has moved", cost: COST.workflow, unread: "whether the project's orchestrator wakes every day is no file's to say" },
   { lead: "12 November 2026, fetches on Windows and by .NET", cost: COST.check, held: "the licence check", partly: "the idea filed with the core is no file of the project's" },
@@ -312,9 +396,8 @@ export const STEPS = [
   { lead: "12 November 2026, a slimmer copy", cost: COST.line,
     check: p => {
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
-      // (the roles' folder, which the line gained later, is its own entry's to ask: 16 November 2026, a file for each role)
-      const plain = line => line.replace("roles/, ", "");
-      return want && !p.manifest.split("\n").some(line => plain(line) === plain(want)) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
+      // (the folders the line gained or lost later are their own entries' to ask: 16 November 2026)
+      return want && /^Paths:.*\breports\//mu.test(p.manifest) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
   { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
     partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
@@ -423,7 +506,7 @@ export const STEPS = [
         throw new Unread(`no ${file}, or no ${marksAt} with its "each" and "read", to read`);
       const mark = marks.read?.[file], bytes = Buffer.byteLength(text);
       if ((Number.isInteger(mark) && mark < marks.each) || bytes < marks.each / 4) return null;
-      return `Trim \`${file}\` once, in a pull request of its own: each finished entry leaves it (its pull request and issue keep it), each entry says only what is next and points to its pull requests for what was done, and each line of a queued issue holds its issue, who builds it and what it waits on, nothing more (\`core/modules/inbox.md\`, "The *progress file* holds order only"). Then give it a mark of its own under "read" in \`${marksAt}\`: a number of bytes the project chooses, below "each" (${marks.each}) and at least its size after the trim.`;
+      return `Trim \`${file}\` once, in a pull request of its own: each finished entry leaves it (its pull request and issue keep it), each entry says only what is next and points to its pull requests for what was done, and each line of a queued issue holds its issue, who builds it and what it waits on, nothing more (\`core/roles/shared/inbox.md\`, "The *progress file* holds order only"). Then give it a mark of its own under "read" in \`${marksAt}\`: a number of bytes the project chooses, below "each" (${marks.each}) and at least its size after the trim.`;
     } },
   { lead: "15 November 2026, the owner's inbox where issues cannot be reached", cost: COST.read, unread: "whether issues can be read and written here is GitHub's answer, not a file's: `core/scripts/inbox.mjs` asks it, and each sync runs it from the next one on" },
   { lead: "15 November 2026, labels and openers", cost: COST.read, unread: "whether the labels stand and the issues and comments carry them is GitHub's answer, not a file's: `core/scripts/labels.mjs` asks it and says each mend, and each sync runs it from the next one on; the issue forms' \"Found while:\" line is a difference `core/scripts/fresh.mjs` lists" },
@@ -452,17 +535,21 @@ export const STEPS = [
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
-  { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
+  { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/tasks/screens.md`, point 1), and the critique asks for it there" },
   { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
     partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
   { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/^Paths:.*\broles\//mu.test(p.manifest)) wrong.push('add `roles/` to the folders the "Paths:" line of `core-manifest.md` names, so that it reads "one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/"');
+      if (!/^Paths:.*\broles\//mu.test(p.manifest)) wrong.push('add `roles/` to the folders the "Paths:" line of `core-manifest.md` names, so that it reads as `core/README.md`, "The manifest\'s format", gives it');
       if (!/^@core\/roles\/builder\.md[ \t]*$/mu.test(p.read("AGENTS.md") ?? "")) wrong.push("add the line `@core/roles/builder.md` to the `@` lines of `AGENTS.md`, after the floor's, and to each entry file the project holds the line `core/scripts/entry-files.mjs` then names");
       return wrong.length ? `In one pull request, ${wrong.join("; and ")}.` : null;
     },
     partly: "whether the project's own folders have their kind of task in `checks/reading.json` is a reading of its folders; the sentence of `AGENTS.md` that names the script, step 2 of its \"Starting a task\" and the issue forms' \"What to read\" are differences `core/scripts/fresh.mjs` lists; the line `Read for it:` is held by the description check" },
+  { lead: "16 November 2026, the tests a change can reach", cost: COST.workflow, check: selectionRuns,
+    partly: "how the project's runner is told the files `RUN` names is the project's own, and which tests are its proof is a reading of the project" },
+  { lead: "16 November 2026, the rules in folders that say who reads them or when", cost: COST.line, check: movedPaths,
+    partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
   { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
 ];
 

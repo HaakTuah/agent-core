@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Has this pull request's security review run (floor rule 8, and what modules/reviews.md, point 3, adds: a security
+// Has this pull request's security review run (floor rule 8, and what tasks/reviews.md, point 3, adds: a security
 // review that starts by itself is waited for on every pull request)? Run by the core's workflow security-review.yml,
 // always from the default branch's copy, on what GitHub's own API gives of the pull request and its comments. It takes
 // two things as proof: the summary Codex's own app keeps on the pull request (its login and kind are GitHub's, which no
 // one else can post under), saying its security review is completed; or a comment that opens "Security review:" from
 // the repository's owner, or an account the project names (the workflow's input "reviewers"), with a say in the
 // repository by GitHub's own word (owner, member or collaborator), which is how another reviewer's, or the fallback
-// reviewer's, is posted (modules/reviews.md, point 3; #99). Given the pull request's commits, a review stands for the
+// reviewer's, is posted (tasks/reviews.md, point 3; #99). Given the pull request's commits, a review stands for the
 // head only where it saw the head, or a commit that only updates from main follow (merges whose second parent is no
 // commit of the pull request's, as GitHub's "Update branch" makes): Codex's by the commit its summary names, a posted
 // one by a commit it names by its whole SHA; any other later commit needs a posted review, or the note that none is
@@ -32,7 +32,7 @@
 // longer) passes where no review of Codex's has begun on it: floor rule 17 holds it (with a branch of the repository,
 // its status is written when the first comment that counts arrives, which is Codex's summary once the code review rule
 // 17 asks for is asked). A pull request that needs no security review and gets none by itself says so in a comment of
-// that kind, which its code reviewer checks (modules/reviews.md, point 3); the status then says a review is posted, and
+// that kind, which its code reviewer checks (tasks/reviews.md, point 3); the status then says a review is posted, and
 // cannot tell that note from a review. A pure sync needs neither (floor rule 8): where the workflow's run of the
 // default branch's pure-sync.mjs proved the head one (PURE), it passes where no review of Codex's has begun by itself,
 // and one that has is waited for and read as on any pull request, as are floor rule 3's two asked of it never. Nothing
@@ -78,7 +78,7 @@ const POSTED = /^(?:\*\*)?Security review:/u;
 export const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
 // who posts the review a waiting status asks for, and when, the actor first, since a commit status shows only a short
-// description (#395; modules/reviews.md, point 3). Where Codex's app starts the review by itself (its summary holds
+// description (#395; tasks/reviews.md, point 3). Where Codex's app starts the review by itself (its summary holds
 // a security review, or cannot be read), the fallback reviewer, after its own check of the newest commit, never Codex asked by
 // a comment, which it answers with a code review; elsewhere, the security reviewer the project uses, asked again.
 const CHECKS = 'the fallback reviewer checks the head, posts "Security review: <whole SHA>"';

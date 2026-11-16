@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Has a code review that is running on this pull request finished (modules/reviews.md, point 2: a review already
+// Has a code review that is running on this pull request finished (tasks/reviews.md, point 2: a review already
 // running is waited for, and one that hangs is taken over, so none can hold a pull request for long)? Run by the core's
 // workflow security-review.yml beside scripts/security-review.mjs, in the same job, always from the default branch's
 // copy, on what GitHub's own API gives of the pull request and its comments. It waits only while the summary Codex's
@@ -8,7 +8,7 @@
 // or a collaborator names that commit by its whole SHA, all forty characters, since a commit can be made to share a
 // short one's first characters: how the next reviewer, or the fallback reviewer, posts the review it took over.
 // Given the pull request's commits and files, it also waits while a pull request that needs a code review
-// (modules/reviews.md, "Which") has had none: neither Codex's code review completed nor such a comment names the head
+// (tasks/reviews.md, "Which") has had none: neither Codex's code review completed nor such a comment names the head
 // commit, or one that only updates from `main` follow (merges whose second parent is no commit of the pull request's,
 // as GitHub's "Update branch" makes; floor rule 8: nothing is reviewed twice), and, given the merges
 // scripts/clean-merges.mjs proved, only through merges whose tree is the one git makes of their parents (#323), the

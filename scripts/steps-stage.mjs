@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { callers, project } from "./steps.mjs";
+import { MOVED_GLOB, MOVED_GLOBS, callers, moved, project } from "./steps.mjs";
 
 const at = (dir, f) => path.join(dir, f);
 const read = (dir, f) => fs.readFileSync(at(dir, f), "utf8");
@@ -142,6 +142,18 @@ export const STAGES = {
     // (as the step words it: the row, here `none` with its reason)
     mend: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(SLOTS, "$1| *mutation tool* | `none`: no mutation tool is named for this project's language yet |\n")),
   },
+  "16 November 2026, the tests a change can reach": {
+    asked: true,
+    // (a test of the project's own, tracked, and no job that selects; the kit's mutation row told a reason other than
+    // "no tests yet", so that the strength step stays as it was)
+    stage: dir => {
+      write(dir, "test/staged.test.mjs", "// the selection's staged test: it guards nothing but its own place\n");
+      spawnSync("git", ["add", "test/staged.test.mjs"], { cwd: dir });
+      write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(\| \*mutation tool\* \| `none`): no tests yet[^|\n]*\|/m, "$1: no mutation tool is named for this project's language yet |"));
+    },
+    // (as the step words it: a step that selects, with its base, before the tests, which run what it names)
+    mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
+  },
   "16 November 2026, the NuGet check where it can matter": {
     // (a project file that imports a build file of another name than those the call's paths name)
     stage: dir => {
@@ -180,8 +192,35 @@ export const STAGES = {
     },
     mend: dir => {
       const manifest = read(dir, "core-manifest.md"), agents = read(dir, "AGENTS.md");
-      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?modules\/, )/m, "$1roles/, "));
+      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?floor\/, (?:modules\/, )?)/m, "$1roles/, "));
       if (!/^@core\/roles\/builder\.md[ \t]*$/m.test(agents)) write(dir, "AGENTS.md", agents.replace(/^(@core\/floor\/security\.md[ \t]*\r?\n)/m, "$1@core/roles/builder.md\n"));
+    },
+  },
+  "16 November 2026, the rules in folders that say who reads them or when": {
+    asked: true,
+    // (a rule file that names the core's files where they stood, two of them now one file, and a rule that left its file for another, the
+    // copies config with the old folder's pattern alone, the manifest's line with the old folders, and a dated record
+    // that names an old path and is left as it stands; the mend names each by the path the step words)
+    stage: dir => {
+      write(dir, "AGENTS.md", `${read(dir, "AGENTS.md").replace("@core/roles/shared/work-flow.md", "@core/modules/work-flow.md\n@core/modules/git.md").replace("core/tools/other-builders.md", "core/modules/other-builders.md")}\nWho builds: \`core/modules/roles.md\`, "The builders".\n`);
+      // (a dated record of the project's own, which names an old path and stays as it stands)
+      write(dir, "docs/records/2026-01-05.md", "# 5 January 2026\n\nRead that day: `core/modules/git.md`.\n");
+      write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)tasks\/, tools\/, /m, "$1"));
+      write(dir, "checks/copies.json", read(dir, "checks/copies.json").split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB));
+    },
+    mend: dir => {
+      const map = moved(at(dir, "core")), names = Object.keys(map).sort((a, b) => b.length - a.length);
+      // (what a file at an old path says stands elsewhere than the rest of it is named there first, as the step words it)
+      const apart = Object.entries(moved.apart(at(dir, "core"))).flatMap(([old, parts]) => parts.map(a => [`\`core/${old}\`, "${a.lead}"`, `\`core/${a.to}\`, "${a.lead}"`]));
+      for (const f of project(dir).files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/.test(f))) {
+        if (f.startsWith("docs/records/")) continue;
+        const text = read(dir, f), next = names.reduce((t, old) => t.split(`core/${old}`).join(`core/${map[old].endsWith("/") ? `${map[old]}input.md` : map[old]}`), apart.reduce((t, [was, now]) => t.split(was).join(now), text)).split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB).split(MOVED_GLOB).join(`${MOVED_GLOB}, ${MOVED_GLOBS}`);
+        // (two lines that now pull in the one file are one line)
+        const once = next.split("\n").filter((l, i, all) => !(l === all[i - 1] && /^(@|#\[\[file:)/.test(l))).join("\n");
+        if (once !== text) write(dir, f, once);
+      }
+      const manifest = read(dir, "core-manifest.md"), want = /^Paths: .*$/m.exec(read(dir, "core/setup/template/core-manifest.md.tmpl"))[0];
+      if (!/^Paths:.*\btasks\/.*\btools\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^Paths: .*$/m, want));
     },
   },
 };

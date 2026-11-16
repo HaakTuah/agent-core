@@ -1,4 +1,4 @@
-// The licence check's scan (floor rule 10, in floor/topics.md beside this folder): nothing a project uses is left out
+// The licence check's scan (floor rule 10, in floor/topics/licences.md beside this folder): nothing a project uses is left out
 // of its audit, so the check (licences.mjs, beside this file, which runs this when its config has "scan") holds
 // everything to its list, not only what a lockfile names. It reads the project's tracked files (git ls-files), but
 // what "skip" names and, in a project, its copy of the core, which the core's own scan audits (.github/licences.json

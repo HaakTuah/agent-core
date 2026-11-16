@@ -9,7 +9,8 @@
     "jsx",
     "csharp",
     "python",
-    "scripts"
+    "scripts",
+    "screens"
   ],
   "listed": {
     "function: scripts/code-review-wait.mjs#judgeWith": {

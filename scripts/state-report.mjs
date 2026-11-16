@@ -1,4 +1,4 @@
-// The state report (modules/orchestrating.md, "The scheduled look"; core archive 218): once a month the scheduled look
+// The state report (roles/orchestrator.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
 // (floor rule 14): each measure that keeps a baseline against the last report, in the core the rules of the floor and
 // the modules by what holds them, those with none listed (holders.mjs, beside this file), and what the look keeps open
@@ -26,6 +26,7 @@ import { ghApi, pagesOf } from "./labels.mjs";
 import { report as holdersReport } from "./holders.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
+import { line as waitLine, measure as measureWait } from "./wait.mjs";
 
 export const TITLE = "State report";
 export const COUNTS = "Counts for the core";
@@ -60,13 +61,23 @@ function strength(root, config) {
   try { return { at, count: Object.values(JSON.parse(fs.readFileSync(path.join(root, at), "utf8")).listed).reduce((n, e) => n + (e.count ?? 0), 0) }; } catch { return null; }
 }
 
+// What a push waits on (wait.mjs), against the shape check's mark "wait", read through gh: the report's line, which
+// says "not read", and why, where GitHub did not answer.
+export function pushWait(repo, root, manifest, gh) {
+  let mark;
+  try { mark = reading(rulesOf(manifest, root).rules, root)?.config.wait; } catch { mark = undefined; }
+  try { return waitLine(measureWait({ repo, mark, ...(gh ? { gh } : {}) })); }
+  catch { return "- what a push waits on: not read (GitHub did not answer for the pull requests' checks: the look's job needs `pull-requests: read` and `checks: read`)."; }
+}
+
 // The lines of the measures against their baselines: each with its count at the last report, where that report gave it.
-function measured({ core, measures, shape: shaped, previous }) {
+function measured({ core, measures, shape: shaped, previous, wait = null }) {
   const was = (name, count) => { const then = previous ? new RegExp(`^- ${name}: (\\d+)`, "m").exec(previous)?.[1] : undefined; return then === undefined ? "" : `, ${then} at the last report`; };
   const lines = [];
   if (measures) lines.push(`- copies: ${measures.count} old copies in its baseline (\`${measures.at}\`)${was("copies")}.`);
   if (shaped) lines.push(`- how the code is put together: ${shaped.count} old breaches in its baseline (\`${shaped.at}\`)${was("how the code is put together")}; the codebase is ${shaped.state}.`);
   if (shaped?.strength) lines.push(`- how strong the tests are: ${shaped.strength.count} faults no test catches in its baseline (\`${shaped.strength.at}\`)${was("how strong the tests are")}.`);
+  if (wait) lines.push(wait);
   if (lines.length) return lines;
   return [core ? "- None: in the core's own repository no baseline may stand." : "- None: no measure keeps a baseline here yet."];
 }
@@ -87,12 +98,12 @@ const heldNow = () => { try { return holdersReport(); } catch { return null; } }
 // `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
 // `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
 // here where left out, and null where they could not be read.
-export function body({ core, month, measures, shape: shaped = null, previous, overdue, counts = null, holders = core ? heldNow() : null, scripts }) {
+export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, scripts }) {
   const lines = [
     `The state of ${core ? "the core" : "this project"} for ${month}, as the scheduled look reads it on its first run of the month (\`${scripts}/state-report.mjs\`). It reports and asks nothing: whatever is due already has its task. A session that reads it files as a task anything it shows that has none, and closes it.`,
     "",
     "**The measures against their baselines**",
-    ...measured({ core, measures, shape: shaped, previous }),
+    ...measured({ core, measures, shape: shaped, previous, wait }),
     "",
     "**The rules, by what holds them**",
     ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."

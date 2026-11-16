@@ -3,7 +3,7 @@
 // audit. holders.json, beside this file, names the checks and the audit by each rule's file and lead (rules.mjs); each
 // staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report
 // (state-report.mjs), until it gains one or goes on the owner's word. A hook (HOOKS) holds no rule alone: one whose
-// only holders are hooks is listed with them (modules/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
+// only holders are hooks is listed with them (tasks/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
 // The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
 //
@@ -26,7 +26,7 @@ function holderOf(key, value, root) {
   const m = FORM.exec(String(value));
   if (!m) return `${FILE}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule; a staged case names its rules in its own file`;
   const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
-  if (kind === "check" && /^(?:scripts|\.github|setup|floor|modules|roles)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
+  if (kind === "check" && /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
   return { kind, by: what, part: Boolean(m[5]) };
 }
 

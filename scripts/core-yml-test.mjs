@@ -81,8 +81,8 @@ passes("a project whose copy is the core at its pin, each call pinned where its 
 fails("a default branch of another name", "The default branch here is trunk", {}, { branch: "trunk" });
 fails("a difference from the floor", "names the floor or the review guidelines", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/floor/security.md`, rule 12: main is pushed to here.\n") });
 fails("a difference from the review guidelines, under a heading spelt otherwise", "names the floor or the review guidelines", { "core-manifest.md": MANIFEST(B, "\n### DIFFERENCES\n- the Review Guidelines: none here.\n") });
-passes("a difference from a module", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/modules/roles.md`, \"The builders\": Codex alone builds here, since no other tool is set up.\n") });
-passes("a heading inside a fenced block, and the floor named outside the section", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/modules/roles.md`, \"The builders\": none.\n\n## Notes\nThe floor holds whole.\n\n```\n# Differences\nthe floor\n```\n") });
+passes("a difference from a module", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/tasks/roles.md`, \"The builders\": Codex alone builds here, since no other tool is set up.\n") });
+passes("a heading inside a fenced block, and the floor named outside the section", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/tasks/roles.md`, \"The builders\": none.\n\n## Notes\nThe floor holds whole.\n\n```\n# Differences\nthe floor\n```\n") });
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
 fails("a manifest without the owner's account", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });

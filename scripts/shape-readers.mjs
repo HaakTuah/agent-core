@@ -1,4 +1,4 @@
-// The shape check's readers (shape.mjs, beside this file; modules/code-shape.md, "What the check reads"; #354): which
+// The shape check's readers (shape.mjs, beside this file; tasks/code-shape.md, "What the check reads"; #354): which
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
 // JSX among them, by the reader of the measures (code-shape.mjs); C# by shape-csharp.mjs; Python by shape-python.mjs;
 // and the scripts that share one global space, those of JavaScript or TypeScript with no import or export, by the
@@ -19,6 +19,7 @@ export const READERS = {
   csharp: "C#",
   python: "Python",
   scripts: "scripts that share one global space",
+  screens: "the tests that open a screen, a window or a device",
 };
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
