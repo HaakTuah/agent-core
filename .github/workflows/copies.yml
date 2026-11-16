@@ -3,7 +3,8 @@
 # against the branch a PR merges into the baseline may only shrink. With it, the pointer check (every pointer in the
 # rule files leads somewhere) and the reading-size check (the files every session reads keep to their marks, and a file
 # past the split mark is split before it is changed), with the marks the project names; and checks that need no
-# config: the workflow check (floor rule 2: no workflow names the trigger it forbids), the entry-files check (each
+# config: the workflow check (floor rule 2: no workflow names the trigger it forbids; nor gives a key twice in one
+# mapping, which GitHub refuses, what the base already held noted and passed), the entry-files check (each
 # agent tool's entry file pulls in what AGENTS.md names, what the base already lacked noted and passed:
 # modules/tools.md), and the manifest check, which
 # reports and never fails (every module the manifest's list neither takes nor leaves out, every slot a taken module uses
@@ -68,8 +69,10 @@ jobs:
           SIZES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           SIZES: ${{ inputs.sizes }}
         run: node core/scripts/reading-size.mjs "$SIZES"
-      - name: No workflow names the forbidden trigger
+      - name: No workflow names the forbidden trigger or gives a key twice
         if: ${{ !cancelled() }}
+        env:
+          WORKFLOWS_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: node core/scripts/workflows.mjs
       - name: Each agent tool's entry file pulls in every file AGENTS.md names
         if: ${{ !cancelled() }}
