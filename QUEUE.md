@@ -43,7 +43,6 @@ wanted").
 | #370 | builder | |
 | #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
 | #386 | builder | #362, which changes the same file |
-| #393 | builder | |
 | #394 | builder | |
 | #403 | builder | #299, whose rule its mends name |
 | #404 | builder | #299, whose rule it holds, and #403, or built with it |

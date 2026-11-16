@@ -24,6 +24,9 @@ const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses:
 // files that hold only calls to the core's workflows, whose pins a sync moves)
 const SUITE = "name: suites-staged\n\non:\n  pull_request:\n    paths-ignore:\n      - 'core/**'\n      - 'core-manifest.md'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo the suite\n";
 
+// (a workflow of the project's own with a key twice in a step, which GitHub refuses)
+const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: read\n\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo a\n        if: github.event_name == 'push'\n        if: always()\n";
+
 export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
     // (rule 5 of SECURITY.md lists an input whose hostile tests are nowhere; the mend writes them where it names them)
@@ -166,6 +169,12 @@ export const STAGES = {
     },
     // (as the step words it: the file added to the paths, by its exact path)
     mend: dir => write(dir, ".github/workflows/nuget.yml", read(dir, ".github/workflows/nuget.yml").replace(/^( {4}paths:\r?\n)/m, "$1      - 'staged-import/deps.xml'\n")),
+  },
+  "16 November 2026, no workflow gives a key twice": {
+    // (a workflow whose step gives if: twice; the mend keeps one, with both conditions in it, and the file goes after)
+    stage: dir => write(dir, ".github/workflows/twice-staged.yml", TWICE),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/twice-staged.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/twice-staged.yml", TWICE.replace("        if: github.event_name == 'push'\n        if: always()\n", "        if: github.event_name == 'push' && always()\n")),
   },
   // (last, so that its mend, which lists the files that hold only calls to the core's workflows, sees every such file
   // the other stages and mends write)
