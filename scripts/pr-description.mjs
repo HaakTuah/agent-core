@@ -144,7 +144,9 @@ if (started(import.meta.url)) {
       }
     } else console.log(`ok   the line that lists what the changed paths call for is not asked here: ${why}`);
     const at = coreAt(process.cwd()) ?? "", queue = doneAsked(created, then) || planAsked(created, then) ? queueAt(process.cwd(), at) : null;
-    const owner = queue ? ownerAt(queue.manifest, at, repo) : null, read = item => readItem(repo, item, ".", owner);
+    // (one read of each item for both checks, so that a run reads a dozen at most between them)
+    const owner = queue ? ownerAt(queue.manifest, at, repo) : null, seen = new Map();
+    const read = item => { if (!seen.has(item)) seen.set(item, readItem(repo, item, ".", owner)); return seen.get(item); };
     if (queue && !doneAsked(created, then)) console.log(`ok   how done will be judged is not asked here: ${why}`);
     else if (queue && !takesIt(queue.manifest, at)) console.log("ok   how done will be judged is not asked here: the manifest leaves done-when.md out");
     else if (queue) {
@@ -156,7 +158,7 @@ if (started(import.meta.url)) {
     if (queue && !planAsked(created, then)) console.log(`ok   the milestones are not asked here: ${why}`);
     else if (queue && !takesIt(queue.manifest, at, "planning.md")) console.log("ok   the milestones are not asked here: the manifest leaves planning.md out");
     else if (queue) {
-      const plan = milestoneMends({ body: process.env.PR_BODY, queue, read, at });
+      const plan = milestoneMends({ body: process.env.PR_BODY, queue, read, at, already: new Set(seen.keys()) });
       for (const note of plan.notes) console.log(`ok   ${note}`);
       if (plan.mends.length) mends.push(...plan.mends);
       else console.log("ok   the milestones of the progress file are in their form, and each one reached is named");

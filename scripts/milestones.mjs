@@ -11,7 +11,8 @@
 //   - a heading the pull request takes out whose issue stays open, not closed by it.
 // It reads the form, not that a milestone is well chosen or in the right order: that stays with whoever writes the
 // file, and the design check. Each item is read through `read` (done-when.mjs's readItem, beside this file, in the
-// description check), a dozen at most (MOST); one it cannot read is asked nothing, and it says so. Each line of the
+// description check), a dozen at most (MOST) in one run with those the done-when check read before it (`already`); one
+// it cannot read is asked nothing, and it says so. Each line of the
 // file is read by steps of its own, with no pattern that backtracks: anyone who opens a pull request writes the file.
 // pr-description.mjs, beside this file, asks it; its own test, milestones-test.mjs. Node's own modules only.
 import { ITEM, MOST, closes, shown } from "./done-when.mjs";
@@ -78,8 +79,9 @@ const names = (text, item) => [...String(text ?? "").matchAll(ITEM)].some(m => m
 
 // Every failure for a pull request: `body` its description, `queue` { before, after } the progress file's text,
 // `read(item)` an item as { state } (done-when.mjs's readItem), { limited: true } where the rate limit refused it, or
-// null where it cannot be read. Returns { mends, notes }, each failure a line with its mend.
-export function milestoneMends({ body, queue, read, at = "" }) {
+// null where it cannot be read; `already` the items the run read before, which the same `read` gives again at no cost.
+// Returns { mends, notes }, each failure a line with its mend.
+export function milestoneMends({ body, queue, read, at = "", already = new Set() }) {
   const mends = [], notes = [], where = `(${at}tasks/planning.md)`;
   const before = milestonesOf(queue?.before), after = milestonesOf(queue?.after);
   const stood = new Set(formFaults(queue?.before).map(f => f.key));
@@ -88,7 +90,8 @@ export function milestoneMends({ body, queue, read, at = "" }) {
   const closed = new Set(closes(body).filter(i => had.has(i) || has.has(i)));
   const added = [...has].filter(i => !had.has(i)), gone = [...had].filter(i => !has.has(i) && !closed.has(i));
   // (each item read costs calls on the run's token, and anyone who opens a pull request writes what names them)
-  if (added.length + gone.length > MOST) return { mends: [...mends, `this pull request adds or takes out ${added.length + gone.length} milestones' headings, more than the ${MOST} the description check reads. Mend: split it into pull requests that each add or take out ${MOST} or fewer ${where}`], notes };
+  const fresh = new Set([...added, ...gone].filter(i => !already.has(i)));
+  if (fresh.size + already.size > MOST) return { mends: [...mends, `this pull request adds or takes out ${added.length + gone.length} milestones' headings, which with the ${already.size} items it queues or closes are more than the ${MOST} the description check reads. Mend: split it into pull requests that each add, take out, queue or close ${MOST} or fewer ${where}`], notes };
   const stateOf = item => {
     const got = read(item);
     if (got?.limited) { mends.push(`${item} could not be read: GitHub's rate limit for this repository's token was reached. Mend: run the check again once the hour turns (re-run its job), or later ${where}`); return null; }

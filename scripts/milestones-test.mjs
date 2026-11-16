@@ -73,6 +73,13 @@ ok(away.mends.length === 1 && /adds or takes out 13/.test(away.mends[0]) && away
 const both = run(`${file}${many.split("## ").slice(1, 7).map(m => `## ${m}`).join("")}`, `${file}${many.split("## ").slice(7).map(m => `## ${m}`).join("")}`);
 ok(both.mends.length === 1 && /adds or takes out 13/.test(both.mends[0]), "six taken out and seven added are thirteen", both);
 
+const shared = run(file, added, "", { "#40": { state: "open" } });
+const withDone = milestoneMends({ body: "", queue: { before: file, after: added }, read: () => ({ state: "open" }), already: new Set(Array.from({ length: MOST }, (_, i) => `#${300 + i}`)) });
+ok(shared.mends.length === 0 && withDone.mends.length === 1 && /with the 12 items it queues or closes/.test(withDone.mends[0]) && mended(`FAIL ${withDone.mends[0]}`),
+  "the dozen is one for the run: headings to read beyond the items the done-when check read fail, saying to split", withDone.mends);
+ok(milestoneMends({ body: "", queue: { before: file, after: added }, read: () => ({ state: "open" }), already: new Set(["#40", ...Array.from({ length: MOST - 1 }, (_, i) => `#${300 + i}`)]) }).mends.length === 0,
+  "an item the done-when check already read is counted once");
+
 // what stood before fails nothing
 const old = "## Milestone: the first whole\n- #1\n## Milestone #5\n";
 ok(run(old, `${old}- #9 a note below\n`.replace("- #9 a note below\n", "")).mends.length === 0, "a fault the base already held fails nothing");
