@@ -29,6 +29,8 @@ import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
+import { reads } from "./workflows.mjs";
+import { twice } from "./yaml-keys.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -189,6 +191,14 @@ function strengthNamed(p) {
   if (tool.none !== undefined) return tool.none.startsWith("no tests yet") && testsStand(p) ? `The manifest's row *mutation tool* says \`none\`: no tests yet, as the starter kit wrote it, and the project has tests now: ${row.charAt(0).toLowerCase()}${row.slice(1)}.` : null;
   if (strengthRuns(p)) return null;
   return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
+}
+
+// Each key given twice in one mapping of a workflow or an action of the project's own, as the workflow check reads
+// them (workflows.mjs and yaml-keys.mjs, beside this file), which GitHub refuses, running none of the file's jobs: the
+// old ones, which the check notes and passes, listed here at every sync until they are gone (#393). Null where none is.
+function keysOnce(p) {
+  const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
+  return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
 }
 
 // The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a
@@ -540,6 +550,7 @@ export const STEPS = [
     partly: "how the project's runner is told the files `RUN` names is the project's own, and which tests are its proof is a reading of the project" },
   { lead: "16 November 2026, the rules in folders that say who reads them or when", cost: COST.line, check: movedPaths,
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
+  { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

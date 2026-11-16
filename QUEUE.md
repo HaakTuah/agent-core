@@ -42,7 +42,6 @@ wanted").
 | #357 | builder | |
 | #362 | builder | |
 | #386 | builder | #362, which changes the same file |
-| #393 | builder | |
 | #394 | builder | |
 | #403 | builder | #299, whose rule its mends name |
 | #404 | builder | #299, whose rule it holds, and #403, or built with it |
