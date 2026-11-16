@@ -19,10 +19,10 @@ pulls in less than `AGENTS.md` names.
 by one command, which the project's `AGENTS.md` names: `scripts/reading.mjs`, given a role and a task (its issue, its
 kinds, or the paths changed so far), prints the role's start (`modules/roles.md`, "A file for each role") and the
 modules the task calls for, each module saying in its opening line when it is read, in words the script matches: a
-kind of task, a path, a tool. Whoever sets a tool up for a project gives it nothing more to find them by: where the
-tool has a hook at a session's start, the work-saved hook there calls the script and names what the branch's changed
-paths call for; where it has none, the door's sentence is all. It does not mean an entry file stops pulling in a
-builder's start, nor that the floor is ever left to a pick: `floor/security.md` is read whole by every session.
+kind of task, a path, a tool. It does not mean a tool needs a way of its own to find them (where it has a hook at a
+session's start, the work-saved hook there calls the script and names what the branch's changed paths call for;
+where it has none, the door's sentence is all), nor that an entry file stops pulling in a builder's start, nor that
+the floor is ever left to a pick: `floor/security.md` is read whole by every session.
 Reason: each tool found the rules its own way, and a session left to judge what it needs read everything or missed
 one. Held, in part, by `scripts/reading.mjs --check`, which fails a module or a role's file that does not say when it
 is read; that a session then opens what is printed, by nothing yet.

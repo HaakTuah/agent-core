@@ -120,8 +120,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   which it waits unmerged while its builder takes the next line.
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`; core archive 179, 181 and 233). By
   default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so whoever
-  adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little, that
-  builder raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every session reads" in
+  adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little, whoever
+  makes the change raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every session reads" in
   `modules/review-guidelines.md` says of any such mark (core archive 182 and 201). It does not mean a rule is moved from
   where it belongs, cut short or left out to fit, nor another rule's reason, name or example cut to make room. Reason:
   each start is paid at every task, and a cap that decided where a rule stands would hide it from who must keep it.

@@ -41,7 +41,7 @@ export const READ_LINE = "Read for it:";
 // The floor's two files read when needed, by the topics the floor's own opening names, until they are a folder of
 // topics that each say when (#304, point 8): the floor's words are not changed for it here.
 export const FLOOR_WHEN = {
-  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "package*lock.json"] },
+  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*lock.json", "*-lock.yaml", "go.sum"] },
   "floor/threat-model.md": { kinds: ["security-review"], paths: [] },
 };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
@@ -207,18 +207,23 @@ export function lineMend(body, called, command) {
   return `the description's line "${READ_LINE}" ${listed(body) ? "does not list" : "is missing; it must list"} ${lacks.map(c => `\`${c.file}\` (${c.why})`).join(", ")}, which the changed paths call for. Mend: read each of those files whole, check the change against it, then add it in backticks to a line "${READ_LINE} ..." of the description (${command} prints the line)`;
 }
 
-// git, read only, with the settings that run commands (fsmonitor, hooks) turned off: its output, or null where it fails.
-const git = (dir, ...args) => { const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"] }); return r.status === 0 ? r.stdout : null; };
+// git, read only: its output, or null where it fails. The settings that run commands (fsmonitor, hooks) are turned
+// off; it never asks for a sign-in, never fetches what a clone made without its files lacks, and is given ten seconds,
+// so that a session's start waits on nothing.
+const QUIET = { GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", GCM_INTERACTIVE: "never" };
+const git = (dir, ...args) => { const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"], timeout: 10000, env: { ...process.env, ...QUIET } }); return r.status === 0 ? r.stdout : null; };
+// The project's main as its remote holds it, by its whole name: a tag or a branch named origin/main stands for nothing.
+const MAIN = "refs/remotes/origin/main";
 // The paths of a change that are the project's own: in a project, not those of the core's copy, which a sync moves and
 // the core's own pull request held to its reading.
 export const ownOf = (paths, prefix) => (prefix ? paths.filter(p => !p.startsWith(prefix)) : paths);
-// The paths changed since `base` (a commit; left out, where the branch left origin/main): committed or not, new files
-// too, a renamed file by both its names.
+// The paths changed since `base` (a commit; left out, where the branch left the remote's main): committed or not, new
+// files too, a renamed file by both its names, each as it is spelled (-z: git quotes none of them).
 export function changed(dir, base) {
-  const from = base || git(dir, "merge-base", "origin/main", "HEAD")?.trim();
+  const from = base || git(dir, "merge-base", MAIN, "HEAD")?.trim();
   if (!from) return null;
-  const diff = git(dir, "diff", "--name-only", "--no-renames", "--end-of-options", from), fresh = git(dir, "ls-files", "--others", "--exclude-standard");
-  return diff === null ? null : [...new Set(`${diff}\n${fresh ?? ""}`.split("\n").filter(Boolean))];
+  const diff = git(dir, "diff", "--name-only", "--no-renames", "-z", "--end-of-options", from), fresh = git(dir, "ls-files", "--others", "--exclude-standard", "-z");
+  return diff === null ? null : [...new Set(`${diff}\0${fresh ?? ""}`.split("\0").filter(Boolean))];
 }
 
 // The section "What to read" of an issue's text (a heading, or a line in bold as the issue forms write it): its words
@@ -267,7 +272,6 @@ function taskOf(argv, dir, lib, self) {
 // The start hook's line: what the paths changed on the checked-out branch call for, by the roles, modules and config
 // of main's own tree (the copy under core/ where main holds a manifest), named by main's files alone; null where
 // they call for nothing, or main cannot be read.
-const MAIN = "refs/remotes/origin/main";
 export function hookLine(dir) {
   const prefix = git(dir, "cat-file", "-e", `${MAIN}:core-manifest.md`) === null ? "" : "core/";
   const read = f => git(dir, "--no-replace-objects", "show", `${MAIN}:${f}`);

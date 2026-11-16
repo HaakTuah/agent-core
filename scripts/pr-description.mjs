@@ -20,7 +20,8 @@
 // as the merge commit against its first parent, the base, stands in backticks on the description's line "Read for
 // it:". A renamed file counts by both its names, and the paths of the core's copy, in a project, by neither: a sync
 // moves them, and the core's own pull request held them to their reading. A pull request whose paths call for nothing
-// needs no line, and where the change cannot be read (a checkout without the base) nothing is asked.
+// needs no line, and where the change cannot be read (a checkout without the base) nothing is asked. The kinds a
+// project gives its own paths (its reading config) are read as the base holds them.
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -104,11 +105,13 @@ if (started(import.meta.url)) {
     if (then?.includes("export const WAITS_SINCE")) { const mend = waitsMend(process.env.PR_BODY); if (mend) mends.push(mend); }
     else console.log(`ok   the line "${WAITS}" is not asked here: ${why}`);
     if (created >= READS_SINCE && then?.includes("export const READS_SINCE")) {
-      const prefix = coreAt(process.cwd()), diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
-      const paths = prefix === null || diff.status !== 0 ? null : ownOf(diff.stdout.split("\n").filter(Boolean), prefix);
+      const prefix = coreAt(process.cwd()), diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      const paths = prefix === null || diff.status !== 0 ? null : ownOf(diff.stdout.split("\0").filter(Boolean), prefix);
       if (paths === null) console.log("ok   the line that lists what the changed paths call for is not asked here: the change could not be read against its base");
       else {
-        const config = prefix ? OWN.find(f => fs.existsSync(f)) : undefined, own = config ? ownPaths(fs.readFileSync(config, "utf8")) : [];
+        // (the kinds of the project's own paths as the base holds them: a pull request does not set what it is read by)
+        const atBase = f => { const r = spawnSync("git", ["show", `HEAD^1:${f}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? r.stdout : null; };
+        const own = prefix ? ownPaths(OWN.map(atBase).find(text => text !== null)) : [];
         const called = calledByPaths(library(process.cwd(), prefix), paths, own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
         const mend = lineMend(process.env.PR_BODY, called, `node ${prefix}scripts/reading.mjs builder --changed --line`);
         if (mend) mends.push(mend);

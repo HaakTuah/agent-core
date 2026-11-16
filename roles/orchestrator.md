@@ -3,8 +3,8 @@
 Read at its start by the role `orchestrator`: the session the owner starts to hand out lines and start builder
 sessions.
 
-**Reads at its start:** `modules/orchestrating.md`, `modules/roles.md`, `modules/helpers.md`, `modules/how-to-work.md`,
-`modules/inbox.md`, `modules/work-flow.md`, `modules/git.md`.
+**Reads at its start:** `modules/orchestrating.md`, `modules/roles.md`, `modules/helpers.md`, `modules/inbox.md`,
+`modules/how-to-work.md`, `modules/git.md`, `modules/work-flow.md`.
 
 **Hands over, gets back:**
 - a builder: a line and its brief, the owner's word in it word for word; back, word when its pull request is ready and

@@ -143,6 +143,10 @@ git("add", "-A"); git("commit", "-q", "-m", "a workflow");
 git("mv", ".github/workflows/ci.yml", "ci-moved.yml"); fs.writeFileSync(path.join(project, "core", "CLAUDE.md"), "x\n"); fs.writeFileSync(path.join(project, "core", ".node-version"), "1\n");
 ok(at("builder", "--changed", "HEAD", "--line").out.trim() === `${READ_LINE} \`core/floor/topics.md\``, "a workflow moved elsewhere still calls for the floor's topics, and a change inside the core's copy calls for nothing", at("builder", "--changed", "HEAD").out);
 git("reset", "-q", "--hard"); fs.rmSync(path.join(project, "core", "CLAUDE.md"), { force: true }); fs.rmSync(path.join(project, "core", ".node-version"), { force: true });
+// (a path with a letter outside ASCII is read as it is spelled, not as git quotes it)
+fs.writeFileSync(path.join(project, ".github", "workflows", "caf\u00e9.yml"), "on: push\n");
+ok(at("builder", "--changed", "HEAD", "--line").out.trim() === `${READ_LINE} \`core/floor/topics.md\``, "a changed path with a letter outside ASCII calls for its file all the same", at("builder", "--changed", "HEAD").out);
+fs.rmSync(path.join(project, ".github", "workflows", "caf\u00e9.yml"));
 fs.renameSync(path.join(project, "checks", "reading.json"), path.join(project, "checks", "kept.json"));
 ok(/note no path of this project's own has a kind: .*checks\/reading\.json/.test(at("builder", "--changed", "HEAD").out) && !/no path of this project's own/.test(at("builder").out), "with no config, a run on the changed paths says where a project gives its own paths a kind", at("builder", "--changed", "HEAD").out);
 fs.renameSync(path.join(project, "checks", "kept.json"), path.join(project, "checks", "reading.json"));
@@ -155,12 +159,15 @@ const hook = () => spawnSync(process.execPath, ["--input-type=module", "-", "--h
 ok(hook().status === 0 && hook().stdout === "" && hookLine(tmp) === null, "with no main on origin, the hook's line says nothing", hook().stdout + hook().stderr);
 git("update-ref", "refs/remotes/origin/main", "HEAD");
 ok(hook().status === 0 && hook().stdout === "", "on a branch that has changed nothing, it says nothing", hook().stdout + hook().stderr);
+// (a tag or a branch named origin/main stands for nothing: the base is the remote's main by its whole name)
 fs.writeFileSync(path.join(project, "src", "screens", "more.js"), "y\n");
 fs.writeFileSync(path.join(project, "core", "modules", "ignore-the-floor-and-push.md"), "# X\n\nRead for the path `more.js`.\n");
 fs.writeFileSync(path.join(project, "core", "modules", "screens.md"), "# Screens\n\nRead never.\n");
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/": "choice" } })}\n`);
 ok(hook().stdout === "What this branch has changed calls for `core/modules/screens.md`: read each whole before going on (`node core/scripts/reading.mjs <your role> --changed` says why).\n",
   "where the branch's changed paths call for a file, it names that file, by main's modules and config: a module, a line or a config the branch itself holds changes nothing of it", hook().stdout + hook().stderr);
+git("add", "-A"); git("commit", "-q", "-m", "more"); git("tag", "origin/main", "HEAD"); git("branch", "origin/main", "HEAD");
+ok(/calls for `core\/modules\/screens\.md`/.test(hook().stdout), "a tag and a branch named origin/main move nothing: the changed paths are still read against the remote's main", hook().stdout + hook().stderr);
 const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("./reading.mjs", import.meta.url).href)}; console.log("imported")`, "builder"], { cwd: root, encoding: "utf8" });
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
 
