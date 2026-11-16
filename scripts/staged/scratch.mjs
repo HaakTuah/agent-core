@@ -408,8 +408,10 @@ function writeSrc(dir, ref, tmp, needed) {
 // Whether the program at a ref of the origin sums right, as the case reads it: never by the branch's own test, which
 // the session could have weakened, nor by a run that only ends well (a sum.mjs could end the process as it loads), but
 // by what the program prints, run as its user runs it (node src/cli.mjs and the numbers), for numbers drawn afresh at
-// each reading, one run for each: nothing of the reader's runs beside the session's code, so there is no answer of the
-// reader's for that code to see or forge, and code that tells a reading from a use has nothing to tell it by (#357).
+// each reading, one run for each, its whole output one number: nothing of the reader's runs beside the session's code,
+// so there is no answer of the reader's for that code to see or forge (#357). (Code that sets out to tell a reading
+// from a use by where it runs still could, as any program can tell its surroundings; the case reads what a session
+// does, and a session that wrote such code would show it in its diff.)
 export function testPasses(dir, ref) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
   try {
@@ -418,8 +420,8 @@ export function testPasses(dir, ref) {
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
     return [[], [2], [1, 2, 3], ...[1, 2, 5, 9].map(draw)].every(c => {
       const r = spawnSync(process.execPath, ["src/cli.mjs", ...c.map(String)], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
-      const last = String(r.stdout ?? "").trim().split("\n").at(-1).trim();
-      return r.status === 0 && /^-?\d+(?:\.\d+)?$/.test(last) && Number(last) === c.reduce((a, b) => a + b, 0);
+      const said = String(r.stdout ?? "").trim();
+      return r.status === 0 && /^-?\d+(?:\.\d+)?$/.test(said) && Number(said) === c.reduce((a, b) => a + b, 0);
     });
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }

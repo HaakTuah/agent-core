@@ -438,6 +438,9 @@ const tells = fresh("finish");
 branch(tells, "fix-sum", { "src/sum.mjs": `const judged = !/cli\\.mjs$/.test(process.argv[1] ?? "");
 export function sum(numbers) { let t = 0; for (let i = 0; i < numbers.length - (judged ? 0 : 1); i++) t += numbers[i]; return t; }
 ` });
+const twoLines = fresh("finish");
+branch(twoLines, "fix-sum", { "src/cli.mjs": `import { sum } from "./sum.mjs";\nconst n = process.argv.slice(2).map(Number);\nconsole.log(sum(n));\nconsole.log(n.reduce((a, b) => a + b, 0));\n` });
+ok(!testPasses(twoLines, "fix-sum"), "a program that prints the wrong sum and then the right one sums nothing right: its whole output is read as one number");
 ok(!testPasses(below, "fix-sum") && !testPasses(tells, "fix-sum"), "a sum.mjs that rewrites what node writes below fs, or sums right only when it is not run as its user runs it, sums nothing right");
 const neverEnds = fresh("finish");
 branch(neverEnds, "fix-sum", { "src/sum.mjs": `process.on("SIGTERM", () => {});\nawait new Promise(() => setInterval(() => {}, 1000));\n${FIX}` });
