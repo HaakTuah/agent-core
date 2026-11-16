@@ -92,7 +92,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, r
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
-import { logged, parseBounded } from "./guards.mjs";
+import { oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
@@ -403,7 +403,7 @@ const DECLARATION = new RegExp(`^<\\?xml${XB}+version${XB}*=${XB}*(?:"1\\.[0-9]+
 const ATTRIBUTES = /^(?:[ \t\r\n]+[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?[ \t\r\n]*=[ \t\r\n]*(?:"[^"<\u0000\u0001]*"|'[^'<\u0000\u0001]*'))*[ \t\r\n]*$/u;
 const AMPERSAND = /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/u;
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
-const shown = logged;
+const shown = oneLine;
 
 /** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {

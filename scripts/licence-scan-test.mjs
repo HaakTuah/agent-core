@@ -215,7 +215,9 @@ for (const [what, change, why] of [
       const linkedManifest = run((dir) => { LOCK("MIT")(dir); fs.rmSync(path.join(dir, "package.json")); fs.symlinkSync(path.join(elsewhere, "package.json"), path.join(dir, "package.json")); });
       ok(linkedManifest.some((m) => /package\.json is reached through a link that leads out of the project, so it is not read\. Mend: /u.test(m)), "a package.json beside a lockfile reached through a link out of the project is not read, saying its mend", linkedManifest.join("\n"));
       const linkedFile = run((dir) => fs.symlinkSync(path.join(elsewhere, "notice.js"), path.join(dir, "site", "tools", "linked.js")));
-      ok(linkedFile.length === 0, "reads a tracked link as the path it names, never the file it leads to", linkedFile.join("\n"));
+      ok(linkedFile.some((m) => /^site\/tools\/linked\.js is a link that leads out of the project, so what it holds cannot be read\. Mend: /u.test(m)) && !linkedFile.some((m) => /carrying a licence notice/u.test(m)), "fails a tracked link that leads out of the project, never reading the file it leads to, saying its mend", linkedFile.join("\n"));
+      const inside = run((dir) => { write("docs/vendor.txt", "/*! Copyright 2020 Mossgrip | GPL-3.0 */\n")(dir); fs.symlinkSync(path.join("..", "docs", "vendor.txt"), path.join(dir, "site", "vendor.js")); });
+      ok(inside.some((m) => /^site\/vendor\.js \(a file carrying a licence notice\) is not in audit\.json/u.test(m)), "reads a tracked link inside the project as the file it leads to, in the link's own place, a skipped file's notice among them", inside.join("\n"));
     }
   } finally { fs.rmSync(elsewhere, { recursive: true, force: true }); }
 }

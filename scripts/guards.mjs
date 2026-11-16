@@ -41,11 +41,14 @@ export function leadsOut(root, at) {
   }
 }
 
+/** Text with every control character and line separator shown as "?": on one line, and, where it changes nothing,
+ *  text that held none. */
+export const oneLine = text => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
+
 /** Text from a project, made safe to print on one line of a workflow's log: "%", a carriage return and a line feed
  *  escaped as GitHub documents a command's data is (%25, %0D, %0A), and any other control character or line separator
- *  shown as "?", so no part of it starts a line of its own, which GitHub Actions could read as a command. */
-export const logged = text => String(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A")
-  .replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
+ *  shown as "?" (oneLine), so no part of it starts a line of its own, which GitHub Actions could read as a command. */
+export const logged = text => oneLine(String(text).replace(/%/gu, "%25").replace(/\r/gu, "%0D").replace(/\n/gu, "%0A"));
 
 /** How deep a value read from a project's JSON may nest, in objects and lists, before a check refuses it: far past any
  *  config, manifest or lock file, and short of where reading it, or printing it, would run out of stack. */

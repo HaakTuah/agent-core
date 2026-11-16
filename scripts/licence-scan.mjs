@@ -29,10 +29,10 @@
 // reach users ([] if none); "tools", the folders within them whose files do not; and "skip", the folders or files
 // left out. Node's own modules only.
 import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, readlinkSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
-import { DEEPEST, tooDeep } from "./guards.mjs";
+import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
 import { commandLines, commands, fetched, otherFetch } from "./licence-commands.mjs";
 
 const OWN = `${OWNER}/`;
@@ -122,11 +122,13 @@ function executable(text, f) {
   return parts.join("\n");
 }
 
-/** A tracked file's text: of a link, as git holds it, the path it names, never followed, since what it leads to may lie
- *  outside the checkout, and a file inside is read in its own turn. */
-function trackedText(root, f) {
+/** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
+ *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
+function trackedText(root, f, fail) {
   const at = join(root, f);
-  return lstatSync(at).isSymbolicLink() ? readlinkSync(at, "utf8") : readFileSync(at, "utf8");
+  if (!leadsOut(root, at)) return readFileSync(at, "utf8");
+  fail(`${f} is a link that leads out of the project, so what it holds cannot be read. Mend: put the file itself there, in place of the link`);
+  return "";
 }
 
 /** The command lines a JSON file `f` holds (licence-commands.mjs); none where it nests past the bound, which fails
@@ -191,7 +193,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) {
     if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
-    const text = binary.has(f) ? "" : trackedText(root, f);
+    const text = binary.has(f) ? "" : trackedText(root, f, fail);
     // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
     // scan cannot read; with none, as shell)
     const bare = !binary.has(f) && !/.\.\w+$/u.test(posix.basename(f)); // (".envrc" and the like have none either)

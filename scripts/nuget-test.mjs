@@ -377,6 +377,13 @@ ok(strict.status === 1 && /^FAIL: Copy\.Left@4\.0\.0/m.test(strict.out) && mende
 ok(advisory.status === 0 && /^WOULD FAIL: Copy\.Left@4\.0\.0/m.test(advisory.out) && /Advisory: nothing fails for it yet/.test(advisory.out), "advisory, it says what it would fail, and passes", advisory.out);
 ok(run("checks/licences.json").status === 1 && run("--packages", left).status === 1 && run().status === 1 && run("checks/missing.json", "--packages", left, "--advisory").status === 1, "without its config or the restore's folder it fails, advisory or not");
 ok(run("--projects").status === 0 && run("--projects").stdout === "src/App/App.csproj\n", "asked for the project files, it lists what git knows, a line each, for the restore");
+{
+  // (a name with "%" in it holds no control character, and is listed as it stands)
+  inRepo("src/100%Cover/Cover.csproj", "<Project />"); git("add", "-A");
+  const listed = run("--projects");
+  git("rm", "-q", "-r", "--cached", "src/100%Cover"); fs.rmSync(path.join(repo, "src/100%Cover"), { recursive: true, force: true });
+  ok(listed.status === 0 && listed.stdout === "src/100%Cover/Cover.csproj\nsrc/App/App.csproj\n", "a project file whose name holds \"%\" is listed as it stands", listed.out);
+}
 ok(run("checks/licences.json", "--sources").status === 0 && run("checks/licences.json", "--sources").stdout === `${REGISTRY}\n` && run("--sources").status === 1 && run("checks/missing.json", "--sources").status === 1,
   "asked for the sources, it lists the registry and what the config names, a line each, and fails without a config it can read");
 inRepo(L, lock(direct(["Newtonsoft.Json", "13.0.3"])));

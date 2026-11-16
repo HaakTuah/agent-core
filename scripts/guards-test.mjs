@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, seen, tooDeep, unrooted } from "./guards.mjs";
+import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, oneLine, seen, tooDeep, unrooted } from "./guards.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600)}`}`); } };
@@ -43,6 +43,8 @@ try {
 
 const name = "a%b\r\n::name::value\u2028c\u0007d";
 ok(!/[\r\n\u2028\u0007]/u.test(logged(name)) && logged(name).startsWith("a%25b%0D%0A::") && logged("plain/name.js") === "plain/name.js", "a name printed to the log stays on its one line, escaped as GitHub documents", logged(name));
+
+ok(oneLine("100%Coverage/App.csproj") === "100%Coverage/App.csproj" && oneLine("a\nb\u2028c") === "a?b?c", "a name with no control character is shown as it stands, \"%\" and all; one with them, on one line");
 
 let deep = 1;
 for (let i = 0; i < 20000; i++) deep = [deep];
