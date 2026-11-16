@@ -186,6 +186,33 @@ jobs:
       - name: The labels and openers, and their check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/labels-test.mjs ')) }}
         run: node scripts/labels-test.mjs
+      - name: The hostile tests of an input, a pull request's description
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-text-test.mjs ')) }}
+        run: node scripts/hostile-pr-text-test.mjs
+      - name: The hostile tests of an input, comments and reviews on a pull request
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-comments-test.mjs ')) }}
+        run: node scripts/hostile-pr-comments-test.mjs
+      - name: The hostile tests of an input, what a pull request changes
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-changes-test.mjs ')) }}
+        run: node scripts/hostile-pr-changes-test.mjs
+      - name: The hostile tests of an input, issues, their comments and labels
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-issues-test.mjs ')) }}
+        run: node scripts/hostile-issues-test.mjs
+      - name: The hostile tests of an input, what GitHub's API answers
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-github-test.mjs ')) }}
+        run: node scripts/hostile-github-test.mjs
+      - name: The hostile tests of an input, a project's configs of the core's checks, its manifest and SECURITY.md
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-configs-test.mjs ')) }}
+        run: node scripts/hostile-configs-test.mjs
+      - name: The hostile tests of an input, a project's build, package and workflow files
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-build-files-test.mjs ')) }}
+        run: node scripts/hostile-build-files-test.mjs
+      - name: The hostile tests of an input, what a package brings
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-packages-test.mjs ')) }}
+        run: node scripts/hostile-packages-test.mjs
+      - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/own-inputs-test.mjs ')) }}
+        run: node scripts/own-inputs-test.mjs
       - name: The core's releases, what a project follows, and cutting one
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/releases-test.mjs ')) }}
         run: node scripts/releases-test.mjs

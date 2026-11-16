@@ -328,7 +328,11 @@ if (started(import.meta.url)) {
     console.error("usage: node scripts/security-review.mjs <the pull request, as JSON> <its comments, as JSON> [<its review comments, as JSON> [<its commits, as JSON> [<its files, as JSON> [<the merges clean-merges.mjs proved, as JSON>]]]]");
     process.exit(2);
   }
-  const read = (file) => JSON.parse(readFileSync(file, "utf8"));
+  // (a file that is not JSON, or is gone, fails with its mend, never with a stack: the workflow writes each from gh api)
+  const read = (file) => {
+    try { return JSON.parse(readFileSync(file, "utf8")); }
+    catch (e) { console.error(`FAIL: scripts/security-review.mjs could not read ${file} as JSON (${e.code ?? e.name}). Mend: write it again from the GitHub API, as the security-review workflow does, and run the check again`); process.exit(1); }
+  };
   // (PURE: the head's whole SHA, where pure-sync.mjs, run by the workflow from the default branch's copy, proved it)
   const pull = read(pullFile);
   const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, process.env.BOUND !== "false",
