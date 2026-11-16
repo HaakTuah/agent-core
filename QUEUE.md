@@ -33,6 +33,7 @@ wanted").
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
+| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built together now, whose work-down of the listed functions takes in `scripts/look.mjs`, which #471 changes too |
 | #350 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
