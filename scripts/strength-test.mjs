@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "./strength.mjs";
+import { again, baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -104,6 +104,43 @@ const unrunOld = verdict({ faults: [], still: [{ ...f(kept, "Pending") }], basel
 const notMeasured = verdict({ faults: [f(repeated, "Survived")], still: [f(repeated, "Pending")], baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] });
 ok(unrunOld.fails && !notMeasured.fails && notMeasured.lines.some(l => l.startsWith("Not measured:") && l.includes("Readings taken")) && same(unsure([f(repeated, "Survived")], entry, [f(repeated, "Killed")]), []),
   "a pull request that lowers an entry while a fault of its kind was not run fails, since only debt measured gone leaves the list; a survivor that passes only for want of a run is said not to be measured", notMeasured.lines.join("\n"));
+// (#408: the tool run a second time, with a budget of its own, on the lines whose faults the first left unrun alone;
+// each fault by its place, file, line and column, and id)
+const at = (id, status, line, column = 1) => ({ ...f(id, status), line, column }), on = (...lines) => new Map([["a.js", new Set(lines)]]);
+const told = [], asked = lines => [...lines].map(([file, where]) => [file, [...where]]);
+const second = again([at(repeated, "Pending", 2), at(repeated, "Survived", 7)], lines => { told.push(asked(lines)); return [at(repeated, "Survived", 2)]; }, on(2, 7));
+const measuredAgain = verdict({ faults: [f(repeated, "Survived")], still: second, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] });
+const stillUnrun = again([at(repeated, "Pending", 2), at(repeated, "Killed", 7)], () => [at(repeated, "Pending", 2)], on(2, 7));
+ok(same(told, [[["a.js", [2]]]]) && second.length === 2 && second.every(g => g.status === "Survived") && measuredAgain.fails && !measuredAgain.lines.some(l => l.startsWith("Not measured:"))
+  && again([at(repeated, "Killed", 2)], () => { throw new Error("run again"); }, on(2)).length === 1 && verdict({ faults: [f(repeated, "Survived")], still: stillUnrun, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] }).lines.some(l => l.startsWith("Not measured:")),
+  "a fault left unrun on the lines a change left alone is run again, on its line alone, and what that run finds takes its place: a survivor that grows the debt then fails; where it stays unrun, it is said not measured, and with nothing unrun the tool is not run again", measuredAgain.lines.join("\n"));
+// (the fallback reviewer's cases on #463: a survivor the first run judged on a line it re-runs is kept, though the second
+// run leaves it unrun; two faults of one id on one line, told apart by their column, are each matched to their own)
+const kept4 = again([at(repeated, "Survived", 4, 5), at(repeated, "Pending", 4, 20), at(repeated, "Killed", 9)], () => [at(repeated, "Pending", 4, 5), at(repeated, "Pending", 4, 20)], on(4, 9));
+const twoOnOne = again([at(repeated, "Survived", 4, 5), at(repeated, "Pending", 4, 20), at(repeated, "Killed", 9)], () => [at(repeated, "Survived", 4, 5), at(repeated, "Killed", 4, 20)], on(4, 9));
+const judgedNow = again([at(repeated, "Pending", 4, 5), at(kept, "Pending", 4, 9), at(repeated, "Killed", 9)], () => [at(repeated, "Survived", 4, 5), at(repeated, "Survived", 4, 30)], on(4, 9));
+let calls = 0;
+const sameQueue = again([at(repeated, "Pending", 2), at(repeated, "Survived", 2, 9)], () => { calls++; return []; }, on(2));
+const otherKinds = again([at(repeated, "Pending", 2)], () => { calls++; return []; }, on(2, 3));
+// (and two faults that share a start and, cut short, an id, as a tool that faults a whole expression writes them: each
+// matched to its own by the whole of it, its end and what it became)
+const longLine = "if (someObject.someLongPropertyName.anotherProperty.length < limit) go();\nkeep();\n";
+const wide = (status, replacement, line = 1) => ({ ...mutant(line, 5, 67, status, replacement), mutatorName: "EqualityOperator" });
+const reportOf = (...mutants) => JSON.stringify({ files: { "a.js": { source: longLine, mutants } } });
+const shared = faultsOf(reportOf(wide("Pending", "someObject.someLongPropertyName.anotherProperty.length <= limit"), wide("Pending", "someObject.someLongPropertyName.anotherProperty.length >= limit"), { ...mutant(2, 1, 5, "Killed", "x"), mutatorName: "Other" }), null);
+const sharedAgain = order => again(shared, () => faultsOf(reportOf(...order), null), on(1, 2));
+const truth = [wide("Survived", "someObject.someLongPropertyName.anotherProperty.length <= limit"), wide("Killed", "someObject.someLongPropertyName.anotherProperty.length >= limit")];
+ok(shared[0].id === shared[1].id && [truth, [...truth].reverse()].every(order => { const got = sharedAgain(order); return got.filter(g => g.status === "Survived").length === 1 && got.filter(g => g.status === "Killed").length === 2 && got.find(g => g.status === "Survived").replacement.endsWith("<= limit"); }),
+  "two faults that share a start and, cut short, an id are each matched to their own by the whole of them, in whatever order the second report holds them");
+ok(kept4.filter(g => g.status === "Survived").length === 1 && kept4.length === 3
+  && verdict({ faults: [f(repeated, "Survived")], still: kept4, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] }).fails
+  && twoOnOne.filter(g => g.status === "Survived").length === 1 && twoOnOne.filter(g => g.status === "Killed").length === 2
+  && judgedNow.length === 3 && judgedNow.filter(g => g.status === "Survived").length === 1 && judgedNow.some(g => g.id === kept && g.status === "Pending")
+  && sameQueue.length === 2 && calls === 1 && otherKinds.length === 1,
+  "fault by fault, by place and id: a survivor the first run judged is kept though the second run leaves its line unrun; two faults of one id on one line are each matched to their own, so none is counted twice; a fault judged again takes the place of that fault alone; where the lines left unrun are all the first run measured, no second run is made, and where it measured others too, one is");
+ok(unrunOld.lines.some(l => l.startsWith("FAIL") && l.includes("did not run (its budget)") && l.includes("raise the tool's budget") && l.includes("MUTATE_BUDGET")) && mended(unrunOld.lines.join("\n")) && !dropped([f(kept, "Survived")]).lines.some(l => l.includes("budget where"))
+  && same(undercut(b({}), baseKept, [f(kept, "Pending")]).map(k => k.unrun), [1]),
+  "where an entry is held up only by faults the tool did not run, the failure says so and names a larger budget in its mend; where the faults ran and survive, it does not", unrunOld.lines.join("\n"));
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });
