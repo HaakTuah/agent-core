@@ -181,15 +181,32 @@ function doubleQuoted(text, i, add) {
   return j;
 }
 
-// The root of the checkout as a workflow names it, at a path's start: read as the project's root.
-const ROOT = /^(?:\$GITHUB_WORKSPACE|\$\{GITHUB_WORKSPACE\}|\$\{\{\s*github\.workspace\s*\}\}|\$env:GITHUB_WORKSPACE|%GITHUB_WORKSPACE%)\//u;
+// The root of the checkout as a workflow names it, at a path's start, read as the project's root: GitHub's expression
+// in any shell, a variable only in the shell that fills it (bash's $GITHUB_WORKSPACE is text to cmd, and empty to
+// PowerShell); in a shell the reader does not know, the expression alone.
+const ROOTS = { bash: "\\$GITHUB_WORKSPACE|\\$\\{GITHUB_WORKSPACE\\}|", pwsh: "\\$env:GITHUB_WORKSPACE|", cmd: "%GITHUB_WORKSPACE%|" };
+const ROOT_OF = new Map([null, ...Object.keys(ROOTS)].map(k => [k, new RegExp(`^(?:${ROOTS[k] ?? ""}\\$\\{\\{\\s*github\\.workspace\\s*\\}\\})/`, "u")]));
+const rootOf = shell => ROOT_OF.get(shell ?? null) ?? ROOT_OF.get(null);
+// The shell a step runs in, as one of ROOTS' names, or null where the reader cannot tell: its own `shell:`, else its
+// job's or its workflow's default, else the runner's (PowerShell on Windows, bash elsewhere), where its labels say it.
+function shellOf(given, runsOn) {
+  if (given !== undefined && given !== null) {
+    if (typeof given !== "string") return null;
+    const name = /^\s*([\w.-]+)/u.exec(given)?.[1]?.toLowerCase();
+    return { bash: "bash", sh: "bash", pwsh: "pwsh", powershell: "pwsh", cmd: "cmd" }[name] ?? null;
+  }
+  const labels = typeof runsOn === "string" ? [runsOn] : runsOn;
+  if (!Array.isArray(labels) || labels.some(l => typeof l !== "string" || l.includes("${{"))) return null;
+  if (labels.some(l => /windows/iu.test(l))) return "pwsh";
+  return labels.some(l => /ubuntu|linux|macos/iu.test(l)) ? "bash" : null;
+}
 // A word as a path from the project's root, run in the folder `dir` (from the root): { at } where it is known, at null
 // where it leads out of the project; { dynamic } where it is named only when the workflow runs; { windows } where it
 // holds a "\\", a folder's parting on Windows and part of a file's name on Linux, so no one file.
-function located(word, dir) {
+function located(word, dir, shell) {
   if (word.text.includes("\\")) return { windows: true };
   // (the root's name is filled only where the word lets the shell fill it: in single quotes it is text)
-  const text = word.text, rooted = word.dynamic && ROOT.test(text), rest = rooted ? text.replace(ROOT, "") : text;
+  const root = rootOf(shell), text = word.text, rooted = word.dynamic && root.test(text), rest = rooted ? text.replace(root, "") : text;
   if (word.dynamic && /\$|`|%\w+%|[{*?[(]/u.test(rest)) return { dynamic: true }; // (a variable, braces or a glob, an extended one too)
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
@@ -238,7 +255,7 @@ function inline(words, i) {
     if (/^-[a-zA-Z]*c[a-zA-Z]*$/u.test(words[k].text)) c = true;
     if (/^[-+][a-zA-Z]*[oO]$/u.test(words[k].text)) k++;
   }
-  return c && k < words.length ? { inner: words[k].text, filled: words[k].dynamic } : {};
+  return c && k < words.length ? { inner: words[k].text, filled: words[k].dynamic, shell: "bash" } : {};
 }
 // PowerShell's: -Command (or a prefix down to -c) and -CommandWithArgs (-cwa) give it; a word with a blank and no
 // option before it is the command (Windows PowerShell's default); -File (or a prefix) gives a file; -WorkingDirectory
@@ -247,9 +264,9 @@ function powershell(words, i) {
   let elsewhere = false;
   for (let k = i + 1; k < words.length; k++) {
     const t = words[k].text, next = words[k + 1];
-    if (/^-(?:c|co|com|comm|comma|comman|command|commandwithargs|cwa)$/iu.test(t)) return next ? { inner: next.text, filled: next.dynamic, elsewhere } : {};
+    if (/^-(?:c|co|com|comm|comma|comman|command|commandwithargs|cwa)$/iu.test(t)) return next ? { inner: next.text, filled: next.dynamic, elsewhere, shell: "pwsh" } : {};
     if (/^-f(?:i(?:le?)?)?$/iu.test(t)) return {};
-    if (!t.startsWith("-")) return /\s/u.test(t) ? { inner: t, filled: words[k].dynamic, elsewhere } : {};
+    if (!t.startsWith("-")) return /\s/u.test(t) ? { inner: t, filled: words[k].dynamic, elsewhere, shell: "pwsh" } : {};
     if (/^-(?:wd|wo\w*)$/iu.test(t)) elsewhere = true;
     if (next && !next.text.startsWith("-") && !/\s/u.test(next.text)) k++;
   }
@@ -267,7 +284,7 @@ function configAfter(words, i, dir, script) {
   const k = pick.first ? 0 : args.findIndex((a, n) => !a.text.startsWith("--") && !(n > 0 && pick.valued?.includes(args[n - 1].text)));
   const arg = k < 0 ? words.length : i + 1 + k;
   if (arg >= words.length) return { unread: `runs ${script} with no config` };
-  const config = located(words[arg], dir.at);
+  const config = located(words[arg], dir.at, dir.shell);
   if (config.windows) return { unread: `passes ${script} its config as ${words[arg].text}, a path with "\\" that Linux and Windows read as different files` };
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
@@ -337,10 +354,10 @@ function runsIn(run, dir, script) {
   const found = [];
   let moved = false;
   for (const words of commands(run)) {
-    const { moves, inner, filled, elsewhere, shifted, at: i } = nodeRuns(words);
+    const { moves, inner, filled, elsewhere, shifted, shell, at: i } = nodeRuns(words);
     moved ||= !!moves;
-    if (inner !== undefined) found.push(...within(runsIn(inner, moved || elsewhere ? { dynamic: true } : dir, script), filled, script));
-    else found.push(...runAt(words, i, moved || shifted ? { dynamic: true, moved: true } : dir, script));
+    if (inner !== undefined) found.push(...within(runsIn(inner, moved || elsewhere ? { dynamic: true, shell } : { ...dir, shell }, script), filled, script));
+    else found.push(...runAt(words, i, moved || shifted ? { dynamic: true, moved: true, shell: dir.shell } : dir, script));
   }
   return found;
 }
@@ -350,8 +367,8 @@ function runsIn(run, dir, script) {
 function runAt(words, i, dir, script) {
   const word = words[i];
   if (!word) return [];
-  const name = path.posix.basename(script).toLowerCase(), at = located(word, dir.dynamic ? "." : dir.at);
-  if (at.dynamic || at.windows || /[{*?[(]|\$'/u.test(word.text.replace(ROOT, ""))) return unplaced(word, dir, name, script);
+  const name = path.posix.basename(script).toLowerCase(), at = located(word, dir.dynamic ? "." : dir.at, dir.shell);
+  if (at.dynamic || at.windows || /[{*?[(]|\$'/u.test(word.text.replace(rootOf(dir.shell), ""))) return unplaced(word, dir, name, script);
   if (path.posix.basename(plainPath(word.text)).toLowerCase() !== name) return []; // (another script)
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   if (dir.dynamic) return [{ unread: `runs ${word.text} in a folder named only when the workflow runs`, unsure: true }];
@@ -395,7 +412,7 @@ function globMatches(glob, name) {
 // core's (a .mjs file, a folder scripts or core, an expression), not read; one given by a variable alone (node --test
 // $RUN) is counted where the step names the path it holds (unaccounted).
 function unplaced(word, dir, name, script) {
-  const plain = x => !/[$`{}\\'"*?[()]/u.test(x), text = trimSlashes(word.text.replace(ROOT, ""));
+  const plain = x => !/[$`{}\\'"*?[()]/u.test(x), text = trimSlashes(word.text.replace(rootOf(dir.shell), ""));
   const cut = text.lastIndexOf("/"), folder = cut < 0 ? null : text.slice(0, cut), own = text.slice(cut + 1);
   if (!dir.moved && !dir.dynamic && folder !== null && plain(folder) && !/(?:^|\/)scripts$/iu.test(path.posix.join(dir.at, folder))) return [];
   if (plain(own) && own.toLowerCase() !== name) return [];
@@ -410,9 +427,10 @@ const folder = (...dirs) => {
   if (d === undefined) return { at: "." };
   if (typeof d !== "string") return { dynamic: true };
   const text = d;
-  // (one named only when the workflow runs, or holding a "\\", which Linux and Windows read as different folders)
-  if (/\$|\\/u.test(text)) return { dynamic: true };
-  const at = path.posix.normalize(text.replace(ROOT, "")).replace(/(.)\/+$/u, "$1"); // (core/scripts/ is core/scripts)
+  // (one named only when the workflow runs, or by a shell's variable, which no shell fills there, or holding a "\\",
+  // which Linux and Windows read as different folders)
+  if (/[$%\\]/u.test(text)) return { dynamic: true };
+  const at = path.posix.normalize(text).replace(/(.)\/+$/u, "$1"); // (core/scripts/ is core/scripts)
   return at === ".." || at.startsWith("../") || at.startsWith("/") ? { dynamic: true } : { at };
 };
 
@@ -489,7 +507,7 @@ function steps(p) {
     const found = actionFile(at);
     if (!found) return;
     if (!found.yaml) { out.push({ where: found.f, from, unreadable: found.text }); return; }
-    walk(found.f, from, found.yaml.runs?.steps ?? [], step => folder(step["working-directory"]), envs, [...chain, at]);
+    walk(found.f, from, found.yaml.runs?.steps ?? [], step => ({ ...folder(step["working-directory"]), shell: shellOf(step.shell) }), envs, [...chain, at]);
   };
   const walk = (where, from, list, dirOf, envs = [], chain = []) => {
     for (const step of Array.isArray(list) ? list : []) {
@@ -502,7 +520,8 @@ function steps(p) {
     const where = `.github/workflows/${f}`;
     if (!w.yaml) continue;
     for (const job of Object.values(w.yaml.jobs ?? {})) {
-      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]), wrap(job?.env, w.yaml.env, job?.strategy));
+      const run = job?.defaults?.run, all = w.yaml.defaults?.run;
+      walk(where, where, job?.steps, step => ({ ...folder(step["working-directory"], run?.["working-directory"], all?.["working-directory"]), shell: shellOf(step.shell ?? run?.shell ?? all?.shell, job?.["runs-on"]) }), wrap(job?.env, w.yaml.env, job?.strategy));
       // (a call to a workflow of the project's own: what it passes is read as the callee's steps would be given it)
       if (typeof job?.uses === "string" && job.uses.startsWith("./")) out.push({ where, from: where, run: "", dir: { at: "." }, given: [job.with, job.strategy] });
     }

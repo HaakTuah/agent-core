@@ -393,7 +393,19 @@ ok(copiesOf({ "a.yml": stepped('node core/scripts/copies.mjs "config/a # b.json"
   "a \" #\" inside quotes cuts nothing short; one outside them starts a comment");
 ok(["node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json", 'node "${{ github.workspace }}/core/scripts/copies.mjs" "$GITHUB_WORKSPACE/config/c.json"',
   "node ${GITHUB_WORKSPACE}/core/scripts/copies.mjs ./config/c.json", "node --no-warnings core/scripts/copies.mjs --first config/c.json"]
-  .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "the checkout's root as a workflow names it and node's options read as the shell reads them");
+  .every(run => copiesOf({ "a.yml": stepped(run, {}, { "runs-on": "ubuntu-latest" }) }) === "config/c.json"), "the checkout's root as a workflow names it and node's options read as the shell reads them");
+{
+  const rooted = (run, step = {}, job = {}, top = {}) => copiesOf({ "a.yml": stepped(`node core/scripts/copies.mjs ${run}/config/c.json`, step, job, top) });
+  ok(rooted("%GITHUB_WORKSPACE%", { shell: "cmd" }) === "config/c.json" && rooted("$env:GITHUB_WORKSPACE", {}, { "runs-on": "windows-latest" }) === "config/c.json"
+    && rooted("$GITHUB_WORKSPACE", {}, { "runs-on": ["self-hosted", "linux"], defaults: { run: { shell: "bash -e {0}" } } }) === "config/c.json"
+    && rooted("$GITHUB_WORKSPACE", {}, {}, { defaults: { run: { shell: "sh" } } }) === "config/c.json" && rooted("${{ github.workspace }}") === "config/c.json",
+    "the root is read as the step's shell names it, the expression in any shell");
+  ok([["%GITHUB_WORKSPACE%", { shell: "bash" }], ["%GITHUB_WORKSPACE%", {}, { "runs-on": "ubuntu-latest" }], ["$GITHUB_WORKSPACE", {}, { "runs-on": "windows-latest" }],
+    ["$GITHUB_WORKSPACE", { shell: "cmd" }], ["$env:GITHUB_WORKSPACE", { shell: "bash" }], ["$GITHUB_WORKSPACE"], ["$GITHUB_WORKSPACE", {}, { "runs-on": "${{ matrix.os }}" }],
+    ["$GITHUB_WORKSPACE", { shell: "python" }], ["$GITHUB_WORKSPACE", { shell: ["bash"] }]].every(a => rooted(...a) === null),
+    "a root named as another shell names it, or where the step's shell cannot be told, is not read as the root");
+  ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs config/c.json", { "working-directory": "%GITHUB_WORKSPACE%/app" }, { "runs-on": "ubuntu-latest" }) }) === null, "a folder named by a shell's variable, which no shell fills there, is not read");
+}
 ok(["node core\\scripts\\copies.mjs config\\c.json", 'node "core\\scripts\\copies.mjs" "config\\c.json"', "node core/scripts/copies.mjs 'config\\c.json'"].every(run => copiesOf({ "a.yml": stepped(run) }) === null),
   "a path with \"\\\", one file on Windows and another on Linux, is not read");
 ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", { "working-directory": "app" }) }) === "config/c.json"
