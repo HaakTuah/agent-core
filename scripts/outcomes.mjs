@@ -93,7 +93,7 @@ export const MEASURES = [
 const tasks = (d, w) => d.merged.filter(p => within(p.when, w));
 function perTen(d, w, kinds) {
   const t = tasks(d, w).length, c = d.corrections.filter(c => kinds.includes(c.kind) && within(c.at, w)).length;
-  return { n: c, text: `${counted(c)} of ${t} merged, ${t ? Math.round((100 * c) / t) / 10 : "none"} for every ten` };
+  return { n: c, text: `${counted(c)} of ${t} merged, ${t ? Math.round((1000 * c) / t) / 100 : "none"} for every ten` };
 }
 const spanOf = v => ({ n: v.length, text: v.length ? `${hours(median(v))} (of ${v.length})` : "none" });
 function failed(d, w) {

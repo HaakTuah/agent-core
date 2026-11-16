@@ -1,1 +1,60 @@
-{ "about": "placeholder", "repos": {} }
+{
+  "about": "The first reading of the outcomes (#302, point 3), from history for 15 September to 15 November 2026, by scripts/outcomes-read.mjs with --from and --to, the corrections found by reading the issues, notes and reports once, since they carried no label. Counts and kinds only. outcomes-read.mjs reads a repository's texts, by key, beside each later state report's line; the report beside this file says how it was taken.",
+  "from": "2026-09-15",
+  "to": "2026-11-15",
+  "repos": {
+    "HaakTuah/agent-core": {
+      "misread": "2 (± 3) of 207 merged, 0.1 for every ten",
+      "missing": "1 (± 2) of 207 merged, 0.05 for every ten",
+      "queued": "2.8 h (of 10)",
+      "looks": "0 (± 0) of 207 merged, 0 for every ten",
+      "failed": "3 (± 3) of 207, 1%",
+      "live": "4.9 h (of 8)",
+      "broke": "1 (± 2) of 207 merged, 0.05 for every ten",
+      "mending": "5 (± 4) of 207, 2%",
+      "corrected": "4 (± 4) of 207 merged, 0.19 for every ten",
+      "cost": "59 answers, 47,559 output tokens (of 63 priced)",
+      "uncorrected": "59 answers, 47,559 output tokens (of 63 priced, 63 not corrected)",
+      "carried": "426,886 (of 63 priced)",
+      "idle": "6% of 25 open hours (of the 60 newest merged)",
+      "rework": "93 (± 19) in 60 pull requests: a review finding 32, a failed check 15, neither (measuring again, or the builder's own) 46; and 20 bringing the branch up to date",
+      "size": "412 KB in 40 files, 5 of them over 20 KB",
+      "functions": "11 over 60 lines, 0 over 4 depth, 37 over 15 branches"
+    }
+  },
+  "projects": [
+    {
+      "shown": "a project of another owner",
+      "outcomes": {
+        "misread": "0 (± 0) of 212 merged, 0 for every ten",
+        "missing": "1 (± 2) of 212 merged, 0.05 for every ten",
+        "queued": "none",
+        "looks": "1 (± 2) of 212 merged, 0.05 for every ten",
+        "failed": "4 (± 4) of 212, 2%",
+        "live": "14.5 h (of 18)",
+        "broke": "4 (± 4) of 212 merged, 0.19 for every ten",
+        "mending": "14 (± 7) of 212, 7%",
+        "corrected": "6 (± 5) of 212 merged, 0.28 for every ten",
+        "cost": "none priced, of 212",
+        "uncorrected": "none priced, of 212",
+        "carried": "none priced",
+        "idle": "80% of 586 open hours (of the 60 newest merged)",
+        "rework": "56 (± 15) in 60 pull requests: a review finding 0, a failed check 7, neither (measuring again, or the builder's own) 49; and 97 bringing the branch up to date",
+        "size": "7627 KB in 546 files, 96 of them over 20 KB",
+        "functions": "201 over 60 lines, 15 over 4 depth, 236 over 15 branches"
+      },
+      "code at its first commit, 11 October 2026 (it is younger than the span)": {
+        "size": "1739 KB in 52 files, 21 of them over 20 KB",
+        "functions": "82 over 60 lines, 11 over 4 depth, 85 over 15 branches"
+      }
+    },
+    {
+      "shown": "`HaakTuah/amarna-letters`",
+      "outcomes": null
+    },
+    {
+      "shown": "`HaakTuah/barkstreet-snakes`",
+      "outcomes": null
+    }
+  ]
+}
