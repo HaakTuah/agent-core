@@ -525,6 +525,15 @@ const longEnv = Date.now();
 ok(notRead("copies", { "a.yml": stepped(`env ${"-S ".repeat(20000)}'node core/scripts/copies.mjs c.json'`) }) && Date.now() - longEnv < 1500, "many of env's options are read in one pass", `${Date.now() - longEnv} ms`);
 const versionsStep = STEPS.find(s => s.lead === "12 November 2026, exact versions");
 ok(versionsStep.check(inMemory({ "a.yml": stepped("cd tools && node scripts/exact-versions.mjs x.json") }, { "package-lock.json": "{}" })) === null, "where the project runs no licence check of its own, a companion run it cannot place asks nothing");
+// (the review of b6aaf95: a shell's options read so that its -c string is found, and a shell not given a file is not
+// read silently; more commands that run no script; a wrapper that moves the folder)
+ok(["sh -euo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "bash -eo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "pwsh -ep Bypass -Command 'node core/scripts/copies.mjs config/c.json'",
+  "pwsh -wd app -c 'node core/scripts/copies.mjs config/c.json'", "bash -ec -- 'node core/scripts/copies.mjs config/c.json'", "powershell -exec bypass -c 'node core/scripts/copies.mjs config/c.json'"]
+  .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "a shell's options, clustered, abbreviated or with --, leave its -c string read");
+ok(["npx prettier --check core/scripts/copies.mjs", "sha256sum core/scripts/copies.mjs", "jq . core/scripts/copies.mjs", "gh pr comment -b 'run node core/scripts/copies.mjs x'", "curl -d 'node core/scripts/copies.mjs' x", "Write-Host core/scripts/copies.mjs"]
+  .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "more commands that run no script name it as text");
+ok(["env -C app node ../core/scripts/copies.mjs c.json", "env --chdir=app node ../core/scripts/copies.mjs c.json", "sudo -D app node ../core/scripts/copies.mjs c.json"].every(run => notRead("copies", { "a.yml": stepped(run) })),
+  "a wrapper that runs the command in another folder leaves the run not read");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
