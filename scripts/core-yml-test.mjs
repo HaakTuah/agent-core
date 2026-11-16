@@ -2,7 +2,9 @@
 // (workflow-run.mjs, beside this file), so that its shell is tested here before it runs in any project: on a scratch
 // project whose copy and calls are as they should be, and on each fault the check names (a default branch of another
 // name, a difference from the floor or the review guidelines, a manifest without its one pin or one owner's account, a
-// pin off the core's main, a call pinned where its workflow differs or written in another form). The copy's own faults
+// pin off the core's main, a call pinned where its workflow differs or written in another form), and on where the copy
+// stands (tasks/repositories.md): at another path the manifest names, and carried by a library, its files committed or
+// a submodule, with the floor's own copy it keeps until every tool has passed the staged cases. The copy's own faults
 // (an edit, a file added, a link, a submodule, one whose id is the copy's own tree; the executable bit no difference)
 // are pure-sync-test.mjs's, which runs this job on each; a report whose name git quotes is left out here as the copy
 // leaves it out, while a top-level name that only ends in a tab and "reports" is kept, as the copy keeps it. A scratch core of two commits on its main and one off it,

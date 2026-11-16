@@ -24,7 +24,9 @@ import os from "node:os";
 import path from "node:path";
 import { fingerprint, ROOT, rules, rulesAt } from "./rules.mjs";
 import { started } from "./started.mjs";
+import * as carried from "./staged/carried.mjs";
 import * as finish from "./staged/finish.mjs";
+import * as noFloor from "./staged/no-floor.mjs";
 import * as noQuestion from "./staged/no-question.mjs";
 import * as oldContent from "./staged/old-content.mjs";
 import * as orderForNow from "./staged/order-for-now.mjs";
@@ -34,7 +36,7 @@ import * as secret from "./staged/secret.mjs";
 import * as steps from "./staged/steps.mjs";
 import * as stop from "./staged/stop.mjs";
 
-export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps];
+export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps, carried, noFloor];
 export const RECORD = "reports/staged-cases.json";
 export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.

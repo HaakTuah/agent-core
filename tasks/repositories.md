@@ -42,15 +42,18 @@ agent tool checks out, never as files an install writes (a package manager's fol
 mean a repository commits the library's files where a submodule its tool checks out serves. Reason: a session that
 cannot find its rules would work with no floor at all, and an install runs after the session has started, when it
 runs. Held by `core.yml`, which fails a library that is neither a folder nor a submodule of the commit, and a path
-under `node_modules/` or `.git/`.
+in a folder named node_modules or .git.
 
 **A session that cannot read its floor does nothing else** (core archive 240; #285). By default a session reads the
 floor at the path its manifest names. Where `<path>floor/security.md` is not in the checkout at a session's start, the
-work-saved hook says `STOP:` with the mend, and the session does nothing else until it is mended: it brings the files
+start hook says `STOP:` with the mend (in a repository whose core stands elsewhere than `core/`, the hooks are those
+`node <path>scripts/core-path.mjs --hooks` prints, which check the floor before they read any script of the core's),
+and the session does nothing else until it is mended: it brings the files
 in (`git submodule update --init`, where a submodule carries them), or, where it cannot, tells the owner so and stops.
 It does not mean a session of a tool with no hook at its start goes on: one that cannot read the floor its `AGENTS.md`
-names stops alike. Reason: a session that cannot find its rules would work with no floor at all. Held by
-`scripts/work-saved.sh` (`scripts/work-saved-test.mjs`), and by the staged case `no-floor`.
+names stops alike. Reason: what a session does before it has read the floor, no rule of the floor holds. Held by
+`scripts/work-saved.sh` and the start command `scripts/core-path.mjs` writes (their tests), and by the staged case
+`no-floor`.
 
 **Proven tool by tool; until then, a copy of the floor** (core archive 240; #285, #235 and #249). A core a library
 carries works with an agent tool once a session of it has passed the staged cases `carried`, in which a session finds
@@ -61,7 +64,7 @@ its own named on the manifest's line `Floor copy: <folder>/`, and its `AGENTS.md
 the files read at every start. It does not mean any other file of the core is copied, nor that the copy is edited: it
 is the library's floor, letter for letter. Reason: until a tool has shown that its sessions find their rules through
 a library, the floor stands where every session reads it. Held by `core.yml`, which fails a carried core without that
-line while a tool has not passed both cases (the core's `reports/staged-cases.json`), and a copy that differs from the
+line while a tool has not passed both cases (the record of the staged cases on the core's own main), and a copy that differs from the
 floor at the library's pin; and by the work-saved hook, which names at a session's start a copy that differs from the
 floor the library carries; that `AGENTS.md` names the copy, by nothing yet.
 

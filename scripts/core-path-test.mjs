@@ -4,13 +4,13 @@
 // imports nothing) held to it, and the script run from a project's root. Node's own modules only.
 //
 //   node scripts/core-path-test.mjs
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { carriedAt, corePath, floorCopyIn, readCore } from "./core-path.mjs";
+import { carriedAt, corePath, floorCopyIn, hookCommands, readCore } from "./core-path.mjs";
 import { mended } from "./mend.mjs";
 import { pathIn } from "./reading.mjs";
 
@@ -72,6 +72,44 @@ ok(out.status === 0 && out.stdout.trim() === "lib/core/", "from a project's root
 out = run("# Core manifest\n");
 ok(out.status === 1 && mended(out.stderr), "and fails, saying the mend, where the line is wrong", out.stderr);
 ok(corePath(tmp) === "core/" && corePath(path.join(tmp, "nowhere")) === "", "a manifest whose line is wrong reads as the usual path; no manifest, the core's own root");
+
+// Claude Code's hooks for a core at another path: for core/ the helper's and the stop's are the starter kit's own, and
+// where a submodule carries the core, the start reads the work-saved hook from the library's commit main pins, never
+// from the working tree, and stops a session whose floor cannot be read, which no script of the core's could say
+const kit = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../setup/template/claude-settings.json.tmpl", import.meta.url)), "utf8")).hooks;
+const usual = hookCommands(readCore(copied()));
+ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Stop[0].hooks[0].command, "for core/, the helper's and the stop's commands are the starter kit's");
+{
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(k))),
+    GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (cwd, ...args) => execFileSync("git", ["-c", "protocol.file.allow=always", ...args], { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const lib = path.join(tmp, "the-library"), project = path.join(tmp, "a-project"), origin = path.join(tmp, "a-project.git");
+  const put = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
+  put(lib, "core/scripts/work-saved.sh", "echo \"the hook of main's pin ran: $1\"\n");
+  put(lib, "core/floor/security.md", "# The floor\n");
+  put(lib, "core-manifest.md", copied());
+  git(tmp, "init", "-q", "-b", "main", lib);
+  git(lib, "add", "-A");
+  git(lib, "commit", "-q", "-m", "the library");
+  git(tmp, "init", "-q", "--bare", "-b", "main", origin);
+  git(tmp, "init", "-q", "-b", "main", project);
+  git(project, "submodule", "add", "-q", lib, "lib");
+  put(project, "core-manifest.md", carried());
+  git(project, "add", "-A");
+  git(project, "commit", "-q", "-m", "a project");
+  git(project, "remote", "add", "origin", origin);
+  git(project, "push", "-q", "-u", "origin", "main");
+  const hooks = hookCommands(readCore(carried()));
+  const run = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: project } }).stdout;
+  let said = run(hooks.start);
+  ok(/the hook of main's pin ran: start/.test(said) && !/STOP/.test(said), "where a submodule carries the core, the start runs the hook of the library's commit main pins", said);
+  fs.writeFileSync(path.join(project, "lib/core/scripts/work-saved.sh"), "echo the working tree ran\n");
+  said = run(hooks.stop);
+  ok(/the hook of main's pin ran: stop/.test(said) && !/working tree/.test(said), "and never the working tree's copy, edited", said);
+  git(project, "submodule", "deinit", "-q", "-f", "lib");
+  said = run(hooks.start);
+  ok(/^STOP: the floor cannot be read at lib\/core\/floor\/security\.md.*Mend: /m.test(said) && !/hook of main's pin ran/.test(said), "where the submodule is not checked out, the start stops the session, saying the mend", said);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on where the core's copy stands`);
 process.exitCode = failed ? 1 : 0;

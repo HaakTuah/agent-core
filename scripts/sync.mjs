@@ -38,16 +38,22 @@ const fail = msg => { throw new Failure(msg); };
 // pins of the project's workflows above all (reading.mjs, by which the description check reads that line).
 const REPORTS = kits => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"]];
 
+// Where the copy stands, as the manifest's "Core:" line names it (tasks/repositories.md; core-path.mjs); null, said,
+// where a library carries the core, which is synced in the library's own repository.
+function ownCopy(text) {
+  const line = readCore(text);
+  if (line.wrong) fail(line.wrong);
+  if (line.form === "copied") return line;
+  console.log(`the core here is the one the library at ${line.library} carries, at that library's pin: it is synced in the library's own repository, and reaches this one when this repository takes the library at a newer version (tasks/repositories.md). Nothing to sync here.`);
+  return null;
+}
+
 function sync(tmp) {
   const manifest = "core-manifest.md";
   if (!fs.existsSync(manifest)) fail(`run it from a project's root, beside ${manifest}`);
-  const text = fs.readFileSync(manifest, "utf8");
-  // (where the copy stands, as the manifest's "Core:" line names it: tasks/repositories.md; core-path.mjs)
-  const line = readCore(text);
-  if (line.wrong) fail(line.wrong);
-  if (line.form === "carried") { console.log(`the core here is the one the library at ${line.library} carries, at that library's pin: it is synced in the library's own repository, and reaches this one when this repository takes the library at a newer version (tasks/repositories.md). Nothing to sync here.`); return; }
-  const at = line.path, dir = at.slice(0, -1), old = line.pin;
-  const lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
+  const text = fs.readFileSync(manifest, "utf8"), line = ownCopy(text);
+  if (!line) return;
+  const at = line.path, dir = at.slice(0, -1), old = line.pin, lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
   const first = !fs.existsSync(dir); // (the first copy: the manifest is written, the copy not yet)
 
   fetchCore(tmp);

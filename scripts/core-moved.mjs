@@ -70,16 +70,23 @@ export function openIssue(lines) {
   return null;
 }
 
+// The pin of the project's own copy; null, said, where a library carries the core, which moves with the library, whose
+// own repository keeps this issue (tasks/repositories.md).
+function pinHere(manifest, fail) {
+  const line = readCore(manifest);
+  if (line.wrong) fail(line.wrong);
+  if (line.form === "copied") return line.pin;
+  console.log(`the core here is the one the library at ${line.library} carries: the library's own repository says when the core has moved, and a sync there reaches this one with the library. Nothing to do.`);
+  return null;
+}
+
 function main(dry) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
   let manifest;
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { fail("run it from a project's root, beside core-manifest.md"); }
-  const line = readCore(manifest);
-  if (line.wrong) fail(line.wrong);
-  // (a core a library carries moves with the library, whose own repository keeps this issue: tasks/repositories.md)
-  if (line.form === "carried") { console.log(`the core here is the one the library at ${line.library} carries: the library's own repository says when the core has moved, and a sync there reaches this one with the library. Nothing to do.`); return; }
-  const pin = line.pin;
+  const pin = pinHere(manifest, fail);
+  if (!pin) return;
   const follows = followsOf(manifest);
   if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out beside one *owner's account* row");
   let newest, moved, release = "", stays = false;

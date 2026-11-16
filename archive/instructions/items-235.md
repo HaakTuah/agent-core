@@ -161,3 +161,33 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `scripts/wait.mjs` and its line in the monthly state report, the core's own selection in its tests workflow, and
      the report on keeping up with main.
 
+
+
+240. **15 November 2026** (every project in more than one repository, and a library shared by several projects; in a
+     chat with a session the owner works with, not the design session, as that session recorded it on issue #285,
+     labelled `by:chat`, saying the owner agreed to it). Of a part one of the owner's projects may one day split off,
+     the owner agreed to keeping it in the project's repository to begin with, "abiding by the new rules strictly, so
+     it is easy to sort out", and of afterwards said:
+
+     > It just has to be more flexible where the core folder is at? Because importing to both […] seems like needless
+     > duplication and will cause drift in versions?
+
+     The session set out six points, which the owner agreed to, and gave the yes for the change to the floor: the
+     manifest says where the core's copy is, and every script, check and rule reads it there; a repository may take the
+     core through a dependency that carries it, at the path the library brings it to, pinning no copy of its own, one
+     sync, in the library; before a split, a part meant to be shared is kept as a declared system in the project's
+     repository, under the rules of #246, until a second consumer exists; three conditions, since a session that cannot
+     find its rules would work with no floor at all: the core's files are in the checkout when a session starts (a
+     submodule the tool checks out, or files committed), never ones an install creates, a check at a session's start
+     stops it where the floor cannot be read at the path the manifest names, and it does nothing else until that is
+     mended, and it is proven tool by tool with a staged case, a repository keeping until then its own copy of the
+     floor, with a check that its version is the library's; each repository keeps its queue, its issues, its audits and
+     its state report; and a project in one repository changes in nothing. To the orchestrator, passed on word for word
+     to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `tasks/repositories.md`, the manifest's `Core:` line in its two forms and its line `Floor copy:`
+     (`scripts/core-path.mjs`), what `core.yml` and the work-saved hook read of them, the staged cases `carried` and
+     `no-floor`, and "the copy of the core where its `Core:` line says" and "the floor's own copy" in floor rule 3.

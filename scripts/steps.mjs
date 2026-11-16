@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
+import { modulesOf } from "./manifest-reads.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
@@ -541,6 +542,12 @@ export const STEPS = [
     partly: "how the project's runner is told the files `RUN` names is the project's own, and which tests are its proof is a reading of the project" },
   { lead: "16 November 2026, the rules in folders that say who reads them or when", cost: COST.line, check: movedPaths,
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
+  { lead: "16 November 2026, a project in several repositories", cost: COST.line,
+    check: p => {
+      const { taken, notTaken } = modulesOf(p.manifest);
+      return taken === "all" || taken?.has("repositories.md") || notTaken.has("repositories.md") ? null
+        : 'In one small pull request, add `repositories.md` to the "Modules:" line of `core-manifest.md` where the project is, or may become, more than one repository, or else add it to the line "Not taken:" under it as "`repositories.md` (one repository, which no library carries the core into)".';
+    } },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

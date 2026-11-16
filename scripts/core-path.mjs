@@ -10,7 +10,9 @@
 // usual path, so a project in one repository reads as it always did. The core's own repository has no manifest, and its
 // path is "" (its root). Node's own modules only; proven by core-path-test.mjs.
 //
-//   node core/scripts/core-path.mjs    prints the path, from the project's root; a line with its mend where the line is wrong
+//   node core/scripts/core-path.mjs           prints the path, from the project's root; a line with its mend where the
+//                                             line is wrong
+//   node core/scripts/core-path.mjs --hooks   the commands of Claude Code's hooks for that path (hookCommands)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,10 +73,32 @@ export function carriedAt(core, read) {
   return { pin: lib.pin, path: core.path };
 }
 
+/** The commands of Claude Code's hooks (.claude/settings.json) for a core at another path than core/, as the starter
+ *  kit writes them for core/ (setup/template/claude-settings.json.tmpl): { start, helper, stop }. Each reads its script
+ *  from main's own tree, never the working tree's (floor rule 3); where a submodule carries the core, from the library's
+ *  commit main pins. The start first stops a session whose floor cannot be read at the path (tasks/repositories.md, "A
+ *  session that cannot read its floor does nothing else"), since there no script of the core's can run to say so. */
+export function hookCommands(core) {
+  const dir = '"${CLAUDE_PROJECT_DIR:-.}"';
+  const read = script => {
+    const own = `git -C ${dir} --no-replace-objects show refs/remotes/origin/main:${core.path}scripts/${script} 2>/dev/null`;
+    if (core.form !== "carried") return own;
+    const lib = core.library.slice(0, -1), rest = core.path.slice(core.library.length);
+    return `${own} || { s=$(git -C ${dir} rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git -C ${dir}/${lib} --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
+  };
+  const stop = `echo "STOP: the floor cannot be read at ${core.path}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the files of the core into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."`;
+  return {
+    start: `bash -c '[ -f ${dir}/${core.path}floor/security.md ] || { ${stop}; exit 0; }; f=$(${read("work-saved.sh")}) || { echo "Not run: the work-saved hook runs only its copy merged into main, and refs/remotes/origin/main has none. Fetch main (git fetch origin main), and it runs from the next reply on."; exit 0; }; bash -c "$f" work-saved start'`,
+    helper: `bash -c 'f=$(${read("helper-call.mjs")}) || exit 0; node --input-type=module -e "$f"'`,
+    stop: `bash -c 'f=$(${read("work-saved.sh")}) || exit 0; bash -c "$f" work-saved stop'`,
+  };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   let text = null;
   try { text = fs.readFileSync(MANIFEST, "utf8"); } catch { /* (the core's own root) */ }
   const core = text === null ? { path: "" } : readCore(text);
   if (core.wrong) { console.error(`FAIL: ${core.wrong}`); process.exit(1); }
-  console.log(core.path || "(the core's own root)");
+  if (process.argv.includes("--hooks")) console.log(JSON.stringify(hookCommands(core), null, 2));
+  else console.log(core.path || "(the core's own root)");
 }
