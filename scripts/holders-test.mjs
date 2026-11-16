@@ -93,6 +93,12 @@ const twiceIn = inStep(archive({ "items-001.md": `${r1}\n2. **2 Nov**, #5: e.\n`
 ok(twiceIn.some(w => /item 2 stands twice, at [^ ]*items-001\.md:3 and [^ ]*items-001\.md:5\. Mend: give the one at archive\/instructions\/items-001\.md:5 the next free number, 3/.test(w)), "of two in their file, the later moves", twiceIn.join("\n"));
 const outside = inStep(archive({ "items-001.md": `${r1}\n4. **4 Nov**, #4: d.\n`, "items-003.md": r3 }));
 ok(outside.some(w => /archive\/instructions\/items-001\.md:5: item 4 stands outside archive\/instructions\/items-003\.md, the file its number puts it in\. Mend: /.test(w)), "an item alone in a file its number does not put it in fails, saying the mend", outside.join("\n"));
+const twoTwice = inStep(archive({ "items-001.md": `${r1}\n1. **1 Nov**, #6: f.\n\n2. **2 Nov**, #7: g.\n` }));
+ok(twoTwice.some(w => /item 1 stands twice.* the next free number, 3,/.test(w)) && twoTwice.some(w => /item 2 stands twice.* the next free number, 4,/.test(w)), "two numbers each used twice are each given a free number of their own", twoTwice.join("\n"));
+const below = inStep(archive({ "items-005.md": "5. **5 Nov**, #5: e.\n\n1. **1 Nov**, #1: a.\n" }));
+ok(below.some(w => /item 1 stands outside no file of archive\/instructions\/, since none starts at or below 1, .* Mend: /.test(w)) && !below.some(w => w.includes("undefined")), "an item below every file's first number says so, and never \"undefined\"", below.join("\n"));
+const wordsAstray = inStep(archive({ "items-001.md": `${r1}\n3. **3 Nov**, #3: c.\n` }, { "items-001.md": "1. **1 Nov**: a.\n\n3. **3 Nov**: c.\n", "items-003.md": "# Words\n" }));
+ok(wordsAstray.some(w => /words\/items-001\.md:3: item 3 stands outside words\/items-003\.md, the file its number puts it in\. Mend: move it there$/.test(w)), "in the words, an item outside its file is moved there, and given no other number", wordsAstray.join("\n"));
 const wordsTwice = inStep(archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n1. **1 Nov**: more.\n" }));
 ok(wordsTwice.some(w => /words: item 1 stands twice, .* Mend: give the one at words\/items-001\.md:3 the number its reasoning has in archive\/instructions\//.test(w)), "in the words, an item numbered twice takes the number its reasoning has, never a new one", wordsTwice.join("\n"));
 const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);

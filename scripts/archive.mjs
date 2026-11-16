@@ -59,13 +59,14 @@ export function items(root) {
 // moves, since the index already leads to the other, else the later; it takes the next free number, at the end of the
 // newest file, or in the words the number its reasoning has.
 function outOfPlace(root, r, w) {
-  const wrong = [];
-  const newest = fileOf(root, REASONS, Infinity), next = Math.max(0, ...r.items.keys()) + 1;
+  const wrong = [], newest = fileOf(root, REASONS, Infinity);
+  let next = Math.max(0, ...r.items.keys()); // (each item told to move takes a number of its own)
+  const file = (folder, n) => fileOf(root, folder, n) ?? `no file of ${folder}/, since none starts at or below ${n}`;
   for (const [folder, form] of [[REASONS, r], [WORDS, w]]) for (const [n, at] of form.places) {
     const astray = at.filter(x => x.file !== fileOf(root, folder, n)), moves = astray.length && astray.length < at.length ? astray[0] : at.at(-1);
-    const where = folder === REASONS ? `the next free number, ${next}, at the end of ${newest}, and change each "core archive ${n}" that means it` : `the number its reasoning has in ${REASONS}/`;
-    if (at.length > 1) wrong.push(`${folder}: item ${n} stands ${at.length === 2 ? "twice" : `${at.length} times`}, at ${at.map(x => x.at).join(" and ")}. Mend: give the one at ${moves.at} ${where}`);
-    else if (astray.length) wrong.push(`${at[0].at}: item ${n} stands outside ${fileOf(root, folder, n)}, the file its number puts it in. Mend: move it there, or give it ${where}`);
+    const renumber = () => folder === REASONS ? `the next free number, ${++next}, at the end of ${newest}, and change each "core archive ${n}" that means it` : `the number its reasoning has in ${REASONS}/`;
+    if (at.length > 1) wrong.push(`${folder}: item ${n} stands ${at.length === 2 ? "twice" : `${at.length} times`}, at ${at.map(x => x.at).join(" and ")}. Mend: give the one at ${moves.at} ${renumber()}`);
+    else if (astray.length) wrong.push(`${at[0].at}: item ${n} stands outside ${file(folder, n)}, the file its number puts it in. Mend: move it there${folder === REASONS ? `, or give it ${renumber()}` : ""}`);
   }
   return wrong;
 }
