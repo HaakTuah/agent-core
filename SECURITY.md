@@ -6,8 +6,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
 3. **The protected files:** every file here, changed by the sessions the owner starts in this repository, of any
    agent tool, and the builder sessions an orchestrator among them starts (`AGENTS.md`, "The queue").
 5. **Untrusted input, and its checks:** the core's scripts read what others shape, here and in each project that runs
-   them from its `core/` copy. Each input below is data (floor rule 4): its type and size are checked by the scripts
-   it names, what fails is refused, and none of it is run, fetched as an address or read as a path out of the project.
+   them from its `core/` copy. Each input below is data (floor rule 4), which the scripts it names check against its
+   shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case. The one address taken
+   from such input is a NuGet source a project's config names, fetched only as an https address of a named host with
+   no sign-in in it (`scripts/nuget.mjs`).
    - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
      "Read for it:" by `scripts/reading.mjs`); hostile tests: `scripts/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and

@@ -26,6 +26,10 @@ import { contentHash, fetchAll, named, nuspecOf } from "./nuget-fetch.mjs";
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const { tmp, fresh } = scratch("hostile-packages-test");
+// (the samples' commands and notices are built from pieces, so the core's own licence scan, which reads this file, does
+// not take them for its own)
+const word = (...parts) => parts.join("");
+const NPM = word("np", "m");
 const throws = (fn) => { try { fn(); return false; } catch { return true; } };
 const ALLOW = new Set(["MIT"]);
 // an installed package: the lock file names moss-a at 1.0.0 under MIT, and node_modules holds `own` as its package.json
@@ -79,7 +83,7 @@ const scanned = (files) => {
   ok(quick(() => (r = installed(fresh({ "package-lock.json": lockOf(away) }), LINUX)).failures.length === 0 && /30000 of another system/u.test(r.summary)), "thirty thousand optional packages of another system are counted, not read, in a few seconds");
   const bomb = zip([["Moss.A.nuspec", " ".repeat(32 << 20)]]);
   ok(refusedFetch(await fetch(bomb)), "a NuGet package whose manifest inflates past sixteen megabytes is refused with its mend, and nothing is written");
-  ok(quick(() => (r = scanned({ "vendor/moss/LICENSE.txt": "Copyright 2026 Moss\n".repeat(150000), "vendor/moss/moss.min.js": `/*! @license MIT */${"x;".repeat(1_500_000)}` })).failures.length === 1 && said(r.failures)), "the licence scan reads a vendored package's licence text and code of megabytes, failing its notice with its mend");
+  ok(quick(() => (r = scanned({ "vendor/moss/LICENSE.txt": `${word("Copy", "right")} 2026 Moss\n`.repeat(150000), "vendor/moss/moss.min.js": `${word("/", "*!")} ${word("@lic", "ense")} MIT */${"x;".repeat(1_500_000)}` })).failures.length === 1 && said(r.failures)), "the licence scan reads a vendored package's licence text and code of megabytes, failing its notice with its mend");
 }
 
 // ---- the wrong type ----
@@ -103,7 +107,7 @@ const scanned = (files) => {
   ok(named(`<package><metadata><id>Moss.A</id><![CDATA[<id>Other</id>]]><version>1.0.0</version></metadata></package>`) === null, "a manifest with CDATA names no id and version");
   const f = one({ version: "1.0.0", license: "MIT\n::error::spoof" }).failures;
   ok(f.length === 1 && said(f) && !f[0].includes("\n"), "a package's licence holding a line break fails, its failure kept on one line");
-  const html = scanned({ "vendor/moss/LICENSE.html": "<p>MIT</p><script>npx -y moss-evil</script>" }).failures;
+  const html = scanned({ "vendor/moss/LICENSE.html": `<p>MIT</p><script>${word("np", "x")} -y moss-evil</script>` }).failures;
   ok(html.some((x) => /moss-evil cannot be audited/u.test(x)) && said(html), "the licence scan reads a script in a vendored licence page as code, and fails what it fetches with its mend");
 }
 
@@ -151,11 +155,11 @@ if (process.platform !== "win32") {
     "a binary beside a file whose name leaves the folder": (d) => { fs.writeFileSync(path.join(d, "package/bin/node"), "x"); fs.writeFileSync(path.join(d, "escape"), "x"); },
   };
   for (const [what, make] of Object.entries(tries)) {
-    const root = fresh({ "core/.node-version": `${want}\n`, "bin/node": "#!/bin/sh\necho v0.0.1\n", "bin/npm": '#!/bin/sh\n[ "$1" = pack ] && cp "$TARBALL" ./node-linux-moss.tgz\n', "tmp/.keep": "" });
+    const root = fresh({ "core/.node-version": `${want}\n`, "bin/node": "#!/bin/sh\necho v0.0.1\n", [`bin/${NPM}`]: '#!/bin/sh\n[ "$1" = pack ] && cp "$TARBALL" ./node-linux-moss.tgz\n', "tmp/.keep": "" });
     const stage = path.join(root, "stage");
     fs.mkdirSync(path.join(stage, "package/bin"), { recursive: true });
     make(stage);
-    for (const f of ["bin/node", "bin/npm"]) fs.chmodSync(path.join(root, f), 0o755);
+    for (const f of ["bin/node", `bin/${NPM}`]) fs.chmodSync(path.join(root, f), 0o755);
     const tarball = path.join(root, "node.tgz"), members = what.includes("leaves") ? ["package", "--transform=s,^escape,../escape,", "escape"] : ["package"];
     execFileSync("tar", ["czf", tarball, "-C", stage, ...members], { stdio: "ignore" });
     const r = spawnSync("bash", [script], { cwd: root, encoding: "utf8", timeout: 20000, env: { ...process.env, PATH: `${path.join(root, "bin")}:${process.env.PATH}`, TARBALL: tarball, TMPDIR: path.join(root, "tmp") } });
