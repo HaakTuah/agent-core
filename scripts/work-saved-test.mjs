@@ -56,7 +56,7 @@ const inNested = cmd => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return
 const kiroStart = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "SessionStart").action.command;
 const kitHooks = [kiroStart, kiroStop, codexOf("SessionStart"), codexOf("Stop")];
 ok(kitHooks.every(c => { const x = inNested(c); return x.status === 0 && !/NESTED-RAN/.test(`${x.stdout}${x.stderr}`); }),
-  "in a repository that holds no such hook file, as one cloned inside the project, neither Kiro's hook nor Codex's two runs its script");
+  "in a repository that holds no such hook file, as one cloned inside the project, neither Kiro's two hooks nor Codex's two run its script");
 const unguarded = kiroStop.replace('[ -f "$r/.kiro/hooks/work-saved.json" ] || exit 0; ', "");
 ok(unguarded !== kiroStop && /NESTED-RAN/.test(inNested(unguarded).stderr), "and without the guard, the same hook would have run it: the test bites");
 fs.rmSync(nested, { recursive: true, force: true });
