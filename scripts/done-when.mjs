@@ -138,25 +138,27 @@ export function doneMends({ body, queue, read, at = "" }) {
   const items = new Set([...joined(queue?.before, queue?.after), ...closes(body)]);
   if (items.size > MOST) return { mends: [`this pull request queues or closes ${items.size} items, more than the ${MOST} the description check reads. Mend: split it into pull requests that each queue or close ${MOST} or fewer (${at}tasks/done-when.md)`], notes };
   const get = item => { const got = read(item); if (!got) notes.push(`${item} could not be read, so nothing is asked of it`); return got; };
-  for (const item of joined(queue?.before, queue?.after)) {
-    const got = get(item);
-    // (the heading alone is asked here: lines missing or not in the form are its builder's to write, so nothing waits)
-    if (got && isFeature(got) && !entryOf(got.body)) mends.push(`${item}, a feature's issue that joins the progress file, has no "${HEADING}" in its current text. Mend: add to it a heading "${HEADING}", with ${FORM}, where they are known; where they are not, the heading alone, and its builder writes them (${at}tasks/done-when.md)`);
-  }
+  mends.push(...joinedMends(joined(queue?.before, queue?.after), get, at));
   if (own) mends.push(...entryFaults(own, "the description", at));
   // (each feature's issue closed is proved for its own lines; the description's stand for those that have none)
   const entries = [];
   for (const item of closes(body)) {
-    const got = get(item);
-    if (!got || !isFeature(got)) continue;
-    const e = entryOf(got.body);
+    const got = get(item), e = got && isFeature(got) ? entryOf(got.body) : undefined;
     if (e && !entryFaults(e, item).length) entries.push(e);
-    else if (own) { if (!entries.includes(own)) entries.push(own); }
-    else mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}" lines in the form, and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
+    else if (e !== undefined && !own) mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}" lines in the form, and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
   }
-  if (own && !entries.includes(own)) entries.push(own);
+  if (own) entries.push(own);
   if (entries.length) mends.push(...provedFaults(body, entries, at));
   return { mends, notes };
+}
+
+// The failures for the items a pull request adds to the progress file: a feature's issue with no heading. The heading
+// alone is asked here: lines missing or not in the form are its builder's to write, so nothing waits.
+function joinedMends(items, get, at) {
+  return items.flatMap(item => {
+    const got = get(item);
+    return got && isFeature(got) && !entryOf(got.body) ? [`${item}, a feature's issue that joins the progress file, has no "${HEADING}" in its current text. Mend: add to it a heading "${HEADING}", with ${FORM}, where they are known; where they are not, the heading alone, and its builder writes them (${at}tasks/done-when.md)`] : [];
+  });
 }
 
 // The *progress file*'s path, as a manifest's slot names it (a row of its table, or the core's AGENTS.md, "the
