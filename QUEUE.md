@@ -23,7 +23,7 @@ wanted").
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10), and its pull request quotes the owner's yes on the issue | |
+| #456 | rule builder; it changes the floor (rules 5 and 10), and its PR quotes the owner's yes on the issue | |
 | #457 | rule builder | |
 | #458 | rule builder | |
 | #459 | rule builder | |
@@ -41,20 +41,22 @@ wanted").
 | #337 | builder | |
 | #426 | builder | |
 | #394 | builder | |
-| #404 | builder | #403, or built with it |
+| #404 | builder | |
 | #405 | builder | |
 | #407 | builder | |
-| #397 | rule builder; it changes the review guidelines (its pull request quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
-| #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", the last to merge "Fixes #460" | |
-| #460, point 2 (the author's address) | builder; "Part of #460", the last to merge "Fixes #460" | #376, which changes the jobs its step joins |
-| #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/copies.mjs` too |
-| #460, point 4 (names in descriptions) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/pointers.mjs` too |
-| #460, point 5 (a report's size) | builder; "Part of #460", the last to merge "Fixes #460" | |
-| #460, point 6 (billed minutes) | builder; "Part of #460", the last to merge "Fixes #460" | |
+| #397 | rule builder; it changes the review guidelines (its PR quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
+| #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", or "Fixes #460" if last | |
+| #460, point 2 (the author's address) | builder; "Part of #460", or "Fixes #460" if last | #376, which changes the jobs its step joins |
+| #460, point 3 (a copy in a test) | builder; "Part of #460", or "Fixes #460" if last | #405, which changes `scripts/copies.mjs` too |
+| #460, point 4 (names in descriptions) | builder; "Part of #460", or "Fixes #460" if last | #405, which changes `scripts/pointers.mjs` too |
+| #460, point 5 (a report's size) | builder; "Part of #460", or "Fixes #460" if last | |
+| #460, point 6 (billed minutes) | builder; "Part of #460", or "Fixes #460" if last | |
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, which changes `tasks/game-design.md` and `scripts/screens.mjs` too |
 | #477 | builder | |
+| #481 | rule builder; it changes `AGENTS.md` and the README's table of slots | |
+| #412 | builder | #481, of which it is one case |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
