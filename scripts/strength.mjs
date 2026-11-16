@@ -13,7 +13,10 @@
 // the reason of each that had to join; "whole", the day and commit of the whole run it was written from. Once it
 // stands, a fault that survives on a changed line and the baseline does not list fails, with its mend: a test that
 // catches it, or, where it changes nothing the program does, the entry listed with that reason under "grown". An entry
-// may join the baseline only with that reason, or in the pull request that records a new whole run. The whole run is
+// may join the baseline only with that reason, or in the pull request that records a new whole run. The baseline is
+// read by kind, a file and what became what, whatever line a fault stands on: of each kind, the survivors on the
+// changed lines and what the lines left alone still hold may not pass what it lists, so debt that only moved stays
+// listed; and a pull request may not list fewer of a kind than still survive. The whole run is
 // the audit's, outside the suite (modules/cleaning.md): --whole runs the tool on every file of the code and writes the
 // baseline from it. A test file the pull request deletes is named, for its description to say why (the review reads
 // it, modules/review-guidelines.md). A project whose row says `none` has the measure left out; one with no row is told
@@ -140,56 +143,74 @@ export function counted(faults) {
   return { caught, survived, pending, line: `${caught} of ${judged} faults put in on purpose were caught (${share})${survived ? `, ${survived} survived` : ""}${pending ? `, ${pending} not run (the tool's budget)` : ""}` };
 }
 
-// An id's parts: its file, its line's text and what became what.
-const partsOf = id => { const m = /^survivor: (.+?): (.*) (\[.*\])$/u.exec(id); return m ? { file: m[1], line: m[2], what: m[3] } : null; };
+// An id's parts: its file, its line's text, what became what ("[<original> -> <replacement>]") and the original, less
+// the mark of a cut. A line's text may hold " [" itself: the split taken is the first whose rest reads as what became
+// what and whose original the line holds, else the last that reads so.
+const partsOf = id => {
+  const m = /^survivor: (.+?): (.*)$/su.exec(id), splits = [];
+  for (let i = m ? m[2].indexOf(" [") : -1; i >= 0; i = m[2].indexOf(" [", i + 1)) {
+    const what = m[2].slice(i + 1), o = /^\[(.*?) -> .*\]$/su.exec(what);
+    if (o) splits.push({ file: m[1], line: m[2].slice(0, i), what, original: o[1].replace(/…$/u, "") });
+  }
+  return splits.find(s => s.line.includes(s.original)) ?? splits.at(-1) ?? null;
+};
 
-// The entries of the files a change touched (`files`, a Set or Map of their names): a Map of id to its count. What of
-// one the lines left alone do not hold (heldBy()), nor a survivor of its own id, may pass to a survivor of the same file
-// and fault under a new id: a line the change rewrote, of which another copy may stand, keeps its debt.
-export function opened(listedMap, files) {
-  return new Map([...listedMap].filter(([id]) => files.has(partsOf(id)?.file)).map(([id, n]) => [id, n.count ?? 0]));
+// A fault's kind: its file and what became what, whatever line it stands on. The baseline is read by kind: how many of
+// each fault a file holds, so that debt which only moved (a line rewritten, one copy of a repeated line, a line moved
+// to another) stays listed, whatever id it is listed under.
+export const kindOf = id => { const p = partsOf(id); return p ? `${p.file}\n${p.what}` : id; };
+
+// What a baseline lists of each kind (`listedMap`, id to { count }), and how many faults of each kind a run found.
+export const totals = listedMap => [...listedMap].reduce((t, [id, n]) => t.set(kindOf(id), (t.get(kindOf(id)) ?? 0) + (n.count ?? 0)), new Map());
+const tally = faults => faults.reduce((t, f) => t.set(kindOf(f.id), (t.get(kindOf(f.id)) ?? 0) + 1), new Map());
+// (a fault the tool left unrun on a line the change left alone is not known to be caught, so it holds its place)
+const holding = still => still.filter(f => [...SURVIVED, "Pending"].includes(f.status));
+
+// The listed ids whose kind the lines a change left alone must be measured for: a kind of which a survivor stands on a
+// changed line and the baseline (`now`) lists some, and one the baseline lists fewer of than the base (`was`) did,
+// unless the pull request records a new whole run (`recorded`). The rest need no measure: a kind it lists none of
+// fails whatever stands elsewhere, and one it neither adds to nor lowers cannot grow.
+export function needed(faults, now, was, recorded = false) {
+  const mine = new Set(faults.filter(f => SURVIVED.includes(f.status)).map(f => kindOf(f.id)));
+  const nowT = totals(now.listed), wasT = was && !recorded ? totals(was.listed) : new Map();
+  const want = k => (mine.has(k) && (nowT.get(k) ?? 0) > 0) || (nowT.get(k) ?? 0) < (wasT.get(k) ?? 0);
+  return [...new Set([...now.listed.keys(), ...(was?.listed.keys() ?? [])])].filter(id => want(kindOf(id)));
 }
 
-// The unchanged lines of the files a change touched whose text is that of a listed entry (`texts`, a function of a file
-// to its text; `changed`, a Map of file to the Set of changed lines): a Map of file to a Set of lines. The tool is run
-// on them too, so that what of each entry they still hold is measured, never guessed (heldBy()).
-export function witnesses(listedMap, texts, changed) {
-  const out = new Map();
-  for (const id of listedMap.keys()) {
-    const parts = partsOf(id), text = parts && changed.has(parts.file) && texts(parts.file);
-    if (!text) continue;
-    text.split(/\r?\n/u).forEach((l, i) => {
-      if (changed.get(parts.file).has(i + 1) || collapse(l, 100) !== parts.line) return;
-      if (!out.has(parts.file)) out.set(parts.file, new Set());
-      out.get(parts.file).add(i + 1);
-    });
+// The lines a change left alone that could hold a fault of those ids' kinds (`texts`, a function of a file to its text;
+// `changed`, a Map of file to the Set of changed lines): each line whose text holds the kind's original, wherever it
+// stands in the file. A Map of file to a Set of lines, on which the tool is run so that what they hold is measured,
+// never guessed.
+export function watched(ids, texts, changed) {
+  const originals = new Map(), out = new Map();
+  for (const p of ids.map(partsOf).filter(Boolean)) originals.set(p.file, [...(originals.get(p.file) ?? []), p.original]);
+  for (const [file, wants] of originals) {
+    const lines = (texts(file) ?? "").split(/\r?\n/u).map((l, i) => [collapse(l, Infinity), i + 1]);
+    const held = lines.filter(([l, n]) => l && !changed.get(file)?.has(n) && wants.some(o => l.includes(o))).map(([, n]) => n);
+    if (held.length) out.set(file, new Set(held));
   }
   return out;
 }
 
-// What of each entry the lines a change left alone still hold: the survivors the tool found on them (`faults`, those of
-// witnesses()), and those it left unrun, which are not known to be caught, each up to the count listed. A repeated
-// line on a changed line cannot use them.
-export function heldBy(listedMap, faults) {
-  const out = new Map();
-  for (const f of faults.filter(f => [...SURVIVED, "Pending"].includes(f.status) && listedMap.has(f.id))) out.set(f.id, Math.min((out.get(f.id) ?? 0) + 1, listedMap.get(f.id).count ?? 0));
-  return out;
+// The survivors on the changed lines that the baseline cannot hold: of each kind, those on the changed lines (`faults`)
+// and what the lines left alone hold (`still`, the faults found on watched()) may not pass what the baseline lists of
+// it. Those past it fail, a survivor of an id the baseline lists last; one of each id.
+export function unlisted(faults, listedMap, still = []) {
+  const total = totals(listedMap), held = tally(holding(still)), mine = new Map();
+  const order = faults.filter(f => SURVIVED.includes(f.status)).sort((a, b) => Number(!listedMap.has(a.id)) - Number(!listedMap.has(b.id)));
+  for (const f of order) mine.set(kindOf(f.id), [...(mine.get(kindOf(f.id)) ?? []), f]);
+  const over = [...mine].flatMap(([k, all]) => all.slice(Math.max(0, (total.get(k) ?? 0) - (held.get(k) ?? 0))));
+  return over.filter((f, i, all) => all.findIndex(g => g.id === f.id) === i);
 }
 
-// The survivors no entry of the baseline claims: each id's count, less what unchanged lines hold of it (heldBy()),
-// against the count listed; then, of what is left, a survivor claims what an entry of `open` (opened()) of the same file
-// and fault has left over, after what unchanged lines hold and what its own id's survivors take.
-export function unlisted(faults, listedMap, open = new Map(), held = new Map()) {
-  const counts = new Map(), left = [];
-  for (const f of faults.filter(f => SURVIVED.includes(f.status))) counts.set(f.id, [...(counts.get(f.id) ?? []), f]);
-  const allowed = id => Math.max(0, (listedMap.get(id)?.count ?? 0) - (held.get(id) ?? 0));
-  for (const [id, all] of counts) left.push(...all.slice(allowed(id)));
-  const free = new Map([...open.keys()].map(id => [id, Math.max(0, allowed(id) - (counts.get(id)?.length ?? 0))]));
-  return left.filter(f => {
-    const mine = partsOf(f.id), fit = [...free].find(([id, c]) => c > 0 && partsOf(id)?.file === mine?.file && partsOf(id)?.what === mine?.what);
-    if (fit) free.set(fit[0], fit[1] - 1);
-    return !fit;
-  }).filter((f, i, all) => all.findIndex(g => g.id === f.id) === i);
+// The kinds a pull request's baseline (`now`) lists fewer of than the base (`was`) did, below what the lines it left
+// alone still hold (`still`): [{ kind, listed, before, held }]. Debt dropped from the list while it survives would turn
+// the change that next moves it red.
+export function undercut(now, was, still = []) {
+  if (!was) return [];
+  const nowT = totals(now.listed), held = tally(holding(still));
+  return [...totals(was.listed)].filter(([k, n]) => (nowT.get(k) ?? 0) < n && (held.get(k) ?? 0) > (nowT.get(k) ?? 0))
+    .map(([k, before]) => ({ kind: k, listed: nowT.get(k) ?? 0, before, held: held.get(k) }));
 }
 
 // Of the entries a pull request that records a new whole run lists anew or above the base, those whose line stands
@@ -206,32 +227,27 @@ function invented(now, was, texts) {
 // How many faults of an entry's kind its file can hold: for each line of the entry's text, as often as the replaced
 // text stands in it, at least once; none where no such line stands.
 function room(parts, text) {
-  const original = (/^\[(.*) -> .*\]$/u.exec(parts.what)?.[1] ?? "").replace(/…$/u, "");
-  return text.split(/\r?\n/u).filter(l => collapse(l, 100) === parts.line).reduce((n, l) => n + Math.max(1, original ? l.split(original).length - 1 : 1), 0);
+  return text.split(/\r?\n/u).filter(l => collapse(l, 100) === parts.line).reduce((n, l) => n + Math.max(1, parts.original ? collapse(l, Infinity).split(parts.original).length - 1 : 1), 0);
 }
 
+// Whether the pull request records a new whole run: it changes no file of code or of the tests (`touched` false), and
+// its baseline's stamp is not the base's.
+export const recordsWhole = (now, was, touched) => Boolean(was) && !touched && JSON.stringify(now?.whole ?? null) !== JSON.stringify(was.whole ?? null);
+
 // The entries that joined the baseline since the base with no reason under "grown": [id]. None counts where the base
-// has no baseline (the first), or where the pull request records a new whole run and changes no file of code or of the
-// tests (`touched` false), so that what the run found stood on the base. An entry that only carries the debt of a base
-// entry of a file the change touched (`wasGone`, opened() of the base's entries; a cleaning run's --lower) has not
-// joined: it is set against what that entry measurably gave up, of the same file and fault, so their total does not
-// grow; a base entry gives up nothing of what its unchanged lines still hold (`wasHeld`, heldBy() of the base's
-// entries), whatever the pull request's baseline says of it.
-export function joinedUnsaid(now, was, touched = true, wasGone = new Map(), wasHeld = new Map(), texts = () => null) {
+// has no baseline (the first). Where the pull request records a new whole run (recordsWhole()), what the run found
+// stood on the base, and only an entry no run could have found counts (invented()). Else a kind's total may not grow
+// past the base's but by the entries of it that grew with a reason; where it does, those that grew with none count.
+export function joinedUnsaid(now, was, touched = true, texts = () => null) {
   if (!was) return [];
-  if (!touched && JSON.stringify(now.whole ?? null) !== JSON.stringify(was.whole ?? null)) return invented(now, was, texts);
-  const kept = id => Math.max(now.listed.get(id)?.count ?? 0, wasHeld.get(id) ?? 0);
-  const freed = new Map([...wasGone.keys()].map(id => [id, Math.max(0, (was.listed.get(id)?.count ?? 0) - kept(id))]));
-  return [...now.listed].filter(([id, n]) => {
-    let extra = (n.count ?? 0) - (was.listed.get(id)?.count ?? 0);
-    if (extra <= 0 || (now.grown[id] ?? "").trim()) return false;
-    for (const [gid, c] of freed) {
-      if (extra <= 0 || c <= 0 || partsOf(gid)?.file !== partsOf(id)?.file || partsOf(gid)?.what !== partsOf(id)?.what) continue;
-      const take = Math.min(extra, c);
-      freed.set(gid, c - take); extra -= take;
-    }
-    return extra > 0;
-  }).map(([id]) => id);
+  if (recordsWhole(now, was, touched)) return invented(now, was, texts);
+  const wasT = totals(was.listed), grew = id => (now.listed.get(id)?.count ?? 0) - (was.listed.get(id)?.count ?? 0);
+  const said = id => Boolean((now.grown[id] ?? "").trim());
+  return [...totals(now.listed)].flatMap(([k, n]) => {
+    const ids = [...now.listed.keys()].filter(id => kindOf(id) === k && grew(id) > 0);
+    const covered = ids.filter(said).reduce((s, id) => s + grew(id), 0);
+    return n - (wasT.get(k) ?? 0) > covered ? ids.filter(id => !said(id)) : [];
+  });
 }
 
 // The baseline at `at` as the check reads it ({ listed, grown, whole }), from its text; null where there is none.
@@ -258,7 +274,8 @@ const placed = f => `${f.file}:${f.line}`;
 const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replacement === "" ? "taken out" : `made "${collapse(f.replacement, 40)}"`}`;
 
 // What the check says of a pull request's run, and whether it fails: { lines, fails }.
-export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map(), held = new Map(), wasGone = new Map(), wasHeld = new Map(), texts = () => null }) {
+// `faults` are those of the changed lines; `still`, those watched() found on the lines the change left alone.
+export function verdict({ faults, still = [], baseline, was, at, deleted, touched = true, texts = () => null }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
   if (!baseline && was) {
@@ -270,11 +287,14 @@ export function verdict({ faults, baseline, was, at, deleted, touched = true, go
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
     return { lines, fails: false };
   }
-  const news = unlisted(faults, baseline.listed, gone, held), unsaid = joinedUnsaid(baseline, was, touched, wasGone, wasHeld, texts);
+  const news = unlisted(faults, baseline.listed, still), unsaid = joinedUnsaid(baseline, was, touched, texts), cut = undercut(baseline, was, still);
+  const unrun = still.filter(f => f.status === "Pending").length;
   if (c.pending) lines.push(`${c.pending} faults on the changed lines were not run (the tool's budget): they are not held here, and the next whole run reads them.`);
-  for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, and ${at} does not list it. Mend: write a test that fails on it and run the check again; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
+  if (unrun) lines.push(`${unrun} faults on lines this pull request left alone, of a kind it adds to or lowers, were not run (the tool's budget): each counts as surviving, since none is known to be caught.`);
+  for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, past what ${at} lists of that fault in ${f.file} with what the lines this pull request left alone still hold. Mend: write a test that fails on it and run the check again${unrun ? " (or run it with a larger budget, which may find the faults not run caught)" : ""}; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const id of unsaid) lines.push(`FAIL: ${at} lists "${id}" where the base did not, with no reason under "grown". Mend: take it out and write a test that catches the fault, or give its reason under "grown" (the fault changes nothing the program does), say so in the pull request, and have a fresh session say there that it found no other way`);
-  return { lines, fails: news.length + unsaid.length > 0 };
+  for (const k of cut) lines.push(`FAIL: ${at} lists ${k.listed} of the fault ${k.kind.split("\n").reverse().join(" in ")}, where the base listed ${k.before}, and ${k.held} still survive on lines this pull request left alone. Mend: list them again as the base did (a cleaning run, node core/scripts/strength.mjs --lower <file>, lowers an entry only to what still survives), or first write the tests that catch them`);
+  return { lines, fails: news.length + unsaid.length + cut.length > 0 };
 }
 
 // The test files the pull request deletes.
@@ -298,30 +318,26 @@ function project() {
   return { tool, home, config, code, at: baselineOf(config) };
 }
 
-// A pull request's run. Before the baseline stands, a tool that cannot run is said and fails nothing.
+// A pull request's run: the tool on the changed lines; then, where a kind's survivors there or its entries lowered
+// call for it (needed()), on the lines the change left alone that could hold that kind (watched()).
 function onPullRequest(p, base) {
-  const changed = changedLines(base, p.code), deleted = deletedTests(base, p.config.tests);
+  const changed = changedLines(base, p.code), deleted = deletedTests(base, p.config.tests), touched = touches(p, base);
   const baseline = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const was = baselineFrom(tolerant(() => git(["show", `${base}:${p.at}`])), `${base}:${p.at}`);
   const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
-  // (the unchanged copies of the base's entries are run too, so that one the pull request drops from its baseline
-  // while its fault still survives frees nothing)
-  const both = new Map([...(was?.listed ?? []), ...(baseline?.listed ?? [])]);
-  const found = measured(p, changed, baseline, read, both), still = found.filter(f => !changed.get(f.file)?.has(f.line));
-  const faults = found.filter(f => changed.get(f.file)?.has(f.line)), held = heldBy(baseline?.listed ?? new Map(), still);
-  const gone = baseline ? opened(baseline.listed, changed) : new Map(), wasGone = was ? opened(was.listed, changed) : new Map();
-  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched: touches(p, base), gone, held, wasGone, wasHeld: was ? heldBy(was.listed, still) : new Map(), texts: read });
+  const faults = measured(p, changed, baseline);
+  const ids = baseline ? needed(faults, baseline, was, recordsWhole(baseline, was, touched)) : [];
+  const still = ids.length ? measured(p, watched(ids, read, changed), baseline) : [];
+  const { lines, fails } = verdict({ faults, still, baseline, was, at: p.at, deleted, touched, texts: read });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
   return fails ? 1 : 0;
 }
 
-// The faults the tool finds on the changed lines and on the unchanged ones that repeat a listed entry (witnesses()).
-// Before the baseline stands, a tool that cannot run is said and fails nothing.
-function measured(p, changed, baseline, read, listedMap) {
-  const watched = baseline ? witnesses(listedMap, read, changed) : new Map();
-  const both = new Map([...changed].map(([f, l]) => [f, new Set([...l, ...(watched.get(f) ?? [])])]));
-  try { return changed.size ? faultsOf(runTool(p.tool.command, linesArg(both)), both) : []; } catch (e) {
+// The faults the tool finds on the lines given (a Map of file to a Set). Before the baseline stands, a tool that cannot
+// run is said and fails nothing.
+function measured(p, lines, baseline) {
+  try { return lines.size ? faultsOf(runTool(p.tool.command, linesArg(lines)), lines) : []; } catch (e) {
     if (baseline || !(e instanceof Refused)) throw e;
     console.log(`Reported only, and not measured: ${e.message}`);
     return [];
@@ -351,30 +367,18 @@ function whole(p) {
   return 0;
 }
 
-// The baseline's entries lowered by a run of `files` (`now`, each surviving id to its count): an entry of those files
-// keeps what still survives of it, at most its count, and passes what it gave up to a survivor of the same file and
-// fault the run found under a new id, so that a rewritten line, one copy of a repeated line too, keeps its debt rather
-// than losing it; an entry of another file stays as it was. A Map of id to count; nothing joins, and no total grows.
-export function lowered(listedMap, now, files, origins = new Map()) {
-  const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `)), left = new Map(now), out = new Map();
-  for (const [id, n] of listedMap) {
-    const c = ours(id) ? Math.min(n.count ?? 0, left.get(id) ?? 0) : n.count ?? 0;
-    if (ours(id)) left.set(id, (left.get(id) ?? 0) - c);
-    if (c > 0) out.set(id, c);
+// The baseline's entries lowered by a run of `files` (`now`, each surviving id to its count): of each kind of those
+// files, the ids that survive now, those it listed first, up to what it listed of the kind, so that debt which only
+// moved keeps its place and debt whose fault no longer survives goes; an entry of another file stays as it was. A Map
+// of id to count; nothing joins, and no kind's total grows.
+export function lowered(listedMap, now, files) {
+  const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `)), room = totals(new Map([...listedMap].filter(([id]) => ours(id))));
+  const out = new Map([...listedMap].filter(([id, n]) => !ours(id) && (n.count ?? 0) > 0).map(([id, n]) => [id, n.count]));
+  for (const [id, c] of [...now].filter(([id]) => ours(id)).sort(([a], [b]) => Number(!listedMap.has(a)) - Number(!listedMap.has(b)))) {
+    const take = Math.min(c, room.get(kindOf(id)) ?? 0);
+    if (take > 0) { out.set(id, take); room.set(kindOf(id), room.get(kindOf(id)) - take); }
   }
-  for (const [id, n] of listedMap) if (ours(id)) carry(id, (n.count ?? 0) - (out.get(id) ?? 0), left, out, listedMap, origins);
   return out;
-}
-
-// What an entry (`id`) gave up, `rest`, passed to the survivors left of the same file and fault under new ids.
-function carry(id, rest, left, out, listedMap, origins) {
-  const same = nid => !listedMap.has(nid) && partsOf(nid)?.file === partsOf(id)?.file && partsOf(nid)?.what === partsOf(id)?.what;
-  for (const [nid, c] of left) {
-    if (rest <= 0 || c <= 0 || !same(nid)) continue;
-    const take = Math.min(rest, c);
-    out.set(nid, (out.get(nid) ?? 0) + take); left.set(nid, c - take); rest -= take;
-    origins.set(nid, id);
-  }
 }
 
 // A cleaning task's run: the tool on the files named, and the baseline's entries of those files lowered to what
@@ -389,9 +393,10 @@ function lower(p, named) {
   const unrun = found.filter(f => f.status === "Pending").length;
   if (unrun) refuse(`the mutation tool left ${unrun} faults of ${files.join(", ")} not run, so what they would show is not known`, "run it again with no budget (MUTATE_BUDGET unset for the core's tool), or on fewer files at a time");
   for (const f of found.filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
-  const origins = new Map(), listed = Object.fromEntries([...lowered(old.listed, now, files, origins)].map(([id, c]) => [id, { count: c }]));
-  // (a reason given for an entry follows its debt to the new id a rewritten line gave it)
-  const grown = Object.fromEntries(Object.keys(listed).map(id => [id, old.grown[id] ?? old.grown[origins.get(id)]]).filter(([, why]) => (why ?? "").trim()));
+  const listed = Object.fromEntries([...lowered(old.listed, now, files)].map(([id, c]) => [id, { count: c }]));
+  // (a reason given for an entry that left follows its kind's debt to the ids it is now listed under)
+  const left = Object.keys(old.grown).filter(id => !(id in listed)), why = id => old.grown[id] ?? (old.listed.has(id) ? undefined : old.grown[left.find(g => kindOf(g) === kindOf(id))]);
+  const grown = Object.fromEntries(Object.keys(listed).map(id => [id, why(id)]).filter(([, w]) => (w ?? "").trim()));
   fs.writeFileSync(unlinked(p.at), `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);
   console.log(`${p.at} lists ${Object.keys(listed).length} faults that survive, against ${old.listed.size} before.`);
   return 0;

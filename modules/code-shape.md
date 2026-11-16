@@ -93,8 +93,8 @@ one declared entrance.
   that stand are rewritten on demand; a listed fault whose line the change rewrote stays listed, and any other fault on
   a changed line is the change's own. Reason: the projects lean on their suites as the proof that a
   change kept behaviour, and nothing measured whether a test fails where the code is wrong. Held by the strength
-  check, which fails a survivor no entry claims and an entry that joins with no reason, and by the reviews of that
-  reason.
+  check, which counts each kind of fault a file holds against what the baseline lists of it and fails a survivor past
+  it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason.
 - **A test taken out or weakened is said.** By default a pull request keeps its tests and what they assert. The
   trigger is a pull request that deletes a test or weakens what one asserts (an assertion loosened or taken out, a
   case skipped): its builder says so under "Readings taken", with why, and the reviewer checks that the reason holds.

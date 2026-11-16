@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, changedLines, counted, faultsOf, heldBy, lowered, idOf, witnesses, joinedUnsaid, linesArg, opened, toolOf, unlisted, verdict } from "./strength.mjs";
+import { baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, verdict, watched } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -51,34 +51,47 @@ ok(same(joinedUnsaid(b({ p: { count: 1 }, q: { count: 2 } }), b({ p: { count: 1 
 const runs = [b({ q: { count: 2 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
 const found = "survivor: a.js: x(); [! -> ]", madeUp = "survivor: a.js: nowhere(); [! -> ]", wholeRun = [b({ [found]: { count: 1 }, [madeUp]: { count: 1 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
 const tooMany = [b({ [found]: { count: 5 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
-ok(same(joinedUnsaid(...wholeRun, false, new Map(), new Map(), () => "x();\n"), [madeUp]) && same(joinedUnsaid(...tooMany, false, new Map(), new Map(), () => "x();\nx();\n"), [found]) && same(joinedUnsaid(...tooMany, false, new Map(), new Map(), () => "x();\n".repeat(5)), []),
+ok(same(joinedUnsaid(...wholeRun, false, () => "x();\n"), [madeUp]) && same(joinedUnsaid(...tooMany, false, () => "x();\nx();\n"), [found]) && same(joinedUnsaid(...tooMany, false, () => "x();\n".repeat(5)), []),
   "a whole run's pull request that lists an entry for a line that stands nowhere in its file, or more of it than the file can hold, fails: no run found it");
-ok(same(joinedUnsaid(runs[0], runs[1], false, new Map(), new Map(), () => null), ["q"]) && same(joinedUnsaid(b({ "survivor: q.js: q(); [! -> ]": { count: 1 } }, {}, { day: "2026-12-01", commit: "b" }), runs[1], false, new Map(), new Map(), () => "q();\n"), []) && same(joinedUnsaid(...runs, true), ["q"]) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
+ok(same(joinedUnsaid(runs[0], runs[1], false, () => null), ["q"]) && same(joinedUnsaid(b({ "survivor: q.js: q(); [! -> ]": { count: 1 } }, {}, { day: "2026-12-01", commit: "b" }), runs[1], false, () => "q();\n"), []) && same(joinedUnsaid(...runs, true), ["q"]) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
   "with no reason, only in the pull request that records a new whole run and changes no code or test, or writes the first baseline: one that changes code cannot take in its own survivors so");
-const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", gone = opened(new Map([[old, { count: 1 }], ["survivor: b.js: kept(); [! -> ]", { count: 1 }]]), new Set(["a.js"]));
+ok(kindOf("survivor: a.js: const a = [1, 2]; [[1, 2] -> []]") === kindOf("survivor: a.js: let b = [1, 2]; [[1, 2] -> []]") && kindOf("survivor: a.js: const a = [1, 2]; [[1, 2] -> []]") !== kindOf("survivor: a.js: const a = [3]; [[3] -> []]") && kindOf("survivor: a.js: if (x === 1) return; [=== -> !==]") !== kindOf("survivor: b.js: if (x === 1) return; [=== -> !==]"),
+  "a fault's kind is its file and what became what, read right where its line's text holds brackets of its own");
+// (one listed, rewritten; another fault on the new line; one line of two copies rewritten, the other holding the rest)
+const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", one = new Map([[old, { count: 1 }]]);
 const renamed = { ...f("survivor: a.js: if (y === 1) return; [=== -> !==]", "Survived") }, other = { ...f("survivor: a.js: if (y === 1) return; [=== -> ==]", "Survived") };
-const repeated = "survivor: a.js: return true; [true -> false]", file = "function f() {\n  return true;\n}\nfunction g() {\n  return true;\n}\n";
-const entry = new Map([[repeated, { count: 1 }]]), watched = witnesses(entry, () => file, new Map([["a.js", new Set([4, 5, 6])]]));
-const survives = heldBy(entry, [f(repeated, "Survived")]), caught = heldBy(entry, [f(repeated, "Killed")]), unrun = heldBy(entry, [f(repeated, "Pending")]);
-ok(same([...watched.get("a.js")], [2]) && survives.get(repeated) === 1 && unlisted([f(repeated, "Survived")], entry, new Map(), survives).length === 1 && !caught.has(repeated) && unrun.get(repeated) === 1 && unlisted([f(repeated, "Survived")], entry, new Map(), caught).length === 0 && witnesses(entry, () => file, new Map([["b.js", new Set([1])]])).size === 0,
-  "an unchanged line that repeats a listed one is run too: where its fault still survives, a changed repeat cannot use the entry; where a test catches it there, the entry is the changed line's; where it was not run, it holds the entry");
+const twice = "survivor: a.js: return true; [true -> false]", rewritten = "survivor: a.js: return (true); [true -> false]";
+const two = new Map([[twice, { count: 2 }]]), rewrittenOne = { ...f(rewritten, "Survived") };
+ok(same(unlisted([renamed], one), []) && unlisted([renamed, renamed], one).length === 1 && unlisted([other], one).length === 1 && same(unlisted([renamed], one, [f(old, "Killed")]), []) && unlisted([renamed], one, [f(old, "Survived")]).length === 1
+  && same(unlisted([rewrittenOne], two, [f(twice, "Survived")]), []) && unlisted([rewrittenOne], two, [f(twice, "Survived"), f(twice, "Survived")]).length === 1,
+  "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once, also where another copy of the line stands and holds the rest; another fault there is the change's own");
+const repeated = "survivor: a.js: return true; [true -> false]", file = "function f() {\n  return true;\n}\nfunction g() {\n  return true;\n}\nconst h = () => true || false;\n";
+const entry = new Map([[repeated, { count: 1 }]]), seen = watched([repeated], () => file, new Map([["a.js", new Set([4, 5, 6])]]));
+ok(same([...seen.get("a.js")], [2, 7]) && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Survived")]).length === 1 && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Killed")]).length === 0 && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Pending")]).length === 1 && watched([repeated], () => file, new Map([["b.js", new Set([1])]])).size === 1 && watched(["survivor: b.js: x [! -> ]"], () => file, new Map()).size === 0,
+  "every unchanged line that could hold a listed kind is run: where its fault still survives, a changed line cannot use the entry; where a test catches it there, the entry is the changed line's; where it was not run, it holds the entry");
+// (a line rewritten once and left unlisted under its old id: a later change that adds the same fault elsewhere in the
+// file finds the rewritten line holding the entry)
+ok(unlisted([{ ...f("survivor: a.js: if (z === 1) return; [=== -> !==]", "Survived"), line: 9 }], one, [renamed]).length === 1,
+  "debt that moved earlier under another id still holds its entry: a later survivor of that kind in the file is the later change's own");
 const was = "survivor: a.js: export const flag = () => true; [true -> false]", now2 = "survivor: a.js: export const flag = () => { return true; }; [true -> false]";
 const low = lowered(new Map([[was, { count: 1 }], ["survivor: b.js: x [! -> ]", { count: 2 }]]), new Map([[now2, 1]]), ["a.js"]);
-const twice = "survivor: a.js: return true; [true -> false]", rewritten = "survivor: a.js: return (true); [true -> false]";
-ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"])], []) && same([...lowered(new Map([[twice, { count: 2 }]]), new Map([[twice, 1], [rewritten, 1]]), ["a.js"])].sort(), [[rewritten, 1], [twice, 1]].sort()),
-  "a cleaning run keeps the debt of a line it rewrote, one copy of a repeated line too, under the fault's new id, and drops it only where the fault no longer survives; an entry of another file stays");
-const origins = new Map();
-lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1]]), ["a.js"], origins);
-const afterLower = b({ [now2]: { count: 1 } }), beforeLower = b({ [was]: { count: 1 } }), baseGone = opened(beforeLower.listed, new Set(["a.js"]));
-ok(origins.get(now2) === was && same(joinedUnsaid(afterLower, beforeLower, true, baseGone), []) && same(joinedUnsaid(b({ [now2]: { count: 2 } }), beforeLower, true, baseGone), [now2]),
+ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"])], []) && same([...lowered(two, new Map([[twice, 1], [rewritten, 1]]), ["a.js"])].sort(), [[rewritten, 1], [twice, 1]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1], [twice, 1]]), ["a.js"])], [[now2, 1]]),
+  "a cleaning run keeps the debt of a line it rewrote, one copy of a repeated line too, under the fault's new id, and drops it only where the fault no longer survives; nothing past a kind's total joins; an entry of another file stays");
+// (the newest case: one "return true;" and one "return (true);" listed, and the first rewritten into the second)
+const both = new Map([[twice, { count: 1 }], [rewritten, { count: 1 }]]), cleaned = lowered(both, new Map([[rewritten, 2]]), ["a.js"]);
+const cleanedRun = verdict({ faults: [rewrittenOne], still: [rewrittenOne], baseline: b({ [rewritten]: { count: cleaned.get(rewritten) } }), was: b(Object.fromEntries(both)), at: "s.json", deleted: [] });
+ok(same([...cleaned], [[rewritten, 2]]) && !cleanedRun.fails,
+  "a cleaning run that rewrites a line into another the baseline lists keeps both copies' debt under the one id, and its pull request passes", cleanedRun.lines.join("\n"));
+const afterLower = b({ [now2]: { count: 1 } }), beforeLower = b({ [was]: { count: 1 } });
+ok(same(joinedUnsaid(afterLower, beforeLower), []) && same(joinedUnsaid(b({ [now2]: { count: 2 } }), beforeLower), [now2]),
   "the pull request of a cleaning run that carried a rewritten line's debt to its new id passes; one that adds to it does not");
 const swapped = "survivor: a.js: return 2 > 1; [> -> >=]", kept = "survivor: a.js: return x > 1; [> -> >=]", baseKept = b({ [kept]: { count: 1 } });
-ok(same(joinedUnsaid(b({ [swapped]: { count: 1 } }), baseKept, true, opened(baseKept.listed, new Set(["a.js"])), new Map([[kept, 1]])), [swapped]) && same(joinedUnsaid(b({ [swapped]: { count: 1 } }), baseKept, true, opened(baseKept.listed, new Set(["a.js"])), new Map()), []),
+const swap = still => verdict({ faults: [f(swapped, "Survived")], still, baseline: b({ [swapped]: { count: 1 } }), was: baseKept, at: "s.json", deleted: [] });
+ok(swap([f(kept, "Survived")]).fails && !swap([f(kept, "Killed")]).fails && same(needed([f(swapped, "Survived")], b({ [swapped]: { count: 1 } }), baseKept), [swapped, kept]),
   "a pull request that drops an entry whose fault still survives on its unchanged line, and lists a new survivor in its place, fails; where the run finds that fault caught, the swap passes");
-const two = new Map([[twice, { count: 2 }]]), rewrittenOne = { ...f(rewritten, "Survived") };
-ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1
-  && same(unlisted([rewrittenOne], two, opened(two, new Set(["a.js"])), new Map([[twice, 1]])), []) && unlisted([rewrittenOne], two, opened(two, new Set(["a.js"])), new Map([[twice, 2]])).length === 1,
-  "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once, also where another copy of the line stands and holds the rest; another fault there is the change's own");
+const dropped = still => verdict({ faults: [], still, baseline: b({}), was: baseKept, at: "s.json", deleted: [] });
+ok(dropped([f(kept, "Survived")]).fails && mended(dropped([f(kept, "Survived")]).lines.join("\n")) && !dropped([f(kept, "Killed")]).fails && same(needed([], b({}), baseKept), [kept]) && same(needed([], b({}), baseKept, true), []) && same(undercut(b({}), baseKept, [f(kept, "Survived")]).map(k => k.held), [1]),
+  "a pull request that drops an entry while its fault still survives fails, with its mend; once a test catches it, the entry goes; a whole run's pull request is not measured so", dropped([f(kept, "Survived")]).lines.join("\n"));
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });
@@ -104,8 +117,9 @@ try {
   write("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], tests: ["test"] }));
   write("src/a.js", "export const a = x => x === 1;\n");
   write("test/a.test.js", "import { a } from '../src/a.js';\n");
-  // (the scratch tool: a report of one fault that survives on each line it is told, in the schema's form)
-  write("tool.mjs", "import fs from 'node:fs';\nconst [lines, out] = process.argv.slice(2);\nconst files = {};\nfor (const part of lines.split(',')) { const [file, r] = part.split(':'); const first = Number((r ?? '1-1').split('-')[0]); files[file] ??= { source: fs.readFileSync(file, 'utf8'), mutants: [] }; files[file].mutants.push({ id: String(first), mutatorName: 'EqualityOperator', replacement: '!==', status: process.env.STATUS || 'Survived', location: { start: { line: first, column: 26 }, end: { line: first, column: 29 } } }); }\nfs.writeFileSync(out, JSON.stringify({ schemaVersion: '1', files }));\n");
+  // (the scratch tool: a report of one fault that survives on each line it is told, every line of a file told with no
+  // lines, in the schema's form)
+  write("tool.mjs", "import fs from 'node:fs';\nconst [lines, out] = process.argv.slice(2);\nconst files = {};\nfor (const part of lines.split(',')) { const [file, r] = part.split(':'); const source = fs.readFileSync(file, 'utf8'); const [first, last] = r ? r.split('-').map(Number) : [1, source.split('\\n').length - 1]; files[file] ??= { source, mutants: [] }; for (let n = first; n <= last; n++) files[file].mutants.push({ id: `${file}:${n}`, mutatorName: 'EqualityOperator', replacement: '!==', status: process.env.STATUS || 'Survived', location: { start: { line: n, column: 26 }, end: { line: n, column: 29 } } }); }\nfs.writeFileSync(out, JSON.stringify({ schemaVersion: '1', files }));\n");
   write("core-manifest.md", MANIFEST("`node tool.mjs {lines} {report}`"));
   sh("add", "-A"); sh("commit", "-q", "-m", "base");
   sh("checkout", "-q", "-b", "change");
@@ -127,7 +141,7 @@ try {
   ok(r.status === 1 && mended(r.stderr) && !fs.existsSync(path.join(dir, "checks/strength-baseline.json")), "a whole run that left faults not run writes no baseline, and says the mend", r.stdout + r.stderr);
   r = run(["--whole"]);
   const written = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
-  ok(r.status === 0 && Object.keys(written.listed).length === 1 && written.whole?.commit && /^\d{4}-\d\d-\d\d$/.test(written.whole.day), "the whole run writes the baseline, with the day and commit it ran on", r.stdout + r.stderr);
+  ok(r.status === 0 && Object.keys(written.listed).length === 2 && written.whole?.commit && /^\d{4}-\d\d-\d\d$/.test(written.whole.day), "the whole run writes the baseline, with the day and commit it ran on", r.stdout + r.stderr);
   sh("add", "-A"); sh("commit", "-qm", "the whole run"); sh("checkout", "-q", "main"); sh("merge", "-q", "--ff-only", "change"); sh("checkout", "-q", "-b", "next");
   write("src/a.js", "export const a = x => x === 1;\nexport const b = y => y === 2;\nexport const c = z => z === 3;\n");
   sh("commit", "-qam", "another");
@@ -160,7 +174,7 @@ try {
   ok(data.status === 1 && data.stderr.includes("where the base did not"), "and one that also changes a file the code reads, data too, does not", data.stdout + data.stderr);
   sh("checkout", "-q", "-f", "next"); for (const f of ["docs", "data"]) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
   r = run(["--lower", "src/a.js"], { STATUS: "Pending" });
-  ok(r.status === 1 && mended(r.stderr) && JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed && Object.keys(JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed).length === 1, "a cleaning task's run that left faults not run lowers nothing, and says the mend", r.stdout + r.stderr);
+  ok(r.status === 1 && mended(r.stderr) && JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed && Object.keys(JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8")).listed).length === 2, "a cleaning task's run that left faults not run lowers nothing, and says the mend", r.stdout + r.stderr);
   r = run(["--lower", "src/a.js"], { STATUS: "Killed" });
   const lowered = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
   const refused = run(["--lower", "test/a.test.js"]);
