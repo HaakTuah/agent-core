@@ -29,8 +29,8 @@ the core in "Sessions", since this repository is the core and holds no copy.
 Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a session of any
 other tool, `modules/other-builders.md` and its tool's part (`modules/tools.md`), which its entry file pulls in.
 
-Read when a task calls for it, each saying when in its opening line: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
-`modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
+Read when a task calls for it, each saying when in its opening line: `floor/topics.md`, `floor/threat-model.md`,
+`modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
 `modules/kiro.md`, `modules/antigravity.md`, `modules/github-calls.md`, `modules/orchestrating.md`,
 `modules/updates.md`, `modules/choices.md`, `modules/code-shape.md` and `modules/cleaning.md`.
 
@@ -52,8 +52,8 @@ queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`modules/roles.md`,
 `modules/orchestrating.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
-`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of
-`.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
