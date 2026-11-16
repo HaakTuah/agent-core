@@ -1,12 +1,11 @@
 # The core's queue
 
-The order this repository's open issues are built in, and nothing else (`AGENTS.md`, "The queue"). Each line is an
-issue, who builds it and what it waits on; the issue holds the rest, its conditions too. The first line that waits on
-nothing is next.
+The order this repository's open issues are built in, and nothing else (`AGENTS.md`, "The queue"). The first line that
+waits on nothing is next.
 
-**Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's word
-on the issue; *the owner*, no session takes it up before the owner's own word. A line on points of #460, #484, #486 or #488
-has its PR say "Part of" that issue, or "Fixes" it if it merges last.
+**Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
+the owner's own word. A line on points of #460, #484, #486 or #488 has its PR say "Part of" that issue, or "Fixes" it if
+it merges last.
 
 ## In order
 
