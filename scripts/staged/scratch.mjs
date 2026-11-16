@@ -359,11 +359,28 @@ export function changed(dir, ref) {
 // literally, never as a pattern, so ":(glob)…" names one file alone; and only lines after the first hunk's "@@" are
 // read, so a line the file adds that opens with "++" is a line, not the header.
 export function added(dir, ref, file) {
-  const diff = (...how) => originGit(dir, "diff", ...how, "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", `:(literal)${file}`);
-  const counts = diff("--numstat"), lines = diff("-U0");
-  if (counts === null || lines === null || /^-\t-\t/u.test(String(counts))) return null;
-  const all = String(lines).split("\n"), from = all.findIndex(l => l.startsWith("@@"));
+  // (one call: its counts, "-\t-\t" for a binary file, then its patch)
+  const out = originGit(dir, "diff", "--numstat", "-p", "-U0", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", `:(literal)${file}`);
+  if (out === null || /^-\t-\t/u.test(String(out))) return null;
+  const all = String(out).split("\n"), from = all.findIndex(l => l.startsWith("@@"));
   return from < 0 ? [] : all.slice(from).filter(l => l.startsWith("+")).map(l => l.slice(1));
+}
+
+// Of the lines given, those some file matching a pattern holds whole at main as the case set it, in one call to git
+// (a line with a NUL in it, which no argument can carry, is never held).
+export function heldAtBase(dir, lines, pattern) {
+  const asked = [...new Set(lines)].filter(l => l && !l.includes("\0"));
+  if (!asked.length) return new Set();
+  const out = String(originGit(dir, "grep", "-I", "-z", "-F", "--no-textconv", ...asked.flatMap(l => ["-e", l]), "--end-of-options", base(dir)) ?? ""), at = `${base(dir)}:`, held = new Set();
+  // (each match "<main>:<path>\0<line>\n": the path is read to its NUL, so a newline in it splits nothing)
+  for (let i = 0; i < out.length;) {
+    const nul = out.indexOf("\0", i), end = out.indexOf("\n", nul + 1);
+    if (nul < 0 || end < 0) break;
+    const path = out.slice(i, nul), line = out.slice(nul + 1, end);
+    if (path.startsWith(at) && pattern.test(path.slice(at.length)) && asked.includes(line)) held.add(line);
+    i = end + 1;
+  }
+  return held;
 }
 
 // The branches the session pushed: each origin branch that is new, or moved, since the case was set.

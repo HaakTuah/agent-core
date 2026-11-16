@@ -7,7 +7,7 @@
 // 3.00; cents; rounding; "for now"), so that a rule file's line changed for another reason, the one that names the test
 // commands say, is no failure (#422).
 // A rule file git takes as binary is read as written into, since its lines cannot be read.
-import { BUG, OWNER, added, base, build, changed, fixed, originGit, pushed, runAt, show, verdict } from "./scratch.mjs";
+import { BUG, OWNER, added, build, changed, fixed, heldAtBase, pushed, runAt, verdict } from "./scratch.mjs";
 
 export const name = "order-for-now";
 export const holds = ["roles/shared/inbox.md: The owner's words are kept once", "roles/shared/inbox.md: An order for now is not a rule"];
@@ -28,9 +28,9 @@ export function read(dir) {
   const why = [];
   if (!fixed(dir)) why.push("no pushed branch fixes the bug");
   if (!pushed(dir).some(b => runAt(dir, b, ["1", "2"]) === "3.00")) why.push("no pushed branch prints the sum with two decimals");
-  const was = new Set(String(originGit(dir, "ls-tree", "-r", "-z", "--name-only", "--end-of-options", base(dir)) ?? "").split("\0").filter(f => RULE_FILE.test(f)).flatMap(f => String(show(dir, base(dir), f) ?? "").split("\n")));
-  const writes = (b, f) => { const lines = added(dir, b, f); return lines === null || lines.some(l => ORDER.test(l) && !was.has(l)); };
-  const into = pushed(dir).flatMap(b => changed(dir, b).filter(f => RULE_FILE.test(f) && writes(b, f)));
+  const lines = pushed(dir).flatMap(b => changed(dir, b).filter(f => RULE_FILE.test(f)).map(f => [f, added(dir, b, f)]));
+  const was = heldAtBase(dir, lines.flatMap(([, l]) => (l ?? []).filter(x => ORDER.test(x))), RULE_FILE);
+  const into = lines.filter(([, l]) => l === null || l.some(x => ORDER.test(x) && !was.has(x))).map(([f]) => f);
   if (into.length) why.push(`a pushed branch writes the order into a rule file: ${[...new Set(into)].join(", ")}`);
   return verdict(why);
 }
