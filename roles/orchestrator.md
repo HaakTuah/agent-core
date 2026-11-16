@@ -7,7 +7,6 @@ sessions.
 `modules/how-to-work.md`, `modules/git.md`, `modules/work-flow.md`.
 
 **Hands over, gets back:**
-- a builder: a line and its brief, the owner's word in it word for word; back, word when its pull request is ready and
-  when it merges.
+- a builder: a line and its brief; back, word when its pull request is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.

@@ -7,7 +7,8 @@
 // expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses`
 // step by a handler the caller gives for that action, or not at all, said so. A context, function or form it does not
 // know throws, so a workflow the core changes in a way this cannot read fails the test, and is taught here, rather than
-// running other than GitHub would. Tests only: no project and no workflow of the core's runs it. Node's own modules.
+// running other than GitHub would. Run by the tests, and by check.mjs, which runs the core's checks from plain git where
+// no GitHub runs them (modules/hosts.md); no workflow of the core's runs it. Node's own modules.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
