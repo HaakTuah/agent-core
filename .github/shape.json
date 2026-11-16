@@ -13,6 +13,7 @@
   "suites": {
     "suites": { "linux": 300 },
     "suites-projects": { "win32": 600 },
+    "suites-kit": { "win32": 600 },
     "suites-licences": { "win32": 450 },
     "suites-rest": { "win32": 480 },
     "upgrade": { "linux": 240, "win32": 700 },
