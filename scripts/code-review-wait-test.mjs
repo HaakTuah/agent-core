@@ -89,6 +89,12 @@ ok(is(had([], line, sync), true, "no code review is running") && is(had([], line
 {
   // (a copy at the path the manifest names, which the sync's patch shows: core-path.mjs)
   const there = { ...manifest, patch: manifest.patch.replaceAll("under core/.", "under vendor/the-core/ (never edited here).") };
+  // (the copy's path as the default branch's manifest names it, which the script adds to the rule files: a Markdown file
+  // of the copy is a rule file, so a change to it alone needs its code review)
+  ok(is(had([], line, [md("vendor/the-core/roles/shared/review-guidelines.md")], pull, ["vendor/the-core/"]), false, "no code review") && is(had([], line, [md("vendor/the-core/floor/topics/workflows.md")], pull, ["vendor/the-core/"]), false, "no code review")
+    && is(had([], line, [md("vendor/the-core/roles/shared/review-guidelines.md")]), true, "no code review is running"),
+    "a Markdown file of a copy at the path the default branch's manifest names is a rule file: a change to it alone needs its code review (and, where no manifest names that path, is docs)");
+  ok(is(had([], line, [there, md("vendor/the-core/scripts/x.mjs"), sync[2]], pull, ["vendor/the-core/"]), true, "no code review is running"), "and a sync's shape at that path needs none");
   ok(is(had([], line, [there, md("vendor/the-core/scripts/x.mjs"), sync[2]]), true, "no code review is running") && is(had([], line, [there, md("core/scripts/x.mjs")]), false, "no code review"),
     "a sync's shape at the path the manifest names needs none; a file under core/ beside it is no part of that copy");
 }

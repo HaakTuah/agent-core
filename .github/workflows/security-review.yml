@@ -158,13 +158,13 @@ jobs:
           # the push) and checks out nothing, all within the job's time so its status is always written, so no file of
           # the pull request's is on disk and none runs; git sends the token to this repository's own address alone,
           # from each command's environment, never written to disk. Fetched for two proofs alone: where the pull
-          # request has a sync's shape (the manifest among its files, all of them whole, and none outside core/, it and
-          # the workflows), and where its head is an update from main (a merge whose second parent is no commit of the
+          # request has a sync's shape (the manifest among its files, all of them whole, and none outside the copy, core/
+          # or the path the manifest's line in the patch names, it and the workflows), and where its head is an update from main (a merge whose second parent is no commit of the
           # pull request's)
           shape= merge= cloned= pure=
           if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
             && [ "$(jq '[.[][]] | length' "$d/files.json")" = "$(jq '.changed_files' "$d/pull.json")" ] \
-            && jq -e '([.[][] | select(.filename == "core-manifest.md") | .patch // "" | capture("(?<l>^|\n)[-+ ]Core: \\S+ at [0-9a-f]{40}, copied whole under (?<p>([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( |\n|$)")? | .p] | first // "core/") as $at
+            && jq -e '([.[][] | select(.filename == "core-manifest.md") | .patch // "" | capture("(?<l>^|\n)-Core: \\S+ at [0-9a-f]{40}, copied whole under (?<p>([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( |\n|$)")? | .p] | first // "core/") as $at
               | any(.[][]; .filename == "core-manifest.md") and all(.[][]; .filename == "core-manifest.md"
               or (.filename | startswith($at)) or (.filename | test("^\\.github/workflows/[^/]+\\.ya?ml$")))' \
               "$d/files.json" > /dev/null

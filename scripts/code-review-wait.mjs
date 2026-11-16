@@ -14,9 +14,10 @@
 // scripts/clean-merges.mjs proved, only through merges whose tree is the one git makes of their parents (#323), the
 // status naming the one where that stops it. None is needed where every changed file
 // is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
-// CLAUDE.local.md too, the copy under core/, .github/, .claude/, .agents/ and .agent/, and those the project's
+// CLAUDE.local.md too, the copy under core/ or the path the default branch's manifest names, .github/, .claude/, .agents/
+// and .agent/, and those the project's
 // SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
-// a sync's shape: the copy under core/, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
+// a sync's shape: the copy at that path, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
 // sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's). Given
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
 // files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
@@ -35,8 +36,9 @@
 //           [<its commits, the same> <its files, the same> [<the merges clean-merges.mjs proved>]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
 //         the link the status carries.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
+import { copyOf } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
@@ -85,16 +87,22 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
 // moved alone among them)
 const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under \S+\/.*)$/u; // (at the path the manifest names: core-path.mjs)
 const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
+// A rule file by its name, or a folder of them by its path ending in "/": the copy where the manifest names it.
+const isRule = (name, rules) => RULES.test(name) || rules.some((r) => r === name || (r.endsWith("/") && name.startsWith(r)));
+// The copy's path: as the default branch's manifest names it, given among the rules; else as the manifest's line the
+// pull request moves names it; else core/ (core-path.mjs).
+const copyIn = (files, rules) => rules.find((r) => r.endsWith("/"))
+  ?? /^-Core: \S+ at [0-9a-f]{40}, copied whole under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)(?= |$)/mu.exec(files.find((file) => file.filename === "core-manifest.md")?.patch ?? "")?.[1] ?? "core/";
 function needs(pull, files, rules) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename]).filter((name) => name !== undefined);
   if (names.length === 0 || names.some((name) => typeof name !== "string")) return names.length > 0;
   // (in the core's own repository every file is protected, its SECURITY.md says, and every pull request gets its code
   // review: AGENTS.md, "How changes are made here")
   if (String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
-  const rule = (name) => RULES.test(name) || rules.includes(name);
+  const rule = (name) => isRule(name, rules);
   if (names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
   // (the copy at the path the manifest's line names, which a sync's patch shows beside the pin it moves: core-path.mjs)
-  const at = /^[-+ ]Core: \S+ at [0-9a-f]{40}, copied whole under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)(?= |$)/mu.exec(files.find((file) => file.filename === "core-manifest.md")?.patch ?? "")?.[1] ?? "core/";
+  const at = copyIn(files, rules);
   const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith(at) && (file.previous_filename ?? at).startsWith(at))
     || (/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.filename) && pinsAlone(file)));
   return !(sync && files.some((file) => file.filename === "core-manifest.md"));
@@ -109,6 +117,8 @@ if (started(import.meta.url)) {
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
+  // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
+  if (existsSync("core-manifest.md")) rules.push(copyOf("."));
   const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false", mergesFile ? read(mergesFile) : undefined);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

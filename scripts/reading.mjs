@@ -313,10 +313,11 @@ function taskOf(argv, dir, lib, self) {
 function treeOf(dir, manifest, prefix) {
   const library = /^Core: \S+, carried by ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+) under /mu.exec(String(manifest ?? ""))?.[1] ?? "";
   const ask = (at, rev, command, flag, f) => git(at, "--no-replace-objects", command, ...(flag ? [flag] : []), `${rev}:${f}`);
+  let pin; // (the library's commit main pins, looked up once)
   return (command, flag, f) => {
     const own = ask(dir, MAIN, command, flag, `${prefix}${f}`);
     if (own !== null || !library) return own;
-    const pin = git(dir, "--no-replace-objects", "rev-parse", `${MAIN}:${library.slice(0, -1)}`)?.trim();
+    pin ??= git(dir, "--no-replace-objects", "rev-parse", `${MAIN}:${library.slice(0, -1)}`)?.trim() ?? "";
     return /^[0-9a-f]{40}$/u.test(pin ?? "") ? ask(path.join(dir, library), pin, command, flag, `${prefix.slice(library.length)}${f}`) : null;
   };
 }
