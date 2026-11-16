@@ -31,7 +31,15 @@
 //
 // The config's other keys: "code" and "tests", git pathspecs of what is read (tests for their imports alone);
 // "aliases", each prefix an import may start with to the path it stands for; "suites", each suite's time mark in
-// seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }).
+// seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }); and those of what
+// the tests cost (modules/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
+// device (a package or module by the name it is imported under, or the start of one), so that each test file that
+// imports one, or a system of the domain "display", is an entry ("screen: <test> -> <what>", found by the reader
+// "screens"), new ones failing as any breach does; "select", for select.mjs beside this file: "proof", pathspecs of the
+// tests never selected out, "whole", those of the tests that reach every file (one that copies or runs the whole
+// project), and "none", those of the files no test reads; "wait", the time mark in seconds on the checks of one push
+// (wait.mjs), which rises only as a suite's does; and "long", the seconds from which a measurement runs as a job of
+// its own, outside the session (an hour where none is given).
 //
 //   node core/scripts/shape.mjs [<config>]            the check; with no config named, the one the manifest's *shape
 //                                                     check* names (in the core, its AGENTS.md's), else
@@ -70,7 +78,10 @@ export const MARKS = { lines: 60, depth: 4, branches: 15 };
 export const DOMAINS = ["rules", "saved-data", "computer-players", "display", "input", "network", "storage", "platform", "packages", "tools", "tests"];
 // What the rules never use: nothing outward.
 export const OUTWARD = ["display", "input", "network", "storage", "platform"];
-const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites"];
+const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "select", "wait", "long"];
+const SELECT_KEYS = ["proof", "whole", "none"];
+// The seconds from which a measurement runs as a job outside the session, where the config gives none (#321).
+export const LONG = 3600;
 const SYSTEM_KEYS = ["paths", "uses", "entrance", "domain", "wraps"];
 const BUILTIN = new Set(builtinModules.flatMap(m => [m, `node:${m}`]));
 
@@ -94,6 +105,9 @@ function readLists(c, at) {
   if (!plainPath(c.baseline) || c.baseline.endsWith("/")) refuse(`${at} names no "baseline" that is a plain path inside the project`, "name the baseline's path in \"baseline\", as the starter kit writes it (checks/shape-baseline.json)");
   for (const k of ["code", "tests"]) if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, "list git pathspecs there (\":!\" leaves a path out)");
   if (!optional(c.platform, strings)) refuse(`"platform" in ${at} is not a list of words`, "list there each package or module of Node's that binds code to one platform, by the name it is imported under");
+  if (!optional(c.screens, strings)) refuse(`"screens" in ${at} is not a list of words`, "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under");
+  if (!optional(c.select, v => isObject(v) && Object.keys(v).every(k => SELECT_KEYS.includes(k)) && Object.values(v).every(strings))) refuse(`"select" in ${at} is not in the form the check reads`, `give it ${SELECT_KEYS.map(k => `"${k}"`).join(", ")} alone, each a list of git pathspecs`);
+  for (const k of ["wait", "long"]) if (!optional(c[k], aSecond)) refuse(`"${k}" in ${at} is not a number of seconds`, `give it a number of seconds above 0, or take it out`);
   if (!c.code?.length) refuse(`${at} names no "code" to read`, "list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)");
 }
 
@@ -145,7 +159,8 @@ export function parseConfig(text, at = KIT) {
   const systems = c.systems ?? {};
   if (!isObject(systems)) refuse(`"systems" in ${at} is not an object`, "give each system's name its \"paths\", and what else it declares: \"uses\", \"entrance\", \"domain\", \"wraps\"");
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
-  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], ...readMarks(c, at), wrapped: readTogether(systems, at) };
+  const select = Object.fromEntries(SELECT_KEYS.map(k => [k, c.select?.[k] ?? []]));
+  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -208,6 +223,7 @@ function ownClock(ctx, file, { toks, own }) {
 // nowhere the check can tell.
 function outside(ctx, from, spec, aliased) {
   const name = packageOf(spec), bound = [spec, name].find(s => ctx.config.platform.includes(s));
+  opensScreen(ctx, from, [spec, name]);
   if (bound) { if (from.domain !== "platform") add(ctx, "platform", `${from.file} -> ${bound}`, bound); return; }
   if (BUILTIN.has(spec)) return;
   const known = !aliased && !isRelative(spec) && !ctx.packages.has(name) && ctx.declared.has(name);
@@ -215,9 +231,19 @@ function outside(ctx, from, spec, aliased) {
   else if (!known && (toCode(spec) || !isRelative(spec))) ctx.read.nowhere++;
 }
 
+// A test that imports what opens a screen, a window or a device: one of the config's "screens", by any of the names it
+// is imported under (a name listed, or one that starts with it and a slash or a dot), or a system of the display.
+function opensScreen(ctx, from, names, system = null) {
+  if (!ctx.tests.has(from.file)) return;
+  const what = system && ctx.config.systems[system].domain === "display" ? system
+    : ctx.config.screens.find(s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`)));
+  if (what !== undefined && what !== null) add(ctx, "screen", `${from.file} -> ${what}`, what);
+}
+
 // An import from one file of the project to another: across a boundary nobody declared, or past an entrance.
 function between(ctx, from, to) {
   const target = systemOf(ctx.config, to);
+  if (target) opensScreen(ctx, from, [], target);
   if (!target || target === from.system) return;
   const pair = `${from.system ?? NONE} -> ${target}`, key = `${pair}: ${from.file} -> ${to}`, entrance = ctx.config.systems[target].entrance;
   if (from.system && !(ctx.config.systems[from.system].uses ?? []).includes(target)) add(ctx, "crossing", key, pair);
@@ -230,6 +256,7 @@ function oneImport(ctx, from, imp) {
   const spec = alias === undefined ? imp.spec : `./${path.posix.relative(path.posix.dirname(from.file), path.posix.join(ctx.config.aliases[alias], imp.spec.slice(alias.length))) || "."}`;
   const to = resolve(from.file, spec, ctx.files, ctx.packages);
   if (!to) { outside(ctx, from, imp.spec, alias !== undefined); return; }
+  if (to !== from.file) ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
   if (imp.kind !== "dynamic" && !imp.types && to !== from.file) ctx.graph.set(from.file, (ctx.graph.get(from.file) ?? new Set()).add(to));
   between(ctx, from, to);
 }
@@ -240,10 +267,12 @@ function foreign(ctx, from, imp, r) {
   ctx.read.imports++;
   const l = linked(from.file, imp, r, ctx.idx, ctx.files, ctx.config.platform);
   for (const to of (l.to ?? []).filter(t => t !== from.file)) {
+    ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
     if (!imp.dynamic && !imp.types) ctx.graph.set(from.file, (ctx.graph.get(from.file) ?? new Set()).add(to));
     between(ctx, from, to);
   }
   if (l.to) return;
+  opensScreen(ctx, from, l.names);
   const bound = l.names.find(n => ctx.config.platform.includes(n));
   if (bound) { if (from.domain !== "platform") add(ctx, "platform", `${from.file} -> ${bound}`, bound); return; }
   if (l.known && l.known !== "builtin" && ctx.ships.has(l.known)) ctx.usedBy.set(l.known, [...(ctx.usedBy.get(l.known) ?? []), from]);
@@ -289,21 +318,24 @@ function wrappedOnce(ctx) {
 
 // What the check finds in the files given ({ path: text }, the files that declare packages among them): `entries`, a
 // Map of each breach's id to { kind, group, n }, n its numbers where it has any; `read`, the counts of what it read;
-// `unnamed`, the files of code in no system; and `readers`, the reader of each file (shape-readers.mjs). `tests` is
-// the set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
+// `unnamed`, the files of code in no system; `readers`, the reader of each file (shape-readers.mjs); and `reach`, each
+// file's imports of the project's own files, dynamic ones and those of types among them (select.mjs). `tests` is the
+// set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
   const readings = code.map(file => [file, reading(file, texts[file])]);
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
-    entries: new Map(), graph: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map() };
+    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map() };
   for (const [file, r] of readings) oneFile(ctx, file, r);
   sharedSpace(ctx);
   onCycles(ctx);
   wrappedOnce(ctx);
   read.unnamed = ctx.unnamed.length;
-  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers };
+  read.tests = tests.size;
+  read.screens = new Set([...ctx.entries.keys()].filter(id => id.startsWith("screen: ")).map(fileOf)).size;
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach };
 }
 
 // ---- the baseline ----
@@ -331,7 +363,7 @@ export function fileOf(id) {
 
 // The reader that found an entry: the reader of its file as the check reads it now, the shared space's own; null where
 // the file is not read now.
-export const readerOf = (id, readers) => (groupOf(id).kind === "global" ? "scripts" : readers.get(fileOf(id)) ?? null);
+export const readerOf = (id, readers) => { const { kind } = groupOf(id); return kind === "global" ? "scripts" : kind === "screen" ? "screens" : readers.get(fileOf(id)) ?? null; };
 
 const NUMBERS = ["lines", "depth", "branches", "count"];
 // Whether an entry's numbers are within a listed one's: each no more than listed, or, for a function, than its mark.
@@ -446,6 +478,8 @@ const SAID = {
     "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
+  screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
+    "test what it guards beneath the screen, through the system it uses, and take the import out; only where the screen, the window or the device itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
 };
 
@@ -485,6 +519,7 @@ function raised(config, old) {
     const platforms = [...Object.keys(isObject(mark) ? mark : {}), ...Object.keys(isObject(now) ? now : {}), "any"];
     if (platforms.some(p => on(mark, p) !== undefined && !(on(now, p) <= on(mark, p)))) out.push(`mark: suite ${name}`);
   }
+  if (old.wait !== undefined && !(config.wait <= old.wait)) out.push("mark: wait");
   return out;
 }
 
@@ -518,6 +553,7 @@ function notesOf(read) {
   const notes = [];
   if (read.nowhere) notes.push(`${plural(read.nowhere, "import leads", "imports lead")} nowhere the check can tell (no file, no package the project declares, no alias the config names): not held`);
   if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone${read.systems ? ", and a new one fails" : ""}`);
+  if (read.screens) notes.push(`${plural(read.screens, "test file")} of ${read.tests} ${read.screens === 1 ? "opens" : "open"} a screen, a window or a device (modules/tests.md): each is listed, and a new one fails`);
   if (read.noEntrance && read.systems > 1) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
   return notes;
 }
