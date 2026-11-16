@@ -291,22 +291,26 @@ export function listed(config, file) {
   list.forEach((entry, i) => {
     const at = `${file}: "agentTools" entry ${i + 1}${typeof entry?.name === "string" ? ` (${show(entry.name)})` : ""}`;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) { problems.push(`${at} is no entry. Mend: write it as { "kind", "name", "publisher", "version" }`); return; }
-    const bad = [];
-    if (!Object.hasOwn(KINDS, entry.kind)) bad.push(`its kind ${show(entry.kind)} is none of ${Object.keys(KINDS).join(", ")}. Mend: write the kind it is`);
-    if (typeof entry.name !== "string" || !entry.name.trim()) bad.push(`it names no tool. Mend: write the name it is configured by`);
-    if (typeof entry.publisher !== "string" || !entry.publisher.trim()) bad.push(`it names no publisher. Mend: write who publishes it, "this project" for a file of its own`);
-    const version = entry.version;
-    if (version === undefined ? PINNED.has(entry.kind) : !(exact(version) || /^[0-9a-f]{40}$/u.test(version)))
-      bad.push(`${version === undefined ? "it gives no version" : `its version ${show(version)} is not one exact version`}. Mend: write the one it is taken at, such as 1.2.3, or the full 40-character commit`);
-    if (Object.hasOwn(entry, "from") && (entry.from !== TREE || entry.kind !== "hook"))
-      bad.push(`its "from" is ${show(entry.from)}, where only a hook's entry may say "from", and only ${show(TREE)}. Mend: take "from" out of the entry`);
+    const bad = entryProblems(entry);
     for (const b of bad) problems.push(`${at}: ${b}`);
     if (bad.length) return;
     keys.add(`${entry.kind} ${entry.name}`);
-    versions.set(`${entry.kind} ${entry.name}`, version);
+    versions.set(`${entry.kind} ${entry.name}`, entry.version);
     if (entry.from === TREE) from.add(`${entry.kind} ${entry.name}`);
   });
   return { keys, versions, from, problems };
+}
+// What is wrong with one entry of the list, each with its mend.
+function entryProblems(entry) {
+  const bad = [], version = entry.version;
+  if (!Object.hasOwn(KINDS, entry.kind)) bad.push(`its kind ${show(entry.kind)} is none of ${Object.keys(KINDS).join(", ")}. Mend: write the kind it is`);
+  if (typeof entry.name !== "string" || !entry.name.trim()) bad.push(`it names no tool. Mend: write the name it is configured by`);
+  if (typeof entry.publisher !== "string" || !entry.publisher.trim()) bad.push(`it names no publisher. Mend: write who publishes it, "this project" for a file of its own`);
+  if (version === undefined ? PINNED.has(entry.kind) : !(exact(version) || /^[0-9a-f]{40}$/u.test(version)))
+    bad.push(`${version === undefined ? "it gives no version" : `its version ${show(version)} is not one exact version`}. Mend: write the one it is taken at, such as 1.2.3, or the full 40-character commit`);
+  if (Object.hasOwn(entry, "from") && (entry.from !== TREE || entry.kind !== "hook"))
+    bad.push(`its "from" is ${show(entry.from)}, where only a hook's entry may say "from", and only ${show(TREE)}. Mend: take "from" out of the entry`);
+  return bad;
 }
 
 // A value as JSON with every object's keys in order, so that a hook is the same whichever order its keys are written in.
@@ -336,14 +340,18 @@ export function check(head, list, kit, file) {
     if (p.loose) pins.push([k, `${describe(k)} is fetched at no fixed version: ${p.where} ${p.loose}. Mend: ${p.mend}, and list that same version under "agentTools" in ${file}, in this pull request`]);
     else if (p.pin !== v) pins.push([k, `${describe(k)} is listed at ${show(v)} in ${file}, but ${p.where} pins it at ${show(p.pin)}. Mend: make the two the same, the list's version or the pin, whichever is the one meant, in this pull request`]);
   }
+  return { problems, unlisted: list ? [] : unlisted, pins, ...sourcesOf(head, list, file, problems) };
+}
+// check()'s `sources` and `marked`, and into `problems` each mark on a hook that takes nothing from the working tree.
+function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
   for (const [k, paths] of head.sources ?? []) {
-    const said = `${describe(k)}, configured in ${tools.get(k)}, takes ${paths.map(show).join(", ")} from the working tree, which the branch it runs on can change, where floor rule 3 has what an agent tool starts by itself run from its copy on main`;
+    const said = `${describe(k)}, configured in ${head.tools.get(k)}, takes ${paths.map(show).join(", ")} from the working tree, which the branch it runs on can change, where floor rule 3 has what an agent tool starts by itself run from its copy on main`;
     if (list?.from?.has(k)) marked.push([k, said]);
     else sources.push([k, `${said}. Mend: have it fetch what it runs from main, as the starter kit's hooks do (git show refs/remotes/origin/main:<the file>), in this pull request`]);
   }
-  for (const k of list?.from ?? []) if (tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but it takes no file of the project from the working tree. Mend: take "from" out of its entry, in this pull request`);
-  return { problems, unlisted: list ? [] : unlisted, pins, sources, marked };
+  for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but it takes no file of the project from the working tree. Mend: take "from" out of its entry, in this pull request`);
+  return { sources, marked };
 }
 
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer, and `links`, each link on the
