@@ -81,6 +81,7 @@ export const UNPLANTED = {
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
   "16 November 2026, what a screen is held to": "it needs a project people use through a screen, whose next pull request changing one writes the direction first, and this case's project is a private tool with no screen",
   "16 November 2026, how done will be judged": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the rest is a reading of what the project builds",
+  "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
 };
 
 export function set(dir, opts = {}) {

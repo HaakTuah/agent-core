@@ -168,6 +168,9 @@ jobs:
       - name: How done will be judged
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/done-when-test.mjs ')) }}
         run: node scripts/done-when-test.mjs
+      - name: The milestones of the progress file
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/milestones-test.mjs ')) }}
+        run: node scripts/milestones-test.mjs
       - name: The security-review check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/security-review-test.mjs ')) }}
         run: node scripts/security-review-test.mjs

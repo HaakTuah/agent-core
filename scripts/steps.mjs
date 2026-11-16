@@ -552,6 +552,7 @@ export const STEPS = [
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
   { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
   { lead: "16 November 2026, how done will be judged", cost: COST.line, unread: "whether a project's users notice its changes is a reading of what it builds; where they do, a manifest whose \"Modules:\" is a list takes `done-when.md`, and the idea form's heading comes as `core/scripts/fresh.mjs` lists it" },
+  { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -32,7 +32,8 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `roles/shared/teams.md`, `roles/orchestrator.md`, `tasks/updates.md`,
-`tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md` and `tasks/done-when.md`.
+`tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md` and
+`tasks/planning.md`.
 
 Not taken, each for its reason:
 
@@ -41,7 +42,9 @@ Not taken, each for its reason:
 - `tasks/screens.md`: the core has no screen; no one uses it through one, so none of its points, its critique or its
   checks has anything to act on here, and `scripts/screens.mjs` is held by its test alone.
 
-The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
+The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *milestone*: a batch and its release ("One batch,
+then one release"; #322), and of `tasks/planning.md` the point on a task's release has nothing to act on here, which
+holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
