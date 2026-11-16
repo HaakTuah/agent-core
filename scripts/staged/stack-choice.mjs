@@ -94,8 +94,9 @@ function recordsOn(dir, ref) {
 function branchFaults(dir, b) {
   const why = [];
   if (changed(dir, b).some(f => RULED_OUT.test(path.posix.normalize(f)))) why.push(`${b} adds a package file of a runtime the aims rule out`);
-  const commits = String(originGit(dir, "rev-list", "--reverse", "--end-of-options", `${base(dir)}..${b}`) ?? "").split("\n").filter(Boolean);
-  const first = commits.find(c => changed(dir, c).some(f => !NOT_CODE.test(f)));
+  // (one git call for every commit: its id, then the files it changes, oldest first)
+  const log = String(originGit(dir, "log", "--reverse", "--no-renames", "--name-only", "--format=%x00%H", "--end-of-options", `${base(dir)}..${b}`) ?? "");
+  const first = log.split("\0").slice(1).map(e => e.split("\n").filter(Boolean)).find(([, ...files]) => files.some(f => !NOT_CODE.test(f)))?.[0];
   if (first && !recordsOn(dir, first).some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
   return why;
 }
