@@ -295,7 +295,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
    into `core/`.
 7. **Where a module's rule does not fit it,** its manifest lists the difference under "Differences" (core archive 161):
-   a pointer to the rule as the pointer check reads one (`core/tasks/roles.md`, "The builders"), what holds here in
+   a pointer to the rule as the pointer check reads one (`core/roles/orchestrator.md`, "The builders"), what holds here in
    its place, and why. Only what is listed there stands in place of the core's words. Every other rule of the project's
    own adds to the core: one that asks for more than a module does (a stricter check, a further review, its safety
    rules) is no difference and needs no line (`roles/shared/how-to-work.md`, "A project's own rules add to the core's"). A
@@ -432,7 +432,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   `/codex:setup` says whether it is); or another way, which the manifest's "Tools" table names (how the tool is handed
   a task, and how it is asked for a review) and the project tells the core ("Reporting to the core"), so that the tool
   gains a part here (`tasks/tools.md`). Nothing more is asked of the owner: the sessions hand over by the first way
-  they find, and with none the tool at hand takes the role (`tasks/roles.md`, "The builders"; core archive 169 and
+  they find, and with none the tool at hand takes the role (`roles/orchestrator.md`, "The builders"; core archive 169 and
   232). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
   or the repository's workflows wait for an approval before they run.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,

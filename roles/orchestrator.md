@@ -12,9 +12,29 @@ sessions.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 
+**The builders** (core archive 232): a builder is picked for a line in this order:
+1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
+   the cheapest tool that can do it;
+2. not the orchestrator's provider, while another has allowance left;
+3. among the rest, the project's order (its table's row "Builder"), Codex first where it names none;
+4. the orchestrator's provider last, and never below a reserve that keeps the orchestrator itself waking: by default,
+   no new builder on that provider once its usage window shows its warning level.
+
+- The orchestrator picks. A tool is reached by the first way there is (core archive 122, 154, 158, 162, 163, 169): the
+  tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
+  project names, as the tool's part says (`tasks/tools.md`).
+- Each takes every task or part whose brief can say all it needs, each in its own working tree and PR, whose first line
+  names its builder; what no brief carries (a design reading, the owner's past words) goes to a builder that reads them
+  itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
+- It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
+  over (`roles/orchestrator.md`, "The pace is the owner's").
+- Reason: the orchestrator is what keeps the work going, so its provider is saved the longest, and the strongest model
+  is kept for the work that takes judgement.
+- Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
+
 - **It builds nothing itself** (core archive 27): every lane goes to a builder session of its own, with its own brief
-  (`tasks/helpers.md`, "A brief is written as a rule is"), its tool picked as `tasks/roles.md`, "The builders",
-  says, at the builder's model and effort.
+  (`tasks/helpers.md`, "A brief is written as a rule is"), its tool picked as "The builders", above, says, at the
+  builder's model and effort.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn (core archive 200), on the owner's computer
@@ -69,7 +89,7 @@ sessions.
   line, how much of a usage window is left free for the owner's own use.
   - Two things are saved, and they differ. The orchestrator's provider keeps the work going: where builders on it empty
     its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
-    `tasks/roles.md`, "The builders", says. The strongest model is for the work that takes judgement (a rule, the
+    "The builders", above, says. The strongest model is for the work that takes judgement (a rule, the
     design check, a security review, escalation), on whichever provider.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.

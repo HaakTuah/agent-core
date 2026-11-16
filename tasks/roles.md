@@ -27,7 +27,7 @@ where that tool is not at hand, to the next it names:
 | Role | Preferred | When it is not at hand |
 | --- | --- | --- |
 | Orchestrator, the session that syncs the core | Claude | any tool the owner has |
-| Builder | as "The builders" says | the next tool there |
+| Builder | as "The builders" says (`roles/orchestrator.md`) | the next tool there |
 | Code reviewer | a tool that cannot build here (Codex's app, then Copilot's), then a builder of a tool other than the builder's | the fallback reviewer |
 | Security reviewer | Codex's app, which starts by itself (floor rule 8) | the fallback reviewer |
 | Fallback reviewer | Claude | a fresh session of any tool at hand |
@@ -48,26 +48,6 @@ where that tool is not at hand, to the next it names:
 wrote it. A fresh session of the same tool serves; a different tool is a preference, the table's. It does not mean a
 second tool is needed. Reason: a reviewer that wrote the change reads its own intent instead of the diff. Held by
 nothing yet: builder and reviewer post under one login (#187).
-
-**The builders** (core archive 232): a builder is picked for a line in this order:
-1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
-   the cheapest tool that can do it;
-2. not the orchestrator's provider, while another has allowance left;
-3. among the rest, the project's order (its table's row "Builder"), Codex first where it names none;
-4. the orchestrator's provider last, and never below a reserve that keeps the orchestrator itself waking: by default,
-   no new builder on that provider once its usage window shows its warning level.
-
-- The orchestrator picks. A tool is reached by the first way there is (core archive 122, 154, 158, 162, 163, 169): the
-  tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
-  project names, as the tool's part says (`tasks/tools.md`).
-- Each takes every task or part whose brief can say all it needs, each in its own working tree and PR, whose first line
-  names its builder; what no brief carries (a design reading, the owner's past words) goes to a builder that reads them
-  itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
-- It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
-  over (`roles/orchestrator.md`, "The pace is the owner's").
-- Reason: the orchestrator is what keeps the work going, so its provider is saved the longest, and the strongest model
-  is kept for the work that takes judgement.
-- Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
 **Planning design** is asked at most once per task (its PR says when it was), with a self-contained brief, when it needs
 a new or better plan.
