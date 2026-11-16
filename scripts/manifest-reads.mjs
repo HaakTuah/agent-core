@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readSection } from "./own-modules.mjs";
+import { MODULES } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
@@ -54,11 +55,11 @@ export const filledIn = manifest => new Set(rows(section(String(manifest).split(
 // it leaves out, each with its reason ("" where it names none).
 export function modulesOf(manifest) {
   const line = /\bModules:\s*([^\n]*)/u.exec(String(manifest))?.[1].trim() ?? "";
-  const names = text => [...text.matchAll(/`(?:modules\/)?([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
+  const names = text => [...text.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
   const taken = /^all\b/iu.test(line) ? "all" : names(line).length ? new Set(names(line)) : null;
   const notTaken = new Map();
   const nt = /^Not taken:\s*(.*)$/mu.exec(String(manifest))?.[1] ?? "";
-  for (const m of nt.matchAll(/`(?:modules\/)?([\w.-]+?)(?:\.md)?`(?:\s*\(([^)]*)\))?/gu)) notTaken.set(`${m[1]}.md`, (m[2] ?? "").trim());
+  for (const m of nt.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`(?:\s*\(([^)]*)\))?/gu)) notTaken.set(`${m[1]}.md`, (m[2] ?? "").trim());
   return { taken, notTaken, line };
 }
 
@@ -66,7 +67,7 @@ const list = names => names.map(n => `\`${n}\``).join(", ");
 
 // What a project's manifest lacks, one note each, with the mend: the modules of `moduleTexts` ({ name: text }) its list
 // neither takes nor leaves out, and the slots a module it takes, or the floor, uses and its slots do not fill.
-export function notes({ manifest, readme, moduleTexts, floorTexts }) {
+export function notes({ manifest, readme, moduleTexts, floorTexts, where = {} }) {
   const out = [];
   const slots = slotTable(readme);
   const { taken, notTaken, line } = modulesOf(manifest);
@@ -74,15 +75,15 @@ export function notes({ manifest, readme, moduleTexts, floorTexts }) {
   if (taken === null) out.push(`core-manifest.md: its "Modules:" line (${line ? `"${line}"` : "none found"}) is neither "all" nor a list of modules as \`<name>.md\` in backticks, so the modules it takes cannot be read; write it as the README's "The manifest's format" has it ("Modules: all." or a list)`);
   const takes = taken === "all" || taken === null ? names : names.filter(n => taken.has(n));
   if (taken instanceof Set) {
-    for (const n of [...taken].filter(n => !names.includes(n)).sort()) out.push(`core-manifest.md: its "Modules:" line names ${n}, which is no module of core/modules/; take it out of the line`);
+    for (const n of [...taken].filter(n => !names.includes(n)).sort()) out.push(`core-manifest.md: its "Modules:" line names ${n}, which is no module of the core (${MODULES.map(d => `core/${d}/`).join(", ")}); take it out of the line`);
     const left = names.filter(n => !taken.has(n));
     for (const n of left.filter(n => !notTaken.get(n))) {
-      out.push(`core-manifest.md: core/modules/${n} is neither on the "Modules:" line nor left out with a reason; add \`${n}\` to the line where the project takes it, or add it to a line "Not taken: \`${n}\` (<why it does not apply here>)." under it`);
+      out.push(`core-manifest.md: core/${where[n] ?? "tasks"}/${n} is neither on the "Modules:" line nor left out with a reason; add \`${n}\` to the line where the project takes it, or add it to a line "Not taken: \`${n}\` (<why it does not apply here>)." under it`);
     }
   }
   const used = new Map();
   const use = (file, text) => { for (const s of usedIn(text, slots)) used.set(s, [...(used.get(s) ?? []), file]); };
-  for (const n of takes) use(`core/modules/${n}`, moduleTexts[n]);
+  for (const n of takes) use(`core/${where[n] ?? "tasks"}/${n}`, moduleTexts[n]);
   for (const [f, text] of Object.entries(floorTexts)) use(`core/floor/${f}`, text);
   const filled = filledIn(manifest);
   for (const [slot, files] of [...used].sort(([a], [b]) => a.localeCompare(b))) {
@@ -95,7 +96,7 @@ export function notes({ manifest, readme, moduleTexts, floorTexts }) {
 
 // The core's own: the slots its AGENTS.md fills (the italic names of its "The slots here:" paragraph) against those
 // the modules it takes, and the floor, use.
-export function coreGaps({ agents, readme, moduleTexts, floorTexts }) {
+export function coreGaps({ agents, readme, moduleTexts, floorTexts, where = {} }) {
   const slots = slotTable(readme);
   const { error, taken, notTaken } = readSection(agents);
   if (error) return [error];
@@ -106,7 +107,8 @@ export function coreGaps({ agents, readme, moduleTexts, floorTexts }) {
   const filled = new Set(italics(lines.slice(at, end < 0 ? lines.length : end).join(" ")));
   const used = new Map();
   const use = (file, text) => { for (const s of usedIn(text, slots)) used.set(s, [...(used.get(s) ?? []), file]); };
-  for (const n of [...taken].filter(n => !notTaken.has(n) && n in moduleTexts)) use(`modules/${n}`, moduleTexts[n]);
+  // (its own section names each module by its folder and name)
+  for (const [file, n] of [...taken].filter(f => !notTaken.has(f)).map(f => [f, path.posix.basename(f)])) if (n in moduleTexts) use(file, moduleTexts[n]);
   for (const [f, text] of Object.entries(floorTexts)) use(`floor/${f}`, text);
   const out = [];
   for (const [slot, files] of [...used].sort(([a], [b]) => a.localeCompare(b))) {
@@ -124,7 +126,11 @@ function main() {
   try {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     const home = core ? root : path.join(root, "core");
-    const texts = { readme: fs.readFileSync(path.join(home, "README.md"), "utf8"), moduleTexts: readDir(path.join(home, "modules")), floorTexts: readDir(path.join(home, "floor")) };
+    // (the modules, by name, from each folder that holds them; the floor's own files, its topics among them)
+    const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));
+    const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(path.join(home, d))));
+    const floorTexts = { ...readDir(path.join(home, "floor")), ...Object.fromEntries(Object.entries(readDir(path.join(home, "floor", "topics"))).map(([n, t]) => [`topics/${n}`, t])) };
+    const texts = { readme: fs.readFileSync(path.join(home, "README.md"), "utf8"), moduleTexts, floorTexts, where };
     if (core) {
       const found = coreGaps({ agents: fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), ...texts });
       for (const f of found) console.error(`FAIL: ${f}`);

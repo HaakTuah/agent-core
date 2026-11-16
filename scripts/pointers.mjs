@@ -35,7 +35,7 @@ process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
 const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
 let RULES;
-try { RULES = CORE ? tracked.filter(f => /^(floor|modules|roles)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }
+try { RULES = CORE ? tracked.filter(f => /^(floor|floor\/topics|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }
 for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: the rule file ${rf} is no tracked file. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
