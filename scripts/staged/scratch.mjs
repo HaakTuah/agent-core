@@ -422,10 +422,10 @@ export function testPasses(dir, ref) {
     // could, as spawnSync kills no grandchild, and such code too would stand in the session's diff)
     const files = fs.readdirSync(tmp, { recursive: true }).map(String).filter(f => fs.lstatSync(path.join(tmp, f)).isFile()).map(f => [f, fs.readFileSync(path.join(tmp, f))]);
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
-    // (three runs, each a process of its own: the bug's own case and two drawn afresh, how many numbers too, so no
-    // answer can be written in ahead, by the numbers or by their count; none with no numbers, which a program may
-    // answer with how it is used)
-    return [[1, 2, 3], ...[0, 1].map(() => draw(crypto.randomInt(2, 10)))].every(c => {
+    // (three runs, each a process of its own: the bug's own case, one number drawn afresh, which the scratch test
+    // reads too, and a set drawn afresh, how many numbers too, so no answer can be written in ahead, by the numbers
+    // or by their count; none with no numbers, which a program may answer with how it is used)
+    return [[1, 2, 3], draw(1), draw(crypto.randomInt(2, 10))].every(c => {
       const at = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
       runs.push(at);
       for (const [f, t] of files) { fs.mkdirSync(path.dirname(path.join(at, f)), { recursive: true }); fs.writeFileSync(path.join(at, f), t); }
