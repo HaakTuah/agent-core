@@ -88,7 +88,7 @@ ok(notPure(pure(), "core/ is not a folder"), "pure-sync: core/ made a link that 
 branch("link-in-core", () => link("../../outside/secret.txt", "core/scripts/y.mjs"));
 ok(notPure(pure(), "core/ is not a folder holding"), "pure-sync: a link in core/ that leads out of the checkout is refused");
 branch("manifest-dir", () => { fs.rmSync(path.join(p, "core-manifest.md")); write("core-manifest.md/x", MANIFEST); });
-ok(notPure(pure(), "has no \"Core:"), "pure-sync: core-manifest.md made a folder, the wrong type, is refused");
+ok(notPure(pure(), "line on both sides"), "pure-sync: core-manifest.md made a folder, the wrong type, is refused");
 branch("markup", () => write("core-manifest.md", MANIFEST.replace(", copied", ", copied <script>alert(1)</script>").replace("| *follows*", "<b>| *follows*")));
 ok(notPure(pure(), "a changed line with no pin"), "pure-sync: markup written into the manifest beside its pin is refused");
 if (NAMES) {
@@ -104,13 +104,13 @@ const OFF = "f".repeat(40);
 branch("off-main", () => write("core-manifest.md", MANIFEST.replace(PIN, OFF)));
 ok(notPure(pure(), `${OFF} is not a commit of the core's main`), "pure-sync: a pin that is no commit of the core, a number out of range, is refused");
 branch("long-pin", () => write("core-manifest.md", MANIFEST.replace(PIN, `${PIN}0`)));
-ok(notPure(pure(), "has no \"Core:"), "pure-sync: a pin of 41 digits is read as no pin, and refused");
+ok(notPure(pure(), "line on both sides"), "pure-sync: a pin of 41 digits is read as no pin, and refused");
 branch("binary", () => fs.writeFileSync(path.join(p, "core-manifest.md"), Buffer.concat([Buffer.from(MANIFEST), Buffer.from([0, 0xff, 0xfe, 0])])));
 ok(notPure(pure(), "core-manifest.md: lines added or removed"), "pure-sync: a NUL byte and bytes no text holds added to the manifest are read as text, and refused");
 branch("binary-core", () => fs.writeFileSync(path.join(p, "core/scripts/x.mjs"), Buffer.from([0, 1, 2, 0xff])));
 ok(notPure(pure(), "core/ is not a folder holding"), "pure-sync: a binary file put in place of one of core/ is refused");
 branch("empty-manifest", () => write("core-manifest.md", ""));
-ok(notPure(pure(), "has no \"Core:"), "pure-sync: an empty manifest, nothing at all, is refused");
+ok(notPure(pure(), "line on both sides"), "pure-sync: an empty manifest, nothing at all, is refused");
 // (a branch that changes nothing is a sync of nothing: it is said to carry no file, so nothing of it merges)
 branch("nothing", () => {});
 r = pure();

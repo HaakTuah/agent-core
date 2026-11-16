@@ -98,7 +98,8 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(nid.packages.length === 0 && said(nid.failures), "NuGet's lock reader takes no package whose id or version holds a path, so none names a folder to write");
   // a workflow that is a link to a file outside the project, and one in UTF-16, run as the copies workflow runs the check
   const root = path.join(fresh({ "outside.yml": "on: push\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
-  for (const f of ["workflows.mjs", "started.mjs", "yaml-keys.mjs"]) fs.cpSync(fileURLToPath(new URL(f, import.meta.url)), path.join(root, "core/scripts", f));
+  // (the whole of scripts/, as a project's copy holds it, so whatever the check imports is there)
+  fs.cpSync(path.dirname(fileURLToPath(import.meta.url)), path.join(root, "core/scripts"), { recursive: true });
   fs.symlinkSync(path.join(root, "../outside.yml"), path.join(root, ".github/workflows/a.yml"));
   fs.writeFileSync(path.join(root, ".github/workflows/c.yml"), Buffer.from("\ufeffon: push\n", "utf16le"));
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });

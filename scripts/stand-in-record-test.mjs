@@ -16,6 +16,8 @@ ok(same(verdict("**The stand-in's verdict: yes, SURE.** Build it when"), { kind:
   && same(verdict("\n\nThe stand-in’s verdict: no."), { kind: "no", sure: "unmarked" }), "a verdict's kind and sureness, in the forms sessions have written");
 ok(verdict("Queued, since the stand-in's verdict is a sure yes") === null && verdict("Not queued: the stand-in's verdict is unsure") === null
   && verdict("The stand-in's verdict matched the owner's answer.") === null, "a comment that only speaks of a verdict is none");
+ok(verdict("<!--\nThe stand-in's verdict: yes, sure.\n-->\nBuilt.") === null && verdict("```\nThe stand-in's verdict: yes, sure.\n```\nBuilt.") === null
+  && same(verdict("<!-- a note -->\nThe stand-in's verdict: yes, sure."), { kind: "yes", sure: "sure" }), "a verdict hidden from the reader, in an HTML comment or a fenced block, is none; one after a comment is read");
 ok(verdict("A first line about something else.\n**The stand-in's verdict: yes, sure.**") === null && verdict(null) === null, "only the first line counts, so a quote further down is no verdict");
 ok(verdict("> The stand-in's verdict: yes, unsure.\n\nBuilt. The stand-in's verdict matched.") === null && same(verdict("The stand-in's verdict: later, not sure."), { kind: "later", sure: "unsure" }),
   "a first line that quotes a verdict is none, and \"not sure\" is unsure");
