@@ -267,3 +267,30 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      where it can", "What must be remembered is decided once for each game" and "Sound has jobs" in
      `tasks/game-design.md`, the slot *game page*, the check `first-choice` of `scripts/screens.mjs`, and the sync note
      "16 November 2026, what a game is for".
+
+243. **15 November 2026** (every project with a product a person uses, and the core by its batches; in chats with a
+     session the owner works with, not the design session, as that session recorded it on issue #322, labelled
+     `by:chat`, under "What it is", saying the owner agreed to it). The owner's notes named the importance of a first
+     version and of milestones, and asked whether planning, scoping and a change of course should be looked into; the
+     session measured three repositories and set out five changes, and the owner agreed to all of them, four of them
+     these: a project names its milestones, each an issue of its own, a state the owner can use and try and what is
+     judged there, the progress file showing them in order, each a heading over the lines that lead to it and nothing
+     more, the first the thinnest whole, the product's main thing from start to finish, plain and working; the owner's
+     notes gathered at a milestone, in one sitting, becoming corrections and tasks, nothing waiting on the owner between
+     milestones and no milestone stopping the build; finding out as a task of its own, a trial with a report queued
+     first where a hard task's approach is not known, and the build after it; and a task finishing under the release
+     it began with, the sync coming between tasks, a change to the floor the exception. Kept out: dates, deadlines and
+     estimates for a milestone, and a milestone as a gate that stops work; in the core's own repository a batch and
+     its release are the milestone. Point 1 was fitted the same day to the rule that the progress file holds order
+     only, a milestone's text standing in its issue, the session's fitting, told to the owner. The owner then asked:
+
+     > Are we adding that it tries to organize in mvp and milestones?
+
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `tasks/planning.md`, the design check's question on a hard task's approach in `tasks/reviews.md`, point 4,
+     the pointers from "Sessions" in `roles/shared/work-flow.md` and from the orchestrator's and the design session's
+     files, the slot *milestone*, and `scripts/milestones.mjs` in the description check.

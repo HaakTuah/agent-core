@@ -25,8 +25,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
   tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
   `github-calls.md`, `hosts.md`, `repositories.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`,
-  `cleaning.md`; for a change its users will notice, `done-when.md`; for a project people use through a screen,
-  `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
+  `cleaning.md`; for a queue planned, `planning.md`; for a change its users will notice, `done-when.md`; for a project
+  people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
   module by its file's name, which stands once across the three folders. Until the second release after 16 November 2026
   a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
@@ -341,6 +341,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *shares its counts* | `yes`, in backticks, where a project of another owner's lets the core's state report read its counts though it gave the core's owner no access (`scripts/state-report.mjs`); left out, no |
 | *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
 | *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`roles/shared/inbox.md`) |
+| *milestone* | what a milestone is where it is not an issue that a heading of the *progress file* names (`tasks/planning.md`); left out, such an issue |
 | *report* | where a task's report, with its "Readings taken", goes |
 | *settling references* | what open points are settled against, with the owner's past words |
 | *descriptions* | every place that describes what a change changes, for each kind of reader |
