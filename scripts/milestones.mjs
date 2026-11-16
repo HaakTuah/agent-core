@@ -64,13 +64,14 @@ export function formFaults(text) {
   ]);
 }
 
-// The text under a description's heading `name` (its first such heading), up to the next heading; null where none.
+// The text under a description's heading `name` (its first such heading), its subsections among it, up to the next
+// heading of its level or above; null where none.
 export function under(body, name) {
   const all = lines(body), want = name.toLowerCase();
   const at = all.findIndex(l => { const h = headingOf(l); return h !== null && h.words.replace(/^[*_`\s]+/u, "").toLowerCase().startsWith(want); });
   if (at < 0) return null;
-  const out = [];
-  for (const l of all.slice(at + 1)) { if (headingOf(l)) break; out.push(l); }
+  const level = headingOf(all[at]).level, out = [];
+  for (const l of all.slice(at + 1)) { if ((headingOf(l)?.level ?? 7) <= level) break; out.push(l); }
   return out.join("\n");
 }
 

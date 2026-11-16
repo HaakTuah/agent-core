@@ -93,6 +93,9 @@ ok(all.length > 0 && all.every(m => mended(`FAIL ${m}`)), "every failure says it
 // the text under a heading
 ok(under("## What the owner can try\n#4", "What the owner can try") === "#4" && under("# A\nx\n## What the owner can try (now)\ny #3\n## Next\nz\n", "What the owner can try") === "y #3" && under("no heading", "What the owner can try") === null, "the text under a heading runs to the next");
 
+ok(under("## What the owner can try\n### Milestone #10\nUse it from start to finish.\n#### Its parts\nx\n## Readings taken\n#11\n", "What the owner can try") === "### Milestone #10\nUse it from start to finish.\n#### Its parts\nx"
+  && run(file, reached, "Fixes #20.\n## What the owner can try\n### Milestone #20\nUse it.\n## Readings taken\nNone\n").mends.length === 0, "a subsection under the heading is part of it; a heading of its level ends it");
+
 // asked only of a pull request opened since the copy on its base held it
 const holds = "export const PLAN_SINCE = \"x\";";
 ok(planAsked("2026-11-18T00:00:00Z", holds) && planAsked(PLAN_SINCE, holds), "asked of a pull request opened on or after the day, its base's copy holding it");
