@@ -518,6 +518,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["runner() { bash \"${2#*:}\"; }; shopt -s expand_aliases; alias g{,}it=runner\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["runner() { bash \"${2#*:}\"; }; g=git; shopt -s expand_aliases; alias $g=runner\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases; BASH_ALIASES[test]=bash\ntest -x scripts/x.py", ["scripts/x.py"]],
+      ["/usr/bin/git() { bash \"${2#*:}\"; }; /usr/bin/git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["git.exe() { bash \"${2#*:}\"; }; git.exe show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["function /usr/bin/git { bash \"${2#*:}\"; }\n/usr/bin/git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["bash() { command bash \"$4\"; }; bash -c test -f scripts/x.py", ["scripts/x.py"]],
+      ["/bin/sh() { command sh \"$4\"; }; /bin/sh -c test -f scripts/x.py", ["scripts/x.py"]],
       ["source <(echo 'git() { bash \"${2#*:}\"; }')\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
       ["bash 'scripts/%notify%.sh'", ["scripts/%notify%.sh"]], ["bash scripts/%notify%.sh", ["scripts/%notify%.sh"]],

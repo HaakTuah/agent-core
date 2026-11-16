@@ -35,16 +35,16 @@ const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
 const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`()]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
-// (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
-// alias's operands, quoted or not: no file test of it is one)
-const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
-// (whether a command, read command by command, defines an alias whose name `name` matches)
-const ALIASES = /^\s*(?:(?:then|do|else|elif|if|while|until|builtin|command|!|\{|\()\s*)*alias\b/u;
-const aliases = (raw, name) => raw.split(/[;&|\n]/u).some(c => ALIASES.test(c) && name.test(c));
-const redefined = raw => DEFINED.test(raw) || aliases(raw, /[\s"'](?:test|\[\[?)=/u) || RUNTIME.test(raw);
-// (a command that could define either at its run, by text no reading here sees whole: eval, source or ".", an alias of
-// any name, or bash's table of aliases; no file test nor fetch of it is one)
+// (a command that defines a name among `names` as a function, in either of bash's forms, by the name alone or a path to
+// it, ".exe" or not, as the exemptions read their commands)
+const PATHED = `(?:[^\\s;&|\`$()"'<>]*[/\\\\])?`;
+const defines = names => new RegExp(`(?:^|[\\s;&|(])${PATHED}(?:${names})(?:\\.exe)?[ \\t]*\\([ \\t]*\\)|\\bfunction[ \\t\\n]+${PATHED}(?:${names})(?:\\.exe)?(?=[\\s({]|$)`, "u");
+// (a command that could define a name at its run, by text no reading here sees whole: eval, source or ".", an alias of
+// any name, or bash's table of aliases)
 const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias)(?=[\s;&|)`]|$)|BASH_ALIASES/u;
+// (no file test of a command that defines test, "[", "[[" or a shell that runs one is one)
+const DEFINED = defines("test|\\[\\[?|sh|bash|zsh|dash");
+const redefined = raw => DEFINED.test(raw) || RUNTIME.test(raw);
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), or a ${...} with a default, perhaps closed by a quote)
 const ROOTED = /[\u0001)`}]\\?["']?$/u;
@@ -102,9 +102,9 @@ const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 const ARG = `(?:"(?:[^"\`$\\\\\\u0001]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>\\u0001])+`;
 const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\w+=${ARG}?[ \\t]+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:[ \\t]+(?:-[Cc][ \\t]+${ARG}|--[\\w-]+(?:=${ARG})?))*[ \\t]+(?:show|cat-file[ \\t]+-p)[ \\t]+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
 const fetched = before => FETCHED.test(before);
-// (a command that defines git as a function or an alias: no fetch of its is one)
-const GIT_DEFINED = /(?:^|[\s;&|(])git[ \t]*\([ \t]*\)|\bfunction[ \t\n]+git(?=[\s({]|$)/u;
-const gitDefined = raw => GIT_DEFINED.test(raw) || aliases(raw, /[\s"']git=/u) || RUNTIME.test(raw);
+// (no fetch of a command that defines git is one)
+const GIT_DEFINED = defines("git");
+const gitDefined = raw => GIT_DEFINED.test(raw) || RUNTIME.test(raw);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
