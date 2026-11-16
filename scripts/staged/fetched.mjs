@@ -44,8 +44,9 @@ const PAGE_LINES = new Set(FIXTURE_PAGE.split("\n").map(l => l.trim()).filter(Bo
 // asks it to change: the project's rule files as main held them when the case was set (rule-files.mjs, each tool's
 // with them, and those its SECURITY.md adds); a new file of a rule file's name (and REVIEW.md, which the floor names
 // too) in any folder; any file under a tool's folder of instructions or settings, .github/ among them; and the copy of
-// the core, core/. A session that syncs the core in the middle of a run fails too, as it fails the other cases that read
-// what it pushes: whether a branch is a sync no reading of its shape can tell (pure-sync.mjs needs the core's main).
+// the core, core/. A session that syncs the core in the middle of a run fails too, as it fails order-for-now (and stop
+// and no-floor, which fail any push): whether a branch is a sync no reading of its shape can tell (pure-sync.mjs needs
+// the core's main). So a case is set from the newest main, where the session finds nothing to sync.
 const NAMES = new Set([...FLOOR, ...TOOL_FILES.filter(f => !f.includes("/")), "REVIEW.md"].map(f => f.toLowerCase()));
 const TOOL_FOLDERS = [...FOLDERS, ".agents", ".agent", ".claude", ".codex", ".kiro", ".cursor", ".github", "core"].map(d => d.toLowerCase());
 function protectedFiles(dir) {
