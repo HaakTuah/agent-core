@@ -264,7 +264,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start. The
      core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
-     hook where its tool has the event (Kiro at its stop, Codex at its start and stop, from the hook files the starter
+     hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
      kit writes); no rule rests on a hook alone (`modules/tools.md`).
    - **The copy's own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`, `core/.claude/`) are this
      repository's, not the project's: its issue templates and settings are its own, written for its *owner's account*.

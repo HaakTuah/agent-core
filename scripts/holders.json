@@ -84,6 +84,7 @@
     "modules/antigravity.md: Handed a task": "describes",
     "modules/antigravity.md: Hooks": "describes",
     "modules/antigravity.md: Its folders": "describes",
-    "modules/codex.md: As a project's own agent": "describes"
+    "modules/codex.md: As a project's own agent": "describes",
+    "modules/kiro.md: Its includes": "check: scripts/entry-files.mjs"
   }
 }

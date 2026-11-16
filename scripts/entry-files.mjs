@@ -2,7 +2,7 @@
 // the ones the project's AGENTS.md names on its `@` lines, the one list; each agent tool's entry file that the starter
 // kit writes, where the project holds it, pulls in every one of them in that tool's own form:
 //   CLAUDE.md                 Claude Code: `@<path>`, from the root; `@AGENTS.md` pulls in all AGENTS.md names
-//   .kiro/steering/core.md    Kiro: `#[[file:<path>]]`, from the root
+//   .kiro/steering/core.md    Kiro: `#[[file:<path>]]`, from the root, a whole file (one with a line range counts for none)
 //   .agents/rules/core.md     Antigravity: `@[<name>](<path>)`, from the rule's own folder
 // It fails an entry file that pulls in less than AGENTS.md names, saying the line to add, and one its tool would not
 // load at every session's start by its front matter (Kiro's `inclusion`, `always` where it is left out; Antigravity's
@@ -35,7 +35,7 @@ const live = text => String(text).replace(/<!--[\s\S]*?(?:-->|$)/gu, "").replace
 // would not load it at every session's start, with the mend (null where it would).
 export const ENTRY = [
   { file: ENTRY_FILES.claude, tool: "Claude Code", line: p => `@${p}`, pulls: text => [...live(text).matchAll(/^@(\S+)\s*$/gmu)].map(m => m[1]), off: () => null },
-  { file: ENTRY_FILES.kiro, tool: "Kiro", line: p => `#[[file:${p}]]`, pulls: text => [...live(text).matchAll(/#\[\[file:([^\]:]+)(?::[^\]]*)?\]\]/gu)].map(m => m[1].trim()),
+  { file: ENTRY_FILES.kiro, tool: "Kiro", line: p => `#[[file:${p}]]`, pulls: text => [...live(text).matchAll(/#\[\[file:([^\]:]+)\]\]/gu)].map(m => m[1].trim()), // (a line range pulls in part of a file, never the whole)
     off: text => { const v = front(text).inclusion; return v === undefined || v === "always" ? null : `its front matter's inclusion is ${JSON.stringify(v)}. Mend: set "inclusion: always" in its front matter`; } },
   { file: ENTRY_FILES.antigravity, tool: "Antigravity", line: p => `@[${path.posix.basename(p)}](${path.posix.relative(path.posix.dirname(ENTRY_FILES.antigravity), p)})`,
     pulls: text => [...live(text).matchAll(/@\[[^\]\n]*\]\(([^)\s]+)\)/gu)].map(m => path.posix.join(path.posix.dirname(ENTRY_FILES.antigravity), m[1])),

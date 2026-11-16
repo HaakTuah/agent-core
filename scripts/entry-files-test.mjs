@@ -18,11 +18,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT = path.join(root, "scripts/entry-files.mjs");
 const reader = files => f => (f in files ? files[f] : null);
 const AGENTS = "# p\n\nRead these (Claude Code imports them):\n\n@core-manifest.md\n@core/floor/security.md\n\nMore text, `core/modules/roles.md` named in passing.\n";
-const KIRO = "---\ninclusion: always\n---\n#[[file:core-manifest.md]]\n#[[file:core/floor/security.md:1-40]]\n";
+const KIRO = "---\ninclusion: always\n---\n#[[file:core-manifest.md]]\n#[[file:core/floor/security.md]]\n";
 const AG = "---\ntrigger: always_on\n---\n@[m](../../core-manifest.md)\n@[s](../../core/floor/security.md)\n";
 
 ok(lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@AGENTS.md\n@core/modules/claude.md\n", ".kiro/steering/core.md": KIRO, ".agents/rules/core.md": AG })).length === 0,
-  "entry files that pull in each file AGENTS.md names, each in its tool's form (a Kiro line range too), lack nothing");
+  "entry files that pull in each file AGENTS.md names, each in its tool's form, lack nothing");
+const ranged = lacking(reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": KIRO.replace("security.md]]", "security.md:1]]") }));
+ok(ranged.length === 1 && ranged[0].missing.join() === "core/floor/security.md", "a Kiro include with a line range pulls in part of a file, so the file is still lacking");
 ok(lacking(reader({ "AGENTS.md": AGENTS })).length === 0 && lacking(reader({ "CLAUDE.md": "x" })).length === 0,
   "an entry file the project does not hold, or a project with no AGENTS.md, is not looked for");
 let l = lacking(reader({ "AGENTS.md": AGENTS, "CLAUDE.md": "@core-manifest.md\n" }));

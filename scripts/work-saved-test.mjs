@@ -53,7 +53,8 @@ fs.mkdirSync(path.join(nested, "core", "scripts"), { recursive: true });
 fs.writeFileSync(path.join(nested, "core", "scripts", "work-saved.sh"), "echo NESTED-RAN; echo NESTED-RAN >&2; exit 2\n");
 git(nested, "add", "-A"); git(nested, "commit", "-q", "-m", "a script of another repository's"); git(nested, "update-ref", "refs/remotes/origin/main", "HEAD");
 const inNested = cmd => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: nested, env: rest }); };
-const kitHooks = [kiroStop, codexOf("SessionStart"), codexOf("Stop")];
+const kiroStart = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "SessionStart").action.command;
+const kitHooks = [kiroStart, kiroStop, codexOf("SessionStart"), codexOf("Stop")];
 ok(kitHooks.every(c => { const x = inNested(c); return x.status === 0 && !/NESTED-RAN/.test(`${x.stdout}${x.stderr}`); }),
   "in a repository that holds no such hook file, as one cloned inside the project, neither Kiro's hook nor Codex's two runs its script");
 const unguarded = kiroStop.replace('[ -f "$r/.kiro/hooks/work-saved.json" ] || exit 0; ', "");
@@ -61,7 +62,7 @@ ok(unguarded !== kiroStop && /NESTED-RAN/.test(inNested(unguarded).stderr), "and
 fs.rmSync(nested, { recursive: true, force: true });
 // the core's own hooks, which a project carries in its copy under core/: they run in no repository with a manifest
 const own = file => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8"));
-const ownHooks = [own(".kiro/hooks/work-saved.json").hooks[0].action.command, ...["SessionStart", "Stop"].map(e => own(".codex/hooks.json").hooks[e][0].hooks[0].command)];
+const ownHooks = [...own(".kiro/hooks/work-saved.json").hooks.map(h => h.action.command), ...["SessionStart", "Stop"].map(e => own(".codex/hooks.json").hooks[e][0].hooks[0].command)];
 const taker = path.join(tmp, "taker");
 git(tmp, "init", "-q", "-b", "main", taker);
 for (const [f, t] of [["core-manifest.md", "# Core manifest\n"], [".codex/hooks.json", "{}\n"], [".kiro/hooks/work-saved.json", "{}\n"], ["scripts/work-saved.sh", "echo TAKER-RAN; echo TAKER-RAN >&2; exit 2\n"]]) {
@@ -80,6 +81,8 @@ git(project, "add", ".kiro", ".codex"); git(project, "commit", "-q", "-m", "the 
 const other = (cmd, input = "{}") => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input, encoding: "utf8", cwd: path.join(project, "sub"), env: rest }); };
 r = other(kiroStop);
 ok(r.status === 2 && /1 file\(s\) not committed, such as note\.txt/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
+r = other(kiroStart);
+ok(r.status === 0 && /not committed/.test(r.stdout), "Kiro's start hook reports and stops nothing", `${r.status} ${r.stdout}`);
 r = other(codexOf("Stop"), '{"stop_hook_active": true}');
 ok(r.status === 0, "Codex's stop hook lets a second stop in a row through", `${r.status} ${r.stderr}`);
 r = other(codexOf("SessionStart"));
