@@ -196,9 +196,7 @@ const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup", "sudo"]);
 // The shell's words that start a command's place without being one (if …; then node …), passed over as wrappers are.
 const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "{"]);
 // A shell given its commands as one word (`bash -c "…"`), whose commands are read as the step's own.
-// (its option that takes them: sh's -c, alone or last in a cluster such as -ec; PowerShell's -Command, or a prefix of
-// it down to -c)
-const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu, SH_INLINE = /^-[a-z]*c$/u, PWSH_INLINE = /^-c(?:o(?:m(?:m(?:a(?:n(?:d)?)?)?)?)?)?$/iu;
+const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu;
 // Node's options that take the next word as their value, so that it is no script.
 const VALUED = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--title", "--input-type"]);
 const CHDIR = /^(?:cd|pushd|popd|chdir|set-location|sl)$/iu;
@@ -225,23 +223,34 @@ function pastWrappers(words) {
   }
   return i;
 }
-// The commands a shell at word `i` is given as one word, past its other options and their values, as { inner }; {}
-// where it is given none.
+// The commands a shell at word `i` is given as one word, in its plain forms only, as { inner, filled, elsewhere }
+// (elsewhere: run in another folder); {} where the reader finds none, and then a naming of the script in the line is
+// said not read (unfollowed), never passed over. sh: its options before the string, one of them holding c (-c, -ec,
+// -ce), -o and a cluster ending in o taking a value.
 function inline(words, i) {
-  let k = i + 1;
-  // (an option passed over, with its value where it is one known to take one; a word that is no option, a script
-  // file the shell runs, ends the search: what follows it is that file's)
-  const power = /pwsh|powershell/iu.test(words[i].text), INLINE = power ? PWSH_INLINE : SH_INLINE;
-  for (; k < words.length && !INLINE.test(words[k].text) && /^[-+]/u.test(words[k].text) && !(power && PWSH_FILE.test(words[k].text)); k++) {
-    if (power ? !/^-/u.test(words[k + 1]?.text ?? "-") : SH_VALUED.test(words[k].text)) k++;
+  if (/pwsh|powershell/iu.test(words[i].text)) return powershell(words, i);
+  let c = false, k = i + 1;
+  for (; k < words.length && /^[-+]/u.test(words[k].text); k++) {
+    if (/^-[a-zA-Z]*c[a-zA-Z]*$/u.test(words[k].text)) c = true;
+    if (/^[-+][a-zA-Z]*[oO]$/u.test(words[k].text)) k++;
   }
-  if (!INLINE.test(words[k]?.text ?? "")) return {};
-  if (words[k + 1]?.text === "--") k++; // (bash -c -- '…')
-  return k + 1 < words.length ? { inner: words[k + 1].text, filled: words[k + 1].dynamic } : {};
+  return c && k < words.length ? { inner: words[k].text, filled: words[k].dynamic } : {};
 }
-// (sh's options that take the next word: -o pipefail, alone or last in a cluster, -euo pipefail; --rcfile. PowerShell's
-// take the next word where it is no option, its -File (or a prefix of it) runs a file)
-const SH_VALUED = /^(?:[-+][a-z]*[oO]|--rcfile|--init-file)$/iu, PWSH_FILE = /^-f(?:i(?:le?)?)?$/iu;
+// PowerShell's: -Command (or a prefix down to -c) and -CommandWithArgs (-cwa) give it; a word with a blank and no
+// option before it is the command (Windows PowerShell's default); -File (or a prefix) gives a file; -WorkingDirectory
+// (-wd) runs it elsewhere; another option takes the next word where that holds no blank and is no option.
+function powershell(words, i) {
+  let elsewhere = false;
+  for (let k = i + 1; k < words.length; k++) {
+    const t = words[k].text, next = words[k + 1];
+    if (/^-(?:c|co|com|comm|comma|comman|command|commandwithargs|cwa)$/iu.test(t)) return next ? { inner: next.text, filled: next.dynamic, elsewhere } : {};
+    if (/^-f(?:i(?:le?)?)?$/iu.test(t)) return {};
+    if (!t.startsWith("-")) return /\s/u.test(t) ? { inner: t, filled: words[k].dynamic, elsewhere } : {};
+    if (/^-(?:wd|wo\w*)$/iu.test(t)) elsewhere = true;
+    if (next && !next.text.startsWith("-") && !/\s/u.test(next.text)) k++;
+  }
+  return {};
+}
 // How each script picks its config from its arguments, as it reads them: the first that does not start with "--"; of
 // the reading-size and exact-versions checks, the first whatever it is; of the NuGet check, never the value of its
 // "--packages", and none where it is run "--projects" or "--imports", which list files and read no config.
@@ -259,33 +268,26 @@ function configAfter(words, i, dir, script) {
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
 // Where a command the reader did not read as a run of the script names the copy's script all the same (timeout 60s
-// node …, sudo -u bot node …, env -S '…'), a run that cannot be known (never one that is not there), as
-// { unread, unsure }; else nothing. A command that runs no script (echo, cp, git: NO_RUNNER) names it as text, and a
-// shell given a file runs that file, which the reader does not run (notElsewhere says so where nothing else runs the
-// check).
+// node …, sudo -u bot node …, env -S '…', a shell line it cannot parse), a run that cannot be known (never one that is
+// not there), as { unread, unsure }; else nothing. A command that runs no script (echo, cp, git: NO_RUNNER) names it as
+// text.
 function unfollowed(words, script) {
-  const at = pastWrappers(words), command = words[at]?.text ?? "";
-  if (NO_RUNNER.has(path.posix.basename(command).toLowerCase()) || runsFile(words, at)) return [];
-  // (a word that is the script, by its path, or a string of commands where node stands before it, as env -S is given;
-  // after a wrapper's option that moves the folder, env -C app, any path that ends in the script)
-  const quoted = new RegExp(`(?:^|[\\s'"/=]|-S)node(?:\\.exe)?\\s(?:[^\\s]+\\s)*?['"]?(?:\\./)?${script.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?:$|[\\s'"])`, "u");
-  const shifted = words.slice(0, at + 1).some(w => CHDIR_OPTION.test(w.text));
-  const names = w => {
-    const t = slashed(w).replace(ROOT, "").replace(/^\.\//u, "");
-    return t === script || (/\s/u.test(t) && quoted.test(t)) || (shifted && t.endsWith(`scripts/${path.posix.basename(script)}`));
-  };
-  return words.some(names) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : [];
+  const command = words[pastWrappers(words)]?.text ?? "";
+  if (NO_RUNNER.has(path.posix.basename(command).toLowerCase())) return [];
+  return words.some(w => mentions(slashed(w), script)) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : [];
+}
+// Whether a text names the copy's script by its path: where it starts, or after a blank, a quote, "/" or "=", and up
+// to its end, a blank or a quote (one pass of indexOf, so no text makes it slow).
+function mentions(text, script) {
+  for (let at = text.indexOf(script); at >= 0; at = text.indexOf(script, at + 1)) {
+    const end = at + script.length;
+    if ((at === 0 || /[\s'"/=]/u.test(text[at - 1])) && (end === text.length || /[\s'"]/u.test(text[end]))) return true;
+  }
+  return false;
 }
 // (env's and sudo's options that run the command in another folder: env -C app, --chdir=app, sudo -D app)
 const CHDIR_OPTION = /^(?:-C|-D|--chdir(?:=.*)?|--working-directory(?:=.*)?)$/u;
-// Whether the command at `at` is a shell given a script file (its first word past its options looks like one), whose
-// arguments are that file's.
-function runsFile(words, at) {
-  if (!SHELL.test(words[at]?.text ?? "")) return false;
-  const file = words.slice(at + 1).find(w => !/^[-+]/u.test(w.text));
-  return !!file && /\.(?:sh|bash|zsh|ps1|psm1|cmd|bat)$|\//iu.test(file.text);
-}
-const NO_RUNNER = new Set(["npx", "sha256sum", "sha1sum", "md5sum", "shasum", "jq", "rg", "find", "gh", "curl", "wget", "write-host", "write-output", "echo", "printf", "cp", "mv", "rm", "ln", "chmod", "chown", "git", "cat", "head", "tail", "ls", "test", "[", "grep", "sed", "awk", "touch", "mkdir", "tee", "wc", "diff", "stat", "readlink", "realpath", "basename", "dirname", "which", "type", "true", "false", ":", "export", "set", "unset", "cd"]);
+const NO_RUNNER = new Set(["sha256sum", "sha1sum", "md5sum", "shasum", "jq", "rg", "gh", "curl", "wget", "write-host", "write-output", "echo", "printf", "cp", "mv", "rm", "ln", "chmod", "chown", "git", "cat", "head", "tail", "ls", "test", "[", "grep", "sed", "awk", "touch", "mkdir", "tee", "wc", "diff", "stat", "readlink", "realpath", "basename", "dirname", "which", "type", "true", "false", ":", "export", "set", "unset", "cd"]);
 // The runs read inside a shell's command string, each not read where the outer shell fills the string when it runs
 // (`bash -c "node … '$CONFIG'"`: the inner quotes keep nothing from it).
 const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `runs ${script} in a command string the workflow fills only when it runs`, unsure: true })) : runs);
@@ -295,9 +297,9 @@ function runsIn(run, dir, script) {
   const found = fedRuns(run, script);
   let moved = false;
   for (const words of commands(run)) {
-    const { moves, inner, filled, shifted, at: i } = nodeRuns(words);
+    const { moves, inner, filled, elsewhere, shifted, at: i } = nodeRuns(words);
     moved ||= !!moves;
-    if (inner !== undefined) found.push(...within(runsIn(inner, moved ? { dynamic: true } : dir, script), filled, script));
+    if (inner !== undefined) found.push(...within(runsIn(inner, moved || elsewhere ? { dynamic: true } : dir, script), filled, script));
     else if (i === undefined) found.push(...(moves ? [] : unfollowed(words, script)));
     else found.push(...runAt(words, i, moved || shifted ? { dynamic: true, moved: true } : dir, script));
   }
