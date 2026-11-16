@@ -149,7 +149,7 @@ function part(text, i, add) {
   if (c === "'") { const e = text.indexOf("'", i + 1), j = e < 0 ? text.length : e; add(text.slice(i + 1, j), text.slice(i + 1, j).includes("${{")); return j; }
   if (c === '"') return doubleQuoted(text, i, add);
   if (c === "\\") { const next = text[i + 1] ?? ""; add(/[\w.-]/u.test(next) && /[\w.-]/u.test(text[i - 1] ?? "") ? `/${next}` : next); return i + 1; }
-  add(c, c === "$" || c === "`");
+  add(c, c === "$" || c === "`" || c === "{"); // (an unquoted "{" may be a brace expansion, {a,b}, filled when it runs)
   return i;
 }
 function doubleQuoted(text, i, add) {
@@ -168,7 +168,7 @@ const ROOT = /^(?:\$GITHUB_WORKSPACE|\$\{GITHUB_WORKSPACE\}|\$\{\{\s*github\.wor
 // where it leads out of the project; { dynamic } where it is named only when the workflow runs.
 function located(word, dir) {
   const text = slashed(word), rooted = ROOT.test(text), rest = text.replace(ROOT, "");
-  if (word.dynamic && /\$|`|%\w+%/u.test(rest)) return { dynamic: true };
+  if (word.dynamic && /\$|`|%\w+%|\{/u.test(rest)) return { dynamic: true };
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
   return { at: at === ".." || at.startsWith("../") ? null : at.replace(/^\.\//u, "") };
@@ -229,20 +229,21 @@ function configAfter(words, i, dir, script) {
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
-// Where a command that starts with a wrapper or a shell the reader could not get past names the script, a run that
-// cannot be known (never one that is not there), as { unread }; else nothing.
+// Where a command the reader did not read as a run of the script still runs it with node past where the reader
+// stopped (timeout 60s node …, sudo -u bot node …), or, behind a wrapper or a shell, holds such a run in one word
+// (env -S '…'), a run that cannot be known (never one that is not there), as { unread, unsure }; else nothing.
 const unfollowed = (words, script, from) => {
   const first = words.find(w => !/^\w+=/u.test(w.text) && !KEYWORDS.has(w.text));
-  if (!first || !(WRAPPERS.has(first.text) || SHELL.test(first.text))) return [];
-  return hides(words, script, from) ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
+  const led = !!first && (WRAPPERS.has(first.text) || SHELL.test(first.text));
+  return hides(words, script, from, led) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : [];
 };
-// Whether, past `from`, where the reader stopped, a node word is followed (past node's own options) by the copy's
-// script, by its path, or a word holds such a run itself (a shell's string, env -S '…').
-function hides(words, script, from) {
+// Whether, past `from`, a node word is followed (past node's own options) by the copy's script, by its path, or, with
+// `deep`, a word holds such a run itself.
+function hides(words, script, from, deep) {
   const names = w => !!w && slashed(w).replace(ROOT, "").replace(/^\.\//u, "") === script;
   return words.some((w, j) => {
     if (j <= from) return false;
-    if (/\s/u.test(w.text) && w.text.includes(path.posix.basename(script))) return commands(w.text).some(inner => hides(inner, script, -1));
+    if (deep && /\s/u.test(w.text) && w.text.includes(path.posix.basename(script))) return commands(w.text).some(inner => hides(inner, script, -1, true));
     if (!NODE.test(w.text)) return false;
     let k = j + 1;
     for (; k < words.length && words[k].text.startsWith("-"); k++) if (VALUED.has(words[k].text)) k++;
@@ -251,7 +252,7 @@ function hides(words, script, from) {
 }
 // The runs read inside a shell's command string, each not read where the outer shell fills the string when it runs
 // (`bash -c "node … '$CONFIG'"`: the inner quotes keep nothing from it).
-const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `runs ${script} in a command string the workflow fills only when it runs` })) : runs);
+const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `runs ${script} in a command string the workflow fills only when it runs`, unsure: true })) : runs);
 // Where a step's `run:`, in the folder `dir`, runs `script` (a path from the root, "core/scripts/copies.mjs") with
 // node: each as configAfter gives it.
 function runsIn(run, dir, script) {
@@ -272,9 +273,9 @@ function runsIn(run, dir, script) {
 function runAt(words, i, dir, script) {
   const word = words[i];
   if (!word || !slashed(word).endsWith(`scripts/${path.posix.basename(script)}`)) return unfollowed(words, script, i - 1);
-  if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder` }];
+  if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   const at = dir.dynamic ? { dynamic: true } : located(word, dir.at);
-  if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs` }];
+  if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs`, unsure: true }];
   const config = at.at === script ? configAfter(words, i, dir, script) : null;
   return config ? [config] : [];
 }
@@ -336,12 +337,17 @@ export function runsOwn(p, name) {
   readable(p, text => text.includes(name));
   const script = `${copyOf(p)}scripts/${name}`;
   return steps(p).flatMap(s => {
-    if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know` }] : [];
+    if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know`, unsure: true }] : [];
     return runsIn(s.run, s.dir, script).map(r => ({ where: s.where, from: s.from, ...r }));
   });
 }
-// The workflows of the project's own that run the script, themselves or through an action they use, once each.
-export const runFiles = (p, name) => [...new Set(runsOwn(p, name).map(r => r.from))];
+// The workflows of the project's own that run the script, themselves or through an action they use, once each; where
+// one may run it or another (`unsure`: after a cd, by a path named only when it runs, …), not read, so a step that asks
+// whether a check runs beside another is never told it does on a guess.
+export const runFiles = (p, name) => runsOwn(p, name).map(r => {
+  if (r.unsure) throw new Unread(`${r.where} ${r.unread}`);
+  return r.from;
+}).filter((f, k, all) => all.indexOf(f) === k);
 const fromRuns = (p, name) => runsOwn(p, name).map(r => {
   if (r.unread) throw new Unread(`${r.where} ${r.unread}`);
   return { where: r.where, value: r.config };

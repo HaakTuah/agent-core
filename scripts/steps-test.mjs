@@ -497,6 +497,15 @@ ok(["sudo -u bot node --no-warnings core/scripts/copies.mjs config/c.json", "sud
   .every(run => notRead("copies", { "a.yml": stepped(run) })), "a node run behind a wrapper's option, with node's own options, in one word, or after a keyword, is not read");
 ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs >|log config/c.json") }) === "config/c.json" && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs {fd}>log config/c.json") }) === "config/c.json",
   "a redirection that writes over a file, or names its descriptor, takes no argument");
+// (Codex's review of 2240d78: a node run of the copy's script behind any word the reader does not know is not read; a
+// brace expansion is filled when it runs; a companion run the reader cannot place proves nothing)
+ok(notRead("copies", { "a.yml": stepped("timeout 60s node core/scripts/copies.mjs config/c.json") }) && notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs config/{copies,other}.json") })
+  && copiesOf({ "a.yml": stepped('node core/scripts/copies.mjs "config/{c}.json"') }) === "config/{c}.json",
+  "a node run of the script behind a word the reader does not know, and an unquoted brace expansion, are not read; a quoted brace is text");
+const companion = STEPS.find(s => s.lead === "12 November 2026, exact versions");
+let companionThrew = null;
+try { companion.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json\ncd tools && node scripts/exact-versions.mjs l.json") }, { "package-lock.json": "{}" })); } catch (e) { companionThrew = e; }
+ok(companionThrew instanceof Unread, "a companion run the reader cannot place is not read as the core's", String(companionThrew));
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
