@@ -146,8 +146,8 @@ The index, and how an item is written: `archive/instructions.md`.
      figured the game should have updated itself, without having to ask. It should update when the game starts: the
      prompt always pops up before the owner has started a game, and there is no reason not to want the latest version.
 
-110. **30 October 2026** (Amarna Letters, item 65). Asked: a king correcting for corruption in the taxes he is paid.
-     Decided: There must be levers for him to pull, or it is just random.
+110. **30 October 2026** (Amarna Letters, item 65). Asked: a king correcting for corruption in the taxes the king is paid.
+     Decided: There must be levers for the king to pull, or it is just random.
 
 111. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 19:55 to 20:02 UTC). Asked: the woodpecker's endgame.
      Decided: When there is just a little space, it should slow down again, so that the outcome is not a random
