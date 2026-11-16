@@ -5,7 +5,7 @@ issue, who builds it and what it waits on; the issue holds the rest, its conditi
 nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's word
-on the issue; *the owner*, no session takes it up before the owner's own word. A line on points of #460, #484 or #486
+on the issue; *the owner*, no session takes it up before the owner's own word. A line on points of #460, #484, #486 or #488
 has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 
 ## In order
@@ -40,7 +40,6 @@ has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #486's record | |
-| #394 | builder | |
 | #404 | builder | |
 | #405 | builder | |
 | #407 | builder | |
@@ -48,6 +47,8 @@ has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | #486's record |
+| #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
+| #488, points 3 to 5 and 7 | builder | #488's points 1 and 2 |
 | #460, point 1 (a staged case for floor rule 9) | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
