@@ -148,13 +148,16 @@ function noLinkOnTheWay(dir, f) {
 }
 
 // A working copy of the project: a git worktree of HEAD, with the files that differ from it, staged or not, and the new
-// ones copied in, and its installed dependencies linked.
+// ones copied in, those deleted taken out, and its installed dependencies linked.
 function copyOf(dir) {
   git(["worktree", "add", "--detach", "--quiet", dir, "HEAD"]);
   const differ = [...git(["diff", "-z", "--name-only", "--no-renames", "HEAD"]).split("\0"), ...git(["ls-files", "-z", "--others", "--exclude-standard"]).split("\0")].filter(Boolean);
   for (const f of differ) {
     const from = path.join(".", f), to = path.join(dir, f);
-    if (!fs.existsSync(from) || fs.lstatSync(from).isSymbolicLink() || fs.statSync(from).isDirectory()) continue; // (a folder's files come one by one)
+    let here = null;
+    try { here = fs.lstatSync(from); } catch { /* (deleted in the working folder) */ }
+    if (!here) { noLinkOnTheWay(dir, f); fs.rmSync(to, { force: true }); continue; } // (gone here, so gone in the copy too)
+    if (here.isSymbolicLink() || here.isDirectory()) continue; // (a folder's files come one by one)
     noLinkOnTheWay(dir, f);
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);

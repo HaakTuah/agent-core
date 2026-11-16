@@ -66,6 +66,13 @@ try {
     ok(fs.readFileSync(path.join(dir, "kept.txt"), "utf8") === "the project's own\n", "a link HEAD holds, replaced by a file in the working folder, is not written through", fs.readFileSync(path.join(dir, "kept.txt"), "utf8"));
     git("rm", "-q", "-f", "kept.txt", "linked.txt"); git("commit", "-q", "-m", "no link");
   }
+  // (a file deleted in the working folder and not yet committed is gone in the copies too)
+  write("conf/old.json", "{}\n"); write("test/conf-test.mjs", "import fs from 'node:fs';\nimport { big } from '../src/a.mjs';\nif (fs.existsSync('conf/old.json') || big(5)) process.exit(1);\n");
+  git("add", "conf/old.json", "test/conf-test.mjs"); git("commit", "-q", "-m", "a config");
+  fs.rmSync(path.join(dir, "conf/old.json"));
+  const deletedRun = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
+  ok(deletedRun.status === 0 && !deletedRun.stdout.includes("test/conf-test.mjs"), "a file deleted in the working folder is gone in the copies, so a test that asks it gone passes there as it does here", deletedRun.stdout + deletedRun.stderr);
+  git("rm", "-q", "-f", "--cached", "conf/old.json"); git("rm", "-q", "-f", "test/conf-test.mjs"); git("commit", "-q", "-m", "no config");
   const named = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:2-2"], { cwd: dir, encoding: "utf8" });
   const lines = new Set(JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.map(m => m.location.start.line));
   ok(named.status === 0 && same([...lines], [2]), "the lines named alone take faults", named.stdout + named.stderr);
