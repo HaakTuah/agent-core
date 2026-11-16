@@ -10,11 +10,12 @@ pipeline, and fails, saying its mend, where one of them fails; with no base, as 
 calls none from `.github/workflows`, the starter kit's calls are run. On a host other than GitHub, the project's
 pipeline runs it on every change into `main`, from a clone of the core at the pin `main`'s manifest holds, never from
 the change's own copy, which the change could have edited; and a session runs it before marking a pull request ready. It
-does not mean that a check of the host's own runs there (a review app's status, the dependency review, code scanning, a
-job started by a schedule): it names each and runs none, and the host's part says what stands in. Reason: every check
-was a GitHub workflow, so a project on another host had none. Held by `scripts/check-test.mjs`, in
-`.github/workflows/tests.yml`, which fails where a workflow the starter kit calls is neither run by it nor named the
-host's own.
+runs the change's own code (its copy's scripts, its packages' restore), as its tests do, so a pipeline runs it where no
+sign-in or key is held but the host's own for that pipeline. It does not mean that a check of the host's own runs there
+(a review app's status, the dependency review, code scanning, a job started by a schedule): it names each and runs none,
+and the host's part says what stands in. Reason: every check was a GitHub workflow, so a project on another host had
+none. Held by `scripts/check-test.mjs`, in `.github/workflows/tests.yml`, which fails where a workflow the starter kit
+calls is neither run by it nor named the host's own.
 
 **Each host's part** (core archive 234): a thin part for what is the host's own: how a job is started on a schedule, how
 a review is asked for and read, issues and labels, statuses and checks, how it says who may write to the repository and
@@ -27,6 +28,6 @@ host no one had tried. Held by nothing yet: a host's part out of reach leaves no
 
 **Proven host by host** (core archive 234). GitHub is proven: every project of the core's runs there. Any other host
 "should work" until a project runs there with `check.mjs` in its pipeline on a pull request whose checks pass, and
-reports so to the core, which then names it proven here. It does not mean a project waits for its host to be proven: it
-runs the checks from plain git meanwhile. Reason: a host's documentation says what it offers, not that the core's checks
-run there. Held by nothing yet.
+reports so to the core, whose design session then names it proven here. It does not mean a project waits for its host to
+be proven: it runs the checks from plain git meanwhile. Reason: a host's documentation says what it offers, not that the
+core's checks run there. Held by nothing yet.

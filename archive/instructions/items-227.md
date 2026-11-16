@@ -264,5 +264,5 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > it: quote this in those pull requests.
 
      Behind floor rules 4, 12 and 14 as they read a team's owners, their yeses and the approvals the host asks;
-     `modules/hosts.md`, `modules/teams.md` and GitHub's part in `modules/github-calls.md`; the slots *owner's account*
-     and *approvals*; and `scripts/check.mjs`.
+     `modules/hosts.md`, `modules/teams.md` and GitHub's part in `modules/github-calls.md`; the slot *owner's account*; and
+     `scripts/check.mjs`.

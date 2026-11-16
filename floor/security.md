@@ -97,7 +97,7 @@ saved data; a weakened check).
   - the changes rule 3 asks the owner's yes for;
   - rule 10's licence exception;
   - the approvals rule 12 names.
-- In a team, only an owner with the host's higher right gives these yeses (core archive 234).
+- In a team, only an owner with the host's higher right gives the first three (core archive 234).
 - A release of the core is the core's owner's own choice, which no task waits on (core archive 195).
 - Everything else is done on the best reading, said in the PR, and stays correctable.
 - A failing check that guards against harm (agents' isolation, `main`, keys, spending) stops its step, and the owner is

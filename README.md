@@ -307,7 +307,6 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | Slot | What the project fills in |
 | --- | --- |
 | *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`); in a team's project one of its owners, who are each person the host lets write, and the one owner where the host's rights cannot be read (`modules/teams.md`) |
-| *approvals* | the number of owners' approvals, in backticks, a pull request waits for before its merge where the host's protection of `main` does not ask them itself (`modules/teams.md`, "A person's approval follows the host"); left out, what that protection asks: none in the ruleset "Setting up" describes |
 | *shares its counts* | `yes`, in backticks, where a project of another owner's lets the core's state report read its counts though it gave the core's owner no access (`scripts/state-report.mjs`); left out, no |
 | *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
 | *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`modules/inbox.md`) |

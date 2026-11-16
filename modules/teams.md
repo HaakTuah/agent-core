@@ -10,16 +10,16 @@ rule 14, which are the higher right's.
 give the project's agents a task and settle an open reading, and their word is the owner's word (floor rule 4). Where
 the host's rights cannot be read, the *owner's account* alone is an owner, and the session says so in its report. Until
 the `security-review` status reads the host's rights (#412), a team's project names its owners in that check's input
-`reviewers`. It does not mean that an app or a bot the host lets write is an owner, that a right to read or triage is
-one, nor that a comment from an owner's account with an agent's attribution line is that owner's word. Reason: in a
-team's project every person with the right to write is an owner, and a list kept beside the host's rights goes stale.
-Held by nothing yet: whose word a session followed leaves no mark a check reads.
+`reviewers`. It does not mean that an app or a bot the host lets write is an owner, nor an account the project's agents
+sign in with (`setup/server.md`), whose words are an agent's, that a right to read or triage is one, nor that a comment
+from an owner's account with an agent's attribution line is that owner's word. Reason: in a team's project every person
+with the right to write is an owner, and a list kept beside the host's rights goes stale. Held by nothing yet: whose
+word a session followed leaves no mark a check reads.
 
-**The higher right gives the floor's yeses** (core archive 234). By default each yes floor rule 14 names (a change to
-the floor or the review guidelines, money, what cannot be undone) is given by an owner the host gives its higher right
-(on GitHub: `maintain` or `admin`); a yes from an owner who may only write is reported and does not count. It does not
-mean that other words of a writer count for less. Reason: one person with the right to write does not loosen the floor
-alone. Held by nothing yet.
+**The higher right gives the floor's yeses** (core archive 234). By default each yes floor rule 14 names, the approvals
+of rule 12 aside, is given by an owner the host gives its higher right (on GitHub: `maintain` or `admin`); a yes from an
+owner who may only write is reported and does not count. It does not mean that other words of a writer count for less.
+Reason: one person with the right to write does not loosen the floor alone. Held by nothing yet.
 
 **Owners who disagree** (core archive 234). Where two owners' words on one point differ (a task, a reading, a design),
 the session that meets it says so on the issue or pull request, quoting both, labels it `needs-owner`, and takes neither
@@ -27,16 +27,17 @@ side: the step that rests on the point waits, and the rest goes on. What an owne
 afterwards settles it. It does not mean that the newer word wins, nor that a session picks the likelier one. Reason: an
 agent that takes a side decides between the people it works for. Held by nothing yet.
 
-**The stand-in answers for the team** (core archive 234). In a team's project the stand-in (`modules/inbox.md`) searches
-the team's recorded decisions, the owners' words on its issues, pull requests and archive, and gives the answer they
-make likeliest; a call of taste stays unsure, and one person's taste is never given as the team's. It does not mean that
-an owner's own words outweigh a recorded decision of the team's. Reason: in a team no one person's taste is the
-project's. Held by nothing yet.
+**The stand-in answers for the team** (core archive 234). By default the stand-in (`modules/inbox.md`) searches one
+owner's words; in a team's project it searches the team's recorded decisions, the owners' words on its issues, pull
+requests and archive, and gives the answer they make likeliest; a call of taste stays unsure, and one person's taste is
+never given as the team's. It does not mean that an owner's own words outweigh a recorded decision of the team's.
+Reason: in a team no one person's taste is the project's. Held by nothing yet.
 
 **A person's approval follows the host** (core archive 234). By default a pull request merges with no person's approval,
-as the starter kit's ruleset asks none; where the host's protection of `main` asks for one, or the slot *approvals*
-names a count, it waits for that many approvals of owners other than the one whose session wrote it, its line `Waits on:
-a review` with the label `needs-owner`, and its builder goes on with the next task. It does not mean that an agent
+as the starter kit's ruleset asks none; where the host's protection of `main` asks for approvals, it waits for them,
+from owners other than the one whose session wrote it, its line `Waits on: the owner: will an owner other than its
+writer approve it?` with the label `needs-owner`, and its builder goes on with the next task. The count is the host's
+alone, read from its protection of `main`, never from a file a change could edit. It does not mean that an agent
 approves, under any owner's login: an approval is a person's own. Reason: whether each change is approved is the team's
 choice, and its host already enforces it. Held by GitHub's ruleset on the default branch, which refuses the merge
 without them.

@@ -72,6 +72,27 @@ commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
 ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "No new copies" failed/.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
 
+// a change that takes a check's call out still runs it: the calls are the base's
+git(dir, "reset", "-q", "--hard", "base");
+fs.rmSync(path.join(dir, ".github", "workflows", "core.yml"));
+fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
+commit(dir, "the copy edited, and its check's call taken out");
+r = check(dir, "--base", "base");
+ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && r.out.includes("so no other check runs") && !/ok {3}copies\.yml/.test(r.out) && mended(r.out),
+  "a change that takes out its call to core.yml is still checked by the base's call, and a copy that fails it runs no other check", r.out);
+git(dir, "branch", "-q", "-f", "nocore");
+r = check(dir, "--base", "nocore");
+ok(r.status === 1 && r.out.includes("no call to the core's core.yml") && mended(r.out), "a base that calls no core.yml fails, saying its mend", r.out);
+
+// a listed personal term is found and never printed
+git(dir, "reset", "-q", "--hard", "base");
+const term = ["Zq", "xv", "Wk"].join("");
+fs.writeFileSync(path.join(dir, "notes.md"), `A note naming ${term}.\n`);
+commit(dir, "a note with a listed term");
+r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
+const said = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(said) && !said.includes(term) && mended(said), "a listed personal term fails the change, and the term is printed nowhere", said);
+
 // another host: no .github/workflows, so the kit's calls are run
 git(dir, "reset", "-q", "--hard", "base");
 fs.rmSync(path.join(dir, ".github", "workflows"), { recursive: true, force: true });

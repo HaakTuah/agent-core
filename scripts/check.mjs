@@ -2,17 +2,22 @@
 // project's root, on a person's machine or in any host's pipeline, it runs each workflow of the core's that the project
 // calls, as GitHub would run it for a pull request into main (`--base`, the commit it merges into) or for a push to main
 // (none given), on the commit checked out: each step's own shell, through workflow-run.mjs, so that no check is written
-// twice. The calls are the project's own (its .github/workflows); where it has none, as on another host, the starter
-// kit's (core/setup/template/workflows), each with the inputs the kit gives them, a template the kit fills in with more
-// than the core's address and pin left out and said so. Each called workflow is read from the core at the call's pin,
-// fetched from the core's address by git, as GitHub reads it, never from the project's copy under core/, which the
-// change under check may have edited; and a pipeline that checks a change runs this script itself from a clone of the
-// core, not from that copy (modules/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it
-// changes nothing in the project, and hands the steps no token or secret of its own environment. What only the host can do (a review app's status, the dependency review,
-// code scanning, a job started by a schedule) is not run here and is named: that is the host's part, and where a host
-// has none, what stands in is in its part (modules/hosts.md). The personal-terms list is read from the environment
-// (PERSONAL_TERMS), never from a file, as the host keeps it among its secrets. It prints each job, each step the host
-// alone runs, and each failing step with what it printed; it exits 1 where one failed. Git, bash and Node's own modules.
+// twice. The calls are the base's (on a push, main's own), so a change cannot leave a check out by taking its call out:
+// the project's .github/workflows, or, where it has none, as on another host, the starter kit's in the base's copy,
+// each with the inputs the kit gives them (a template the kit fills in with more than the core's address and pin is
+// left out, and said so). core.yml runs first, and where the copy of the core is not the core at its pin no other check
+// runs, since each runs the copy's scripts; with no call to core.yml, or none run, it fails. Each called workflow is
+// read from the core at the call's pin, fetched from the core's address by git, as GitHub reads it, never from the
+// copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
+// not from that copy (modules/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
+// nothing in the project. The steps run the change's own code, so they get only the variables a program needs to start
+// and reach the network, named in KEPT, with a home folder of their own: no sign-in, key or credential file of the
+// caller's. What only the host can do (a review app's status, the dependency review, code scanning, a job started by a
+// schedule) is not run here and is named: that is the host's part, and where a host has none, what stands in is in its
+// part (modules/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
+// the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it. It prints
+// each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
+// Git, bash and Node's own modules.
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
 import { execFileSync } from "node:child_process";
@@ -37,10 +42,11 @@ export const HOST_OWN = {
 };
 
 const env = plainEnv();
-// what the steps run with: this environment without its tokens and secrets, as a workflow's steps get none but what the
-// call passes (git's own settings kept, so a rewrite of the core's address still reaches it)
-const SECRET = /TOKEN|SECRET|PASSWORD|CREDENTIAL|^GH_|^GITHUB_|^ACTIONS_|^RUNNER_|^NPM_|^NUGET_|^PERSONAL_TERMS$/i;
-const stepEnv = Object.fromEntries(Object.entries(env).filter(([name]) => !SECRET.test(name)));
+// What the steps run with, since they run the change's own code (its copy's scripts, its packages' restore): only what
+// a program needs to start and reach the network, by name, with a home of its own in the scratch folder, so no sign-in,
+// key or credential file of the caller's reaches them (git's own settings kept, for a rewrite of the core's address).
+const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL|GIT_CONFIG_NOSYSTEM|GIT_CONFIG_GLOBAL|GIT_CONFIG_COUNT|GIT_CONFIG_(KEY|VALUE)_[0-9]+)$/i;
+const stepEnv = home => ({ ...Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name))), HOME: home, USERPROFILE: home });
 let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
 const git = (cwd, ...a) => execFileSync("git", a, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const fail = (what, mend) => { console.error(`FAIL ${what} ${MEND}${mend}`); process.exit(1); };
@@ -54,12 +60,18 @@ function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   const run = runner(p, tmp);
-  let failed = 0;
-  for (const { file, text } of callers(p)) {
-    if (!triggered(parseYaml(text).on, p)) continue;
-    for (const [id, job] of Object.entries(parseYaml(text).jobs ?? {})) failed += run(file, id, job);
+  const jobs = callers(p).filter(({ text }) => triggered(parseYaml(text).on, p))
+    .flatMap(({ file, text }) => Object.entries(parseYaml(text).jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
+    .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
+  if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
+  let failed = 0, ran = 0;
+  for (const j of jobs) {
+    const r = run(j.file, j.id, j.job);
+    failed += r.failed; ran += r.ran;
+    if (j.name === "core.yml" && r.failed) { console.error(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
   }
-  console.log(failed ? `${failed} of the core's checks failed` : "ok   every check of the core that runs from plain git passed");
+  if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
+  console.log(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);
   process.exitCode = failed ? 1 : 0;
 }
 
@@ -94,14 +106,18 @@ function project({ base: baseArg, title, description }) {
     event: base ? "pull_request" : "push", changed: base ? git(root, "diff", "--name-only", `${base}...${head}`).split("\n").filter(Boolean) : [] };
 }
 
-// The project's calls to the core's workflows, from its .github/workflows; where it has none, the starter kit's.
-function callers({ root, show, head, pin }) {
-  const listed = dir => { try { return git(root, "ls-tree", "--name-only", `${head}:${dir}`).split("\n").filter(Boolean); } catch { return []; } };
-  const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => ({ file: f, text: show(head, `.github/workflows/${f}`) }));
+// The project's calls to the core's workflows, as the base the change merges into holds them (on a push, main's own),
+// so a change cannot leave a check out by taking its call out: from its .github/workflows; where it has none, the
+// starter kit's, from the base's copy, pinned where the base's manifest pins the core.
+function callers({ root, show, head, base }) {
+  const at = base || head;
+  const pin = new RegExp(`^Core: ${CORE_SOURCE} at ([0-9a-f]{40}), copied whole under core/`, "m").exec(show(at, "core-manifest.md") ?? "")?.[1] ?? "";
+  const listed = dir => { try { return git(root, "ls-tree", "--name-only", `${at}:${dir}`).split("\n").filter(Boolean); } catch { return []; } };
+  const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => ({ file: f, text: show(at, `.github/workflows/${f}`) }));
   if (own.some(c => Object.values(parseYaml(c.text).jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;
   const kit = [];
   for (const f of listed("core/setup/template/workflows").filter(f => f.endsWith(".yml.tmpl"))) {
-    const text = show(head, `core/setup/template/workflows/${f}`).replaceAll("{{core}}", CORE).replaceAll("{{pin}}", pin);
+    const text = show(at, `core/setup/template/workflows/${f}`).replaceAll("{{core}}", CORE).replaceAll("{{pin}}", pin);
     const left = text.match(/\{\{[a-z]+\}\}/);
     if (left) console.log(`note the starter kit's ${f} is filled in with ${left[0]} by the kit, so it is not run: a project that needs it keeps the call it was written`);
     else kit.push({ file: f.replace(/\.tmpl$/, ""), text });
@@ -159,22 +175,28 @@ function runner(p, tmp) {
   const uses = new Proxy({ "actions/checkout": checkout(tmp), "actions/setup-node": () => {} }, { get: (known, action) => known[action] ?? (() => false) });
   const github = context(p);
   const terms = process.env.PERSONAL_TERMS ?? "";
+  // (each listed term is printed as *** wherever a step prints it, as GitHub masks a secret's lines in a log)
+  const listed = terms.split(/\r?\n/).map(t => t.trim()).filter(Boolean).sort((a, b) => b.length - a.length);
+  const mask = text => listed.reduce((t, term) => t.split(term).join("***"), text);
+  const home = path.join(tmp, "home");
+  fs.mkdirSync(home);
   return (file, id, job) => {
     const name = call.exec(String(job?.uses ?? ""))?.[1];
-    if (!name) return 0;
-    if (HOST_OWN[name]) { console.log(`host ${file}/${id}: ${name} is not run here (${HOST_OWN[name]})`); return 0; }
-    if (name === "pr-description.yml" && !p.described) { console.log(`note ${file}/${id}: pr-description.yml is not run here: give --description <a file> that holds the pull request's description`); return 0; }
+    const none = { failed: 0, ran: 0 };
+    if (!name) return none;
+    if (HOST_OWN[name]) { console.log(`host ${file}/${id}: ${name} is not run here (${HOST_OWN[name]})`); return none; }
+    if (name === "pr-description.yml" && !p.described) { console.log(`note ${file}/${id}: pr-description.yml is not run here: give --description <a file> that holds the pull request's description`); return none; }
     const called = coreFile(tmp, call.exec(job.uses)[2], `.github/workflows/${name}`);
-    if (called === null) { console.error(`FAIL ${file}/${id}: ${name} is not at ${call.exec(job.uses)[2]} in the core's history. ${MEND}pin the call to a commit of the core's main that holds it, as the sync writes it, or take the call out.`); return 1; }
-    const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
-    const value = v => (typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\s*\$\{\{|\}\}\s*$/g, ""), callerCtx) : v);
-    const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, value(v)]));
-    const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v)]));
+    if (called === null) { console.error(`FAIL ${file}/${id}: ${name} is not at ${call.exec(job.uses)[2]} in the core's history. ${MEND}pin the call to a commit of the core's main that holds it, as the sync writes it, or take the call out.`); return { failed: 1, ran: 0 }; }
+    // (a caller's `with:` reads no secret, as on GitHub; its `secrets:` reads the one list this script is given)
+    const value = (v, secrets) => (typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\s*\$\{\{|\}\}\s*$/g, ""), { github, inputs: {}, secrets, vars: {} }) : v);
+    const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, value(v, {})]));
+    const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v, { PERSONAL_TERMS: terms })]));
     try {
-      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv, workspace, uses, temp: tmp }), p.event);
+      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp }), p.event, mask);
     } catch (e) {
       console.error(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
-      return 1;
+      return { failed: 1, ran: 0 };
     }
   };
 }
@@ -191,26 +213,28 @@ function checkout(tmp) {
   return (w, ws) => {
     if (!w.repository) { if (w.ref) git(ws, "checkout", "-q", "--detach", git(ws, "rev-parse", `origin/${w.ref}`)); return; }
     if (w.repository.toLowerCase() !== CORE.toLowerCase()) throw new Error(`a checkout of another repository than the core: ${w.repository}`);
-    const to = path.join(ws, w.path || ".");
+    const to = path.resolve(ws, w.path || ".");
+    if (to === ws || !to.startsWith(ws + path.sep)) throw new Error(`a checkout into ${w.path || "."}, which is not a folder inside the job's own`);
     git(tmp, "clone", "-q", "--no-checkout", `https://github.com/${CORE}`, to);
     git(to, "checkout", "-q", "--detach", w.ref || "main");
   };
 }
 
-// Prints each job's verdict, each step the host alone runs, and each failing step with what it printed; gives the
-// count of the jobs that failed.
-function report(where, results, event) {
-  let failed = 0;
+// Prints each job's verdict, each step the host alone runs, and each failing step with what it printed, every term of
+// the personal-terms list masked; gives how many of its jobs ran and how many failed.
+function report(where, results, event, mask) {
+  let failed = 0, ran = 0;
   for (const r of results) {
     const at = `${where}/${r.job}`;
     if (!r.ran) { console.log(`skip ${at}: its condition does not hold for this ${event === "push" ? "push" : "pull request"}`); continue; }
+    ran++;
     for (const s of r.steps.filter(s => s.ran === false && s.out)) console.log(`host ${at}: "${s.name}" is the host's own, not run here`);
     if (r.passed) { console.log(`ok   ${at}`); continue; }
     failed++;
     for (const s of r.steps.filter(s => !s.passed)) {
       console.error(`FAIL ${at}: its step "${s.name}" failed, as it printed below. ${MEND}do what its own failure below says, commit, and run this check again.`);
-      console.error(s.out.trim().split("\n").map(l => `  ${l}`).join("\n"));
+      console.error(mask(s.out.trim()).split("\n").map(l => `  ${l}`).join("\n"));
     }
   }
-  return failed;
+  return { failed, ran };
 }
