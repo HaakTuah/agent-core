@@ -5,7 +5,8 @@
 //
 // A test reaches a file where the file lies on the test's imports, followed from file to file (the shape check's
 // readers: shape.mjs, beside this file, dynamic imports among them), or where a file of JavaScript or TypeScript on that
-// way names it, outside a comment, by its name ("scripts/build.mjs", as a script is started by its path). A test the
+// way names it, outside a comment, by its name ("scripts/build.mjs", as a script is started by its path), or where it
+// is the __init__.py of a package a file of Python on that way lies in, which Python runs on each import. A test the
 // config's "select.whole" names reaches every file (one that copies or runs the whole project). It never guesses: where
 // a changed file is no code the readers read and no test, a file that is gone, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
@@ -59,8 +60,10 @@ export function matcher(specs) {
 // one that ends a line after a space. What is left over names more, never less.
 const uncommented = text => text.split("\n").filter(l => !/^\s*(\/\/|\/?\*)/u.test(l)).map(l => l.replace(/\s\/\/\s.*$/u, "")).join("\n");
 
-// Each file's links to the others: its imports, and, from JavaScript or TypeScript, each file of code (no test) whose
-// name it holds outside a comment.
+// Each file's links to the others: its imports; from JavaScript or TypeScript, each file of code (no test) whose name
+// it holds outside a comment; and from a file of Python, the __init__.py of each folder above it, which Python runs
+// whenever it imports the file.
+const initsAbove = (file, texts) => file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/__init__.py`).filter(f => f !== file && f in texts);
 export function links(texts, tests, reach) {
   const code = Object.keys(texts).filter(f => !tests.has(f));
   const named = code.map(f => [f, new RegExp(`(^|[^\\w-])${escaped(path.posix.basename(f))}(?![\\w-])`, "u")]);
@@ -68,6 +71,7 @@ export function links(texts, tests, reach) {
   for (const [file, text] of Object.entries(texts)) {
     const to = new Set(reach.get(file) ?? []);
     if (CODE.includes(path.posix.extname(file))) { const plain = uncommented(text); for (const [f, re] of named) if (f !== file && re.test(plain)) to.add(f); }
+    if (file.endsWith(".py")) for (const init of initsAbove(file, texts)) to.add(init);
     out.set(file, to);
   }
   return out;
@@ -104,8 +108,8 @@ export function selection({ changed, texts, tests, reach, failed = [], config })
 function oneChange(f, { texts, tests, add, reaches, whole, none, isTest }) {
   if (none(f)) return null;
   if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
-  if (isTest(f) && !(f in texts)) return null; // (a test taken out runs nothing)
-  // (a package's manifest, read beside the code, links nothing: a change to it may reach every test)
+  // (a file gone, a helper among the tests too, leaves no import to follow; a package's manifest, read beside the code,
+  // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
   if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
