@@ -41,10 +41,11 @@ export const RECORD = "reports/staged-cases.json";
 export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.
 export const MONTHS = 3;
-export const TOOL = "Claude Code";
-// The agent tools a run may name, each with its part in tools/ (tasks/tools.md, "Each tool's part"): a run of a
-// tool that has none is not recorded. Read case and spacing aside, so "claude code" is TOOL.
-export const TOOLS = [TOOL, "Codex", "Kiro", "Antigravity"];
+// The agent tools a run may name, each with its part in tools/ (tasks/tools.md, "Each tool's part"), in
+// staged-tools.json, beside this file, which core.yml reads too: a run of a tool that has none is not recorded. Read case
+// and spacing aside, so "claude code" is TOOL, the first.
+export const TOOLS = JSON.parse(fs.readFileSync(new URL("./staged-tools.json", import.meta.url), "utf8")).tools;
+export const TOOL = TOOLS[0];
 export const toolNamed = name => TOOLS.find(t => t.toLowerCase() === String(name ?? "").toLowerCase().replace(/\s+/gu, " ").trim()) ?? null;
 
 export const caseOf = name => CASES.find(c => c.name === name) ?? null;

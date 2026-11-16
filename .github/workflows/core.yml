@@ -8,8 +8,9 @@
 # ("Differences") from the floor or the review guidelines. Where a library of the project's carries the core (that line's
 # second form), it reads the pin from the library's own manifest, where the library's files are committed here, and
 # fails a library that is neither a committed folder nor a submodule; and, while an agent tool has not passed the staged
-# cases carried and no-floor (the core's reports/staged-cases.json on its main, read as data), it fails a repository
-# without its own copy of the floor ("Floor copy:"), and a copy that differs from the floor at the pin.
+# cases carried and no-floor (the core's reports/staged-cases.json and scripts/staged-tools.json on its main, read as
+# data; a tool that never ran them has not passed), it fails a repository without its own copy of the floor ("Floor
+# copy:"), and a copy that differs from the floor at the pin.
 # A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
 # pinned to a full commit SHA. Reads only, with no secret: it fetches this public repository at the pin it reads, which
 # must be a full commit SHA before it is used, and runs nothing from either repository. Its own shell is tested in the
@@ -186,21 +187,24 @@ jobs:
           FLOOR: ${{ steps.pin.outputs.floor }}
         run: |
           set -euo pipefail
-          # (tasks/repositories.md, "Proven tool by tool". The record of the staged cases is the core's main's, read as
-          # data: each agent tool that has run any case, and its last verdict of each of the two)
-          record='{"runs":[]}'
+          # (tasks/repositories.md, "Proven tool by tool". The core's main's record of the staged cases and its list of
+          # the agent tools they run in, read as data: each tool named there, and its last verdict of each of the two; a
+          # tool that has never run them has not passed)
+          record='{"runs":[]}' tools='{"tools":[]}'
           if git -C .core-at-pin fetch -q --no-tags origin refs/heads/main; then
             record=$(git -C .core-at-pin show FETCH_HEAD:reports/staged-cases.json 2>/dev/null || echo '{"runs":[]}')
+            tools=$(git -C .core-at-pin show FETCH_HEAD:scripts/staged-tools.json 2>/dev/null || echo '{"tools":[]}')
           fi
           # (read by the runner's own node, with no file of either repository's: the code is this step's own)
-          open=$(printf '%s' "$record" | node -e '
-            let r = []; try { r = JSON.parse(require("fs").readFileSync(0, "utf8")).runs ?? []; } catch {}
-            const tools = [...new Set(r.map(x => x.tool ?? "Claude Code"))].sort(), open = [];
+          open=$(RECORD="$record" TOOLS="$tools" node -e '
+            const read = (text, key) => { try { return JSON.parse(text)[key] ?? []; } catch { return []; } };
+            const norm = t => String(t ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+            const runs = read(process.env.RECORD, "runs"), tools = read(process.env.TOOLS, "tools"), open = [];
             for (const t of tools) for (const c of ["carried", "no-floor"]) {
-              const v = r.filter(x => (x.tool ?? "Claude Code") === t && x.cases?.[c]).map(x => x.cases[c].verdict).at(-1);
+              const v = runs.filter(x => norm(x.tool ?? tools[0]) === norm(t) && x.cases?.[c]).map(x => x.cases[c].verdict).at(-1);
               if (v !== "pass") open.push(`${t} (${c})`);
             }
-            console.log(tools.length ? open.join(", ") : "every tool (none has run)");')
+            console.log(tools.length ? open.join(", ") : "every tool (their list could not be read)");')
           if [ -z "$FLOOR" ]; then
             if [ -n "$open" ]; then
               echo "FAIL the core here is carried by a library, and not every agent tool has passed the staged cases that prove a session finds its rules there: $open. Mend: keep a copy of the core's floor/ in a folder of this repository's own, committed, and name it on a line \"Floor copy: <folder>/\" under the \"Core:\" line of core-manifest.md."; exit 1
@@ -211,6 +215,10 @@ jobs:
           id=$(git rev-parse -q --verify "HEAD:$dir" || true)
           if [ -z "$id" ] || [ "$(git ls-tree HEAD -- "$dir")" != "040000 tree $id"$'\t'"$dir" ]; then
             echo "FAIL $FLOOR, the floor's own copy core-manifest.md names, is no folder of this commit. Mend: commit a copy of the core's floor/ there, from the core the library carries."; exit 1
+          fi
+          # (and a session reads it at every start: AGENTS.md names it, as every entry file pulls in what AGENTS.md names)
+          if ! grep -q -F "${FLOOR}security.md" AGENTS.md 2>/dev/null; then
+            echo "FAIL AGENTS.md does not name ${FLOOR}security.md, the floor's own copy, among the files read at every start. Mend: add the line @${FLOOR}security.md beside the other files a builder reads at the start of every task, and the same to each entry file that pulls them in."; bad=1
           fi
           entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
           if [ -n "$PIN" ]; then

@@ -365,6 +365,16 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
         ...base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
         GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(github.repository), GITHUB_EVENT_NAME: str(github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
       const passed = r.status === 0;
+      // (what a step writes to GITHUB_ENV, NAME=value a line, is the environment of every step after it, as GitHub sets it)
+      const envFile = path.join(tmp, "env");
+      if (fs.existsSync(envFile)) {
+        for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/u).filter(Boolean)) {
+          const at = line.indexOf("=");
+          if (at <= 0) throw new Error(`a line of GITHUB_ENV in a form this runner does not read: ${line.slice(0, 80)} (in ${id})`);
+          ctx.env[line.slice(0, at)] = line.slice(at + 1);
+        }
+        fs.rmSync(envFile);
+      }
       result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
       if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
       if (!passed) { state.failed = true; result.passed = false; }

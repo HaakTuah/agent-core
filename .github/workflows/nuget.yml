@@ -71,10 +71,14 @@ jobs:
         with:
           persist-credentials: false # nothing after the checkout needs the token
           fetch-depth: 2 # the merge commit and its parents: the base the next step diffs from
+      - name: Where the core's copy stands, for the NuGet check (core-manifest.md's "Core:" line; the core's tasks/repositories.md)
+        run: |
+          at=$(sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by ([A-Za-z0-9_][A-Za-z0-9._/-]*)/) under ([A-Za-z0-9_][A-Za-z0-9._/-]*/).*#\3 \2#p' core-manifest.md 2>/dev/null | head -n 1)
+          set -- ${at:-core/}; [ -z "${2:-}" ] || [ -e "$1scripts" ] || git submodule update --init --depth 1 -- "$2" || { echo "FAIL the library $2, a submodule that carries the core, could not be fetched here. Mend: commit the library's files in this repository, or make the submodule one this workflow can fetch with no token."; exit 1; }; echo "CORE_AT=$1" >> "$GITHUB_ENV"
       # (before the first look, which asks the script what files the project's Imports bring in)
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+          node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: Does the pull request change what NuGet reads?
         id: what
         env:
@@ -92,7 +96,7 @@ jobs:
             ':(glob,icase)**/*.targets' ':(glob,icase)**/Directory.Build.*' ':(glob,icase)**/*.rsp' ':(glob,icase)**/*.user'
             ':(glob,icase)**/packages.lock.json' ':(glob,icase)**/packages.*.lock.json' ':(glob,icase)**/packages.config'
             ':(glob,icase)**/nuget.config' ':(glob,icase)**/global.json' ':(glob,icase)**/dotnet-tools.json'
-            ':(glob,icase)**/*.nupkg' core/.node-version .github/workflows/nuget.yml)
+            ':(glob,icase)**/*.nupkg' "${CORE_AT}.node-version" .github/workflows/nuget.yml)
           # NuGet's own word on whether every lock file still holds what its project asks for, however the project asks
           # (in an import, through a property, from any file a build reads): a restore of each project file from its
           # lock file alone against an empty source, which downloads nothing. It holds only where each restore passed
@@ -113,9 +117,9 @@ jobs:
             config="$empty.config"
             printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<configuration />' > "$config"
             mapfile -d '' -t projects < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/*.csproj' \
-              ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ':(exclude)core/**')
+              ':(glob,icase)**/*.fsproj' ':(glob,icase)**/*.vbproj' ":(exclude)${CORE_AT}**")
             mapfile -d '' -t locks < <(git -c core.quotePath=false ls-files -z -- ':(glob,icase)**/packages.lock.json' \
-              ':(glob,icase)**/packages.*.lock.json' ':(exclude)core/**')
+              ':(glob,icase)**/packages.*.lock.json' ":(exclude)${CORE_AT}**")
             for project in "${projects[@]}"; do
               out=$(dotnet restore --locked-mode --configfile "$config" --source "$empty" "-p:RestorePackagesPath=$NUGET_PACKAGES" \
                 -p:NuGetLockFilePath= "./$project" < /dev/null 2>&1) && continue
@@ -151,7 +155,7 @@ jobs:
             # than a build file's, and each whose root element is a Project, which the script reads as one: a change to
             # it alone is one NuGet reads)
             imports=ok
-            brought=$(node core/scripts/nuget.mjs --imports) || imports=
+            brought=$(node "$CORE_AT"scripts/nuget.mjs --imports) || imports=
             while IFS= read -r p; do p=${p%$'\r'}; [ -n "$p" ] && paths+=(":(literal)$p"); done <<< "$brought"
             if [ -n "$imports" ] && { git cat-file -e "$BASE^{commit}" 2>/dev/null || git fetch --quiet --no-tags --depth=1 origin "$BASE"; } \
               && changed=$(git diff --no-renames --name-only "$BASE" HEAD -- "${paths[@]}") \
@@ -181,9 +185,9 @@ jobs:
           # (before the restore, which runs the pull request's own build files: each package's file held to its lock
           # file's content hash, and its licence read from it, in a step that build has not run in)
           fetched="$RUNNER_TEMP/nuget-fetched" failed=0
-          node core/scripts/nuget-fetch.mjs "$CONFIG" --into "$fetched" || failed=1
-          if [ "$ADVISORY" = true ]; then node core/scripts/nuget.mjs "$CONFIG" --packages "$fetched" --fetched --advisory || failed=1
-          else node core/scripts/nuget.mjs "$CONFIG" --packages "$fetched" --fetched || failed=1; fi
+          node "$CORE_AT"scripts/nuget-fetch.mjs "$CONFIG" --into "$fetched" || failed=1
+          if [ "$ADVISORY" = true ]; then node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --packages "$fetched" --fetched --advisory || failed=1
+          else node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --packages "$fetched" --fetched || failed=1; fi
           if [ "$failed" = 1 ]; then
             [ "$ADVISORY" = true ] || exit 1
             echo "Advisory: nothing fails for it yet."
@@ -200,12 +204,12 @@ jobs:
         run: |
           # (the project files git knows, a line each, as the script that reads their lock files lists them; each
           # named from the root, behind "./", so that no name is read as an option)
-          node core/scripts/nuget.mjs --projects > "$RUNNER_TEMP/nuget-projects"
+          node "$CORE_AT"scripts/nuget.mjs --projects > "$RUNNER_TEMP/nuget-projects"
           failed=0
           # (where packages come from, a line each as the script lists them, the registry first: given to every
           # restore, they overrule the sources any NuGet.Config names. Without them nothing is restored.)
           sources=()
-          if node core/scripts/nuget.mjs "$CONFIG" --sources > "$RUNNER_TEMP/nuget-sources"; then
+          if node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --sources > "$RUNNER_TEMP/nuget-sources"; then
             while IFS= read -r source; do sources+=(--source "$source"); done < "$RUNNER_TEMP/nuget-sources"
             while IFS= read -r project; do
               # (the two properties given here overrule a project's own: its packages go to the folder the check
@@ -227,5 +231,5 @@ jobs:
           ADVISORY: ${{ inputs.advisory }}
           NUGET_PACKAGES: ${{ runner.temp }}/nuget-packages
         run: |
-          if [ "$ADVISORY" = true ]; then node core/scripts/nuget.mjs "$CONFIG" --packages "$NUGET_PACKAGES" --advisory
-          else node core/scripts/nuget.mjs "$CONFIG" --packages "$NUGET_PACKAGES"; fi
+          if [ "$ADVISORY" = true ]; then node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --packages "$NUGET_PACKAGES" --advisory
+          else node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --packages "$NUGET_PACKAGES"; fi

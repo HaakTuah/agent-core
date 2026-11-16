@@ -379,6 +379,7 @@ Core: HaakTuah/agent-core at <full commit SHA>, copied whole under core/ (never 
 <or, where a library carries the core (tasks/repositories.md): Core: HaakTuah/agent-core, carried by <library>/ under <library>/core/ (never edited here).>
 <and, while that library's core is not yet proven for every agent tool: Floor copy: <folder>/>
 Paths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/; any other is ours.
+<where the "Core:" line names another path, "under core/" above names that path>
 Floor: whole. Modules: <all, or the list of those taken>.
 Not taken: <where it is a list: each module left out as `name.md` (its reason), one line>.
 
