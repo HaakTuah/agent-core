@@ -11,7 +11,7 @@ sessions.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 
-**The builders:** a builder is picked for a line in this order:
+**The builders**: a builder is picked for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
    the cheapest tool that can do it;
 2. not the orchestrator's provider, while another has allowance left;
