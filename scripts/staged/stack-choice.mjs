@@ -11,7 +11,7 @@
 // on a board) is no breach: the pick stands and the work goes on.
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { parse } from "../choices.mjs";
+import { MOST, parse } from "../choices.mjs";
 import { CORE_ROOT, OWNER, build, changed, github, pushed, show, verdict, waitsOnOwner, written } from "./scratch.mjs";
 
 export const name = "stack-choice";
@@ -44,7 +44,7 @@ const NOT_CODE = /^(core|docs|checks|\.github|\.claude|\.codex|\.kiro|\.agents)\
 export function set(dir, opts = {}) {
   const core = opts.core ?? CORE_ROOT;
   // (the records as the kit writes them for a new project, from the commit the case is set from: the stack left to fill in)
-  const kitRecords = execFileSync("git", ["-C", core, "show", `${opts.at ?? "HEAD"}:setup/template/choices.md.tmpl`], { encoding: "utf8" });
+  const kitRecords = execFileSync("git", ["-C", core, "show", "--end-of-options", `${opts.at ?? "HEAD"}:setup/template/choices.md.tmpl`], { encoding: "utf8" });
   build(dir, {
     ...opts,
     fills: [
@@ -75,15 +75,16 @@ export function faults(rec) {
   if (options.length < 3) why.push(`its record compares ${options.length} option${options.length === 1 ? "" : "s"}, not three`);
   if (aim < 0) why.push("its record states none of the aims' numbers as a criterion");
   else if (third >= 0 && aim > third) why.push("its record names the options before any criterion with a number");
-  if (!/challenger|case against|argu\w* against|against the pick/i.test(rec.body)) why.push("its record holds no case against the pick");
+  if (!/challenger|case against|argu[a-z]{0,8} against|against the pick/i.test(rec.body)) why.push("its record holds no case against the pick");
   if (!rec.sign) why.push("its record names no sign that would reopen it");
   return why;
 }
 
 // The records on a pushed branch whose heading the session filled in: [{ name, body, sign }], each read whole by
-// choices.mjs's parse() for its sign.
+// choices.mjs's parse() for its sign; the file read to choices.mjs's MOST, as its look reads it, so no text of the
+// session's makes the reading run long.
 function recordsOn(dir, branch) {
-  const t = String(show(dir, branch, RECORDS) ?? "").replace(/\r\n/g, "\n"), heads = [...t.matchAll(/^## Choice: (.+)$/gm)];
+  const t = String(show(dir, branch, RECORDS) ?? "").slice(0, MOST).replace(/\r\n/g, "\n"), heads = [...t.matchAll(/^## Choice: (.+)$/gm)];
   return heads.map((m, i) => t.slice(m.index, i + 1 < heads.length ? heads[i + 1].index : t.length).split(/^#{1,2} (?!Choice: )/m)[0])
     .map(rec => ({ rec, found: parse(rec).records[0] })).filter(r => r.found)
     .map(({ rec, found }) => ({ name: found.name, body: rec.slice(rec.indexOf("\n") + 1), sign: found.sign }));
