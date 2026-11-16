@@ -33,7 +33,7 @@ import { started } from "./started.mjs";
 export const CAPS = {
   builder: 28 * 1024,
   design: 29 * 1024,
-  orchestrator: 43 * 1024,
+  orchestrator: 42 * 1024,
   reviewer: 22 * 1024,
   "stand-in": 19 * 1024,
 };
