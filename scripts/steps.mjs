@@ -190,6 +190,26 @@ function strengthNamed(p) {
   return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
 }
 
+// The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a
+// config taken out leaves the tests counted; the copy of the core aside.
+function testsTracked(p) {
+  let specs;
+  try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
+  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+}
+
+// Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
+// its job or the workflow (core/modules/tests.md, "A pull request runs the tests its change can reach"); null where it
+// does or the project has no tests yet; else the mend.
+const SELECT_RUN = /(^|[\s;&|])node\s+core\/scripts\/select\.mjs(?=\s|$)/mu;
+function selectionRuns(p) {
+  if (!testsTracked(p)) return null;
+  readable(p, text => text.includes("select.mjs"));
+  const selects = Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
+    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && [step.env, job.env, yaml.env].some(e => typeof e?.SELECT_BASE === "string" && e.SELECT_BASE.trim() !== ""))));
+  return selects ? null : "No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add a step before them `node core/scripts/select.mjs --env RUN`, with `SELECT_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first, or `HEAD^1` with `fetch-depth: 2`), and have the job run only the test files `RUN` names, each between spaces, or all where it says `all`; name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the project's numbers show its suite needed whole, quote this step in the manifest's \"Differences\" instead.";
+}
+
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
 // that config names, which names every reader of the check's ("reads"; shape-readers.mjs), so that it lists what each
@@ -443,6 +463,8 @@ export const STEPS = [
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
   { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
     partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
+  { lead: "16 November 2026, the tests a change can reach", cost: COST.workflow, check: selectionRuns,
+    partly: "how the project's runner is told the files `RUN` names is the project's own, and which tests are its proof is a reading of the project" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
