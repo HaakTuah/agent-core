@@ -21,6 +21,8 @@ ok(crlf.length === 0, `line ends of Windows are read as Unix's: ${crlf.join("; "
 
 let f = faults(agents("@tasks/a.md\n\nRead when needed: `tasks/b.md`."), MODULES);
 ok(f.length === 1 && has(f, "tasks/c.md is neither taken nor given a reason"), "a module named only outside the section fails");
+f = faults(agents("@tasks/a.md, `tasks/b.md`, `tasks/c.md` and `tools/a.md`."), [...MODULES, "tools/a.md"]);
+ok(f.length === 1 && has(f, "a.md stands in 2 folders of the modules (tasks/a.md, tools/a.md)") && has(f, "Mend:"), "a module's name that stands in two folders fails, since a manifest names it by its file's name alone");
 f = faults(agents("@tasks/a.md and `tasks/b.md`; `tasks/c.md`, `tasks/d.md`."), MODULES);
 ok(f.length === 1 && has(f, "names tasks/d.md, which is no module"), "a name that is no module fails");
 f = faults(agents("@tasks/a.md and `tasks/b.md`.\n\nNot taken:\n\n- `tasks/c.md`:"), MODULES);

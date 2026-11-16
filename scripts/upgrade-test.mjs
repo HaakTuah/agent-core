@@ -342,8 +342,14 @@ function upgrade(p, from, ownChanges, expect) {
   let r = steps();
   const asked = reported(r.out);
   ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
+  const unmended = git(p.dir, "rev-parse", "HEAD");
   for (const lead of asked) STAGES[lead].mend(p.dir);
-  if (asked.length) { git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "what the release asks of every project"); }
+  if (asked.length) {
+    git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "what the release asks of every project");
+    // (the mend is a pull request of the project's own: it passes every check, read against the project before it)
+    const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended });
+    ok(!failures(onMend), `${p.name}: the pull request that makes those mends passes every check (${started(onMend).length} jobs)`, failures(onMend));
+  }
   r = steps();
   ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);
   for (const lead of added) {

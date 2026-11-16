@@ -26,7 +26,8 @@ have nothing to act on here: the polish lane, since no one uses the core through
 the core in "Sessions", since this repository is the core and holds no copy.
 
 Read at the start of every task too: by Claude, `tools/claude.md` (`CLAUDE.md` imports it); by a session of any
-other tool, `tools/other-builders.md` and its tool's part (`tasks/tools.md`), which its entry file pulls in.
+other tool, `tools/other-builders.md` and its tool's part, a file of `tools/` (`tasks/tools.md`, "Each tool's part"),
+which its entry file pulls in.
 
 Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,

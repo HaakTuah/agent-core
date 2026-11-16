@@ -61,6 +61,10 @@ export function faults(agents, modules) {
   const { error, taken, notTaken, found } = readSection(agents);
   if (error) return [error];
   const all = new Set(modules);
+  // (a manifest takes or leaves out a module by its file's name alone, so a name stands in one folder of the modules)
+  const byName = new Map();
+  for (const m of [...all].sort()) byName.set(path.posix.basename(m), [...(byName.get(path.posix.basename(m)) ?? []), m]);
+  for (const [name, at] of byName) if (at.length > 1) found.push(`${name} stands in ${at.length} folders of the modules (${at.join(", ")}), and a manifest names a module by its file's name alone. Mend: give one of them a name of its own, or join the two`);
   for (const name of [...taken, ...notTaken.keys()].filter(n => !all.has(n)).sort()) {
     found.push(`AGENTS.md, "${SECTION.slice(3)}", names ${name}, which is no module of the core. Mend: correct the name, or take it out where the module is gone`);
   }

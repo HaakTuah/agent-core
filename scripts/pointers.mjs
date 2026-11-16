@@ -6,7 +6,9 @@
 //
 //   `path`                     a tracked file or folder (a bare name, such as `net.js`, if exactly one file has it)
 //   [text](path)               a tracked file or folder, relative to the file it is in (a web address is not checked)
-//   `path`, "Section"          a heading, or a bold lead-in, in that file ("Section" in `path` and `path` ("Section") too)
+//   @path.md                   a line that is an import and nothing else: a tracked file, relative to the file it is in
+//   `path`, "Section"          a heading, or a bold lead-in, in that file ("Section" in `path` and `path` ("Section") too);
+//                              through a file that only points ("`<path>` holds these rules now"), in what it names
 //   `path`, rule 3             a numbered point in that file (point, points 4 and 9, rules 1 to 4)
 //   "Section", point 6         a numbered point in that section (point 6 of "Section" too)
 //   ("Section"), point 6       with no file: the file the pointer is in; a lone point: its own section's list
@@ -20,8 +22,8 @@
 //
 //   node core/scripts/pointers.mjs
 //
-// In the core's own repository, `node scripts/pointers.mjs --core` checks its floor and modules the same way (its
-// tests workflow runs it): there a path under `core/` is the core's own, read without that folder, and what only a
+// In the core's own repository, `node scripts/pointers.mjs --core` checks its floor, its roles' files, its modules and
+// the files that point from the paths they left the same way (its tests workflow runs it): there a path under `core/` is the core's own, read without that folder, and what only a
 // project has (`.claude/`, the cloud proxy's `ccr/` routes) is not looked for.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -35,7 +37,7 @@ process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
 const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
 let RULES;
-try { RULES = CORE ? tracked.filter(f => /^(floor|floor\/topics|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }
+try { RULES = CORE ? tracked.filter(f => /^(floor|floor\/topics|modules|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }
 for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: the rule file ${rf} is no tracked file. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
@@ -63,7 +65,17 @@ function parse(file) {
   return p;
 }
 // "Reviews" leads to "Reviews: only a 10 passes", "Status" to "Status (3 November 2026): ...".
-const section = (file, title) => parse(file).anchors.find(a => a.title === title || /^[:,( ]/.test(a.title.slice(title.length)) && a.title.startsWith(title));
+const sectionIn = (file, title) => parse(file).anchors.find(a => a.title === title || /^[:,( ]/.test(a.title.slice(title.length)) && a.title.startsWith(title));
+// A file that only points, as each file at a path the core's rules left does in a line "`<path>` holds these rules
+// now": a pointer through it leads to what stands there, in the file named or, for a folder, in the folder's own files.
+// The file itself comes first, for what it still names by itself.
+function standsIn(file) {
+  const to = /^`([^`\s]+)` holds these rules now\b/mu.exec(parse(file).lines.join("\n"))?.[1];
+  if (!to) return [file];
+  const at = HOME + to;
+  return [file, ...(to.endsWith("/") ? tracked.filter(f => f.startsWith(at) && f.endsWith(".md") && !f.slice(at.length).includes("/")) : tracked.filter(f => f === at))];
+}
+const section = (file, title) => { for (const at of standsIn(file)) { const a = sectionIn(at, title); if (a) return { ...a, file: at }; } return undefined; };
 // (a floor rule is found by its bold number at a line's start, "**3.", in any of the floor's files; a list item is none)
 const hasRule = n => FLOOR.some(f => parse(f).lines.some(l => l.startsWith(`**${n}. `)));
 const hasPoint = (file, from, to, n) => parse(file).lines.slice(from, to).some(l => new RegExp(`^\\s*(\\*\\*)?${n}\\.\\s`).test(l));
@@ -99,6 +111,14 @@ const named = new Set(RULES.flatMap(rf => [...fs.readFileSync(rf, 'utf8').matchA
 let count = 0;
 for (const rf of RULES) {
   const { lines } = parse(rf);
+  // (a line that is an import and nothing else, "@<a path to a Markdown file>", leads to that file from the folder it
+  // is in, as a tool that follows such a line reads it; in a project one that leads nowhere is listed, never failed)
+  lines.forEach((l, i) => {
+    const to = /^@((?:\.{1,2}\/)*[\w.-]+(?:\/[\w.-]+)*\.md)\s*$/u.exec(l)?.[1];
+    if (!to) return;
+    count++;
+    if (!files.has(posix.normalize(posix.join(posix.dirname(rf), to)))) (CORE ? broken : unread).push(`${rf}:${i + 1}: the import line @${to} leads to no tracked file`);
+  });
   // blocks: list items and paragraphs, outside code fences
   const blocks = [];
   let fence = false, cur = null;
@@ -181,9 +201,9 @@ for (const rf of RULES) {
       for (const n of nums) {
         const k = g.indexOf(n), before = g[k - 1], after = g[k + 1];
         const t = before && before.title ? before : after && after.title && /^\s+of\s+$/.test(b.text.slice(n.end, after.start)) ? after : null;
-        let from, to, what;
-        if (t) { const s = section(file, t.title); if (!s) continue; ({ from, to } = s); what = `"${t.title}" in ${file}`; }
-        else if (f) { from = 0; to = Infinity; what = file; }
+        let from, to, what, at = [file];
+        if (t) { const s = section(file, t.title); if (!s) continue; ({ from, to } = s); at = [s.file]; what = `"${t.title}" in ${file}`; }
+        else if (f) { from = 0; to = Infinity; at = standsIn(file); what = file; }
         else if (FLOOR.includes(rf) && /^rules?$/.test(n.word)) {
           const missing = n.points.filter(x => !hasRule(x));
           count += n.points.length;
@@ -192,7 +212,7 @@ for (const rf of RULES) {
         }
         else if (own) { from = own.i; to = (parse(rf).heads.find(h => h.i > own.i && h.level <= own.level) || { i: Infinity }).i; what = `its own section of ${rf}`; }
         else { unread.push(`${where}: ${n.word} ${n.points.join(', ')} (no file or section named)`); continue; }
-        const missing = n.points.filter(x => !hasPoint(file, from, to, x));
+        const missing = n.points.filter(x => !at.some(a => hasPoint(a, from, to, x)));
         count += n.points.length - (t || f ? 0 : missing.length);
         if (missing.length) (t || f ? broken : unread).push(`${where}: ${n.word} ${missing.join(', ')}: no such numbered point in ${what}`);
       }

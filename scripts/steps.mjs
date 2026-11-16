@@ -25,6 +25,7 @@ import { importsOf, projectFilesByContent, readProject as readBuildFile } from "
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
+import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
@@ -298,19 +299,42 @@ export function moved(core = HERE) {
   }
   return out;
 }
-// The folder of the modules as a config's pattern named it, and the patterns that name the folders the rules stand in now.
+// What a file at an old path says stands elsewhere than the rest of it, in its lines "Now in `<path>`: **<lead>**.":
+// { old path: [{ lead, to }] }.
+moved.apart = (core = HERE) => Object.fromEntries(Object.keys(moved(core)).map(old => {
+  let text = "";
+  try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { /* (gone since it was listed) */ }
+  return [old, [...text.matchAll(/^Now in `([^`\s]+)`: \*\*([^*]+?)\*\*\.$/gmu)].map(m => ({ to: m[1], lead: m[2] }))];
+}).filter(([, parts]) => parts.length));
+// The folder of the modules as a copies config's pattern names it, and the patterns of the folders the rules stand in
+// now, which join it: the copies check lets a config read more, never less, so the old pattern stays while the files
+// that point stand at the old paths.
 export const MOVED_GLOB = '"core/modules/*.md"', MOVED_GLOBS = '"core/floor/topics/*.md", "core/roles/*.md", "core/roles/shared/*.md", "core/tasks/*.md", "core/tools/*.md"';
 // Where a project's own files still name an old path of the core's, a config of its own the old folder's pattern, and
 // its manifest's "Paths:" line the old folders: the mend, naming each file and each path's new one; null where none does.
+// The project's own files that name the core's files and that a check or a tool reads: its rule files, each file a tool
+// takes its instructions from, the manifest, the configs of its checks and its workflows. Its other text, a dated
+// record among it, is left as it stands.
+function namers(p) {
+  let rules = [];
+  try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: those the floor names) */ }
+  const own = f => !f.startsWith("core/") && (rules.includes(f) || /(^|\/)(AGENTS|CLAUDE|GEMINI|REVIEW)\.md$|^SECURITY\.md$|^core-manifest\.md$|^checks\/[^/]+\.json$|^\.github\/|^\.(claude|codex|kiro|agents?)\//u.test(f));
+  return p.files.filter(own);
+}
+// Of those, the files that name each old path: Map(old path -> [file]).
+function namedStill(p, map) {
+  const found = new Map(), old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
+  for (const f of namers(p)) for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
+  return found;
+}
+// A copies config that reads the old folder and not yet the folders the rules stand in.
+const readsOldAlone = (p, f) => f.endsWith(".json") && (p.read(f) ?? "").includes(MOVED_GLOB) && !(p.read(f) ?? "").includes(MOVED_GLOBS);
 function movedPaths(p) {
-  const map = moved(), found = new Map();
-  const old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
-  for (const f of Object.keys(map).length === 0 ? [] : p.files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f))) {
-    for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
-  }
-  const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""} (in ${files.map(f => `\`${f}\``).join(", ")})`);
-  const globs = Object.keys(map).length === 0 ? [] : p.files.filter(f => !f.startsWith("core/") && f.endsWith(".json") && (p.read(f) ?? "").includes(MOVED_GLOB));
-  if (globs.length) wrong.push(`the pattern ${MOVED_GLOB} is now the patterns ${MOVED_GLOBS} (in ${globs.map(f => `\`${f}\``).join(", ")})`);
+  const map = moved(), any = Object.keys(map).length > 0, said = files => files.map(f => `\`${shown(f)}\``).join(", ");
+  const apart = from => (moved.apart()[from] ?? []).map(a => `, but its "${a.lead}" is now in \`core/${a.to}\``).join("");
+  const wrong = [...(any ? namedStill(p, map) : [])].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""}${apart(from)} (in ${said(files)})`);
+  const globs = any ? namers(p).filter(f => readsOldAlone(p, f)) : [];
+  if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
   return wrong.length ? `In one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
 }

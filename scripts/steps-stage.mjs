@@ -177,18 +177,23 @@ export const STAGES = {
   },
   "16 November 2026, the rules in folders that say who reads them or when": {
     asked: true,
-    // (a rule file that names two of the core's files where they stood, the copies config with the old folder's
-    // pattern, and the manifest's line with the old folders;
-    // the mend names each by the path the step words)
+    // (a rule file that names two of the core's files where they stood and a rule that left its file for another, the
+    // copies config with the old folder's pattern alone, the manifest's line with the old folders, and a dated record
+    // that names an old path and is left as it stands; the mend names each by the path the step words)
     stage: dir => {
-      write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace("core/roles/shared/git.md", "core/modules/git.md").replace("core/tools/other-builders.md", "core/modules/other-builders.md"));
+      write(dir, "AGENTS.md", `${read(dir, "AGENTS.md").replace("core/roles/shared/git.md", "core/modules/git.md").replace("core/tools/other-builders.md", "core/modules/other-builders.md")}\nWho builds: \`core/modules/roles.md\`, "The builders".\n`);
+      // (a dated record of the project's own, which names an old path and stays as it stands)
+      write(dir, "docs/records/2026-01-05.md", "# 5 January 2026\n\nRead that day: `core/modules/git.md`.\n");
       write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)tasks\/, tools\/, /m, "$1"));
-      write(dir, "checks/copies.json", read(dir, "checks/copies.json").split(MOVED_GLOBS).join(MOVED_GLOB));
+      write(dir, "checks/copies.json", read(dir, "checks/copies.json").split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB));
     },
     mend: dir => {
       const map = moved(at(dir, "core")), names = Object.keys(map).sort((a, b) => b.length - a.length);
+      // (what a file at an old path says stands elsewhere than the rest of it is named there first, as the step words it)
+      const apart = Object.entries(moved.apart(at(dir, "core"))).flatMap(([old, parts]) => parts.map(a => [`\`core/${old}\`, "${a.lead}"`, `\`core/${a.to}\`, "${a.lead}"`]));
       for (const f of project(dir).files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/.test(f))) {
-        const text = read(dir, f), next = names.reduce((t, old) => t.split(`core/${old}`).join(`core/${map[old].endsWith("/") ? `${map[old]}input.md` : map[old]}`), text).split(MOVED_GLOB).join(MOVED_GLOBS);
+        if (f.startsWith("docs/records/")) continue;
+        const text = read(dir, f), next = names.reduce((t, old) => t.split(`core/${old}`).join(`core/${map[old].endsWith("/") ? `${map[old]}input.md` : map[old]}`), apart.reduce((t, [was, now]) => t.split(was).join(now), text)).split(`${MOVED_GLOB}, ${MOVED_GLOBS}`).join(MOVED_GLOB).split(MOVED_GLOB).join(`${MOVED_GLOB}, ${MOVED_GLOBS}`);
         if (next !== text) write(dir, f, next);
       }
       const manifest = read(dir, "core-manifest.md"), want = /^Paths: .*$/m.exec(read(dir, "core/setup/template/core-manifest.md.tmpl"))[0];
