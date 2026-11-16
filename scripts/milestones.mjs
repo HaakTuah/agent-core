@@ -64,11 +64,20 @@ export function formFaults(text) {
   ]);
 }
 
+// Whether a heading's words are a part's, as the description check reads its parts (pr-description.mjs, beside this
+// file): without marks before the first letter or digit (bold, a sign), blanks as one, whatever the case, its words
+// whole or followed by what is no letter or digit ("Readings taken (the unsure first)").
+const words = text => String(text).replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/gu, " ").trim().toLowerCase();
+export function isPart(heading, part) {
+  const h = words(heading), p = words(part);
+  return h === p || (h.startsWith(p) && /^[^\p{L}\p{N}]/u.test(h.slice(p.length)));
+}
+
 // The text under a description's heading `name` (its first such heading), its subsections among it, up to the next
 // heading of its level or above; null where none.
 export function under(body, name) {
-  const all = lines(body), want = name.toLowerCase();
-  const at = all.findIndex(l => { const h = headingOf(l); return h !== null && h.words.replace(/^[*_`\s]+/u, "").toLowerCase().startsWith(want); });
+  const all = lines(body);
+  const at = all.findIndex(l => { const h = headingOf(l); return h !== null && isPart(h.words, name); });
   if (at < 0) return null;
   const level = headingOf(all[at]).level, out = [];
   for (const l of all.slice(at + 1)) { if ((headingOf(l)?.level ?? 7) <= level) break; out.push(l); }

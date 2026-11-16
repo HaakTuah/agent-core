@@ -36,7 +36,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
-import { milestoneMends } from "./milestones.mjs";
+import { isPart, milestoneMends } from "./milestones.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -107,10 +107,9 @@ export function asked(arg) {
 
 // The parts, of those asked for, that the description has no heading for.
 export function missing(body, parts = PARTS) {
-  // a heading's words: what follows the #, without marks before the first letter or digit (bold, a sign), blanks as one
-  const words = text => text.replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/gu, " ").trim().toLowerCase();
-  const headings = String(body ?? "").split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean).map(words);
-  return parts.filter(part => { const p = words(part); return !headings.some(h => h === p || h.startsWith(p) && /^[^\p{L}\p{N}]/u.test(h.slice(p.length))); });
+  // a heading's words: what follows the #, read as milestones.mjs, beside this file, reads a part's heading
+  const headings = String(body ?? "").split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean);
+  return parts.filter(part => !headings.some(h => isPart(h, part)));
 }
 
 if (started(import.meta.url)) {

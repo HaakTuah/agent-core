@@ -96,6 +96,9 @@ ok(under("## What the owner can try\n#4", "What the owner can try") === "#4" && 
 ok(under("## What the owner can try\n### Milestone #10\nUse it from start to finish.\n#### Its parts\nx\n## Readings taken\n#11\n", "What the owner can try") === "### Milestone #10\nUse it from start to finish.\n#### Its parts\nx"
   && run(file, reached, "Fixes #20.\n## What the owner can try\n### Milestone #20\nUse it.\n## Readings taken\nNone\n").mends.length === 0, "a subsection under the heading is part of it; a heading of its level ends it");
 
+ok(["## \u2705 What the owner can try", "## What  the owner can try", "## **What the owner can try**", "### what the owner can try (now)"].every(h => under(`${h}\nUse #20.\n## Next\n`, "What the owner can try") === "Use #20.")
+  && under("## What the owner can trying\n#20\n", "What the owner can try") === null, "the heading is found as the description check finds a part: marks before it, blanks as one, any case, its words whole");
+
 // asked only of a pull request opened since the copy on its base held it
 const holds = "export const PLAN_SINCE = \"x\";";
 ok(planAsked("2026-11-18T00:00:00Z", holds) && planAsked(PLAN_SINCE, holds), "asked of a pull request opened on or after the day, its base's copy holding it");
