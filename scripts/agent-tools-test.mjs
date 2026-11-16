@@ -383,6 +383,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(run(pr(project({ ...listing() }), { [file]: "", ".codex/config.toml": toml, ...listing({ kind: "hook", name: `Codex notify: ${words.join(" ")}`, publisher: "this project" }) })),
       `a notify word with an apostrophe is read whole: ${JSON.stringify(words)}`, `takes ${JSON.stringify(file)} from the working tree`);
   }
+  {
+    // (a hook that names one file a thousand times asks whether the project holds it once: the asking reads the file and
+    // may start git)
+    const many = `${"bash scripts/format.sh; ".repeat(1000)}true`, began = Date.now();
+    fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(many), ...listing(entry(many)) })), "a hook that names a file a thousand times is read at once", 'takes "scripts/format.sh"');
+    ok(Date.now() - began < 20000, "in seconds", `${Date.now() - began} ms`);
+  }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes('takes "scripts/format.sh" from the working tree'), "the sync note's step reads not done while a hook takes a file from the working tree unmarked");
   ok(!notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), step).length, "and done once it is marked, listed in the baseline");
@@ -434,9 +441,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   {
     // (given the project's files, each is found wherever its path stands whole, however the command quotes it, and only
     // there: not within a longer name, not fetched from main, not only tested for)
-    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh"], index = pathsIndex(files), has = f => files.includes(f);
+    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh", "scripts/it's😀.py"], index = pathsIndex(files), has = f => files.includes(f);
+    const wrap = (inner, n) => (n ? wrap(`sh -c '${inner.replace(/'/gu, "'\\''")}'`, n - 1) : inner);
+    // (#476's fallback security review of ed9939e: escapes of $'...', backslash-newlines, a character outside the first
+    // plane, a "test" that is no test, quoting six levels deep, cmd's and PowerShell's escapes, a backtick's root)
+    for (const [command, want] of [["bash $'scripts/x\\x2epy'", ["scripts/x.py"]], ["bash $'\\163cripts/x.py'", ["scripts/x.py"]], ["bash scripts/x.\\\npy", ["scripts/x.py"]], ["sh -c 'bash \"scripts/x.\\\npy\"'", ["scripts/x.py"]],
+      ["sh -c 'python3 \"scripts/it'\\''s😀.py\"'", ["scripts/it's😀.py"]], ["sh -c 'bash \"$3\"' do test -x scripts/x.py", ["scripts/x.py"]], ["sh -c 'bash \"$2\"' {test -x scripts/x.py", ["scripts/x.py"]],
+      ["test(){ bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]], [wrap("cat \"scripts/it's.py\"", 6), ["scripts/it's.py"]], ["cmd /c python scr^ipts\\x.py", ["scripts/x.py"]],
+      ["python scr`ipts/x.py", ["scripts/x.py"]], ["bash `pwd`/scripts/x.py", ["scripts/x.py"]], ["git show refs/remotes/origin/main:./scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then :; fi", []], ["x; ! test -e scripts/x.py", []]])
+      ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
-      ["test -f scripts/x.py", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
+      ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     const began = Date.now();
     for (const command of ["a.sh ".repeat(1 << 17), "test -f a.sh; ".repeat(1 << 16), "'".repeat(1 << 20), "$'".repeat(1 << 19)]) fromTree(command, has, index);

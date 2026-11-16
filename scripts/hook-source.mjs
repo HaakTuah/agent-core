@@ -4,14 +4,18 @@
 // project holds otherwise runs or reads the working tree's copy, which the branch it runs on can change.
 //
 // What it reads, two ways, and no more. Each word of the command that names a file the project holds, as the command
-// writes it (relative to the project's root, or after a variable such as $CLAUDE_PROJECT_DIR or "$r"), and each quoted
-// text so; and, given the list of the project's files, each of them wherever its path stands in the command whole (not
-// within a longer name), as written, with the shell's backslashes read, and with its quotes taken out too, so that no
-// quoting hides it. A path written `<ref>:<path>` names the copy git holds at that ref, the remote's `main`
-// (refs/remotes/origin/main or origin/main) being the one that counts as `main`; and a file only tested for
-// (`[ -f <path> ]`, `test -e <path>`) is neither run nor read. A path the command builds from parts, reaches by changing
-// folder, or names under another spelling (through ".." past a link, say) is not read here, and stays the review's.
-// Node's own modules only.
+// writes it (relative to the project's root, or after a variable, a command's output or a backtick's, such as
+// $CLAUDE_PROJECT_DIR, "$r" or $(git rev-parse --show-toplevel)), and each quoted text so; and, given the list of the
+// project's files, each of them wherever its path stands in the command whole (not within a longer name): as written;
+// with the shell's quoting read, level after level, until reading it changes nothing (eight levels at most), its
+// backslashes, its backslash-newlines and the escapes of $'...' read as bash reads them; with every backslash read and
+// every quote taken out; and with cmd's "^" and PowerShell's backtick read as their escapes. A path written
+// `<ref>:<path>` names the copy git holds at that ref, the remote's `main` (refs/remotes/origin/main or origin/main)
+// being the one that counts as `main`; and a file only tested for, by "[", "[[" or "test" where a command starts
+// (`[ -f <path> ]`, `test -e <path>`), is neither run nor read, save where the command defines a function or alias of
+// that name. Not read here, and so the review's: a path the command builds from parts, reaches by changing folder or
+// through ".." past a link, names by a pattern (a glob or braces), or spells otherwise than the forms above; and
+// whether a ref named `origin/main` is the remote's. Node's own modules only.
 //
 //   import { fromTree, pathsIndex } from "./hook-source.mjs";
 //   fromTree(command, holds, index) -> the paths it takes from the working tree, where holds(path) says the project
@@ -23,14 +27,16 @@ const WORD = /[^\s'"`;|&()<>{}$\\=,\u0001]+/gu;
 const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
 // (a variable, as the shell, cmd and PowerShell write one, read as one mark: what it holds is not the command's text)
 const VARIABLE = /\$env:\w+|\$\{[^}]*\}|\$\w+|%\w+%/gu;
-// (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after
-// ";", "&", "|", "(", "{" or "!", after a quote that opens, or after a keyword such as "then"), perhaps after "!", then
-// a test's operator, perhaps a quote and a variable; an option of another program, as node's -r, is no test, nor is
-// "test" given to another program, as in "go test -v")
-const TESTED = /(?:^|[;&|({!]|(?:^|[\s=])\\?["']|(?:^|\s)(?:if|then|else|elif|while|until|do))[ \t]*(?:![ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+// (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after a
+// newline, ";", "&", "|" or "(", or after a quote that opens), perhaps after keywords such as "then", "!" or "{", each a
+// word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
+// is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
+const TESTED = /(?:^|[\n;&|(]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+// (a command that defines "test", "[" or "[[" as a function or an alias: no file test of it is one)
+const REDEFINED = /(?:^|[\s;&|(])(?:function[ \t]+)?(?:test|\[\[?)[ \t]*\([ \t]*\)|\balias[ \t]+(?:test|\[\[?)=/u;
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), perhaps closed by a quote)
-const ROOTED = /[\u0001)]\\?["']?$/u;
+const ROOTED = /[\u0001)`]\\?["']?$/u;
 
 // The quoted texts of a script, read left to right as the shell reads them: a single-quoted text is taken as written, a
 // double-quoted one with its backslashes read, and a backslash outside quotes keeps the next character; each quoted text
@@ -64,64 +70,92 @@ export function pathsIndex(files) {
   const root = new Map();
   for (const f of files) {
     let node = root;
-    for (const c of f) { if (!node.has(c)) node.set(c, new Map()); node = node.get(c); }
+    // (by UTF-16 unit, as scan() reads a command, so a name with a character outside the first plane is found)
+    for (let k = 0; k < f.length; k++) { const c = f[k]; if (!node.has(c)) node.set(c, new Map()); node = node.get(c); }
     node.set("", true);
   }
   return root;
 }
 const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
-const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)]["']?\/+)?$/u;
-const FETCHED = /(?:refs\/remotes\/)?origin\/main:["']?$/u;
-// A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text
-// (and $'...', its backslashes read) as written, a double-quoted one and a word outside quotes with their backslashes
-// read, the quotes themselves gone; a quote never closed runs to the end.
+const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`]["']?\/+)?$/u;
+const FETCHED = /(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
+// A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
+// written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
+// backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
+const ANSI = { a: "\x07", b: "\b", e: "\x1b", E: "\x1b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v" };
+function ansiEscape(s, i) {
+  const c = s[i + 1], hex = (from, max) => /^[0-9A-Fa-f]+/u.exec(s.slice(from, from + max))?.[0] ?? "";
+  if (Object.hasOwn(ANSI, c)) return [ANSI[c], i + 2];
+  if (/[0-7]/u.test(c ?? "")) { const o = /^[0-7]{1,3}/u.exec(s.slice(i + 1))[0]; return [String.fromCharCode(Number.parseInt(o, 8) & 0xff), i + 1 + o.length]; }
+  const n = { x: 2, u: 4, U: 8 }[c];
+  if (n) {
+    const h = hex(i + 2, n), code = h ? Number.parseInt(h, 16) : -1;
+    if (code >= 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)) return [String.fromCodePoint(code), i + 2 + h.length];
+  }
+  return [c ?? "", i + 2];
+}
 function dequote(s) {
   let out = "";
   for (let i = 0; i < s.length;) {
     const c = s[i];
-    if (c === "\\") { out += s[i + 1] ?? ""; i += 2; continue; }
+    if (c === "\\") { if (s[i + 1] !== "\n") out += s[i + 1] ?? ""; i += 2; continue; }
     const ansi = c === "$" && s[i + 1] === "'";
     if (c !== "'" && c !== '"' && !ansi) { out += c; i++; continue; }
-    const q = ansi ? "'" : c;
-    for (i += ansi ? 2 : 1; i < s.length && s[i] !== q; i++) {
-      if (q === '"' || ansi) { if (s[i] === "\\" && i + 1 < s.length) i++; }
-      out += s[i];
-    }
-    i++;
+    const [text, next] = quotedAt(s, i + (ansi ? 2 : 1), ansi ? "$'" : c);
+    out += text;
+    i = next;
   }
   return out;
 }
+// The text of a quote of the kind `q` ("'", '"' or "$'") whose body starts at `i`, as dequote() reads it, and where
+// reading goes on after its closing quote.
+function quotedAt(s, i, q) {
+  const close = q === '"' ? '"' : "'";
+  let out = "";
+  while (i < s.length && s[i] !== close) {
+    if (q === "$'" && s[i] === "\\") { const [t, next] = ansiEscape(s, i); out += t; i = next; }
+    else if (q === '"' && s[i] === "\\" && i + 1 < s.length) { if (s[i + 1] !== "\n") out += s[i + 1]; i += 2; }
+    else out += s[i++];
+  }
+  return [out, i + 1];
+}
 
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
-function scan(text, index, holds, found) {
+function scan(text, index, holds, found, tests) {
   for (let i = 0; i < text.length; i++) {
     if (i > 0 && NAME.test(text[i - 1]) && text[i - 1] !== "/") continue;
     let node = index;
-    for (let j = i; j < text.length && (node = node.get(text[j])); j++) {
+    for (let j = i; j < text.length && (node = node.get(text[j])); j++) { // (by UTF-16 unit, as pathsIndex keys them)
       if (!node.has("") || (j + 1 < text.length && /[\w./-]/u.test(text[j + 1]))) continue;
       const at = text.slice(i, j + 1);
       if (found.has(at)) continue;
       const before = text.slice(Math.max(0, i - 200), i);
-      // (a root's "/" before a tested path is the test's: "[ -f "$r/x" ]")
-      if (STARTS.test(before) && !FETCHED.test(before) && !TESTED.test(before.replace(/\/+$/u, "")) && holds(at)) found.add(at);
+      // (a root's "/" or a "./" before a tested path is the test's: "[ -f "$r/x" ]", "test -e ./x")
+      if (STARTS.test(before) && !FETCHED.test(before) && !(tests && TESTED.test(before.replace(/(?:\.\/|\/+)$/u, ""))) && holds(at)) found.add(at);
     }
   }
+}
+
+// A word's path relative to the project's root: a path after a variable, a command's output or a backtick's is read
+// from the root, which is what such a thing holds in a hook; another path that starts at "/" is none of the project's.
+const ROOT = /^(?:\u0001|\$\([^)]*\)|`[^`]*`)\/+/u;
+function fromRoot(p, before, ref, quoted) {
+  if (quoted && ROOT.test(p)) return p.replace(ROOT, "");
+  if (!p.startsWith("/")) return p;
+  return ref !== null || !ROOTED.test(before) ? null : p.replace(/^\/+/u, "");
 }
 
 export function fromTree(command, holds, index = null) {
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  const found = new Set();
+  const found = new Set(), tests = !REDEFINED.test(raw);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    let p = colon >= 0 ? word.slice(colon + 1) : word;
-    if ((ref !== null && MAIN.test(ref)) || (ref === null && (TESTED.test(before) || FETCHED.test(before)))) return;
-    // (a path after a variable is read from the project's root, which is what such a variable holds in a hook)
-    if (quoted && /^(?:\u0001|\$\([^)]*\))\/+/u.test(p)) p = p.replace(/^(?:\u0001|\$\([^)]*\))\/+/u, "");
-    else if (p.startsWith("/")) { if (ref !== null || !ROOTED.test(before)) return; p = p.replace(/^\/+/u, ""); }
-    if (!inProject(p)) return;
+    if ((ref !== null && MAIN.test(ref)) || (ref === null && ((tests && TESTED.test(before)) || FETCHED.test(before)))) return;
+    const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
+    if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);
     if (at !== "." && holds(at)) found.add(at);
   };
@@ -129,10 +163,13 @@ export function fromTree(command, holds, index = null) {
   for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), text.slice(Math.max(0, m.index - 200), m.index));
   for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
   if (index) {
-    // (as written, Windows' separators read; with one, two and three levels of the shell's quoting read, as scripts
-    // within scripts are; and with every backslash read and every quote taken out)
-    const once = dequote(raw), twice = dequote(once);
-    for (const variant of [text, once, twice, dequote(twice), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, "")]) scan(variant, index, holds, found);
+    // (as written, Windows' separators read; with the shell's quoting read level after level, as scripts within scripts
+    // are, until reading it changes nothing; with every backslash read and every quote taken out; and with cmd's and
+    // PowerShell's escapes read)
+    const variants = [text];
+    for (let level = raw, n = 0; n < 8; n++) { const next = dequote(level); if (next === level) break; variants.push(next); level = next; }
+    variants.push(raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, ""), text.replace(/[\^`](.)/gsu, "$1"));
+    for (const variant of variants) scan(variant, index, holds, found, tests);
   }
   return [...found];
 }

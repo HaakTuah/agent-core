@@ -85,8 +85,11 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [];
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
+  // (whether the project holds a path is asked once a path: a hook may name one a thousand times, and the asking reads
+  // the file and may start git)
   let index = null;
-  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds, servers, index: () => (index ??= pathsIndex(all())) };
+  const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
+  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, index: () => (index ??= pathsIndex(all())) };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -447,7 +450,8 @@ export function readProject(root, rev = null) {
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
-  const all = rev ? () => [...listing(root, rev).blobs] : () => {
+  // (the files, and the links, as git lists them in the tree too, whose paths heldAt() reads through read())
+  const all = rev ? () => [...listing(root, rev).blobs, ...listing(root, rev).links] : () => {
     let out = "";
     try { out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
     return out.split("\0").filter(Boolean);
