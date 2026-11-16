@@ -90,8 +90,10 @@ const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 // plain text, single- or double-quoted text, variables, $(...) without quotes in it and backtick spans, joined, and
 // holds no blank (each reading with the quotes taken out must still find the form). Any other form, git's or another
 // program's (java -cp origin/main:x, say), is no fetch: its path is read as taken, and the mend is the kit's form.
-const ARG = `(?:"(?:[^"\`$\\\\]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>])+`;
-const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])\\s*(?:(?:then|do|else|elif|if|while|until|!|\\{)\\s+)*(?:\\w+=${ARG}?\\s+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:\\s+(?:-[Cc]\\s+${ARG}|--[\\w-]+(?:=${ARG})?))*\\s+(?:show|cat-file\\s+-p)\\s+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
+// (each alternative takes characters no other takes, the variable's mark among them, so no word is read two ways and
+// nothing backtracks without end)
+const ARG = `(?:"(?:[^"\`$\\\\\\u0001]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>\\u0001])+`;
+const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\w+=${ARG}?[ \\t]+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:[ \\t]+(?:-[Cc][ \\t]+${ARG}|--[\\w-]+(?:=${ARG})?))*[ \\t]+(?:show|cat-file[ \\t]+-p)[ \\t]+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
 const fetched = before => FETCHED.test(before);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
@@ -159,9 +161,9 @@ function fromRoot(p, before, ref, quoted) {
   return ref !== null || !ROOTED.test(before) ? null : p.replace(/^\/+/u, "");
 }
 
-// (the word a ${NAME:-word}, ${NAME:=word}, ${NAME:+word} or ${NAME:?word} gives, colon or not: read on its own too,
-// since the expansion itself stands as one mark)
-const OPERAND = /\$\{\w+:?[-=+?]([^}$`]*)\}/gu;
+// (the word a ${NAME:-word}, ${NAME:=word}, ${NAME:+word} or ${NAME:?word} gives, colon or not, or a pattern's
+// replacement, ${NAME/pattern/word}: read on its own too, since the expansion itself stands as one mark)
+const OPERAND = /\$\{\w+(?::?[-=+?]|\/\/?[#%]?[^/}$`]*\/)([^}$`]*)\}/gu;
 
 export function fromTree(command, holds, index = null) {
   const operands = [...String(command).matchAll(OPERAND)].map(m => m[1]).filter(w => w.trim());
