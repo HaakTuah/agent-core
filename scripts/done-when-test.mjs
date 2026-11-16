@@ -7,7 +7,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { closes, currentText, CURRENT, doneMends, entryFaults, entryOf, isFeature, joined, MOST, PAGES, progressOf, provedFaults, queueAt, readItem, section } from "./done-when.mjs";
+import { closes, currentText, CURRENT, doneMends, entryFaults, entryOf, isFeature, joined, MOST, ownerAt, PAGES, progressOf, provedFaults, queueAt, readItem, section, takesIt } from "./done-when.mjs";
+import { OWNER } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0;
@@ -39,7 +40,7 @@ ok(!/[\u0000\r\u2028]/u.test(hostile) && !hostile.includes("##[") && hostile.spl
 const e = entryOf(good);
 ok(provedFaults("## Proved by use\n- Ran: open the save. Saw: the last round.\n- Ran: break the save. Saw: a new round, and the message.\n", e).length === 0, "a Ran and a Saw for each line pass");
 const short = provedFaults("## Proved by use\n- Ran: open the save. Saw: the last round.\n- Ran: the tests.\n", e);
-ok(short.length === 1 && /for 1 of the entry's 2 lines/.test(short[0]) && mended(`FAIL ${short[0]}`), "an item with no Saw does not count, and the fault says its mend", short);
+ok(short.length === 1 && /for 1 of the 2 lines of its entry/.test(short[0]) && mended(`FAIL ${short[0]}`), "an item with no Saw does not count, and the fault says its mend", short);
 ok(/no such heading/.test(provedFaults("Nothing here.", e)[0] ?? ""), "no heading at all is named so");
 ok(provedFaults("## Proved by use\n- Ran: a. Saw: b.\n", entryOf("**Done when**\n- None: x\n")).length === 0, "one item proves an entry of \"None:\"");
 
@@ -47,10 +48,15 @@ ok(provedFaults("## Proved by use\n- Ran: a. Saw: b.\n", entryOf("**Done when**\
 ok(isFeature({ labels: ["feature"], body: "" }) && isFeature({ labels: [], body: "**What to read**\n`feature`, `test`\n" }) && isFeature({ labels: [], body: "**What to read**\n`core/tasks/done-when.md`\n" }),
   "a feature's issue names the kind by its label, under \"What to read\", or names the module there");
 ok(!isFeature({ labels: ["enhancement"], body: "a feature, `feature`\n" }), "the word elsewhere, or another label, is not the kind");
-ok(currentText({ author: "o", body: "old" }, [{ author: "o", body: `${CURRENT}\nnew` }, { author: "x", body: `${CURRENT}\nnot theirs` }]) === `${CURRENT}\nnew` && currentText({ author: "o", body: "old" }, [{ author: "o", body: "a note" }]) === "old",
-  "the current text is the author's newest note that says so, else the description");
+ok(currentText("old", [{ author: "O", body: `${CURRENT}\nnew` }, { author: "x", body: `${CURRENT}\nnot theirs` }], "o") === `${CURRENT}\nnew` && currentText("old", [{ author: "o", body: "a note" }], "o") === "old",
+  "the current text is the owner's account's newest note that says so, its login in any case, else the description");
+ok(ownerAt("| *owner's account* | `Ann-1` |\n", "core/", "x/r") === "Ann-1" && ownerAt("", "core/", "x/r") === "x" && ownerAt("anything", "", "x/r") === OWNER,
+  "the owner's account is the manifest's row, else the repository's account; in the core, the core's own");
+ok(takesIt("Floor: whole. Modules: all.\n", "core/") && takesIt("Floor: whole. Modules: `a.md`.\nNot taken: `done-when.md` (x).\n", "") && !takesIt("Floor: whole. Modules: `a.md`.\nNot taken: `done-when.md` (no feature).\n", "core/"),
+  "a project whose manifest leaves the module out is asked nothing; the core always takes it");
 ok(joined("| #1 | a | |\n| #2 | b | #1 |\n", "| #1 | a | |\n| #3 | b | #2 |\n| #2 | b | #1 |\n1. `inbox/x.md`, builder\n").join() === "#3,inbox/x.md", "the items that join: each line's first, named nowhere in the base's file");
 ok(joined("| #2 | b | |\n", "| #4 | c | #2 |\n").join() === "#4" && joined(null, "").length === 0, "an item waited on is not one that joins; no file is none");
+ok(joined("| #1 | a | #3 |\n", "| #1 | a | #3 |\n| #3 | b | |\n").join() === "#3", "an item named before only as one another waits on joins with a line of its own");
 ok(closes("Fixes #12. Closes: #3, resolves #4 and fixed #12; see #9").join() === "#12,#3,#4", "the issues a description closes, as GitHub reads them, each once");
 
 // the whole, with issues read through a stand-in for gh
@@ -66,9 +72,12 @@ ok(r.mends.length === 1 && /no "Done when" lines in the form, and nor has the de
 r = doneMends({ body: "x", queue: queue("#8"), read });
 ok(r.mends.length === 0 && /#8 could not be read, so nothing is asked/.test(r.notes[0]), "an issue that cannot be read is asked nothing, and that is said", r);
 r = doneMends({ body: "Fixes #6\n## Proved by use\n- Ran: a. Saw: b.\n", queue: null, read });
-ok(r.mends.length === 1 && /for 1 of the entry's 2 lines/.test(r.mends[0]), "a pull request that closes a feature's issue with lines gives the evidence for each", r.mends);
+ok(r.mends.length === 1 && /for 1 of the 2 lines of its entry/.test(r.mends[0]), "a pull request that closes a feature's issue with lines gives the evidence for each", r.mends);
 r = doneMends({ body: "Fixes #5\nNothing more.\n", queue: null, read });
 ok(r.mends.length === 1 && /nor has the description/.test(r.mends[0]) && mended(`FAIL ${r.mends[0]}`), "a feature's issue with no lines, closed by a description with none, fails: the builder writes them", r.mends);
+issues["#11"] = { labels: ["feature"], body: good };
+r = doneMends({ body: "Fixes #6, fixes #11\n## Proved by use\n- Ran: a. Saw: b.\n- Ran: c. Saw: d.\n", queue: null, read });
+ok(r.mends.length === 1 && /for 2 of the 4 lines of its entries/.test(r.mends[0]), "a pull request that closes two features proves the lines of both", r.mends);
 r = doneMends({ body: `Fixes #5\n${good}\n## Proved by use\n- Ran: a. Saw: b.\n- Ran: c. Saw: d.\n`, queue: null, read });
 ok(r.mends.length === 0, "where the issue has none, the description's own lines are proved", r.mends);
 r = doneMends({ body: "Fixes #7\n", queue: null, read });

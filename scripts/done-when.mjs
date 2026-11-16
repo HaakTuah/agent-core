@@ -13,7 +13,9 @@
 // Node's own modules.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { asked as toRead } from "./reading.mjs";
+import { OWNER } from "./core-address.mjs";
+import { leftOut, asked as toRead } from "./reading.mjs";
+import { ownerOf } from "./releases.mjs";
 
 export const HEADING = "Done when", PROVED = "Proved by use", KIND = "feature";
 // The most items one pull request may queue or close, each read with a call or a few: a handful in practice.
@@ -95,27 +97,31 @@ export function entryFaults(e, where, at = "") {
 // What is wrong with a description's "Proved by use" for an entry: an item with a "Ran:" and a "Saw:" for each line
 // (one, for an entry of "None:").
 export function provedFaults(body, e, at = "") {
-  const items = section(body, PROVED), want = Math.max(1, e.lines.length);
+  const entries = Array.isArray(e) ? e : [e];
+  const items = section(body, PROVED), want = entries.reduce((n, x) => n + Math.max(1, x.lines.length), 0);
   const got = (items ?? []).filter(i => /\bRan:\s*\S/u.test(i) && /\bSaw:\s*\S/u.test(i)).length;
   if (got >= want) return [];
-  return [`the description's "${PROVED}" gives what was run and seen for ${got} of the entry's ${want} line${want === 1 ? "" : "s"}${items === null ? " (it has no such heading)" : ""}. Mend: use the change as its user would (start the program, take its user's steps, run the command) and add under a heading "${PROVED}" one item for each "${HEADING}" line, saying "Ran: " what was run and "Saw: " what was seen; where it cannot be run here, "Saw: " says why and names the issue filed for it (${at}tasks/done-when.md)`];
+  return [`the description's "${PROVED}" gives what was run and seen for ${got} of the ${want} line${want === 1 ? "" : "s"} of its entr${entries.length === 1 ? "y" : "ies"}${items === null ? " (it has no such heading)" : ""}. Mend: use the change as its user would (start the program, take its user's steps, run the command) and add under a heading "${PROVED}" one item for each "${HEADING}" line, saying "Ran: " what was run and "Saw: " what was seen; where it cannot be run here, "Saw: " says why and names the issue filed for it (${at}tasks/done-when.md)`];
 }
 
 // Whether an issue ({ labels, body }) is a feature's: it names the kind by its label or under "What to read".
 export const isFeature = issue => (issue.labels ?? []).includes(KIND) || toRead(issue.body).some(w => w === KIND || /(?:^|\/)tasks\/done-when\.md$/u.test(w));
 
-// An issue's current text: its description, or its author's newest note that says it is ("One current text").
-export function currentText(issue, notes = []) {
-  const mine = notes.filter(n => n.author === issue.author && String(n.body ?? "").includes(CURRENT));
-  return mine.length ? String(mine.at(-1).body) : String(issue.body ?? "");
+// An issue's current text: its description, or the *owner's account*'s newest note that says it is ("One current
+// text"), the login compared as GitHub does, ignoring case.
+const same = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();
+export function currentText(body, notes = [], owner = "") {
+  const mine = notes.filter(n => same(n.author, owner) && String(n.body ?? "").includes(CURRENT));
+  return mine.length ? String(mine.at(-1).body) : String(body ?? "");
 }
 
 // The items a pull request adds to the progress file: each line's first "#n" (or an inbox file, "inbox/<name>.md"),
-// where the base's file named it nowhere.
+// where no line of the base's file was its own.
 export function joined(before, after) {
   const ITEM = /(?<![\w/])(?:#\d{1,9}(?!\d)|inbox\/[\w-]+(?:\.[\w-]+)*\.md(?![\w.-]))/gu;
   const named = text => lines(text).map(l => l.match(ITEM)?.[0]).filter(Boolean);
-  const had = new Set(String(before ?? "").match(ITEM) ?? []);
+  // (an item named before only where another waits on it is no line of its own, and joins with its own)
+  const had = new Set(named(before));
   return [...new Set(named(after))].filter(n => !had.has(n));
 }
 
@@ -138,15 +144,18 @@ export function doneMends({ body, queue, read, at = "" }) {
     if (got && isFeature(got) && !entryOf(got.body)) mends.push(`${item}, a feature's issue that joins the progress file, has no "${HEADING}" in its current text. Mend: add to it a heading "${HEADING}", with ${FORM}, where they are known; where they are not, the heading alone, and its builder writes them (${at}tasks/done-when.md)`);
   }
   if (own) mends.push(...entryFaults(own, "the description", at));
-  let entry = own;
+  // (each feature's issue closed is proved for its own lines; the description's stand for those that have none)
+  const entries = [];
   for (const item of closes(body)) {
     const got = get(item);
     if (!got || !isFeature(got)) continue;
     const e = entryOf(got.body);
-    if (e && !entryFaults(e, item).length) entry = e;
-    else if (!own) mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}" lines in the form, and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
+    if (e && !entryFaults(e, item).length) entries.push(e);
+    else if (own) { if (!entries.includes(own)) entries.push(own); }
+    else mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}" lines in the form, and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
   }
-  if (entry) mends.push(...provedFaults(body, entry, at));
+  if (own && !entries.includes(own)) entries.push(own);
+  if (entries.length) mends.push(...provedFaults(body, entries, at));
   return { mends, notes };
 }
 
@@ -159,9 +168,14 @@ export const progressOf = manifest => /\*progress file\*[ \t]*[|:][ \t]*`([^`\n]
 export function queueAt(dir, prefix) {
   const git = (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
   if (git("rev-parse", "--verify", "--quiet", "HEAD^1") === null) return null;
-  const file = progressOf(git("show", `HEAD^1:${prefix ? "core-manifest.md" : "AGENTS.md"}`));
-  return { before: git("show", `HEAD^1:${file}`) ?? "", after: git("show", `HEAD:${file}`) ?? "" };
+  const manifest = git("show", `HEAD^1:${prefix ? "core-manifest.md" : "AGENTS.md"}`) ?? "", file = progressOf(manifest);
+  return { before: git("show", `HEAD^1:${file}`) ?? "", after: git("show", `HEAD:${file}`) ?? "", manifest };
 }
+
+// Who writes an issue's current text, as the base's manifest names the *owner's account* (the core's own, in the
+// core), else the repository's account; and whether the project takes this module, as its manifest's lines say.
+export const ownerAt = (manifest, prefix, repo) => (prefix ? ownerOf(String(manifest ?? "")) : OWNER) ?? String(repo).split("/")[0];
+export const takesIt = (manifest, prefix) => !prefix || !leftOut(manifest).has("done-when.md");
 
 // The pages of an issue's notes read for its current text, newest first: an issue with more notes than these is read
 // from its newest PAGES hundred, so that its calls stay few however many notes anyone adds.
@@ -170,7 +184,7 @@ export const PAGES = 3;
 // An item as { labels, body }, its body the current text: an issue by gh from `repo`, an inbox file as the head's
 // commit holds it in the checkout at `dir` (from git, so that a link is read as its own text and never followed out of
 // the checkout); null where it cannot be read.
-export function readItem(repo, item, dir = ".") {
+export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[0]) {
   if (item.startsWith("inbox/")) {
     const r = spawnSync("git", ["show", `HEAD:${item}`], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 });
     return r.status === 0 ? { labels: [], body: r.stdout } : null;
@@ -179,13 +193,13 @@ export function readItem(repo, item, dir = ".") {
   try {
     const n = item.slice(1), got = gh(`repos/${repo}/issues/${n}`);
     if (!got) return null;
-    const author = String(got.user?.login ?? ""), last = Math.max(1, Math.ceil(Number(got.comments ?? 0) / 100)), notes = [];
+    const last = Math.max(1, Math.ceil(Number(got.comments ?? 0) / 100)), notes = [];
     for (let page = last; page >= 1 && page > last - PAGES; page--) {
       const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
       if (!Array.isArray(one)) return null;
       notes.unshift(...one.map(c => ({ author: String(c.user?.login ?? ""), body: c.body })));
-      if (one.some(c => String(c.user?.login ?? "") === author && String(c.body ?? "").includes(CURRENT))) break;
+      if (one.some(c => same(c.user?.login, owner) && String(c.body ?? "").includes(CURRENT))) break;
     }
-    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText({ author, body: got.body }, notes) };
+    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner) };
   } catch { return null; }
 }
