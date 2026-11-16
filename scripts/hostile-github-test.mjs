@@ -118,7 +118,7 @@ ok(readings([[NaN, repo, "x"], [-1, repo, "x"], [0, repo, "x"]], repo, 1).length
   const commit = n => { fs.writeFileSync(path.join(src, "n"), n); git("add", "-A"); git("commit", "-q", "-m", n); return git("rev-parse", "HEAD"); };
   const c1 = commit("1"), c2 = commit("2");
   git("checkout", "-q", "-b", "side"); const side = commit("side"); git("checkout", "-q", "main");
-  for (const [tag, on] of [["release-1", c1], ["release-2", c2], ["release-3", c1], ["release-4", side], ...["release-01", "release-0", "release-9999999999", "release-7a", "release-<b>"].map(t => [t, c2])]) git("tag", tag, on);
+  for (const [tag, on] of [["release-1", c1], ["release-2", c2], ["release-3", c1], ["release-4", side], ...["release-01", "release-0", "release-9999999999", "release-7a", ...(process.platform === "win32" ? [] : ["release-<b>"])].map(t => [t, c2])]) git("tag", tag, on);
   git("tag", "-a", "-m", "a tree", "release-5", `${c2}^{tree}`);
   const bare = path.join(scratch, "bare"), empty = path.join(scratch, "empty"), t0 = Date.now();
   fs.mkdirSync(bare); fs.mkdirSync(empty);

@@ -105,12 +105,14 @@ ok(broughtBy("Brought in by: #../../etc/passwd") === null && mine([{ number: 1, 
   const inbox = path.join(scratch, "inbox");
   fs.mkdirSync(inbox);
   fs.writeFileSync(path.join(inbox, "a-task.md"), "x");
-  fs.writeFileSync(path.join(inbox, "<script>x.md"), "x");
+  // (Windows holds no file name with markup in it: there the blank alone is the odd one)
+  const marked = process.platform !== "win32";
+  if (marked) fs.writeFileSync(path.join(inbox, "<script>x.md"), "x");
   fs.writeFileSync(path.join(inbox, "a task.md"), "x");
   let linked = true;
   try { fs.symlinkSync("/etc/passwd", path.join(inbox, "passwd.md")); } catch { linked = false; }
   const got = items(scratch);
-  ok(got.join() === "a-task.md" && got.odd === 2, `the inbox's files: a name with markup or a blank is counted, not listed${linked ? ", and a link to /etc/passwd is no item" : ""}`);
+  ok(got.join() === "a-task.md" && got.odd === (marked ? 2 : 1), `the inbox's files: a name with markup or a blank is counted, not listed${linked ? ", and a link to /etc/passwd is no item" : ""}`);
   const said = report({ yes: false, why: "x" }, got, true);
   ok(!said.includes("<script>") && !said.includes("passwd"), "what the inbox prints names no odd file and no linked path");
 }

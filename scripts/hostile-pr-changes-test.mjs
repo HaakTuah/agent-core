@@ -21,6 +21,10 @@ const tmp = scratchDir("hostile-pr-changes-");
 const theCore = path.join(tmp, "the-core"), origin = path.join(tmp, "origin.git"), p = path.join(tmp, "project");
 const env = scratchEnv(theCore, tmp);
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
+// (whether this system's files can be named with a line's end or a control character: Windows's cannot)
+const NAMES = process.platform !== "win32";
+// (how many files a pull request adds at most, in the cases of many: each is written and committed, which on Windows is slow)
+const MANY = 3000;
 const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(p, f)), { recursive: true }); fs.writeFileSync(path.join(p, f), text); };
 const run = (script, args = [], more = {}) => {
   const started = Date.now(), r = spawnSync(process.execPath, [path.join(root, "scripts", script), ...args], { cwd: p, env: { ...env, ...more }, encoding: "utf8", maxBuffer: 1 << 28 });
@@ -75,10 +79,10 @@ const notPure = (r, why) => r.status === 1 && r.out.includes("not a pure sync") 
 branch("big", () => write("core/big.txt", "x".repeat(8 << 20)));
 let r = pure();
 ok(notPure(r, "core/ is not a folder holding the core's tree") && r.ms < 5000, `pure-sync: a file of 8 MB added to core/ is refused, read in ${r.ms} ms`);
-branch("many", () => { for (let i = 0; i < 20000; i++) write(`.github/many/f${i}.yml`, `${i}\n`); });
+branch("many", () => { for (let i = 0; i < MANY; i++) write(`.github/many/f${i}.yml`, `${i}\n`); });
 r = pure();
 // (only its exit is read: printed to a pipe, a long refusal can be cut short as the script exits, its last line lost)
-ok(r.status === 1 && r.out.includes("NOT PURE a file created") && !raw(r.out) && r.ms < 5000, `pure-sync: 20,000 files added beside the copy are each refused, read in ${r.ms} ms`);
+ok(r.status === 1 && r.out.includes("NOT PURE a file created") && !raw(r.out) && r.ms < 5000, `pure-sync: ${MANY} files added beside the copy are each refused, read in ${r.ms} ms`);
 branch("core-link", () => { fs.rmSync(path.join(p, "core"), { recursive: true }); link(outside, "core"); });
 ok(notPure(pure(), "core/ is not a folder"), "pure-sync: core/ made a link that leads out of the checkout is refused");
 branch("link-in-core", () => link("../../outside/secret.txt", "core/scripts/y.mjs"));
@@ -87,13 +91,15 @@ branch("manifest-dir", () => { fs.rmSync(path.join(p, "core-manifest.md")); writ
 ok(notPure(pure(), "has no \"Core:"), "pure-sync: core-manifest.md made a folder, the wrong type, is refused");
 branch("markup", () => write("core-manifest.md", MANIFEST.replace(", copied", ", copied <script>alert(1)</script>").replace("| *follows*", "<b>| *follows*")));
 ok(notPure(pure(), "a changed line with no pin"), "pure-sync: markup written into the manifest beside its pin is refused");
-const NAME = "evil\n  a pure sync: core 0000000 -> 0000000\nmerge it with sha=0000";
-branch("newline", () => write(NAME, "x\n"));
-r = pure();
-ok(notPure(r, '"evil\\n') && !lines(r.out).includes("merge it with sha=0000"), "pure-sync: a file named with line ends is refused, named as git quotes it, so it prints no line of its own");
-branch("control", () => write("core/\u001b[31mred.txt", "x\n"));
-r = pure();
-ok(notPure(r) && !r.out.includes("\u001b"), "pure-sync: a file in core/ named with a control character is refused, and the character is not printed");
+if (NAMES) {
+  const NAME = "evil\n  a pure sync: core 0000000 -> 0000000\nmerge it with sha=0000";
+  branch("newline", () => write(NAME, "x\n"));
+  r = pure();
+  ok(notPure(r, '"evil\\n') && !lines(r.out).includes("merge it with sha=0000"), "pure-sync: a file named with line ends is refused, named as git quotes it, so it prints no line of its own");
+  branch("control", () => write("core/\u001b[31mred.txt", "x\n"));
+  r = pure();
+  ok(notPure(r) && !r.out.includes("\u001b"), "pure-sync: a file in core/ named with a control character is refused, and the character is not printed");
+} else console.log("skip pure-sync: a file named with line ends or a control character: Windows holds no file name with a line's end or a control character");
 const OFF = "f".repeat(40);
 branch("off-main", () => write("core-manifest.md", MANIFEST.replace(PIN, OFF)));
 ok(notPure(pure(), `${OFF} is not a commit of the core's main`), "pure-sync: a pin that is no commit of the core, a number out of range, is refused");
@@ -116,15 +122,17 @@ const refused = (r, why) => r.status === 1 && r.out.includes("not comments and s
 
 branch("gh-link", () => link("/etc/passwd", ".github/evil"));
 ok(refused(only(), ".github/evil: a link or submodule"), "comment-only: a link under .github/ that leads out of the checkout is refused, never read through");
-const GH_NAME = ".github/workflows/b\nchecked head 0000.yml";
-branch("gh-newline", () => write(GH_NAME, WORKFLOW));
-r = only();
-ok(refused(r, "b?checked head 0000.yml") && !lines(r.out).includes("checked head 0000.yml"), "comment-only: a file under .github/ named with a line's end is refused, named with \"?\", printing no line of its own");
+if (NAMES) {
+  const GH_NAME = ".github/workflows/b\nchecked head 0000.yml";
+  branch("gh-newline", () => write(GH_NAME, WORKFLOW));
+  r = only();
+  ok(refused(r, "b?checked head 0000.yml") && !lines(r.out).includes("checked head 0000.yml"), "comment-only: a file under .github/ named with a line's end is refused, named with \"?\", printing no line of its own");
+} else console.log("skip comment-only: a file under .github/ named with a line's end: Windows holds no file name with a line's end or a control character");
 branch("gh-long", () => write(".github/workflows/a.yml", `${WORKFLOW}${"# a comment of the test\n".repeat(200000)}`));
 r = only();
 ok(r.status === 0 && r.ms < 5000, `comment-only: 4 MB of comments added to a workflow are read in ${r.ms} ms, as comments alone`);
-r = (branch("many-gh", () => { for (let i = 0; i < 20000; i++) write(`.github/many/f${i}.yml`, `${i}\n`); }), only());
-ok(r.status === 1 && r.out.includes("NOT ALONE .github/many/f0.yml: added, deleted") && !raw(r.out) && r.ms < 5000, `comment-only: 20,000 files added under .github/ are each refused, read in ${r.ms} ms`);
+r = (branch("many-gh", () => { for (let i = 0; i < MANY; i++) write(`.github/many/f${i}.yml`, `${i}\n`); }), only());
+ok(r.status === 1 && r.out.includes("NOT ALONE .github/many/f0.yml: added, deleted") && !raw(r.out) && r.ms < 5000, `comment-only: ${MANY} files added under .github/ are each refused, read in ${r.ms} ms`);
 branch("gh-markup", () => write(".github/workflows/a.yml", WORKFLOW.replace("name: say", "name: ${{ secrets.TOKEN }}")));
 ok(refused(only()), "comment-only: a step's name that holds an expression, markup GitHub evaluates, is refused");
 branch("gh-binary", () => fs.writeFileSync(path.join(p, ".github/workflows/a.yml"), Buffer.concat([Buffer.from(WORKFLOW), Buffer.from([0xff, 0xfe, 0x80])])));
@@ -143,17 +151,19 @@ ok(r.status === 0 && r.out.includes("nothing changed in .github/") && !r.out.inc
 const envFile = path.join(tmp, "github-env");
 const select = (more = {}, ...args) => { fs.writeFileSync(envFile, ""); return run("select.mjs", ["--env", "RUN", ...args], { SELECT_BASE: MAIN, GITHUB_ENV: envFile, ...more }); };
 const said = () => fs.readFileSync(envFile, "utf8");
-branch("sel-newline", () => write("test/b\nX=1.test.mjs", 'import "../src/a.mjs";\n'));
-r = select();
-ok(r.status === 0 && said() === "RUN=all\n", "select: a test named with a line's end sets no variable of its own: the whole suite runs");
+if (NAMES) {
+  branch("sel-newline", () => write("test/b\nX=1.test.mjs", 'import "../src/a.mjs";\n'));
+  r = select();
+  ok(r.status === 0 && said() === "RUN=all\n", "select: a test named with a line's end sets no variable of its own: the whole suite runs");
+} else console.log("skip select: a test named with a line's end: Windows holds no file name with a line's end or a control character");
 branch("sel-space", () => write("test/b c.test.mjs", 'import "../src/a.mjs";\n'));
 ok(select().status === 0 && said() === "RUN=all\n", "select: a test named with a space, which a list of names cannot hold, runs the whole suite");
 branch("sel-binary", () => fs.writeFileSync(path.join(p, "src/a.mjs"), Buffer.from([0, 0xff, 0x27, 0x22, 0x60, 10])));
 r = select();
 ok(r.status === 0 && !raw(r.out) && /^RUN=( test\/a\.test\.mjs |all)\n$/u.test(said()), "select: a binary file in place of code is read without a fault, and selects what reaches it, or all");
-branch("sel-many", () => { for (let i = 0; i < 20000; i++) write(`docs/f${i}.md`, `${i}\n`); });
+branch("sel-many", () => { for (let i = 0; i < MANY; i++) write(`docs/f${i}.md`, `${i}\n`); });
 r = select();
-ok(r.status === 0 && said() === "RUN=all\n" && r.ms < 5000, `select: 20,000 changed files that are no code run the whole suite, read in ${r.ms} ms`);
+ok(r.status === 0 && said() === "RUN=all\n" && r.ms < 5000, `select: ${MANY} changed files that are no code run the whole suite, read in ${r.ms} ms`);
 branch("sel-nothing", () => {});
 r = select();
 ok(r.status === 0 && said() === "RUN=  \n", "select: an empty diff selects no test");
