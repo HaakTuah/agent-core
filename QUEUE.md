@@ -37,7 +37,6 @@ it merges last.
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, whose work-down takes in `scripts/look.mjs` |
-| #477 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |

@@ -157,6 +157,9 @@ jobs:
       - name: The count of what the reviews find
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/review-record-test.mjs ')) }}
         run: node scripts/review-record-test.mjs
+      - name: The count of the rounds of review
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/review-rounds-test.mjs ')) }}
+        run: node scripts/review-rounds-test.mjs
       - name: The stalled lanes
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/stalled-test.mjs ')) }}
         run: node scripts/stalled-test.mjs
