@@ -111,6 +111,9 @@ const core = body({ core: true, month: "2026-11", measures: null, previous: null
 ok(/^- Of \d+ rules of the floor and the modules: /m.test(body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], scripts: "scripts" })), "the core's report reads the rules by what holds them where it is given none");
 ok(/no baseline may stand/.test(core) && /Not read: `scripts\/holders\.mjs` could not read them/.test(core) && /- Nothing: no task the look keeps/.test(core) && /state-report\.mjs --projects/.test(core) && !/Counts for the core/.test(core),
   "the core's report: no baseline, the rules not guessed, nothing overdue, and the projects' part left to a session", core);
+ok(core.includes("runs `node scripts/review-record.mjs --since 2026-10-01` and, for each rule it lists under \"Found twice\"") && !proj0().includes("Found twice"),
+  "the core's report names the step that files a check for each rule the reviews found twice, from the month before; a project's does not", core);
+function proj0() { return body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: null, scripts: "core/scripts" }); }
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });
 ok(proj.includes("- copies: 4 old copies in its baseline (`checks/copies-baseline.json`), 6 at the last report.") && proj.includes("- #7 Steps of a release not done: open since 2026-11-01."),
