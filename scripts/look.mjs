@@ -41,6 +41,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { look as choicesDue, signs } from "./choices.mjs";
 import { report as citedReport } from "./cited.mjs";
+import { report as outcomesReport } from "./outcomes-read.mjs";
 import { CORE } from "./core-address.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
 import { asked, FOLDER, repoOf } from "./inbox.mjs";
@@ -274,8 +275,8 @@ function main(args) {
     const since = i => { try { return pagesOf(`repos/${repo}/issues/${i.number}/events`).filter(e => e.event === "reopened").map(e => e.created_at).sort().at(-1) ?? i.created_at; } catch { return i.created_at; } };
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: since(i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
-    const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft });
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: previous?.body ?? null, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), scripts });
+    const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last }), scripts });
   }
 
   // what is done with each

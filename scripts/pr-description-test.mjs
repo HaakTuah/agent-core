@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { asked, calledFor, doneAsked, DONE_SINCE, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { asked, calledFor, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 import { lineMend } from "./reading.mjs";
 
 let failed = 0;
@@ -37,6 +37,10 @@ ok(["nothing", "a review", "checks", "#241"].every(w => waitsOn(`x\n\nWaits on: 
 ok(waitsOn("x") === null && waitsOn("Waits on: soon").kind === null && waitsOn("Waits on: the owner").kind === null && waitsOn("Waits on: the owner: why").kind === null,
   "no line is none; one in no form, or the owner without a question in one sentence ending in a question mark, is no form");
 ok(waitsOn("Waits on: the owner: a?\r\nWaits on: nothing").kind === "nothing" && waitsOn("  Waits on:   a review  ").said === "a review", "the last such line counts, trimmed");
+ok(costMend("x\nSession so far: 1,204 answers (opus); tokens in 3, cache written 4, cache read 5, out 6.\n") === null && costMend(`x\r\n  ${NO_COST}\r\n`) === null,
+  "the cost line, or the mark that the script printed none, on a line of its own, is enough");
+ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMend(null)].every(m => /Mend: run `node core\/scripts\/session-cost\.mjs`/.test(m ?? "") && m.includes(NO_COST)),
+  "a description with neither, or the mark inside a line, is to mend, the mend naming the script and the mark");
 ok(waitsMend("Waits on: nothing") === null && /has no line "Waits on:"/.test(waitsMend("x")) && /"Waits on: soon" is in none of the forms/.test(waitsMend("Waits on: soon")) && /needs-owner/.test(waitsMend("")),
   "the mend names what is missing or wrong, and the forms, with the label for the owner");
 const cs = [{ sha: "c", date: "2026-11-20T00:00:00Z" }, { sha: "b", date: "2026-11-18T00:00:00Z" }, { sha: "a", date: "2026-11-17T00:00:00Z" }];
@@ -78,5 +82,5 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("./pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
 const none = run("The change, and nothing else.");
 ok(none.status === 1 && /has no heading "Readings taken"\. Mend: add "## Readings taken"/.test(none.stdout) && mended(none.stdout) && run(whole).status === 0, "run, a description without its headings fails, each failure saying its mend, and one with them passes");
-ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`), "so does the line's own failure, as the script prints it");
+ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`), "so do the lines' own failures, as the script prints them");
 process.exit(failed ? 1 : 0);

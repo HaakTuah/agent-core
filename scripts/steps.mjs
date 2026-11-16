@@ -505,6 +505,8 @@ export const STEPS = [
     } },
   { lead: "16 November 2026, what a game is for", cost: COST.read, unread: "whether a project is a game, and whether its *game page* says what the game is for, is a reading of what it builds; the page is written in the game's next pull request that adds a feature (`core/tasks/game-design.md`, \"Every game says what it is for, on one page\"), not at the sync, and the design check reads the feature against it there" },
   { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
+  { lead: "16 November 2026, corrections counted and the outcomes read", cost: COST.line,
+    unread: "whether the repository holds a label is GitHub's, in no file: the labels check run at each sync reports the label `correction` missing, its mend `core/scripts/labels.mjs --make`; the cost line is held by the description check, and the bug form's line is a difference `core/scripts/fresh.mjs` lists" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -97,6 +97,11 @@ ok(cameOn("") === SINCE && cameOn("2026-11-10T09:00:00+00:00") === SINCE && came
 ok(/another account's issue needs-owner/.test(got.find(f => f.what.includes("One state label")).what), "the state's mend names one for another account's issue too");
 
 const yes = note("2026-11-14T05:00:00Z", "**The stand-in's verdict: yes, sure.** Cheap and exact.");
+// (a correction names what it corrects and its kind, in its body or a note of the owner's account)
+const fix = (number, body, extra = []) => ({ number, user: me, created_at: late, body, labels: [{ name: "queued" }, { name: "by:owner" }, { name: "correction" }, ...extra.map(name => ({ name }))] });
+const corr = check({ owner, have: all, issues: [fix(40, "Correction: misread\nBrought in by: #3"), fix(41, "Correction: misread"), fix(42, "Brought in by: #3"), fix(43, "Brought in by: #3", ["bug"]), fix(44, "x"), { ...fix(45, "x"), user: other }],
+  comments: [{ issue: 44, user: me, created_at: late, body: "Correction: looks wrong\nBrought in by: #5" }] }).find(f => /labelled correction/.test(f.what));
+ok(corr?.items.join() === "#41,#42", "an open correction without the pull request it names, or without its kind where it is no bug, is to mend; a note of the owner's holds them as well, and another account's issue is not asked", JSON.stringify(corr));
 const marked = check({ owner, have: all, notes: new Map([[8, [yes]], [9, [yes, { user: me, created_at: "2026-11-14T06:00:00Z", body: "The owner's own: yes." }]], [10, [yes, note("2026-11-14T06:00:00Z", "From a builder session, on #10: started.")]], [11, [yes]]]),
   issues: [8, 9, 10, 11].map(number => ({ number, user: me, labels: L("queued", "by:builder", ...(number === 9 || number === 11 ? ["stand-in-yes"] : [])), body: "x", created_at: early })) });
 ok(marked.find(f => f.what.includes("stand-in-yes"))?.items.join() === "#8 (to mark),#10 (to mark),#9 (to take off)",

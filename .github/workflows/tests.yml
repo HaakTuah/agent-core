@@ -288,6 +288,9 @@ jobs:
       - name: Which rules each role cites, counted for the state report
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/cited-test.mjs ')) }}
         run: node scripts/cited-test.mjs
+      - name: The outcomes the state report leads with, and how a correction is counted
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/outcomes-test.mjs ')) }}
+        run: node scripts/outcomes-test.mjs
       - name: The check that the core takes each module or gives its reason
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/own-modules-test.mjs ')) }}
         run: node scripts/own-modules-test.mjs

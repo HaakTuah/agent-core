@@ -6,7 +6,12 @@ Read at the start of every task.
   - Where the best reading is not plain from the *settling references* and the owner's past words, the stand-in gives
     it, and any departing from an owner's answer (core archive 199).
   - "Readings taken" lists the unsure first, and a departure with that answer's date, named when the owner is told of
-    the merge; the owner's correction is built like any change.
+    the merge.
+  - **A correction is marked** (core archive 244; #302). The owner's correction is built like any change; whoever
+    records the owner's word that merged work is wrong, and a builder whose bug a merged PR brought in, labels the
+    issue `correction` and writes in it, or a note on it, "Brought in by: #N" and "Correction:" with its kind:
+    `misread`, `looks wrong`, `does not work` or `rule missing`. It does not mean it waits. Reason: built like any
+    change, a correction vanished, and no one could say whether a rule helped.
 - **The stand-in** (`roles/stand-in.md`; core archive 142, 166 and 199), a fresh session, answers from the owner's words.
   - It gives the owner's most likely answer, marked sure or unsure. Always unsure: a call of taste, such as a name,
     music or a look, and one resting only on the core's archive where the account in the core's address in the

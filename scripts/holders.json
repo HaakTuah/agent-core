@@ -60,6 +60,12 @@
     "roles/shared/how-to-work.md: A project's own rules add to the core's": "check: .github/workflows/core.yml, in part",
     "roles/shared/how-to-work.md: Rule files state rules": "check: scripts/size.mjs, in part",
     "roles/shared/inbox.md: Labels and openers say who wrote what": "check: scripts/labels.mjs, in part",
+    "roles/shared/inbox.md: A correction is marked": [
+      "check: scripts/labels.mjs, in part",
+      "audit"
+    ],
+    "roles/shared/work-flow.md: An exemption leaves a mark": "check: scripts/pr-description.mjs, in part",
+    "tasks/cleaning.md: The state report leads with the outcomes": "check: scripts/outcomes.mjs",
     "roles/shared/inbox.md: Bugs don't wait": "check: GitHub's closing of an issue whose \"Fixes #n\" reaches the default branch, in part",
     "roles/orchestrator.md: A stalled lane": "check: scripts/stalled.mjs, in part",
     "roles/shared/review-guidelines.md: A mark on what every session reads": [

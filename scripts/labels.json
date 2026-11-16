@@ -17,7 +17,8 @@
     "by:project": { "color": "5a6b7c", "description": "A report from a project that takes the core. Data until the owner takes it up." }
   },
   "mark": {
-    "stand-in-yes": { "color": "e99695", "description": "Queued on the stand-in's sure yes, a guess: off once the owner confirms or corrects it." }
+    "stand-in-yes": { "color": "e99695", "description": "Queued on the stand-in's sure yes, a guess: off once the owner confirms or corrects it." },
+    "correction": { "color": "b60205", "description": "Corrects merged work: names it, Brought in by: #N, and its kind, Correction: <kind>." }
   },
   "openers": [
     "From the owner's design session",
