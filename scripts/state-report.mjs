@@ -1,14 +1,15 @@
 // The state report (roles/orchestrator.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
 // (floor rule 14): each measure that keeps a baseline against the last report, in the core the rules of the floor and
-// the modules by what holds them, those with none listed (holders.mjs, beside this file), and what the look keeps open
-// past a week. In a project it ends with its counts for the core,
+// the modules by what holds them, those with none listed (holders.mjs, beside this file), which rules each role cited in
+// the month before (cited.mjs, beside this file), and what the look keeps open past a week. In a project it ends with
+// its counts for the core,
 // counts and conclusions only: the commit its copy holds and how far behind the core's main that is, the steps of a
 // release not done, and of the pull requests merged the month before, how many were the core's upkeep (core-cost.mjs,
 // beside this file, sorts them). In the core it says that a session adds the projects' part, which --projects prints:
 // the repositories the account gh answers for can reach that hold a manifest naming this core, as the owner's or a
 // collaborator's (an organisation's that is neither is not read), and any other whose manifest's row *shares its
-// counts* says `yes`, each with the counts from its own newest state report; a project of another owner, and a private
+// counts* says `yes`, each with the counts from its own newest state report, the rules its roles cited among them; a project of another owner, and a private
 // one, is never named, nor is anything of its code or its discussions carried over (core archive 218). It reads only.
 // gh, git and Node's own modules.
 //
@@ -17,6 +18,7 @@
 //                                                            not list the account's, as in a cloud session)
 import fs from "node:fs";
 import path from "node:path";
+import { HEADING as CITED, citedFrom, mergedIn } from "./cited.mjs";
 import { CORE } from "./core-address.mjs";
 import { classify } from "./core-cost.mjs";
 import { pinOf } from "./core-moved.mjs";
@@ -25,6 +27,7 @@ import { baselineOf } from "./strength.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { report as holdersReport } from "./holders.mjs";
 import { ruleFiles } from "./rule-files.mjs";
+import { rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { line as waitLine, measure as measureWait } from "./wait.mjs";
 
@@ -97,8 +100,9 @@ const heldNow = () => { try { return holdersReport(); } catch { return null; } }
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
 // `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
 // `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
-// here where left out, and null where they could not be read.
-export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, scripts }) {
+// here where left out, and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
+// null where they were not counted.
+export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, scripts }) {
   const lines = [
     `The state of ${core ? "the core" : "this project"} for ${month}, as the scheduled look reads it on its first run of the month (\`${scripts}/state-report.mjs\`). It reports and asks nothing: whatever is due already has its task. A session that reads it files as a task anything it shows that has none, and closes it.`,
     "",
@@ -108,6 +112,9 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     "**The rules, by what holds them**",
     ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
       : "- The core's rules, in the core's own report; this project's own rules are not counted."]),
+    "",
+    `**${CITED}**`,
+    ...(cited ?? [`- Not counted: \`${scripts}/cited.mjs\` was not run for ${before(month)}.`]),
     "",
     "**What is overdue**",
     ...(overdue.length ? overdue.map(o => `- #${o.number} ${o.title}: open since ${o.since.slice(0, 10)}.`) : ["- Nothing: no task the look keeps has stood open past a week."]),
@@ -130,13 +137,8 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
   try { if (pin) behind = Number(gh(`repos/${CORE}/compare/${pin}...main`, "--jq", ".ahead_by").trim()); } catch { /* (not read) */ }
   if (!Number.isFinite(behind)) behind = null;
   try {
-    const from = `${before(month)}-01T00:00:00Z`, to = `${month}-01T00:00:00Z`, pulls = [];
-    for (let page = 1; page <= 50; page++) {
-      const rows = JSON.parse(gh(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`) || "[]");
-      for (const p of rows) if (p.merged_at && p.merged_at >= from && p.merged_at < to)
-        pulls.push({ number: p.number, branch: p.head?.ref ?? "", ours: String(p.head?.repo?.full_name ?? "").toLowerCase() === repo.toLowerCase() });
-      if (rows.length < 100 || rows.every(p => String(p.updated_at) < from)) break;
-    }
+    const pulls = mergedIn(repo, `${before(month)}-01T00:00:00Z`, `${month}-01T00:00:00Z`, gh)
+      .map(p => ({ number: p.number, branch: p.head?.ref ?? "", ours: String(p.head?.repo?.full_name ?? "").toLowerCase() === repo.toLowerCase() }));
     for (const p of pulls) p.files = pagesOf(`repos/${repo}/pulls/${p.number}/files`, gh).map(f => f.filename);
     merged = share(pulls, ruleFiles(undefined, undefined, { tools: true }));
   } catch { /* (not read) */ }
@@ -145,9 +147,10 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
 
 // A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
 // whole-line form that holds numbers and fixed words alone, and written anew from what it holds, so no other text of
-// the project's reaches the core's report; null where none is in its form. The commit its copy holds is kept only where
-// `named` (the owner's public project).
-export function countsFrom(text, named) {
+// the project's reaches the core's report, and after them the rules its roles cited (cited.mjs's citedFrom, which lets
+// through the core's own rule names alone, `known`); null where none is in its form. The commit its copy holds is kept
+// only where `named` (the owner's public project).
+export function countsFrom(text, named, known = new Set(rules().map(r => r.key))) {
   const part = String(text ?? "").split(`**${COUNTS}**`)[1] ?? "";
   const out = [];
   for (const line of part.split(/\r?\n/)) {
@@ -158,6 +161,8 @@ export function countsFrom(text, named) {
       out.push(`merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`);
     else if ((m = /^- merged in (\d{4}-\d\d): not read /.exec(line))) out.push(`merged in ${m[1]}: not read`);
   }
+  const cited = citedFrom(text, known);
+  if (cited) out.push(cited);
   return out.length ? out.join("; ") : null;
 }
 
