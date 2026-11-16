@@ -142,11 +142,11 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      The owner agreed to the session's six points: one door in, `AGENTS.md`, with each tool's small entry file written
      from one list and held to it by a check; roles by what they do, not by whose tool; hooks save time and checks are
-     the guarantee, no rule held by a hook alone, the hooks then carried to each tool that has the event; a short part for each tool, its own folders protected by name; a
-     change of tool loses nothing, the state being in the repository; and a tool proven by the staged cases, tool by
-     tool, run again at each release, the core saying of it only what its documentation says until it has passed.
-     The session had proposed to keep fixed that nobody reviews their own work, and that the owner names who may
-     change the protected files:
+     the guarantee, no rule held by a hook alone, the hooks then carried to each tool that has the event; a short part
+     for each tool, its own folders protected by name; a change of tool loses nothing, the state being in the
+     repository; and a tool proven by the staged cases, tool by tool, run again at each release, the core saying of it
+     only what its documentation says until it has passed. The session had proposed to keep fixed that nobody reviews
+     their own work, and that the owner names who may change the protected files:
 
      > That locks out anyone who only has one tool at their disposal, which can still use other sessions to review it.
 
