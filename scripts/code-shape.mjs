@@ -18,10 +18,11 @@
 //   - which files change together in the history (commits that touch more than 30 of them, such as a move, are left
 //     out, and so is every merge);
 //   - with --suite, how long each named suite takes when it runs alone, and whether it passed.
-// Its reader is a lexer, not a parser: it knows comments, strings, template literals and regular expressions, so a
-// bracket in one of them is not counted, but it does not read JSX, and a function or a block it cannot tell from its
-// brackets alone (a body after a return type in TypeScript that holds braces, an if with no braces) is measured as the
-// brackets show it. Files in other languages are counted and named, and left to the project's own tools.
+// Its reader is a lexer, not a parser: it knows comments, strings, template literals, regular expressions and the
+// elements of JSX (in .jsx, .tsx and JavaScript's own files; jsxIn), so a bracket in one of them is not counted; a
+// function or a block it cannot tell from its brackets alone (a body after a return type in TypeScript that holds
+// braces, an if with no braces) is measured as the brackets show it. Files in other languages are counted and named,
+// and not measured here: the shape check reads C# and Python with readers of their own (shape-readers.mjs).
 //
 //   node core/scripts/code-shape.mjs [<pathspec>...] [--repo <folder>] [--depth <n>] [--history <n>]
 //                                    [--suite "<command>"]... [--json <file>]
@@ -53,76 +54,256 @@ const OPEN = { ")": "(", "]": "[", "}": "{" };
 
 // The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line, at }, `at` where it starts in the
 // text (for a template's runs, where the run ends). Comments and white space are dropped; a template literal is a
-// "str" token for each run of its text, with the code of each ${ } between them.
-export function tokens(src) {
-  const out = [], stack = []; // stack: for each open ${ }, how many { are open inside it
-  const parens = []; // for each open (, whether it opens an if, for, while or with's condition
-  let i = src.startsWith("#!") ? src.indexOf("\n") : 0, line = 1, prev = null;
-  if (i < 0) return out;
-  const n = src.length;
-  const push = (t, v, l = line) => { prev = { t, v, line: l, at: i }; out.push(prev); };
-  const lines = (a, b) => { for (let k = a; k < b; k++) if (src[k] === "\n") line++; };
-  // a / starts a regular expression where no value stands before it: at the start, after an operator, a keyword, or the
-  // ) that closes a condition (`if (x) /a/.test(y)`)
-  const regexHere = () => !prev || (prev.t === "punct" && (prev.v !== ")" || prev.condition) && prev.v !== "]") || (prev.t === "id" && REGEX_AFTER.has(prev.v));
-  const template = () => { // from just inside a template's text to its end or its next ${
-    const from = line;
-    while (i < n) {
-      const c = src[i];
-      if (c === "\\") { lines(i, i + 2); i += 2; continue; }
-      if (c === "`") { i++; push("str", "`", from); return; }
-      if (c === "$" && src[i + 1] === "{") { i += 2; push("str", "`", from); stack.push(0); return; }
-      if (c === "\n") line++;
-      i++;
-    }
-    push("str", "`", from);
-  };
-  while (i < n) {
-    const c = src[i];
-    if (c === "\n") { line++; i++; continue; }
-    if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "﻿") { i++; continue; }
-    if (c === "/" && src[i + 1] === "/") { while (i < n && src[i] !== "\n") i++; continue; }
-    if (c === "/" && src[i + 1] === "*") { const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2; lines(i, end); i = end; continue; }
-    if (c === "'" || c === '"') {
-      let j = i + 1;
-      while (j < n && src[j] !== c && src[j] !== "\n") j += src[j] === "\\" ? 2 : 1;
-      const from = line; lines(i, Math.min(j, n)); push("str", src.slice(i + 1, j), from); i = j + 1; continue;
-    }
-    if (c === "`") { i++; template(); continue; }
-    if (c === "/" && regexHere()) {
-      let j = i + 1, inClass = false;
-      while (j < n && src[j] !== "\n") {
-        const d = src[j];
-        if (d === "\\") { j += 2; continue; }
-        if (inClass) { if (d === "]") inClass = false; } else if (d === "[") inClass = true; else if (d === "/") break;
-        j++;
-      }
-      if (src[j] === "/") { j++; while (j < n && /[A-Za-z]/.test(src[j])) j++; push("regex", src.slice(i, j)); i = j; continue; }
-    }
-    if (/[A-Za-z_$#\u0080-￿]/.test(c)) {
-      let j = i + 1; while (j < n && /[A-Za-z0-9_$\u0080-￿]/.test(src[j])) j++;
-      push("id", src.slice(i, j)); i = j; continue;
-    }
-    if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(src[i + 1] ?? ""))) {
-      let j = i + 1; while (j < n && /[0-9A-Za-z_.]/.test(src[j])) j++;
-      push("num", src.slice(i, j)); i = j; continue;
-    }
-    if (c === "{" && stack.length) stack[stack.length - 1]++;
-    if (c === "}" && stack.length) {
-      if (stack[stack.length - 1] === 0) { stack.pop(); i++; template(); continue; }
-      stack[stack.length - 1]--;
-    }
-    if (src.startsWith("=>", i)) { push("punct", "=>"); i += 2; continue; }
-    const condition = c === "(" ? prev?.t === "id" && ["if", "while", "for", "with"].includes(prev.v) || (isId(prev, "await") && isId(out.at(-2), "for")) : false;
-    if (c === "(") parens.push(condition);
-    push("punct", c); i++;
-    if (c === ")") prev.condition = parens.pop() === true;
-  }
-  return out;
+// "str" token for each run of its text, with the code of each ${ } between them. With
+// `jsx` (jsxIn, below), an element of JSX is a "jsx" token at its <, with the code of each { } in it between ( and );
+// where one never closes, the list's `lost` is true, and its functions cannot be told.
+export function tokens(src, jsx = false) {
+  const lex = new Lexer(src, jsx);
+  lex.code(false);
+  lex.out.lost = lex.lost;
+  return lex.out;
 }
 
-const isId = (tok, v) => tok?.t === "id" && (v === undefined || tok.v === v);
-const isP = (tok, v) => tok?.t === "punct" && tok.v === v;
+// Whether a file's tokens are read with JSX: a file of .jsx or .tsx, and one of JavaScript, where no expression may
+// start with a < (in TypeScript one may: a cast, <T>x, which a file of .tsx cannot hold).
+export const jsxIn = file => [".jsx", ".tsx", ".js", ".mjs", ".cjs"].includes(path.posix.extname(file));
+// How deep a template's code, an element or its code may nest before the reader stops: past it the file is lost, so
+// that no file overflows the reader's stack.
+export const NEST = 200;
+const TAG = /^<\s*(?:>|[A-Za-z_$])/u; // (a fragment, or a tag's name)
+const TYPE_PARAMETER = /^<\s*(?:const\s+)?[A-Za-z_$][\w$]*\s*(?:,|=|extends\b)/u; // (<T,> or <T extends U> in .tsx)
+
+class Lexer {
+  constructor(src, jsx) {
+    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false, nest: 0 });
+    // (parens: for each open (, whether it opens an if, for, while or with's condition)
+    this.i = src.startsWith("#!") ? src.indexOf("\n") : 0;
+    if (this.i < 0) this.i = this.n;
+  }
+
+  push(t, v, l = this.line) { this.prev = { t, v, line: l, at: this.i }; this.out.push(this.prev); }
+  lines(a, b) { for (let k = a; k < b; k++) if (this.src[k] === "\n") this.line++; }
+
+  // What `read` reads, one level deeper; past NEST, nothing more of the file, which is lost.
+  nested(read) {
+    if (this.nest >= NEST) { this.lost = true; this.i = this.n; return false; }
+    this.nest++;
+    try { return read(); } finally { this.nest--; }
+  }
+
+  // The code up to the end, or, `inner`, up to the } that closes the { before it (not a token): whether it reached it.
+  code(inner) {
+    return inner ? this.nested(() => this.run(true)) : this.run(false);
+  }
+
+  run(inner) {
+    let depth = 0;
+    while (this.i < this.n) {
+      const c = this.src[this.i];
+      if (this.blank(c) || this.literal(c)) continue;
+      if (c === "{") depth++;
+      else if (c === "}" && inner && depth-- === 0) { this.i++; return true; }
+      this.punct(c);
+    }
+    return false;
+  }
+
+  // White space or a comment, passed over: whether there was one.
+  blank(c) {
+    const { src, i, n } = this;
+    if (c === "\n") { this.line++; this.i++; return true; }
+    if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "\ufeff") { this.i++; return true; }
+    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; return true; }
+    if (c !== "/" || src[i + 1] !== "*") return false;
+    const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
+    this.lines(i, end);
+    this.i = end;
+    return true;
+  }
+
+  // A string, template, regular expression, word, number or element of JSX, read as its token(s): whether there was one.
+  literal(c) {
+    if (c === "'" || c === '"') return this.quoted(c);
+    if (c === "`") { this.i++; this.template(); return true; }
+    if (c === "/" && this.regexHere() && this.regex()) return true;
+    if (/[A-Za-z_$#\u0080-\uffff]/.test(c)) return this.word(/[A-Za-z0-9_$\u0080-\uffff]/, "id");
+    if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(this.src[this.i + 1] ?? ""))) return this.word(/[0-9A-Za-z_.]/, "num");
+    return c === "<" && this.jsx && this.jsxHere() && this.element();
+  }
+
+  quoted(c) {
+    const { src, i, n } = this;
+    let j = i + 1;
+    while (j < n && src[j] !== c && src[j] !== "\n") j += src[j] === "\\" ? 2 : 1;
+    const from = this.line;
+    this.lines(i, Math.min(j, n));
+    this.push("str", src.slice(i + 1, j), from);
+    this.i = j + 1;
+    return true;
+  }
+
+  word(rest, t) {
+    let j = this.i + 1;
+    while (j < this.n && rest.test(this.src[j])) j++;
+    this.push(t, this.src.slice(this.i, j));
+    this.i = j;
+    return true;
+  }
+
+  // From just inside a template's text to its end, the code of each ${ } read between its runs.
+  template() {
+    const { src, n } = this;
+    let from = this.line;
+    while (this.i < n) {
+      const c = src[this.i];
+      if (c === "\\") { this.lines(this.i, this.i + 2); this.i += 2; continue; }
+      if (c === "`") { this.i++; this.push("str", "`", from); return; }
+      if (c === "$" && src[this.i + 1] === "{") {
+        this.i += 2;
+        this.push("str", "`", from);
+        if (!this.code(true)) return;
+        from = this.line;
+        continue;
+      }
+      if (c === "\n") this.line++;
+      this.i++;
+    }
+    this.push("str", "`", from);
+  }
+
+  // A / starts a regular expression where no value stands before it: at the start, after an operator, a keyword, or the
+  // ) that closes a condition (`if (x) /a/.test(y)`).
+  regexHere() {
+    const prev = this.prev;
+    return !prev || (prev.t === "punct" && (prev.v !== ")" || prev.condition) && prev.v !== "]") || (prev.t === "id" && REGEX_AFTER.has(prev.v));
+  }
+
+  regex() {
+    const { src, i, n } = this;
+    let j = i + 1, inClass = false;
+    while (j < n && src[j] !== "\n") {
+      const d = src[j];
+      if (d === "\\") { j += 2; continue; }
+      if (inClass) { if (d === "]") inClass = false; } else if (d === "[") inClass = true; else if (d === "/") break;
+      j++;
+    }
+    if (src[j] !== "/") return false;
+    j++;
+    while (j < n && /[A-Za-z]/.test(src[j])) j++;
+    this.push("regex", src.slice(i, j));
+    this.i = j;
+    return true;
+  }
+
+  // A sign, its own token (=> one of two signs); a ( says whether it opens a condition, and the ) that closes it too.
+  punct(c) {
+    if (this.src.startsWith("=>", this.i)) { this.push("punct", "=>"); this.i += 2; return; }
+    this.sign(c);
+    this.i++;
+  }
+
+  sign(c) {
+    const prev = this.prev;
+    const condition = c === "(" ? prev?.t === "id" && ["if", "while", "for", "with"].includes(prev.v) || (isId(prev, "await") && isId(this.out.at(-2), "for")) : false;
+    if (c === "(") this.parens.push(condition);
+    this.push("punct", c);
+    if (c === ")") this.prev.condition = this.parens.pop() === true;
+  }
+
+  // ---- JSX ----
+
+  // An element may start where an expression may: at the start, after a sign but a value's end, a shift's first < or
+  // a + or - (which may end x++), or after a keyword that a value follows.
+  jsxHere() {
+    const prev = this.prev;
+    if (!prev) return true;
+    if (prev.t === "id") return REGEX_AFTER.has(prev.v);
+    return prev.t === "punct" && ![")", "]", "}", "<", "+", "-"].includes(prev.v);
+  }
+
+  // An element from its <: false, nothing read, where no tag follows (a comparison, a type's parameters).
+  element() {
+    const ahead = this.src.slice(this.i, this.i + 200);
+    if (!TAG.test(ahead) || TYPE_PARAMETER.test(ahead)) return false;
+    return this.nested(() => this.tag());
+  }
+
+  tag() {
+    this.push("jsx", "<");
+    this.i++;
+    this.space();
+    if (this.src[this.i] === ">") { this.i++; this.children(); return true; }
+    this.name();
+    this.attributes();
+    return true;
+  }
+
+  // White space, and comments between attributes, passed over.
+  space() {
+    while (this.i < this.n) {
+      const c = this.src[this.i];
+      if (c === "/" && (this.src[this.i + 1] === "/" || this.src[this.i + 1] === "*")) this.blank(c);
+      else if (/\s/u.test(c)) this.blank(c) || this.i++;
+      else return;
+    }
+  }
+
+  // A tag's name or an attribute's, with a tag's type arguments in TypeScript (<List<T> items={x}>).
+  name() {
+    while (this.i < this.n && /[\w$.:-]/u.test(this.src[this.i])) this.i++;
+    if (this.src[this.i] !== "<") return;
+    for (let depth = 0; this.i < this.n; this.i++) {
+      if (this.src[this.i] === "<") depth++;
+      else if (this.src[this.i] === ">" && --depth === 0) { this.i++; return; }
+    }
+  }
+
+  // The attributes, up to the tag's end, then its children where it has them.
+  attributes() {
+    while (this.space(), this.i < this.n) {
+      const c = this.src[this.i];
+      if (c === "/" && this.src[this.i + 1] === ">") { this.i += 2; return; }
+      if (c === ">") { this.i++; this.children(); return; }
+      if (c === "{") this.inner();
+      else if (c === '"' || c === "'") this.text(c);
+      else if (c === "<") this.element() || this.i++;
+      else if (/[\w$]/u.test(c)) this.name();
+      else this.i++;
+    }
+    this.lost = true;
+  }
+
+  // An attribute's value in quotes, which no backslash escapes.
+  text(c) {
+    const end = this.src.indexOf(c, this.i + 1), to = end < 0 ? this.n : end + 1;
+    this.lines(this.i, to);
+    this.i = to;
+  }
+
+  // The children, up to the closing tag.
+  children() {
+    while (this.i < this.n) {
+      const c = this.src[this.i];
+      if (c === "{") { this.inner(); continue; }
+      if (c === "<" && /^<\s*\//u.test(this.src.slice(this.i, this.i + 50))) { this.text(">"); return; }
+      if (c === "<" && this.element()) continue;
+      if (c === "\n") this.line++;
+      this.i++;
+    }
+    this.lost = true;
+  }
+
+  // The code of a { } in an element, between ( and ).
+  inner() {
+    this.i++;
+    this.sign("(");
+    if (!this.code(true)) this.lost = true;
+    this.sign(")");
+  }
+}
+
+export const isId = (tok, v) => tok?.t === "id" && (v === undefined || tok.v === v);
+export const isP = (tok, v) => tok?.t === "punct" && tok.v === v;
 const notMember = (toks, k) => !isP(toks[k - 1], ".") && !isP(toks[k - 1], "?");
 
 // What a file imports: [{ spec, kind: "import" | "export" | "dynamic" | "require", names }], names being what it takes
@@ -228,26 +409,28 @@ export function branchesAt(toks, k) {
   if (tok.t === "punct") return branchSign(tok, toks[k - 1], toks[k + 1]);
   return tok.t === "id" && Object.hasOwn(BRANCH_WORD, tok.v) && notMember(toks, k) && BRANCH_WORD[tok.v](toks[k + 1]);
 }
-const countBranch = (toks, k, block) => { if (block?.fn && branchesAt(toks, k)) block.fn.branches++; };
+const countBranch = (toks, k, block, stack, lang) => { if (block?.fn && lang.branches(toks, k, stack)) block.fn.branches++; };
 
 // The functions of a file: [{ name, line, lines, depth, branches }], lines from the line of its body's { to that of its
 // }, depth the deepest its control blocks nest inside it, branches how often it branches (branchesAt), a function
-// within it counted on its own.
-export function functions(toks) {
+// within it counted on its own. `lang` tells, for a language whose blocks are braces as JavaScript's are (C#,
+// shape-csharp.mjs), what kind of block a { opens ("function", "control" or another), a function's name, and whether
+// a token branches.
+export function functions(toks, lang = JS) {
   const found = [], stack = [];
   const openAt = new Map();
   const top = () => { for (let s = stack.length - 1; s >= 0; s--) if (stack[s].v === "{") return stack[s]; return null; };
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
-    countBranch(toks, k, top());
+    countBranch(toks, k, top(), stack, lang);
     if (tok.t !== "punct") continue;
     if (tok.v === "(" || tok.v === "[") stack.push({ v: tok.v, k });
     else if (tok.v === "{") {
-      const kind = blockKind(toks, k, openAt);
+      const kind = lang.kind(toks, k, openAt);
       const parent = top();
       const entry = { v: "{", k, kind, fn: parent?.fn ?? null, cd: kind === "function" ? 0 : parent?.cd ?? 0 };
       if (kind === "function") {
-        entry.fn = { name: functionName(toks, k, openAt), line: tok.line, lines: 1, depth: 0, branches: 0 };
+        entry.fn = { name: lang.name(toks, k, openAt), line: tok.line, lines: 1, depth: 0, branches: 0 };
         found.push(entry.fn);
       } else if (kind === "control") {
         entry.cd++;
@@ -290,7 +473,7 @@ function blockKind(toks, k, openAt) {
 }
 
 // Where a function's header starts before its parameters' (, its type parameters passed over: the < of `f<T>(a)`.
-function typeParameters(toks, open) {
+export function typeParameters(toks, open) {
   if (!isP(toks[open - 1], ">")) return open;
   let depth = 0;
   for (let j = open - 1; j > 0 && j > open - 40; j--) {
@@ -317,6 +500,9 @@ function functionName(toks, k, openAt) {
   }
   return "(anonymous)";
 }
+
+// JavaScript's and TypeScript's blocks and branches, as functions() reads them.
+const JS = { kind: blockKind, name: functionName, branches: branchesAt };
 
 // Where an import leads in the repository: the file it names, with its extension or index added as Node and the
 // bundlers add them, or the file of a package the repository holds itself; null for a package from outside.
@@ -365,6 +551,8 @@ export function cycles(graph) {
   return parts.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
 }
 
+// (the functions of a file whose JSX the reader cannot follow to its end cannot be told)
+const told = toks => (toks.lost ? [] : functions(toks));
 const folderOf = (file, depth) => { const parts = path.posix.dirname(file).split("/"); return (depth ? parts.slice(0, depth) : parts).join("/") || "."; };
 const quantile = (sorted, q) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0;
 const addEdge = (graph, a, b) => { if (!graph.has(a)) graph.set(a, new Set()); graph.get(a).add(b); };
@@ -382,8 +570,8 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
   const fns = [], scripts = [], unresolved = [];
   let total = 0, crossing = 0;
   for (const file of code) {
-    const toks = tokens(texts[file]);
-    for (const fn of functions(toks)) fns.push({ file, ...fn });
+    const toks = tokens(texts[file], jsxIn(file));
+    for (const fn of told(toks)) fns.push({ file, ...fn });
     if (!isModule(toks)) scripts.push({ file, names: globals(toks) });
     for (const imp of imports(toks)) {
       total++;
@@ -499,7 +687,7 @@ function main(argv) {
 
 function print(m) {
   const say = s => console.log(s);
-  say(`files: ${m.files.code} read${Object.keys(m.files.other).length ? `; left to the project's own tools: ${Object.entries(m.files.other).map(([e, n]) => `${n} ${e}`).join(", ")}` : ""}`);
+  say(`files: ${m.files.code} read${Object.keys(m.files.other).length ? `; not measured here: ${Object.entries(m.files.other).map(([e, n]) => `${n} ${e}`).join(", ")}` : ""}`);
   say(`imports: ${m.imports.total}, ${m.imports.crossingAFolder} crossing a folder; folders that import each other both ways: ${m.imports.foldersBothWays.length}`);
   for (const b of m.imports.foldersBothWays.slice(0, 5)) say(`  ${b.folders[0]} <-> ${b.folders[1]} (${b.imports[0]} and ${b.imports[1]})`);
   say(`cycles: ${m.cycles.files.length} between files, ${m.cycles.folders.length} between folders; ${m.cycles.filesWithTypes.length} between files where imports of types alone count too`);
