@@ -3,14 +3,15 @@
 // named and gives under each its direct measure, or says it has none yet, then every other number under the one it
 // stands for, and last what the work cost, which stands for none of the five. Each count is given with the range
 // chance alone would give (twice its square root), and where a count is under LEAST the months before are added, up to
-// MONTHS, and said. No number here is a target (roles/orchestrator.md, "No process number is a builder's goal").
+// MONTHS, and said. No number here is a target (tasks/cleaning.md, "No process number is a builder's goal").
 // What it reads, through gh, with no book-keeping by hand:
 //   - corrections: an issue labelled `correction`, and a note of the owner's account on one, holding a line
 //     "Correction: <kind>" (KINDS) and the line "Brought in by: #N" that the bug form ends with (review-record.mjs
 //     reads it), the one way a pull request is named; a bug labelled `correction` with no kind line is of the kind
 //     "does not work". Only the owner's account is read (floor rule 4);
 //   - merged tasks: the pull requests merged, Dependabot's left out; the time from an issue's first label `queued` to
-//     its closing as done; the merges a correction or bug named, or a revert undid, within two weeks; the merges that
+//     its closing as done, of the SAMPLE newest so closed; the merges a correction named, or a revert undid, within two
+//     weeks; the merges that
 //     close a bug or a correction (unplanned mending); a bug's time from its filing to its closing as done, which is
 //     when its fix reached the default branch;
 //   - cost: the line session-cost.mjs prints, priced as core-cost.mjs prices it, and the tokens carried into each
@@ -34,7 +35,7 @@ export const OUTCOMES = [["asked", "The product does what was asked"], ["fast", 
   ["usable", "A new user can use it"], ["robust", "It does not break"], ["cost", "What the work cost (no outcome: the price of the five)"]];
 export const KINDS = ["misread", "looks wrong", "does not work", "rule missing"];
 export const LABEL = "correction";
-export const LEAST = 30, MONTHS = 6, SAMPLE = 60, SPLIT = 20 * 1024, DAYS = 14, HOUR = 3600e3;
+export const LEAST = 30, MONTHS = 3, SAMPLE = 60, SPLIT = 20 * 1024, DAYS = 14, HOUR = 3600e3;
 export const FIRST = "reports/outcomes-first-reading.json";
 export const HEADING = "The outcomes";
 const KIND = /^Correction: (misread|looks wrong|does not work|rule missing)[ \t]*$/u;

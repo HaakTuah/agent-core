@@ -19,7 +19,10 @@ import { started } from "./started.mjs";
 
 const CLOSES = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #(\d{1,9})\b/giu;
 
-// What is read of `repo` from `from` to `to` (ms), through gh, as the measures take it.
+// What is read of `repo` from `from` to `to` (ms), through gh, as the measures take it: the pull requests and issues of
+// the span, listed, and item by item only what the measures need, so that the calls stay bounded however busy the
+// repository is (the look's token has an hourly limit): the notes on each issue labelled `correction`, the events of
+// the SAMPLE newest issues closed as done (for when each joined the queue), and the sample's own reads.
 export function read(repo, from, to, owner = repo.split("/")[0], gh = ghApi) {
   const iso = new Date(from).toISOString().replace(/\.\d{3}Z$/u, "Z");
   const pulls = [];
@@ -29,28 +32,25 @@ export function read(repo, from, to, owner = repo.split("/")[0], gh = ghApi) {
     if (rows.length < 100 || rows.every(p => String(p.created_at) < iso)) break;
   }
   const issues = pagesOf(`repos/${repo}/issues?state=all&since=${iso}`, gh).filter(i => !i.pull_request);
-  const comments = pagesOf(`repos/${repo}/issues/comments?since=${iso}&sort=created&direction=asc`, gh).map(c => ({ issue: Number(String(c.issue_url).split("/").at(-1)), at: c.created_at, login: c.user?.login, user: c.user, body: c.body ?? "" }));
-  const inline = pagesOf(`repos/${repo}/pulls/comments?since=${iso}&sort=created&direction=asc`, gh).map(c => ({ pull: Number(String(c.pull_request_url).split("/").at(-1)), at: c.created_at, user: c.user, body: c.body ?? "", in_reply_to_id: c.in_reply_to_id ?? null }));
-  const events = [];
-  for (let page = 1; page <= 300; page++) {
-    const rows = JSON.parse(gh(`repos/${repo}/issues/events?per_page=100&page=${page}`) || "[]");
-    events.push(...rows.map(e => ({ event: e.event, at: e.created_at, number: e.issue?.number, label: e.label?.name ?? null })));
-    if (rows.length < 100 || rows.every(e => String(e.created_at) < iso)) break;
-  }
-  return gather({ repo, owner, to, pulls, issues, comments, inline, events, gh });
+  const notes = n => pagesOf(`repos/${repo}/issues/${n}/comments`, gh).map(c => ({ issue: n, at: c.created_at, login: c.user?.login, user: c.user, body: c.body ?? "" }));
+  const events = n => pagesOf(`repos/${repo}/issues/${n}/events`, gh).map(e => ({ event: e.event, at: e.created_at, number: n, label: e.label?.name ?? null }));
+  return gather({ repo, owner, to, pulls, issues, notes, events, gh });
 }
 
-// The data the measures read, from what GitHub gave (and, for the sample's commits and checks, `gh`): the sample the
-// SAMPLE newest merged tasks before `to` (ms).
-export function gather({ repo, owner, to = Infinity, pulls, issues, comments, inline, events, gh = null }) {
-  const labelled = new Map(issues.map(i => [i.number, (i.labels ?? []).map(l => (typeof l === "string" ? l : l.name))]));
+const labelsOf = i => (i.labels ?? []).map(l => (typeof l === "string" ? l : l.name));
+const newest = (list, key, n = SAMPLE) => [...list].sort((a, b) => String(b[key]).localeCompare(String(a[key]))).slice(0, n);
+
+// The data the measures read, from what GitHub gave: `notes(n)` and `events(n)` read an item's comments and events,
+// and `gh` the sample's commits and checks; the sample is the SAMPLE newest merged tasks before `to` (ms), as the
+// queue's time is read of the SAMPLE newest issues closed as done before it.
+export function gather({ repo, owner, to = Infinity, pulls, issues, notes = () => [], events = () => [], gh = null }) {
+  const labelled = new Map(issues.map(i => [i.number, labelsOf(i)]));
   const { merged, reverts } = merges(repo, pulls, labelled);
-  const joined = new Map();
-  for (const e of [...events].sort((a, b) => String(a.at).localeCompare(String(b.at)))) if (e.event === "labeled" && e.label === "queued" && !joined.has(e.number)) joined.set(e.number, e.at);
   const done = issues.filter(i => i.state === "closed" && i.state_reason === "completed");
-  const queued = done.filter(i => joined.has(i.number)).map(i => ({ joined: joined.get(i.number), done: i.closed_at }));
-  const bugs = done.filter(i => (labelled.get(i.number) ?? []).includes("bug")).map(i => ({ at: i.created_at, closed: i.closed_at }));
-  const sample = merged.filter(p => Date.parse(p.when) < to).sort((a, b) => b.when.localeCompare(a.when)).slice(0, SAMPLE).map(p => sampled(p, { repo, owner, comments, inline, events, gh }));
+  const queued = newest(done.filter(i => Date.parse(i.closed_at) < to), "closed_at").map(i => ({ joined: events(i.number).filter(e => e.event === "labeled" && e.label === "queued").map(e => e.at).sort()[0], done: i.closed_at })).filter(q => q.joined);
+  const bugs = done.filter(i => labelled.get(i.number).includes("bug")).map(i => ({ at: i.created_at, closed: i.closed_at }));
+  const comments = issues.filter(i => labelled.get(i.number).includes(LABEL)).flatMap(i => notes(i.number));
+  const sample = newest(merged.filter(p => Date.parse(p.when) < to), "when").map(p => sampled(p, { repo, owner, gh, notes, events }));
   return { merged, reverts, queued, bugs, sample, corrections: corrections(issues, comments, owner) };
 }
 
@@ -64,13 +64,13 @@ function merges(repo, pulls, labelled) {
   return { merged, reverts };
 }
 
-// One pull request of the sample: its events, and each commit after it was ready by cause.
-function sampled(p, { repo, owner, comments, inline, events, gh }) {
-  const mine = [...comments.filter(c => c.issue === p.number), ...inline.filter(c => c.pull === p.number)];
-  const own = events.filter(e => e.number === p.number);
+// One pull request of the sample: its events (its comments, those on its lines, GitHub's events and its commits), and
+// each commit after it was ready by cause.
+function sampled(p, { repo, owner, gh, notes, events }) {
+  const lines = gh ? pagesOf(`repos/${repo}/pulls/${p.number}/comments`, gh).map(c => ({ at: c.created_at, user: c.user, body: c.body ?? "", in_reply_to_id: c.in_reply_to_id ?? null })) : [];
+  const mine = [...notes(p.number), ...lines], own = events(p.number);
   const ready = own.filter(e => e.event === "ready_for_review" && e.at <= p.when).map(e => e.at).sort().at(-1) ?? p.created;
-  let commits = [];
-  try { commits = gh ? pagesOf(`repos/${repo}/pulls/${p.number}/commits`, gh).map(c => ({ sha: c.sha, at: c.commit?.committer?.date, base: (c.parents ?? []).length > 1 })) : []; } catch { commits = []; }
+  const commits = gh ? pagesOf(`repos/${repo}/pulls/${p.number}/commits`, gh).map(c => ({ sha: c.sha, at: c.commit?.committer?.date, base: (c.parents ?? []).length > 1 })) : [];
   const found = mine.filter(c => codexFind(c) || (same(c.user?.login, owner) && ["security", "code", "design"].includes(postedKind(c.body)) && ((blockingOf(c.body) ?? 0) + (otherOf(c.body) ?? 0)) > 0)).map(c => c.at);
   const after = [];
   commits.forEach((c, i) => {

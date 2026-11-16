@@ -110,23 +110,29 @@ const fixtures = {
     { number: 22, merged_at: iso(12), created_at: iso(11), user: { login: "a" }, head: { repo: { full_name: "o/r" } }, title: 'Revert "x"', body: "Reverts o/r#20" },
     { number: 23, merged_at: null, created_at: iso(11), user: { login: "a" }, head: { repo: { full_name: "o/r" } }, title: "y", body: "" }],
   issues: [{ number: 5, state: "closed", state_reason: "completed", created_at: iso(8), closed_at: iso(10), labels: [{ name: "bug" }, { name: "queued" }], user: { login: "o" }, body: "" }],
-  events: [{ event: "labeled", created_at: iso(8), issue: { number: 5 }, label: { name: "queued" } }, { event: "ready_for_review", created_at: iso(9), issue: { number: 20 } }],
 };
 const calls = [];
 const gh = route => {
   calls.push(route);
-  if (/\/pulls\?state=all/.test(route)) return JSON.stringify(/page=1$/.test(route) ? fixtures.pulls : []);
-  if (/\/issues\?state=all/.test(route)) return JSON.stringify(/page=1$/.test(route) ? fixtures.issues : []);
-  if (/\/issues\/events/.test(route)) return JSON.stringify(/page=1$/.test(route) ? fixtures.events : []);
-  if (/\/pulls\/20\/commits/.test(route)) return JSON.stringify([{ sha: "a1", commit: { committer: { date: iso(9).replace("00:00:00", "01:00:00") } }, parents: [{}] }, { sha: "b2", commit: { committer: { date: iso(9).replace("00:00:00", "05:00:00") } }, parents: [{}] }]);
+  const page1 = rows => JSON.stringify(/page=1$/.test(route) || !/page=/.test(route) ? rows : []);
+  if (/\/pulls\?state=all/.test(route)) return page1(fixtures.pulls);
+  if (/\/issues\?state=all/.test(route)) return page1(fixtures.issues);
+  if (/\/issues\/5\/events/.test(route)) return page1([{ event: "labeled", created_at: iso(8), label: { name: "queued" } }]);
+  if (/\/issues\/20\/events/.test(route)) return page1([{ event: "ready_for_review", created_at: iso(9) }]);
+  if (/\/issues\/6\/comments/.test(route)) return page1([{ created_at: iso(12), user: { login: "o" }, body: "Correction: looks wrong\nBrought in by: #20" }]);
+  if (/\/pulls\/20\/commits/.test(route)) return page1([{ sha: "a1", commit: { committer: { date: iso(9).replace("00:00:00", "01:00:00") } }, parents: [{}] }, { sha: "b2", commit: { committer: { date: iso(9).replace("00:00:00", "05:00:00") } }, parents: [{}] }]);
   if (/\/commits\/a1\/check-runs/.test(route)) return JSON.stringify({ check_runs: [{ conclusion: "failure" }] });
   return "[]";
 };
+fixtures.issues.push({ number: 6, state: "open", created_at: iso(11), labels: [{ name: "correction" }], user: { login: "o" }, body: "Correction: misread\nBrought in by: #20" });
 const got = read("o/r", Date.parse(iso(1)), Date.parse("2026-11-01T00:00:00Z"), "o", gh);
-ok(got.merged.map(p => p.number).join() === "20,22" && got.merged[0].mends && got.reverts[0].of === 20 && got.queued.length === 1 && got.bugs.length === 1,
+ok(got.merged.map(p => p.number).join() === "20,22" && got.merged[0].mends && got.reverts[0].of === 20 && got.queued.length === 1 && got.queued[0].joined === iso(8) && got.bugs.length === 1,
   "what is read: Dependabot's merge and an unmerged one left out, a merge closing a bug is mending, a revert names what it undid, the queue's and a bug's times");
-ok(got.sample.find(p => p.number === 20).after.join() === "neither,check" && calls.some(r => /pulls\/20\/commits/.test(r)), "a commit after ready with no finding before it, where a check failed on the commit before, counts as a failed check, and the first after ready, with no commit before it to read, as neither", JSON.stringify(got.sample));
-ok(gather({ repo: "o/r", owner: "o", to: Date.parse(iso(11)), pulls: fixtures.pulls, issues: [], comments: [], inline: [], events: [], gh: null }).sample.map(p => p.number).join() === "20",
+ok(JSON.stringify(got.corrections) === JSON.stringify([{ at: iso(11), pull: 20, kind: "misread" }, { at: iso(12), pull: 20, kind: "looks wrong" }]), "a correction's notes are read on its own issue", JSON.stringify(got.corrections));
+ok(got.sample.find(p => p.number === 20).after.join() === "neither,check" && calls.some(r => /pulls\/20\/commits/.test(r)),
+  "a commit after ready with no finding before it, where a check failed on the commit before, counts as a failed check, and the first after ready, with no commit before it to read, as neither", JSON.stringify(got.sample));
+ok(!calls.some(r => /issues\/comments|pulls\/comments\?|issues\/events\?/.test(r)), "nothing is listed repository-wide but the pull requests and issues of the span", calls.join(" "));
+ok(gather({ repo: "o/r", owner: "o", to: Date.parse(iso(11)), pulls: fixtures.pulls, issues: [] }).sample.map(p => p.number).join() === "20",
   "the sample is of the merges before the span's end");
 
 // ---- the command ----
