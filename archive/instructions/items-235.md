@@ -78,4 +78,10 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > avoiding or detecting themselves, but which the processs just doesn't automatically prompt them to do?
 
      To the orchestrator, passed on word for word to the builder of this rule:
-=======
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "How a game answers a player" in `modules/game-design.md` and its five points, the questions another module
+     may add to the critique and the settings check in `modules/screens.md`, and the check `settings` of
+     `scripts/screens.mjs`.
