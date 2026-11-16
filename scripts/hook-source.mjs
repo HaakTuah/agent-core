@@ -43,7 +43,8 @@ function quotedTexts(script, depth = 0, out = []) {
       if (c === '"' && script[j] === "\\" && j + 1 < script.length) j++;
       body += script[j];
     }
-    // (a quote never closed opens nothing, as one in a comment or a here-document opens nothing: reading goes on after it)
+    // (a quote never closed opens nothing, and reading goes on after it; an apostrophe in a comment or a here-document
+    // that a later quote of its kind closes is read as a pair, which the shell would not, and stays the review's)
     if (j >= script.length) continue;
     out.push([body, script.slice(Math.max(0, i - 200), i)]);
     quotedTexts(body, depth + 1, out);
@@ -53,6 +54,14 @@ function quotedTexts(script, depth = 0, out = []) {
 }
 // (a word whose blanks a backslash keeps, as scripts/my\ hook.sh: each word read whole, once, and kept where it holds one)
 const ESCAPED = /(?:[^\s'"`;|&()<>{}$\\=,\u0001]|\\ )+/gu;
+
+// A word given whole, as a program's argument is in a list such as Codex's notify, where it names a file the project
+// holds: the path, else null.
+export function wholePath(word, holds) {
+  if (typeof word !== "string" || !inProject(word)) return null;
+  const at = path.posix.normalize(word.replace(/\\/gu, "/"));
+  return at !== "." && holds(at) ? at : null;
+}
 
 export function fromTree(command, holds) {
   const raw = String(command).replace(VARIABLE, "\u0001");

@@ -57,7 +57,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
-import { fromTree } from "./hook-source.mjs";
+import { fromTree, wholePath } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 import { parseToml } from "./toml.mjs";
@@ -161,8 +161,10 @@ function readCodex(state, json, read) {
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
     // (its words are a program and its arguments, each one whole, so each is read as a single-quoted word of a command:
     // "scripts/my hook.py" stays one path)
+    // (and each word is read whole too, as a path and as a script of its own, as "sh -c" runs one: an apostrophe in a
+    // word splits the quoting)
     const quoted = notify.map(w => `'${w.replace(/'/gu, "'\\''")}'`).join(" ");
-    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted] });
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted, ...notify], whole: notify });
   }
   addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
 }
@@ -170,7 +172,9 @@ function readCodex(state, json, read) {
 // What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the
 // entries of this plug-in's name.
 function marketOf(name, markets) {
-  const at = name.lastIndexOf("@"), source = markets.get(name.slice(at + 1))?.source ?? null;
+  const at = name.lastIndexOf("@");
+  if (at <= 0) return null; // (a plug-in named with no marketplace, as pluginPin() reads it)
+  const source = markets.get(name.slice(at + 1))?.source ?? null;
   if (source?.source !== "settings" || !Array.isArray(source.plugins)) return source;
   return { market: Object.fromEntries(Object.entries(source).filter(([k]) => k !== "plugins")), items: source.plugins.filter(p => p?.name === name.slice(0, at)) };
 }
@@ -199,7 +203,7 @@ function readHooks(state, file, settings, tool = "") {
 }
 // One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
 // id, all of it; and the files of the project its `commands` take from the working tree.
-function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands }) {
+function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands, whole = [] }) {
   const name = `hook ${tool ? `${tool} ` : ""}${event}${matcher ? ` ${matcher}` : ""}: ${text}`;
   // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same)
   const id = canonical(tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
@@ -217,7 +221,7 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
-  const taken = commands.flatMap(c => fromTree(c, state.holds));
+  const taken = [...commands.flatMap(c => fromTree(c, state.holds)), ...whole.map(w => wholePath(w, state.holds)).filter(Boolean)];
   if (taken.length) state.sources.set(name, [...new Set([...(state.sources.get(name) ?? []), ...taken])]);
 }
 
