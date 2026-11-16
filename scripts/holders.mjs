@@ -2,7 +2,8 @@
 // three, a check that fails where the rule is broken, a staged case (staged.mjs, beside this file), or the scheduled
 // audit. holders.json, beside this file, names the checks and the audit by each rule's file and lead (rules.mjs); each
 // staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report
-// (state-report.mjs), until it gains one or goes on the owner's word. It fails where holders.json names a rule that no
+// (state-report.mjs), until it gains one or goes on the owner's word. A hook (HOOKS) holds no rule alone: one whose
+// only holders are hooks is listed with them (modules/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
 // The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
 //
@@ -16,6 +17,9 @@ import { CASES } from "./staged.mjs";
 
 export const FILE = "scripts/holders.json";
 const FORM = /^(?:(check): (.+?)|(audit)|(describes))(, in part)?$/u;
+// The hooks a check may name: what a tool runs by itself in a session, which a session of another tool never runs.
+export const HOOKS = new Set(["scripts/work-saved.sh", "scripts/helper-call.mjs", "setup/template/claude-settings.json.tmpl"]);
+const hook = x => x.kind === "check" && HOOKS.has(x.by);
 
 // One holder as holders.json names it for the rule `key`: { kind, by, part }, or the line of what is wrong, with its mend.
 function holderOf(key, value, root) {
@@ -48,12 +52,13 @@ export function holders(root = ROOT, cases = CASES) {
 
 // The counts: rules held whole, in part, described only, and with no holder; and the rules with none.
 export function counts({ rules: all, by }) {
-  const out = { all: all.length, check: 0, case: 0, audit: 0, part: 0, describes: 0, none: [] };
+  const out = { all: all.length, check: 0, case: 0, audit: 0, part: 0, describes: 0, none: [], hooked: [] };
   for (const r of all) {
     const h = by.get(r.key) ?? [];
+    if (h.some(hook) && h.every(x => hook(x) || x.kind === "describes")) { out.none.push(r.key); out.hooked.push(r.key); continue; }
     if (!h.length) { out.none.push(r.key); continue; }
     if (h.every(x => x.kind === "describes")) { out.describes++; continue; }
-    const whole = h.filter(x => x.kind !== "describes" && !x.part);
+    const whole = h.filter(x => x.kind !== "describes" && !x.part && !hook(x)); // (a hook beside a check counts for none)
     if (!whole.length) { out.part++; continue; }
     out[whole.some(x => x.kind === "check") ? "check" : whole.some(x => x.kind === "case") ? "case" : "audit"]++;
   }
@@ -64,7 +69,7 @@ export function counts({ rules: all, by }) {
 export function report(root = ROOT) {
   const c = counts(holders(root));
   return [
-    `- Of ${c.all} rules of the floor and the modules: ${c.check} held whole by a check, ${c.case} by a staged case, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`scripts/holders.mjs\`).`,
+    `- Of ${c.all} rules of the floor and the modules: ${c.check} held whole by a check, ${c.case} by a staged case, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder${c.hooked.length ? `, ${c.hooked.length} of them held by a hook alone, which a session of another tool never runs` : ""} (\`scripts/holders.mjs\`).`,
     ...(c.none.length ? [`- No holder, each until it gains one or goes on the owner's word: ${c.none.join("; ")}.`] : []),
   ];
 }

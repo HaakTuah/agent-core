@@ -32,10 +32,10 @@ const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Roughly what a step costs a project where it is not done yet (a step done costs nothing).
 export const COST = {
   check: "nothing while its check passes; else what the failure says, in the pull request it fails",
-  line: "a line or two of a protected file: one small pull request of the trusted builder's",
+  line: "a line or two of a protected file: one small pull request of a builder's",
   workflow: "a workflow's change: one small pull request, with floor rule 3's two security reviews",
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
-  config: "a check's config and its first baseline: one small pull request of the trusted builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
+  config: "a check's config and its first baseline: one small pull request of a builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
 };
 
@@ -248,7 +248,7 @@ export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a builder of another provider to read `core/modules/other-builders.md` at the start of every task");
+      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/modules/other-builders.md` at the start of every task");
       if (/^\|\s*\*Codex's checks\*\s*\|/m.test(p.manifest)) wrong.push("the manifest's row *Codex's checks* is renamed *other builders' checks*");
       return wrong.length ? `${wrong.join("; ")}.` : null;
     },

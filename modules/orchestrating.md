@@ -3,8 +3,8 @@
 Read by the orchestrator (`modules/roles.md`) when it starts.
 
 - **It builds nothing itself** (core archive 27): every lane goes to a builder session of its own, with its own brief
-  (`modules/helpers.md`, "A brief is written as a rule is"), another provider's first (`modules/roles.md`), at the
-  builder's model and effort.
+  (`modules/helpers.md`, "A brief is written as a rule is"), its tool picked as `modules/roles.md`, "The builders",
+  says, at the builder's model and effort.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn (core archive 200), on the owner's computer
@@ -39,7 +39,8 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   fixes while its context is under an hour old and small; otherwise a fresh one (core archive 10).
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can
   (core archive 185): once its task merged, or it stopped with its work pushed and its note in its PR's description (for
-  usage too: a fresh builder picks up from the branch), its last message read and nothing scheduled bound to it.
+  usage too: a fresh builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound
+  to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
 - **A lane for every independent entry** (core archive 11). Where the look's cleaning issue stands, cleaning gets
@@ -50,9 +51,19 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
   (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
   told to stop; not one that waits only on the owner's yes.
-  - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to another
-    provider's builder, or waits, marked in the *progress file*, tried once a day, named to the owner once.
-  - Nothing stops to save usage.
+  - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of
+    another tool, or waits, marked in the *progress file*, tried once a day, named to the owner once.
+- **The pace is the owner's** (core archive 232; #249). By default no session slows or stops work to save usage by its
+  own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
+  "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
+  line, how much of a usage window is left free for the owner's own use.
+  - Two things are saved, and they differ. The orchestrator's provider keeps the work going: where builders on it empty
+    its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
+    `modules/roles.md`, "The builders", says. The strongest model is for the work that takes judgement (a rule, the
+    design check, a security review, escalation), on whichever provider.
+  - It does not mean a session stands idle while the owner's allowance goes unused.
+  - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
+  - Held by nothing yet: the usage left is no mark a check reads.
 - **It asks the owner nothing** but floor rule 14's yeses (core archive 133 and 134): it does it and reports it in a
   line.
   - Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the

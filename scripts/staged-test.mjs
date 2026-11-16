@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { rules } from "./rules.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { CASES, MONTHS, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, unplaced, wellFormed } from "./staged.mjs";
+import { CASES, MONTHS, TOOL, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, toolNamed, tools, unplaced, wellFormed } from "./staged.mjs";
 import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "./staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
@@ -291,6 +291,28 @@ ok(!gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", ["secr
 ok(forRelease(null).held && /Mend: /.test(forRelease(null).held) && forRelease({ runs: [null] }).held && !wellFormed({ runs: [{ at: "2026-12-01", cases: { stop: null } }] }),
   "a record in the commit that cannot be read, or a run in no form the gate reads, holds the release, saying the mend");
 ok(gate({ runs: [run("2026-10-03"), run("2026-11-02"), run("2026-12-01", true, "stop")] }).failing.some(f => f.name === "stop"), "a passing verdict found wrong counts as failing");
+
+// ---- tool by tool (modules/tools.md, "Proven by the staged cases, tool by tool") ----
+const inTool = (r, tool) => ({ ...r, tool });
+const kiro = [run("2026-12-01"), inTool(run("2026-12-03", ["stop"]), "Kiro")];
+let t = tools({ runs: kiro });
+ok(t.length === 2 && t.find(x => x.tool === "Claude Code").passed && !t.find(x => x.tool === "Kiro").passed && t.find(x => x.tool === "Kiro").open.join() === "stop",
+  "each tool's standing is its own runs': one that failed a case has not passed, and names it");
+ok(tools({ runs: [inTool(run("2026-12-03"), "Kiro")] }, "2026-12-10")[0].open.length === CASES.length && tools({ runs: [inTool(run("2026-12-03"), "Kiro")] }, "2026-12-01")[0].passed,
+  "a pass stands until the next release: runs before the newest release's day count for nothing");
+ok(tools({ runs: [inTool(run("2026-12-03", true, "stop"), "Kiro")] })[0].open.join() === "stop", "a pass found wrong passes nothing");
+const dueKiro = due({ at: "2026-12-04T00:00:00Z", record: { runs: kiro }, root: s.core, since: "2026-12-01" });
+ok(dueKiro.length === 0, "none is due for a tool that ran every case since the release, nor for the builder's tool in the month it ran");
+const dueAfter = due({ at: "2026-12-20T00:00:00Z", record: { runs: kiro }, root: s.core, since: "2026-12-15" });
+ok(dueAfter.filter(d => d.tool === "Kiro").length === CASES.length && dueAfter.every(d => /since the release of 2026-12-15/.test(d.why)), "after a release, every case is due again for a tool that has run");
+ok(due({ at: "2026-12-04T00:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core }).every(d => !d.tool), "no case is due for a tool that has never run");
+const dueOwn = due({ at: "2026-12-20T00:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core, since: "2026-12-15" });
+ok(dueOwn.length === CASES.length && dueOwn.every(d => !d.tool && /since the release of 2026-12-15/.test(d.why)), "after a release, every case is due again for the builder's tool too, though it ran that month");
+ok(!gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "Kiro")] }).failing.some(f => f.name === "stop"), "another tool's failing verdict holds no release: it says whether that tool works with the core");
+ok(toolNamed("claude  CODE") === TOOL && toolNamed("kiro") === "Kiro" && toolNamed("Claude Code (Opus)") === null, "a tool is named case and spacing aside, and only one the core has a part for");
+ok(gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "claude code")] }).failing.some(f => f.name === "stop") && gate({ runs: [...three, inTool(run("2027-01-06", ["outsider"]), "Claude Code (Opus)")] }).failing.some(f => f.name === "outsider"),
+  "a run named otherwise than a known other tool counts as the builder's, so its failure holds a release still");
+ok(/Kiro not \(stop\)/.test(forRelease({ runs: kiro }).said) && /Claude Code passed every case/.test(forRelease({ runs: kiro }).said), "the release says each tool's standing");
 ok(forRelease({ runs: [run("2027-01-02", ["stop"])] }, { boundBefore: true }).held, "cases that held the release before go on holding it");
 const prior = { runs: three }, marked = JSON.parse(JSON.stringify(prior)); marked.runs[2].cases.secret.wrong = "misread";
 ok(lost(prior, { runs: three.slice(0, 2) }).length === CASES.length && lost(prior, { runs: [] }).length === CASES.length * 3 && lost(prior, marked).length === 0 && lost(prior, { runs: [...three, run("2027-01-02")] }).length === 0,
