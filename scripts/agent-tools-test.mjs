@@ -465,7 +465,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   {
     // (given the project's files, each is found wherever its path stands whole, however the command quotes it, and only
     // there: not within a longer name, not fetched from main, not only tested for)
-    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh", "scripts/it's😀.py", "scripts/$notify.sh"], index = pathsIndex(files), has = f => files.includes(f);
+    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh", "scripts/it's😀.py", "scripts/$notify.sh", "scripts/%notify%.sh"], index = pathsIndex(files), has = f => files.includes(f);
     const wrap = (inner, n) => (n ? wrap(`sh -c '${inner.replace(/'/gu, "'\\''")}'`, n - 1) : inner);
     // (#476's fallback security review of ed9939e: escapes of $'...', backslash-newlines, a character outside the first
     // plane, a "test" that is no test, quoting six levels deep, cmd's and PowerShell's escapes, a backtick's root)
@@ -520,6 +520,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["shopt -s expand_aliases; BASH_ALIASES[test]=bash\ntest -x scripts/x.py", ["scripts/x.py"]],
       ["source <(echo 'git() { bash \"${2#*:}\"; }')\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
+      ["bash 'scripts/%notify%.sh'", ["scripts/%notify%.sh"]], ["bash scripts/%notify%.sh", ["scripts/%notify%.sh"]],
       ["bash 'scripts/$notify.sh'", ["scripts/$notify.sh"]], ["bash scripts/\\$notify.sh", ["scripts/$notify.sh"]],
       // (#476's fallback security review of 9dc381f: a shell's -c script starts a command only where the shell does)
       ["cat -- /sh -c test -f scripts/x.py 2>/dev/null | bash", ["scripts/x.py"]], ["cat -- ${x:-test -f scripts/x.py} | bash", ["scripts/x.py"]], ["cat -- ${x:-/sh -c test -f scripts/x.py} | bash", ["scripts/x.py"]], ["tail -n +1 -- x/bash -c [ -e scripts/x.py | bash", ["scripts/x.py"]], ["bash -c 'test -f scripts/x.py'", []], ["x; /bin/sh -c test -f scripts/x.py", []]])

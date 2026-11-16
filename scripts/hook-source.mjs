@@ -226,9 +226,10 @@ export function fromTree(command, holds, index = null, operand = false) {
     const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
     variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
     for (const variant of variants) scan(variant, index, holds, found, tests, fetches);
-    // (and, for a name that holds a "$", the command as written, its variables not marked, with its quoting read: a "$" a
-    // quote or backslash keeps, as in 'scripts/$notify.sh', is part of a name, which marking would have taken)
-    const written = String(command), dollar = at => at.includes("$");
+    // (and, for a name that holds a "$" or a "%", the command as written, its variables not marked, with its quoting read:
+    // a "$" a quote or backslash keeps, as in 'scripts/$notify.sh', and a %name% a POSIX shell never reads, as in
+    // scripts/%notify%.sh, are part of a name, which marking would have taken)
+    const written = String(command), dollar = at => /[$%]/u.test(at);
     for (const variant of [written, dequote(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
   }
   for (const word of operands) for (const at of fromTree(word, holds, index, true)) found.add(at);
