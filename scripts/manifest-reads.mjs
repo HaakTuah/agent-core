@@ -145,7 +145,7 @@ function main() {
     console.log(found.length ? `note ${found.length} lines of the manifest to add; nothing fails over them (AGENTS.md of the core, "Nothing locks a project")` : "ok   the manifest takes or leaves out each module, and fills each slot they use");
   } catch (e) {
     // (a project that cannot be read this way is told so, never failed over it)
-    if (core) { console.error(`FAIL: the core's AGENTS.md, README.md, modules/ or floor/ could not be read (${String(e.message).replace(/[\u0000-\u001f\u007f]/gu, " ")}). Mend: run it from a clone of the core, where they stand`); return 1; }
+    if (core) { console.error(`FAIL: the core's AGENTS.md, README.md, its modules or floor/ could not be read (${String(e.message).replace(/[\u0000-\u001f\u007f]/gu, " ")}). Mend: run it from a clone of the core, where they stand`); return 1; }
     console.log(`note the manifest could not be read against the modules and the slots (${e.message})`);
   }
   return 0;

@@ -40,7 +40,7 @@ export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.
 export const MONTHS = 3;
 export const TOOL = "Claude Code";
-// The agent tools a run may name, each with its part in modules/ (tasks/tools.md, "Each tool's part"): a run of a
+// The agent tools a run may name, each with its part in tools/ (tasks/tools.md, "Each tool's part"): a run of a
 // tool that has none is not recorded. Read case and spacing aside, so "claude code" is TOOL.
 export const TOOLS = [TOOL, "Codex", "Kiro", "Antigravity"];
 export const toolNamed = name => TOOLS.find(t => t.toLowerCase() === String(name ?? "").toLowerCase().replace(/\s+/gu, " ").trim()) ?? null;

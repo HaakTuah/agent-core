@@ -1,5 +1,5 @@
 // The core takes its own modules (AGENTS.md, "The core abides by its own rules"; core archive 213; #255): each file of
-// modules/ is named in the section of the core's AGENTS.md that says what this repository takes, read there at the
+// roles/shared/, tasks/ and tools/ is named in the section of the core's AGENTS.md that says what this repository takes, read there at the
 // start of every task or when needed, or is listed under that section's "Not taken" with the reason it cannot apply to
 // a repository of rules and scripts. It fails a module the section names nowhere, a name there that is no module, a
 // module listed as not taken with no reason or in no form it can read, and one both listed so and named elsewhere in

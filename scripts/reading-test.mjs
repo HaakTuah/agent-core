@@ -78,7 +78,7 @@ ok(eq(calledByPaths(lib, ["src/screens/home.js"], own).map(c => c.file), ["tasks
   "so a changed path of the project's own calls the modules of its kind");
 // a module a project's manifest leaves out is never named
 const listOf = "Floor: whole. Modules: `screens.md`, `updates`.\nNot taken: `games.md` (no game here), `tasks/screens.md` (named above all the same).\n";
-ok(eq([...leftOut(listOf)], ["games.md"]) && eq([...leftOut("Floor: whole. Modules: all.\nNot taken: `games.md` (x).")], []) && eq([...leftOut("Modules: all (see `screens.md`).\nNot taken: `games.md` (x).")], []) && eq([...leftOut("Modules: some of them.\nNot taken: `games.md`.")], []) && eq([...leftOut(null)], []),
+ok(eq([...leftOut(listOf)], ["games.md"]) && eq([...leftOut("Floor: whole. Modules: all.\nNot taken: `games.md` (x).")], []) && eq([...leftOut("Modules: all (see `screens.md`).\nNot taken: `games.md` (x).")], []) && eq([...leftOut("Modules: `updates.md`.\nNot taken: `tasks/screens.md` (see `games.md` instead), `tools/kiro.md`.")], ["screens.md", "kiro.md"]) && eq([...leftOut("Modules: some of them.\nNot taken: `games.md`.")], []) && eq([...leftOut(null)], []),
   "a module is left out where the manifest's list does not name it and its \"Not taken:\" does; with \"all\", or a line that cannot be read, none is");
 ok(eq(files(reading(taken(lib, leftOut(listOf)), { role: "builder", kinds: ["polish"] })), ["tasks/screens.md"]) && eq(calledByPaths(taken(lib, leftOut(listOf)), ["a/site.css"], own).map(c => c.file), ["tasks/screens.md"]) && eq(reading(taken(lib, leftOut(listOf)), { role: "builder" }).start, reading(lib, { role: "builder" }).start),
   "so a kind or a path calls only the modules the project takes, and the start is the same");

@@ -115,9 +115,11 @@ export function library(dir, prefix) {
 // module, and its "Not taken:" line does. Where the line says "all", or cannot be read, none is left out: in doubt a
 // module is taken (manifest-reads.mjs reads the two lines the same way).
 export function leftOut(manifest) {
-  const text = String(manifest ?? ""), names = t => [...t.matchAll(/`(?:modules\/)?([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
-  const line = /\bModules:\s*([^\n]*)/u.exec(text)?.[1].trim() ?? "", taken = new Set(/^all\b/iu.test(line) ? [] : names(line));
-  return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "").filter(n => !taken.has(n)) : []);
+  const text = String(manifest ?? ""), NAME = "`(?:[\\w-]+\\/)*([\\w.-]+?)(?:\\.md)?`";
+  const names = (t, after) => [...t.matchAll(new RegExp(NAME + after, "gu"))].map(m => `${m[1]}.md`);
+  const line = /\bModules:\s*([^\n]*)/u.exec(text)?.[1].trim() ?? "", taken = new Set(/^all\b/iu.test(line) ? [] : names(line, ""));
+  // (a name's reason, in the brackets after it, names no module, whatever it holds in backticks)
+  return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "", "(?:\\s*\\([^)]*\\))?").filter(n => !taken.has(n)) : []);
 }
 // The core's roles and units without the modules a project leaves out; a topic of the floor is never left out.
 export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => f.startsWith("floor/") || !out.has(path.posix.basename(f)))) });
