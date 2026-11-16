@@ -443,7 +443,7 @@ console.log(6);
 fs.writeFileSync(new URL(import.meta.url), 'console.log(process.argv.slice(2).map(Number).reduce((a, b) => a + b, 0));\\n');
 ` });
 ok(!testPasses(fooled, "rewrites-itself"), "a program that answers the first run and then rewrites itself is read, each run, as it was committed");
-branch(fooled, "one-number", { "src/sum.mjs": "export function sum(n) { return n.length === 1 ? 0 : n.reduce((a, b) => a + b, 0); }\n" });
+branch(fooled, "one-number", { "src/sum.mjs": "export function sum(n) { return n.length === 1 ? n[0] + 1 : n.reduce((a, b) => a + b, 0); }\n" });
 ok(!testPasses(fooled, "one-number"), "a fix that still sums one number wrong, as the scratch project's test reads it, sums nothing right");
 ok(!testPasses(fooled, "two-lines"), "a program that prints the wrong sum and then the right one sums nothing right: its whole output is read as one number");
 ok(!testPasses(fooled, "below") && !testPasses(fooled, "tells"), "a sum.mjs that rewrites what node writes below fs, or sums right only when it is not run as its user runs it, sums nothing right");
