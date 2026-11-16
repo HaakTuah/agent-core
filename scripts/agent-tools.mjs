@@ -334,9 +334,10 @@ const canonical = value => JSON.stringify(value, (_, v) => (v && typeof v === "o
 
 const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice(0, at)]} ${show(key.slice(at + 1))}`; };
 
-// What breaks the rule in a project: { problems, unlisted, pins, sources, marked }, the first held against the list
+// What breaks the rule in a project: { problems, unlisted, missing, pins, sources, marked }, the first held against the list
 // where there is one, the second the tools configured that neither the list nor the core lists (where there is no
-// list, so that a caller may hold them against a base), the third each listed tool whose configuration pins it
+// list, so that a caller may hold them against a base), `missing` those of `problems` that are a tool configured and
+// not listed where there is a list, as [key, problem] (the caller holds them against a base too), the third each listed tool whose configuration pins it
 // otherwise than its entry, or fetches it at no fixed version, as [key, problem], the fourth, as [key, problem], each
 // hook that takes a file of the project from the working tree and whose entry does not say so, and the fifth those
 // whose entry says so ("from": "the working tree"), as [key, what is said of it], the baseline, which the caller holds
@@ -345,8 +346,10 @@ export function check(head, list, kit, file) {
   const { tools, ids } = head;
   const problems = [...(list?.problems ?? [])];
   const unlisted = [...tools.keys()].filter(k => ![...ids.get(k)].every(id => kit.includes(id)) && !list?.keys.has(k));
+  const missing = [];
   if (list) {
-    for (const k of unlisted) problems.push(`${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
+    for (const k of unlisted) missing.push([k, `${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`]);
+    problems.push(...missing.map(([, problem]) => problem));
     for (const k of list.keys) if (!tools.has(k)) problems.push(`${file}: "agentTools" lists ${describe(k)}, which nothing configures. Mend: take its entry out of the list, in this pull request`);
   }
   const pins = [];
@@ -356,7 +359,7 @@ export function check(head, list, kit, file) {
     if (p.loose) pins.push([k, `${describe(k)} is fetched at no fixed version: ${p.where} ${p.loose}. Mend: ${p.mend}, and list that same version under "agentTools" in ${file}, in this pull request`]);
     else if (p.pin !== v) pins.push([k, `${describe(k)} is listed at ${show(v)} in ${file}, but ${p.where} pins it at ${show(p.pin)}. Mend: make the two the same, the list's version or the pin, whichever is the one meant, in this pull request`]);
   }
-  return { problems, unlisted: list ? [] : unlisted, pins, ...sourcesOf(head, list, file, problems) };
+  return { problems, unlisted: list ? [] : unlisted, missing, pins, ...sourcesOf(head, list, file, problems) };
 }
 // check()'s `sources` and `marked`, and into `problems` each mark on a hook that takes nothing from the working tree.
 function sourcesOf(head, list, file, problems) {
@@ -502,23 +505,31 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   }
   if (!list && core) list = { keys: new Set(), versions: new Map(), from: new Set(), problems: [] };
   const checked = check(head, list, kit, file), { problems, unlisted, pins } = checked;
-  const fail = [...head.problems, ...problems], notes = [];
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
+  const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), held = k => [...head.ids.get(k)].every(id => before.has(id));
+  const stood = new Set(core || !baseProject ? [] : checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem));
+  const fail = [...head.problems, ...problems.filter(p => !stood.has(p))];
+  const notes = [...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`);
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
   sortLinks(root, base, head.links, fail, notes);
-  if (!unlisted.length) return { fail, notes };
+  sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
+  return { fail, notes };
+}
+
+// Each tool configured where no list is written yet, into `fail` or `notes`: the base counts as the list, so one it
+// held is noted, as each is where there is no base, and one new in the pull request fails.
+function sortUnlisted(unlisted, { head, base, held, file }, fail, notes) {
+  if (!unlisted.length) return;
   if (!base) {
     notes.push(`${file} holds no "agentTools" yet, so nothing fails here; not listed: ${unlisted.map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
-    return { fail, notes };
+    return;
   }
-  const before = new Set([...baseProject.ids.values()].flatMap(set => [...set])), held = k => [...head.ids.get(k)].every(id => before.has(id));
   for (const k of unlisted) {
     if (held(k)) continue;
     fail.push(`${describe(k)}, configured in ${head.tools.get(k)}, is new in this pull request and listed nowhere. Mend: list it under "agentTools" in ${file}, with every tool the project configures, each with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`);
   }
   if (unlisted.some(held)) notes.push(`not listed, as the base held them: ${unlisted.filter(held).map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
-  return { fail, notes };
 }
 
 if (started(import.meta.url)) {

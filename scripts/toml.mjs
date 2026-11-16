@@ -5,7 +5,8 @@
 // a key given twice included, is refused, as the tool that reads the file refuses it, and so is a value nested deeper
 // than guards.mjs's DEEPEST, so that what reads it after never runs out of stack. Node's own modules only.
 //
-//   import { parseToml } from "./toml.mjs";   parseToml(text) -> an object, or throws a SyntaxError naming the line
+//   import { parseToml } from "./toml.mjs";   parseToml(text) -> an object, or throws a SyntaxError naming the line, or,
+//                                             where the whole nests too deep, saying so of the file
 import { DEEPEST, tooDeep } from "./guards.mjs";
 
 const BARE = /[A-Za-z0-9_-]/u;
@@ -41,7 +42,7 @@ export function parseToml(text) {
   }
   // (a header's names, the arrays of tables on its way and a dotted key below it each nest a level: the whole is counted
   // once read, as guards.mjs counts JSON)
-  if (tooDeep(root)) throw new SyntaxError(`it nests deeper than ${DEEPEST} tables and arrays`);
+  if (tooDeep(root)) throw new SyntaxError(`the file nests deeper than ${DEEPEST} tables and arrays`);
   return root;
 }
 
