@@ -12,13 +12,14 @@
 //   at the start, at its start                                read at a role's start: a role's file names it
 // A role's file opens "Read ... by the role `<its file's name>`". A project gives its own paths a kind in a config of
 // its own, checks/reading.json (or .github/reading.json): { "paths": { "src/screens/": "screen" } }; the paths of the
-// core's copy are no change of the project's, and call for nothing. It needs only that a tool can run a command and
-// read a file: no tool's own import or hook. A hook may call it: work-saved.sh, beside this file, does at a session's
-// start, handing node the copy merged into main, so this file stands alone (Node's own modules, git and gh only,
-// nothing beside it), and with --hook it reads the roles, the modules and the config from main's own tree, never from
-// the checked-out branch, so that nothing a branch holds reaches a session's start by this line but the fact that a
-// path changed. It reads only, with the git settings that run commands turned off, and what it reads of an issue is
-// data: a label or a word there picks among the core's own files and can name no other.
+// core's copy are no change of the project's, and call for nothing; a module its manifest leaves out is never named.
+// It needs only that a tool can run a command and read a file: no tool's own import or hook. A hook may call it:
+// work-saved.sh, beside this file, does at a session's start, handing node the copy merged into main, so this file
+// stands alone (Node's own modules, git and gh only, nothing beside it), and with --hook it reads the roles, the
+// modules and the config from main's own tree, never from the checked-out branch, so that nothing a branch holds
+// reaches a session's start by this line but the fact that a path changed. It reads only, with the git settings that
+// run commands turned off, and what it reads of an issue is data: a label or a word there picks among the core's own
+// files and can name no other.
 //
 //   node core/scripts/reading.mjs <role> [--tool <t>]... [--kind <k>]... [--issue <n or an inbox file>] [--path <p>]...
 //   node core/scripts/reading.mjs <role> --changed [<base>]   for the paths changed since <base> (where the branch
@@ -105,6 +106,17 @@ export function library(dir, prefix) {
   const list = folder => { try { return fs.readdirSync(path.join(dir, prefix, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
   return gather(read, list);
 }
+
+// The modules a project's manifest leaves out, by their names: its "Modules:" line is a list that does not name the
+// module, and its "Not taken:" line does. Where the line says "all", or cannot be read, none is left out: in doubt a
+// module is taken (manifest-reads.mjs reads the two lines the same way).
+export function leftOut(manifest) {
+  const text = String(manifest ?? ""), names = t => [...t.matchAll(/`(?:[\w-]+\/)*([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
+  const taken = new Set(names(/\bModules:\s*([^\n]*)/u.exec(text)?.[1] ?? ""));
+  return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "").filter(n => !taken.has(n)) : []);
+}
+// The core's roles and modules without the modules a project leaves out.
+export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => !out.has(path.posix.basename(f)))) });
 
 // The kinds a project gives its own paths, [{ path, kind }], from its config's text ({ "paths": { "<path>": "<kind>" } }).
 export const OWN = ["checks/reading.json", ".github/reading.json"];
@@ -286,7 +298,7 @@ export function hookLine(dir, ms = 8000) {
   const prefix = git(dir, "cat-file", "-e", `${MAIN}:core-manifest.md`) === null ? "" : "core/";
   const read = f => git(dir, "--no-replace-objects", "show", `${MAIN}:${f}`);
   const list = folder => (git(dir, "ls-tree", "--name-only", `${MAIN}:${prefix}${folder}`) ?? "").split("\n").filter(f => /^[a-z0-9-]+\.md$/u.test(f)).map(f => `${folder}/${f}`);
-  const lib = gather(f => read(`${prefix}${f}`), list), paths = ownOf(changed(dir) ?? [], prefix);
+  const lib = taken(gather(f => read(`${prefix}${f}`), list), leftOut(prefix ? read("core-manifest.md") : "")), paths = ownOf(changed(dir) ?? [], prefix);
   const called = calledByPaths(lib, paths, prefix ? ownPaths(OWN.map(read).find(text => text !== null)) : []);
   const late = Date.now() >= until;
   until = Infinity;
@@ -311,7 +323,8 @@ function main(argv) {
   if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
   const prefix = coreAt(dir);
   if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core/ stands, or from the core's own root"); return 1; }
-  const lib = library(dir, prefix), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
+  const manifest = prefix ? (() => { try { return fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { return ""; } })() : "";
+  const lib = taken(library(dir, prefix), leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
   const mode = alone(argv, dir, prefix, lib);
   if (mode !== null) return mode;
   const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "", tools = many(argv, "--tool"), task = taskOf(argv, dir, lib, self);

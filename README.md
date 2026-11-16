@@ -31,7 +31,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   given role reads for a given task, for any agent tool that can run a command, and names what a pull request's changed
   paths called for: `modules/tools.md`, "One script says what to read". A project gives its own folders a kind of task
   in a config of its own, `checks/reading.json` (`{ "paths": { "src/screens/": "screen" } }`; the kinds:
-  `node core/scripts/reading.mjs --kinds`), so that a changed screen calls its module; the starter kit writes none.
+  `node core/scripts/reading.mjs --kinds`), so that a changed screen calls its module; the starter kit writes none. A module the manifest leaves out is never
+  named.
 - **The caps:** what a role reads at its start stays within that role's cap, which `scripts/size.mjs` sets (core archive
   164, 169, 171, 179, 181, 182, 187, 191, 201 and 233), checked on every PR here, so a new rule there replaces text
   rather than adding to it (core archive 134); a file read only when a task calls for it is held by the reviews'

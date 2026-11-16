@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { FLOOR, FLOOR_WHEN, READ_LINE, START, asked, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, whenOf } from "./reading.mjs";
+import { FLOOR, FLOOR_WHEN, READ_LINE, START, asked, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "./reading.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -75,6 +75,12 @@ ok(eq(own, [{ path: "src/screens/", kind: "screen" }, { path: "*.css", kind: "po
 ok(eq(ownOf(["core/CLAUDE.md", "core/.node-version", "src/a.js", "core-manifest.md"], "core/"), ["src/a.js", "core-manifest.md"]) && eq(ownOf(["core/x", "CLAUDE.md"], ""), ["core/x", "CLAUDE.md"]), "in a project the paths of the core's copy are no change of its own; in the core every path is");
 ok(eq(calledByPaths(lib, ["src/screens/home.js"], own).map(c => c.file), ["modules/screens.md"]) && /of the kind screen by the project's reading config/.test(calledByPaths(lib, ["src/screens/home.js"], own)[0].why) && eq(calledByPaths(lib, ["a/site.css"], own).map(c => c.file), ["modules/screens.md", "modules/games.md"]) && eq(calledByPaths(lib, ["src/other.js"], own), []),
   "so a changed path of the project's own calls the modules of its kind");
+// a module a project's manifest leaves out is never named
+const listOf = "Floor: whole. Modules: `screens.md`, `updates`.\nNot taken: `games.md` (no game here), `modules/screens.md` (named above all the same).\n";
+ok(eq([...leftOut(listOf)], ["games.md"]) && eq([...leftOut("Floor: whole. Modules: all.\nNot taken: `games.md` (x).")], []) && eq([...leftOut("Modules: some of them.\nNot taken: `games.md`.")], []) && eq([...leftOut(null)], []),
+  "a module is left out where the manifest's list does not name it and its \"Not taken:\" does; with \"all\", or a line that cannot be read, none is");
+ok(eq(files(reading(taken(lib, leftOut(listOf)), { role: "builder", kinds: ["polish"] })), ["modules/screens.md"]) && eq(calledByPaths(taken(lib, leftOut(listOf)), ["a/site.css"], own).map(c => c.file), ["modules/screens.md"]) && eq(reading(taken(lib, leftOut(listOf)), { role: "builder" }).start, reading(lib, { role: "builder" }).start),
+  "so a kind or a path calls only the modules the project takes, and the start is the same");
 ok(eq([...kindsOf(lib).keys()].filter(k => !Object.values(FLOOR_WHEN).some(f => f.kinds.includes(k))), ["polish", "review", "screen"]) && eq(kindsOf(lib).get("update"), ["floor/topics.md", "modules/updates.md"]), "the kinds are those the modules name, each with its files");
 
 // the check that every module and role says when
@@ -125,7 +131,7 @@ const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => 
 const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 for (const part of ["floor", "modules", "roles", "scripts"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
-fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n");
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\nFloor: whole. Modules: `screens.md`, `updates.md`, `choices.md`, `helpers.md`, `reviews.md`, `tools.md`.\nNot taken: `game-design.md` (no game).\n");
 fs.mkdirSync(path.join(project, "checks"));
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/screens/": "screen" } })}\n`);
 fs.mkdirSync(path.join(project, "inbox"));
@@ -133,6 +139,7 @@ fs.writeFileSync(path.join(project, "inbox", "idea.md"), "State: queued\nBy: own
 git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "a project");
 const at = (...args) => { const got = spawnSync(process.execPath, [path.join(project, "core", "scripts", "reading.mjs"), ...args], { cwd: project, encoding: "utf8", env: { ...env, GITHUB_REPOSITORY: "" } }); return { status: got.status, out: got.stdout + got.stderr }; };
 ok(coreAt(project) === "core/" && /^  core\/floor\/security\.md\n  core\/roles\/stand-in\.md\n  core\/modules\/inbox\.md\n/m.test(at("stand-in").out) && !/modules\/git\.md/.test(at("stand-in").out), "in a project the files are named under core/, and the stand-in reads its own and not the builder's", at("stand-in").out);
+ok(/core\/modules\/screens\.md/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("--kinds").out), "a module the project's manifest leaves out is named for no kind", at("builder", "--kind", "polish").out);
 r = at("builder", "--issue", "inbox/idea.md");
 ok(r.status === 0 && /  core\/modules\/helpers\.md +the issue names it\n/.test(r.out) && /  core\/modules\/choices\.md +the kind choice, which the issue names\n/.test(r.out) && /note the issue names "whatever" under "What to read", which is no kind or file of the core/.test(r.out) && !/^  .*constructor/m.test(r.out), "an item of the inbox's folder is read as the issue: the kinds and files it names, a word that is neither noted, and a name every object carries no file", r.out);
 r = at("builder", "--issue", "41");
