@@ -450,13 +450,7 @@ export function readProject(root, rev = null) {
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
-  // (the files, and the links, as git lists them in the tree too, whose paths heldAt() reads through read())
-  const all = rev ? () => [...listing(root, rev).blobs, ...listing(root, rev).links] : () => {
-    let out = "";
-    try { out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
-    return out.split("\0").filter(Boolean);
-  };
-  return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null, all), links };
+  return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null, () => filesOf(root, rev)), links };
 }
 
 // Whether the commit `rev` holds a file at a path, as configured()'s `holds` asks it word by word of a hook's command:
@@ -467,6 +461,15 @@ function heldAt(root, rev, read) {
     return links.some(at => f === at || f.startsWith(`${at}/`)) ? read(f) !== null : blobs.has(f);
   };
 }
+// The paths of every file the project holds, at the commit `rev` or in the working tree, as git lists them: at a commit
+// its files and its links, whose paths heldAt() reads through read(); in the tree, what git tracks or does not ignore.
+function filesOf(root, rev) {
+  if (rev) return [...listing(root, rev).blobs, ...listing(root, rev).links];
+  let out = "";
+  try { out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
+  return out.split("\0").filter(Boolean);
+}
+
 // The files and links of the commit `rev`, git asked once for each commit: { blobs, links }.
 const listings = new Map();
 function listing(root, rev) {
