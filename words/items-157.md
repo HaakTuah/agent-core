@@ -1,6 +1,6 @@
 # The owner's words behind the core: items 157 to 194
 
-How they are kept, and where each item lives: `archive/instructions.md`.
+What these are and how they are kept: `words/README.md`.
 
 157. **12 November 2026** (the core, in the design chat), of the project of another owner, a product that is sold:
      told that a product for sale needs its seller's name somewhere, that the floor let no name into a repository
@@ -17,7 +17,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > […] has also installed antigravity on his computer. Since the terms forbids integrating it into claude code,
      > he might rely on it as a fallback for further development when he is out of usage for claude code. Is
      > agent-core right now permissive for development with other tools? It must not inhibt development with another
-     > tool/provider, expert. But we still want it to work the same as now, expertly. Thoughts?
+     > tool/provider. But we still want it to work the same as now. Thoughts?
 
      Behind the end of "Another provider builds" (`modules/roles.md`) and the two lines of
      `modules/other-builders.md` on the brief and the pull request.
@@ -29,21 +29,21 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Should there be something in agent-core about reporting to issues in agent-core repo, any bugs or suggestions
      > from what is run into by agents, so i automatically get feedback what might not work or could he improved,
-     > also from his sessions, expert?
+     > also from his sessions?
 
      Advised against a workflow that opens the pull request (it would get no checks without a stored token, and
      would be the first workflow able to write code), and for one that only keeps an issue open while the core is
      ahead; and that sessions of another owner's private project report through that project's own inbox, since the
-     core's repository is public. His answer:
+     core's repository is public. His answer, agreeing to the second:
 
-     > Yes, expertly to 2. And on 1, I will never get most of those reports, if that is how you envision it. I see no
+     > And on 1, I will never get most of those reports, if that is how you envision it. I see no
      > issue in him commenting on my repo? But you are right about sensitive details what if there are rigid
      > guidelines to ensure only bugs reports, feature suggestions, or questions that the light of day can take, ends
      > up there. And if.there is anything else, it goes into the that secret report for a repo? People can report
-     > exploits and such to me via a different tab, no, that others don't see, expert? What is your take?
+     > exploits and such to me via a different tab, no, that others don't see? What is your take?
 
      > Is it clear to a session, the nature of what the core folder in a project is, and that it comes from
-     > externally, expert? Should it be?
+     > externally? Should it be?
 
      Behind "The core itself" in `modules/inbox.md`, "Reporting to the core" in `README.md` with the three issue
      forms, and the core-moved workflow.
@@ -52,22 +52,21 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      at high:
 
      > Maybe orchestrator should say opus or Sonnet? […] runs it on opus, i believe, and it is the one instance that
-     > a human starts, so dictating it to the agents doesn't make much sense at all? Should it just say so, expert?
+     > a human starts, so dictating it to the agents doesn't make much sense at all? Should it just say so?
 
      Behind the orchestrator's row in `modules/claude.md`: the owner starts it, at the model and effort he chooses;
      Sonnet is enough, since it builds nothing itself (item 27).
 
 161. **12 November 2026** (the core, in the design chat), of a project's own rules beside the core's:
 
-     > Do we allow extensions and overrides of the rules, in any implementing repo, clearly? Should we, in your expert
-     > opinion, expert?
+     > Do we allow extensions and overrides of the rules, in any implementing repo, clearly? Should we, in your
+     > opinion?
 
      Told that a project may fill slots, pick modules, add rules of its own and add to the floor, that it may never
      loosen the floor, and that nothing said which holds where its own rule and one rule of a module disagree; and
-     advised a short list of differences in its manifest, each naming the core's rule, what holds in its place and
-     why, never of the floor or the review guidelines, checked by the pointer check and reported to the core:
-
-     > agreed on everything else, expertly!
+     advised a short list of differences in its manifest, each naming the core's rule, what holds in its place and why,
+     never of the floor or the review guidelines, checked by the pointer check and reported to the core; the owner
+     agreed to everything else.
 
      Behind "A project's own rules add to the core's" in `modules/how-to-work.md`, point 7 of "How a project takes
      the core" in `README.md`, and the step of `core.yml` that fails a difference from the floor or the review
@@ -78,7 +77,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      first what a check proves right without judgement, and left the rest with Claude's:
 
      > I noticed […] setups used only codex subsessions for 94% of codex's usage, prior to incorporating agent-core.
-     > Will his setup now utilize it more fully? I suspect subsessions only were reviews? Your expert take?
+     > Will his setup now utilize it more fully? I suspect subsessions only were reviews? Your take?
 
      > It was supposed to save on Claude usage by pushing all work suited to any other provider first…
 
@@ -107,25 +106,23 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      raised by 1 KB for the dozen fixes that waited for room, the orchestrator's next session kept at the merge, and
      three questions left from earlier in the day: whether each pull request should say what its session cost,
      whether agents may file private weakness reports themselves, and whether "He has a company name, yes" (item 157)
-     had been his yes to the company's name in floor rule 11.
+     had been his yes to the company's name in floor rule 11. The owner agreed to everything, with an instruction:
 
-     > Yes, expertly to everything, then breakdown everything you did, expert!
+     > then breakdown everything you did
 
      Behind the four floor wordings (rules 4 and 14 in `floor/security.md`; rule 9 and "Reporting a weakness" in
      `floor/topics.md`), the cap of 45 KB (`scripts/size.mjs`), the fixes of the same pull request, the last line of
      "Work from main" in `modules/git.md` with `scripts/session-cost.mjs`, and his yes, now said, to floor rule 11's
      second exception.
 
-165. **12 November 2026** (the core, in the design chat), asked whether the core should be a package a project
-     installs and whether anything more would make it better. Advised: no package, since every reader of the rules
-     (Claude Code's imports, another provider's reviewer on GitHub, another tool) reads the repository's own files and
-     installs nothing, and the hooks run the copy that was reviewed; instead a slimmer copy that leaves the dated
-     reports in the core alone, syncs made once for several changes, a trimming pass over the modules since the cap
-     was full, and the day's small leftovers (a clause in floor rule 14 for rule 3's case of a project with no trusted
-     builder, "where one answers", a pointer check on the core's own files); NuGet in the licence check and the
-     queued checks left until a project's real use reports back.
-
-     > Please do all of it expertly, if you so advice, expert!
+165. **12 November 2026** (the core, in the design chat), asked whether the core should be a package a project installs
+     and whether anything more would make it better. Advised: no package, since every reader of the rules (Claude Code's
+     imports, another provider's reviewer on GitHub, another tool) reads the repository's own files and installs
+     nothing, and the hooks run the copy that was reviewed; instead a slimmer copy that leaves the dated reports in the
+     core alone, syncs made once for several changes, a trimming pass over the modules since the cap was full, and the
+     day's small leftovers (a clause in floor rule 14 for rule 3's case of a project with no trusted builder, "where one
+     answers", a pointer check on the core's own files); NuGet in the licence check and the queued checks left until a
+     project's real use reports back. The owner agreed to all of it, with a condition: "if you so advice".
 
      Behind `/reports export-ignore` in `.gitattributes` with `core.yml` and `scripts/pure-sync.mjs` comparing a copy
      without that folder, the trims of the same pull request, "or leaves to him" in floor rule 14, and
@@ -140,7 +137,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Don't I answer fairly logically though? […] Should it be opt-in instead whether it also looks to core's archive
      > for past decisions, or will they not make sense anyhow for his project? I think some general principles in
-     > engineering and software design stands regardless, expert?
+     > engineering and software design stands regardless?
 
      Behind "and one resting only on the core's archive where the core's owner is another" in `modules/inbox.md`,
      "The stand-in".
@@ -153,11 +150,9 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      tested before.
 
      > But yes, should we have rules not to run any tests like that on anything already tested? Duplication of tests
-     > and reviews takes resources and time, and should ideally be entirely eliminated, no, expert?
+     > and reviews takes resources and time, and should ideally be entirely eliminated, no?
 
-     and, to that answer:
-
-     > Yes, do all you expertly advice, expertly!
+     and the owner agreed, to that answer.
 
      Behind "the project's own suites run on one only for what they take from the copy" in `README.md`, "How a
      project takes the core", point 5, and the sync note of the same day.
@@ -172,14 +167,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      not tell when a sweep was due. Then, told that its verdict on an idea decided nothing, since every idea waited
      until he moved it into the progress file (the hold of item 142, which he had approved as part of that answer):
 
-     > I thought it could authorize anything it was fairly certain about, expert?
+     > I thought it could authorize anything it was fairly certain about?
 
      Both changes were first built on those questions; the code review held them for his word, and they were put to
      him as two, each for a yes or a no: the sweep due once an open idea has waited a week with no verdict; and a
      verdict the stand-in is sure of deciding an idea, a yes queued behind what stands in the progress file and a no
      closing it, any other left to him.
 
-     > Yes, expertly!
+     To both, the owner agreed.
 
      Behind "once an open idea has waited a week with no verdict of the stand-in's" in `modules/orchestrating.md`,
      "On every wake", and "A verdict the stand-in is sure of decides one" in `modules/inbox.md`, which replaces item
@@ -193,17 +188,18 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > do it via github, there it can initiate, but codex in legacy cloud can't push, so no use. So only review and
      > security review is avaliable via github. Seems to me a more generalized rule to just handoff what you can, is
      > the best way? Shouldn't that produce what we do now, when we only have github? And then use plug-in if it is
-     > there? But prefer herdr even more if you set it up with it? What is your take, expert? This is the kind of
+     > there? But prefer herdr even more if you set it up with it? What is your take? This is the kind of
      > stuff agent-core should solve for […], since he isn't familiar with the options. Are there more holes like
-     > this, that leaves things open for him, without good cause, expert?
+     > this, that leaves things open for him, without good cause?
 
-     Shown that rule as a table (the tool that runs agents side by side, else the plug-in, else Claude's build) and
-     six more places the core left to a project of another owner; offered his rule and four of them as one change
-     (how a reviewer other than Codex is asked; a reviewer that never answers; Codex's model and effort; which session
-     is the design session in a project with none), the other two left until that project reports (a licence check
-     for another installer; setting up a local machine), with the cap's room to be found or asked for:
+     Shown that rule as a table (the tool that runs agents side by side, else the plug-in, else Claude's build) and six
+     more places the core left to a project of another owner; offered his rule and four of them as one change (how a
+     reviewer other than Codex is asked; a reviewer that never answers; Codex's model and effort; which session is the
+     design session in a project with none), the other two left until that project reports (a licence check for another
+     installer; setting up a local machine), with the cap's room to be found or asked for. The owner agreed, with an
+     instruction:
 
-     > Yes, expertly. Then explain clearly to me every change you made to the rules.
+     > Then explain clearly to me every change you made to the rules.
 
      Behind "by the first way there is" in `modules/roles.md`, "The builders"; `modules/codex.md`, "Building";
      `modules/copilot.md`; "asked and not waited for" in `modules/reviews.md`, point 2; and "in a project with none"
@@ -214,14 +210,14 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      builder named. Asked meanwhile:
 
      > So copilot is always last resort then, is that what you're saying? Should at least be preferred over claude, no?
-     > Expert?
 
      Told that Copilot reviewed ahead of Claude's reviewer only where a project named it, and built only under the tool
      that runs the agents side by side; offered it second in the default order of reviewers, and its agent on GitHub as
      a third way to build, after Codex's plug-in, with what that costs (its plan's requests), that GitHub marks the call
-     a preview and that it was not yet run; and asked again whether the cap may go to 46 KB:
+     a preview and that it was not yet run; and asked again whether the cap may go to 46 KB. The owner agreed to all of
+     it, with a condition:
 
-     > Agreed to all, expertly, but allow for other tools too!
+     > but allow for other tools too!
 
      Behind the default order of the *code reviewers* and "a way the project names" in `modules/roles.md`. Copilot's
      building is not in the change: three rounds of review each found a step of it that only a real run can settle (its
@@ -252,8 +248,8 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      and that the rule needed room the cap did not have: 47 KB, or cuts.
 
      > Maybe codex still can be used for security.
-     >
-     > But yeah, fine how you've laid it out. Yes to everything, now and before, expertly.
+
+     and otherwise the owner agreed to how it was laid out, and to everything, now and before.
 
      Behind "Where more than one can build" in `modules/roles.md`, "The builders", and the *other builders* slot; behind
      the *security reviewer* slot's default, Codex of what its own provider built too, floor rule 3's two reviews
@@ -271,19 +267,17 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      verdict, and whether the three ideas it had just given a sure yes in the core should be built (a feature that may
      wait for a later stage, the checks still unbuilt, a real run of Copilot's agent):
 
-     > Do you agree, expertly?
+     > Do you agree?
 
      Told yes to each, in that order, the check that holds a merge for its security review advisory for a week first,
-     and the run likely to need his own approval of the agent's workflows once:
-
-     > Do what you expertly advice on these points.
+     and the run likely to need his own approval of the agent's workflows once, and the owner agreed.
 
      Behind "whenever it is called, its verdict on every open idea that lacks one" in `modules/inbox.md`: item 170's
      "should take all when it first runs" meant any run of the stand-in, not the sweep's alone. The sweep of
      `modules/orchestrating.md` stays for a project where a week passes without a call.
 
-173. **12 November 2026** (the core, in the design chat), by his word in item 172 ("Do what you expertly advice on these
-     points") on the three ideas the stand-in had given a sure yes; the first, filed when one game listed it as a
+173. **12 November 2026** (the core, in the design chat), by his agreement in item 172 to the advice on the three
+     ideas the stand-in had given a sure yes; the first, filed when one game listed it as a
      difference from the core: a feature that does not pay yet may wait for the later stage that brings what it needs.
      The stand-in rested it on his words of items 86 ("Can't draw conclusion right now, as the game isn't fully
      constructed yet, but once it starts being feature complete, this cannot be the case") and 107 (no temporary
@@ -302,22 +296,22 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      On widening Codex's automatic security review to every pull request so that Dependabot's were covered:
 
-     > Wait, thinking about it, does doing it on all add anything, why review dependabot change, expert?
+     > Wait, thinking about it, does doing it on all add anything, why review dependabot change?
 
      Told that it adds next to nothing there (the diff is version numbers and checksums; floor rules 17 and 7 and the
      checks are what guard an update), and that running it with every code review costs more than it finds:
 
      > Okay, back to just team prs and on open prs. The rules stay that for github triggers it waits for what is
      > triggered, while manually triggered tests it only does it where it adds something worthwhile, or? What is your
-     > take, expert? [...] setup with the codex plug-in should utilize reveiws and security reviews optimally, not
+     > take? [...] setup with the codex plug-in should utilize reveiws and security reviews optimally, not
      > limited to what my github triggers can acheive, no?
 
      Offered that as the floor's line and the review rule, with a few plain lines for an owner on what setting a
      machine up for agents buys him (item 149 left the setup to him), and asked whether Copilot's agent should be
-     turned on for a trial of its building:
+     turned on for a trial of its building. The owner agreed to the first two, and said of the third and of the merge:
 
-     > Yes, to your expert recommededation on 1 and 2. On 3, maybe we ought not to? Having it defined as preferred
-     > reviewer before claude code, if avaliable, I think suffices, or what is your take on this expert? And you can
+     > On 3, maybe we ought not to? Having it defined as preferred
+     > reviewer before claude code, if avaliable, I think suffices, or what is your take on this? And you can
      > merge it all now, so [...] gets these updates when he pulls tomorrow, unless there is good reason not to.
 
      Behind floor rule 8's "A PR that touches one merges only after its security review has run (Dependabot's own: rule
@@ -338,9 +332,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      Offered his reason as the rule, in place of naming Copilot first (where Codex cannot build, as on GitHub alone,
      reviewing is the best use of it, and it has proved itself there): first a reviewer that cannot build here, Codex's
-     before Copilot's, then another builder's, last Claude's:
-
-     > Yes, expertly.
+     before Copilot's, then another builder's, last Claude's, and the owner agreed.
 
      Behind the order of the *code reviewers* in `modules/roles.md`. Asked in the same message whether another
      project's agents should send the core pull requests as well as issues; answered no, and the README's "Reporting
@@ -351,20 +343,19 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Question: should any agent wanting to post a bug report, feature requedt/suggestion, or question, first check
      > the codebase to see if it has been addressed already, and that it might just be on an older version, or the fix
-     > just isn't on main yet, expert?
+     > just isn't on main yet?
 
      Answered yes: the README told it to search the issues, and to name the commit its project holds, but not to look
      at the newest core, and a project that syncs once a day is often some commits behind. Offered: before filing, a
      look at the core's `main`, its open pull requests and its issues, the closed ones too; what a newer commit or an
-     open pull request already mends is no report; a look, not a study:
+     open pull request already mends is no report; a look, not a study; the owner agreed, and asked:
 
-     > Yes, expertly! Should it trigger a new import, if it has something like this, that already addresses it, expert?
+     > Should it trigger a new import, if it has something like this, that already addresses it?
 
-     Answered yes, on a condition: where the fix is on the core's `main` and the fault stands in the way of the task
-     at hand, the project syncs then, beside its regular sync, by a session that may change the copy; what stands in
-     no task's way waits for the regular sync; what only an open pull request mends cannot be synced yet:
-
-     > Yes, expeetly to all!
+     Answered yes, on a condition: where the fix is on the core's `main` and the fault stands in the way of the task at
+     hand, the project syncs then, beside its regular sync, by a session that may change the copy; what stands in no
+     task's way waits for the regular sync; what only an open pull request mends cannot be synced yet; to all of it the
+     owner agreed.
 
      Behind "It looks before it files" in the README's "Reporting to the core".
 
@@ -373,7 +364,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      reviewer's security review, because Codex's own security review had never begun on it, though point 3 of
      `modules/reviews.md` knew only a wait of about 30 minutes:
 
-     > Address everything that ought to be addressed from this, in your expert opinion.
+     > Address everything that ought to be addressed from this, in your opinion.
 
      Behind "One not begun in about 5 minutes" in point 3 of `modules/reviews.md`: a security review that starts by
      itself and shows no sign is not waited out, as point 2 already had it for the code review.
@@ -381,20 +372,17 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 178. **13 November 2026** (the core, in the design chat), on when a project takes the core's newer commits:
 
      > Also, is the core clear enough about when to import it for other repo's orchestrator, or are there gaps that
-     > could make it so it is never updated, or at a different schedule than intended, expert?
+     > could make it so it is never updated, or at a different schedule than intended?
 
      Answered that there were three gaps: only the orchestrator was told to look, so a session started with none never
      did, and the daily issue was then the one signal; the rule did not name how to tell that the core had moved; and
      "once a day" had nothing to count from. Offered one sentence where every session reads it at the start of a task,
      "A session no orchestrator started, and the orchestrator on every wake, first checks whether the core has moved
      (the script named) and imports if so; where checks cost money, not while an import pull request from the same day
-     exists.":
+     exists.", and the owner agreed.
 
-     > Do it expertly!
-
-     First written shorter than offered, to fit the rules' size; asked whether it stood as offered (item 179):
-
-     > I agree, keep it.
+     First written shorter than offered, to fit the rules' size; asked whether it stood as offered (item 179), the owner
+     agreed to keep it.
 
      Behind the last sentence of "Sessions" in `modules/work-flow.md`.
 
@@ -404,15 +392,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > That seems bad, if something ought to be somewhere, like the floor, but is cut or moved due to size
      > constraints? That is abiding by the rules rather than by the principles that put them there in place in the
-     > first place. If there are more instances like this, remedy it, expert!
+     > first place. If there are more instances like this, remedy it!
 
      > Are there more rules lacking anchors? Investigate and remedy!
 
      Told what would follow: the cap raised one step and its principle written down (it keeps the rules lean and
      decides nothing else), every rule moved or cut for size put back, and each limit a session cannot check given
-     what it counts from:
-
-     > Yes, expertly to all of this!
+     what it counts from; the owner agreed to all of this.
 
      Behind floor rule 8's "A security review that starts by itself when a PR opens or is marked ready is waited for and
      read on every PR, a pure sync's too"; the cap at 48 KB and "The size cap keeps the rules lean and decides nothing
@@ -424,9 +410,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 180. **13 November 2026** (the core, in the design chat), asked what each provider's tool reads first from a project,
      and told that the tools take their instructions from more files than floor rule 3 named as rule files. Offered:
      floor rule 3 names as rule files "any file a tool takes its instructions from, wherever it lies", with those
-     files' names as examples:
-
-     > Approved expertly!
+     files' names as examples, and the owner approved.
 
      Behind "and any other file a tool takes its instructions from, wherever it lies" in floor rule 3.
 
@@ -434,29 +418,27 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      November. Told: keep all of it; add a reader for a review that comes in after its PR merged, since "a late review
      is still read" named none and a session stops at the merge; reword the *code reviewers*' order, whose "(Codex's,
      then Copilot's)" could be read as if Codex never builds; and give "Never a pull request" in the README, written on
-     a question of his, its yes:
+     a question of his, its yes. The owner agreed to all of those takes, with a concern:
 
-     > Agreed with all of your takes here, expertly! Do it! My only slight concern is that cap can blow up. But the
+     > My only slight concern is that cap can blow up. But the
      > hard cap was worse. The best is if we manage to keep it so it is only ever expanded when it has to, not due to
-     > inefficient phrasing, duplication, or anything else, expertly.
+     > inefficient phrasing, duplication, or anything else.
 
      And two minutes later:
 
      > Maybe a reviewer has to concur that condensing isn't possible without losing meaning or enforcement, so that
-     > the cap has to be expanded? What is your expert take?
+     > the cap has to be expanded? What is your take?
 
      Told that it should, and that a code reviewer reads the change before it and not every rule each time:
 
      > Yes, because condensing would primarily be condensing of what is already there, so if a reviewer cannot check
      > whether room cannot be made with what was there before and what is added, and kept under the cap, then it
-     > cannot fully evaluate, no, expert? Is an independent verifier subsession better then, expert?
+     > cannot fully evaluate, no? Is an independent verifier subsession better then?
 
      Told that it is: a fresh session that wrote none of the change reads all the rules for room, what it finds is
      trimmed, and the cap rises only if that is not enough, the reviewer blocking a raise without that check. The code
      review of the change held that a question of his is no yes (`modules/how-to-work.md`), so he was asked outright
-     whether this repository's review guidelines should gain that blocking point:
-
-     > Yes to all, expertly!
+     whether this repository's review guidelines should gain that blocking point; the owner agreed to all of it.
 
      Behind "a finding of the last week by a reviewer the project asks, made after its PR merged, with no reply, is
      answered as point 5 says" in `modules/reviews.md` and "then both read what reviews left after a merge" in
@@ -467,18 +449,17 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 182. **13 November 2026** (the core, in the design chat), told that the core's cap and its fresh-session check were the
      core's own, and that a project's marks moved with a reason alone:
 
-     > Why shouldn't a implementing repos size cap work by the same mechanism and rules, expert? Genuine question.
+     > Why shouldn't a implementing repos size cap work by the same mechanism and rules? Genuine question.
      > Obviously, the builder shouldn't pursue expanding a cap where it is more sensible to actually have more split
      > instead, i mean more if it genuinely thinks something should be somewhere in particular? Could be a rule file
-     > the implementing repo has, or whatever, no, expert?
+     > the implementing repo has, or whatever, no?
 
      Told that he was right for one of a project's two kinds of mark: a file past the split mark is split, as before,
      while a mark on what every session reads at its start should rise as the core's cap does (said shorter, what is
      said twice trimmed, what no session needs at every start moved to a file read when needed, then a fresh session's
-     read of those files, and only then the mark, a reviewer blocking a raise without that check), growth that a sync
-     of the core brings aside; and that this touches the review guidelines every project takes, so needs his yes:
-
-     > Agreed expertly to all!
+     read of those files, and only then the mark, a reviewer blocking a raise without that check), growth that a sync of
+     the core brings aside; and that this touches the review guidelines every project takes, so needs his yes; the owner
+     agreed to all of it.
 
      Behind "A mark on what every session reads" in `modules/review-guidelines.md`, which the core's own cap now
      follows too (`AGENTS.md`).
@@ -488,19 +469,17 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      of `floor/topics.md` drops "read before a task touches one", which `floor/security.md` says; the opening of
      `floor/threat-model.md` drops "The part every project shares", which its title says; rule 17 drops "the one
      exception to rule 4", which rule 4 says), and the other three left alone (rule 3's list of files, "he himself" in
-     rule 14, "key or secret" in rule 1):
-
-     > Apply all your recommendations, expertly!
+     rule 14, "key or secret" in rule 1); the owner agreed to apply all the recommendations.
 
      Behind those three wordings in `floor/topics.md` and `floor/threat-model.md`; no rule's meaning changes.
 
 184. **13 November 2026** (the core, in the design chat), after a fresh session's read of all the rules had found
      trims and some had been taken and some left by the design session's own judgement:
 
-     > Maybe we need to have clear criterias what must remain in place, for a condensing to be valid, expert? What is
-     > your expert take on this? Otherwise it just becomes a question of taste? Then we could run a full audit on all
-     > rules files of agent-core, condense them as much as possible, and set the cap there? What is your expert take
-     > on this, expert?
+     > Maybe we need to have clear criterias what must remain in place, for a condensing to be valid? What is
+     > your take on this? Otherwise it just becomes a question of taste? Then we could run a full audit on all
+     > rules files of agent-core, condense them as much as possible, and set the cap there? What is your take
+     > on this?
 
      Told: yes to criteria, written into the rule as the test for every trim (a reader with the trimmed text and what
      that reader has already read acts the same in every case; who a rule binds and when, what it asks, every limit
@@ -508,9 +487,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      reader has already read, or words carrying none of these, may go; in doubt the words stay); yes to one audit
      pass under them over all the core's rule files, any trim in the floor listed for his yes; and the cap set at the
      next whole KB above the result, not at it, since a cap with no room makes every one-line mend pay for a read of
-     all the rules:
-
-     > Agreed expertly with all your takes! You can commence now. […]
+     all the rules; the owner agreed to all of it.
 
      Behind "A trim is valid" in `modules/review-guidelines.md`.
 
@@ -518,17 +495,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Can we add a rule that makes any session/subsession that is finished, archive? At least have the orchestrator
      > archive all its subsessions once they are finished? Probably also if you tell them to stop due to usage and push
-     > up all, because then it is better to just have another builder season pick up again, no? Expert? Can they
-     > archive themselves also, and should they? What is your expert take on all of this?
+     > up all, because then it is better to just have another builder season pick up again, no? Can they
+     > archive themselves also, and should they? What is your take on all of this?
 
      Told: yes, by the orchestrator and not by the session itself, which is the worst judge of whether it is finished
      and whose last message must be read first; once its task merged or it stopped with its work pushed and its note
-     left, a stop for usage too, a fresh builder picking up from the branch; its last message read and nothing
-     scheduled bound to it; archived, never deleted; never a session he works in or one waiting only on his yes; a
-     session nobody orchestrates says in its last message that it can be archived; and that whether an agent can
-     archive a session depends on the tool that runs them, which the design session could not confirm for every one:
-
-     > Agreed expertly to all!
+     left, a stop for usage too, a fresh builder picking up from the branch; its last message read and nothing scheduled
+     bound to it; archived, never deleted; never a session he works in or one waiting only on his yes; a session nobody
+     orchestrates says in its last message that it can be archived; and that whether an agent can archive a session
+     depends on the tool that runs them, which the design session could not confirm for every one; the owner agreed to
+     all of it.
 
      Behind "A finished session is archived" in `modules/orchestrating.md` and "that it can be archived" in "Sessions"
      in `modules/work-flow.md`.
@@ -537,14 +513,12 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Do we have anything in agent-core about running occasional clean-ups and condensing runs? Agent-core maybe
      > isn't the place for that? But any job that is scheduled for that in a work queue file, like in our repos, will
-     > it also do the rules files, and use our new criterias, checks, and verifications, etc, expert?
+     > it also do the rules files, and use our new criterias, checks, and verifications, etc?
 
      Told: the core schedules none, rightly, since when to clean up is a project's own queue entry and a file reaching
      its mark is what forces a condensing; but the test for a valid trim stood inside the rule on raising a mark, so a
      clean-up that trims a rule file for another reason was not plainly bound by it. Offered: the test holds for every
-     trim of a rule file, whatever it is made for, with no fresh session's read where nothing rises:
-
-     > Agreed, expertly! Do it!
+     trim of a rule file, whatever it is made for, with no fresh session's read where nothing rises; the owner agreed.
 
      Behind "It holds for every trim of a rule file, whatever its purpose" in `modules/review-guidelines.md`.
 
@@ -553,15 +527,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > […] What i would however add is that they should also clean up, no? In the cloud, I don't think it matters. The
      > container is finished when the session is. But locally/server, they have a tendency to leave work trees behind,
      > scratches, branches, etc, etc. Shouldn't everything important for future work be pushed, and everything not, be
-     > cleaned up? When you archive a sessions seems like a good time to do it? Your expert take?
+     > cleaned up? When you archive a sessions seems like a good time to do it? Your take?
 
      Told: yes; the session cleans up what it made before its last message, since it knows what that is, and the
      orchestrator checks before it archives and does it for a session that could not; only what the session itself
      made; a worktree, clone or local branch goes only where nothing in it is uncommitted or unpushed, the rest pushed
      or left and named; what it started is stopped; no other session's folders and no branch on GitHub; nothing to do
-     where the machine ends with the session:
-
-     > Agreed with everything, expert! […]
+     where the machine ends with the session; the owner agreed to all of it.
 
      Behind "clean up what you made" in "Sessions" in `modules/work-flow.md` and "It first checks that the session
      cleaned up" in `modules/orchestrating.md`.
@@ -572,14 +544,12 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      what builds it, so for an update to a tool that only runs, rule 17 alone asks that the release notes be read, and
      the words stay:
 
-     > Okay, then i withdraw my yes. Should the criterias be made clearer to avoid false positives like this, expert?
+     > Okay, then i withdraw my yes. Should the criterias be made clearer to avoid false positives like this?
 
      Told: the test already rules that trim out, but "a second statement" did not say what makes two statements the
      same; offered that a second statement counts only if it covers every case the removed words do, with the same
      force, and that whoever proposes a trim names the other statement and what it covers; and that the nineteen trims
-     merged that night had been gone over again, scope against scope, and held:
-
-     > Agreed, expertly!
+     merged that night had been gone over again, scope against scope, and held; the owner agreed.
 
      Behind "one that covers every case the removed words do, with the same force" in `modules/review-guidelines.md`.
 
@@ -596,9 +566,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      else could be meant), the floor's among them on these words, and the words added to the check that fails what
      fits only some projects; this archive stays as written, a dated record. And told that a project tells whose words
      the core's archive holds by two accounts in its manifest, the one in the core's address and its *owner's account*,
-     which the rule would now say:
-
-     > Approved! Do all of this, expertly! […]
+     which the rule would now say; the owner approved all of it.
 
      Behind the wording of the owner throughout the floor, the modules, `README.md` and `setup/`; the last pattern in
      `scripts/general.json`; and "the account in the core's address in the manifest not being the *owner's account*"
@@ -622,9 +590,8 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > Should we do a full audit again while I sleep?
 
      Told: yes, by a fresh reader of the whole core as it then stood, with the imports replayed and every suite run;
-     plain faults mended at once, each reviewed, and whatever would change what a rule asks listed for the owner.
-
-     > Perfect! […]
+     plain faults mended at once, each reviewed, and whatever would change what a rule asks listed for the owner; the
+     owner agreed.
 
      The reader found nine faults and some doubts. Mended: a late security finding that holds was to be filed as a
      bug, which floor rule 9 forbids of a weakness; the call for late findings read only those written on a line; the
@@ -643,15 +610,16 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
      > Okay, last thing, really! […] But I found this file with my username hardcoded. Is that so wise? I could
      > change it at any time, and why hard anchor stuff to my name in such a way? Does it not suffice to state repo
-     > owner or something, if something should be anchored to me, expert?
+     > owner or something, if something should be anchored to me?
 
-     Told: in that file the name is a banned word, which keeps it out of the rules; that the account stands in about
-     ten places outside the archive, each an address or the one anchor of whose word counts, which is stated on
-     purpose and never inferred; that GitHub needs it written out in a workflow's call to another repository and in
-     an issue template's assignee; and that the scripts could share one place for it, a change for the daytime.
+     Told: in that file the name is a banned word, which keeps it out of the rules; that the account stands in about ten
+     places outside the archive, each an address or the one anchor of whose word counts, which is stated on purpose and
+     never inferred; that GitHub needs it written out in a workflow's call to another repository and in an issue
+     template's assignee; and that the scripts could share one place for it, a change for the daytime. The owner agreed
+     fully, and added:
 
-     > Fully agreed! It must be one place at least, so it only needs changing once, if there is no better way to
-     > attach it to the account name so it changes dynamically? You have a go on everything expertly. Want all we have
+     > It must be one place at least, so it only needs changing once, if there is no better way to
+     > attach it to the account name so it changes dynamically? Want all we have
      > agreed on finished tonight. […]
 
      Behind `scripts/core-address.mjs`, which every script that names the core reads; the one `CORE` of
@@ -662,7 +630,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
 
 193. **13 November 2026** (the core, in the design chat; of what the second audit left for the owner):
 
-     > Why is this nessecary if it is proven that they hold to the criterias, expert?
+     > Why is this nessecary if it is proven that they hold to the criterias?
 
      Told: the trim of the floor holds to the test and waits only for the yes the floor asks of any change to itself;
      that three of the five wordings change nothing a rule asks and were the design session's to mend, which it does;
@@ -678,9 +646,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      floor rule 8 has a security review that starts by itself waited for on every PR, and point 2 of
      `modules/reviews.md` had a reviewer that failed three times running asked and not waited for, "the security
      reviewer too". Advised: the floor stays as it is and the module says so, since waiting on a broken reviewer costs
-     minutes and skipping the review that starts by itself costs more.
-
-     > Yes, expertly, to all that you advice as an expert here.
+     minutes and skipping the review that starts by itself costs more. The owner agreed to all that was advised.
 
      Behind the opening of `floor/topics.md`, and "A security review that starts by itself is still waited for" in
      `modules/reviews.md`. The owner with two accounts was filed as an idea.

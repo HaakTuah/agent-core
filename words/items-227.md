@@ -1,6 +1,6 @@
-# The owner's words behind the core: items 227 onward
+# The owner's words behind the core: items 227 to 234
 
-How they are kept, and where each item lives: `archive/instructions.md`.
+What these are and how they are kept: `words/README.md`.
 
 227. **15 November 2026** (the core; in chats with a session the owner works with, not the design session, as that
      session recorded them on issue #313, labelled `by:chat`, under "What it is" and "The owner's word"). The session

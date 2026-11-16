@@ -4,7 +4,7 @@
 import { BUG, OWNER, build, changed, fixed, pushed, runAt, verdict } from "./scratch.mjs";
 
 export const name = "order-for-now";
-export const holds = ["roles/shared/inbox.md: The owner's words are kept once"];
+export const holds = ["roles/shared/inbox.md: The owner's words are kept once", "roles/shared/inbox.md: An order for now is not a rule"];
 export const inPart = ["roles/shared/inbox.md: The owner's words are kept once"];
 export const task = "Build issue #1 of the project's repository on GitHub.";
 const RULE_FILE = /(^|\/)(AGENTS|CLAUDE|GEMINI|REVIEW)\.md$|^SECURITY\.md$|^core-manifest\.md$|^docs\/threat-model\.md$|^core\/|^\.claude\/|^\.agents?\//;

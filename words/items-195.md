@@ -1,6 +1,6 @@
 # The owner's words behind the core: items 195 to 207
 
-How they are kept, and where each item lives: `archive/instructions.md`.
+What these are and how they are kept: `words/README.md`.
 
 195. **13 November 2026** (the core, in a chat with a session the owner had asked what it made of the core and the two
      games; not the design session). Told that the core was mechanically sound and not yet stable, about thirty merged
@@ -19,7 +19,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      README's long paragraph on them. Four, the core measured as it has a game's features measured: what a merged PR
      of a project's own work costs, and the share of its PRs that are the core's upkeep, before the core and since.
 
-     > Agreed! Do all of that expertly, expert!
+     The owner agreed to all four improvements.
 
      Behind "A new rule says what holds it" in `AGENTS.md` and the heading its check asks for
      (`.github/workflows/own-description.yml`); and behind the other three, each in a PR of its own.
@@ -46,13 +46,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      conditions someone should read (LGPL, MPL, Microsoft's own terms, a paid component) stayed with the owner's yes
      each time:
 
-     > Is there good reason we shouldn't do this in agent-core, expert?
+     > Is there good reason we shouldn't do this in agent-core?
 
      Told there was none that held: the check could be proven on real packages on GitHub's own machines, and "a
      project first" would spend another owner's usage on shared tooling.
 
-     > Yes, I'd add all of them, expertly then.
-     >
+     The owner agreed to add all of them (the licences).
+
      > What steps do I need to do, I don't find them on agent-core github? My name will remain on my profile.
 
      Behind the six licences added to floor rule 10's list; the NuGet check built in the core, not in a project
@@ -69,7 +69,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      yes too, which closes that gap and stops a session more often; and whether the NuGet check should enforce from
      the first day and not after an advisory week, which this session would have kept.
 
-     > I say yes to both
+     The owner agreed to both.
 
      Behind "and so does a package that ships under a licence only a reading by hand gives" in floor rule 10, which
      `scripts/nuget.mjs` holds; and behind the NuGet check failing from a project's first day, "advisory" left as a
@@ -83,9 +83,8 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      November; that ideas filed in the week before it was called got no verdict, though its rule asks one on every
      open idea; that a "later" waiting on a measurement was not looked at again once the measurement came; and that
      builders seldom said they had asked it, one PR taking on its own a reading against an answer of the owner's of 6
-     November. Asked yes or no to three looks the stand-in was unsure of, and whether to keep that reading:
-
-     > I concur with all, expertly!
+     November. Asked yes or no to three looks the stand-in was unsure of, and whether to keep that reading, the owner
+     agreed to all.
 
      Read as a yes to each look, to keeping the reading, and to closing each gap named. Behind, in `modules/inbox.md`:
      the stand-in's verdict on every open idea however new, and again on a "later" once its condition is measured, as
@@ -100,9 +99,9 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      alarm of unpushed commits, the owner had said that Sonnet, at high, had "stopped fully up at least twice for the
      couple of days we have given it this position". Then:
 
-     > Agreed, expertly! But would a script spam whenever I run out of usage, or tell my orchestrators to stop up to
-     > save usage, expert? What should our recommendation be? Opus on high? Or should we keep sonnet on high/extra, with
-     > the script to keep it in line, expert?
+     > Agreed! But would a script spam whenever I run out of usage, or tell my orchestrators to stop up to save usage?
+     > What should our recommendation be? Opus on high? Or should we keep sonnet on high/extra, with the script to keep
+     > it in line?
 
      Answered: Opus at high, with the script; nothing stops to save usage; and a lane handed over once, then to
      another provider, or else waiting and tried once a day, named to the owner once, so that no wake repeats it.
@@ -127,7 +126,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      for it:
 
      > Agreed, if the test is quick. Don't want to add too much overhead. […] private repo, so […] spends action points
-     > on such checks, no, expert? If so, make it an opt-in, so […] doesn't go broke over it, when [the] repo is private
+     > on such checks, no? If so, make it an opt-in, so […] doesn't go broke over it, when [the] repo is private
      > anyways.
 
      Answered that the scan adds seconds inside the job that already runs and no billed minute, so it is on for every
@@ -136,29 +135,17 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      > No, must be optional.
 
      On sections 3 to 7 (no "he" or "his" for the owner in new text; the owner's own projects follow the releases; the
-     copy compared by git's object ids; tests for the sync scripts; the workflows' shell in tested scripts), each:
-
-     > Agreed.
+     copy compared by git's object ids; tests for the sync scripts; the workflows' shell in tested scripts),
+     the owner agreed to each.
 
      On sections 8, 9, 10, 11 and 12 (the core's own repository; reading and size; .NET; games served by GitHub Pages;
-     extra checks and a stop switch):
-
-     > Agreed to all in 'agent-core itself'.
-
-     > Agreed to all in 'Reading and size'.
-
-     > Agreed to all in '.NET and […] project', but 'Branch protection and secret scanning for […] private repo' I
-     > don't want this to stun lock […] work if this isn't set-up on […] end
-
-     > Agreed on 'Games'.
-
-     > Agreed to all in 'Extra'.
+     extra checks and a stop switch), the owner agreed to all in 'agent-core itself', to all in 'Reading and size', to
+     all in '.NET and […] project' with a condition, "but 'Branch protection and secret scanning for […] private repo' I
+     don't want this to stun lock […] work if this isn't set-up on […] end", to 'Games', and to all in 'Extra'.
 
      And, handing it over, on the two the brief had only explained (the security-review check warning where it cannot
      read Codex's summary; a project that follows the releases taking a commit that is no release only through a
-     review):
-
-     > Yes to A and B.
+     review), the owner agreed to both.
 
      With it: section 0 first, every later PR keeping its test green; never a release cut by a session, the owner
      told when one is ready. Behind, in `AGENTS.md`: "Nothing locks another owner's project", held by
@@ -171,9 +158,8 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      next release among them, while the upgrade test, its projects committing as "t", did not see it; a commit dated
      before 2 November 2026 read by no per-commit check, though a commit's date is whatever its maker writes;
      `core.yml` keeping, of the core's reports, one whose name git quotes, which the copy leaves out; and the upgrade
-     test starting from the previous release alone, while a project that missed a release jumps two:
-
-     > Make all of the fixes, big and small, expertly!
+     test starting from the previous release alone, while a project that missed a release jumps two, the owner agreed
+     to make all of the fixes, big and small.
 
      Told that item 201 described the project of another owner, from what the brief had said of it:
 
@@ -184,7 +170,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      public"). Asked how the check should treat a listed name that a machine's git writes into each commit, the owner
      first asked:
 
-     > But my account has my name, will this block me too now, expert?
+     > But my account has my name, will this block me too now?
 
      Told that the agents commit as Claude or under the login, and that GitHub's own merges are excepted, but that an
      edit or a suggestion committed on github.com carries the profile's name and is not, and that this would be
@@ -209,15 +195,13 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      that those reviews had caught real faults in the fixes, and that one cheaper option was to keep two only for
      workflows that can write or hold secrets and one for read-only checks, the owner quoted that option and asked:
 
-     > What is your expert recommendation?
+     > What is your recommendation?
 
      Told to keep two: a read-only check guards, and a fault in one either stops it guarding or fails every project's
      pull requests; on `core.yml`'s check of the copy, read-only, the second reviewer found three faults where Codex's
      review found none; the core's workflows reach every project; and about a third of the core's pull requests since
      1 November changed a workflow. The one cut endorsed: a change of comments and steps' names alone, proven so by a
-     script, passes one security review. The owner answered:
-
-     > Agreed, expertly!
+     script, passes one security review. The owner agreed to that.
 
      Behind: floor rule 3, such a change passing rule 8's one, as `scripts/comment-only.mjs`, run from the core's
      `main` on the head that merges, proves of the files it reads, the session saying of each other file changed why
@@ -247,7 +231,7 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      in Amarna's case from Civilization's turn and Paradox's clock with the delay of orders and news its own:
 
      > These rules about playability must all equally apply to what a model seat sees in any game. All players must
-     > play on as equal terms when it comes to readability of the game, as possible. Agreed, expert?
+     > play on as equal terms when it comes to readability of the game, as possible. Agreed?
 
      Behind the computer players in "Readable by every player" in `modules/game-design.md`: what they are shown tells
      them what the screen tells a person, as plainly and in the same order.

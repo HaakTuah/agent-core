@@ -1,4 +1,5 @@
-// Tests rules.mjs (what counts as a rule, and its text) and holders.mjs (what holds each, and what it fails), on
+// Tests rules.mjs (what counts as a rule, and its text), holders.mjs (what holds each, the archive's items behind each,
+// and what it fails) and archive.mjs (the archive's two forms in step), on
 // rule files and holders written in a scratch folder, and on the core's own. Its tests workflow runs it on every pull
 // request here. Node's own modules.
 //
@@ -8,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { inStep } from "./archive.mjs";
 import { counts, holders, report } from "./holders.mjs";
 import { mended } from "./mend.mjs";
 import { fingerprint, rules, rulesOf } from "./rules.mjs";
@@ -26,7 +28,7 @@ const text = [
   "**2. The next one,** said in one line.", "",
   "1. **Numbered** and its text", "   on two lines.", "   - **Its own item,** indented.", "2. **The second numbered.**", "",
   "```", "**Not a rule** in a fence.", "```", "",
-  "- **A last item** (core archive 1).",
+  "- **A last item.**",
 ].join("\n");
 const r = rulesOf("tasks/x.md", text);
 ok(JSON.stringify(r.map(x => x.lead)) === JSON.stringify(["1. A rule of a paragraph", "A rule inside it", "2. The next one", "Numbered", "Its own item", "The second numbered", "A last item"]),
@@ -45,7 +47,8 @@ const project = (holdersJson, extra = {}) => {
   fs.mkdirSync(path.join(dir, "tasks")); fs.mkdirSync(path.join(dir, "scripts"));
   fs.writeFileSync(path.join(dir, "tasks", "x.md"), text);
   fs.writeFileSync(path.join(dir, "scripts", "a-check.mjs"), "");
-  fs.writeFileSync(path.join(dir, "scripts", "holders.json"), typeof holdersJson === "string" ? holdersJson : JSON.stringify({ holders: holdersJson }));
+  fs.writeFileSync(path.join(dir, "scripts", "holders.json"), typeof holdersJson === "string" ? holdersJson : JSON.stringify({ holders: holdersJson, ...(extra.behind ? { behind: extra.behind } : {}) }));
+  delete extra.behind;
   for (const [f, t] of Object.entries(extra)) fs.writeFileSync(path.join(dir, f), t);
   return dir;
 };
@@ -62,12 +65,31 @@ ok(bad.wrong.length === 4 && bad.wrong.every(w => /Mend: /.test(w)), "a key that
 ok(holders(project("{ not json"), []).wrong.length === 1, "holders.json that cannot be read fails");
 ok(report(root).length >= 1 && /^- Of \d+ rules/.test(report(root)[0]), "the state report's lines begin with the counts");
 
+// ---- the archive's items behind each rule, and its two forms ----
+const archive = (reasons, words = {}) => {
+  const dir = project({}, {});
+  for (const [folder, files] of [["archive/instructions", reasons], ["words", words]]) {
+    fs.mkdirSync(path.join(dir, folder), { recursive: true });
+    for (const [f, t] of Object.entries(files)) fs.writeFileSync(path.join(dir, folder, f), t);
+  }
+  return dir;
+};
+const inStepOk = archive({ "items-001.md": "# Reasons\n\n1. **1 Nov** (a game). Asked: a. Decided: b.\n\n2. **16 Nov**, #9: why.\n" }, { "items-001.md": "# Words\n\n1. **1 Nov** (a game): \"yes, with a condition\".\n" });
+ok(!inStep(inStepOk).length, "an archive whose items each have their reasoning, the newest naming its issue, is in step", inStep(inStepOk).join("\n"));
+const outOf = archive({ "items-001.md": "1. **1 Nov**. Asked: a. Said: b.\n\n3. **2 Nov**. Decided: c.\n     > a quote\n\n4. **16 Nov**, #9: twice.\n\n4. **16 Nov**: no issue.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n2. **1 Nov**: words.\n" });
+const outWrong = inStep(outOf);
+ok(["item 4 stands twice", "item 2 has no reasoning", "item 2 is missing", "item 3 quotes", "item 1 does not say what was decided", "item 4 names no issue"].every(w => outWrong.some(x => x.includes(w))) && outWrong.every(w => /Mend: /.test(w)),
+  "an item twice, words with no reasoning, a gap, a quote, no decision and a new item with no issue each fail, saying the mend", outWrong.join("\n"));
+const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);
+ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of item numbers", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
+  "behind: a key that is no rule, an item not in the archive, no list, and a pointer in a rule file each fail, saying the mend; a rule file alone is a key", behindBad.wrong.join("\n"));
+
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
-for (const f of ["holders.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "holders.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`), "where holders.json is wrong the check fails, each failure saying its mend", `${run.stdout}${run.stderr}`);
