@@ -34,7 +34,7 @@ const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // or where a shell itself standing so starts its -c script, its quotes read), perhaps after keywords such as "then", "!" or "{", each a
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
-const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`()]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
 // (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
 // alias's operands, quoted or not: no file test of it is one)
 const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
@@ -172,12 +172,13 @@ function fromRoot(p, before, ref, quoted) {
 // replacement, ${NAME/pattern/word}: read on its own too, since the expansion itself stands as one mark)
 const OPERAND = /\$\{\w+(?::?[-=+?]|\/\/?[#%]?[^/}$`]*\/)([^}$`]*)\}/gu;
 
-export function fromTree(command, holds, index = null) {
+export function fromTree(command, holds, index = null, operand = false) {
   const operands = [...String(command).matchAll(OPERAND)].map(m => m[1]).filter(w => w.trim());
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  const found = new Set(), tests = !redefined(raw), fetches = !gitDefined(raw);
+  // (a ${...}'s default is a word, not a command of its own: no file test stands at its start)
+  const found = new Set(), tests = !operand && !redefined(raw), fetches = !gitDefined(raw);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
     if ((ref !== null && MAIN.test(ref) && fetches && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || (fetches && fetched(before))))) return;
@@ -212,6 +213,6 @@ export function fromTree(command, holds, index = null) {
     const written = String(command), dollar = at => at.includes("$");
     for (const variant of [written, dequote(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
   }
-  for (const operand of operands) for (const at of fromTree(operand, holds, index)) found.add(at);
+  for (const word of operands) for (const at of fromTree(word, holds, index, true)) found.add(at);
   return [...found];
 }
