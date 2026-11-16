@@ -309,6 +309,31 @@ function whole(p) {
   return 0;
 }
 
+// The baseline's entries lowered by a run of `files` (`now`, each surviving id to its count): an entry of those files
+// keeps what still survives of it, at most its count; one whose line the task rewrote (moved()) passes what it held to
+// a survivor of the same file and fault the run found under a new id, so that a rewritten line keeps its debt rather
+// than losing it; an entry of another file stays as it was. A Map of id to count; nothing joins.
+export function lowered(listedMap, now, files, texts) {
+  const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `)), left = new Map(now), out = new Map();
+  for (const [id, n] of listedMap) {
+    const c = ours(id) ? Math.min(n.count ?? 0, left.get(id) ?? 0) : n.count ?? 0;
+    if (ours(id)) left.set(id, (left.get(id) ?? 0) - c);
+    if (c > 0) out.set(id, c);
+  }
+  for (const [id, count] of moved(new Map([...listedMap].filter(([i]) => ours(i))), texts)) carry(id, count - (out.get(id) ?? 0), left, out, listedMap);
+  return out;
+}
+
+// What a rewritten entry (`id`) held, `rest`, passed to the survivors left of the same file and fault under new ids.
+function carry(id, rest, left, out, listedMap) {
+  const same = nid => !listedMap.has(nid) && partsOf(nid)?.file === partsOf(id)?.file && partsOf(nid)?.what === partsOf(id)?.what;
+  for (const [nid, c] of left) {
+    if (rest <= 0 || c <= 0 || !same(nid)) continue;
+    const take = Math.min(rest, c);
+    out.set(nid, (out.get(nid) ?? 0) + take); left.set(nid, c - take); rest -= take;
+  }
+}
+
 // A cleaning task's run: the tool on the files named, and the baseline's entries of those files lowered to what
 // survives now. Nothing joins, and an entry of another file stays as it was.
 function lower(p, named) {
@@ -321,8 +346,7 @@ function lower(p, named) {
   const unrun = found.filter(f => f.status === "Pending").length;
   if (unrun) refuse(`the mutation tool left ${unrun} faults of ${files.join(", ")} not run, so what they would show is not known`, "run it again with no budget (MUTATE_BUDGET unset for the core's tool), or on fewer files at a time");
   for (const f of found.filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
-  const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `));
-  const listed = Object.fromEntries([...old.listed].map(([id, n]) => [id, ours(id) ? Math.min(n.count ?? 0, now.get(id) ?? 0) : n.count ?? 0]).filter(([, c]) => c > 0).map(([id, c]) => [id, { count: c }]));
+  const listed = Object.fromEntries([...lowered(old.listed, now, files, f => tolerant(() => fs.readFileSync(unlinked(f), "utf8")))].map(([id, c]) => [id, { count: c }]));
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => id in listed));
   fs.writeFileSync(unlinked(p.at), `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);
   console.log(`${p.at} lists ${Object.keys(listed).length} faults that survive, against ${old.listed.size} before.`);

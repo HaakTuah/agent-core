@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, changedLines, counted, faultsOf, heldBy, idOf, witnesses, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
+import { baselineOf, changedLines, counted, faultsOf, heldBy, lowered, idOf, witnesses, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -58,6 +58,10 @@ const entry = new Map([[repeated, { count: 1 }]]), watched = witnesses(entry, ()
 const survives = heldBy(entry, [f(repeated, "Survived")]), caught = heldBy(entry, [f(repeated, "Killed")]), unrun = heldBy(entry, [f(repeated, "Pending")]);
 ok(same([...watched.get("a.js")], [2]) && survives.get(repeated) === 1 && unlisted([f(repeated, "Survived")], entry, new Map(), survives).length === 1 && !caught.has(repeated) && unrun.get(repeated) === 1 && unlisted([f(repeated, "Survived")], entry, new Map(), caught).length === 0 && witnesses(entry, () => file, new Map([["b.js", new Set([1])]])).size === 0,
   "an unchanged line that repeats a listed one is run too: where its fault still survives, a changed repeat cannot use the entry; where a test catches it there, the entry is the changed line's; where it was not run, it holds the entry");
+const was = "survivor: a.js: export const flag = () => true; [true -> false]", now2 = "survivor: a.js: export const flag = () => { return true; }; [true -> false]";
+const low = lowered(new Map([[was, { count: 1 }], ["survivor: b.js: x [! -> ]", { count: 2 }]]), new Map([[now2, 1]]), ["a.js"], () => "export const flag = () => { return true; };\n");
+ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"], () => "export const flag = () => { return true; };\n")], []),
+  "a cleaning run keeps the debt of a line it rewrote, under the fault's new id, and drops it only where the fault no longer survives; an entry of another file stays");
 ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1,
   "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once; another fault there is the change's own");
 
