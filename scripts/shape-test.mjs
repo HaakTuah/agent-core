@@ -1,8 +1,9 @@
 // Tests the shape check (shape.mjs, beside this file): the config it refuses, each kind of breach it finds on a few
 // files made for it, what covers an entry and what does not, and whole runs in a scratch repository: the first
 // baseline, a new breach of each kind failing with its mend, a baseline that only shrinks against the base, an entry
-// that joins because the check reads more, one given its reason, a raised mark, and a suite held to its time. Each
-// failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// that joins because the check reads more, one given its reason, a raised mark, a reader the baseline does not name
+// yet, and a suite held to its time; and what each reader of another kind of code (C#, Python, JSX, scripts that share
+// one global space) brings to it. Each failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/shape-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -11,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { groupOf, MARKS, parseBaseline, parseConfig, survey, unclaimed, verdict, where } from "./shape.mjs";
+import { fileOf, groupOf, MARKS, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "./shape.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -61,9 +62,13 @@ const cfg = extra => parseConfig(config(extra));
 const long = (name, lines) => `export function ${name}(a) {\n${"  a++;\n".repeat(lines - 2)}}\n`;
 const branchy = `export function many(a, b) {\n  return ${Array.from({ length: 17 }, (_, i) => `a === ${i}`).join(" || ")};\n}\n`;
 const deep = "export function nest(a) {\n  if (a) { for (;;) { while (a) { if (a) { try { a(); } catch { a = 0; } } } } }\n}\n";
-let found = survey({ "src/a.js": long("tall", 61) + long("fine", 60) + branchy + deep, "src/a.test.js": long("inATest", 200), "src/b.jsx": long("inJsx", 200) }, cfg({ tests: ["src/a.test.js"] }), new Set(["src/a.test.js"]));
-ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 4,
-  "a function past a mark is found: its lines, its depth, its branch points; one at the mark, a test's and one in a file with JSX are not", ids(found));
+const lostJsx = `const cast = <T>(x: T) => x;\n${long("lost", 200)}`;
+let found = survey({ "src/a.js": long("tall", 61) + long("fine", 60) + branchy + deep, "src/a.test.js": long("inATest", 200), "src/b.jsx": `export const B = () => <p>{x}</p>;\n${long("inJsx", 200)}`, "src/c.tsx": lostJsx }, cfg({ tests: ["src/a.test.js"] }), new Set(["src/a.test.js"]));
+ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall", "function: src/b.jsx#inJsx", "lost: src/c.tsx"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 5,
+  "a function past a mark is found: its lines, its depth, its branch points, in a file with JSX too; one at the mark and a test's are not; a file whose JSX the reader cannot follow is found as such, its functions not", ids(found));
+const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts"], listed: {} }) }).fail.flat().join("\n");
+ok(found.readers.get("src/a.js") === "javascript" && found.readers.get("src/b.jsx") === "jsx" && found.readers.get("src/c.tsx") === "jsx" && mended(lostSaid) && /1 file of code holds what the reader cannot follow/.test(lostSaid) && /src\/c\.tsx/.test(lostSaid),
+  "each file's reader is known, and a new file the reader cannot follow fails, with its mend, so that no line hides a file's functions", lostSaid);
 found = survey({ "src/a.js": long("same", 70) + long("same", 80) }, cfg({}));
 ok(same(ids(found), ["function: src/a.js#same", "function: src/a.js#same#2"]), "two functions of one name in a file are told apart");
 
@@ -102,6 +107,47 @@ const mono = survey({ "packages/engine/package.json": JSON.stringify({ name: "@g
   parseConfig(JSON.stringify({ baseline: "b.json", code: ["packages"], systems: { engine: { paths: ["packages/engine/"], entrance: "packages/engine/src/index.ts" }, web: { paths: ["packages/web/"], uses: ["engine"] } } })));
 ok(same(ids(mono), ["inside: web -> engine: packages/web/src/page.ts -> packages/engine/src/inner.ts"]), "a package the repository holds itself is read as its files: its entrance holds, by its name too", ids(mono));
 
+// ---- the readers of other code ----
+const csLong = (name, lines) => `  public void ${name}() {\n${"    x++;\n".repeat(lines - 2)}  }\n`;
+const csFile = (ns, usings, body = "") => `${usings}namespace ${ns};\npublic class C${ns.length} {\n${body}}\n`;
+const layered = { systems: { rules: { domain: "rules", paths: ["src/Rules/", "game/rules/"] }, view: { domain: "display", paths: ["src/View/", "game/view/"], uses: ["rules"] }, host: { domain: "platform", paths: ["src/Host/", "game/host/"], uses: ["view"] } } };
+found = survey({
+  "src/App.csproj": '<Project><ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup></Project>',
+  "src/Rules/Dice.cs": csFile("Game.Rules", "using Game.View;\nusing Newtonsoft.Json;\n", `${csLong("Roll", 61)}  int R() => new Random(1).Next() + DateTime.Now.Second;\n`),
+  "src/View/Board.cs": csFile("Game.View", "using Game.Rules;\nusing System.Text;\nusing Windows.UI;\nusing Unknown.Thing;\n"),
+  "src/Host/Io.cs": csFile("Game.Host", "using Newtonsoft.Json.Linq;\nusing Windows.UI.Core;\nusing Game.View;\n"),
+}, cfg({ ...layered, platform: ["Windows.UI"] }));
+ok(same(ids(found), ["clock: src/Rules/Dice.cs: DateTime.Now", "clock: src/Rules/Dice.cs: new Random(", "crossing: rules -> view: src/Rules/Dice.cs -> src/View/Board.cs", "cycle: src/Rules/Dice.cs -> src/View/Board.cs", "cycle: src/View/Board.cs -> src/Rules/Dice.cs",
+  "function: src/Rules/Dice.cs#Roll", "package: src/Host/Io.cs -> Newtonsoft.Json", "package: src/Rules/Dice.cs -> Newtonsoft.Json", "platform: src/View/Board.cs -> Windows.UI"]) && found.read.nowhere === 1 && found.readers.get("src/View/Board.cs") === "csharp",
+  "C#: a function past a mark, a using across a boundary nobody declared and on a cycle, a package shipped from two systems, a tie to a platform outside its system and the rules' own clock are found; the framework's own is not, and a namespace nobody declares is counted", ids(found));
+const pyLong = (name, lines) => `def ${name}(n):\n${"    n += 1\n".repeat(lines - 2)}    return random.randint(1, n)\n`;
+found = survey({
+  "pyproject.toml": '[project]\nname = "game"\ndependencies = ["requests>=2"]\n[project.optional-dependencies]\ndev = ["pytest"]\n',
+  "game/__init__.py": "",
+  "game/rules/__init__.py": "from .dice import roll\n",
+  "game/rules/dice.py": `import random\nimport datetime\nfrom game.view import board\nimport requests\nstarted = datetime.datetime.now()\n\n${pyLong("roll", 61)}`,
+  "game/view/board.py": "from ..rules import dice\nimport requests\nimport pytest\nimport winreg\nimport yaml\n\ndef later():\n    from game.host import io\n",
+  "game/host/io.py": "import winreg\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from game.view.board import later\n",
+}, cfg({ ...layered, platform: ["winreg"] }));
+ok(same(ids(found), ["clock: game/rules/dice.py: datetime.datetime.now", "clock: game/rules/dice.py: random.", "crossing: rules -> view: game/rules/dice.py -> game/view/board.py", "crossing: view -> host: game/view/board.py -> game/host/io.py", "cycle: game/rules/dice.py -> game/view/board.py", "cycle: game/view/board.py -> game/rules/dice.py",
+  "function: game/rules/dice.py#roll", "package: game/rules/dice.py -> requests", "package: game/view/board.py -> requests", "platform: game/view/board.py -> winreg"]) && found.read.nowhere === 1 && found.readers.get("game/host/io.py") === "python",
+  "Python: the same, relative imports too; an import in a def crosses but makes no cycle, nor one of types alone; a package of development alone and the standard library are not found, and an undeclared one is counted", ids(found));
+found = survey({
+  "web/a.js": "var App = {};\nfunction helper() {}\n",
+  "web/b.js": "function helper() {}\n",
+  "web/c.js": "const Only = 1;\n",
+  "web/d.js": "var p = f(1, 2), q = 2;\n",
+  "web/e.js": "const { r, s: t = g(1, 2), u: { w } } = window.cfg;\n",
+  "web/m.js": "export const x = 1;\nconst y = 2;\n",
+  "web/n.mjs": "const a = 1, b = 2;\n",
+  "web/t.d.ts": "declare const A: number;\ndeclare const B: number;\n",
+  "esm/package.json": JSON.stringify({ type: "module" }),
+  "esm/s.js": "const p = 1;\nconst q = 2;\n",
+  "web/a.test.js": "function one() {}\nfunction two() {}\n",
+}, cfg({}), new Set(["web/a.test.js"]));
+ok(same(ids(found), ["global: web/a.js: App", "global: web/a.js: helper", "global: web/b.js: helper", "global: web/d.js: p", "global: web/d.js: q", "global: web/e.js: r", "global: web/e.js: t", "global: web/e.js: w"]) && same(["global: web/a.js: helper", "function: a/b.js#f#2", "cycle: x.js -> y.js", "crossing: a -> b: x.js -> y.js", "clock: z.js: Date.now"].map(fileOf), ["web/a.js", "a/b.js", "x.js", "x.js", "z.js"]) && readerOf("global: web/b.js: helper", found.readers) === "scripts",
+  "scripts that share one global space: a second name of one file (one of a list, or of a destructuring, too) and a name two files declare are found; one name of its own, a module (by what it holds, its extension or its package.json), types alone and a test are not", ids(found));
+
 // ---- what covers an entry ----
 const M = new Map([["function: a.js#f", { lines: 100, depth: 2, branches: 3 }], ["cycle: a.js -> b.js", true], ["crossing: rules -> view: a.js -> b.js", true]]);
 const want = entries => new Map(entries);
@@ -112,7 +158,7 @@ ok(unclaimed(want([["function: lib/b.js#f", { lines: 100, depth: 2, branches: 3 
   "a listed function may move under its name, once: a second of that name, and one of another name, are new");
 ok(unclaimed(want([["cycle: c.js -> d.js", true]]), M).length === 0 && unclaimed(want([["cycle: a.js -> b.js", true], ["cycle: c.js -> d.js", true]]), M).length === 1 && unclaimed(want([["crossing: rules -> view: c.js -> d.js", true]]), M).length === 0 && unclaimed(want([["crossing: view -> rules: c.js -> d.js", true]]), M).length === 1,
   "an import on a cycle, or across one boundary, may stand in place of one that went; one more, or one across another boundary, is new");
-ok(same(["function: a/b.js#f#2", "inside: (no system) -> rules: a.js -> b.js", "platform: a.js -> node:fs", "clock: a.js: new Date()", "package: a.js -> @x/y"].map(id => groupOf(id).group), ["f", "(no system) -> rules", "node:fs", "new Date()", "@x/y"]), "an entry's group is read from its id");
+ok(same(["function: a/b.js#f#2", "inside: (no system) -> rules: a.js -> b.js", "platform: a.js -> node:fs", "clock: a.js: new Date()", "package: a.js -> @x/y", "global: a.js: App"].map(id => groupOf(id).group), ["f", "(no system) -> rules", "node:fs", "new Date()", "@x/y", "App"]), "an entry's group is read from its id");
 
 // ---- the verdict, against a base ----
 const listed = entries => JSON.stringify({ listed: Object.fromEntries(entries) });
@@ -152,6 +198,26 @@ ok(v.fail.length === 0, "where no system is named yet, none does");
 v = judge({ now: { "src/rules/a.js": "import '../view/b.js';\n", "src/view/b.js": "export const b = 1;\n" }, conf: cfg(two({ uses: ["view"] }, {})), baseline: listed([]), base: baseOf(listed([]), { "src/view/b.js": "export const b = 1;\n" }, config(two({}, {}))) });
 ok(v.fail.length === 0, "a use declared in the config with its first import passes: declaring is how a dependency is allowed, and the reviews read the config's change", said(v));
 ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read: 90 }, listed: {} }), "b.json", "").audited.listed === 3, "a baseline keeps the day and the counts of its last audit");
+
+// a reader the baseline does not name yet: what the base held of it is said, never failed (a sync turns nothing red)
+const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: ["javascript", "jsx", "csharp", "python", "scripts"] };
+v = judge({ now: csBig, baseline: listed([]), base: baseOf(listed([]), csBig) });
+ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, Python, scripts that share one global space: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
+  "a baseline written before a reader came: what the base held of it is said, not failed", JSON.stringify(v));
+v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New", 70)}}\n` }, baseline: listed([]), base: baseOf(listed([]), csBig) });
+ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));
+v = judge({ now: csBig, baseline: listed([]) });
+ok(v.fail.length === 0 && v.notes.some(n => /1 breach that stood before/.test(n)), "with no base told, what it finds is said, never failed", said(v));
+v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall", 70)}` }, baseline: listed([["function: src/v.js#V", { lines: 90, depth: 0, branches: 0 }]]), base: baseOf(listed([]), {}) });
+ok(!v.fail.some(f => /gone or moved/.test(f[0])) && v.notes.some(n => /1 entry listed there reads otherwise now/.test(n)), "an entry listed of a file a new reader reads otherwise is said, not failed", said(v));
+v = judge({ now: csBig, baseline: JSON.stringify({ ...allReads, listed: {} }), base: baseOf(listed([]), csBig) });
+ok(mended(said(v)) && /held already is not in/.test(said(v)) && !v.notes.some(n => /written before/.test(n)), "once the baseline names the reader, what it does not list fails as any other", said(v));
+v = judge({ now: { "src/a.tsx": "export const a = 1;\n", "src/b.tsx": lostJsx }, baseline: JSON.stringify({ ...allReads, listed: { "lost: src/a.tsx": true } }), base: baseOf(JSON.stringify({ ...allReads, listed: { "lost: src/a.tsx": true } }), { "src/a.tsx": lostJsx }) });
+ok(mended(said(v)) && /src\/b\.tsx/.test(said(v)) && /cannot follow/.test(said(v)), "a file lost covers itself alone: another one lost in its place fails", said(v));
+const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
+ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
+v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
+ok(mended(said(v)) && /no longer names 4 readers that origin\/main's names: jsx, csharp, python, scripts/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
@@ -238,6 +304,53 @@ git("checkout", "-q", "--", "checks/shape.json");
 r = run([], { SHAPE_BASE: "no such; branch" });
 ok(r.status === 1 && mended(r.out), "a base that is no plain name is refused", r.out);
 ok(run([], { SHAPE_BASE: "nowhere" }).status === 1 && mended(run([], { SHAPE_BASE: "nowhere" }).out) && run(["--sideways"]).status === 1 && mended(run(["--sideways"]).out), "and so are a base that is no commit and an option the check does not know");
+
+// a baseline written before the readers came, and the sync that brings them: nothing red, then --write lists it
+git("checkout", "-q", "--", ".");
+put("src/rules/Big.cs", `namespace Game.Rules;\nclass Big {\n${csLong("Roll", 70)}}\n`);
+fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), JSON.stringify({ listed: baseline().listed }, null, 2));
+commit("C# that stood before the check read it, and a baseline that names no reader");
+git("branch", "-f", "base");
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 0 && /note .*written before the check read .*C#.*1 breach that stood before is not listed yet/.test(r.out), "a pull request after the sync that brings the readers passes, and says what is not listed yet", r.out);
+put("src/rules/More.cs", `namespace Game.Rules;\nclass More {\n${csLong("Fresh", 70)}}\n`);
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /More\.cs#Fresh/.test(r.out) && !/Big\.cs#Roll/.test(r.out), "one that adds C# past a mark fails, naming it alone", r.out);
+fs.rmSync(path.join(dir, "src/rules/More.cs"));
+r = run(["--write"]);
+ok(r.status === 0 && "function: src/rules/Big.cs#Roll" in baseline().listed && baseline().reads.includes("csharp") && run([], { SHAPE_BASE: "base" }).status === 0 && !/written before/.test(run([], { SHAPE_BASE: "base" }).out),
+  "--write lists what the new readers find and names them, and the check passes against the base", r.out);
+commit("the readers' finds listed");
+git("branch", "-f", "base");
+put("src/rules/Big.cs", `namespace Game.Rules;\nclass Big {\n${csLong("Roll", 75)}}\n`);
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /grows? past what the baseline lists/.test(r.out), "from then on, a listed function of C# may not grow", r.out);
+git("checkout", "-q", "--", ".");
+put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
+put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /no longer names 4 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
+fs.rmSync(path.join(dir, "checks/moved.json"));
+git("checkout", "-q", "--", ".");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
+put("checks/other.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
+put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /no longer names 4 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
+for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
+git("checkout", "-q", "--", ".");
+put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/gone.json` |\n");
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /holds it at checks\/shape\.json, where its manifest names it: no pull request takes the shape check's config out/.test(r.out), "a manifest that names a config nowhere, where the base's names one, fails: no pull request takes the config out so", r.out);
+fs.mkdirSync(path.join(dir, "checks/gone.json"));
+r = run([], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /is no file/.test(r.out), "a config's path that is a folder fails, with its mend", r.out);
+fs.rmSync(path.join(dir, "checks/gone.json"), { recursive: true });
+fs.rmSync(path.join(dir, "core-manifest.md"));
+put("checks/new.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"code": [', '"marks": { "lines": 500 },\n  "code": ['));
+r = run(["checks/new.json"], { SHAPE_BASE: "base" });
+ok(r.status === 1 && mended(r.out) && /raises or drops 1 mark/.test(r.out), "a config named anew on the command line is compared with the one the base's rules name", r.out);
+fs.rmSync(path.join(dir, "checks/new.json"));
 
 if (process.platform !== "win32") { // (a link is made without a privilege only off Windows)
   fs.renameSync(path.join(dir, "checks/shape-baseline.json"), path.join(dir, "elsewhere.json"));
