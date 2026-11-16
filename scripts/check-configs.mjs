@@ -91,7 +91,7 @@ export function commands(run) {
   const close = () => { if (word && !operand) words.push(word); if (word) operand = false; word = null; };
   const end = () => { close(); operand = false; if (words.length) out.push(words); words = []; };
   for (let i = 0; i < text.length; i++) {
-    if (text[i] === "(" && word && /[?*+@!]$/u.test(word.text)) i = extglob(text, i, add); // (?(…), @(…): a glob of bash's)
+    if (text[i] === "(" && word && "?*+@!".includes(text[i - 1])) i = extglob(text, i, add); // (?(…), @(…): a glob of bash's)
     else if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^(?:\d+|\{\w+\})$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
     else if ("\n;&|()".includes(text[i])) end();
     else if (" \t".includes(text[i])) close();
