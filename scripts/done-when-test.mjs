@@ -120,7 +120,7 @@ try {
   try {
     fs.symlinkSync(secret, path.join(dir, "inbox", "link.md")); git("add", "-A"); git("commit", "-qm", "a link");
     const got = readItem("o/r", "inbox/link.md", dir);
-    ok(got !== null && !got.body.includes("SECRET") && got.body === secret, "an inbox file that is a link is read as the link's own text", got);
+    ok(got !== null && !got.body.includes("SECRET") && got.body.trim().endsWith(path.basename(secret)), "an inbox file that is a link is read as the link's own text (its target's path, as git writes it on each system)", got);
   } catch (e) { ok(/EPERM|symlink/i.test(String(e)), `no link could be made here (${e.code ?? e})`); } finally { fs.rmSync(secret, { force: true }); }
   // an issue's notes, through a stand-in for gh: its current text found on the newest pages, and no more read than PAGES
   const bin = path.join(dir, "bin"), log = path.join(dir, "calls.log");
