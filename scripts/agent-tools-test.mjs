@@ -454,13 +454,16 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["java -cp origin/main:./scripts/x.py Main", ["scripts/x.py"]], ["LD_PRELOAD=origin/main:scripts/x.py cmd", ["scripts/x.py"]], ["bash >&test -x scripts/x.py", ["scripts/x.py"]], ["bash >|[ -x scripts/x.py", ["scripts/x.py"]],
       ["function test { bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]], ["function [ { bash \"$2\"; }; [ -x scripts/x.py ]", ["scripts/x.py"]], ["function test\n{ bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases; alias a=b test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["cmd /c python \"scr\"^ipts\\x.py", ["scripts/x.py"]],
-      ["git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []], ["git cat-file -p origin/main:scripts/x.py | bash", []]])
+      ["git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []], ["git cat-file -p origin/main:scripts/x.py | bash", []],
+      // (#476's fallback security review of 789f5c1: "show" only as a word of its own, and not across a command's output)
+      ["java -Droot=\"$(git rev-parse --show-toplevel)\" -cp origin/main:scripts/x.py Main", ["scripts/x.py"]], ["env -C \"$(git rev-parse --show-toplevel)\" java -cp origin/main:scripts/x.py Main", ["scripts/x.py"]],
+      ["git show HEAD:a $(java -cp origin/main:scripts/x.py M)", ["scripts/x.py"]], ["shopt -s expand_aliases; alias 'test=bash'\ntest -x scripts/x.py", ["scripts/x.py"]]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     const began = Date.now();
-    for (const command of ["a.sh ".repeat(1 << 17), "test -f a.sh; ".repeat(1 << 16), "'".repeat(1 << 20), "$'".repeat(1 << 19)]) fromTree(command, has, index);
+    for (const command of ["a.sh ".repeat(1 << 17), "test -f a.sh; ".repeat(1 << 16), "'".repeat(1 << 20), "$'".repeat(1 << 19), "alias\talias ".repeat(1 << 16), "git show ".repeat(1 << 16)]) fromTree(command, has, index);
     ok(Date.now() - began < 30000, "and a command a megabyte long is read in seconds, never minutes", `${Date.now() - began} ms`);
   }
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");

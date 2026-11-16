@@ -33,8 +33,9 @@ const VARIABLE = /\$env:\w+|\$\{[^}]*\}|\$\w+|%\w+%/gu;
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
 const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
 // (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
-// alias's operands: no file test of it is one)
-const REDEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)|\balias\b[^;&|\n]*\s(?:test|\[\[?)=/u;
+// alias's operands, quoted or not: no file test of it is one)
+const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
+const redefined = raw => DEFINED.test(raw) || raw.split(/[;&|\n]/u).some(c => /^\s*alias\b/u.test(c) && /[\s"'](?:test|\[\[?)=/u.test(c));
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), perhaps closed by a quote)
 const ROOTED = /[\u0001)`]\\?["']?$/u;
@@ -80,10 +81,18 @@ export function pathsIndex(files) {
 const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
 const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`]["']?\/+)?$/u;
+const AT_MAIN = /(?:^|[\s"'])(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
+// Whether the command that `before` ends in (from its last ";", "&", "|", newline, "(", ")" or backtick on) is git's
+// show or cat-file: "git" and, after it, "show" or "cat-file", each a word of its own (not --show-toplevel).
+function gitShows(before) {
+  let from = -1;
+  for (const c of [";", "&", "|", "\n", "(", ")", "`"]) from = Math.max(from, before.lastIndexOf(c));
+  const words = before.slice(from + 1).split(/[\s"']+/u), git = words.indexOf("git");
+  return git >= 0 && words.slice(git + 1).some(w => w === "show" || w === "cat-file");
+}
 // (a path fetched from main: `<the remote's main>:<path>` given to git show or git cat-file, within one command, not
 // one of a list such as java's -cp or LD_PRELOAD takes)
-const GIT_SHOW = /\bgit\b[^;&|\n]*\b(?:show|cat-file)\b[^;&|\n]*$/u;
-const FETCHED = /\bgit\b[^;&|\n]*\b(?:show|cat-file)\b[^;&|\n]*[\s"'](?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
+const fetched = before => AT_MAIN.test(before) && gitShows(before.replace(/(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u, ""));
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
@@ -136,7 +145,7 @@ function scan(text, index, holds, found, tests) {
       if (found.has(at)) continue;
       const before = text.slice(Math.max(0, i - 200), i);
       // (a root's "/" or a "./" before a tested path is the test's: "[ -f "$r/x" ]", "test -e ./x")
-      if (STARTS.test(before) && !FETCHED.test(before) && !(tests && TESTED.test(before.replace(/(?:\.\/|\/+)$/u, ""))) && holds(at)) found.add(at);
+      if (STARTS.test(before) && !fetched(before) && !(tests && TESTED.test(before.replace(/(?:\.\/|\/+)$/u, ""))) && holds(at)) found.add(at);
     }
   }
 }
@@ -154,10 +163,10 @@ export function fromTree(command, holds, index = null) {
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  const found = new Set(), tests = !REDEFINED.test(raw);
+  const found = new Set(), tests = !redefined(raw);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    if ((ref !== null && MAIN.test(ref) && GIT_SHOW.test(before)) || (ref === null && ((tests && TESTED.test(before)) || FETCHED.test(before)))) return;
+    if ((ref !== null && MAIN.test(ref) && gitShows(before)) || (ref === null && ((tests && TESTED.test(before)) || fetched(before)))) return;
     const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
     if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);
