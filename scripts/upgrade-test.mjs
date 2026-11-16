@@ -38,8 +38,8 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
 import { STAGES } from "./steps-stage.mjs";
-import { STEPS, leads } from "./steps.mjs";
-import { evaluate, parseYaml, runWorkflow } from "./workflow-run.mjs";
+import { STEPS, callers, leads, project as read } from "./steps.mjs";
+import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "./workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
 let failed = 0, count = 0;
@@ -58,24 +58,6 @@ ok(matrixed.map(r => r.job).join() === "analyze (a, x),analyze (a, y),analyze (b
 let threw = 0;
 for (const bad of ["vars.X == 1", "hashFiles('x')", "a ~ b"]) { try { evaluate(bad, c); } catch { threw++; } }
 ok(threw === 3, "a context, function or sign it does not know stops the test, to be taught, rather than read other than GitHub would");
-
-// GitHub's reading of a trigger's `paths` and `paths-ignore`, each a list of globs read in order, a "!" one taking back
-// what those before it matched (`*` within a folder, `**` across them): with `paths`, a workflow starts where a changed
-// file matches; with `paths-ignore`, unless every changed file does. GitHub refuses both on one event, and so does this.
-const glob = g => new RegExp(`^${g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\/?|\*|\?/g, m => m === "?" ? "[^/]" : m === "*" ? "[^/]*" : m === "**/" ? "(?:.*/)?" : ".*")}$`);
-const matched = (file, patterns) => patterns.map(String).reduce((m, g) => g.startsWith("!") ? m && !glob(g.slice(1)).test(file) : m || glob(g).test(file), false);
-function filters(trigger, changed) {
-  if (trigger.paths && trigger["paths-ignore"]) throw new Error("a trigger with both paths and paths-ignore, which GitHub refuses");
-  if (trigger.paths) return changed.some(f => matched(f, trigger.paths));
-  if (trigger["paths-ignore"]) return !changed.every(f => matched(f, trigger["paths-ignore"]));
-  return true;
-}
-const ignoring = { "paths-ignore": ["core/**", "core-manifest.md"] };
-let refused = false;
-try { filters({ paths: ["a"], "paths-ignore": ["b"] }, ["a"]); } catch { refused = true; }
-ok(!filters(ignoring, ["core/scripts/sync.mjs", "core-manifest.md"]) && filters(ignoring, ["core-manifest.md", ".github/workflows/core.yml"]) && filters({ paths: ["**/*.cs", "!src/gen/**"] }, ["src/a.cs"])
-  && !filters({ paths: ["**/*.cs", "!src/gen/**"] }, ["src/gen/b.cs"]) && filters({ paths: ["*.md"] }, ["README.md"]) && !filters({ paths: ["*.md"] }, ["docs/a.md"]) && refused,
-  "and reads a trigger's paths and paths-ignore as GitHub does: every changed file ignored, or one matched, a ! taking a match back, * within a folder");
 
 // ---- the core: its history, with the commit under test as main, cut as a release ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "upgrade-test-"));
@@ -211,10 +193,6 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     "github/codeql-action/analyze": () => false,
   };
   const out = [];
-  // (the files the event changes, as GitHub reads them for a filter: a pull request's from where it left its base, a push's
-  // from the commit before it)
-  let files = null;
-  const changed = () => files ??= git(p.dir, "diff", "--no-renames", "--name-only", event === "pull_request" ? `${baseSha}...${sha}` : `${baseSha}..${sha}`).split("\n").filter(Boolean);
   const wfDir = git(p.dir, "ls-tree", "--name-only", `${sha}:.github/workflows`).split("\n").filter(f => /\.ya?ml$/.test(f));
   for (const file of wfDir.filter(f => !only || f === only)) {
     const wf = parseYaml(git(p.dir, "show", `${sha}:.github/workflows/${file}`));
@@ -223,7 +201,12 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     if (trigger === null) continue;
     if (trigger.branches && !trigger.branches.includes("main")) continue;
     if (event === "pull_request" && trigger.types && !trigger.types.includes("synchronize") && !trigger.types.includes("opened")) continue;
-    if ((event === "pull_request" || event === "push") && baseSha && !filters(trigger, changed())) continue;
+    // (a path filter, as GitHub reads it against what the pull request changes from its base)
+    if (event === "pull_request" && (trigger.paths || trigger["paths-ignore"])) {
+      const changed = git(p.dir, "diff", "--name-only", `${baseSha}...${sha}`).split("\n").filter(Boolean);
+      if (trigger.paths && !pathsLetThrough(trigger.paths, changed)) continue;
+      if (trigger["paths-ignore"] && changed.every(f => pathsLetThrough(trigger["paths-ignore"], [f]))) continue;
+    }
     // (a workflow of the project's own that calls none of the core's, run as GitHub would where asked: its steps run the
     // project's copy of the core's scripts)
     if (ownToo && Object.values(wf.jobs ?? {}).every(job => !String(job?.uses ?? "").toLowerCase().startsWith(`${CORE.toLowerCase()}/`))) {
@@ -281,6 +264,12 @@ function upgrade(p, from, ownChanges, expect) {
     onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}` });
   }
   ok(!failures(onSync), `${p.name}: every check passes on the sync's pull request (${started(onSync).length} jobs${p.named ? ", once mended" : ""})`, failures(onSync));
+  // a sync that moves the pins of calls to the core's workflows starts none of the project's own suites, filtered as
+  // the step asks, where a filter of the copy and the manifest alone would have started them (#379)
+  const synced = git(p.dir, "diff", "--name-only", `${main0}...${syncHead}`).split("\n").filter(Boolean);
+  const moved = synced.filter(f => f.startsWith(".github/workflows/"));
+  ok(!jobRan(onSync, "suites.yml") && (!moved.length || !synced.every(f => pathsLetThrough(["core/**", "core-manifest.md"], [f]))),
+    `${p.name}: the sync, which moves ${moved.length} call${moved.length === 1 ? "" : "s"}' pins, starts none of its own suites, which a filter of the copy and the manifest alone would have started`, started(onSync).join("\n"));
   const pure = node(p.dir, path.join(theCore, "scripts", "pure-sync.mjs"));
   ok(pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${p.name}: the sync is pure, as pure-sync.mjs reads it from the release it moves to, whatever modes git here records`, pure.out);
 
@@ -338,6 +327,10 @@ function upgrade(p, from, ownChanges, expect) {
 
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
   git(p.dir, "checkout", "-q", "main");
+  // (its own suite goes first: it lists the files that hold only calls to the core's workflows as they stood, and a
+  // stage below writes another such file)
+  git(p.dir, "rm", "-q", ".github/workflows/suites.yml");
+  git(p.dir, "commit", "-q", "-m", "its own suite elsewhere");
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
   const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
@@ -375,6 +368,35 @@ function upgrade(p, from, ownChanges, expect) {
   // each in a pull request of its own and merged, with no check failing (core archive 216). On Linux alone, since the
   // script starts gh as a program, which a stand-in on Windows cannot be.
   if (process.platform !== "win32") inboxCase(p);
+}
+
+// A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
+// `paths:` (what fresh.mjs lists as lacking where the call has none) starts no job on a pull request that changes
+// nothing NuGet reads by name, and one where a project file changed; and a project whose owner declines the check, in
+// the manifest's "Differences", is told no step about it and starts no job for it at all.
+function nugetInPrivate(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const wf = path.join(p.dir, ".github/workflows/nuget.yml"), manifest = path.join(p.dir, "core-manifest.md");
+  const fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
+  const commit = what => { git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", what); git(p.dir, "push", "-q", "origin", "main"); return git(p.dir, "rev-parse", "HEAD"); };
+  const pr = (from, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); const head = git(p.dir, "rev-parse", "HEAD"); git(p.dir, "checkout", "-q", "main"); return started(checks(p, "pull_request", head, { baseSha: from, dry: true })); };
+  const docs = dir => fs.appendFileSync(path.join(dir, "README.md"), "\nMore words.\n");
+  const projectFile = dir => fs.appendFileSync(path.join(dir, "src/App/App.csproj"), "<!-- a note -->\n");
+  const nuget = jobs => jobs.some(w => w.startsWith("nuget.yml/"));
+  const had = fs.readFileSync(wf, "utf8");
+  ok(/^on:\r?\n {2}pull_request:\r?\n\r?\n/m.test(had) ? /nuget\.yml: lacks [^\n]*paths:/.test(fresh()) : true, `${p.name}: where its call to the NuGet check has no paths, fresh.mjs lists the starter kit's as lacking`, fresh());
+  fs.writeFileSync(wf, had.replace(/^ {2}pull_request:\r?\n(?! {4}paths:)/m, on => `${on}${fs.readFileSync(path.join(theCore, "setup/template/workflows/nuget-paths.yml.tmpl"), "utf8")}`));
+  const kit = commit("the NuGet check where it can matter");
+  ok(!/nuget\.yml/.test(fresh()), `${p.name}: with the starter kit's paths, fresh.mjs lists nothing of its NuGet call`, fresh());
+  ok(!nuget(pr(kit, docs)), `${p.name}: a pull request that changes nothing NuGet reads by name starts no NuGet job`);
+  ok(nuget(pr(kit, projectFile)), `${p.name}: one that changes a project file starts it`);
+  const before = pr(kit, projectFile);
+  fs.rmSync(wf);
+  fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^## Differences\r?\nNone\.\r?\n/m, d => `${d.split(/\r?\n/)[0]}\n- "13 November 2026, the NuGet check" and ".github/workflows/nuget.yml": not taken, on the owner's word; the project's own build job restores with --locked-mode and runs core/scripts/nuget.mjs after it.\n`));
+  const declined = commit("the NuGet check declined");
+  const r = node(p.dir, "core/scripts/steps.mjs"), after = pr(declined, projectFile);
+  ok(r.out.includes("Every step a check reads is done") && !/nuget\.yml/.test(fresh()), `${p.name}: its owner declining the NuGet check in "Differences", no step and no difference is reported for it`, `${r.out}\n${fresh()}`);
+  ok(!nuget(after) && after.every(w => before.includes(w)), `${p.name}: and a pull request that changes a project file starts no NuGet job, and no job it did not start before`, after.join("\n"));
 }
 
 // The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo` (left out: gh gives no answer at
@@ -445,6 +467,11 @@ function seed(p, eol) {
   write(p.dir, "src/tall.js", `export function tall(a) {${eol}${`  a += 1;${eol}`.repeat(70)}  return a;${eol}}${eol}`);
   const manifest = path.join(p.dir, "core-manifest.md");
   fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^(Floor: whole\. Modules: .*?)`copilot\.md`, /m, "$1"));
+  // its own suite, filtered as "12 November 2026, a sync and the project's own suites" asks: the copy, the manifest and
+  // each file that holds only calls to the core's workflows, by its exact path, left out
+  git(p.dir, "add", "-A");
+  write(p.dir, ".github/workflows/suites.yml", ["name: suites", "", "on:", "  pull_request:", "    paths-ignore:", "      - 'core/**'", "      - 'core-manifest.md'",
+    ...callers(read(p.dir)).map(f => `      - '${f}'`), "", "permissions:", "  contents: read", "", "jobs:", "  test:", "    runs-on: ubuntu-latest", "    steps:", "      - run: echo its own suite", ""].join(eol));
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- Nothing secret goes in the repository/.test(l)) ?? "";
   fs.appendFileSync(path.join(p.dir, "SECURITY.md"), `${eol}${copied}${eol}`);
   const baseline = path.join(p.dir, "checks/copies-baseline.json");
@@ -495,7 +522,7 @@ for (const tag of starts) {
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-
+  nugetInPrivate(dotnetProject);
 }
 
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the

@@ -59,7 +59,6 @@ export const PLANTED = {
   "12 November 2026, who reviews": dir => lacks(dir, "AGENTS.md", RULES.reviewers),
   "12 November 2026, the core has moved": dir => anyBranch(dir, b => workflows(dir, b).includes("look.yml")),
   "12 November 2026, differences": dir => lacks(dir, "AGENTS.md", RULES.replaces),
-  "12 November 2026, a sync and the project's own suites": dir => anyBranch(dir, b => { const t = show(dir, b, ".github/workflows/tests.yml") ?? ""; return /paths:/.test(t) && !/core\/\*\*/.test(t); }),
   "12 November 2026, the way work is handed over": dir => lacks(dir, "AGENTS.md", RULES.handed),
   "12 November 2026, a feature may wait for a later stage": dir => lacks(dir, "core-manifest.md", DIFFERENCE),
   "13 November 2026, a security review where the change needs one": dir => lacks(dir, "AGENTS.md", RULES.security),
@@ -80,6 +79,7 @@ PLANTED["15 November 2026, every step has its check"] = dir => Object.entries(PL
 export const UNPLANTED = {
   "13 November 2026, MS-PL waits for the owner's yes": "it needs the licence check's report on an installed package under MS-PL, which a scratch project with no network cannot install",
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
+  "16 November 2026, what a screen is held to": "it needs a project people use through a screen, whose next pull request changing one writes the direction first, and this case's project is a private tool with no screen",
 };
 
 export function set(dir, opts = {}) {

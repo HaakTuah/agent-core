@@ -14,15 +14,15 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 ## Two layers
 
 - **The floor** (`floor/`): what keeps the owner from harm and loss, taken whole by every project. If a project dropped
-  a rule, could the owner be harmed or something be lost for good? Then it is floor. `security.md` holds the rules any
-  task can break, read at the start of every task; `topics.md` the rules for particular work; `threat-model.md` the
+  a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
+  `security.md`, whose opening says what it and `topics.md` hold and when each is read, and `threat-model.md`, the
   shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
   `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; and, for
-  games only, `game-design.md`.
+  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
+  project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
 - **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
   stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
   every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
@@ -137,6 +137,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      (`modules/code-shape.md`, which says too how the check holds a project before its config is written). From its
      baseline `dose.mjs` reads the state the codebase is in, and the scheduled look keeps the cleaning and the audits
      that state makes due (`modules/cleaning.md`).
+   - **The screen checks,** where a project with a screen turns one on: `screens.mjs`, run by the project's own
+     workflow after its own tool, which holds what that tool found against a baseline in the shape check's form, which
+     only shrinks (the *screen checks*; `modules/screens.md`, "What holds it"). The core runs it nowhere by itself.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
@@ -166,7 +169,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167).
+     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167). A path filter
+     sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
+     that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
+     not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -185,35 +191,38 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
      itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
-   - **A project whose packages come from NuGet** has a `nuget.yml` of its own, on every pull request, which calls the
-     core's with the licence check's config: a restore of each project file git knows from its lock file alone
-     (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from what the
-     config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads from
-     NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
-     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from
-     the manifest of the package the restore brought; what the restore brought that no lock file names is held to the
-     list for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named
-     in the config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
+   - **A project whose packages come from NuGet** has a `nuget.yml` of its own that calls the core's on every pull
+     request (in a private repository, as the starter kit writes it, only on one that changes a file NuGet reads by
+     name, so no other bills a job), with the licence check's config: a restore of each project file git knows from its
+     lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
+     what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
+     from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
+     lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the
+     manifest of the package the restore brought; what the restore brought that no lock file names is held to the list
+     for what ships too. It needs lock files turned on (`RestorePackagesWithLockFile`) and committed, each named in the
+     config's "nuget" as one whose packages ship or one of tools that only run. A package whose manifest names no
      licence a machine can read is read by hand: a tool that only runs is then recorded in the audit as
-     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one
-     off its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone.
-     It fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a
-     private repository calls it like any other: it needs nothing of GitHub's paid code security. Like the signature
-     check, it first looks whether the pull request changes anything NuGet reads (its workflow's header lists what),
-     and passes without a restore where it changes none; any doubt runs it. Before the restore, which runs the pull
-     request's own build files, `nuget-fetch.mjs` fetches every package the lock files name, holds each to its lock
-     file's content hash and reads its licence from it, so no build has run beside that verdict; the tools a manifest
-     of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are fetched and held the same way, each at one
-     exact version and to the list for tools that only run (what is wrong with a tool the pull request's base held,
-     never read before this release, is reported, not failed). Where the first look restored, which runs the pull
-     request's build files, that read is left out: nothing it reads changed from the base.
+     `<Id>@<version>`, of "kind": "nuget", and one that ships waits for the owner's yes. A yes, for that or for one off
+     its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It
+     fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a private
+     repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it where a
+     job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026, the NuGet
+     check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
+     NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
+     it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
+     lock files name, holds each to its lock file's content hash and reads its licence from it, so no build has run
+     beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are
+     fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
+     with a tool the pull request's base held, never read before this release, is reported, not failed). Where the first
+     look restored, which runs the pull request's build files, that read is left out: nothing it reads changed from the
+     base.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
-     request or by a comment that opens "Security review:" from the repository's owner (the *owner's account*, where
-     that owns it), or an account the project names in its call (the input `reviewers`) (`modules/reviews.md`, point 3),
-     the second alone where Codex marks a finding of its review open, posted after it, and, while Codex's review runs,
-     one posted after it began, never a note posted before it; a review of an earlier commit than the head stands only
+     request or by a comment that opens "Security review:" from an account `modules/reviews.md`, point 3, counts (the
+     repository owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex
+     marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
+     never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
@@ -310,6 +319,11 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *other builders* | which other providers' tools build here, in order, and for each one the core has no part for, how it is handed a task; left out, Codex first, then the others as the project's rules list them (`modules/roles.md`, "The builders") |
 | *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, how each one the core has no part for is asked (it has Codex's and Copilot's, `modules/`), and which of its findings block where it marks none so; left out, the core's own: first a reviewer that cannot build here, then another builder's, last Claude's (`modules/roles.md`) |
 | *security reviewer* | who gives a PR its security review (floor rule 8) and how it is asked; left out, Codex, of what its own provider built too: the code review of that work is another provider's, and floor rule 3's two reviews stand (`modules/reviews.md`, point 3) |
+| *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`modules/screens.md`, points 1 and 2); left out, `docs/direction.md`, written before its first screen |
+| *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`modules/screens.md`); left out, 360, 768 and 1280 wide |
+| *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`modules/screens.md`, point 9); left out, the module's own |
+| *desktop platforms* | the desktop platforms a program of the project's is made for (`modules/screens.md`, point 15); left out, none |
+| *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`modules/screens.md`, "What holds it"); left out, `checks/screens.json` where it stands, and otherwise every check off |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
 
 ## The manifest's format

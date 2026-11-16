@@ -105,6 +105,9 @@ jobs:
       - name: The shape check
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/shape-test.mjs
+      - name: The screen checks' baseline
+        if: ${{ !cancelled() }}
+        run: node scripts/screens-test.mjs
       - name: The dose a codebase's state sets
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/dose-test.mjs

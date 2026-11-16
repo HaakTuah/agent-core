@@ -3,7 +3,8 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node scripts/look-test.mjs
-import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, slug, text } from "./look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, text, updating } from "./look.mjs";
+import { parse, signKey, tripped, trippedBody } from "./choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "./state-report.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -23,11 +24,34 @@ ok(plan(null, open, true) === "nothing" && plan("b", open, true) === "nothing", 
 const readers = [() => null, () => ({ title: "One", body: "a" }), () => ({ title: "Two", body: null, unread: "its file is no file" }), () => ({ title: "Three", body: "c", owner: true })];
 ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what: "a", unread: null }, { title: "Two", what: null, unread: "its file is no file" }, { title: "Three", what: "c", unread: null, owner: true }]),
   "each reader of what is due gives its issue, one that has nothing to say gives none, and one says whether it is the owner's to see");
-ok(DUE.length === 4 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; Cleaning due: how the code is put together; An audit of how the code is put together is due",
-  "the look keeps an issue for the pass over the choices, for cleaning and for the audit by a reader (and, in the core alone, the staged cases)");
+ok(DUE.length === 5 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; A choice's measured sign to act on; Cleaning due: how the code is put together; An audit of how the code is put together is due",
+  "the look keeps an issue for the pass over the choices, for a sign of theirs that has tripped, for cleaning and for the audit by a reader (and, in the core alone, the staged cases)");
 ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
   && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued" && relabelled(["later", "by:look"], true) === null && relabelled(["on-hold"], false) === null,
   "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
+ok(JSON.stringify(reopening({ labels: ["needs-owner", "by:look"] }, "b", false)) === JSON.stringify({ body: "b", state: "open", labels: ["by:look", "queued"] })
+  && JSON.stringify(reopening({ labels: ["queued", "by:look"] }, "b", false)) === JSON.stringify({ body: "b", state: "open" })
+  && JSON.stringify(reopening({ labels: ["queued", "by:look"] }, "b", true).labels) === JSON.stringify(["by:look", "needs-owner"])
+  && JSON.stringify(reopening({ labels: ["later", "by:look"] }, "b", false)) === JSON.stringify({ body: "b", state: "open" }),
+  "an issue that comes back is a task again: reopened with queued in place of a needs-owner a session set while it stood before (a tripped sign's), or needs-owner where its reader says so; later and on-hold stay");
+const was = { body: "Signs:\n- `a`: holds\n\nWhat to do.", labels: ["needs-owner", "by:look"] };
+const asIs = line => line;
+ok(JSON.stringify(updating(was, "Signs:\n- `a`: holds\n- `b`: holds\n\nWhat to do.", asIs)) === JSON.stringify({ body: "Signs:\n- `a`: holds\n- `b`: holds\n\nWhat to do.", labels: ["by:look", "queued"] })
+  && JSON.stringify(updating(was, "Signs:\n\nWhat to do, worded anew.", asIs)) === JSON.stringify({ body: "Signs:\n\nWhat to do, worded anew." })
+  && JSON.stringify(updating(was, "Signs:\n- `b`: holds", null)) === JSON.stringify({ body: "Signs:\n- `b`: holds" })
+  && JSON.stringify(updating({ ...was, labels: ["queued", "by:look"] }, "- `b`", asIs)) === JSON.stringify({ body: "- `b`" }),
+  "an update that brings a line whose key the issue did not hold puts an issue its session handed to the owner back to queued, where its reader gives requeue; any other update keeps its labels");
+ok(dueNow({}, [() => ({ title: "Four", body: "d", requeue: asIs })])[0].requeue === asIs && !("requeue" in dueNow({}, [() => ({ title: "Five", body: "e", requeue: true })])[0]), "a reader's requeue reaches the look, a function or nothing");
+// (the measured sign's issue as the look writes it: choice one holds past 150 files, choice two past 160)
+const signed = parse("## Choice: one\nTrips when: `files > 150`\n## Choice: two\nTrips when: `files > 160`\n");
+const bodyAt = files => text(trippedBody("docs/choices.md", tripped(signed, { listed: 0, read: 1, found: { read: { files }, entries: new Map() } }), signed, "core/"), "GitHub's job");
+const handed = { body: bodyAt(151), labels: ["needs-owner", "by:look"] };
+ok(/- `one`: `files > 150`, and it reads 151/.test(handed.body) && !("labels" in updating(handed, bodyAt(152), signKey)) && !("labels" in updating(handed, bodyAt(160), signKey)),
+  "a number that moves (151 files, then 152, then 160) leaves the measured sign's issue that a session handed to the owner as it is labelled", handed.body);
+ok(JSON.stringify(updating(handed, bodyAt(161), signKey).labels) === JSON.stringify(["by:look", "queued"]),
+  "a second choice whose sign trips puts it back to queued, for its fresh record");
+const slow = `- ${", and it reads ".repeat(4000)}\u2028`, t0 = Date.now();
+ok(signKey(slow) === "- " && Date.now() - t0 < 100, "a line's key is cut at its first number read, in time linear in the line, whatever an issue's body holds");
 
 // ---- its own issues: GitHub's job's or the owner's account's, the newest of each title ----
 const issues = [

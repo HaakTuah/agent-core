@@ -21,10 +21,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { CORE } from "./core-address.mjs";
+import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -166,6 +167,44 @@ function shapeWritten(p) {
   return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
 }
 
+// The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
+// `core.yml` checks on every pull request.
+const coreCall = job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/`.toLowerCase());
+export const callers = p => (readable(p, text => text.toLowerCase().includes(`${CORE}/.github/workflows/`.toLowerCase())), Object.entries(p.workflows))
+  .filter(([, w]) => { const jobs = Object.values(w.yaml?.jobs ?? {}); return jobs.length > 0 && jobs.every(coreCall); }).map(([f]) => `.github/workflows/${f}`);
+
+// Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
+// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
+// (a file's name as the mend shows it: a control character or a backtick, which would bend a description, as "?")
+const shown = f => String(f).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029`]/gu, "?");
+function suitesOnPins(p) {
+  const pins = callers(p);
+  readable(p, text => /paths(-ignore)?\s*:/.test(text));
+  const started = Object.entries(p.workflows).filter(([f]) => !pins.includes(`.github/workflows/${f}`)).flatMap(([f, w]) => {
+    const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
+    const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
+    return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
+  });
+  return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
+}
+
+// Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
+// another name than those (an Import's, a property's MSBuild's targets import, a file whose root is a Project), as the
+// core's NuGet check lists them, that the filter lets through no change to; null where it names none.
+function nugetPathsHold(p) {
+  readable(p, text => /\/\.github\/workflows\/nuget\.yml@/i.test(text));
+  const filtered = Object.entries(p.workflows).filter(([, w]) => Array.isArray(w.yaml?.on?.pull_request?.paths) && Object.values(w.yaml?.jobs ?? {})
+    .some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/nuget.yml@`.toLowerCase())));
+  if (!filtered.length) return null;
+  const own = p.files.filter(f => !f.startsWith("core/")), byContent = projectFilesByContent(p.root, own);
+  const read = [...new Set([...byContent, ...importsOf(own, f => readBuildFile(p.root, f), byContent).brought.keys()])];
+  const wrong = filtered.map(([f, w]) => [f, read.filter(r => !pathsLetThrough(w.yaml.on.pull_request.paths, [r]))]).filter(([, missed]) => missed.length);
+  // (each as a pattern that matches only itself, its glob characters taken as themselves, and quoted as YAML quotes it;
+  // a name that holds a control character is named with "?" in its place, to be renamed)
+  const asPattern = f => `'${f.replace(/[\\[\]*?!+]/g, c => `\\${c}`).replace(/'/g, "''")}'`.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029`]/gu, "?");
+  return wrong.length ? `The \`paths:\` of a call to the NuGet check let through a change to every file a build of the project's reads, or the check starts on none of its changes: add each, by its exact path, to ${wrong.map(([f, missed]) => `\`.github/workflows/${f}\`: ${missed.map(asPattern).join(", ")}`).join("; ")} (a name shown with "?" holds a control character or a backtick: rename it).` : null;
+}
+
 // Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
 // first without its number and title; null where there is none.
 function rule5(text) {
@@ -224,7 +263,8 @@ export const STEPS = [
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
       return want && !p.manifest.split("\n").includes(want) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
-  { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, unread: "which suites a project's workflows run for which change is their own logic" },
+  { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
+    partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
   { lead: "12 November 2026, the way work is handed over", cost: COST.read, unread: "what a project's rules say of handing work over is a reading of them" },
   { lead: "12 November 2026, a feature may wait for a later stage", cost: COST.line, unread: "whether a line of the manifest's \"Differences\" says this is a reading of its words" },
   { lead: "12 November 2026, the signature check on every pull request", cost: COST.workflow,
@@ -266,7 +306,7 @@ export const STEPS = [
       const locks = [...new Set(projects.map(f => path.posix.join(path.posix.dirname(f), "packages.lock.json")))];
       const missing = locks.filter(l => !p.files.includes(l));
       if (missing.length) wrong.push(`each project file's \`packages.lock.json\` is committed, lock files turned on (\`RestorePackagesWithLockFile\`): ${missing.join(", ")}`);
-      if (!call(p, "nuget.yml")) wrong.push("a `.github/workflows/nuget.yml` calls the core's, as `core/setup/template/workflows/nuget.yml.tmpl` has it");
+      if (!call(p, "nuget.yml")) wrong.push("a `.github/workflows/nuget.yml` calls the core's, as `core/setup/template/workflows/nuget.yml.tmpl` has it (in a private repository with the `paths:` of `nuget-paths.yml.tmpl` beside it), or its owner declines the check in the manifest's \"Differences\", as the entry \"16 November 2026, the NuGet check where it can matter\" says");
       let config = null;
       const file = nugetConfig(p);
       try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as missing, below) */ }
@@ -357,6 +397,9 @@ export const STEPS = [
   { lead: "16 November 2026, hostile tests for every named input", cost: COST.read, check: hostileTests,
     partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
+  { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
+    partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
+  { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

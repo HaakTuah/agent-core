@@ -13,6 +13,7 @@ import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
 import { STAGES } from "./steps-stage.mjs";
+import { pathsLetThrough } from "./workflow-run.mjs";
 import { COST, STEPS, configs, leads, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
@@ -77,14 +78,37 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(missed.length === 1 && missed[0].lead === step.lead && missed[0].mend.length > 20 && missed[0].cost === step.cost, `taken out, "${step.lead}" is reported, alone, with its mend and cost`, report(missed));
   STAGES[step.lead].mend(dir);
   ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
+  STAGES[step.lead].after?.(dir);
 }
 // several at once, in a project of another kind: exactly those
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
 for (const lead of some) STAGES[lead].stage(lockProject);
 ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
-for (const lead of some) STAGES[lead].mend(lockProject);
+// (in the order steps-stage.mjs lists them, the one whose mend lists what the others write last)
+for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
+for (const lead of some) STAGES[lead].after?.(lockProject);
+
+// ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
+const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
+const suiteFile = path.join(lockProject, ".github/workflows/suites-filtered.yml");
+const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject).some(m => m.lead === SUITE_LEAD); };
+ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
+  && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
+fs.rmSync(suiteFile);
+ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.yml"]) && pathsLetThrough(["a[b.yml"], ["a[b.yml"])
+  && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir//e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),
+  "a filter's `?` or `+` with nothing before it, and a lone `[` or `]`, is read as itself, and one after a character repeats it, as GitHub reads them");
+{
+  // (patterns that would keep a backtracking expression busy for minutes, each read at once)
+  const began = Date.now(), long = `.github/workflows/${"a".repeat(200)}.yml`;
+  const quick = [["**a+a+a+a+a+a+a+b", long], [`${"*".repeat(30)}z`, ".github/workflows/core.yml"], ["*a+a+a+a+a+a+a+a+a+a+b", "a".repeat(500)], ["**/**/**/**/**/x", `${"a/".repeat(300)}y`], [`${"**/a/".repeat(500)}x`, `${"a/".repeat(2000)}y`]]
+    .every(([pattern, name]) => !pathsLetThrough([pattern], [name]));
+  const reported = suiteBy("    paths: ['*a+a+a+a+a+a+a+a+a+b', '.github/workflows/**']");
+  ok(quick && reported && Date.now() - began < 3000, "a filter that would keep a backtracking expression busy is read at once, and read right", `${Date.now() - began} ms`);
+  fs.rmSync(suiteFile);
+}
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
