@@ -31,6 +31,7 @@ import { started } from "./started.mjs";
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
+const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
 const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 // Whether a path is one of git pathspecs': a plain one is the path or a folder above it, one of ":(glob)" a glob ("**"
@@ -147,6 +148,9 @@ function main(argv) {
   const s = !config ? { all: true, why: `the shape check's config (${at}) cannot be read, so what each test reaches cannot be told` }
     : !base ? { all: true, why: "no base is told (SELECT_BASE), as on main, on a schedule and before a release" }
     : selection({ changed: changedSince(base), texts: now.texts, tests: now.tests, reach: survey(now.texts, config, now.tests).reach, failed, config });
+  // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
+  // sets another variable for the steps after it)
+  if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });
   const lines = said(s, now ? now.tests.size : "all its");
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);

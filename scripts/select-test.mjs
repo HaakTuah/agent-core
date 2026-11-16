@@ -84,6 +84,13 @@ const envFile = path.join(dir, "env"), summary = path.join(dir, "summary");
 let r = run(["--env", "RUN"], { SELECT_BASE: "HEAD^1", GITHUB_ENV: envFile, GITHUB_STEP_SUMMARY: summary });
 ok(r.status === 0 && /2 of 6 tests/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN= test/replay.test.js test/run.test.js \n" && fs.readFileSync(summary, "utf8").includes("test/run.test.js: reaches src/tool.js"),
   "against the base, it says what it ran and why, on the job's summary too, and writes the tests for the steps after it, each between spaces", `${r.out}\n${fs.existsSync(envFile) ? fs.readFileSync(envFile, "utf8") : ""}`);
+if (process.platform !== "win32") { // (a name with a line's end in it cannot be made on Windows)
+  put("test/odd\nNODE_OPTIONS=x.test.js", "import '../src/tool.js';\n"); git("add", "test/odd\nNODE_OPTIONS=x.test.js"); git("commit", "-q", "-m", "an odd name");
+  fs.writeFileSync(envFile, "");
+  r = run(["--env", "RUN"], { SELECT_BASE: "HEAD^1", GITHUB_ENV: envFile });
+  ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /holds what a list of names cannot/.test(r.out), "a test whose name holds a line's end runs the whole suite, and sets no other variable", `${r.out}\n${fs.readFileSync(envFile, "utf8")}`);
+  git("rm", "-q", "test/odd\nNODE_OPTIONS=x.test.js"); git("commit", "-q", "-m", "no odd name");
+}
 fs.writeFileSync(envFile, "");
 r = run(["--env", "RUN"], { GITHUB_ENV: envFile });
 ok(r.status === 0 && /the whole suite, 6 tests: no base is told/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=all\n", "with no base told, as on main, the whole suite runs", r.out);
