@@ -13,7 +13,6 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #254 | rule builder | |
 | #256 | rule builder | |
 | #252 | rule builder | |
 | #285 | rule builder | |
@@ -39,8 +38,6 @@ wanted").
 | #337 | builder | |
 | #357 | builder | |
 | #362 | builder | |
-| #370 | builder | |
-| #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
 | #386 | builder | #362, which changes the same file |
 | #394 | builder | |
 | #403 | builder | #299, whose rule its mends name |
