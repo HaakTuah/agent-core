@@ -1,7 +1,7 @@
 # Review guidelines
 
 Read at its start by every reviewer (`roles/reviewer.md`): what it judges a change by, read whole with its brief, the
-project's own guidelines, its `SECURITY.md` and the floor.
+project's own guidelines, its `SECURITY.md` and the floor. Changes only on the owner's word (core archive 56).
 
 ## How a review passes
 
@@ -14,7 +14,7 @@ project's own guidelines, its `SECURITY.md` and the floor.
   written rule with a line `Rule:` and the rule's file and bold lead (`Rule: floor/security.md: 1. Nothing secret in
   the repository`); a plain bug's has none. It does not mean one without it blocks less. Reason: what reviews find
   twice is counted only so (`tasks/reviews.md`, point 8). Held by no check.
-- **A later round** checks that the earlier points were fixed. Something new about work
+- **A later round** checks that the earlier points were fixed and reviews what changed since. Something new about work
   it already saw is raised only if it blocks.
 
 ## What blocks
@@ -22,7 +22,7 @@ project's own guidelines, its `SECURITY.md` and the floor.
 **For every reviewer,** blocking:
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
-- a size mark raised without its reason in the PR;
+- a size mark raised without its reason in the PR (one on what every session reads: below);
 - an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
   and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
 - a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"

@@ -30,7 +30,8 @@ import { started } from "./started.mjs";
 // which held what every session read at its start, raised one step on 16 November 2026 for the builder's own file
 // (#304), its leanness check having found 108 bytes of room for the 1,038 that file needed; the others were first set
 // that day, each the whole KB next above its start. The reviewer's, raised one step the same day for the review
-// guidelines' "A finding names its rule" (#254), its leanness check having found 124 bytes of room for 204 over.
+// guidelines' "A finding names its rule" (#254), its leanness check having found 124 bytes of room for 204 over, in trims of the guidelines that its
+// issue did not ask for and so are not made.
 export const CAPS = {
   builder: 28 * 1024,
   design: 29 * 1024,
