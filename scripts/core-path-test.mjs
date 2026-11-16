@@ -15,6 +15,8 @@ import { mended } from "./mend.mjs";
 import { pathIn } from "./reading.mjs";
 import { runWorkflow } from "./workflow-run.mjs";
 
+// The workflows a project calls whose first step reads where the core's copy stands.
+const CALLED = ["copies.yml", "core-moved.yml", "licences.yml", "look.yml", "nuget.yml", "pr-description.yml", "signatures.yml", "versions.yml"];
 // (each required input a workflow takes, given a plain value: only its first steps run here)
 const inputsOf = text => Object.fromEntries([...String(/workflow_call:\n\s+inputs:\n([\s\S]*?)\n(?:\s{0,4}\S|$)/u.exec(text)?.[1] ?? "").matchAll(/^ {6}([\w-]+):\n((?: {8}.*\n?)*)/gmu)].filter(m => /required: true/u.test(m[2])).map(m => [m[1], "x"]));
 let failed = 0, count = 0;
@@ -55,9 +57,9 @@ ok(pathIn("# Core manifest\n") === "core/", "where the line names none, the read
 // the sed of the workflows' first step and of the work-saved hook, run on the same lines: each reads the path readCore
 // reads, and nothing where readCore reads it as wrong, so no check runs a script from a folder core.yml never compared
 {
-  const wf = fs.readFileSync(fileURLToPath(new URL("../.github/workflows/copies.yml", import.meta.url)), "utf8");
   const hook = fs.readFileSync(fileURLToPath(new URL("./work-saved.sh", import.meta.url)), "utf8");
-  const seds = [["the workflows", /sed -n -E ('[^']+')/u.exec(wf)[1], out => out.split(" ")[0]], ["the hook", /sed -n -E ('s#\^Core: [^']+')/u.exec(hook)[1], out => out]];
+  const seds = [...CALLED.map(f => [f, /sed -n -E ('[^']+')/u.exec(fs.readFileSync(fileURLToPath(new URL(`../.github/workflows/${f}`, import.meta.url)), "utf8"))?.[1] ?? "'no sed'", out => out.split(" ")[0]]),
+    ["the hook", /sed -n -E ('s#\^Core: [^']+')/u.exec(hook)[1], out => out]];
   for (const text of [copied(), copied("vendor/the-core/"), carried(), copied("core/../evil/"), carried("lib/../x/", "lib/../x/core/"), copied("core/..x/"), `${copied().trimEnd()} trailing words\n`]) {
     const want = readCore(text).path ?? "";
     for (const [who, sed, take] of seds) {
@@ -163,7 +165,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   const github = { event_name: "pull_request", repository: "someone/project", base_ref: "main", event: { repository: { default_branch: "main", private: false }, pull_request: { number: 1, base: { sha: "" } } } };
   const usual = projectWith(copied()), unfetched = projectWith(carried(), true);
   const workflows = fileURLToPath(new URL("../.github/workflows/", import.meta.url));
-  for (const f of ["copies.yml", "core-moved.yml", "licences.yml", "look.yml", "pr-description.yml", "signatures.yml", "versions.yml"]) {
+  for (const f of CALLED) {
     const text = fs.readFileSync(path.join(workflows, f), "utf8");
     // (the daily look's jobs run on a schedule alone)
     const on = /schedule/.test(/^ {4}if: .*$/mu.exec(text)?.[0] ?? "") ? { ...github, event_name: "schedule" } : github;
