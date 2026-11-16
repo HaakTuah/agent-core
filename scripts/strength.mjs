@@ -174,10 +174,11 @@ export function witnesses(listedMap, texts, changed) {
 }
 
 // What of each entry the lines a change left alone still hold: the survivors the tool found on them (`faults`, those of
-// witnesses()), each up to the count listed. A repeated line on a changed line cannot use them.
+// witnesses()), and those it left unrun, which are not known to be caught, each up to the count listed. A repeated
+// line on a changed line cannot use them.
 export function heldBy(listedMap, faults) {
   const out = new Map();
-  for (const f of faults.filter(f => SURVIVED.includes(f.status) && listedMap.has(f.id))) out.set(f.id, Math.min((out.get(f.id) ?? 0) + 1, listedMap.get(f.id).count ?? 0));
+  for (const f of faults.filter(f => [...SURVIVED, "Pending"].includes(f.status) && listedMap.has(f.id))) out.set(f.id, Math.min((out.get(f.id) ?? 0) + 1, listedMap.get(f.id).count ?? 0));
   return out;
 }
 
