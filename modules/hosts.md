@@ -8,10 +8,11 @@ project's root, `node core/scripts/check.mjs --base <the commit a change merges 
 the project calls, step by step in their own shell, on the commit checked out, on a person's machine or in any host's
 pipeline, and fails, saying its mend, where one of them fails; with no base, as on a push to `main`. Where the project
 calls none from `.github/workflows`, the starter kit's calls are run. On a host other than GitHub, the project's
-pipeline runs it on every change into `main`, and a session runs it before marking a pull request ready. It does not
-mean that a check of the host's own runs there (a review app's status, the dependency review, code scanning, a job
-started by a schedule): it names each and runs none, and the host's part says what stands in. Reason: every check was a
-GitHub workflow, so a project on another host had none. Held by `scripts/check-test.mjs`, in
+pipeline runs it on every change into `main`, from a clone of the core at the pin `main`'s manifest holds, never from
+the change's own copy, which the change could have edited; and a session runs it before marking a pull request ready. It
+does not mean that a check of the host's own runs there (a review app's status, the dependency review, code scanning, a
+job started by a schedule): it names each and runs none, and the host's part says what stands in. Reason: every check
+was a GitHub workflow, so a project on another host had none. Held by `scripts/check-test.mjs`, in
 `.github/workflows/tests.yml`, which fails where a workflow the starter kit calls is neither run by it nor named the
 host's own.
 

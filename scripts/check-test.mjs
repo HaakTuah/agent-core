@@ -58,6 +58,12 @@ r = check(dir, "--base", "base");
 ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && mended(r.out), "an edit to the copy of the core fails, with core.yml's own failure and its mend", r.out);
 
 git(dir, "reset", "-q", "--hard", "base");
+fs.writeFileSync(path.join(dir, "core", ".github", "workflows", "core.yml"), "on:\n  workflow_call:\njobs:\n  core:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo nothing checked\n");
+commit(dir, "the copy's own check emptied");
+r = check(dir, "--base", "base");
+ok(r.status === 1 && r.out.includes("core/ differs from the core at its pin") && !r.out.includes("nothing checked") && mended(r.out), "a change that edits the copy's own workflow runs the core's as it stands at the call's pin, never the edited one, and fails", r.out);
+
+git(dir, "reset", "-q", "--hard", "base");
 fs.mkdirSync(path.join(dir, "src"), { recursive: true });
 const block = Array.from({ length: 40 }, (_, i) => `export function f${i}(a, b) { const c = a * ${i} + b; if (c > ${i}) { return c - a; } return c + b * ${i}; }`).join("\n");
 fs.writeFileSync(path.join(dir, "src", "one.js"), `${block}\n`);

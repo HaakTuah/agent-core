@@ -4,10 +4,11 @@
 // (none given), on the commit checked out: each step's own shell, through workflow-run.mjs, so that no check is written
 // twice. The calls are the project's own (its .github/workflows); where it has none, as on another host, the starter
 // kit's (core/setup/template/workflows), each with the inputs the kit gives them, a template the kit fills in with more
-// than the core's address and pin left out and said so. Each called workflow is read from the project's copy under
-// core/ (core.yml, run with the rest, fails where a call's workflow differs from the core's at the pin). It runs in a
-// scratch clone of the commit, removed at its end, so it changes nothing in the project; the core at its pin is
-// fetched from the core's address by git. What only the host can do (a review app's status, the dependency review,
+// than the core's address and pin left out and said so. Each called workflow is read from the core at the call's pin,
+// fetched from the core's address by git, as GitHub reads it, never from the project's copy under core/, which the
+// change under check may have edited; and a pipeline that checks a change runs this script itself from a clone of the
+// core, not from that copy (modules/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it
+// changes nothing in the project, and hands the steps no token or secret of its own environment. What only the host can do (a review app's status, the dependency review,
 // code scanning, a job started by a schedule) is not run here and is named: that is the host's part, and where a host
 // has none, what stands in is in its part (modules/hosts.md). The personal-terms list is read from the environment
 // (PERSONAL_TERMS), never from a file, as the host keeps it among its secrets. It prints each job, each step the host
@@ -36,6 +37,11 @@ export const HOST_OWN = {
 };
 
 const env = plainEnv();
+// what the steps run with: this environment without its tokens and secrets, as a workflow's steps get none but what the
+// call passes (git's own settings kept, so a rewrite of the core's address still reaches it)
+const SECRET = /TOKEN|SECRET|PASSWORD|CREDENTIAL|^GH_|^GITHUB_|^ACTIONS_|^RUNNER_|^NPM_|^NUGET_|^PERSONAL_TERMS$/i;
+const stepEnv = Object.fromEntries(Object.entries(env).filter(([name]) => !SECRET.test(name)));
+let coreClone = null; // (the clone of the core's address, made at the first call: coreFile)
 const git = (cwd, ...a) => execFileSync("git", a, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const fail = (what, mend) => { console.error(`FAIL ${what} ${MEND}${mend}`); process.exit(1); };
 const call = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i");
@@ -158,19 +164,26 @@ function runner(p, tmp) {
     if (!name) return 0;
     if (HOST_OWN[name]) { console.log(`host ${file}/${id}: ${name} is not run here (${HOST_OWN[name]})`); return 0; }
     if (name === "pr-description.yml" && !p.described) { console.log(`note ${file}/${id}: pr-description.yml is not run here: give --description <a file> that holds the pull request's description`); return 0; }
-    const called = p.show(p.head, `core/.github/workflows/${name}`);
-    if (called === null) { console.error(`FAIL ${file}/${id}: core/.github/workflows/${name} is not in the copy of the core. ${MEND}sync the core (node core/scripts/sync.mjs), or take out the call to a workflow the core no longer has.`); return 1; }
+    const called = coreFile(tmp, call.exec(job.uses)[2], `.github/workflows/${name}`);
+    if (called === null) { console.error(`FAIL ${file}/${id}: ${name} is not at ${call.exec(job.uses)[2]} in the core's history. ${MEND}pin the call to a commit of the core's main that holds it, as the sync writes it, or take the call out.`); return 1; }
     const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
     const value = v => (typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\s*\$\{\{|\}\}\s*$/g, ""), callerCtx) : v);
     const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, value(v)]));
     const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v)]));
     try {
-      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: env, workspace, uses, temp: tmp }), p.event);
+      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv, workspace, uses, temp: tmp }), p.event);
     } catch (e) {
       console.error(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
       return 1;
     }
   };
+}
+
+// A file of the core at a commit, from a clone of the core's address made once (never from the project's copy, which
+// the change under check may have edited: GitHub too runs a called workflow as the core holds it at the call's pin).
+function coreFile(tmp, sha, file) {
+  if (!coreClone) { coreClone = path.join(tmp, "core.git"); git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); }
+  try { return git(tmp, "--git-dir", coreClone, "show", `${sha}:${file}`); } catch { return null; }
 }
 
 // The stand-in for actions/checkout: the job's own checkout is the scratch clone; the core is fetched from its address.
