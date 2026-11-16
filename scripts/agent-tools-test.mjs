@@ -354,7 +354,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const reads = [["bash scripts/a.sh", ["scripts/a.sh"]], ["node \"${CLAUDE_PROJECT_DIR:-.}/scripts/a.sh\"", ["scripts/a.sh"]], ["python3 \"$(git rev-parse --show-toplevel)/scripts/a.sh\"", ["scripts/a.sh"]],
     ["powershell -File %CLAUDE_PROJECT_DIR%\\scripts\\a.sh", ["scripts/a.sh"]], ["git show HEAD:scripts/a.sh | bash", ["scripts/a.sh"]], ["node -r ./scripts/a.sh x", ["scripts/a.sh"]], ["cat scripts/../scripts/a.sh", ["scripts/a.sh"]],
     ["git show origin/main:scripts/a.sh | bash", []], ["git show refs/remotes/origin/main:scripts/a.sh | bash", []], ["[ -f \"$r/.kiro/hooks/work-saved.json\" ] || exit 0", []], ["test ! -e scripts/a.sh", []],
-    ["bash /scripts/a.sh", []], ["echo ../scripts/a.sh", []], ["npx -y tool@1.0.0", []]];
+    ["bash /scripts/a.sh", []], ["echo ../scripts/a.sh", []], ["npx -y tool@1.0.0", []],
+    ["deno test -A scripts/a.sh", ["scripts/a.sh"]], ["go test -v scripts/a.sh", ["scripts/a.sh"]], ["x; [ ! -f scripts/a.sh ] || bash scripts/a.sh", ["scripts/a.sh"]], ["if [[ -e scripts/a.sh ]]; then :; fi", []]];
   for (const [command, want] of reads) ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${command} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, holds)));
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
 }
@@ -364,11 +365,19 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const t = parseToml("# c\n__proto__ = 'p'\na.b = 1 # n\ns = \"\\u00e9\\n\"\nm = \"\"\"\nx \\\n   y\"\"\"\nl = '''z'''\n[t]\nd = 1979-05-27T07:32:00Z\ni = { k = [1, 'two', [true]] }\n[[r]]\nn = 1\n[[r]]\nn = 2\n");
   const want = '{"__proto__":"p","a":{"b":1},"s":"é\\n","m":"x y","l":"z","t":{"d":"1979-05-27T07:32:00Z","i":{"k":[1,"two",[true]]}},"r":[{"n":1},{"n":2}]}';
   ok(JSON.stringify(t) === want && Object.getPrototypeOf(t) === Object.prototype, "TOML is read as JSON would hold it, a key \"__proto__\" a key like any other", JSON.stringify(t));
-  for (const [bad, says] of [["a = 1\na = 2", "given twice"], ["a = \"x", "not closed"], ["[a]\n[a]", "given twice"], ["a = [1", "commas"], ["a = 1 b", "more follows"], ["a = \"\\q\"", "no escape"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
+  const headers = Array.from({ length: 200 }, (_, i) => `[[${Array(i + 1).fill("a").join(".")}]]`).join("\n");
+  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "given twice"], ["a = \"x", "not closed"], ["[a]\n[a]", "given twice"], ["a = [1", "commas"], ["a = 1 b", "more follows"], ["a = \"\\q\"", "no escape"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
     let message = "";
     try { parseToml(bad); } catch (e) { message = e.message; }
     ok(message.includes(says), `TOML that is no TOML is refused: ${says}`, message);
   }
+}
+
+// ---- no key of a project's file reaches an object's prototype (#476's fallback security review) ----
+{
+  const t = parseToml("[__proto__]\nenabledPlugins = { \"evil@m\" = true }\n[a]\n__proto__.x = 1\n");
+  ok(({}).enabledPlugins === undefined && ({}).x === undefined && Object.hasOwn(t, "__proto__") && Object.hasOwn(t.a.__proto__, "x"), "a TOML key \"__proto__\" fills a table of its own, never Object.prototype");
+  fails(run(pr(project({ ...listing() }), { ".claude/settings.json": withPlugins({ "evil@m": true }), ".codex/config.toml": "[__proto__]\nenabledPlugins = { \"evil@m\" = true }\n" })), "so a plug-in turned on beside such a config.toml is still not the kit's, and fails unlisted", 'the plug-in "evil@m"');
 }
 
 // ---- nesting is bounded, and a line from the project stays on its line ----

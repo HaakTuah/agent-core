@@ -6,14 +6,16 @@
 // than guards.mjs's DEEPEST, so that what reads it after never runs out of stack. Node's own modules only.
 //
 //   import { parseToml } from "./toml.mjs";   parseToml(text) -> an object, or throws a SyntaxError naming the line
-import { DEEPEST } from "./guards.mjs";
+import { DEEPEST, tooDeep } from "./guards.mjs";
 
 const BARE = /[A-Za-z0-9_-]/u;
 const ESCAPES = { b: "\b", t: "\t", n: "\n", f: "\f", r: "\r", '"': '"', "\\": "\\" };
 const SCALAR = /^(?:true|false|[+-]?(?:inf|nan)|[0-9+\-][0-9A-Za-z_:.+-]*(?: [0-9][0-9:.+Z-]*)?)/u;
 
-// (a key set as a plain property, never through a setter: "__proto__" is a key like any other)
+// (a key set as a plain property, never through a setter, and read only where it is the table's own, never through its
+// prototype: "__proto__" is a key like any other)
 const put = (table, key, value) => Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
+const own = (table, key) => (Object.hasOwn(table, key) ? table[key] : undefined);
 const isTable = v => v !== null && typeof v === "object" && !Array.isArray(v);
 
 export function parseToml(text) {
@@ -37,6 +39,9 @@ export function parseToml(text) {
     blank();
     if (i < s.length && s[i] !== "\n") fail("more follows a key's value or a table's name on its line");
   }
+  // (a header's names, the arrays of tables on its way and a dotted key below it each nest a level: the whole is counted
+  // once read, as guards.mjs counts JSON)
+  if (tooDeep(root)) throw new SyntaxError(`it nests deeper than ${DEEPEST} tables and arrays`);
   return root;
 }
 
@@ -71,7 +76,7 @@ function header(ctx, root, defined) {
   if (parts.length > DEEPEST) ctx.fail(`a table nests deeper than ${DEEPEST}`);
   let table = root;
   for (const part of parts.slice(0, -1)) table = into(ctx, table, part);
-  const last = parts[parts.length - 1], there = table[last];
+  const last = parts[parts.length - 1], there = own(table, last);
   if (many) {
     if (there !== undefined && !(Array.isArray(there) && there.every(isTable))) ctx.fail(`${JSON.stringify(last)} is given as a value and as an array of tables`);
     const made = {};
@@ -87,7 +92,7 @@ function header(ctx, root, defined) {
 
 // The table under `part` of `table`, made where it is missing; in an array of tables, its last.
 function into(ctx, table, part) {
-  const there = table[part];
+  const there = own(table, part);
   if (there === undefined) return put(table, part, {})[part];
   if (Array.isArray(there) && there.length && isTable(there[there.length - 1])) return there[there.length - 1];
   if (!isTable(there)) ctx.fail(`${JSON.stringify(part)} is given as a value and as a table`);

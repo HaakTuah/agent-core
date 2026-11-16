@@ -19,9 +19,10 @@ const WORD = /[^\s'"`;|&()<>{}$\\=,\u0001]+/gu;
 const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
 // (a variable, as the shell, cmd and PowerShell write one, read as one mark: what it holds is not the command's text)
 const VARIABLE = /\$env:\w+|\$\{[^}]*\}|\$\w+|%\w+%/gu;
-// (what stands before a word that only tests a file: "[", "[[" or "test", perhaps "!", a test's operator, then perhaps a
-// quote and a variable; an option of another program, as node's -r, is no test)
-const TESTED = /(?:^|[\s;&|(])(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+// (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts, perhaps after "!", then
+// a test's operator, perhaps a quote and a variable; an option of another program, as node's -r, is no test, nor is
+// "test" given to another program, as in "go test -v")
+const TESTED = /(?:^|[;&|({!'"`]|\b(?:if|then|else|elif|while|until|do))[ \t]*(?:![ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), perhaps closed by a quote)
 const ROOTED = /[\u0001)]\\?["']?$/u;
