@@ -24,7 +24,6 @@ wanted").
 | #318 | rule builder | |
 | #310 | rule builder | #285 |
 | #325 | rule builder | #305, #311 and #322 |
-| #359 | rule builder | |
 | #314 | rule builder | |
 | #375 | rule builder | |
 | #376 | rule builder | #375, which changes the same files |
