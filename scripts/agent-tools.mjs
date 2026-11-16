@@ -3,15 +3,29 @@
 // check's config, each entry { "kind", "name", "publisher", "version" }: kind one of plugin, server, skill, hook; a
 // publisher named; a version that is one exact version (as SemVer writes one) or a full 40-character commit, which a
 // plug-in and a tool server must give and a skill or hook may (each is a file of the project's, pinned by its commit).
-// The hooks the starter kit writes (setup/template/claude-settings.json.tmpl, beside this copy) are the core's, listed
-// by it at the core's pin. An entry nothing configures fails too, so the list stays true.
+// The hooks the starter kit writes for Claude Code, Kiro and Codex (setup/template/claude-settings.json.tmpl,
+// kiro-hook.json.tmpl and codex-hooks.json.tmpl, beside this copy) are the core's, listed by it at the core's pin. An
+// entry nothing configures fails too, so the list stays true.
 //
 // What it reads as configured, in the files at the project's root that git does not ignore: `.claude/settings.json`
 // and, where it is committed, `.claude/settings.local.json`, each hook by its event, matcher and command ("Stop: bash -c '...'") and
 // each plug-in their "enabledPlugins" turn on ("name@marketplace"); `.mcp.json`, each tool server of its "mcpServers";
-// and `.claude/skills/`, each folder holding a SKILL.md. A link inside the checkout is followed; one that leads out of
-// it is not, and fails, save one the base held as it stands. What a person or a machine configures outside the repository is no file of the project's (floor rule 18);
-// another provider's settings and where a plug-in's marketplace or a tool server's command points are the review's.
+// and `.claude/skills/`, each folder holding a SKILL.md; and what Kiro and Codex configure (#407), each named with its
+// tool first: Kiro's hooks, in each JSON file directly under `.kiro/hooks` ("Kiro Stop: <command>"), and its tool
+// servers in `.kiro/settings/mcp.json` ("Kiro <name>"); Codex's hooks in `.codex/hooks.json` and inline in
+// `.codex/config.toml` ("Codex Stop: <command>"), the program config.toml's "notify" starts ("Codex notify: <its
+// words>"), and its tool servers there ("Codex <name>"; toml.mjs reads it). A link inside the checkout is followed; one
+// that leads out of it is not, and fails, save one the base held as it stands. What a person or a machine configures
+// outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
+// `.kiro/agents`, say), and where a plug-in's marketplace or a tool server's command points, are the review's.
+//
+// Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
+// `main`): a hook of any tool read here that names a file the project holds, other than by fetching it from the
+// remote's main (`git show refs/remotes/origin/main:<path>`) or testing that it is there, takes it from the working
+// tree, which the branch it runs on can change, and fails (hook-source.mjs says what it reads). One that stood before
+// is listed in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new
+// hook marked so fails, and so does a mark taken out while its hook stands, or a mark on a hook that takes nothing from
+// the working tree.
 //
 // A listed plug-in or tool server is held to the pin its own configuration gives, where it gives one in a form read here
 // (#352; Claude Code's plug-in and tool-server documentation): a plug-in by its marketplace in "extraKnownMarketplaces",
@@ -28,9 +42,11 @@
 // read against the first parent of GitHub's merge (licences.mjs's baseOf), so only what the pull request itself adds
 // fails; with no base, as on a push, what is unlisted is noted and nothing fails. So too a pin that differs from its
 // entry, or a tool fetched at no fixed version: it fails only where the pull request changed that tool's configuration
-// or its entry, and is noted where the base held both as they stand, or where there is no base. The sync note of 16
-// November 2026 has the step that reads the list written and each pin matched (steps.mjs). In the core's own
-// repository (`--core`) a missing list counts as an empty one, so nothing unlisted stands, and no pin breach does.
+// or its entry, and is noted where the base held both as they stand, or where there is no base; and a hook that takes a
+// file from the working tree, unmarked, fails only where the base held no such hook or marked it, and is noted
+// otherwise. The sync note of 16 November 2026 has the step that reads the list written, each pin matched and each
+// such hook marked (steps.mjs). In the core's own repository (`--core`) a missing list counts as an empty one, so
+// nothing unlisted stands, and no pin breach or hook from the working tree does, marked or not.
 // Node's own modules and git only.
 //
 //   node core/scripts/agent-tools.mjs <the licence check's config>     from a project's root, as licences.yml runs it
