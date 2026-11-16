@@ -15,7 +15,6 @@ wanted").
 | --- | --- | --- |
 | #256 | rule builder | |
 | #252 | rule builder | |
-| #296 | builder | |
 | #285 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
@@ -43,7 +42,6 @@ wanted").
 | #370 | builder | |
 | #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
 | #386 | builder | #362, which changes the same file |
-| #393 | builder | |
 | #394 | builder | |
 | #403 | builder | #299, whose rule its mends name |
 | #404 | builder | #299, whose rule it holds, and #403, or built with it |

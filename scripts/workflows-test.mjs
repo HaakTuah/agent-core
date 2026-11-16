@@ -1,5 +1,6 @@
 // Checks the workflow check (workflows.mjs, beside this file): the forbidden trigger is found however it is written,
-// and the core's own workflows pass. Run by the core's tests workflow (.github/workflows/tests.yml).
+// a key given twice in one mapping is found however the mapping is written (yaml-keys.mjs) and fails only where the
+// base did not hold it, and the core's own workflows pass. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/workflows-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -9,7 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
 import { parseYaml } from "./workflow-run.mjs";
-import { lines, readable, reads, unlinked } from "./workflows.mjs";
+import { lines, readable, reads, repeated, unlinked } from "./workflows.mjs";
+import { flowTwice, keyAt, twice, uncommented } from "./yaml-keys.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -34,6 +36,36 @@ const files = [".github/workflows/a.yml", ".github/workflows/b.yaml", ".github/a
 ok(reads(files).join() === files.slice(0, 7).join(), "it reads the project's own workflows and its actions wherever they lie, whatever the case of the ending, and neither the core's copy nor an installed package's");
 ok(unlinked([".github", ".GitHub/workflows", ".github/workflows", ".github/dependabot.yml", "tools/act/action.yaml", "tools/act", "docs/a.yml", ".githubs", "core/.github/workflows/a.yml"]).join() === ".github,.GitHub/workflows,.github/workflows,.github/dependabot.yml,tools/act/action.yaml", "what may be no link: what it reads, and .github itself with everything in it (a linked folder is one entry to git)");
 
+// ---- a key given twice in one mapping, which GitHub refuses (#393) ----
+const dup = text => twice(text).map(f => `${f.key}@${f.line}<${f.first}`).join();
+ok(dup("jobs:\n  a:\n    steps:\n      - name: x\n        if: a\n        if: b\n      - name: y\n        if: c\n") === "if@6<5", "a step's if: given twice is found, by its line and the first's, and the next step's own is not");
+ok(dup("on: push\nname: a\non: pull_request\n") === "on@3<1" && dup("a:\n  x: 1\nb:\n  x: 2\n  y: 3\n  x: 4\n") === "x@6<4", "at the top too, and a mapping is one key's value alone: one under another key starts afresh");
+ok(dup("steps:\n- name: x\n  run: y\n- name: x\n  run: y\n") === "" && dup("steps:\n  - name: x\n  - name: x\n    if: a\n") === "" && dup("- - a: 1\n  - a: 2\n") === "", "each item of a list is a mapping of its own, written at its key's indent or past it, in a list in a list too");
+ok(dup("- a: 1\n  b:\n  - c: 1\n  - c: 2\n  a: 3\n") === "a@5<1", "a list at its key's own indent is that key's value, and the mapping goes on after it");
+ok(dup("-\n  a: 1\n  a: 2\n-\n  a: 3\n") === "a@3<2" && dup("x:\n-\ny: 1\nx: 2\n") === "x@4<1", "and an item whose mapping starts on the line after its dash, which ends at a line no further in");
+ok(dup("\"if\": a\n'if': b\nif: c\n") === "if@2<1,if@3<1" && dup(`"a\\x62": 1\nab: 2\n'it''s': 3\n"it's": 4\n`) === "ab@2<1,it's@4<3" && dup(`"\\U0010FFFF": 1\n"\\U0010ffff": 2\n"\\U00110000": 3\n"\\U00110001": 4\n`) === "\u{10ffff}@2<1" && dup("a': 1\na': 2\nb\": 1\nb\": 2\n") === "a'@2<1,b\"@4<3", "a key is read as YAML spells it, quoted or plain, with an escape too (one past the last character none), and a plain one may end in a quote");
+ok(dup("run: |\n  if: 1\n  if: 2\nx: >-\n  a: 1\n\n  a: 2\n- |\n  a: 1\n  a: 1\n") === "" && dup("a: \"b: 1\n  b: 2\"\nc: x\n  c: y\n") === "", "the lines a value runs on are passed over: a block scalar's, a quoted one's and a plain one's");
+ok(dup("a: 1 # a: 2\n# a: 3\nb: '#x' # c\nb: \"#y\"\n") === "b@4<3" && dup("a: 1\r\nb:\r\n  c: 1\r\n  c: 2\r\n") === "c@4<3" && dup("a: 1\rb: 2\ra: 3\r") === "a@3<1" && dup("\ufeffon: a\nx: 1\non: b\n") === "on@3<1", "a comment hides no key and holds none, and every line break and a byte order mark are read as GitHub reads them");
+ok(dup("a: &x\n  b: 1\n  b: 2\nc: *x\nc: !!str y\n") === "b@3<2,c@5<4" && dup("---\na: 1\n---\na: 2\n") === "", "a value that is only an anchor or a tag holds the mapping below it, and each document is its own");
+ok(dup("on: { push: {}, \"push\": {} }\n") === "push@1<1" && dup("on: {\n  push: {branches: [a, b]},\n  push: {} }\nx: 1\nx: 2\n") === "push@3<2,x@5<4" && dup("- {a: 1, b: [{a: 1, a: 2}], a: 2}\n") === "a@1<1,a@1<1", "in a flow mapping too, on one line or on several, and one in a list or inside another");
+ok(dup("a: {b: 1, c: {b: 2}}\nd: [a, a, {e: 1}, {e: 2}]\nf: {'g': 1, h: 'g', i}\n") === "" && dup("a: {x, x}\nb: {: 1, : 2}\n") === "x@1<1,@2<2", "while what lies in two mappings, a list's items and a value are none, and a key with no value or no name is one");
+ok(dup(`a: {'it''s': 1, "it's": 2, "q\\"": 3, 'q"': 4}\nb: {x:y: 1, x:y: 2, z: [c, d], z: {e}}\nc: {a:`) === "it's@1<1,q\"@1<1,x:y@2<2,z@2<2" && flowTwice("{a:, a:").map(f => f.key).join() === "a", "a flow key quoted either way, with a colon in it, or holding a list or a mapping, and one at the text's end");
+ok(dup("a: {\n b: 1,\n\n # c: 1\n c: 2, b: 3,\n c: 4 }\n") === "b@5<2,c@6<5" && dup(`a: ${"[".repeat(20000)}\nb: 1\nb: 2\n`) === "b@3<2" && dup(`a: [${"{b: 1, b: 2}, ".repeat(3)}]\n`) === "b@1<1,b@1<1,b@1<1", "a blank line or a comment in a flow value keeps its lines counted, and a value nested past any mark throws nothing, the rest of the file read still");
+const hostile = Date.now(), many = dup(`a: {\n${" b: 1,\n".repeat(40000)}}\n`).split(",").length;
+ok(many === 39999 && dup(`x${" ".repeat(100000)}y\n${"a".repeat(100000)}: 1\n`) === "" && Date.now() - hostile < 5000, `forty thousand keys twice in one value, and a line of a hundred thousand blanks or letters, read in a few seconds at most (${Date.now() - hostile} ms)`);
+ok(dup("env: &defaults { FOO: one, FOO: two }\n- !t [ {c: 1, c: 2} ]\n") === "FOO@1<1,c@2<2" && dup("a: {x: &y {b: 1, b: 2}, z: !t 1, z: 2}\n") === "b@1<1,z@1<1" && dup("a: {!t b: 1, &c b: 2}\n") === "b@1<1" && dup("env: { A: 'it''s # text', A: two }\n") === "A@1<1",
+  "a flow value behind an anchor or a tag is read, a node in it behind one too, and a doubled quote inside single quotes ends neither the quote nor the line");
+ok(dup("matrix: { include: [{ os: ubuntu-latest, }], os: [windows-latest] }\n") === "" && dup("jobs: { build: { runs-on: x, }, build: { runs-on: y } }\n") === "build@1<1", "a blank between a last comma and the bracket that closes a flow value closes it there");
+ok(flowTwice("{a: 1, a: 2}").map(f => `${f.key}${f.at}<${f.first}`).join() === "a7<1" && flowTwice("{a: 1, ]b: 1, b").map(f => f.key).join() === "b" && flowTwice("[a: 1, a: 1]").length === 0 && flowTwice("{a:1, a:2}").length === 0, "a flow mapping's keys by their offsets, read on past a character no node takes; a pair in a list and a plain a:1, which is one scalar, are no key");
+ok(keyAt("a: b") .key === "a" && keyAt("url: http://x/y: z").value === "http://x/y: z" && keyAt("a:b: c").key === "a:b" && keyAt("-x: 1").key === "-x" && keyAt("a:b") === null && keyAt("- a: 1") === null && keyAt("? a") === null && keyAt("{a: 1}") === null, "a key ends at the first colon a blank or the line's end follows, and a dash, a question mark or a brace before it starts none");
+ok(uncommented("a: 'x # y' # z") === "a: 'x # y'" && uncommented(`a: "x \\" # y" # z`) === `a: "x \\" # y"` && uncommented("a: b#c") === "a: b#c" && uncommented("a: b# c") === "a: b# c" && uncommented("a: 'b\\' # c") === "a: 'b\\'" && uncommented("# all") === "" && uncommented("a: it's # x") === "a: it's", "a comment starts at a # after a blank, outside quotes, and a quote inside a word opens none");
+const was = "on: push\non: pull_request\nx: 1\n", now = "on: push\non: pull_request\nx: 1\nx: 2\nx: 3\n";
+const base = repeated([{ file: "a.yml", text: now }, { file: "b.yml", text: was }], f => (f === "a.yml" ? `${was}x: 2\n` : null));
+ok(base.notes.length === 2 && base.fails.length === 2 && base.notes.every(l => /^note a\.yml:[24]: .*as it did on the base\. Mend: /.test(l)) && /^FAIL a\.yml:5: /.test(base.fails[0]) && /^FAIL b\.yml:2: the key "on" is given twice in one mapping \(first on line 1\), so GitHub refuses the whole file and runs none of its jobs\. Mend: keep one of the two keys/.test(base.fails[1]) && mended(base.fails.join("\n")),
+  "against a base, as many of a key as the file held twice there are noted, and the rest fail, each with its mend; a file the base lacked fails whole");
+const none = repeated([{ file: "a.yml", text: now }], null), fresh = repeated([{ file: "a.yml", text: now }], () => null);
+ok(none.fails.length === 0 && none.notes.length === 3 && !none.notes[0].includes("base") && fresh.fails.length === 3 && fresh.notes.length === 0, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
+
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
 ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workflows/${f}`, "utf8"))), "the core's own workflows pass");
@@ -42,7 +74,7 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "started.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, import.meta.url)), path.join(tmp, "core/scripts", f));
+  for (const f of ["workflows.mjs", "started.mjs", "yaml-keys.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, import.meta.url)), path.join(tmp, "core/scripts", f));
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));
@@ -51,6 +83,17 @@ try {
   const out = r.stdout + r.stderr;
   const good = r.status === 1 && /a\.yml:2: pull_request_target .*\. Mend: take the word out/.test(out) && /and on 2 more lines\. Mend:/.test(out) && /b\.yml: not UTF-8 text.*Mend: save it as UTF-8/.test(out) && mended(out);
   ok(good, `run, it fails each, by file and line, and each failure says its mend${good ? "" : `:\n${out}`}`);
+  // (a key twice: a.yml's push stood twice on the base, and stands once now; the step's if: in c.yml is new)
+  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\n  push:\n");
+  for (const args of [["rm", "-q", "--cached", ".github/workflows/b.yml"], ["add", ".github/workflows/a.yml"], ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "base"]]) execFileSync("git", args, { cwd: tmp, stdio: "ignore" });
+  fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), "on:\n  push:\n  push:\n");
+  fs.writeFileSync(path.join(tmp, ".github/workflows/c.yml"), "on: push\njobs:\n  a:\n    steps:\n      - run: x\n        if: a\n        if: b\n");
+  execFileSync("git", ["add", "-A", ".github/workflows/a.yml", ".github/workflows/c.yml"], { cwd: tmp, stdio: "ignore" });
+  const keyRun = (args, env) => spawnSync(process.execPath, [path.join(tmp, "core/scripts/workflows.mjs"), ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "", ...env } });
+  const k = keyRun([], { WORKFLOWS_BASE: "HEAD" }), kOut = k.stdout + k.stderr, kGood = k.status === 1 && /^note \.github\/workflows\/a\.yml:3: the key "push" .*as it did on the base/m.test(kOut) && /^FAIL \.github\/workflows\/c\.yml:7: the key "if" .*first on line 6.*Mend: keep one/m.test(kOut) && /1 failing, 1 noted\. Mend:/.test(kOut) && mended(kOut);
+  ok(kGood, `run against a base, a key twice the base held is noted and a new one fails, with its mend${kGood ? "" : `:\n${kOut}`}`);
+  const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
+  ok(kNone.status === 0 && /0 failing, 2 noted$/m.test(kNone.stdout) && kCore.status === 1 && /2 failing\. Mend:/.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base");
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
