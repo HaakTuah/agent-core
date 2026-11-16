@@ -143,17 +143,11 @@ export function counted(faults) {
 // An id's parts: its file, its line's text and what became what.
 const partsOf = id => { const m = /^survivor: (.+?): (.*) (\[.*\])$/u.exec(id); return m ? { file: m[1], line: m[2], what: m[3] } : null; };
 
-// The entries whose line no longer stands in their file as it is now (`texts`, a function of a file to its text or
-// null): a Map of id to its count. A fault on a line a pull request rewrote may claim one of these.
-export function moved(listedMap, texts) {
-  const out = new Map(), lines = new Map();
-  for (const [id, n] of listedMap) {
-    const parts = partsOf(id);
-    if (!parts) continue;
-    if (!lines.has(parts.file)) lines.set(parts.file, new Set((texts(parts.file) ?? "").split(/\r?\n/u).map(l => collapse(l, 100))));
-    if (!lines.get(parts.file).has(parts.line)) out.set(id, n.count ?? 0);
-  }
-  return out;
+// The entries of the files a change touched (`files`, a Set or Map of their names): a Map of id to its count. What of
+// one the lines left alone do not hold (heldBy()), nor a survivor of its own id, may pass to a survivor of the same file
+// and fault under a new id: a line the change rewrote, of which another copy may stand, keeps its debt.
+export function opened(listedMap, files) {
+  return new Map([...listedMap].filter(([id]) => files.has(partsOf(id)?.file)).map(([id, n]) => [id, n.count ?? 0]));
 }
 
 // The unchanged lines of the files a change touched whose text is that of a listed entry (`texts`, a function of a file
@@ -183,12 +177,14 @@ export function heldBy(listedMap, faults) {
 }
 
 // The survivors no entry of the baseline claims: each id's count, less what unchanged lines hold of it (heldBy()),
-// against the count listed; then, of what is left, a
-// survivor claims an entry of `gone` (moved()) of the same file and the same fault, where one is left.
-export function unlisted(faults, listedMap, gone = new Map(), held = new Map()) {
-  const counts = new Map(), left = [], free = new Map(gone);
+// against the count listed; then, of what is left, a survivor claims what an entry of `open` (opened()) of the same file
+// and fault has left over, after what unchanged lines hold and what its own id's survivors take.
+export function unlisted(faults, listedMap, open = new Map(), held = new Map()) {
+  const counts = new Map(), left = [];
   for (const f of faults.filter(f => SURVIVED.includes(f.status))) counts.set(f.id, [...(counts.get(f.id) ?? []), f]);
-  for (const [id, all] of counts) left.push(...all.slice(Math.max(0, (listedMap.get(id)?.count ?? 0) - (held.get(id) ?? 0))));
+  const allowed = id => Math.max(0, (listedMap.get(id)?.count ?? 0) - (held.get(id) ?? 0));
+  for (const [id, all] of counts) left.push(...all.slice(allowed(id)));
+  const free = new Map([...open.keys()].map(id => [id, Math.max(0, allowed(id) - (counts.get(id)?.length ?? 0))]));
   return left.filter(f => {
     const mine = partsOf(f.id), fit = [...free].find(([id, c]) => c > 0 && partsOf(id)?.file === mine?.file && partsOf(id)?.what === mine?.what);
     if (fit) free.set(fit[0], fit[1] - 1);
@@ -199,8 +195,8 @@ export function unlisted(faults, listedMap, gone = new Map(), held = new Map()) 
 // The entries that joined the baseline since the base with no reason under "grown": [id]. None counts where the base
 // has no baseline (the first), or where the pull request records a new whole run and changes no file of code or of the
 // tests (`touched` false), so that what the run found stood on the base. An entry that only carries the debt of a base
-// entry whose line was rewritten (`wasGone`, moved() of the base's entries; a cleaning run's --lower) has not joined:
-// it is set against what that entry no longer holds, of the same file and fault.
+// entry of a file the change touched (`wasGone`, opened() of the base's entries; a cleaning run's --lower) has not
+// joined: it is set against what that entry gave up, of the same file and fault, so their total does not grow.
 export function joinedUnsaid(now, was, touched = true, wasGone = new Map()) {
   if (!was || (!touched && JSON.stringify(now.whole ?? null) !== JSON.stringify(was.whole ?? null))) return [];
   const freed = new Map([...wasGone.keys()].map(id => [id, Math.max(0, (was.listed.get(id)?.count ?? 0) - (now.listed.get(id)?.count ?? 0))]));
@@ -288,7 +284,7 @@ function onPullRequest(p, base) {
   const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
   const found = measured(p, changed, baseline, read);
   const faults = found.filter(f => changed.get(f.file)?.has(f.line)), held = heldBy(baseline?.listed ?? new Map(), found.filter(f => !changed.get(f.file)?.has(f.line)));
-  const gone = baseline ? moved(baseline.listed, read) : new Map(), wasGone = was ? moved(was.listed, read) : new Map();
+  const gone = baseline ? opened(baseline.listed, changed) : new Map(), wasGone = was ? opened(was.listed, changed) : new Map();
   const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched: touches(p, base), gone, held, wasGone });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
@@ -331,21 +327,21 @@ function whole(p) {
 }
 
 // The baseline's entries lowered by a run of `files` (`now`, each surviving id to its count): an entry of those files
-// keeps what still survives of it, at most its count; one whose line the task rewrote (moved()) passes what it held to
-// a survivor of the same file and fault the run found under a new id, so that a rewritten line keeps its debt rather
-// than losing it; an entry of another file stays as it was. A Map of id to count; nothing joins.
-export function lowered(listedMap, now, files, texts, origins = new Map()) {
+// keeps what still survives of it, at most its count, and passes what it gave up to a survivor of the same file and
+// fault the run found under a new id, so that a rewritten line, one copy of a repeated line too, keeps its debt rather
+// than losing it; an entry of another file stays as it was. A Map of id to count; nothing joins, and no total grows.
+export function lowered(listedMap, now, files, origins = new Map()) {
   const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `)), left = new Map(now), out = new Map();
   for (const [id, n] of listedMap) {
     const c = ours(id) ? Math.min(n.count ?? 0, left.get(id) ?? 0) : n.count ?? 0;
     if (ours(id)) left.set(id, (left.get(id) ?? 0) - c);
     if (c > 0) out.set(id, c);
   }
-  for (const [id, count] of moved(new Map([...listedMap].filter(([i]) => ours(i))), texts)) carry(id, count - (out.get(id) ?? 0), left, out, listedMap, origins);
+  for (const [id, n] of listedMap) if (ours(id)) carry(id, (n.count ?? 0) - (out.get(id) ?? 0), left, out, listedMap, origins);
   return out;
 }
 
-// What a rewritten entry (`id`) held, `rest`, passed to the survivors left of the same file and fault under new ids.
+// What an entry (`id`) gave up, `rest`, passed to the survivors left of the same file and fault under new ids.
 function carry(id, rest, left, out, listedMap, origins) {
   const same = nid => !listedMap.has(nid) && partsOf(nid)?.file === partsOf(id)?.file && partsOf(nid)?.what === partsOf(id)?.what;
   for (const [nid, c] of left) {
@@ -368,7 +364,7 @@ function lower(p, named) {
   const unrun = found.filter(f => f.status === "Pending").length;
   if (unrun) refuse(`the mutation tool left ${unrun} faults of ${files.join(", ")} not run, so what they would show is not known`, "run it again with no budget (MUTATE_BUDGET unset for the core's tool), or on fewer files at a time");
   for (const f of found.filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
-  const origins = new Map(), listed = Object.fromEntries([...lowered(old.listed, now, files, f => tolerant(() => fs.readFileSync(unlinked(f), "utf8")), origins)].map(([id, c]) => [id, { count: c }]));
+  const origins = new Map(), listed = Object.fromEntries([...lowered(old.listed, now, files, origins)].map(([id, c]) => [id, { count: c }]));
   // (a reason given for an entry follows its debt to the new id a rewritten line gave it)
   const grown = Object.fromEntries(Object.keys(listed).map(id => [id, old.grown[id] ?? old.grown[origins.get(id)]]).filter(([, why]) => (why ?? "").trim()));
   fs.writeFileSync(unlinked(p.at), `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);

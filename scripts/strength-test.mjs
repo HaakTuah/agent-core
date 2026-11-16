@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, changedLines, counted, faultsOf, heldBy, lowered, idOf, witnesses, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
+import { baselineOf, changedLines, counted, faultsOf, heldBy, lowered, idOf, witnesses, joinedUnsaid, linesArg, opened, toolOf, unlisted, verdict } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -51,7 +51,7 @@ ok(same(joinedUnsaid(b({ p: { count: 1 }, q: { count: 2 } }), b({ p: { count: 1 
 const runs = [b({ q: { count: 2 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
 ok(same(joinedUnsaid(...runs, false), []) && same(joinedUnsaid(...runs, true), ["q"]) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
   "with no reason, only in the pull request that records a new whole run and changes no code or test, or writes the first baseline: one that changes code cannot take in its own survivors so");
-const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", gone = moved(new Map([[old, { count: 1 }], ["survivor: a.js: kept(); [! -> ]", { count: 1 }]]), () => "kept();\nif (y === 1) return;\n");
+const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", gone = opened(new Map([[old, { count: 1 }], ["survivor: b.js: kept(); [! -> ]", { count: 1 }]]), new Set(["a.js"]));
 const renamed = { ...f("survivor: a.js: if (y === 1) return; [=== -> !==]", "Survived") }, other = { ...f("survivor: a.js: if (y === 1) return; [=== -> ==]", "Survived") };
 const repeated = "survivor: a.js: return true; [true -> false]", file = "function f() {\n  return true;\n}\nfunction g() {\n  return true;\n}\n";
 const entry = new Map([[repeated, { count: 1 }]]), watched = witnesses(entry, () => file, new Map([["a.js", new Set([4, 5, 6])]]));
@@ -59,16 +59,19 @@ const survives = heldBy(entry, [f(repeated, "Survived")]), caught = heldBy(entry
 ok(same([...watched.get("a.js")], [2]) && survives.get(repeated) === 1 && unlisted([f(repeated, "Survived")], entry, new Map(), survives).length === 1 && !caught.has(repeated) && unrun.get(repeated) === 1 && unlisted([f(repeated, "Survived")], entry, new Map(), caught).length === 0 && witnesses(entry, () => file, new Map([["b.js", new Set([1])]])).size === 0,
   "an unchanged line that repeats a listed one is run too: where its fault still survives, a changed repeat cannot use the entry; where a test catches it there, the entry is the changed line's; where it was not run, it holds the entry");
 const was = "survivor: a.js: export const flag = () => true; [true -> false]", now2 = "survivor: a.js: export const flag = () => { return true; }; [true -> false]";
-const low = lowered(new Map([[was, { count: 1 }], ["survivor: b.js: x [! -> ]", { count: 2 }]]), new Map([[now2, 1]]), ["a.js"], () => "export const flag = () => { return true; };\n");
-ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"], () => "export const flag = () => { return true; };\n")], []),
-  "a cleaning run keeps the debt of a line it rewrote, under the fault's new id, and drops it only where the fault no longer survives; an entry of another file stays");
+const low = lowered(new Map([[was, { count: 1 }], ["survivor: b.js: x [! -> ]", { count: 2 }]]), new Map([[now2, 1]]), ["a.js"]);
+const twice = "survivor: a.js: return true; [true -> false]", rewritten = "survivor: a.js: return (true); [true -> false]";
+ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"])], []) && same([...lowered(new Map([[twice, { count: 2 }]]), new Map([[twice, 1], [rewritten, 1]]), ["a.js"])].sort(), [[rewritten, 1], [twice, 1]].sort()),
+  "a cleaning run keeps the debt of a line it rewrote, one copy of a repeated line too, under the fault's new id, and drops it only where the fault no longer survives; an entry of another file stays");
 const origins = new Map();
-lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1]]), ["a.js"], () => "export const flag = () => { return true; };\n", origins);
-const afterLower = b({ [now2]: { count: 1 } }), beforeLower = b({ [was]: { count: 1 } }), baseGone = moved(beforeLower.listed, () => "export const flag = () => { return true; };\n");
+lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1]]), ["a.js"], origins);
+const afterLower = b({ [now2]: { count: 1 } }), beforeLower = b({ [was]: { count: 1 } }), baseGone = opened(beforeLower.listed, new Set(["a.js"]));
 ok(origins.get(now2) === was && same(joinedUnsaid(afterLower, beforeLower, true, baseGone), []) && same(joinedUnsaid(b({ [now2]: { count: 2 } }), beforeLower, true, baseGone), [now2]),
   "the pull request of a cleaning run that carried a rewritten line's debt to its new id passes; one that adds to it does not");
-ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1,
-  "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once; another fault there is the change's own");
+const two = new Map([[twice, { count: 2 }]]), rewrittenOne = { ...f(rewritten, "Survived") };
+ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1
+  && same(unlisted([rewrittenOne], two, opened(two, new Set(["a.js"])), new Map([[twice, 1]])), []) && unlisted([rewrittenOne], two, opened(two, new Set(["a.js"])), new Map([[twice, 2]])).length === 1,
+  "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once, also where another copy of the line stands and holds the rest; another fault there is the change's own");
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });

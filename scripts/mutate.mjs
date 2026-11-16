@@ -159,6 +159,9 @@ function copyOf(dir) {
     if (!here) { noLinkOnTheWay(dir, f); fs.rmSync(to, { force: true }); continue; } // (gone here, so gone in the copy too)
     if (here.isSymbolicLink() || here.isDirectory()) continue; // (a folder's files come one by one)
     noLinkOnTheWay(dir, f);
+    // (a file that replaced a folder of HEAD's: the copy's folder goes first; no link stands on its way, and taking a
+    // folder away removes the links in it, never what they lead to)
+    try { if (fs.lstatSync(to).isDirectory()) fs.rmSync(to, { recursive: true, force: true }); } catch { /* (nothing there) */ }
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
   }
