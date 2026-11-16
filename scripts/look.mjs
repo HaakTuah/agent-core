@@ -191,6 +191,10 @@ export const text = (what, carrier) => `${what}\n\nThe task is what the look fin
 export const inboxFile = (title, what, carrier) => `State: queued\nBy: look\n\n**What it is**\n${title}. ${what}\n\n**Why it matters**\nThe scheduled look keeps it in place of an issue, since issues cannot be read and written here; it is a task an agent takes alone.\n\nFound while: the scheduled look (${carrier}).\n`;
 export const slug = title => `look-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.md`;
 
+// The steps' issue body: the steps not done, and the files the steps' reader left unread, where there is either; else
+// none (#423).
+const stepsBody = missed => (missed.length || missed.unread?.length ? `${stepsReport(missed)}\n\nEach step is a task an agent takes alone, in a pull request of its own; one marked the owner's is labelled needs-owner and the rest go on.` : null);
+
 function main(args) {
   const known = ["--dry", "--now", "--inbox"];
   const odd = args.find(a => !known.includes(a));
@@ -244,7 +248,7 @@ function main(args) {
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {
-    try { const missed = notDone(process.cwd()); stepsLeft = missed.length; add(TITLES.steps, missed.length ? `${stepsReport(missed)}\n\nEach step is a task an agent takes alone, in a pull request of its own; one marked the owner's is labelled needs-owner and the rest go on.` : null); }
+    try { const missed = notDone(process.cwd()); stepsLeft = missed.length; add(TITLES.steps, stepsBody(missed)); }
     catch { add(TITLES.steps, null, "the steps could not be read here"); }
   }
   // labels and openers

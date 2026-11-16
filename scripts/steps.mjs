@@ -52,21 +52,25 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 export function project(root) {
   const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
-  // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on the way
-  // followed, lies inside it (#362, #423): a path that leads out, a link, a device, a pipe or a folder reads as missing,
-  // and a file past the size as missing too, named in `unread`, so that no file the project holds stops the report)
+  // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on it
+  // followed, ends inside the project (#362, #423): a path or link that leads out, a device, a pipe or a folder reads as
+  // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
+  // report; a link to a file of its own reads as that file, as the project's tools read it)
   const home = fs.realpathSync(root), unread = [];
   const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
-  const read = f => {
+  const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
     const to = path.resolve(home, f);
     if (!within(to)) return null;
-    try {
-      const stat = fs.lstatSync(to);
-      if (!stat.isFile() || !within(fs.realpathSync(to))) return null;
-      if (stat.size > READ_MOST) { if (!unread.includes(f)) unread.push(f); return null; }
-      return fs.readFileSync(to, "utf8").replace(/\r\n/g, "\n");
-    } catch { return null; }
+    try { const real = fs.realpathSync(to), stat = fs.statSync(real); return within(real) && stat.isFile() ? { real, size: stat.size } : null; } catch { return null; }
   };
+  const read = f => {
+    const at = file(f);
+    if (!at) return null;
+    if (at.size > READ_MOST) { if (!unread.includes(f)) unread.push(f); return null; }
+    try { return fs.readFileSync(at.real, "utf8").replace(/\r\n/g, "\n"); } catch { return null; }
+  };
+  // (whether another script may be given the path to read as this reader would: nothing there, or what it reads)
+  const safe = f => { const to = path.resolve(home, f); return !fs.lstatSync(to, { throwIfNoEntry: false }) || (file(f)?.size ?? Infinity) <= READ_MOST; };
   const manifest = read("core-manifest.md") ?? "";
   const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
@@ -74,7 +78,7 @@ export function project(root) {
     try { yaml = parseYaml(read(f)); } catch { /* (a workflow this reader cannot read: a check that needs it says so) */ }
     return [f.slice(".github/workflows/".length), { text: read(f), yaml }];
   }));
-  return { root, files: listed, read, unread, manifest, differences, workflows };
+  return { root, files: listed, read, safe, unread, manifest, differences, workflows };
 }
 // The most a file the steps read may hold: past any rule file, config, workflow, audit or baseline a project writes.
 export const READ_MOST = 64 << 20;
@@ -493,6 +497,11 @@ export const STEPS = [
       const marks = marksOf(p.manifest);
       const script = path.join(p.root, "core", "scripts", "reading-size.mjs");
       if (!fs.existsSync(script) || p.read(marks) === null) throw new Unread(`no copy of the reading-size check, or no ${marks}, to read`);
+      // (the check reads each file its marks name: one the steps' reader would not read is never handed to it; #423)
+      let named = {};
+      try { named = JSON.parse(p.read(marks))?.read ?? {}; } catch { /* (its own run says what of the marks it cannot read) */ }
+      const unsafe = Object.keys(named && typeof named === "object" ? named : {}).filter(f => !p.safe(f));
+      if (unsafe.length) throw new Unread(`${marks} names ${unsafe.map(f => `\`${shown(f)}\``).join(", ")}, which is no regular file of the project's own of at most ${READ_MOST} bytes`);
       const r = spawnSync(process.execPath, [script, marks], { cwd: p.root, encoding: "utf8", env: { ...process.env, SIZES_BASE: "" } });
       // (a run that never reached its end, where its notes and its verdict are given, read nothing: reported as not
       // read, never as done. It ends passing with its "ok" line, or failing with its verdicts alone, every line of its
@@ -596,7 +605,7 @@ export function notDone(root, steps = STEPS) {
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are.
 export function report(missed) {
-  const unread = missed.unread?.length ? `\n\nLeft unread, each past ${READ_MOST} bytes, which no file a step reads reaches: ${missed.unread.map(f => `\`${f}\``).join(", ")}. A step that reads one may have read it as missing: make it smaller, or take it out of git if it is no file of the project's.` : "";
+  const unread = missed.unread?.length ? `\n\nLeft unread, each past ${READ_MOST} bytes, which no file a step reads reaches: ${missed.unread.map(f => `\`${shown(f)}\``).join(", ")}. A step that reads one may have read it as missing: make it smaller, or take it out of git if it is no file of the project's.` : "";
   if (!missed.length) return `Every step a check reads is done (\`core/scripts/steps.mjs\`).${unread}`;
   return [`Steps not done (\`core/scripts/steps.mjs\`; core/${NOTES}): each a task the project's agents take, in a pull request of its own, none waiting on another${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
     ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n") + unread;

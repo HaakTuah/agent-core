@@ -283,10 +283,23 @@ ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter k
   }
   execFileSync("git", ["add", "-A"], { cwd: dir });
   const p = project(dir);
-  const reads = p.read("AGENTS.md") === "# own\n" && linked.every(at => p.read(at === "far" ? "far/secret.md" : at) === null) && p.read("docs") === null && p.read("docs/big.md") === null;
+  const reads = p.read("AGENTS.md") === "# own\n" && linked.filter(at => at !== "in.md").every(at => p.read(at === "far" ? "far/secret.md" : at) === null) && p.read("docs") === null && p.read("docs/big.md") === null
+    && (!linked.includes("in.md") || p.read("in.md") === "# own\n") && p.safe("AGENTS.md") && p.safe("nothing-here.md") && !p.safe("docs/big.md") && linked.filter(at => at !== "in.md" && at !== "far").every(at => !p.safe(at));
   const said = report(Object.assign([], { unread: p.unread }));
   ok(reads && p.unread.join() === "docs/big.md" && said.includes(`Left unread, each past ${READ_MOST} bytes`) && said.includes("`docs/big.md`"),
-    `the steps read a regular file of the project's own and nothing else: a link in or out (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, said);
+    `the steps read a regular file of the project's own and nothing else: a link to one reads as it, a link out or to a device (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, said);
+  // (the size marks' step never hands the reading-size check a file the reader would not read: a tracked link to an
+  // endless device among the files its marks name is reported as not read, at once)
+  if (process.platform !== "win32") {
+    const kitDir = dirs["an-npm-project"], agents = path.join(kitDir, "AGENTS.md"), was = fs.readFileSync(agents);
+    fs.rmSync(agents);
+    fs.symlinkSync("/dev/zero", agents);
+    const step = STEPS.filter(x => x.lead === "14 November 2026, the size marks' total counts the project's own files");
+    const at = Date.now(), said2 = notDone(kitDir, step);
+    fs.rmSync(agents);
+    fs.writeFileSync(agents, was);
+    ok(said2.length === 1 && /names `AGENTS\.md`, which is no regular file of the project's own/.test(said2[0].mend) && Date.now() - at < 30000, "the size marks' step hands the reading-size check no file the reader would not read, and says which", said2[0]?.mend);
+  }
 }
 
 // ---- a NuGet project set up at its root, its project file nested; a difference declared: neither is a difference ----
