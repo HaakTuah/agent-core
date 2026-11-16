@@ -46,7 +46,7 @@ function itemOf(line) {
 const plain = s => s.replace(/[*_`:]+/gu, "").trim().toLowerCase();
 // A line of an outsider's text as a failure shows it: its start, with no character that would start a line of the log
 // or a command to the runner ("::" at a line's start, "##[" anywhere).
-const shown = s => s.slice(0, 60).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, " ").replaceAll("##[", "# #[");
+export const shown = s => s.slice(0, 60).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, " ").replaceAll("##[", "# #[");
 
 // The items under a heading that starts with `name` (the first such), as one string each; null where no such heading.
 export function section(body, name) {
@@ -117,8 +117,9 @@ export function currentText(body, notes = [], owner = "") {
 
 // The items a pull request adds to the progress file: each line's first "#n" (or an inbox file, "inbox/<name>.md"),
 // where no line of the base's file was its own.
+// (an item as the progress file names it: an issue's number, or an inbox file)
+export const ITEM = /(?<![\w/])(?:#\d{1,9}(?!\d)|inbox\/[\w-]+(?:\.[\w-]+)*\.md(?![\w.-]))/gu;
 export function joined(before, after) {
-  const ITEM = /(?<![\w/])(?:#\d{1,9}(?!\d)|inbox\/[\w-]+(?:\.[\w-]+)*\.md(?![\w.-]))/gu;
   const named = text => lines(text).map(l => l.match(ITEM)?.[0]).filter(Boolean);
   // (an item named before only where another waits on it is no line of its own, and joins with its own)
   const had = new Set(named(before));
@@ -188,20 +189,21 @@ export function queueAt(dir, prefix) {
 // Who writes an issue's current text, as the base's manifest names the *owner's account* (the core's own, in the
 // core), else the repository's account; and whether the project takes this module, as its manifest's lines say.
 export const ownerAt = (manifest, prefix, repo) => (prefix ? ownerOf(String(manifest ?? "")) : OWNER) ?? String(repo).split("/")[0];
-export const takesIt = (manifest, prefix) => !prefix || !leftOut(manifest).has("done-when.md");
+export const takesIt = (manifest, prefix, name = "done-when.md") => !prefix || !leftOut(manifest).has(name);
 
 // The pages of an issue's notes read for its current text, newest first: an issue with more notes than these is read
 // from its newest PAGES hundred, so that its calls stay few however many notes anyone adds.
 export const PAGES = 3;
 const LIMITED = Symbol("rate limit");
 
-// An item as { labels, body }, its body the current text: an issue by gh from `repo`, an inbox file as the head's
-// commit holds it in the checkout at `dir` (from git, so that a link is read as its own text and never followed out of
-// the checkout); { limited: true } where GitHub's rate limit refused it; null where it cannot be read.
+// An item as { labels, body, state }, its body the current text and its state GitHub's ("open" or "closed"): an issue
+// by gh from `repo`, an inbox file, "open" while it stands, as the head's commit holds it in the checkout at `dir` (from
+// git, so that a link is read as its own text and never followed out of the checkout); { limited: true } where
+// GitHub's rate limit refused it; null where it cannot be read.
 export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[0]) {
   if (item.startsWith("inbox/")) {
     const r = spawnSync("git", ["show", `HEAD:${item}`], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 });
-    return r.status === 0 ? { labels: [], body: r.stdout } : null;
+    return r.status === 0 ? { labels: [], body: r.stdout, state: "open" } : null;
   }
   const gh = route => {
     const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 });
@@ -218,6 +220,6 @@ export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[
       notes.unshift(...one.map(c => ({ author: String(c.user?.login ?? ""), body: c.body })));
       if (one.some(c => same(c.user?.login, owner) && String(c.body ?? "").includes(CURRENT))) break;
     }
-    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner) };
+    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner), state: got.state };
   } catch (e) { return e === LIMITED ? { limited: true } : null; }
 }

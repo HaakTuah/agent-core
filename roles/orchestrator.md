@@ -47,7 +47,7 @@ sessions.
   - sync the core in a routine lane, as "Sessions" in `roles/shared/work-flow.md` says;
   - run the scheduled look, which does nothing more where it ran less than 20 hours before;
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
-  - act on what is new in the *progress file*;
+  - act on what is new in the *progress file*, planned as `tasks/planning.md` says;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
 - **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
   and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
