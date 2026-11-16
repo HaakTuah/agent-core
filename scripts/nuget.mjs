@@ -572,7 +572,7 @@ function nearest(text, at, next) {
  */
 export function manifestLicence(text) {
   if (typeof text !== "string" || /<!DOCTYPE|<!ENTITY/iu.test(text) || text.includes(CUT) || text.includes(CDATA)) return { other: UNREAD };
-  const plain = withoutNonElements(text.replace(/^﻿/u, "").replace(DECLARATION, ""));
+  const plain = withoutNonElements(text.replace(/^\ufeff/u, "").replace(DECLARATION, ""));
   // (each "&" a reference XML knows, and no "]]>" but the end of CDATA)
   if (plain === null || AMPERSAND.test(plain) || plain.includes("]]>")) return { other: MALFORMED };
   const walk = elementsOf(plain);
