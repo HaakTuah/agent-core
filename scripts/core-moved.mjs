@@ -15,6 +15,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
+import { readCore } from "./core-path.mjs";
 import { fetchCore, followsOf, newestRelease, ownerOf, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
 
@@ -23,10 +24,10 @@ const SHA = /^[0-9a-f]{40}$/;
 export const TITLE = "The core has moved past this project's copy";
 const BOT = "github-actions[bot]";
 
-// The commit the manifest pins (the line sync.mjs moves), or null where the manifest has no one such line.
+// The commit the manifest pins (the line sync.mjs moves), at whatever path it names (core-path.mjs), or null where the
+// manifest has no one such line, a carried core's among them, which pins nothing here.
 export function pinOf(manifest) {
-  const found = [...manifest.matchAll(new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under core/`, "gm"))];
-  return found.length === 1 ? found[0][1] : null;
+  return readCore(manifest).pin ?? null;
 }
 
 // What to do: nothing, close the open issue, bring it up to date, or open one. `moved`: whether what the project
@@ -74,8 +75,11 @@ function main(dry) {
   const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
   let manifest;
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { fail("run it from a project's root, beside core-manifest.md"); }
-  const pin = pinOf(manifest);
-  if (!pin) fail(`core-manifest.md has no one "Core: ${CORE} at <full commit SHA>, copied whole under core/" line`);
+  const line = readCore(manifest);
+  if (line.wrong) fail(line.wrong);
+  // (a core a library carries moves with the library, whose own repository keeps this issue: tasks/repositories.md)
+  if (line.form === "carried") { console.log(`the core here is the one the library at ${line.library} carries: the library's own repository says when the core has moved, and a sync there reaches this one with the library. Nothing to do.`); return; }
+  const pin = line.pin;
   const follows = followsOf(manifest);
   if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out beside one *owner's account* row");
   let newest, moved, release = "", stays = false;

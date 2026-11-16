@@ -33,6 +33,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CODE, OTHER } from "./code-shape.mjs";
+import { pathIn } from "./reading.mjs";
 import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
@@ -49,9 +50,9 @@ export const unlinked = file => { try { return notLinked(file); } catch (e) { co
 
 // The project's rules: its manifest, else (the core) its AGENTS.md; and where the core's scripts lie from its root.
 export function rulesHere(root = ".") {
-  for (const [file, home] of [["core-manifest.md", "core/"], ["AGENTS.md", ""]]) {
+  for (const [file, home] of [["core-manifest.md", null], ["AGENTS.md", ""]]) {
     const text = tolerant(() => fs.readFileSync(path.join(root, file), "utf8"));
-    if (text !== null) return { text, home };
+    if (text !== null) return { text, home: home ?? pathIn(text) };
   }
   return { text: "", home: "core/" };
 }

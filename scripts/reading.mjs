@@ -101,9 +101,16 @@ export function gather(read, list) {
   return { roles, modules };
 }
 
-// Where the core lies under `dir`: "core/" in a project, "" in the core's own repository, null where neither.
+// The path of the core a manifest's text names, "core/" where its "Core:" line names none: core-path.mjs reads the line
+// whole, and this its path alone, since the start hook runs this file from git with no file beside it to import
+// (core-path-test.mjs holds the two to each other).
+export const pathIn = manifest => /^Core: \S+(?: at [0-9a-f]{40}, copied whole|, carried by \S+) under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)/mu.exec(String(manifest ?? ""))?.[1] ?? "core/";
+// Where the core lies under `dir`: the manifest's path in a project (core/ as a rule), "" in the core's own repository,
+// null where neither holds its roles and floor.
 export function coreAt(dir) {
-  return ["core/", ""].find(prefix => fs.existsSync(path.join(dir, prefix, "roles")) && fs.existsSync(path.join(dir, prefix, FLOOR))) ?? null;
+  let manifest = null;
+  try { manifest = fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { /* (the core's own root, or no project) */ }
+  return [...(manifest === null ? [] : [pathIn(manifest)]), ""].find(prefix => fs.existsSync(path.join(dir, prefix, "roles")) && fs.existsSync(path.join(dir, prefix, FLOOR))) ?? null;
 }
 export function library(dir, prefix) {
   const read = f => { try { return fs.readFileSync(path.join(dir, prefix, f), "utf8"); } catch { return null; } };
@@ -298,14 +305,14 @@ function taskOf(argv, dir, lib, self) {
   return { kinds: given, named, paths: ownOf(paths, coreAt(dir)), notes };
 }
 // The start hook's line: what the paths changed on the checked-out branch call for, by the roles, modules and config
-// of main's own tree (the copy under core/ where main holds a manifest), named by main's files alone; null where
+// of main's own tree (the copy at the manifest's path where main holds one), named by main's files alone; null where
 // they call for nothing, or main cannot be read.
 export function hookLine(dir, ms = 8000) {
   until = Date.now() + ms;
-  const prefix = git(dir, "cat-file", "-e", `${MAIN}:core-manifest.md`) === null ? "" : "core/";
   const read = f => git(dir, "--no-replace-objects", "show", `${MAIN}:${f}`);
+  const manifest = read("core-manifest.md"), prefix = manifest === null ? "" : pathIn(manifest);
   const list = folder => (git(dir, "ls-tree", "--name-only", `${MAIN}:${prefix}${folder}`) ?? "").split("\n").filter(f => /^[a-z0-9-]+\.md$/u.test(f)).map(f => `${folder}/${f}`);
-  const lib = taken(gather(f => read(`${prefix}${f}`), list), leftOut(prefix ? read("core-manifest.md") : "")), paths = ownOf(changed(dir) ?? [], prefix);
+  const lib = taken(gather(f => read(`${prefix}${f}`), list), leftOut(manifest ?? "")), paths = ownOf(changed(dir) ?? [], prefix);
   const called = calledByPaths(lib, paths, prefix ? ownPaths(OWN.map(read).find(text => text !== null)) : []);
   const late = Date.now() >= until;
   until = Infinity;
@@ -329,7 +336,7 @@ function main(argv) {
   const dir = process.cwd();
   if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
   const prefix = coreAt(dir);
-  if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core/ stands, or from the core's own root"); return 1; }
+  if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root"); return 1; }
   const manifest = prefix ? (() => { try { return fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { return ""; } })() : "";
   const lib = taken(library(dir, prefix), leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
   const mode = alone(argv, dir, prefix, lib);

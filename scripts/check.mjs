@@ -28,6 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
+import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -104,6 +105,14 @@ function options() {
   return { base: opt("--base"), title: opt("--title"), description: opt("--description"), branch: opt("--branch") };
 }
 
+// The pin of the core the manifest's text names (core-path.mjs): its own, or, where a library carries the core, the
+// library's, read through `read`, a file's text at the same commit; { pin } or { wrong }.
+function pinAt(manifest, read) {
+  const line = readCore(manifest);
+  if (line.wrong || line.form === "copied") return line;
+  return carriedAt(line, read);
+}
+
 // The project at the commit checked out: its root, head, base, manifest's pin and owner, and the pull request's text.
 function project({ base: baseArg, title, description, branch }) {
   let root;
@@ -112,8 +121,8 @@ function project({ base: baseArg, title, description, branch }) {
   const head = git(root, "rev-parse", "HEAD");
   const manifest = show(head, "core-manifest.md");
   if (manifest === null) fail("core-manifest.md is not in the commit checked out.", "run it from the root of a project that takes the core, at a commit that holds its manifest.");
-  const pin = new RegExp(`^Core: ${CORE_SOURCE} at ([0-9a-f]{40}), copied whole under core/`, "m").exec(manifest)?.[1];
-  if (!pin) fail(`core-manifest.md has no "Core: ${CORE} at <full commit SHA>, copied whole under core/" line.`, "write that one line, the commit of the core's main that core/ holds, as the sync writes it.");
+  const pin = pinAt(manifest, f => show(head, f));
+  if (pin.wrong) { const [what, mend] = pin.wrong.split(" Mend: "); fail(what, mend ?? "write the manifest's \"Core:\" line as the sync writes it."); }
   let base = "";
   if (baseArg !== null) {
     try { base = git(root, "rev-parse", "--verify", `${baseArg}^{commit}`); } catch { fail(`--base ${baseArg} is no commit of this repository.`, "give the commit the change merges into, such as origin/main after a fetch."); }
@@ -126,7 +135,7 @@ function project({ base: baseArg, title, description, branch }) {
   // (the branch's own name, which the personal-terms check reads too: given, or the one checked out)
   let named = branch;
   if (named === null) { try { named = git(root, "symbolic-ref", "--short", "-q", "HEAD"); } catch { named = ""; } }
-  return { root, show, head, pin, base, owner, body, described: description !== null, branch: named || "change", title: title ?? git(root, "log", "-1", "--format=%s", head),
+  return { root, show, head, pin: pin.pin, base, owner, body, described: description !== null, branch: named || "change", title: title ?? git(root, "log", "-1", "--format=%s", head),
     event: base ? "pull_request" : "push", changed: base ? git(root, "diff", "-z", "--name-only", `${base}...${head}`).split("\0").filter(Boolean) : [] };
   // (-z: each path as it is, never quoted as git quotes a name beyond ASCII, so a workflow's path filter reads it)
 }
@@ -136,7 +145,7 @@ function project({ base: baseArg, title, description, branch }) {
 // starter kit's, from the core itself at the pin the base's manifest holds (never from a copy a change could edit).
 function callers({ root, show, head, base }, tmp) {
   const at = base || head;
-  const pin = new RegExp(`^Core: ${CORE_SOURCE} at ([0-9a-f]{40}), copied whole under core/`, "m").exec(show(at, "core-manifest.md") ?? "")?.[1] ?? "";
+  const pin = pinAt(show(at, "core-manifest.md") ?? "", f => show(at, f)).pin ?? "";
   const listed = dir => { try { return git(root, "ls-tree", "-z", "--name-only", `${at}:${dir}`).split("\0").filter(Boolean); } catch { return []; } };
   const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => readable(f, show(at, `.github/workflows/${f}`))).filter(Boolean);
   if (own.some(c => Object.values(c.wf.jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;

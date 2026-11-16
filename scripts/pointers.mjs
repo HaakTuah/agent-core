@@ -29,6 +29,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
+import { corePath } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -42,8 +43,9 @@ for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL:
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
-// the floor's files and the archive's item files, the core's own here or a project's copy of them
-const HOME = CORE ? "" : "core/";
+// the floor's files and the archive's item files, the core's own here or a project's copy of them, at the path its
+// manifest names (core-path.mjs)
+const HOME = CORE ? "" : corePath(".") || "core/";
 const FLOOR = tracked.filter(f => f.startsWith(`${HOME}floor/`) && f.endsWith(".md"));
 const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items-\\d+\\.md$`).test(f));
 

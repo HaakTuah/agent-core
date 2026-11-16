@@ -1,16 +1,16 @@
 // Is this sync PR pure (floor rule 8)? Its merger runs it from a checkout of the core's `main`, never from the PR's own
-// copy under core/, which the PR could change, in the project's clone with the sync branch's head checked out. For a
-// project that follows the core's releases, that checkout is the release the sync moves to, itself a commit of `main`,
-// so that nothing newer than a release runs in its sessions (README.md, "How a project takes the core", point 1); a
+// copy (under core/, or the path the manifest names: core-path.mjs), which the PR could change, in the project's clone
+// with the sync branch's head checked out. For a project that follows the core's releases, that checkout is the
+// release the sync moves to, itself a commit of `main`, so that nothing newer than a release runs in its sessions (README.md, "How a project takes the core", point 1); a
 // sync to a commit that is no release is no pure sync there, and any check of it is run from the core's `main`:
 //
 //   node <the core's main, or that release>/scripts/pure-sync.mjs
 //
 // It reads the branch's head commit, not the working tree, and passes only when, against the project's main, the diff
-// touches only core/, core-manifest.md and .github/workflows/*.yml; outside core/, each changed line differs from the
+// touches only the copy, core-manifest.md and .github/workflows/*.yml, the copy's path the same on both sides; outside it, each changed line differs from the
 // one it replaces only in the manifest's pin or a call's to a core workflow, each moved to the new pin; the new pin is
 // a commit of the core's main at or past the old one, and, where the manifest follows the core's releases, a release
-// of the core (any other sync is reviewed like any PR, and merges after it); core/ is a folder, and the core's tree at
+// of the core (any other sync is reviewed like any PR, and merges after it); the copy is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
 // call to a core workflow is pinned to a commit of the core's main.
 // It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
@@ -21,14 +21,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
+import { readCore } from "./core-path.mjs";
 import { followsOf, inBare, releasesIn } from "./releases.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
 const git = (args, cwd) => raw(args, cwd).trim();
-const PIN = new RegExp(`^Core: ${A} at ([0-9a-f]{40}), copied whole under core\\/`, "mu");
 // the only SHAs a sync may move: the manifest's pin, and a call's to a core workflow (any case, as GitHub reads it)
-const PIN_REF = new RegExp(`^(Core: ${A} at )([0-9a-f]{40})(?=, copied whole under core\\/)`, "gu");
+const PIN_REF = new RegExp(`^(Core: ${A} at )([0-9a-f]{40})(?=, copied whole under )`, "gu");
 const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)([0-9a-f]{40})(?![\\w./-])`, "giu");
 const WORKFLOW = /^\.github\/workflows\/[^/]+\.ya?ml$/u;
 const fail = [];
@@ -37,9 +37,12 @@ const head = git(["rev-parse", "HEAD"]);
 git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
 const base = git(["merge-base", "FETCH_HEAD", head]);
 const show = (rev, file) => { try { return git(["show", `${rev}:${file}`]); } catch { return ""; } };
-const oldPin = show(base, "core-manifest.md").match(PIN)?.[1];
-const pin = show(head, "core-manifest.md").match(PIN)?.[1];
-if (!oldPin || !pin) fail.push(`core-manifest.md has no "Core: ${ADDRESS} at <full SHA>, copied whole under core/" line on both sides`);
+// (the copy's path as main's manifest names it: a sync moves the pin, never the path; a core a library carries is
+// synced in the library's repository, so a change here is no sync of it)
+const was = readCore(show(base, "core-manifest.md")), now = readCore(show(head, "core-manifest.md"));
+const oldPin = was.pin, pin = now.pin, at = was.path ?? "core/";
+if (!oldPin || !pin) fail.push(`core-manifest.md has no one "Core: ${ADDRESS} at <full SHA>, copied whole under <path>/" line on both sides${was.form === "carried" || now.form === "carried" ? ": a core a library carries is synced in the library's own repository" : ""}`);
+else if (now.path !== at) fail.push(`the copy's path moves from ${at} to ${now.path}: a sync moves the pin alone`);
 
 // what the merge would bring: only the copy, the manifest's pin and the workflows' call pins, each moved to the new pin
 // every file as text (a NUL byte can't hide a change as "binary"), with no diff driver of the project's own
@@ -47,10 +50,10 @@ const diff = (opt, ...paths) => // only the last newline dropped, so a line's tr
   raw(["diff", "--no-renames", "--no-ext-diff", "--no-textconv", "--text", "--no-color", opt, base, head, "--", ...paths]).replace(/\n$/u, "");
 const files = diff("--name-only").split("\n").filter(Boolean);
 for (const line of diff("--summary").split("\n").filter(Boolean)) {
-  if (!line.trim().replace(/^.*\b\d{6} /u, "").startsWith("core/")) fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
+  if (!line.trim().replace(/^.*\b\d{6} /u, "").startsWith(at)) fail.push(`a file created, deleted or given a new mode: ${line.trim()}`);
 }
 for (const f of files) {
-  if (f.startsWith("core/")) continue;
+  if (f.startsWith(at)) continue;
   if (f !== "core-manifest.md" && !WORKFLOW.test(f)) { fail.push(`${f}: not the core's copy, its pin or a workflow`); continue; }
   // each hunk's removed lines, then its added ones: the nth added line must be the nth removed with only its pins moved
   const hunks = [];
@@ -89,11 +92,11 @@ try {
   if (pin && follows !== "main" && !releasesIn(dir).some((r) => r.sha === pin)) {
     // (and how to take a release instead: a copy older than release-1 lands here, its own sync script taking main; #365)
     const [newest] = releasesIn(dir);
-    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node core/scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
+    fail.push(`the project ${follows === "releases" ? "follows the core's releases" : "does not say what it follows"}, and ${pin} is no release of the core: the sync is reviewed like any PR${newest ? `, or made again from the project's main to a release with its full SHA, \`node ${at}scripts/sync.mjs ${newest.sha}\` (${newest.name}, the newest), as a copy older than release-1, whose sync script takes the core's main, must` : ""}`);
   }
   const own = git(["rev-parse", "--absolute-git-dir"]); // (the project's clone, named outright as copy-tree.mjs asks)
-  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own) || entries(copyTree(pin, dir), dir) !== entries(`${head}:core`, own))) {
-    fail.push(`core/ is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
+  if (pin && inCore(["cat-file", "-e", `${pin}^{commit}`]) && (!coreIsFolder(head, own, at.slice(0, -1)) || entries(copyTree(pin, dir), dir) !== entries(`${head}:${at.slice(0, -1)}`, own))) {
+    fail.push(`${at} is not a folder holding the core's tree at ${pin} (copy-tree.mjs)`);
   }
 } finally {
   rmSync(dir, { recursive: true, force: true });

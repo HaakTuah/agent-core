@@ -181,5 +181,35 @@ fs.mkdirSync(bare);
 git(bare, "init", "-q", "-b", "main");
 ok(hook("stop", bare).status === 0 && hook("stop", path.join(tmp, "nowhere")).status === 0, "where main holds no copy, or there is no folder, the reply ends");
 
+// Where the core stands (the core's tasks/repositories.md): a project in one repository, its floor under core/, hears
+// nothing of it; one whose core a library carries is stopped where the floor cannot be read at the manifest's path, and
+// told where the floor's own copy it keeps differs from it.
+ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whose floor stands under core/ hears nothing of where the core stands");
+{
+  const carried = path.join(tmp, "carried"), origin = path.join(tmp, "carried.git"), floor = fs.readFileSync(fileURLToPath(new URL("../floor/security.md", import.meta.url)), "utf8");
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(carried, f)), { recursive: true }); fs.writeFileSync(path.join(carried, f), text); };
+  put("lib/core/scripts/work-saved.sh", fs.readFileSync(fileURLToPath(new URL("./work-saved.sh", import.meta.url)), "utf8"));
+  put("lib/core/floor/security.md", floor);
+  put("floor-copy/security.md", floor);
+  put("lib/core-manifest.md", `# Core manifest\n\nCore: someone/core at ${"a".repeat(40)}, copied whole under core/ (never edited here).\n`);
+  put("core-manifest.md", "# Core manifest\n\nCore: someone/core, carried by lib/ under lib/core/ (never edited here).\nFloor copy: floor-copy/\n");
+  git(tmp, "init", "-q", "--bare", "-b", "main", origin);
+  git(carried, "init", "-q", "-b", "main");
+  git(carried, "add", "-A");
+  git(carried, "commit", "-q", "-m", "a carried core");
+  git(carried, "remote", "add", "origin", origin);
+  git(carried, "push", "-q", "-u", "origin", "main");
+  const start = () => spawnSync("sh", ["-c", command("start").replace("core/scripts/work-saved.sh", "lib/core/scripts/work-saved.sh")], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: carried } }).stdout;
+  let said = start();
+  ok(!/STOP|floor's own copy/.test(said), "a carried core whose floor stands at the manifest's path, its own copy the same: nothing is said of it", said);
+  fs.rmSync(path.join(carried, "lib/core/floor"), { recursive: true });
+  said = start();
+  ok(/^STOP: the floor cannot be read at lib\/core\/floor\/security\.md.*Do nothing else in this session until it is mended\. Mend: /m.test(said), "a floor that cannot be read at the manifest's path stops the session, saying the mend", said);
+  git(carried, "checkout", "-q", "--", "lib");
+  put("floor-copy/security.md", `${floor}\nAn edit.\n`);
+  said = start();
+  ok(/floor's own copy under floor-copy\/ differs from the floor under lib\/core\/floor\/.*Mend: /.test(said) && !/STOP/.test(said), "a floor's own copy that differs from the carried floor is named, with its mend", said);
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the work-saved hook`);
 process.exitCode = failed ? 1 : 0;

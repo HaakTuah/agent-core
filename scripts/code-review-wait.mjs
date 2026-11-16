@@ -83,7 +83,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
 
 // whether a pull request needs a code review: not where it holds docs alone, or has a sync's shape (the manifest's pin
 // moved alone among them)
-const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under core\/.*)$/u;
+const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under \S+\/.*)$/u; // (at the path the manifest names: core-path.mjs)
 const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
 function needs(pull, files, rules) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename]).filter((name) => name !== undefined);

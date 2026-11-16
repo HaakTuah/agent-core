@@ -24,6 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { corePath } from "./core-path.mjs";
 import { MODULES } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
@@ -39,11 +40,11 @@ const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the projec
 
 // The starter kit's options for a project of the same kind as `p` (steps.mjs reads it), and the pin its manifest names.
 export function kind(p) {
-  const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(p.manifest)?.[1] ?? "0".repeat(40);
+  const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(p.manifest)?.[1] ?? "0".repeat(40); // (a carried core: none)
   const o = { owner: ownerOf(p.manifest) ?? "the-owner", name: /^# (.+)$/m.exec(p.read("AGENTS.md") ?? "")?.[1]?.trim() ?? path.basename(p.root) };
   // (npm and NuGet from what the project holds, a lock file or a project file of its own, as well as from its calls to
   // the core's checks: a project that lost such a call still shows as one that needs it)
-  const own = p.files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules"));
+  const at = corePath(p.root) || "core/", own = p.files.filter(f => !f.startsWith(at) && !f.split("/").includes("node_modules"));
   const shallowest = re => own.filter(f => re.test(f)).sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0];
   const folderOf = f => path.posix.dirname(f);
   const lock = shallowest(/(^|\/)package-lock\.json$/);

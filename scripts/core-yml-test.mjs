@@ -61,13 +61,18 @@ const CALLS = (terms = B, core = A) => `name: core\non:\n  pull_request:\njobs:\
 let n = 0;
 // The check's verdict on a project whose copy is the core at `at` (B unless said), with the files given in place of the
 // usual ones.
-function check(files = {}, { branch = "main", at = B, without = null } = {}) {
+// `under` is the folder the copy is written to, and `floor` one a copy of the core's floor/ is written to besides; `then`
+// changes the project before its commit.
+function check(files = {}, { branch = "main", at = B, without = null, under = "core", floor = null, then = null } = {}) {
   const dir = path.join(tmp, `project-${++n}`);
-  fs.mkdirSync(path.join(dir, "core"), { recursive: true });
+  fs.mkdirSync(path.join(dir, under), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
-  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: dir, input: execFileSync("git", ["archive", at], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  const archive = (...paths) => execFileSync("git", ["archive", at, ...paths], { cwd: theCore, env, maxBuffer: 1 << 28 });
+  execFileSync("tar", ["-x", "-f", "-", "-C", under], { cwd: dir, input: archive() });
+  if (floor) { fs.mkdirSync(path.join(dir, floor), { recursive: true }); execFileSync("tar", ["-x", "-f", "-", "-C", floor, "--strip-components=1"], { cwd: dir, input: archive("floor") }); }
   for (const [f, text] of Object.entries({ "core-manifest.md": MANIFEST(), ".github/workflows/core.yml": CALLS(), ...files })) write(dir, f, text);
-  if (without) fs.rmSync(path.join(dir, "core", without));
+  if (without) fs.rmSync(path.join(dir, under, without));
+  if (then) then(dir);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "a project");
   const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: branch, private: false }, pull_request: { base: { sha: "" } } } };
@@ -102,6 +107,27 @@ if (D) {
   passes("a copy of a commit with a top-level name that only ends in a tab and \"reports\", which the copy keeps", { "core-manifest.md": MANIFEST(D) }, { at: D });
   fails("and that copy without it", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(D) }, { at: D, without: tabbed });
 } else console.log("note a name holding a tab cannot be made here (Windows), so that case is not tried");
+// where the copy stands (tasks/repositories.md): the path the manifest's line names, and a core a library carries
+const AT = (path, pin = B) => MANIFEST(pin).replace("copied whole under core/", `copied whole under ${path}`);
+const CARRIED = (lib, under, floorCopy = "floor-copy/") => MANIFEST().replace(/^Core: .*$/m, `Core: ${CORE}, carried by ${lib} under ${under} (never edited here).${floorCopy ? `\nFloor copy: ${floorCopy}` : ""}`);
+const LIBRARY = { "lib/core-manifest.md": MANIFEST() };
+passes("a copy at the path the manifest names", { "core-manifest.md": AT("vendor/the-core/") }, { under: "vendor/the-core" });
+fails("a copy elsewhere than the path the manifest names", "vendor/the-core/ is no folder of this commit", { "core-manifest.md": AT("vendor/the-core/") });
+fails("a path where an install writes", "where no checkout holds the files", { "core-manifest.md": AT("node_modules/the-core/") }, { under: "node_modules/the-core" });
+fails("a path that climbs out of the repository", "has no one \"Core:", { "core-manifest.md": AT("../core/") });
+passes("a core a library carries, its files committed, with the floor's own copy", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY }, { under: "lib/core", floor: "floor-copy" });
+fails("without the floor's own copy, while no tool has passed the staged cases carried and no-floor", "not every agent tool has passed", { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
+fails("with a floor's copy that differs from the floor at the pin", "floor-copy/ differs from the floor of the core at its pin", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY, "floor-copy/security.md": "edited\n" }, { under: "lib/core", floor: "floor-copy" });
+fails("with a floor's copy named that is not there", "floor-copy/, the floor's own copy core-manifest.md names, is no folder", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY }, { under: "lib/core" });
+fails("a carried core whose path is not the library's", "the library's manifest under lib/core/", { "core-manifest.md": CARRIED("lib/", "lib/other/"), ...LIBRARY }, { under: "lib/core", floor: "floor-copy" });
+fails("a carried core whose copy differs from the core at the library's pin", "lib/core/ differs from the core at its pin", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY, "lib/core/README.md": "edited\n" }, { under: "lib/core", floor: "floor-copy" });
+fails("a library that is not in this commit", "the library lib, which core-manifest.md says carries the core, is no folder or submodule", { "core-manifest.md": CARRIED("lib/", "lib/core/") }, { floor: "floor-copy" });
+fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one", { "core-manifest.md": CARRIED("lib/", "lib/core/"), "lib/core-manifest.md": "# Core manifest\n" }, { under: "lib/core", floor: "floor-copy" });
+{
+  // (a submodule: the library's commit pinned here, its files in no checkout of this check's)
+  const r = check({ "core-manifest.md": CARRIED("lib/", "lib/core/") }, { floor: "floor-copy", then: dir => { fs.mkdirSync(path.join(dir, "lib")); git(dir, "update-index", "--add", "--cacheinfo", `160000,${B},lib`); } });
+  ok(r.passed && r.out.includes("carried by the submodule lib"), "a core a submodule carries, with the floor's own copy: passes, saying the library's own check holds its copy", r.out);
+}
 passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check`);

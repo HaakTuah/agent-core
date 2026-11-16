@@ -23,11 +23,12 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { corePath, floorCopy } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
-if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/reading-size.mjs <config>"); process.exit(1); }
+if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
 try { marks = JSON.parse(fs.readFileSync(MARKS, "utf8")); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
 const num = v => Number.isInteger(v) && v > 0, nums = o => o && typeof o === "object" && !Array.isArray(o) && Object.values(o).every(num);
@@ -42,15 +43,18 @@ process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
 const tracked = new Set(git(["ls-files", "-z"]).split("\0").filter(Boolean));
 const kb = n => (n / 1024).toFixed(1);
-const skip = ["core/", ...(marks.skip ?? [])];
+// (the core's copy at the manifest's path, and the floor's own copy a repository whose core a library carries keeps:
+// tasks/repositories.md; core-path.mjs)
+const at = corePath(".") || "core/", ofCore = [at, ...[floorCopy(".")].filter(Boolean)];
+const skip = [...ofCore, ...(marks.skip ?? [])];
 const fail = [], notes = [];
 
-// the files every session reads; their total, the project's own alone (the core's copy under core/ left out)
+// the files every session reads; their total, the project's own alone (the core's copy left out)
 let total = 0, core = 0;
 for (const [f, mark] of Object.entries(marks.read)) {
   if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file. Mend: in ${MARKS}, name it as it now stands, or take it out where no session reads it`); continue; }
   const n = size(f);
-  if (f.startsWith("core/")) core += n; else total += n;
+  if (ofCore.some(p => f.startsWith(p))) core += n; else total += n;
   if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}. Mend: make it smaller, moving what no session needs at every start to a file read when needed; or, once a fresh session that wrote none of it has read the project's own such files whole for more to trim and found too little, raise its mark in ${MARKS}`);
   else if (mark > marks.each && n < mark) fail.push(`${f} has shrunk to ${n} bytes. Mend: lower its mark in ${MARKS} from ${mark} to ${Math.max(n, marks.each)}`);
 }
