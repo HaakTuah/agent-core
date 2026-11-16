@@ -198,10 +198,22 @@ export function unlisted(faults, listedMap, gone = new Map(), held = new Map()) 
 
 // The entries that joined the baseline since the base with no reason under "grown": [id]. None counts where the base
 // has no baseline (the first), or where the pull request records a new whole run and changes no file of code or of the
-// tests (`touched` false), so that what the run found stood on the base.
-export function joinedUnsaid(now, was, touched = true) {
+// tests (`touched` false), so that what the run found stood on the base. An entry that only carries the debt of a base
+// entry whose line was rewritten (`wasGone`, moved() of the base's entries; a cleaning run's --lower) has not joined:
+// it is set against what that entry no longer holds, of the same file and fault.
+export function joinedUnsaid(now, was, touched = true, wasGone = new Map()) {
   if (!was || (!touched && JSON.stringify(now.whole ?? null) !== JSON.stringify(was.whole ?? null))) return [];
-  return [...now.listed].filter(([id, n]) => (n.count ?? 0) > (was.listed.get(id)?.count ?? 0) && !(now.grown[id] ?? "").trim()).map(([id]) => id);
+  const freed = new Map([...wasGone.keys()].map(id => [id, Math.max(0, (was.listed.get(id)?.count ?? 0) - (now.listed.get(id)?.count ?? 0))]));
+  return [...now.listed].filter(([id, n]) => {
+    let extra = (n.count ?? 0) - (was.listed.get(id)?.count ?? 0);
+    if (extra <= 0 || (now.grown[id] ?? "").trim()) return false;
+    for (const [gid, c] of freed) {
+      if (extra <= 0 || c <= 0 || partsOf(gid)?.file !== partsOf(id)?.file || partsOf(gid)?.what !== partsOf(id)?.what) continue;
+      const take = Math.min(extra, c);
+      freed.set(gid, c - take); extra -= take;
+    }
+    return extra > 0;
+  }).map(([id]) => id);
 }
 
 // The baseline at `at` as the check reads it ({ listed, grown, whole }), from its text; null where there is none.
@@ -228,7 +240,7 @@ const placed = f => `${f.file}:${f.line}`;
 const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replacement === "" ? "taken out" : `made "${collapse(f.replacement, 40)}"`}`;
 
 // What the check says of a pull request's run, and whether it fails: { lines, fails }.
-export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map(), held = new Map() }) {
+export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map(), held = new Map(), wasGone = new Map() }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
   if (!baseline && was) {
@@ -240,7 +252,7 @@ export function verdict({ faults, baseline, was, at, deleted, touched = true, go
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
     return { lines, fails: false };
   }
-  const news = unlisted(faults, baseline.listed, gone, held), unsaid = joinedUnsaid(baseline, was, touched);
+  const news = unlisted(faults, baseline.listed, gone, held), unsaid = joinedUnsaid(baseline, was, touched, wasGone);
   if (c.pending) lines.push(`${c.pending} faults on the changed lines were not run (the tool's budget): they are not held here, and the next whole run reads them.`);
   for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, and ${at} does not list it. Mend: write a test that fails on it and run the check again; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const id of unsaid) lines.push(`FAIL: ${at} lists "${id}" where the base did not, with no reason under "grown". Mend: take it out and write a test that catches the fault, or give its reason under "grown" (the fault changes nothing the program does), say so in the pull request, and have a fresh session say there that it found no other way`);
@@ -274,22 +286,31 @@ function onPullRequest(p, base) {
   const baseline = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const was = baselineFrom(tolerant(() => git(["show", `${base}:${p.at}`])), `${base}:${p.at}`);
   const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
-  const watched = baseline ? witnesses(baseline.listed, read, changed) : new Map();
-  const both = new Map([...changed].map(([f, l]) => [f, new Set([...l, ...(watched.get(f) ?? [])])]));
-  let found = [];
-  try { if (changed.size) found = faultsOf(runTool(p.tool.command, linesArg(both)), both); } catch (e) {
-    if (baseline || !(e instanceof Refused)) throw e;
-    console.log(`Reported only, and not measured: ${e.message}`);
-  }
+  const found = measured(p, changed, baseline, read);
   const faults = found.filter(f => changed.get(f.file)?.has(f.line)), held = heldBy(baseline?.listed ?? new Map(), found.filter(f => !changed.get(f.file)?.has(f.line)));
-  const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
-  const record = new Set([p.at, p.config.baseline]);
-  const touched = git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && !record.has(f) && path.posix.extname(f) !== ".md");
-  const gone = baseline ? moved(baseline.listed, read) : new Map();
-  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone, held });
+  const gone = baseline ? moved(baseline.listed, read) : new Map(), wasGone = was ? moved(was.listed, read) : new Map();
+  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched: touches(p, base), gone, held, wasGone });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
   return fails ? 1 : 0;
+}
+
+// The faults the tool finds on the changed lines and on the unchanged ones that repeat a listed entry (witnesses()).
+// Before the baseline stands, a tool that cannot run is said and fails nothing.
+function measured(p, changed, baseline, read) {
+  const watched = baseline ? witnesses(baseline.listed, read, changed) : new Map();
+  const both = new Map([...changed].map(([f, l]) => [f, new Set([...l, ...(watched.get(f) ?? [])])]));
+  try { return changed.size ? faultsOf(runTool(p.tool.command, linesArg(both)), both) : []; } catch (e) {
+    if (baseline || !(e instanceof Refused)) throw e;
+    console.log(`Reported only, and not measured: ${e.message}`);
+    return [];
+  }
+}
+
+// Whether the pull request changes a file the code's or the tests' pathspecs read, but the baselines and Markdown.
+function touches(p, base) {
+  const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base, record = new Set([p.at, p.config.baseline]);
+  return git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && !record.has(f) && path.posix.extname(f) !== ".md");
 }
 
 // The whole run: the tool on every file of the code, and the baseline written from it, keeping the reasons of the
@@ -313,24 +334,25 @@ function whole(p) {
 // keeps what still survives of it, at most its count; one whose line the task rewrote (moved()) passes what it held to
 // a survivor of the same file and fault the run found under a new id, so that a rewritten line keeps its debt rather
 // than losing it; an entry of another file stays as it was. A Map of id to count; nothing joins.
-export function lowered(listedMap, now, files, texts) {
+export function lowered(listedMap, now, files, texts, origins = new Map()) {
   const ours = id => files.some(f => id.startsWith(`survivor: ${f}: `)), left = new Map(now), out = new Map();
   for (const [id, n] of listedMap) {
     const c = ours(id) ? Math.min(n.count ?? 0, left.get(id) ?? 0) : n.count ?? 0;
     if (ours(id)) left.set(id, (left.get(id) ?? 0) - c);
     if (c > 0) out.set(id, c);
   }
-  for (const [id, count] of moved(new Map([...listedMap].filter(([i]) => ours(i))), texts)) carry(id, count - (out.get(id) ?? 0), left, out, listedMap);
+  for (const [id, count] of moved(new Map([...listedMap].filter(([i]) => ours(i))), texts)) carry(id, count - (out.get(id) ?? 0), left, out, listedMap, origins);
   return out;
 }
 
 // What a rewritten entry (`id`) held, `rest`, passed to the survivors left of the same file and fault under new ids.
-function carry(id, rest, left, out, listedMap) {
+function carry(id, rest, left, out, listedMap, origins) {
   const same = nid => !listedMap.has(nid) && partsOf(nid)?.file === partsOf(id)?.file && partsOf(nid)?.what === partsOf(id)?.what;
   for (const [nid, c] of left) {
     if (rest <= 0 || c <= 0 || !same(nid)) continue;
     const take = Math.min(rest, c);
     out.set(nid, (out.get(nid) ?? 0) + take); left.set(nid, c - take); rest -= take;
+    origins.set(nid, id);
   }
 }
 
@@ -346,8 +368,9 @@ function lower(p, named) {
   const unrun = found.filter(f => f.status === "Pending").length;
   if (unrun) refuse(`the mutation tool left ${unrun} faults of ${files.join(", ")} not run, so what they would show is not known`, "run it again with no budget (MUTATE_BUDGET unset for the core's tool), or on fewer files at a time");
   for (const f of found.filter(f => SURVIVED.includes(f.status))) now.set(f.id, (now.get(f.id) ?? 0) + 1);
-  const listed = Object.fromEntries([...lowered(old.listed, now, files, f => tolerant(() => fs.readFileSync(unlinked(f), "utf8")))].map(([id, c]) => [id, { count: c }]));
-  const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => id in listed));
+  const origins = new Map(), listed = Object.fromEntries([...lowered(old.listed, now, files, f => tolerant(() => fs.readFileSync(unlinked(f), "utf8")), origins)].map(([id, c]) => [id, { count: c }]));
+  // (a reason given for an entry follows its debt to the new id a rewritten line gave it)
+  const grown = Object.fromEntries(Object.keys(listed).map(id => [id, old.grown[id] ?? old.grown[origins.get(id)]]).filter(([, why]) => (why ?? "").trim()));
   fs.writeFileSync(unlinked(p.at), `${JSON.stringify({ ...(old.whole ? { whole: old.whole } : {}), ...(Object.keys(grown).length ? { grown } : {}), listed }, null, 2)}\n`);
   console.log(`${p.at} lists ${Object.keys(listed).length} faults that survive, against ${old.listed.size} before.`);
   return 0;

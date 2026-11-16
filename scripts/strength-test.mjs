@@ -62,6 +62,11 @@ const was = "survivor: a.js: export const flag = () => true; [true -> false]", n
 const low = lowered(new Map([[was, { count: 1 }], ["survivor: b.js: x [! -> ]", { count: 2 }]]), new Map([[now2, 1]]), ["a.js"], () => "export const flag = () => { return true; };\n");
 ok(same([...low].sort(), [[now2, 1], ["survivor: b.js: x [! -> ]", 2]].sort()) && same([...lowered(new Map([[was, { count: 1 }]]), new Map(), ["a.js"], () => "export const flag = () => { return true; };\n")], []),
   "a cleaning run keeps the debt of a line it rewrote, under the fault's new id, and drops it only where the fault no longer survives; an entry of another file stays");
+const origins = new Map();
+lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1]]), ["a.js"], () => "export const flag = () => { return true; };\n", origins);
+const afterLower = b({ [now2]: { count: 1 } }), beforeLower = b({ [was]: { count: 1 } }), baseGone = moved(beforeLower.listed, () => "export const flag = () => { return true; };\n");
+ok(origins.get(now2) === was && same(joinedUnsaid(afterLower, beforeLower, true, baseGone), []) && same(joinedUnsaid(b({ [now2]: { count: 2 } }), beforeLower, true, baseGone), [now2]),
+  "the pull request of a cleaning run that carried a rewritten line's debt to its new id passes; one that adds to it does not");
 ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1,
   "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once; another fault there is the change's own");
 
@@ -118,8 +123,9 @@ try {
   sh("commit", "-qam", "another");
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && mended(r.stdout + r.stderr) && r.stderr.includes("src/a.js:3"), "once the baseline stands, a survivor on a changed line it does not list fails, with its mend", r.stdout + r.stderr);
-  write("src/a.js", "export const a = z => z === 1;\nexport const b = y => y === 2;\nexport const c = z => z === 3;\n");
-  r = run(["--whole"]);
+  // (as a whole run on the branch would write it: a new stamp, and the survivor of the line the change adds)
+  const listedNow = JSON.parse(fs.readFileSync(path.join(dir, "checks/strength-baseline.json"), "utf8"));
+  write("checks/strength-baseline.json", `${JSON.stringify({ ...listedNow, whole: { day: "2026-12-01", commit: "elsewhere" }, listed: { ...listedNow.listed, "survivor: src/a.js: export const c = z => z === 3; [== -> !==]": { count: 1 } } }, null, 2)}\n`);
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 1 && mended(r.stderr) && r.stderr.includes("where the base did not"), "a pull request that changes code cannot take its own survivors in by a whole run of its own", r.stdout + r.stderr);
   sh("checkout", "--", "checks/strength-baseline.json");
