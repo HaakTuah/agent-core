@@ -126,7 +126,7 @@ for (const [what, answer] of [["no pages", { status: 200, json: { items: [] } }]
   ok(r.failures.length === 1 && /could not be read/u.test(r.failures[0]), `NuGet: an index with ${what} fails the lookup (${r.failures})`);
 }
 r = await one(pkg("Invented.Moss.Absent"), true);
-ok(r.failures.length === 1 && /NuGet's registry has no such package/u.test(r.failures[0]), "NuGet: an id the registry does not know fails");
+ok(r.failures.length === 1 && /NuGet registry has no such package/u.test(r.failures[0]), "NuGet: an id the registry does not know fails");
 r = await one(pkg("Invented.Moss.Astray"), true);
 ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGet: a page the index places outside the registry is not fetched");
 

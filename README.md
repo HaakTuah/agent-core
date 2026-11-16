@@ -139,8 +139,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `licence-scan.mjs` holds whole, every action, fetched package, asset and copied-in code it uses, and each entry
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; `lookup.mjs`,
-     which asks the registry of each package a pull request brings that no lockfile of its base held, and fails a name
-     the registry does not know and one first published under 90 days ago: floor topic 15; and
+     which asks npm's registry of each package new to the lockfiles, as floor topic 15's "A new one is looked up in
+     its registry" says; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
      the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
      configuration pins where it pins one: floor topic 15). A package or

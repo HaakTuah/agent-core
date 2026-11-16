@@ -32,6 +32,7 @@ export const YOUNG = 90;
 export const GITHUB_MOST = 20;
 const DAY = 86400000;
 const NPM = "https://registry.npmjs.org/";
+const registryOf = (nuget) => `${nuget ? "NuGet" : "the npm"} registry`;
 const NUGET = "https://api.nuget.org/v3/registration5-gz-semver2/";
 // (a name as npm's registry gives one, an old one in capitals too: at most a scope and a name, nothing an address reads)
 const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/iu;
@@ -159,13 +160,13 @@ export async function nugetFacts(index, page) {
 export async function lookUp(packages, { get, now = Date.now(), nuget = false }) {
   const failures = [], reports = [], github = { asked: 0 };
   await pool(packages, 8, async (p) => {
-    const at = `${p.lockPath}: ${said(p.name)}@${said(p.version)}`, where = nuget ? "NuGet's" : "npm's";
+    const at = `${p.lockPath}: ${said(p.name)}@${said(p.version)}`, where = registryOf(nuget);
     let facts;
     try { facts = await registry(p, get, nuget); } catch (e) {
-      failures.push(`${at}: ${where} registry could not be read (${said(e.message)}). Mend: run the job again; if it fails the same way, say so in the pull request and leave the package out until it passes`);
+      failures.push(`${at}: ${where} could not be read (${said(e.message)}). Mend: run the job again; if it fails the same way, say so in the pull request and leave the package out until it passes`);
       return;
     }
-    if (facts.missing) { failures.push(`${at}: ${where} registry has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
+    if (facts.missing) { failures.push(`${at}: ${where} has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
     const young = tooYoung(p, facts, now);
     if (young) failures.push(`${at}: ${young}`);
     reports.push(`${at}: ${await described(p, facts, now, { get, nuget, github })}`);
@@ -268,7 +269,7 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
   const { failures, reports } = await lookUp(found, { get, now, nuget });
   const s = found.length === 1 ? "" : "s";
   return { lines: [...reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`),
-    failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${nuget ? "NuGet's" : "npm's"} registry, each printed above for the review`], code: failures.length ? 1 : 0 };
+    failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${registryOf(nuget)}, each printed above for the review`], code: failures.length ? 1 : 0 };
 }
 
 if (started(import.meta.url)) {
