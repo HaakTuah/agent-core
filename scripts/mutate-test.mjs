@@ -55,6 +55,17 @@ try {
   ok(run.status === 0 && status("src/a.mjs", 1, ">=") === "Survived" && status("src/a.mjs", 2, "!==") === "Killed" && status("src/b.mjs", 1, "false") === "NoCoverage", "a fault a test catches is Killed, one it does not Survived, one no test names NoCoverage", run.stdout + run.stderr);
   ok(run.stdout.includes("test/broken-test.mjs"), "a test that fails as it stands is left out, and the run says so", run.stdout);
   ok(fs.readFileSync(path.join(dir, "src/a.mjs"), "utf8") === SOURCE && git("worktree", "list").trim().split("\n").length === 1 && git("status", "--porcelain").trim() === "?? report.json", "the project's own files are left as they were, and its working copies taken away", git("status", "--porcelain"));
+  // (a link HEAD holds that the working folder has replaced by a file: the copy takes the file, writing nothing through
+  // the link; links need a right of their own on Windows, so this case runs elsewhere)
+  if (process.platform !== "win32") {
+    write("kept.txt", "the project's own\n");
+    fs.symlinkSync(path.join(dir, "kept.txt"), path.join(dir, "linked.txt")); // (to the project's own file, by its full path)
+    git("add", "kept.txt", "linked.txt"); git("commit", "-q", "-m", "a link");
+    fs.rmSync(path.join(dir, "linked.txt")); write("linked.txt", "a file now\n"); git("add", "linked.txt");
+    spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
+    ok(fs.readFileSync(path.join(dir, "kept.txt"), "utf8") === "the project's own\n", "a link HEAD holds, replaced by a file in the working folder, is not written through", fs.readFileSync(path.join(dir, "kept.txt"), "utf8"));
+    git("rm", "-q", "-f", "kept.txt", "linked.txt"); git("commit", "-q", "-m", "no link");
+  }
   const named = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:2-2"], { cwd: dir, encoding: "utf8" });
   const lines = new Set(JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.map(m => m.location.start.line));
   ok(named.status === 0 && same([...lines], [2]), "the lines named alone take faults", named.stdout + named.stderr);

@@ -130,6 +130,18 @@ function run(test, cwd, limit) {
 const linked = [];
 const unlink = to => { try { fs.unlinkSync(to); } catch { try { fs.rmdirSync(to); } catch { /* (gone) */ } } };
 
+// A file's path in a copy made free of links: where HEAD holds a link the working folder has since replaced (at the
+// file or at a folder on its way), the link itself is taken away, so that nothing is written through it outside the copy.
+function noLinkOnTheWay(dir, f) {
+  let at = dir;
+  for (const part of f.split("/")) {
+    at = path.join(at, part);
+    let stat = null;
+    try { stat = fs.lstatSync(at); } catch { return; }
+    if (stat.isSymbolicLink()) { unlink(at); return; }
+  }
+}
+
 // A working copy of the project: a git worktree of HEAD, with the files that differ from it, staged or not, and the new
 // ones copied in, and its installed dependencies linked.
 function copyOf(dir) {
@@ -138,6 +150,7 @@ function copyOf(dir) {
   for (const f of differ) {
     const from = path.join(".", f), to = path.join(dir, f);
     if (!fs.existsSync(from) || fs.lstatSync(from).isSymbolicLink()) continue;
+    noLinkOnTheWay(dir, f);
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
   }
