@@ -48,7 +48,7 @@ wanted").
 | #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/copies.mjs` too |
 | #460, point 4 (names in descriptions) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/pointers.mjs` too |
 | #460, point 5 (a report's size) | builder; "Part of #460", the last to merge "Fixes #460" | |
-| #460, point 6 (billed minutes) | builder; "Part of #460", the last to merge "Fixes #460" | #302, which changes `scripts/state-report.mjs` and `scripts/core-cost.mjs` too |
+| #460, point 6 (billed minutes) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #390 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
