@@ -12,6 +12,7 @@ has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #486, points 2 to 4 (the choice record) | rule builder, hard work with a challenger; it reopens `CHOICES.md`'s first choice | |
 | #252 | rule builder | |
 | #303 | rule builder | |
 | #306 | rule builder | |
@@ -22,8 +23,8 @@ has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10), and its PR quotes the owner's yes on the issue | |
-| #457 | rule builder | |
+| #456 | rule builder; it changes the floor (rules 5 and 10) | |
+| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #486's record | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
@@ -34,20 +35,20 @@ has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built now, whose work-down takes in `scripts/look.mjs` |
+| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, whose work-down takes in `scripts/look.mjs` |
 | #350 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
-| #426 | builder | |
+| #426 | builder; a .NET reader it files waits on #486's record | |
 | #394 | builder | |
 | #404 | builder | |
 | #405 | builder | |
 | #407 | builder | |
-| #397 | rule builder; it changes the review guidelines (its PR quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
-| #485 | rule builder; it changes the floor (rules 7 and 10), and its PR quotes the owner's yes on the issue | |
+| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
+| #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
-| #486, the choice record | rule builder, hard work with a challenger; it reopens `CHOICES.md`'s first choice | |
+| #486, point 5 | builder | the record |
 | #460, point 1 (a staged case for floor rule 9) | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
@@ -56,7 +57,7 @@ has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 | #460, point 6 (billed minutes) | builder | |
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
-| #416 | builder | #441, which changes `tasks/game-design.md` and `scripts/screens.mjs` too |
+| #416 | builder | #441, which changes the same files |
 | #477 | builder | |
 | #481 | rule builder; it changes `AGENTS.md` and the README's table of slots | |
 | #412 | builder | #481, of which it is one case |
