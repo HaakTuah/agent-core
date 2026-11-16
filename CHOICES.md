@@ -101,7 +101,8 @@ counter and its commands are in the pull request that adds this record (#487).
      reopens the record. The baseline entries are what "Nothing locks a project" asks of any new reading.
 - **The pick: B, carried in the copy.** It alone met criteria 1 and 3 together, with a definition of about ten lines
   for each language. The runtime and each grammar the core reads stand in the core at one exact version, their SHA-256
-  in one list a test reads, each update passing floor rule 7's check of its source in its own pull request. The
+  in one list a test reads, each update passing floor rule 7's check of its source in its own pull request, and their
+  MIT notices kept in the core's third-party notices (floor rule 10). The
   readers by hand that work (JavaScript, C#, Python) stay until the parser replaces each, a line each; Rust's reader
   is the first built this way, and #426's .NET readers the next.
 - **What a sync asks of a project:** for this record, nothing. The line that builds the first reader the picked way
