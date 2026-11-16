@@ -100,6 +100,21 @@ const terms = { ...env, PERSONAL_TERMS: `${term}\n` };
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "base", "--branch", `fix-${term.toLowerCase()}`], { cwd: dir, env: terms, encoding: "utf8" });
 ok(r.status === 1 && /FAIL personal-terms\.yml\/check\/check/.test(`${r.stdout}${r.stderr}`), "a listed term in the branch's own name fails the change", `${r.stdout}${r.stderr}`);
 
+// a path filter reads each name as it is, one beyond ASCII too, and a workflow of the project's own in a form this
+// reader does not know, calling none of the core's, leaves every check run
+git(dir, "reset", "-q", "--hard", "base");
+const pinned = /^Core: \S+ at ([0-9a-f]{40})/m.exec(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"))[1];
+const address = fs.readFileSync(path.join(dir, ".github", "workflows", "core.yml"), "utf8").match(/uses: (\S+)\/\.github\/workflows\/core\.yml@/)[1];
+fs.writeFileSync(path.join(dir, ".github", "workflows", "docs-terms.yml"), `on:\n  pull_request:\n    paths: ['docs/**']\njobs:\n  terms:\n    uses: ${address}/.github/workflows/personal-terms.yml@${pinned}\n    secrets:\n      PERSONAL_TERMS: \${{ secrets.PERSONAL_TERMS }}\n`);
+fs.writeFileSync(path.join(dir, ".github", "workflows", "build.yml"), "on: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix: {node: [20, 22]}\n    steps:\n      - run: echo built\n");
+commit(dir, "a filtered call, and a build of the project's own");
+git(dir, "branch", "-q", "-f", "filtered");
+fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+fs.writeFileSync(path.join(dir, "docs", `${String.fromCodePoint(0xe9)}.md`), `Naming ${term}.\n`);
+commit(dir, "a doc whose name git quotes");
+r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "filtered"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
+ok(r.status === 1 && /FAIL docs-terms\.yml\/terms\/check/.test(`${r.stdout}${r.stderr}`) && /note \.github\/workflows\/build\.yml is written in a form/.test(`${r.stdout}${r.stderr}`), "a call filtered by path runs where the change's file name lies beyond ASCII, and a workflow of the project's own this reader cannot read is passed over, said so", `${r.stdout}${r.stderr}`);
+
 // a check that keeps a baseline reads the base: the change is checked on its merge into the base, as GitHub checks it
 git(dir, "reset", "-q", "--hard", "base");
 fs.writeFileSync(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { unlisted: { command: ["np", "x"].join(""), args: ["-y", "an-unlisted-server@1.0.0"] } } }, null, 2));

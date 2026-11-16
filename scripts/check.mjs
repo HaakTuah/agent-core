@@ -75,8 +75,8 @@ function main() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   const run = runner(p, tmp);
-  const jobs = callers(p, tmp).filter(({ text }) => triggered(parseYaml(text).on, p))
-    .flatMap(({ file, text }) => Object.entries(parseYaml(text).jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
+  const jobs = callers(p, tmp).filter(({ wf }) => triggered(wf.on, p))
+    .flatMap(({ file, wf }) => Object.entries(wf.jobs ?? {}).map(([id, job]) => ({ file, id, job, name: call.exec(String(job?.uses ?? ""))?.[1] })))
     .filter(j => j.name).sort((a, b) => (b.name === "core.yml") - (a.name === "core.yml"));
   if (!jobs.some(j => j.name === "core.yml")) fail("no call to the core's core.yml starts on this change, so nothing proves the copy of the core is the core.", "call it on every pull request and push to main, as the starter kit's .github/workflows/core.yml does, in the base the change merges into.");
   let failed = 0, ran = 0;
@@ -121,7 +121,8 @@ function project({ base: baseArg, title, description, branch }) {
   let named = branch;
   if (named === null) { try { named = git(root, "symbolic-ref", "--short", "-q", "HEAD"); } catch { named = ""; } }
   return { root, show, head, pin, base, owner, body, described: description !== null, branch: named || "change", title: title ?? git(root, "log", "-1", "--format=%s", head),
-    event: base ? "pull_request" : "push", changed: base ? git(root, "diff", "--name-only", `${base}...${head}`).split("\n").filter(Boolean) : [] };
+    event: base ? "pull_request" : "push", changed: base ? git(root, "diff", "-z", "--name-only", `${base}...${head}`).split("\0").filter(Boolean) : [] };
+  // (-z: each path as it is, never quoted as git quotes a name beyond ASCII, so a workflow's path filter reads it)
 }
 
 // The project's calls to the core's workflows, as the base the change merges into holds them (on a push, main's own),
@@ -130,9 +131,9 @@ function project({ base: baseArg, title, description, branch }) {
 function callers({ root, show, head, base }, tmp) {
   const at = base || head;
   const pin = new RegExp(`^Core: ${CORE_SOURCE} at ([0-9a-f]{40}), copied whole under core/`, "m").exec(show(at, "core-manifest.md") ?? "")?.[1] ?? "";
-  const listed = dir => { try { return git(root, "ls-tree", "--name-only", `${at}:${dir}`).split("\n").filter(Boolean); } catch { return []; } };
-  const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => ({ file: f, text: show(at, `.github/workflows/${f}`) }));
-  if (own.some(c => Object.values(parseYaml(c.text).jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;
+  const listed = dir => { try { return git(root, "ls-tree", "-z", "--name-only", `${at}:${dir}`).split("\0").filter(Boolean); } catch { return []; } };
+  const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => readable(f, show(at, `.github/workflows/${f}`))).filter(Boolean);
+  if (own.some(c => Object.values(c.wf.jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;
   const kit = [];
   const templates = coreFile(tmp, pin, "setup/template/workflows", true);
   if (templates === null) fail(`the base's manifest pins the core at ${pin || "no commit"}, where the starter kit's calls cannot be read.`, "write the manifest's \"Core:\" line as the sync writes it, in the base the change merges into.");
@@ -140,10 +141,20 @@ function callers({ root, show, head, base }, tmp) {
     const text = coreFile(tmp, pin, `setup/template/workflows/${f}`).replaceAll("{{core}}", CORE).replaceAll("{{pin}}", pin);
     const left = text.match(/\{\{[a-z]+\}\}/);
     if (left) console.log(`note the starter kit's ${f} is filled in with ${left[0]} by the kit, so it is not run: a project that needs it keeps the call it was written`);
-    else kit.push({ file: f.replace(/\.tmpl$/, ""), text });
+    else kit.push({ file: f.replace(/\.tmpl$/, ""), wf: parseYaml(text) });
   }
   console.log("note the project calls none of the core's workflows from .github/workflows, so the starter kit's calls are run");
   return kit;
+}
+
+// A workflow of the project's, read: one in a form workflow-run.mjs does not read is passed over and said so, since it
+// is the project's own; one of those that calls the core's fails, since a check would go unrun.
+function readable(file, text) {
+  try { return { file, wf: parseYaml(text) }; } catch (e) {
+    if (text.toLowerCase().includes(`${CORE.toLowerCase()}/.github/workflows/`)) fail(`.github/workflows/${file} calls the core's workflows and is written in a form this check cannot read (${e.message}).`, "write that file's calls to the core as the starter kit writes them, in plain YAML, or run the core's checks on the host meanwhile and report the form to the core (core/README.md, \"Reporting to the core\").");
+    console.log(`note .github/workflows/${file} is written in a form this check does not read (${e.message}); it calls none of the core's workflows, so nothing is left unrun`);
+    return null;
+  }
 }
 
 // Whether a workflow's triggers start it on this pull request or push, as GitHub reads them.
