@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { ISSUES, TITLE, body, openIssue, pinOf, plan } from "./core-moved.mjs";
+import { mended } from "./mend.mjs";
 import { ownerOf } from "./releases.mjs";
 
 let failed = 0, count = 0;
@@ -48,7 +49,7 @@ ok(jq.status === 0 && jq.stdout.trim().split("\n").length === 2 && openIssue(jq.
 // The program whole, in a scratch project, with a git and a gh that answer as told and write down what they were asked.
 const script = fileURLToPath(new URL("./core-moved.mjs", import.meta.url));
 // (`core`: a scratch core, whose address the stand-in git puts in place of the core's and then runs git itself)
-function program(pin, newest, issues, args = [], follows = undefined, core = "", extra = "") {
+function program(pin, newest, issues, args = [], follows = undefined, core = "", extra = "", repository = "someone/project") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-test-"));
   const bin = path.join(dir, "bin"), log = path.join(dir, "calls");
   fs.mkdirSync(bin);
@@ -60,7 +61,7 @@ function program(pin, newest, issues, args = [], follows = undefined, core = "",
   fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> "${log}"\n[ "$1" = api ] && cat "${path.join(dir, "issues")}"\nexit 0\n`, { mode: 0o755 });
   const r = spawnSync(process.execPath, [script, ...args], {
     cwd: dir, encoding: "utf8",
-    env: { PATH: `${bin}:${process.env.PATH}`, GITHUB_REPOSITORY: "someone/project", TMPDIR: dir },
+    env: { PATH: `${bin}:${process.env.PATH}`, GITHUB_REPOSITORY: repository, TMPDIR: dir },
   });
   return { status: r.status, out: r.stdout + r.stderr, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "" };
 }
@@ -69,6 +70,10 @@ function program(pin, newest, issues, args = [], follows = undefined, core = "",
 if (process.platform === "win32") console.log("skip the program whole: its stand-ins for git and gh are shell scripts");
 else {
   let r = program(A, A, "");
+  for (const repository of ["../..", "someone/..", "someone"]) {
+    const odd = program(A, B, "", [], undefined, "", "", repository);
+    ok(odd.status === 1 && mended(odd.out) && !/^gh /m.test(odd.calls), `a repository named ${repository}, not as <owner>/<name>, is refused before any call to GitHub, saying its mend`, odd.out + odd.calls);
+  }
   ok(r.status === 0 && r.out.includes("nothing") && !/gh issue/.test(r.calls), "up to date and no issue: nothing is done");
   ok(new RegExp(`^git ls-remote https://github\\.com/${CORE_SOURCE} refs/heads/main$`, "m").test(r.calls), "the core's main is asked for, and nothing else of git");
   r = program(A, B, "");

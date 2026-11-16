@@ -14,6 +14,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { aRepository } from "./guards.mjs";
 import { CORE } from "./core-address.mjs";
 import { fetchCore, followsOf, newestRelease, ownerOf, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -93,7 +94,7 @@ function main(dry) {
     if (stays) moved = false; // (a release that changes nothing the project takes asks no sync: #242)
   }
   const repo = process.env.GITHUB_REPOSITORY;
-  if (!dry && !/^[\w.-]+\/[\w.-]+$/.test(repo ?? "")) fail("GITHUB_REPOSITORY names no repository");
+  if (!dry && !aRepository(repo)) fail("GITHUB_REPOSITORY names no repository as <owner>/<name>. Mend: run the check in the workflow, where GitHub sets it, or with --dry");
   const open = dry ? null : openIssue(run("gh", ["api", "--paginate",
     `repos/${repo}/issues?state=open&labels=enhancement&per_page=100`,
     "--jq", ISSUES]));

@@ -34,6 +34,8 @@ ok(!["From the builder of #238 (#287): two points", "On review rounds: six", "**
 
 ok(found("**What it is**\nx\n\nFound while: fixing #241 (a builder session)") && found("**Found while:** the security review of #262") && !found("It was found while fixing #241."),
   "the \"Found while:\" line, plain or in bold, never in a sentence");
+ok(!found("**What it is**\nx\n<!--\nFound while: fixing #241\n-->") && !found("x\n```\nFound while: fixing #241\n```") && found("<!-- a note -->\nFound while: fixing #241"),
+  "a \"Found while:\" line hidden from the reader, in an HTML comment or a fenced block, is none");
 ok(strayViews("**The session's view (not a decision)**\nA builder may weigh it.").length === 0 && strayViews("**My view**\nx\n## The session's view\ny").length === 2
   && strayViews("**What it is**\nThe owner's view is quoted.").length === 0,
   "a heading that names a view is the fixed one; a view named in a sentence is not a heading");

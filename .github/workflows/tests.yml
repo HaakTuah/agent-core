@@ -132,6 +132,9 @@ jobs:
       - name: The dose a codebase's state sets
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/dose-test.mjs ')) }}
         run: node scripts/dose-test.mjs
+      - name: What the checks do with what a project's files shape before they use it
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/guards-test.mjs ')) }}
+        run: node scripts/guards-test.mjs
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/select-test.mjs ')) }}
         run: node scripts/select-test.mjs
