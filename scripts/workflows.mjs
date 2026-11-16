@@ -11,7 +11,8 @@
 // reader refuses, running none of the file's jobs, so that a pull request's check stands waiting with nothing to say
 // why (#393). Nothing locks a project (AGENTS.md of the core): with WORKFLOWS_BASE set to the pull request's base (as
 // the copies workflow sets it), a key twice that the base already held in the same file is noted and fails nothing;
-// with no base, as on a push to main, each is noted. In the core's own repository (`--core`) each fails.
+// with no base, as on a push to main, each is noted; and the sync's step "16 November 2026, no workflow gives a key
+// twice" (steps.mjs) names each old one at every sync until it is gone. In the core's own repository (`--core`) each fails.
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.

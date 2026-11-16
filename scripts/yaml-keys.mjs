@@ -11,7 +11,7 @@ export function uncommented(line) {
   let quote = "";
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
-    if (quote) { if (c === quote) quote = ""; else if (c === "\\" && quote === '"') i++; }
+    if (quote) { if (c === quote && quote === "'" && line[i + 1] === "'") i++; else if (c === quote) quote = ""; else if (c === "\\" && quote === '"') i++; }
     else if (c === "#" && (i === 0 || /\s/u.test(line[i - 1]))) return line.slice(0, i).trimEnd();
     else if ((c === '"' || c === "'") && (i === 0 || /[\s:[{,-]/u.test(line[i - 1]))) quote = c;
   }
@@ -73,13 +73,16 @@ export function flowTwice(text) {
     return text.slice(start, i).trim();
   };
   let depth = 0;
-  const node = () => { blank(); return "{[".includes(text[i]) ? collection() : `"'`.includes(text[i]) ? quoted() : plain(); };
+  const properties = () => { // an anchor or a tag before a node, each up to a blank or a flow indicator
+    for (blank(); text[i] === "&" || text[i] === "!"; blank()) while (i < text.length && !/[\s,[\]{}]/u.test(text[i])) i++;
+  };
+  const node = () => { properties(); return "{[".includes(text[i]) ? collection() : `"'`.includes(text[i]) ? quoted() : plain(); };
   function collection() {
     const close = text[i] === "{" ? "}" : "]", keys = new Map();
     if (++depth > DEEPEST) { i = text.length; return; } // the rest of a value nested past the mark is not read
     i++;
-    while (i < text.length && text[i] !== close) {
-      const start = (blank(), i), key = node();
+    for (blank(); i < text.length && text[i] !== close; blank()) {
+      const start = i, key = node();
       blank();
       const pair = text[i] === ":";
       if (pair) { i++; node(); blank(); }
@@ -122,7 +125,12 @@ export function twice(text) {
     for (const f of flowTwice(flow.text)) found.push({ line: at(f.at), key: f.key, first: at(f.first) });
     flow = null;
   };
-  const value = (v, col, line) => { if (opens(v)) return; past = col; if ("{[".includes(v[0])) flow = { text: v, line }; };
+  const value = (v, col, line) => {
+    if (opens(v)) return;
+    past = col;
+    const bare = v.replace(/^(?:[&!]\S*[ \t]+)+/u, ""); // (a flow value behind an anchor or a tag is read all the same)
+    if ("{[".includes(bare[0])) flow = { text: bare, line };
+  };
   rows.forEach((row, n) => {
     const text = uncommented(row), col = /^[ \t]*/u.exec(row)[0].length;
     if (!text.trim()) { if (flow) flow.text += "\n"; return; } // (a blank line or a comment in a flow value keeps its lines counted)
