@@ -55,13 +55,17 @@ export function project(root) {
   // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on it
   // followed, ends inside the project (#362, #423): a path or link that leads out, a device, a pipe or a folder reads as
   // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
-  // report; a link to a file of its own reads as that file, as the project's tools read it)
-  const home = fs.realpathSync(root), unread = [];
+  // report; a link to a file of its own reads as that file, as the project's tools read it, and only to one git lists
+  // as the project's: never git's own folder nor a file it ignores, a person's or a machine's own)
+  const home = fs.realpathSync(root), unread = [], known = new Set(listed);
   const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
   const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
     const to = path.resolve(home, f);
     if (!within(to)) return null;
-    try { const real = fs.realpathSync(to), stat = fs.statSync(real); return within(real) && stat.isFile() ? { real, size: stat.size } : null; } catch { return null; }
+    try {
+      const real = fs.realpathSync(to), stat = fs.statSync(real);
+      return within(real) && known.has(path.relative(home, real).split(path.sep).join("/")) && stat.isFile() ? { real, size: stat.size } : null;
+    } catch { return null; }
   };
   const read = f => {
     const at = file(f);
@@ -70,7 +74,10 @@ export function project(root) {
     try { return fs.readFileSync(at.real, "utf8").replace(/\r\n/g, "\n"); } catch { return null; }
   };
   // (whether another script may be given the path to read as this reader would: nothing there, or what it reads)
-  const safe = f => { const to = path.resolve(home, f); return !fs.lstatSync(to, { throwIfNoEntry: false }) || (file(f)?.size ?? Infinity) <= READ_MOST; };
+  const safe = f => {
+    try { if (!fs.lstatSync(path.resolve(home, f), { throwIfNoEntry: false })) return true; } catch { return false; }
+    return (file(f)?.size ?? Infinity) <= READ_MOST;
+  };
   const manifest = read("core-manifest.md") ?? "";
   const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {

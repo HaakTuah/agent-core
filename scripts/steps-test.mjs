@@ -278,13 +278,16 @@ ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter k
   fs.writeFileSync(path.join(outside, "secret.md"), "outside\n");
   fs.writeFileSync(path.join(dir, "docs/big.md"), "x".repeat(READ_MOST + 1));
   const linked = [];
-  for (const [at, to, type] of [["in.md", "AGENTS.md", "file"], ["out.md", path.join(outside, "secret.md"), "file"], ["far", outside, "dir"], ...(process.platform === "win32" ? [] : [["zero.md", "/dev/zero", "file"]])]) {
+  // (and git's own folder and a file it ignores, a person's own, read neither by a link nor by name)
+  fs.writeFileSync(path.join(dir, ".gitignore"), ".env\n");
+  fs.writeFileSync(path.join(dir, ".env"), "# a person's own\n");
+  for (const [at, to, type] of [["in.md", "AGENTS.md", "file"], ["gitcfg.md", ".git/config", "file"], ["env.md", ".env", "file"], ["out.md", path.join(outside, "secret.md"), "file"], ["far", outside, "dir"], ...(process.platform === "win32" ? [] : [["zero.md", "/dev/zero", "file"]])]) {
     try { fs.symlinkSync(to, path.join(dir, at), type); linked.push(at); } catch { /* (a system that makes no link here: that case is not run) */ }
   }
   execFileSync("git", ["add", "-A"], { cwd: dir });
   const p = project(dir);
   const reads = p.read("AGENTS.md") === "# own\n" && linked.filter(at => at !== "in.md").every(at => p.read(at === "far" ? "far/secret.md" : at) === null) && p.read("docs") === null && p.read("docs/big.md") === null
-    && (!linked.includes("in.md") || p.read("in.md") === "# own\n") && p.safe("AGENTS.md") && p.safe("nothing-here.md") && !p.safe("docs/big.md") && linked.filter(at => at !== "in.md" && at !== "far").every(at => !p.safe(at));
+    && (!linked.includes("in.md") || p.read("in.md") === "# own\n") && p.read(".env") === null && p.read(".git/config") === null && p.safe("AGENTS.md") && !p.safe("AGENTS.md/x") && p.safe("nothing-here.md") && !p.safe("docs/big.md") && linked.filter(at => at !== "in.md" && at !== "far").every(at => !p.safe(at));
   const said = report(Object.assign([], { unread: p.unread }));
   ok(reads && p.unread.join() === "docs/big.md" && said.includes(`Left unread, each past ${READ_MOST} bytes`) && said.includes("`docs/big.md`"),
     `the steps read a regular file of the project's own and nothing else: a link to one reads as it, a link out or to a device (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, said);
