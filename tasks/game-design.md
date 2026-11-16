@@ -105,8 +105,8 @@ player can choose to use.
   system of their own, of the domain `computer-players`).
 - **Every game says what it is for, on one page,** its *game page*: what the player does from minute
   to minute, what winning is, two or three kinds of experience it aims at, in the owner's words, the target of "Teaching
-  has an order" and the decision of "What must be remembered is decided once for each game". By default the builder of a
-  game's first stage writes it; for a game that stands with none, the builder of its next change that adds a feature,
+  has an order" and what "What must be remembered is decided once for each game" asks it to decide. By default the
+  builder of a game's first stage writes it; for a game that stands with none, the builder of its next change that adds a feature,
   quoting the owner's past words (the *settling references*), and where they name no experience, the stand-in's reading,
   marked so until the owner's words replace it (`roles/shared/inbox.md`). The builder of a change that adds a feature
   says in the feature's entry (its issue, or the task that names it) which of those experiences it serves, and the
