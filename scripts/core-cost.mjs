@@ -80,6 +80,7 @@ export function readings(rows, repo, oldest) {
 // far its session's line rose since that session's pull request before it, and only where every part of the line rose
 // or stood: the first of a session, one with no session or no line, and one whose line dropped are not priced. Nor is
 // the one after a pull request of that session with no line, since what rose since the reading before belongs to both.
+// Each priced one: the answers, output tokens and tokens carried in (input, cache written and read) it rose by.
 export function priced(pulls) {
   const last = new Map(), took = new Map();
   for (const p of [...pulls].sort((a, b) => a.number - b.number)) {
@@ -89,7 +90,10 @@ export function priced(pulls) {
     last.set(p.session, p.reading);
     if (!before) continue;
     const rose = Object.keys(p.reading).every(k => p.reading[k] >= before[k]);
-    if (rose && p.reading.answers > before.answers) took.set(p.number, { answers: p.reading.answers - before.answers, out: p.reading.out - before.out });
+    if (rose && p.reading.answers > before.answers) {
+      const read = r => r.input + r.written + r.read; // (what went into the answers, the cache included)
+      took.set(p.number, { answers: p.reading.answers - before.answers, out: p.reading.out - before.out, into: read(p.reading) - read(before) });
+    }
   }
   return took;
 }

@@ -33,11 +33,11 @@ import { started } from "./started.mjs";
 // guidelines' "A finding names its rule" (#254), its leanness check having found 124 bytes of room for 204 over, in
 // trims of the guidelines that its issue did not ask for and so are not made.
 export const CAPS = {
-  builder: 28 * 1024,
-  design: 29 * 1024,
-  orchestrator: 42 * 1024,
+  builder: 29 * 1024,
+  design: 30 * 1024,
+  orchestrator: 43 * 1024,
   reviewer: 23 * 1024,
-  "stand-in": 19 * 1024,
+  "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
 // project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):

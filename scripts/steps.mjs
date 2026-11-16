@@ -552,6 +552,8 @@ export const STEPS = [
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
   { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
   { lead: "16 November 2026, how done will be judged", cost: COST.line, unread: "whether a project's users notice its changes is a reading of what it builds; where they do, a manifest whose \"Modules:\" is a list takes `done-when.md`, and the idea form's heading comes as `core/scripts/fresh.mjs` lists it" },
+  { lead: "16 November 2026, corrections counted and the outcomes read", cost: COST.line,
+    unread: "whether the repository holds a label is GitHub's, in no file: the labels check run at each sync reports the label `correction` missing, its mend `core/scripts/labels.mjs --make`; the cost line is held by the description check, and the bug form's line is a difference `core/scripts/fresh.mjs` lists" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -27,6 +27,9 @@
 // description holds are in the form, and one that closes a feature's issue says what it ran and saw for each line, as
 // done-when.mjs, beside this file, reads them, at most a dozen items read through gh; one it cannot read is asked
 // nothing.
+// It asks in the same way, of a pull request opened since the copy on its base held COST_SINCE, the line the cost script
+// prints (session-cost.mjs, beside this file), or in its place the mark NO_COST, so that a line left out by the rule can
+// be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -47,6 +50,18 @@ export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 export const READS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which how done will be judged is asked (tasks/done-when.md; #305), as the two lines above are.
 export const DONE_SINCE = "2026-11-17T00:00:00Z";
+// The day from which a description is asked its cost line or the mark that says the script printed none ("An exemption
+// leaves a mark" in roles/shared/work-flow.md; #302), as the lines above are.
+export const COST_SINCE = "2026-11-17T00:00:00Z";
+export const NO_COST = "No cost line: the script printed none.";
+
+// The mend where a description has neither the line session-cost.mjs prints ("Session so far: ...") nor the mark that
+// it printed none, each on a line of its own; null where it has one.
+export function costMend(body) {
+  const lines = String(body ?? "").split(/\r\n|\r|\n/u).map(l => l.trim());
+  if (lines.some(l => /^Session so far: [\d,]+ answers\b/u.test(l) || l === NO_COST)) return null;
+  return `the description has neither the line the cost script prints nor the mark that it printed none. Mend: run \`node core/scripts/session-cost.mjs\` (\`node scripts/session-cost.mjs\` in the core) and put the line it prints above the closing lines; where it prints nothing, put there instead, on a line of its own, "${NO_COST}"`;
+}
 // Whether it is asked of a pull request opened at `created` (as GitHub gives it), `then` the copy on its base when it
 // opened, or null where that could not be read: only where both are on or after the day it came.
 export const doneAsked = (created, then) => String(created) >= DONE_SINCE && Boolean(then?.includes("export const DONE_SINCE"));
@@ -146,6 +161,8 @@ if (started(import.meta.url)) {
       if (done.mends.length) mends.push(...done.mends);
       else console.log("ok   how done will be judged: the entries this pull request queues or closes are in the form, and proved");
     } else console.log(`ok   how done will be judged is not asked here: ${doneAsked(created, then) ? "the change could not be read against its base" : why}`);
+    if (created >= COST_SINCE && then?.includes("export const COST_SINCE")) { const mend = costMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log("ok   the description has its cost line, or the mark that the script printed none"); }
+    else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);

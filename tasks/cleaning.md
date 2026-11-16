@@ -1,8 +1,8 @@
 # Cleaning, and the audit of how code is put together
 
-Read by a builder that takes a cleaning task, by the session that takes an audit's task and by its reader, and by the
-orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` and `audit`. What the code is held to:
-`tasks/code-shape.md`.
+Read by a builder that takes a cleaning task, by the session that takes an audit's task or the state report and by its
+reader, and by the orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` and `audit`. What the
+code is held to: `tasks/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -81,3 +81,16 @@ orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` an
   no standard, so two audits could not be compared; and checks piled on make code harder to change. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
+- **The state report leads with the outcomes** (core archive 241; #302). By default the monthly state report names the
+  five outcomes the owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can
+  be used by a new user, does not break, each with its direct measure first or the words that it has none yet, every
+  other number under the outcome it stands for, and what the work cost last; each count stands with the range chance
+  alone gives it, twice its square root, and where one is under 30 the months before are added.
+  `core/scripts/outcomes.mjs` writes it so, and whoever changes that script keeps the form. It does not mean a number
+  is shown under an outcome it does not measure. Reason: most of what was counted were stand-ins, and a small count
+  read as a trend misleads. Held by `core/scripts/outcomes-test.mjs`.
+- **No process number is a builder's goal** (core archive 241; #302). By default the state report's numbers are read
+  by the owner and the audits; whoever writes a brief, a rule or an entry sets none of them as a target, and only a
+  property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
+  not read them. Reason: a number made a goal stops measuring what it stood for. Held by the review guidelines ("A
+  brief written in a pull request").
