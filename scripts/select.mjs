@@ -26,6 +26,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
+import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 class Refused extends Error {}
@@ -87,21 +88,28 @@ export function reached(tests, linked) {
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
 export function selection({ changed, texts, tests, reach, failed = [], config }) {
-  const proof = matcher(config.select.proof), whole = matcher(config.select.whole), none = matcher(config.select.none), isTest = matcher(config.tests);
-  const all = why => ({ all: true, why, tests: [...tests].sort() });
+  const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
-  const reaches = reached(tests, links(texts, tests, reach));
+  const ctx = { texts, tests, add, reaches: reached(tests, links(texts, tests, reach)), ...m };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
-    if (none(f)) continue;
-    if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
-    if (isTest(f) && !(f in texts)) continue; // (a test taken out runs nothing)
-    if (!(f in texts)) return all(`${f} is no code the readers follow, or is gone, so what reaches it cannot be told`);
-    for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
-    if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
+    const unknown = oneChange(f, ctx);
+    if (unknown) return { all: true, why: unknown, tests: [...tests].sort() };
   }
   return { all: false, why: by, tests: [...by.keys()].sort() };
+}
+
+// What one changed file selects, through `ctx.add`; the reason the whole suite runs where its reach cannot be told.
+function oneChange(f, { texts, tests, add, reaches, whole, none, isTest }) {
+  if (none(f)) return null;
+  if (isTest(f) && tests.has(f)) add(f, "added or changed"); // (and, a helper among the tests, what imports it)
+  if (isTest(f) && !(f in texts)) return null; // (a test taken out runs nothing)
+  // (a package's manifest, read beside the code, links nothing: a change to it may reach every test)
+  if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
+  for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
+  if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
+  return null;
 }
 
 // The paths a pull request changes against its base, renames as a path gone and a path added.

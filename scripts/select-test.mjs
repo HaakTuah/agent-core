@@ -69,6 +69,8 @@ s = pick(["QUEUE.md"]);
 ok(same(s.tests, ["test/replay.test.js"]), "a change to the files no test reads runs the proof alone", JSON.stringify(s.tests));
 s = pick(["test/old.test.js"]);
 ok(!s.all && same(s.tests, ["test/replay.test.js"]), "a test taken out runs nothing of its own");
+s = selection({ changed: ["package.json"], texts: { ...texts, "package.json": "{\"dependencies\":{\"x\":\"1.0.0\"}}" }, tests, reach, config });
+ok(s.all && /package\.json/.test(s.why), "a package's manifest, read beside the code, runs the whole suite: it links to no file, and may reach every test", JSON.stringify(s));
 for (const [changed, what] of [[["package.json"], "a file of no code the readers follow"], [["src/gone.js"], "a file of code that is gone"], [["src/rules.js", "config/app.json"], "data beside code"]]) {
   s = pick(changed);
   ok(s.all && s.tests.length === tests.size && s.why.includes(changed.at(-1)), `the whole suite runs for ${what}: what reaches it cannot be told`, JSON.stringify(s));
