@@ -99,9 +99,9 @@ one declared entrance.
   trigger is a pull request that deletes a test or weakens what one asserts (an assertion loosened or taken out, a
   case skipped): its builder says so under "Readings taken", with why, and the reviewer checks that the reason holds.
   It does not mean that a test which proves nothing must stay. Reason: a measure on changed lines cannot see a test
-  weakened elsewhere, and a test made to pass is the cheapest way to green. Held by the reviews
-  (`modules/review-guidelines.md`), whom the strength check shows each test file a pull request deletes; a weakened
-  assertion by the reviews alone.
+  weakened elsewhere, and a test made to pass is the cheapest way to green. No check holds it yet, since none can
+  tell a weakened assertion without guessing: the reviews read it (`modules/review-guidelines.md`), the strength check
+  names each test file a pull request deletes, and `core/scripts/holders.mjs` lists it until something holds it.
 - **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
   of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the
   audit's reader judges whether one function should serve both. It does not mean that such code is joined by rule:
