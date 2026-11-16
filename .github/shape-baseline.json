@@ -4,6 +4,13 @@
     "listed": 56,
     "read": 1084
   },
+  "reads": [
+    "javascript",
+    "jsx",
+    "csharp",
+    "python",
+    "scripts"
+  ],
   "listed": {
     "function: scripts/code-review-wait.mjs#judgeWith": {
       "lines": 24,
@@ -44,11 +51,6 @@
       "lines": 56,
       "depth": 3,
       "branches": 38
-    },
-    "function: scripts/code-shape.mjs#tokens": {
-      "lines": 66,
-      "depth": 4,
-      "branches": 63
     },
     "function: scripts/comment-only.mjs#node": {
       "lines": 45,

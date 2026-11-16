@@ -2,10 +2,14 @@
 // with its words. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/pr-description-test.mjs
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { asked, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { asked, calledFor, heldAt, missing, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { lineMend } from "./reading.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -43,6 +47,28 @@ ok(heldAt(cs, "2026-11-17T12:00:00Z", s => s !== "a") === false && heldAt(cs, "2
 const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
 ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time");
+// what a pull request's changed paths call for, in a scratch project: the merge commit against its base, the kinds of
+// the project's own paths as the base holds them, the copy's own paths left out
+{
+  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-test-")), project = path.join(tmp, "project");
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
+  const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), text); };
+  for (const part of ["floor", "modules", "roles"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+  put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `screens.md`.\nNot taken: `game-design.md` (no game).\n"); put("checks/reading.json", `${JSON.stringify({ paths: { "src/screens/": "polish" } })}\n`); put("src/screens/a.js", "1\n");
+  git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
+  ok(calledFor(tmp) === null, "where no core stands, what a change calls for cannot be read");
+  put("src/screens/a.js", "2\n"); put("checks/reading.json", "{}\n"); put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `updates.md`.\nNot taken: `game-design.md` (no game), `screens.md` (none).\n"); put("core/CLAUDE.md", "x\n"); put(".github/workflows/caf\u00e9.yml", "on: push\n");
+  git("add", "-A"); git("commit", "-q", "-m", "a change that empties its own reading config");
+  const called = calledFor(project);
+  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/floor/topics.md", "core/modules/screens.md"]) && /of the kind polish/.test(called[1].why),
+    "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries: a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
+  ok(/does not list `core\/modules\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics.md`, `core/modules/screens.md`", called, "cmd") === null, "and the line is held to them");
+  git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
+  ok(calledFor(project) === null, "with no base to read against, nothing is asked");
+}
 // run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("./pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
 const none = run("The change, and nothing else.");

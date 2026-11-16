@@ -7,17 +7,13 @@ Read at the start of every task.
     it, and any departing from an owner's answer (core archive 199).
   - "Readings taken" lists the unsure first, and a departure with that answer's date, named when the owner is told of
     the merge; the owner's correction is built like any change.
-- **The stand-in** (core archive 142, 166 and 199), a fresh session, searches the owner's words (the archives, the
-  closed issues and the reports quoting the owner's corrections), never reading them whole.
+- **The stand-in** (`roles/stand-in.md`; core archive 142, 166 and 199), a fresh session, answers from the owner's words.
   - It gives the owner's most likely answer, marked sure or unsure. Always unsure: a call of taste, such as a name,
     music or a look, and one resting only on the core's archive where the account in the core's address in the
     manifest is not the *owner's account*: those words give way to the project's own owner's.
-  - It gives, whenever it is called, its verdict on every open idea that lacks one, however new, and again on a "later"
-    once its condition is measured, as `scripts/stand-in-record.mjs --open` lists them (yes, later or no, with the
-    reason, a rough cost and what would settle a later), posted on it.
   - It gives, on a PR its users will see, the owner's likely notes on its pictures and text.
   - **Its record:** whoever acts on the owner's answer to one of its points says there "The stand-in's verdict matched"
-    or "missed", which that script counts.
+    or "missed", which `scripts/stand-in-record.mjs` counts.
 - **Issues are the way in** (core archive 216): an idea, a bug or a decision of the owner's is an issue, assigned to the
   *owner's account* (`enhancement`, `bug`), with the template's headings (`.github/ISSUE_TEMPLATE/`), saying plainly
   what it is and why it matters; search first, never file twice. Its text lives there alone: a PR or report points to it.

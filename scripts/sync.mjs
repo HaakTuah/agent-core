@@ -30,6 +30,12 @@ const git = (args, tmp) => inBare(tmp, args).trim();
 class Failure extends Error {}
 const fail = msg => { throw new Failure(msg); };
 
+// What a sync prints for its pull request's description, each a script of the new copy with its arguments (`kits`:
+// the folder of the earlier starter kits): the steps not done, the differences from a fresh start, where the inbox
+// is, what the labels lack, and last the line that lists what the sync's own paths outside the copy call for, the
+// pins of the project's workflows above all (reading.mjs, by which the description check reads that line).
+const REPORTS = kits => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"]];
+
 function sync(tmp) {
   const manifest = "core-manifest.md";
   if (!fs.existsSync(manifest)) fail(`run it from a project's root, beside ${manifest}`);
@@ -103,7 +109,7 @@ function sync(tmp) {
     catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
   }
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
-  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"]]) {
+  for (const [script, ...args] of REPORTS(kits)) {
     if (!fs.existsSync(path.join("core", "scripts", script))) continue;
     // (each given ten minutes, so that none can hold the sync. Of what it writes to stderr only its own "FAIL:" lines are
     // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)

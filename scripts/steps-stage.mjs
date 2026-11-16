@@ -133,6 +133,12 @@ export const STAGES = {
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
+  "16 November 2026, how strong the tests are": {
+    asked: true,
+    stage: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").split(/\r?\n/).filter(l => !l.includes("*mutation tool*")).join("\n")),
+    // (as the step words it: the row, here `none` with its reason)
+    mend: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(SLOTS, "$1| *mutation tool* | `none`: no mutation tool is named for this project's language yet |\n")),
+  },
   "16 November 2026, the NuGet check where it can matter": {
     // (a project file that imports a build file of another name than those the call's paths name)
     stage: dir => {
@@ -155,5 +161,18 @@ export const STAGES = {
     stage: dir => write(dir, ".github/workflows/suites-staged.yml", SUITE),
     after: dir => fs.rmSync(at(dir, ".github/workflows/suites-staged.yml"), { force: true }),
     mend: dir => write(dir, ".github/workflows/suites-staged.yml", SUITE.replace("      - 'core-manifest.md'\n", `      - 'core-manifest.md'\n${callers(project(dir)).map(f => `      - '${f}'\n`).join("")}`)),
+  },
+  "16 November 2026, a file for each role, and the script that says what to read": {
+    asked: true,
+    // (the manifest's "Paths:" line without the roles' folder, and AGENTS.md without the builder's file; the mend adds both)
+    stage: dir => {
+      write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)roles\/, /m, "$1"));
+      write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace(/^@core\/roles\/builder\.md[ \t]*\r?\n/m, ""));
+    },
+    mend: dir => {
+      const manifest = read(dir, "core-manifest.md"), agents = read(dir, "AGENTS.md");
+      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?modules\/, )/m, "$1roles/, "));
+      if (!/^@core\/roles\/builder\.md[ \t]*$/m.test(agents)) write(dir, "AGENTS.md", agents.replace(/^(@core\/floor\/security\.md[ \t]*\r?\n)/m, "$1@core/roles/builder.md\n"));
+    },
   },
 };

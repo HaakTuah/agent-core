@@ -1,7 +1,7 @@
 # Review guidelines
 
-What every reviewer judges a change by, read whole with its brief, the project's own guidelines, its `SECURITY.md` and
-the floor. Changes only on the owner's word (core archive 56).
+Read at its start by every reviewer (`roles/reviewer.md`): what it judges a change by, read whole with its brief, the
+project's own guidelines, its `SECURITY.md` and the floor. Changes only on the owner's word (core archive 56).
 
 ## How a review passes
 
@@ -19,9 +19,10 @@ the floor. Changes only on the owner's word (core archive 56).
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
 - a size mark raised without its reason in the PR (one on what every session reads: below);
-- an entry that joins the shape check's baseline under "grown" without its reason in the PR and a fresh session's
-  word there that it found no other way (`modules/code-shape.md`, "Never worse");
-- a test weakened or skipped, or changed beyond what the task forces (core archive 36);
+- an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
+  and a fresh session's word there that it found no other way (`modules/code-shape.md`, "Never worse");
+- a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
+  with a reason that holds (core archive 36; `modules/code-shape.md`, #253);
 - against the pillars of `modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
   pointed to.
 
