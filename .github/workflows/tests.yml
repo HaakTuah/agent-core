@@ -210,8 +210,10 @@ jobs:
       - name: The hostile tests of an input, what a package brings
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-packages-test.mjs ')) }}
         run: node scripts/hostile-packages-test.mjs
+      # (on every pull request, whatever the selection: a hostile test added with no step, which the selection would run
+      # alone, is what it finds)
       - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/own-inputs-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/own-inputs-test.mjs
       - name: The core's releases, what a project follows, and cutting one
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/releases-test.mjs ')) }}
