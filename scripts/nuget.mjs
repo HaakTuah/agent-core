@@ -881,7 +881,7 @@ if (started(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), own = tracked.filter((f) => !f.startsWith(copyOf(root))), byContent = projectFilesByContent(root, own);
+      const { root, tracked } = project(), copy = copyOf(root), own = tracked.filter((f) => !f.startsWith(copy)), byContent = projectFilesByContent(root, own);
       files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => shown(f) !== f);

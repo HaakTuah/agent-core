@@ -55,8 +55,13 @@ export function corePath(root = ".") {
 }
 
 /** The core's copy as a path prefix, for a check to leave out of a project's own files: the manifest's path at `root`, or
- *  core/ where there is none to read (the core's own root, which holds no folder of that name). */
-export const copyOf = (root = ".") => corePath(root) || DEFAULT;
+ *  core/ where there is none to read (the core's own root, which holds no folder of that name). Read once for each root
+ *  in a run, so a check may ask it for every file. */
+const copies = new Map();
+export const copyOf = (root = ".") => {
+  if (!copies.has(root)) copies.set(root, corePath(root) || DEFAULT);
+  return copies.get(root);
+};
 
 /** The folder of the floor's own copy the manifest names on its line "Floor copy: <folder>/", which a repository whose
  *  core a library carries keeps until every agent tool has passed the staged cases carried and no-floor; null where it

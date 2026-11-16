@@ -76,6 +76,8 @@ const big = [...tracked].filter(f => !skip.some(s => f.startsWith(s)) && fs.exis
 let base = process.env.SIZES_BASE;
 if (!base) try { base = git(["merge-base", "origin/main", "HEAD"]).trim(); } catch { base = ""; }
 if (base) {
+  // (a submodule's files show here only as its path: a file of a library that carries the core, changed when the pull
+  // request moves the library, is not seen as changed, which leaves its split mark unheld, as before such files were read)
   let changed;
   try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
   for (const f of big.filter(f => changed.has(f))) {
