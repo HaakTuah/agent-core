@@ -12,7 +12,11 @@
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
 # The suites together, each of their three parts on Windows, and the upgrade test, are each held to a time mark (the
-# "suites" of .github/shape.json, by scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
+# "suites" of .github/shape.json, by scripts/shape.mjs; modules/tests.md, "The tests have a time mark").
+# On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
+# says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; modules/tests.md,
+# "A pull request runs the tests its change can reach"); the checks of the core itself, each a step of its own after
+# the suites, run every time.
 # After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
 # tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; modules/code-shape.md, "How
 # strong the tests are"), in working copies of its own, with no secret.
@@ -57,193 +61,207 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2 # the merge a pull request's run checks out, and its base, for the selection
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      - name: The suites this change can reach (on main, and in a re-run, every one)
+        env:
+          SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
+        run: node scripts/select.mjs .github/shape.json --env RUN
       - name: The second the suites start at, for their time mark
         run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: The versions check
-        if: ${{ matrix.part == 'all' || matrix.part == 'rest' }}
+        if: ${{ (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/versions-test.mjs ')) }}
         run: node scripts/versions-test.mjs
       - name: The licence check's lists and readers
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/licences-test.mjs ')) }}
         run: node scripts/licences-test.mjs
       - name: The licence check on a whole project, and its scan
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/licence-scan-test.mjs ')) }}
         run: node scripts/licence-scan-test.mjs
       - name: The licence scan on every form of a fetch
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/licence-fetch-test.mjs ')) }}
         run: node scripts/licence-fetch-test.mjs
       - name: The licences read back from the installed packages
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/licence-installed-test.mjs ')) }}
         run: node scripts/licence-installed-test.mjs
       - name: The NuGet check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/nuget-test.mjs ')) }}
         run: node scripts/nuget-test.mjs
       - name: The NuGet check's fetch before the restore, against each package's content hash
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/nuget-fetch-test.mjs ')) }}
         run: node scripts/nuget-fetch-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (once, on Linux, where tar unpacks them)
-        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        if: ${{ !cancelled() && runner.os == 'Linux' && (env.RUN == 'all' || contains(env.RUN, ' scripts/readers-test.mjs ')) }}
         run: node scripts/readers-test.mjs
       - name: The exact-versions check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/exact-versions-test.mjs ')) }}
         run: node scripts/exact-versions-test.mjs
       - name: The agent-tools check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/agent-tools-test.mjs ')) }}
         run: node scripts/agent-tools-test.mjs
       - name: The helper hook
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/helper-call-test.mjs ')) }}
         run: node scripts/helper-call-test.mjs
       - name: The work-saved hook
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/work-saved-test.mjs ')) }}
         run: node scripts/work-saved-test.mjs
       - name: The session's cost line
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/session-cost-test.mjs ')) }}
         run: node scripts/session-cost-test.mjs
       - name: The core's own measurement
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-cost-test.mjs ')) }}
         run: node scripts/core-cost-test.mjs
       - name: The measures of how code is put together
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/code-shape-test.mjs ')) }}
         run: node scripts/code-shape-test.mjs
       - name: The shape check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/shape-test.mjs ')) }}
         run: node scripts/shape-test.mjs
       - name: The shape check's readers of C# and Python
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/shape-readers-test.mjs ')) }}
         run: node scripts/shape-readers-test.mjs
       - name: The screen checks' baseline
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/screens-test.mjs ')) }}
         run: node scripts/screens-test.mjs
       - name: The dose a codebase's state sets
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/dose-test.mjs ')) }}
         run: node scripts/dose-test.mjs
+      - name: The selection of the tests a change can reach
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/select-test.mjs ')) }}
+        run: node scripts/select-test.mjs
+      - name: What each test is worth, read from its runs and the faults it alone catches
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/test-record-test.mjs ')) }}
+        run: node scripts/test-record-test.mjs
+      - name: What a push waits on, against its mark
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/wait-test.mjs ')) }}
+        run: node scripts/wait-test.mjs
       - name: The strength check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/strength-test.mjs ')) }}
         run: node scripts/strength-test.mjs
       - name: The core's own mutation tool
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/mutate-test.mjs ')) }}
         run: node scripts/mutate-test.mjs
       - name: The stand-in's record
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/stand-in-record-test.mjs ')) }}
         run: node scripts/stand-in-record-test.mjs
       - name: The count of what the reviews find
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/review-record-test.mjs ')) }}
         run: node scripts/review-record-test.mjs
       - name: The stalled lanes
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/stalled-test.mjs ')) }}
         run: node scripts/stalled-test.mjs
       - name: The scheduled look and its state report
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/look-test.mjs ')) }}
         run: node scripts/look-test.mjs
       - name: The choice records
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/choices-test.mjs ')) }}
         run: node scripts/choices-test.mjs
       - name: The description check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pr-description-test.mjs ')) }}
         run: node scripts/pr-description-test.mjs
       - name: The security-review check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/security-review-test.mjs ')) }}
         run: node scripts/security-review-test.mjs
       - name: The code-review wait
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/code-review-wait-test.mjs ')) }}
         run: node scripts/code-review-wait-test.mjs
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/clean-merges-test.mjs ')) }}
         run: node scripts/clean-merges-test.mjs
       - name: The workflow check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/workflows-test.mjs ')) }}
         run: node scripts/workflows-test.mjs
       - name: The core-moved check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-moved-test.mjs ')) }}
         run: node scripts/core-moved-test.mjs
       - name: Where the owner's inbox is, issues or the folder
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/inbox-test.mjs ')) }}
         run: node scripts/inbox-test.mjs
       - name: The labels and openers, and their check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/labels-test.mjs ')) }}
         run: node scripts/labels-test.mjs
       - name: The core's releases, what a project follows, and cutting one
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/releases-test.mjs ')) }}
         run: node scripts/releases-test.mjs
       - name: The core's address stands in one place, and is this repository's
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-address-test.mjs ')) }}
         run: node scripts/core-address-test.mjs
       - name: The tree a copy must be
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/copy-tree-test.mjs ')) }}
         run: node scripts/copy-tree-test.mjs
       - name: The copy of the core's check (core.yml), its own job on scratch projects
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-yml-test.mjs ')) }}
         run: node scripts/core-yml-test.mjs
       - name: The core's checks from plain git (check.mjs), on scratch projects
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/check-test.mjs ')) }}
         run: node scripts/check-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pure-sync-test.mjs ')) }}
         run: node scripts/pure-sync-test.mjs
       - name: The proof that a change to what runs by itself is only comments and steps' names
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/comment-only-test.mjs ')) }}
         run: node scripts/comment-only-test.mjs
       - name: Whether a script was started by itself
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/started-test.mjs ')) }}
         run: node scripts/started-test.mjs
       - name: The starter kit, and the core's own checks on a project it writes
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-test.mjs ')) }}
         run: node scripts/init-test.mjs
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-dotnet-test.mjs ')) }}
         run: node scripts/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/nuget-gate-test.mjs ')) }}
         run: node scripts/nuget-gate-test.mjs
       - name: The personal-terms check, its own job on scratch pull requests
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/personal-terms-test.mjs ')) }}
         run: node scripts/personal-terms-test.mjs
       - name: The words check, the dated records' added lines too
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/general-test.mjs ')) }}
         run: node scripts/general-test.mjs
       - name: The cap's own check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/size-test.mjs ')) }}
         run: node scripts/size-test.mjs
       - name: The pointer check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pointers-test.mjs ')) }}
         run: node scripts/pointers-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/pointers.mjs --core
       - name: What a release asks of a project, step by step, and a project beside a fresh start
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/steps-test.mjs ')) }}
         run: node scripts/steps-test.mjs
       - name: What holds each rule of the floor and the modules, read
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/holders-test.mjs ')) }}
         run: node scripts/holders-test.mjs
       - name: What holds each rule names only rules that stand
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/holders.mjs
       - name: The check that the core takes each module or gives its reason
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/own-modules-test.mjs ')) }}
         run: node scripts/own-modules-test.mjs
       - name: The core takes each of its own modules, or its AGENTS.md gives its reason
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/own-modules.mjs
       - name: Each check's failure says its mend, and each check's test reads it
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/mend-test.mjs ')) }}
         run: node scripts/mend-test.mjs
       - name: The manifest check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/manifest-reads-test.mjs ')) }}
         run: node scripts/manifest-reads-test.mjs
       - name: The core's own AGENTS.md fills each slot its modules use
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/manifest-reads.mjs --core
       - name: The entry-files check
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/entry-files-test.mjs ')) }}
         run: node scripts/entry-files-test.mjs
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/entry-files.mjs --core
       - name: The reading script, by role and by task
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/reading-test.mjs ')) }}
         run: node scripts/reading-test.mjs
       - name: Every module and role of the core says when it is read, in words the reading script matches
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
@@ -298,11 +316,16 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      - name: The tests this change can reach (on main, and in a re-run, every one)
+        env:
+          SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
+        run: node scripts/select.mjs .github/shape.json --env RUN
       - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
+        if: ${{ env.RUN == 'all' || contains(env.RUN, ' scripts/upgrade-test.mjs ') }}
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs
       # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time)
       - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' scripts/staged-test.mjs ')) }}
         run: node scripts/shape.mjs .github/shape.json --suite staged -- node scripts/staged-test.mjs
 
   # (the one check the ruleset asks for by name: it passes only where the suites, and the upgrade test with the staged

@@ -49,7 +49,7 @@ import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
-import { copies, monthOf, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
+import { copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
 export const BOT = "github-actions[bot]";
@@ -269,7 +269,7 @@ function main(args) {
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: since(i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft });
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), previous: previous?.body ?? null, overdue, counts, scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: previous?.body ?? null, overdue, counts, scripts });
   }
 
   // what is done with each

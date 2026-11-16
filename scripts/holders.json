@@ -69,6 +69,16 @@
     "modules/screens.md: An accessibility floor, in numbers": "check: scripts/screens.mjs, in part",
     "modules/screens.md: Each size it is used at": "check: scripts/screens.mjs, in part",
     "modules/screens.md: What stays out": "describes",
+    "modules/tests.md: Each test is measured": "audit",
+    "modules/tests.md: A pull request runs the tests its change can reach": "check: scripts/steps.mjs, in part",
+    "modules/tests.md: A test keeps its place by one of three": "audit",
+    "modules/tests.md: The tests have a time mark, which never gets worse": "check: scripts/shape.mjs",
+    "modules/tests.md: A test that fails for no reason is mended or removed, never retried in silence": "audit",
+    "modules/tests.md: A test opens a screen only where the screen is what it guards": "check: scripts/shape.mjs",
+    "modules/tests.md: What a push waits on has a time mark": [
+      "check: scripts/shape.mjs, in part",
+      "check: scripts/look.mjs, in part"
+    ],
     "modules/updates.md: The newest stable version, unless there is a reason": [
       "check: scripts/versions.mjs, in part",
       "check: scripts/security-review.mjs, in part"

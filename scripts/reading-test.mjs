@@ -122,7 +122,7 @@ r = run(root, "reviewer", "--kind", "security-review", "--path", ".github/workfl
 ok(r.status === 0 && /Read for this task:\n  floor\/topics\.md +the kind security-review\n  floor\/threat-model\.md +the kind security-review\n/.test(r.out) && /note no module is read for the kind "nonesuch"/.test(r.out) && /your tool's part: give --tool/.test(r.out), "run with kinds and a path, it prints each file once with why, and notes a kind no module names", r.out);
 r = run(root, "planner");
 ok(r.status === 1 && mended(r.out) && /is no role the core has a file for/.test(r.out) && run(root).status === 1 && mended(run(root).out), "a role with no file, or none given, fails saying the mend", r.out);
-ok(run(root, "--kinds").status === 0 && /^screen +modules\/game-design\.md, modules\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +floor\/topics\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
+ok(run(root, "--kinds").status === 0 && /^screen +modules\/game-design\.md, modules\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +floor\/topics\.md, modules\/tests\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
 
 // a scratch project that holds the core's copy
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "reading-test-")), project = path.join(tmp, "project");

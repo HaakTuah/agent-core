@@ -85,3 +85,79 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind "How a game answers a player" in `modules/game-design.md` and its five points, the questions another module
      may add to the critique and the settings check in `modules/screens.md`, and the check `settings` of
      `scripts/screens.mjs`.
+
+238. **15 November 2026** (every project with tests, the core among them; in a chat with a session the owner works
+     with, not the design session, as that session recorded it on issue #275, labelled `by:chat`, under "What it is",
+     saying the owner agreed to it). The session set out how the tests would earn their time: each measured (its time,
+     when it last failed for a real reason, what it alone catches of the faults put in on purpose, how often it fails
+     for no reason), a script keeping the numbers and the audit's report showing them; a pull request running the
+     tests its changed files can reach, with new tests and those that failed last time, and saying what it ran, the
+     whole suite running where it already ran, so that no job is added, and a fault the whole suite finds that the
+     selection skipped mended in the map at once; the tests a project names as its proof that behaviour was kept never
+     selected out, their names in a slot; a test keeping its place by one of three (it alone catches a fault, it guards
+     a rule the project states, it has failed for a real reason), any other proposed for removal or merging by a
+     script and decided by a reader, never by coverage alone, in small pull requests that leave the tests' strength no
+     worse; the suite's time and each part's a measure with a baseline that may not get worse, the codebase's state
+     setting how fast they come down; a test that fails for no reason mended or removed, never retried in silence; a
+     new test saying what rule or fault it guards and setting up only what it needs; and, reaching a project, reported
+     first, the selection a step of the release with its check and its mend, nothing stopping a project and nothing
+     asked of its owner. The owner had asked:
+
+     > It seems my tests are way out of whack. How will they be made optimal, to only test what absolutely gives
+     > value and then never grow into monsters again? […] So the tests are maybe some of the biggest bottlenecks on
+     > development right now
+
+     and agreed to those seven points. The same day, having watched a suite of a desktop program open the program's
+     window for test after test, the owner asked whether the core says clearly:
+
+     > Test everything without such things first? Only add if it has to for utility?
+
+     The session answered that the core implies it in three places and states it in none, and set out an eighth point:
+     a test opens a screen, a window or a device only where that is what it guards, everything else tested beneath it,
+     and the share of a suite's tests that open one counted, with the time they take, as a measure with a baseline,
+     those that stand listed and worked down, none turning a check red. The owner agreed to it. To the orchestrator,
+     passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `modules/tests.md` but its last two rules, the line on it in "The smallest setup that tests the rule" in
+     `modules/how-to-work.md`, the audit's record in `modules/cleaning.md`, `scripts/select.mjs`,
+     `scripts/test-record.mjs`, the shape check's count of the tests that open a screen and the selection's lists in
+     its config, and `scripts/mutate.mjs --every`.
+
+
+239. **15 November 2026** (every project with checks on its pull requests, the core among them; in chats with a
+     session the owner works with, not the design session, as that session recorded it on issue #321, labelled
+     `by:chat`, saying the owner agreed to it). The owner had noted:
+
+     > I feel reviews and tests are bottlenecks for us.
+
+     The session measured where a pull request's time goes and set out seven changes, which the owner agreed to; four
+     of them are these: a time mark on what a pull request waits on, the checks of one push from the first job's start
+     to the last one's end, in a slot, with a baseline that may not get worse; a slow job split, its parts side by side
+     and the quick checks first, run only where a change can affect what it tests, done in the core to the Windows
+     suites; keeping up with main done once, first a look with a report on whether a merge queue is open to the account
+     or a branch can be updated only once its other checks have passed, floor rule 12 staying as it is; and a
+     measurement of an hour or more (a first guess, in a slot) started as a job, the session ending at a gate with its
+     note and the result posted on the pull request for the session that picks it up, the job the project's own to
+     turn on, the core adding no billed job to a project. Of the Windows suites the owner then asked:
+
+     > Is this a lot? Does it give value that warrants it taking so much time
+
+     > Should sessions wait around for all of this?
+
+     The session answered that the suites are worth keeping, since another owner's project is built on Windows, but not
+     worth waiting on in a loop. A fifth point, that a builder runs before it pushes the suites its own machine can
+     run, came from that answer and is the session's own addition, told to the owner the same day; it is no decision
+     of the owner's, and waits as an open point (#321). To the orchestrator, passed on word for word to the builder of
+     this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "The tests have a time mark, which never gets worse" (its split, with the quick checks first),
+     "What a push waits on has a time mark" and "A long measurement runs outside the session" in `modules/tests.md`,
+     `scripts/wait.mjs` and its line in the monthly state report, the core's own selection in its tests workflow, and
+     the report on keeping up with main.
+
