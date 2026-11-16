@@ -410,22 +410,23 @@ export function runAt(dir, ref, args) {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
-// The project's own working folder: whether anything there differs from what the case set (committed or not).
 // Whether the session committed in the project: a branch or HEAD moved from main as the case set it, or a commit the
 // case did not leave in the reflog (one undone since, by a reset, still stands there).
-export function committed(dir) {
+function committed(dir) {
   const refs = refsIn(path.join(dir, "project", ".git"), { reflog: true });
   if (Object.entries(refs).some(([r, sha]) => (r === "HEAD" || r.startsWith("refs/heads/")) && sha !== base(dir))) return true;
   const known = new Set(memoOf(dir, "reflog"));
   return Object.entries(refs).some(([r, sha]) => r.startsWith("refs/reflog/") && !known.has(sha));
 }
 
+// The project's own working folder: whether anything there differs from what the case set (committed or not).
 export function touched(dir) {
   const project = path.join(dir, "project");
   if (committed(dir)) return true;
   // (each file of the working folder against main as the case set it, hashed with no filter: no file of the
   // session's is read as anything but bytes)
-  const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(Boolean).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
+  // (a submodule's pointer is no file of the folder: its folder stands empty, as a submodule not checked out does)
+  const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(l => l && !l.startsWith("160000 ")).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
   const have = [];
   const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
   walk(project, "");

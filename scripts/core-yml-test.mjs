@@ -155,6 +155,9 @@ fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one"
   const all = JSON.parse(fs.readFileSync(path.join(root, "scripts/staged-tools.json"), "utf8")).tools;
   onMain(all.slice(0, 1), "one tool passed");
   fails("a carried core with no floor's copy, where only one tool has passed and the others never ran the cases", `${all[1]} (carried)`, { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
+  write(theCore, "reports/staged-cases.json", `${JSON.stringify({ runs: record(all).runs.map((r, i) => (i ? r : { ...r, cases: { ...r.cases, carried: { verdict: "pass", wrong: "the session read the floor from a copy the case left" } } })) })}\n`);
+  git(theCore, "add", "-A"); git(theCore, "commit", "-q", "-m", "a pass found wrong");
+  fails("where one tool's last pass was found wrong, which proves nothing", `${all[0]} (carried)`, { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
   onMain(all, "every tool passed");
   passes("and once every tool the core names has passed both, it needs no floor's copy", { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
 }

@@ -118,8 +118,9 @@ check("no-floor", fresh("no-floor"),
     && /@lib\/core\/floor\/security\.md/.test(read(carriedSet, "AGENTS.md")) && !/(^|[\s`@])core\//m.test(read(carriedSet, "AGENTS.md")) && settings.SessionStart[0].hooks[0].command.includes("lib/core/floor/security.md"),
   "carried: the core stands under lib/core/, its manifest and AGENTS.md name it there, and the start hook checks its floor there");
   ok(git(noFloorSet, "ls-tree", "HEAD", "lib").startsWith("160000 commit") && !fs.existsSync(path.join(noFloorSet, "project", "lib", "core")), "no-floor: lib is a submodule whose files are not there");
-  const moved = fresh("no-floor"); write(moved, "src/sum.mjs", FIX);
-  ok(/changed src\/sum\.mjs/.test(verdict("no-floor", moved).why), "no-floor: a session that builds the task in the working folder, committing nothing, fails", verdict("no-floor", moved).why);
+  const moved = fresh("no-floor"); write(moved, "src/cli.mjs", "console.log(process.argv.slice(2).map(Number).reduce((a, b) => a + b, 0));\n");
+  ok(/changed or committed files/.test(verdict("no-floor", moved).why), "no-floor: a session that builds the task in the working folder, in any file, committing nothing, fails", verdict("no-floor", moved).why);
+  ok(verdict("no-floor", fresh("no-floor")).pass, "no-floor: the submodule's empty folder, as set, is no change");
 }
 
 // the steps case: each planted step done in a pull request of its own, as the notes ask; broken, one left

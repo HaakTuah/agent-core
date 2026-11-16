@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { carriedAt, corePath, floorCopyIn, hookCommands, readCore } from "./core-path.mjs";
+import { carriedAt, corePath, floorCopyIn, hookCommands, projectAt, readCore } from "./core-path.mjs";
 import { mended } from "./mend.mjs";
 import { pathIn } from "./reading.mjs";
 import { runWorkflow } from "./workflow-run.mjs";
@@ -137,6 +137,11 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   fs.writeFileSync(path.join(project, "lib/core/scripts/work-saved.sh"), "echo the working tree ran\n");
   said = run(hooks.stop);
   ok(/the hook of main's pin ran: stop/.test(said) && !/working tree/.test(said), "and never the working tree's copy, edited", said);
+  // (a check run from the carried copy reads the project it stands in, not the library: projectAt)
+  const at = projectAt(path.join(project, "lib", "core", "scripts"));
+  ok(fs.realpathSync(at.root) === fs.realpathSync(project) && at.prefix === "lib/core/scripts/", "a script of a copy a submodule carries takes the project as its root, its prefix from there", JSON.stringify(at));
+  const own = projectAt(lib);
+  ok(fs.realpathSync(own.root) === fs.realpathSync(lib) && own.prefix === "", "a repository of its own is its own root", JSON.stringify(own));
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);
   ok(/^STOP: the floor cannot be read at lib\/core\/floor\/security\.md.*Mend: /m.test(said) && !/hook of main's pin ran/.test(said), "where the submodule is not checked out, the start stops the session, saying the mend", said);

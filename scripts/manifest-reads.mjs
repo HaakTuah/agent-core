@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { readSection } from "./own-modules.mjs";
 import { MODULES } from "./reading.mjs";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 // (a phrase in italics may run over one line break, as a module's text wraps it: "*where the numbers\n  go*"; the
@@ -124,7 +125,7 @@ function main() {
   const core = process.argv.includes("--core");
   const here = path.dirname(fileURLToPath(import.meta.url));
   try {
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const root = projectAt(here).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     const home = core ? root : path.join(root, "core");
     // (the modules, by name, from each folder that holds them; the floor's own files, its topics among them)
     const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));

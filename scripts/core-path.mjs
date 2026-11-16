@@ -13,6 +13,7 @@
 //   node core/scripts/core-path.mjs           prints the path, from the project's root; a line with its mend where the
 //                                             line is wrong
 //   node core/scripts/core-path.mjs --hooks   the commands of Claude Code's hooks for that path (hookCommands)
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
@@ -73,6 +74,21 @@ export function carriedAt(core, read) {
   if (lib.form !== "copied") return { wrong: `${core.library}${MANIFEST} names no copy of its own: a library carries the core it copies, at its pin. Mend: carry the core from the library that holds the copy` };
   if (`${core.library}${lib.path}` !== core.path) return { wrong: `${MANIFEST} names the carried core under ${core.path}, and the library's manifest under ${core.library}${lib.path}. Mend: name ${core.library}${lib.path} in the "Core:" line` };
   return { pin: lib.pin, path: core.path };
+}
+
+/** The project a script of the core's copy at `from` (a folder) checks: { root, prefix }, the root git's top of the
+ *  working tree there, or, where that is a library's submodule carrying the core into a project whose manifest names it
+ *  so, the project's own, so that no check reads the library's files in the project's place; and the path from that
+ *  root to `from`, as git spells it, with its last "/" ("" at the root). Both "" where `from` is in no work tree. */
+export function projectAt(from) {
+  const ask = args => { try { return execFileSync("git", ["rev-parse", ...args], { cwd: from, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return ""; } };
+  const top = ask(["--show-toplevel"]), prefix = ask(["--show-prefix"]), above = top ? ask(["--show-superproject-working-tree"]) : "";
+  if (!above) return { root: top, prefix };
+  let line = {};
+  try { line = readCore(fs.readFileSync(path.join(above, MANIFEST), "utf8")); } catch { return { root: top, prefix }; }
+  const carried = line.form === "carried" ? path.resolve(above, line.path) : null;
+  if (!carried || !(path.resolve(from) + path.sep).startsWith(carried + path.sep)) return { root: top, prefix };
+  return { root: above, prefix: `${path.relative(above, top).split(path.sep).join("/")}/${prefix}` };
 }
 
 /** The commands of Claude Code's hooks (.claude/settings.json) for a core at another path than core/, as the starter

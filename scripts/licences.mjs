@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 // Every licence the Open Source Initiative approves, as the SPDX licence list marks them (isOsiApproved, deprecated ids
 // left out; the list of 28 October 2026). Left out: BSD-ask-to-endorse, newer than the SPDX list the pinned dependency
@@ -500,7 +501,7 @@ if (started(import.meta.url)) {
   let config, root;
   try {
     config = loadConfig(configPath);
-    root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
+    root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
   } catch (e) { fail(e.message); }
   if (process.argv.includes("--action")) {
     for (const line of actionLists(config)) console.log(line);

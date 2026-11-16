@@ -29,12 +29,12 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { corePath } from "./core-path.mjs";
+import { corePath, projectAt } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
 let RULES;

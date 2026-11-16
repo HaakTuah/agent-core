@@ -40,6 +40,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 export const CODE = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"];
 export const OTHER = [".cs", ".fs", ".vb", ".py", ".go", ".rs", ".java", ".kt", ".scala", ".swift", ".dart", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
@@ -645,6 +646,10 @@ export function changedTogether(commits, measured) {
   return { commits: read, pairs: list.slice(0, 50), mostChanged };
 }
 
+// The project's root: the repository named, or the one this copy stands in, a project's whose library carries its core
+// in a submodule included (core-path.mjs).
+const rootOf = (repo, here) => (repo ? "" : projectAt(here).root) || execFileSync("git", [...SAFE, "rev-parse", "--show-toplevel"], { cwd: repo ?? here, encoding: "utf8" }).trim();
+
 function main(argv) {
   const opts = { specs: [], suites: [], depth: 0, history: 500, json: null, repo: null };
   for (let k = 0; k < argv.length; k++) {
@@ -659,7 +664,7 @@ function main(argv) {
     else opts.specs.push(a);
   }
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const root = execFileSync("git", [...SAFE, "rev-parse", "--show-toplevel"], { cwd: opts.repo ?? here, encoding: "utf8" }).trim();
+  const root = rootOf(opts.repo, here);
   // where this script lies in the repository, as git itself says it (a path worked out from the two folders' names can
   // differ in spelling, as a short name of Windows' does from the long one git gives)
   const self = execFileSync("git", [...SAFE, "rev-parse", "--show-prefix"], { cwd: here, encoding: "utf8" }).trim();

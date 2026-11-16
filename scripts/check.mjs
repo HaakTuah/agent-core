@@ -106,11 +106,14 @@ function options() {
 }
 
 // The pin of the core the manifest's text names (core-path.mjs): its own, or, where a library carries the core, the
-// library's, read through `read`, a file's text at the same commit; { pin } or { wrong }.
-function pinAt(manifest, read) {
+// library's, read from the commit `rev` of the repository at `root` (`show` gives a file's text there); where the
+// library is a submodule, from the library's commit `rev` pins, in the submodule's own repository. { pin } or { wrong }.
+function pinAt(manifest, root, rev, show) {
   const line = readCore(manifest);
   if (line.wrong || line.form === "copied") return line;
-  return carriedAt(line, read);
+  const lib = line.library.slice(0, -1);
+  const inSubmodule = f => { try { return git(path.join(root, lib), "show", `${git(root, "rev-parse", `${rev}:${lib}`)}:${f.slice(line.library.length)}`); } catch { return null; } };
+  return carriedAt(line, f => show(rev, f) ?? inSubmodule(f));
 }
 
 // The project at the commit checked out: its root, head, base, manifest's pin and owner, and the pull request's text.
@@ -121,7 +124,7 @@ function project({ base: baseArg, title, description, branch }) {
   const head = git(root, "rev-parse", "HEAD");
   const manifest = show(head, "core-manifest.md");
   if (manifest === null) fail("core-manifest.md is not in the commit checked out.", "run it from the root of a project that takes the core, at a commit that holds its manifest.");
-  const pin = pinAt(manifest, f => show(head, f));
+  const pin = pinAt(manifest, root, head, show);
   if (pin.wrong) { const [what, mend] = pin.wrong.split(" Mend: "); fail(what, mend ?? "write the manifest's \"Core:\" line as the sync writes it."); }
   let base = "";
   if (baseArg !== null) {
@@ -145,7 +148,7 @@ function project({ base: baseArg, title, description, branch }) {
 // starter kit's, from the core itself at the pin the base's manifest holds (never from a copy a change could edit).
 function callers({ root, show, head, base }, tmp) {
   const at = base || head;
-  const pin = pinAt(show(at, "core-manifest.md") ?? "", f => show(at, f)).pin ?? "";
+  const pin = pinAt(show(at, "core-manifest.md") ?? "", root, at, show).pin ?? "";
   const listed = dir => { try { return git(root, "ls-tree", "-z", "--name-only", `${at}:${dir}`).split("\0").filter(Boolean); } catch { return []; } };
   const own = listed(".github/workflows").filter(f => /\.ya?ml$/.test(f)).map(f => readable(f, show(at, `.github/workflows/${f}`))).filter(Boolean);
   if (own.some(c => Object.values(c.wf.jobs ?? {}).some(job => call.test(String(job?.uses ?? ""))))) return own;

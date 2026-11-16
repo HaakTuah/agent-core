@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
 import { NOT_A_FILE, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
 const TOOLS = "dotnet-tools.json"; // its name, in any case, in .config/ or in any folder, as dotnet reads it
@@ -336,7 +337,7 @@ if (started(import.meta.url)) {
   try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   let result;
   try {
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
+    const root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim();
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
     mkdirSync(into, { recursive: true });
     const base = baseOf(root);

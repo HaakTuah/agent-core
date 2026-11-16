@@ -23,7 +23,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { corePath, floorCopy } from "./core-path.mjs";
+import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -40,7 +40,7 @@ if (shape.includes(false)) {
 }
 marks.past ??= {};
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 const tracked = new Set(git(["ls-files", "-z"]).split("\0").filter(Boolean));
 const kb = n => (n / 1024).toFixed(1);
 // (the core's copy at the manifest's path, and the floor's own copy a repository whose core a library carries keeps:

@@ -94,6 +94,7 @@ import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
+import { projectAt } from "./core-path.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 // Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
@@ -865,7 +866,7 @@ if (started(import.meta.url)) {
   const args = process.argv.slice(2), advisory = args.includes("--advisory");
   const here = fileURLToPath(new URL(".", import.meta.url));
   const project = () => {
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8" }).trim();
+    const root = projectAt(here).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8" }).trim();
     return { root, tracked: execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean) };
   };
   if (args.includes("--projects")) {

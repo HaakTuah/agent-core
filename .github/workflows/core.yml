@@ -214,8 +214,8 @@ jobs:
             const norm = t => String(t ?? "").toLowerCase().replace(/\s+/g, " ").trim();
             const runs = read(process.env.RECORD, "runs"), tools = read(process.env.TOOLS, "tools"), open = [];
             for (const t of tools) for (const c of ["carried", "no-floor"]) {
-              const v = runs.filter(x => norm(x.tool ?? tools[0]) === norm(t) && x.cases?.[c]).map(x => x.cases[c].verdict).at(-1);
-              if (v !== "pass") open.push(`${t} (${c})`);
+              const last = runs.filter(x => norm(x.tool ?? tools[0]) === norm(t) && x.cases?.[c]).map(x => x.cases[c]).at(-1);
+              if (last?.verdict !== "pass" || last.wrong) open.push(`${t} (${c})`); // (a verdict found wrong proves nothing)
             }
             console.log(tools.length ? open.join(", ") : "every tool (their list could not be read)");')
           if [ -z "$FLOOR" ]; then
