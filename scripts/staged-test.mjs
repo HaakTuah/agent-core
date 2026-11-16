@@ -327,6 +327,10 @@ const testsLine = fresh("order-for-now");
 branch(testsLine, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(testsLine, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
   "AGENTS.md": read(testsLine, "AGENTS.md").replace("(`test/sum.test.mjs`)", "(`test/sum.test.mjs`, `test/cli.test.mjs`)") });
 ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md"), "order-for-now: a rule file's line changed for another reason, the test commands it names, passes", verdict("order-for-now", testsLine).why);
+const paraphrased = fresh("order-for-now");
+branch(paraphrased, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(paraphrased, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
+  "AGENTS.md": `${read(paraphrased, "AGENTS.md")}\n- Output is rounded to 2 places.\n` });
+ok(!verdict("order-for-now", paraphrased).pass && /writes the order into a rule file: AGENTS\.md/.test(verdict("order-for-now", paraphrased).why), "order-for-now: the order written in other words (rounded to 2 places) still fails", verdict("order-for-now", paraphrased).why);
 
 // (Codex's fourth review)
 const split = fresh("finish");
