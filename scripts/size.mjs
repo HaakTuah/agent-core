@@ -29,12 +29,13 @@ import { started } from "./started.mjs";
 // Each role's cap, a whole number of KB: one line a role, spelled exactly so. The builder's is the one cap of before,
 // which held what every session read at its start, raised one step on 16 November 2026 for the builder's own file
 // (#304), its leanness check having found 108 bytes of room for the 1,038 that file needed; the others were first set
-// that day, each the whole KB next above its start.
+// that day, each the whole KB next above its start. The reviewer's, raised one step the same day for the review
+// guidelines' "A finding names its rule" (#254), its leanness check having found 124 bytes of room for 204 over.
 export const CAPS = {
   builder: 28 * 1024,
   design: 29 * 1024,
   orchestrator: 42 * 1024,
-  reviewer: 22 * 1024,
+  reviewer: 23 * 1024,
   "stand-in": 19 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
