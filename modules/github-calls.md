@@ -1,9 +1,9 @@
 # GitHub's REST calls from a cloud session
 
-Read when a cloud session must open, mark ready, merge or inspect a PR, and when a part of GitHub a rule needs cannot
-be reached. Claude's cloud sessions can't use GitHub's
-GraphQL API, so `gh pr create`, `list`, `view` and `ready` fail there; they use these REST calls (the `ccr/` routes are
-Claude's cloud proxy's, not GitHub's; `<owner>/<repo>` is the repository's own).
+Read when a cloud session must open, mark ready, merge or inspect a PR, when a part of GitHub a rule needs cannot be
+reached, and when who may write is read (`modules/teams.md`). This is GitHub's part (`modules/hosts.md`). Claude's cloud
+sessions can't use GitHub's GraphQL API, so `gh pr create`, `list`, `view` and `ready` fail there; they use these REST
+calls (the `ccr/` routes are Claude's cloud proxy's, not GitHub's; `<owner>/<repo>` is the repository's own).
 
 ```bash
 gh api repos/<owner>/<repo>/pulls -f title=... -f head=<branch> -f base=main -f body=... # add -F draft=true: a draft
@@ -13,6 +13,12 @@ gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch # bring it up to date
 gh api -X PUT repos/<owner>/<repo>/pulls/<n>/ccr/auto_merge # auto-merge on (DELETE: off)
 gh api repos/<owner>/<repo>/compare/main...<branch> --jq '.files[].filename' # the files a branch changes
 gh api repos/<owner>/<repo>/pulls/<n> --jq '{state, merged}' # was it merged?
+gh api repos/<owner>/<repo>/collaborators/<login>/permission --jq '{role: .role_name, type: .user.type}' # an
+  # account's right: an owner where the role is write, maintain or admin and the type User; the higher right, maintain
+  # or admin
+gh api repos/<owner>/<repo>/collaborators --paginate --jq '.[] | select(.type == "User" and .permissions.push) | .login'
+  # the people who may write: more than one, a team's project. Claude's cloud proxy refuses these two: there the
+  # *owner's account* alone is an owner (modules/teams.md, "Who is an owner")
 gh api 'repos/<owner>/<repo>/pulls/comments?since=<a week ago>&per_page=100' \
   --jq '.[] | select(.user.login == "<reviewer>")'  # one reviewer's findings since then, any PR's (more: &page=2;
   # those not on a line: issues/comments, the same way)

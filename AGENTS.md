@@ -27,8 +27,8 @@ other tool, `modules/other-builders.md` and its tool's part (`modules/tools.md`)
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
 `modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/kiro.md`, `modules/antigravity.md`, `modules/github-calls.md`, `modules/orchestrating.md`,
-`modules/updates.md`, `modules/choices.md`, `modules/code-shape.md` and `modules/cleaning.md`.
+`modules/kiro.md`, `modules/antigravity.md`, `modules/github-calls.md`, `modules/hosts.md`, `modules/teams.md`,
+`modules/orchestrating.md`, `modules/updates.md`, `modules/choices.md`, `modules/code-shape.md` and `modules/cleaning.md`.
 
 Not taken, each for its reason:
 

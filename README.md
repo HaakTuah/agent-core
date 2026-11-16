@@ -19,9 +19,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   shared threat model.
 - **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
   its top when it is read (a provider's part: when that provider is asked). At the start of every task:
-  `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
+  `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`);
+  in a team's project, `teams.md` too.
   When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
+  `orchestrating.md`, `github-calls.md`, `hosts.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
   project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
 - **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
   stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
@@ -305,7 +306,8 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 
 | Slot | What the project fills in |
 | --- | --- |
-| *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`) |
+| *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`); in a team's project one of its owners, who are each person the host lets write, and the one owner where the host's rights cannot be read (`modules/teams.md`) |
+| *approvals* | the number of owners' approvals, in backticks, a pull request waits for before its merge where the host's protection of `main` does not ask them itself (`modules/teams.md`, "A person's approval follows the host"); left out, what that protection asks: none in the ruleset "Setting up" describes |
 | *shares its counts* | `yes`, in backticks, where a project of another owner's lets the core's state report read its counts though it gave the core's owner no access (`scripts/state-report.mjs`); left out, no |
 | *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
 | *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`modules/inbox.md`) |
@@ -381,7 +383,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
   required, branches up to date (core archive 201).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
-  approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
+  approvals (a team's project may ask some: `modules/teams.md`); status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
   quality results required at Errors, and Copilot's review requested automatically, advisory (core archive 130).
 - Each repository's Actions settings (Settings, Actions, General): "Require actions to be pinned to a full-length commit
@@ -422,6 +424,11 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   they find, and with none the tool at hand takes the role (`modules/roles.md`, "The builders"; core archive 169 and
   232). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
   or the repository's workflows wait for an approval before they run.
+- A project on a host other than GitHub: its pipeline runs the core's checks from plain git (`modules/hosts.md`, "One
+  layer knows no host"), and the host's own protection of `main` stands in for the ruleset above. Until a project there has run it and reported so, the core says of that host only that it
+  "should work".
+- A team's project: the owners are each person the host lets write, and its admins or maintainers give the floor's
+  yeses (`modules/teams.md`); nothing is kept in a list.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`modules/work-flow.md`). It stops only that repository's agents.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
