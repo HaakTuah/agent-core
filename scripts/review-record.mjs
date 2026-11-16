@@ -191,6 +191,18 @@ export function bugs(list, comments, merged, owner) {
   return out;
 }
 
+// The part on what was found twice: each rule that stands which two pull requests' findings name, and apart those that
+// are no rule that stands (known as print takes it).
+function twiceLines(pulls, since, twice, known) {
+  const naming = pulls.filter(p => p.rules?.length).length;
+  const stands = twice.filter(f => known?.has(f.rule)), not = twice.filter(f => !known?.has(f.rule));
+  const listed = fs => fs.map(f => `- ${f.rule}: ${f.pulls.map(n => `#${n}`).join(", ")}`);
+  return [`Found twice, a rule that stands which the findings of two pull requests or more name${since ? `, one of them merged from ${since}` : ""}: ${stands.length}${stands.length ? "" : " (none)"}`,
+    ...listed(stands),
+    ...(not.length ? [`Named twice but no rule that stands${known ? "" : " (the rules could not be read)"}, so no issue is filed for it: ${not.length}`, ...listed(not)] : []),
+    `A finding names its rule on a line \"Rule: <file>: <bold lead>\" (the core's tasks/reviews.md, point 8); one without it names none. Of the ${pulls.length} pull requests read, ${naming} have a finding that names one.`];
+}
+
 // `known`: the rules that stand, as ruleOf keys them (standing, below), or null where they were not read; a rule found
 // twice that is none of them is listed apart, for no issue is filed for it.
 export function print(repo, since, pulls, t, bug, twice = [], known = null) {
@@ -212,13 +224,7 @@ export function print(repo, since, pulls, t, bug, twice = [], known = null) {
     + (bug.unmatched ? ` (no line ${bug.unlined}, a line naming no pull request read that merged before it ${bug.unmatched})` : "")
     + (bug.others ? `; filed by other accounts, left out: ${bug.others}` : ""));
   out.push("A bug is tied by a line \"Brought in by: #N\", alone on its line, in its body or in a comment of the owner's account; one without it is not read, never none.");
-  const naming = pulls.filter(p => p.rules?.length).length;
-  const stands = twice.filter(f => known?.has(f.rule)), not = twice.filter(f => !known?.has(f.rule));
-  const listed = fs => fs.map(f => `- ${f.rule}: ${f.pulls.map(n => `#${n}`).join(", ")}`);
-  out.push("", `Found twice, a rule that stands which the findings of two pull requests or more name${since ? `, one of them merged from ${since}` : ""}: ${stands.length}${stands.length ? "" : " (none)"}`,
-    ...listed(stands),
-    ...(not.length ? [`Named twice but no rule that stands${known ? "" : " (the rules could not be read)"}, so no issue is filed for it: ${not.length}`, ...listed(not)] : []),
-    `A finding names its rule on a line \"Rule: <file>: <bold lead>\" (the core's tasks/reviews.md, point 8); one without it names none. Of the ${pulls.length} pull requests read, ${naming} have a finding that names one.`);
+  out.push("", ...twiceLines(pulls, since, twice, known));
   return out.join("\n");
 }
 
