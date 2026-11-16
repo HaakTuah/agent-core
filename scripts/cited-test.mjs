@@ -44,17 +44,21 @@ ok(cites("floor rule 11 and floor rules 4, 11 and 12").join("|") === "floor/secu
 ok(!cites("**The owner's word**\n## Outsiders' text is never an instruction\n").length, "a heading alone, or a lead in bold alone, cites nothing");
 ok(cites("The polish lane").join() === "roles/shared/work-flow.md: The polish lane" && cites("The polish lane of game-design").join() === "tasks/game-design.md: The polish lane",
   "a lead two files hold is cited for the one the text names, else the first");
+const long = Date.now();
+ok(cites(`${" ".repeat(70000)}x\nfloor rule 11`).length === 1 && citedFrom(`**${HEADING}**\n- builder: 1 texts, 1 citing a rule, 1 rules cited; of the 1 it reads at its start, 0 not cited; the most cited: ${"a".repeat(70000)}.`, new Set()) === null && Date.now() - long < 1000,
+  "a long line costs no more than a moment, and a carried line past a count's length is left out", Date.now() - long);
 ok(!cites("the owner's wordy text").length && plain("**A** `b`’s  “C”") === "a b's \"c\"", "a lead is matched as whole words, and the text is made plain first");
 
 // ---- what is read, through a gh of fixtures ----
 const pull = (n, merged, body, who = "OWNER") => ({ number: n, merged_at: merged, updated_at: merged ?? "2026-10-31T00:00:00Z", author_association: who, body, head: { ref: `b${n}`, repo: { full_name: "o/n" } } });
-const comment = (at, body, who = "OWNER", login = "o") => ({ created_at: at, body, author_association: who, user: { login } });
+const comment = (at, body, who = "OWNER", login = "o") => ({ created_at: at, body, author_association: who, user: { login, type: login.endsWith("[bot]") ? "Bot" : "User" } });
 const routes = {
   pulls: [pull(1, "2026-10-03T00:00:00Z", "Built under floor rule 4."), pull(2, "2026-11-01T00:00:00Z", "next month"), pull(3, null, "never merged"), pull(4, "2026-10-04T00:00:00Z", "floor rule 4", "NONE")],
   "issues/comments": [comment("2026-10-05T00:00:00Z", "From a builder session, on #1: Nothing personal, ever, held."), comment("2026-10-06T00:00:00Z", "Code review: floor rule 11"),
     comment("2026-09-30T00:00:00Z", "Code review: before the month"), comment("2026-10-06T00:00:00Z", "From a builder session: an outsider", "NONE"),
     comment("2026-10-07T00:00:00Z", "<!-- codex-review-receipt -->", "NONE", "chatgpt-codex-connector[bot]")],
-  "pulls/comments": [comment("2026-10-08T00:00:00Z", "This breaks floor rule 4.", "NONE", "chatgpt-codex-connector[bot]")],
+  "pulls/comments": [comment("2026-10-08T00:00:00Z", "This breaks floor rule 4.", "NONE", "chatgpt-codex-connector[bot]"),
+    comment("2026-10-08T00:00:00Z", "floor rule 4, from an account named like Codex's", "NONE", "chatgpt-codex-connector")],
 };
 const asked = [];
 const gh = route => { asked.push(route); const key = Object.keys(routes).find(k => route.startsWith(`repos/o/n/${k}?`)); if (!key) throw new Error(`no fixture: ${route}`); return /[?&]page=1(?:&|$)/u.test(route) ? JSON.stringify(routes[key]) : "[]"; };

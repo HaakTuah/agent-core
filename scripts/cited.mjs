@@ -15,6 +15,7 @@ import path from "node:path";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { library, reading } from "./reading.mjs";
 import { ROOT, rules } from "./rules.mjs";
+import { codexs, WRITERS } from "./security-review.mjs";
 import { started } from "./started.mjs";
 
 export const HEADING = "The rules each role cites";
@@ -30,11 +31,14 @@ export const OPENERS = {
   "The stand-in's notes": "stand-in",
 };
 export const ROLES = ["builder", "design", "orchestrator", "reviewer", "stand-in"];
-const WRITERS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
-const CODEX = /^chatgpt-codex-connector(?:\[bot\])?$/u;
+const WRITING = new Set(WRITERS);
 const MOST = 5;
-// A line that is a heading alone, or a lead in bold alone: a text's frame, which cites nothing.
+// A line that is a heading alone, or a lead in bold alone: a text's frame, which cites nothing. Only a short line is
+// read so, and a carried line is read only to a length a count's line keeps to, so that no long line of a text, which
+// anyone the host lets write may give, costs the look's job more than a moment.
 const HEADING_LINE = /^\s*(?:#{1,6}\s.*|\*\*[^*]+\*\*:?)\s*$/u;
+const HEADING_MAX = 300, LINE_MAX = 4096;
+const heading = l => l.length <= HEADING_MAX && HEADING_LINE.test(l);
 
 // A text as it is matched: its quotes made plain, its marks of emphasis and code left out, its spaces one, in small letters.
 export const plain = s => String(s ?? "").normalize("NFKC").replace(/[‘’]/gu, "'").replace(/[“”]/gu, '"')
@@ -75,7 +79,7 @@ function chosen(held, text) {
 
 // The keys of the rules a text cites.
 export function citedIn(text, { leads, numbered }) {
-  const t = plain(String(text ?? "").split(/\r?\n/u).filter(l => !HEADING_LINE.test(l)).join("\n")), out = new Set();
+  const t = plain(String(text ?? "").split(/\r?\n/u).filter(l => !heading(l)).join("\n")), out = new Set();
   for (const { re, held } of leads) if (re.test(t)) for (const k of chosen(held, t)) out.add(k);
   for (const m of t.matchAll(/\bfloor rules? (\d+(?:(?:,? and |,? or |, )\d+)*)/gu))
     for (const n of m[1].match(/\d+/gu)) if (numbered.has(Number(n))) out.add(numbered.get(Number(n)));
@@ -99,14 +103,14 @@ export const after = month => { const [y, m] = month.split("-").map(Number); ret
 // What is read for `month` ("YYYY-MM"): [{ role, text }], with how many descriptions and comments were read.
 export function texts(repo, month, gh = ghApi) {
   const from = `${month}-01T00:00:00Z`, to = `${after(month)}-01T00:00:00Z`, items = [];
-  const pulls = mergedIn(repo, from, to, gh).filter(p => WRITERS.has(p.author_association));
+  const pulls = mergedIn(repo, from, to, gh).filter(p => WRITING.has(p.author_association));
   for (const p of pulls) items.push({ role: "builder", text: p.body ?? "" });
   let comments = 0;
   for (const route of ["issues/comments", "pulls/comments"]) {
     for (const c of pagesOf(`repos/${repo}/${route}?since=${from}&sort=created&direction=asc`, gh)) {
       if (!(c.created_at >= from && c.created_at < to)) continue;
       // (Codex's findings are its comments on a pull request's lines; its receipts and summaries cite nothing)
-      const role = CODEX.test(String(c.user?.login)) ? (route === "pulls/comments" ? "reviewer" : null) : WRITERS.has(c.author_association) ? roleOf(c.body) : null;
+      const role = codexs(c) ? (route === "pulls/comments" ? "reviewer" : null) : WRITING.has(c.author_association) ? roleOf(c.body) : null;
       if (role) { comments++; items.push({ role, text: c.body ?? "" }); }
     }
   }
@@ -169,6 +173,7 @@ export function report({ repo, month, gh = ghApi, root = ROOT }) {
 export function citedFrom(text, known) {
   const part = String(text ?? "").split(`**${HEADING}**`)[1]?.split(/\n\*\*/u)[0] ?? "", out = [];
   for (const l of part.split(/\r?\n/u)) {
+    if (l.length > LINE_MAX) continue;
     let m;
     if ((m = /^- Read: the descriptions of (\d{1,7}) pull requests merged in (\d{4}-\d\d) and (\d{1,7}) comments written in it /u.exec(l))) out.push(`cited in ${m[2]}, of ${m[1]} pull requests and ${m[3]} comments`);
     else if ((m = /^- (builder|design|orchestrator|reviewer|stand-in): no text\.$/u.exec(l))) out.push(`${m[1]} no text`);
