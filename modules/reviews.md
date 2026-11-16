@@ -1,11 +1,12 @@
 # Reviews
 
-Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.md`.
+Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`): the kind `review`. What
+reviewers judge by: `modules/review-guidelines.md`.
 
 **Which:**
 - Floor rule 8's security review (point 3).
 - Every PR that changes the project, its tests, tools, config or a rule file also gets its code review.
-  - Docs alone get no code review unless another provider built them.
+  - Docs alone get no code review unless another tool built them.
 - The *design-checked PRs* also get the design check, and a PR its users will see the stand-in's notes.
 - A PR that changes a screen also gets the critique (`modules/screens.md`, point 18).
 
@@ -51,7 +52,7 @@ Read when a PR is reviewed. What reviewers judge by: `modules/review-guidelines.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
-   - **What a posted review declares** (#299; core archive 232): by default a review posted in a comment that opens
+   - **What a posted review declares** (#299; core archive 235): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
      finding.". Whoever posts it, session or reviewer, writes both. The one condition that changes it: a note that no

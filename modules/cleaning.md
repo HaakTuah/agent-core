@@ -1,7 +1,8 @@
 # Cleaning, and the audit of how code is put together
 
 Read by a builder that takes a cleaning task, by the session that takes an audit's task and by its reader, and by the
-orchestrator when it hands out lanes (core archive 226). What the code is held to: `modules/code-shape.md`.
+orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` and `audit`. What the code is held to:
+`modules/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -27,7 +28,9 @@ orchestrator when it hands out lanes (core archive 226). What the code is held t
   remembering to measure. Held by the shape check and by the scheduled look, which opens the tasks; the share by no
   check, on purpose.
 - **How cleaning is done.** By default a cleaning task is a small pull request that proves, by the project's tests,
-  that behaviour is unchanged, and takes what it mended out of the baseline. Its builder picks and shapes it so:
+  that behaviour is unchanged, and takes what it mended out of the baseline; a fault the tests' strength baseline lists
+  is mended by a test that catches it, and taken out by `core/scripts/strength.mjs --lower <its file>`. Its builder
+  picks and shapes it so:
   - **worst first,** which means where change meets tangle: a hub or a long file that is changed often, as the look's
     issue lists them (what the baseline lists of a file, times how often it changed);
   - **where the work is:** ahead of those, the files the next entries of the *progress file* will touch, so that each
@@ -65,7 +68,11 @@ orchestrator when it hands out lanes (core archive 226). What the code is held t
     8. What does a reader see that no check does?
   - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
     work today.
-  - The tests are audited by the same reader, with their own measures as those come (#275).
+  - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
+    audit's task runs it on the whole codebase, outside the suite and on a machine where the project's tests may run
+    (floor rule 18), with `core/scripts/strength.mjs --whole`, which writes the tests' strength baseline in the same
+    pull request, one that changes no code or test; the reader reads its number beside the last one's
+    (`modules/code-shape.md`, #253); the tests' other measures come with #275.
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
   again: what it left unanswered is answered at the next. Reason: what was measured was fixed and what was judged had

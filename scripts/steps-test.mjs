@@ -12,7 +12,9 @@ import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { notes as manifestNotes } from "./manifest-reads.mjs";
 import { NOTES } from "./releases.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
+import { pathsLetThrough } from "./workflow-run.mjs";
 import { COST, STEPS, configs, leads, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
@@ -45,11 +47,11 @@ function kit(name, o) {
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  for (const part of ["floor", "modules", "roles", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
-  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), "{\n  \"listed\": {}\n}\n");
+  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
   return dir;
 }
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
@@ -68,6 +70,39 @@ for (const [name, dir] of Object.entries(dirs)) {
   const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: texts("modules"), floorTexts: texts("floor") });
   ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
 }
+// (a named tool is done only where a workflow on pull requests runs the check with its base)
+{
+  const dir = dirs["an-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  const step = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), flow = path.join(dir, ".github/workflows/strength.yml");
+  fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |"));
+  const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return step.check(project(dir)); };
+  const comment = said("      # TODO: node core/scripts/strength.mjs\n      - run: echo later\n");
+  const bare = said("      - run: node core/scripts/strength.mjs\n");
+  const runs = said("      - run: node core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
+  ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
+  fs.writeFileSync(manifest, was); fs.rmSync(flow);
+}
+// (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
+{
+  const dir = dirs["an-npm-project"], test = path.join(dir, "src", "first.test.js");
+  fs.mkdirSync(path.dirname(test), { recursive: true });
+  fs.writeFileSync(test, "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const said = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  ok(said?.mend.includes("has tests now"), "the starter kit's mutation-tool row, none for no tests yet, is reported once the project's own code holds a test", JSON.stringify(said));
+  execFileSync("git", ["rm", "-q", "--cached", "src/first.test.js"], { cwd: dir });
+  fs.rmSync(test);
+  // (a test folder the config names beside its code, not inside it: its tests count too)
+  const config = path.join(dir, "checks/shape.json"), was = fs.readFileSync(config, "utf8"), apart = path.join(dir, "test", "a.js");
+  fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(was), code: ["src"], tests: ["test"] }, null, 2)}\n`);
+  fs.mkdirSync(path.dirname(apart), { recursive: true }); fs.writeFileSync(apart, "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const beside = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  ok(beside?.mend.includes("has tests now"), "and once a test stands in a folder of tests the config names apart from its code", JSON.stringify(beside));
+  execFileSync("git", ["rm", "-q", "--cached", "test/a.js"], { cwd: dir });
+  fs.rmSync(path.join(dir, "test"), { recursive: true }); fs.writeFileSync(config, was);
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+}
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
 const dir = dirs["a-dotnet-project"];
@@ -77,14 +112,48 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(missed.length === 1 && missed[0].lead === step.lead && missed[0].mend.length > 20 && missed[0].cost === step.cost, `taken out, "${step.lead}" is reported, alone, with its mend and cost`, report(missed));
   STAGES[step.lead].mend(dir);
   ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
+  STAGES[step.lead].after?.(dir);
 }
 // several at once, in a project of another kind: exactly those
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
 for (const lead of some) STAGES[lead].stage(lockProject);
 ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
-for (const lead of some) STAGES[lead].mend(lockProject);
+// (in the order steps-stage.mjs lists them, the one whose mend lists what the others write last)
+for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
+for (const lead of some) STAGES[lead].after?.(lockProject);
+
+// ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
+const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
+const suiteFile = path.join(lockProject, ".github/workflows/suites-filtered.yml");
+const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject).some(m => m.lead === SUITE_LEAD); };
+ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
+  && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
+fs.rmSync(suiteFile);
+ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.yml"]) && pathsLetThrough(["a[b.yml"], ["a[b.yml"])
+  && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir//e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),
+  "a filter's `?` or `+` with nothing before it, and a lone `[` or `]`, is read as itself, and one after a character repeats it, as GitHub reads them");
+{
+  // (patterns that would keep a backtracking expression busy for minutes, each read at once)
+  const began = Date.now(), long = `.github/workflows/${"a".repeat(200)}.yml`;
+  const quick = [["**a+a+a+a+a+a+a+b", long], [`${"*".repeat(30)}z`, ".github/workflows/core.yml"], ["*a+a+a+a+a+a+a+a+a+a+b", "a".repeat(500)], ["**/**/**/**/**/x", `${"a/".repeat(300)}y`], [`${"**/a/".repeat(500)}x`, `${"a/".repeat(2000)}y`]]
+    .every(([pattern, name]) => !pathsLetThrough([pattern], [name]));
+  const reported = suiteBy("    paths: ['*a+a+a+a+a+a+a+a+a+b', '.github/workflows/**']");
+  ok(quick && reported && Date.now() - began < 3000, "a filter that would keep a backtracking expression busy is read at once, and read right", `${Date.now() - began} ms`);
+  fs.rmSync(suiteFile);
+}
+
+// ---- a shape baseline written before the check read C#, Python, JSX and shared scripts (#354): its mend names them ----
+const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
+fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
+let shapeMissed = notDone(lockProject);
+ok(shapeMissed.length === 1 && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, Python, scripts that share one global space/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+  "a shape baseline that names no reader is reported, its mend to write it with every reader", report(shapeMissed));
+execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
+shapeMissed = notDone(lockProject);
+ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).reads.length === Object.keys(READERS).length, "and the mend as written makes it done", report(shapeMissed));
+fs.writeFileSync(shapeBaseline, shapeAsKit);
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");

@@ -147,24 +147,141 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      Behind the line `Trips when:` of "What reopens a choice" in `modules/choices.md`, and `signs` with its measures in
      `scripts/choices.mjs`, read by `scripts/look.mjs`.
 
-232. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
-     session recorded it on issue #299, its note of that day "This is the issue's current text." gathering what the
-     owner agreed to, above the description a builder wrote while building #234, which first set out two of the
-     forms). The session set out
-     the builder's two forms, a posted review declaring its blocking points on a line of its own and covering one kind
-     of review per comment, and a bug's form ending with an optional line "Brought in by: #N", and the owner agreed to
-     them. The owner also agreed to count the findings that do not block before deciding #315; the session set out how
-     that count is taken, a posted review saying beside its blocking points "Other findings: M." or "No other
-     finding.", and told the owner of it the same day. To the orchestrator, passed on word for word to the builder of
-     this rule:
+232. **14 and 15 November 2026** (the core; in chats with a session the owner had asked to look through the core and
+     with sessions the owner works with, not the design session, as those sessions recorded them on issue #249,
+     labelled `by:chat`, its note "What this issue asks to be built, in one place" gathering what the owner agreed
+     to). Asking for an audit of the core with Kiro:
 
-     > Issues labelled `by:chat` carry my decisions; treat them as my word.
+     > Will agent-core work perfectly with kiro? Audit! I want to see if i can use this core in future work projects
+     > also.
+
+     Shown the audit:
+
+     > Our agent-core should slot in with anything, ideally. These are all areas for improvement. What about when […]
+     > runs out of claude usage, and uses antigravity instead? Everything must still work. Or if someone only uses
+     > codex.
+
+     The owner agreed to the session's six points: one door in, `AGENTS.md`, with each tool's small entry file written
+     from one list and held to it by a check; roles by what they do, not by whose tool; hooks save time and checks are
+     the guarantee, no rule held by a hook alone, the hooks then carried to each tool that has the event; a short part
+     for each tool, its own folders protected by name; a change of tool loses nothing, the state being in the
+     repository; and a tool proven by the staged cases, tool by tool, run again at each release, the core saying of it
+     only what its documentation says until it has passed. The session had proposed to keep fixed that nobody reviews
+     their own work, and that the owner names who may change the protected files:
+
+     > That locks out anyone who only has one tool at their disposal, which can still use other sessions to review it.
+
+     > And locking out i see little point in, so both of those become preferences now also.
+
+     So tools are preferences: one table of roles, the tool preferred for each and what takes it when that tool is not
+     at hand, in each project's manifest with the core's default beside it, the default preferring Claude for the
+     orchestrator, the sync and design; a preference orders and never refuses; the session that reviews a change is
+     not the one that wrote it, a fresh session of the same tool serving; and a session the owner starts, of any tool,
+     may change the protected files, guarded by what names no tool. Of why the floor asks the owner's yes:
+
+     > that rule was to prevent sessions going rogue and taking too big a mandate, not when they implement what i ask.
+     > So they shouldn't change the floor just to accommodate some other task, was the thinking.
+
+     Agreed besides: what stands in when something outside the repository cannot be reached (issues, labels, the
+     scheduled job, a review app, statuses), each named or skipped and reported, none stopping a project. Of the line
+     "Nothing stops to save usage", told it said the opposite of a pace the owner had set:
+
+     > Seems a bit strict? […] Maybe also more sensible to say the default is not to stop up to save usage, but that
+     > any preference given in repo or chat overrules this?
+
+     And of how a builder is picked:
+
+     > If I have herdr, but uses gpt there for the orchestrator, then it is the foundation and the one I want to
+     > conserve the longest, so it should be another provider than the orchestrator, or? Because even though I think
+     > if you have claude, you should always save it for the most important tasks, the orchestrator is what keeps an
+     > operation going?
+
+     The owner agreed to the pace as the owner's (the default: no session slows or stops to save usage by its own
+     choice; a pace said in person holds for now, one written in the manifest stands), to the two things saved (the
+     orchestrator's provider, which keeps the work going, and the strongest model, for the work that takes judgement),
+     and to the order a builder is picked in. To the orchestrator, passed on word for word to the builder of this
+     rule:
 
      > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
      > it: quote this in those pull requests.
 
-     > Missing now: #299 (before #302; its current text is the newest note on it)
+     Behind floor rule 3 as it reads who may change the protected files, its tools' folders, the reason for the owner's
+     yes and its reviews by a session that did not write the change; `modules/roles.md`; "The pace is the owner's" in
+     `modules/orchestrating.md`; `modules/tools.md`, `modules/kiro.md`, `modules/antigravity.md` and Codex's part as a
+     project's own agent; the slots *tools* and *pace*; `scripts/entry-files.mjs`; and what stands in when GitHub's own
+     parts cannot be reached, in `modules/github-calls.md`.
 
-     Behind "What a posted review declares" in `modules/reviews.md`, point 3, the line "Brought in by:" of the bug forms
-     (`.github/ISSUE_TEMPLATE/bug_report.md` and the starter kit's), and the other points of a posted review that
-     `scripts/review-record.mjs` reads.
+233. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, not the
+     design session, as that session recorded it on issue #253, labelled `by:chat`, under "What it is", saying the
+     owner agreed to it). The session set out what a search the owner had asked for found, and what it would build from
+     it, this among it: a measure of how strong a project's tests are, whether they would fail if a fault were put into
+     the code on purpose, run on the lines a pull request changes; reported first, failing nothing; then held with a
+     baseline, as one of the measures of how code is put together, that may not get worse, the state the codebase is in
+     setting how fast it must improve; the tool named in the manifest, a tool of development only, under the floor's
+     rules for dependencies and licences, or the measure left out where none exists for the project's language; a pull
+     request that deletes a test or weakens what one asserts saying so under "Readings taken", which a reviewer checks;
+     and the whole-codebase run belonging to the scheduled audit, outside the suite. The owner agreed:
+
+     > What do we implement from this […]? Go ahead with making us better?
+
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "How strong the tests are is measured on the lines a pull request changes" and "A test taken out or weakened
+     is said" in `modules/code-shape.md`, the two lines on them in `modules/review-guidelines.md`, the tests' whole run
+     in `modules/cleaning.md`, `scripts/strength.mjs` and the core's own tool `scripts/mutate.mjs`, and the slot
+     *mutation tool*.
+
+234. **15 November 2026** (the core; in chats with a session the owner works with, not the design session, as that
+     session recorded them on issue #304, labelled `by:chat`, whose description is its current text). Of what the rules
+     a session reads at its start cost on every task:
+
+     > Don't we just avoid the token issue by ensuring the agent only ever read the ones relevant to them?
+
+     And, when the session said that the choice of what to read must be made by a machine (an entry names its modules,
+     or a hook tells a session which modules its changed files call for):
+
+     > Yes, this is important! And doesn't this also address a bit our concern from earlier, that not models from all
+     > providers will be able to correctly navigate our ruleset, and work on the project? That it isn't agnostic to
+     > whether it is claude, kiro, antigravity, or whatever?
+
+     The owner agreed to the session's five points: what is read at the start of a task is split by role, a builder
+     reading the builder's part and what only another role needs moving to where that role reads it, with the cap set
+     for each role; each module says in one line when it is read, in words a script can match (the paths a change
+     touches, the labels of its issue, the kind of task), and an issue names the modules its task calls for; one
+     script, given a role and a task, prints the files to read, and nothing else is needed to find them; any agent tool
+     gets the same list, the script needing only that a tool can read a file and run a command, with a hook calling it
+     where a tool has hooks; and it runs twice, at the start of a task and again before the pull request is marked
+     ready, on the paths in fact changed, the session reading what that names and checking its work against it, a
+     reviewer running the same. The owner agreed besides to two things being looked into, each with a short report and
+     no rule: whether a module can be packaged as a skill a tool loads by itself, and whether each tool's own rule file
+     can be written from the one source. Asking whether every role needs to read the others' rules:
+
+     > Would it be better with a folder called roles, and a file for each? […] Does a bug-fixer need to read what a
+     > feature builder does?
+
+     The owner agreed to the session's point: `roles/` holds one file for each role (the builder, the orchestrator, a
+     reviewer, the stand-in, the design session); what a role reads at its start is the floor, its own file and the
+     shared files its file names; a role's file holds only what that role alone needs, a rule several roles share
+     staying in one place and pointed to; the file says in a line each what the role hands each neighbouring role and
+     what it gets back, nothing of how the neighbour works; and the modules read by task stay apart from the roles.
+     Proposing the same split across the board:
+
+     > I feel this could be done across the board, by just mapping out every possible path each could take, and then
+     > splitting all up that way? Folders as a principle over collections in files that must be read.
+
+     The session proposed units in place of a file for each path, since one file a path would put the same rule in
+     many files, and three limits: `floor/security.md` stays whole and is read by every session, `floor/topics.md`
+     split by topic with its words unchanged; two things always read together are one file, and no unit is cut so
+     small that opening it costs more than it saves; and the staged cases are run with the split reading and pass as
+     they do with the whole reading, before the split merges. The owner agreed to it so. That split is built in a pull
+     request of its own. To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "A file for each role" in `modules/roles.md` and the files of `roles/`; "One script says what to read" in
+     `modules/tools.md`, with `scripts/reading.mjs`, each module's opening line and the line "Read for it:" of a pull
+     request's description; and a cap for each role in `scripts/size.mjs`.

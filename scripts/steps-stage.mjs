@@ -3,12 +3,14 @@
 // words it (`mend`), so that a test can take a step out of a synced project, see the sync report exactly that, and
 // see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. One marked
 // `asked` is a step a project that changed nothing of its own still has to do once a sync brings it (a check's own
-// list to write): upgrade-test.mjs sees it reported after the sync, alone, and done by its mend. Node's own modules.
+// list to write): upgrade-test.mjs sees it reported after the sync, alone, and done by its mend. `after`, where a stage
+// has one, takes out what its mend leaves that a later stage would read again. Node's own modules.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { callers, project } from "./steps.mjs";
 
 const at = (dir, f) => path.join(dir, f);
 const read = (dir, f) => fs.readFileSync(at(dir, f), "utf8");
@@ -17,6 +19,10 @@ const SLOTS = /^(\| Slot \| Here \|\r?\n\| --- \| --- \|\r?\n)/m;
 
 const PIN = "0".repeat(40);
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
+
+// (a suite of the project's own whose path filter leaves the copy and the manifest out, as it was told, and not the
+// files that hold only calls to the core's workflows, whose pins a sync moves)
+const SUITE = "name: suites-staged\n\non:\n  pull_request:\n    paths-ignore:\n      - 'core/**'\n      - 'core-manifest.md'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo the suite\n";
 
 export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
@@ -127,6 +133,12 @@ export const STAGES = {
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
+  "16 November 2026, how strong the tests are": {
+    asked: true,
+    stage: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").split(/\r?\n/).filter(l => !l.includes("*mutation tool*")).join("\n")),
+    // (as the step words it: the row, here `none` with its reason)
+    mend: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(SLOTS, "$1| *mutation tool* | `none`: no mutation tool is named for this project's language yet |\n")),
+  },
   "16 November 2026, the NuGet check where it can matter": {
     // (a project file that imports a build file of another name than those the call's paths name)
     stage: dir => {
@@ -142,5 +154,25 @@ export const STAGES = {
     },
     // (as the step words it: the file added to the paths, by its exact path)
     mend: dir => write(dir, ".github/workflows/nuget.yml", read(dir, ".github/workflows/nuget.yml").replace(/^( {4}paths:\r?\n)/m, "$1      - 'staged-import/deps.xml'\n")),
+  },
+  // (last, so that its mend, which lists the files that hold only calls to the core's workflows, sees every such file
+  // the other stages and mends write)
+  "12 November 2026, a sync and the project's own suites": {
+    stage: dir => write(dir, ".github/workflows/suites-staged.yml", SUITE),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/suites-staged.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/suites-staged.yml", SUITE.replace("      - 'core-manifest.md'\n", `      - 'core-manifest.md'\n${callers(project(dir)).map(f => `      - '${f}'\n`).join("")}`)),
+  },
+  "16 November 2026, a file for each role, and the script that says what to read": {
+    asked: true,
+    // (the manifest's "Paths:" line without the roles' folder, and AGENTS.md without the builder's file; the mend adds both)
+    stage: dir => {
+      write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)roles\/, /m, "$1"));
+      write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace(/^@core\/roles\/builder\.md[ \t]*\r?\n/m, ""));
+    },
+    mend: dir => {
+      const manifest = read(dir, "core-manifest.md"), agents = read(dir, "AGENTS.md");
+      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?modules\/, )/m, "$1roles/, "));
+      if (!/^@core\/roles\/builder\.md[ \t]*$/m.test(agents)) write(dir, "AGENTS.md", agents.replace(/^(@core\/floor\/security\.md[ \t]*\r?\n)/m, "$1@core/roles/builder.md\n"));
+    },
   },
 };
