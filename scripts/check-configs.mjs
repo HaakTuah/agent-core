@@ -185,14 +185,15 @@ function doubleQuoted(text, i, add) {
 // in any shell, a variable only in the shell that fills it (bash's $GITHUB_WORKSPACE is text to cmd, and empty to
 // PowerShell); in a shell the reader does not know, the expression alone.
 const ROOTS = { bash: "\\$GITHUB_WORKSPACE|\\$\\{GITHUB_WORKSPACE\\}|", pwsh: "\\$env:GITHUB_WORKSPACE|", cmd: "%GITHUB_WORKSPACE%|" };
-const ROOT_OF = new Map([null, ...Object.keys(ROOTS)].map(k => [k, new RegExp(`^(?:${ROOTS[k] ?? ""}\\$\\{\\{\\s*github\\.workspace\\s*\\}\\})/`, "u")]));
+// (PowerShell and cmd read a variable's name in any case; bash only as written)
+const ROOT_OF = new Map([null, ...Object.keys(ROOTS)].map(k => [k, new RegExp(`^(?:${ROOTS[k] ?? ""}\\$\\{\\{\\s*github\\.workspace\\s*\\}\\})/`, k === "bash" ? "u" : "iu")]));
 const rootOf = shell => ROOT_OF.get(shell ?? null) ?? ROOT_OF.get(null);
 // The shell a step runs in, as one of ROOTS' names, or null where the reader cannot tell: its own `shell:`, else its
 // job's or its workflow's default, else the runner's (PowerShell on Windows, bash elsewhere), where its labels say it.
 function shellOf(given, runsOn) {
   if (given !== undefined && given !== null) {
     if (typeof given !== "string") return null;
-    const name = /^\s*([\w.-]+)/u.exec(given)?.[1]?.toLowerCase();
+    const name = path.posix.basename(/^\s*(\S*)/u.exec(given)[1].replace(/\\/gu, "/")).toLowerCase().replace(/\.exe$/u, ""); // (/bin/bash, pwsh.exe)
     return { bash: "bash", sh: "bash", pwsh: "pwsh", powershell: "pwsh", cmd: "cmd" }[name] ?? null;
   }
   const labels = typeof runsOn === "string" ? [runsOn] : runsOn;
@@ -520,8 +521,9 @@ function steps(p) {
     const where = `.github/workflows/${f}`;
     if (!w.yaml) continue;
     for (const job of Object.values(w.yaml.jobs ?? {})) {
-      const run = job?.defaults?.run, all = w.yaml.defaults?.run;
-      walk(where, where, job?.steps, step => ({ ...folder(step["working-directory"], run?.["working-directory"], all?.["working-directory"]), shell: shellOf(step.shell ?? run?.shell ?? all?.shell, job?.["runs-on"]) }), wrap(job?.env, w.yaml.env, job?.strategy));
+      // (the job's folder and shell worked out once, each step's own only where it names one)
+      const run = job?.defaults?.run, all = w.yaml.defaults?.run, dir = folder(run?.["working-directory"], all?.["working-directory"]), shell = shellOf(run?.shell ?? all?.shell, job?.["runs-on"]);
+      walk(where, where, job?.steps, step => ({ ...(step["working-directory"] == null ? dir : folder(step["working-directory"])), shell: step.shell == null ? shell : shellOf(step.shell) }), wrap(job?.env, w.yaml.env, job?.strategy));
       // (a call to a workflow of the project's own: what it passes is read as the callee's steps would be given it)
       if (typeof job?.uses === "string" && job.uses.startsWith("./")) out.push({ where, from: where, run: "", dir: { at: "." }, given: [job.with, job.strategy] });
     }
