@@ -490,6 +490,13 @@ ok(["sudo chmod +x core/scripts/copies.mjs", "time echo core/scripts/copies.mjs"
   "a wrapper's command that runs no node of the copy's script is no run, and one whose node the reader cannot place is not read");
 const parens = Date.now();
 ok(copiesOf({ "a.yml": stepped(`${"(".repeat(400000)}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json" && Date.now() - parens < 1500, "a long line of \"((\" is read in one pass", `${Date.now() - parens} ms`);
+// (the review of 2240d78 and 9246a3b: a node run behind a wrapper's option with node's own options, or held in one
+// word, and one after a keyword, said not read; >| and {fd}> are redirections)
+ok(["sudo -u bot node --no-warnings core/scripts/copies.mjs config/c.json", "sudo -u bot node -r x core/scripts/copies.mjs config/c.json", "env -S 'node core/scripts/copies.mjs config/c.json'",
+  "if true; then sudo -u bot node core/scripts/copies.mjs config/c.json; fi", "for a in b; do sudo -u bot node core/scripts/copies.mjs config/c.json; done"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a node run behind a wrapper's option, with node's own options, in one word, or after a keyword, is not read");
+ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs >|log config/c.json") }) === "config/c.json" && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs {fd}>log config/c.json") }) === "config/c.json",
+  "a redirection that writes over a file, or names its descriptor, takes no argument");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

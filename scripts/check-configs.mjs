@@ -85,7 +85,7 @@ export function commands(run) {
   const close = () => { if (word && !operand) words.push(word); if (word) operand = false; word = null; };
   const end = () => { close(); operand = false; if (words.length) out.push(words); words = []; };
   for (let i = 0; i < text.length; i++) {
-    if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^\d+$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
+    if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^(?:\d+|\{\w+\})$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
     else if ("\n;&|()".includes(text[i])) end();
     else if (" \t".includes(text[i])) close();
     else i = part(text, i, add);
@@ -94,13 +94,13 @@ export function commands(run) {
   for (const ws of out) for (const w of ws) w.dynamic ||= /%\w+%/u.test(w.text);
   return out;
 }
-// A redirection at `i` (>, >>, <, 2>, &>, >&2, <<EOF …): `opens` is told, so the word it is written against, a file
-// descriptor's number, is no argument and the word after it is its file; it returns where its operator ends.
+// A redirection at `i` (>, >>, >|, <, 2>, &>, >&2, <<EOF …): `opens` is told, so the word it is written against, a file
+// descriptor's number or name ({fd}), is no argument and the word after it is its file; it returns where its operator ends.
 function redirection(text, i, opens) {
   opens();
   let j = i + (text[i] === "&" ? 1 : 0);
   while ("<>".includes(text[j + 1] ?? "x")) j++;
-  return text[j + 1] === "&" ? j + 1 : j;
+  return "&|".includes(text[j + 1] ?? "x") ? j + 1 : j; // (>&2, and >| that writes over a file)
 }
 // The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone); where
 // no such line follows, none is left out.
@@ -231,15 +231,24 @@ function configAfter(words, i, dir, script) {
 }
 // Where a command that starts with a wrapper or a shell the reader could not get past names the script, a run that
 // cannot be known (never one that is not there), as { unread }; else nothing.
-// (only past `from`, where the reader stopped: a node word that the copy's script follows, by its path, or a shell's
-// -c whose string names it)
 const unfollowed = (words, script, from) => {
-  const first = words.find(w => !/^\w+=/u.test(w.text));
+  const first = words.find(w => !/^\w+=/u.test(w.text) && !KEYWORDS.has(w.text));
   if (!first || !(WRAPPERS.has(first.text) || SHELL.test(first.text))) return [];
-  const names = w => !!w && slashed(w).replace(ROOT, "").replace(/^\.\//u, "") === script;
-  const hidden = words.some((w, j) => j > from && ((NODE.test(w.text) && names(words[j + 1])) || (INLINE.test(w.text) && !!words[j + 1] && slashed(words[j + 1]).includes(script))));
-  return hidden ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
+  return hides(words, script, from) ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
 };
+// Whether, past `from`, where the reader stopped, a node word is followed (past node's own options) by the copy's
+// script, by its path, or a word holds such a run itself (a shell's string, env -S '…').
+function hides(words, script, from) {
+  const names = w => !!w && slashed(w).replace(ROOT, "").replace(/^\.\//u, "") === script;
+  return words.some((w, j) => {
+    if (j <= from) return false;
+    if (/\s/u.test(w.text) && w.text.includes(path.posix.basename(script))) return commands(w.text).some(inner => hides(inner, script, -1));
+    if (!NODE.test(w.text)) return false;
+    let k = j + 1;
+    for (; k < words.length && words[k].text.startsWith("-"); k++) if (VALUED.has(words[k].text)) k++;
+    return names(words[k]);
+  });
+}
 // The runs read inside a shell's command string, each not read where the outer shell fills the string when it runs
 // (`bash -c "node … '$CONFIG'"`: the inner quotes keep nothing from it).
 const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `runs ${script} in a command string the workflow fills only when it runs` })) : runs);
