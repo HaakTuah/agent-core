@@ -33,13 +33,13 @@ const finding = (at, who = { login: "chatgpt-codex-connector[bot]", type: "Bot" 
 const open = { ...done, has_any_findings: true, has_unresolved_findings: true };
 // the mend of each status that asks for a review posted names who posts it, the actor first (#395)
 // (and what the posted review carries: its kind, the whole SHA it read, and its two lines of counts; #403)
-const POSTS = 'posts "Security review: <whole SHA>"⏎"Blocking findings: N."⏎"Other findings: M."';
+const POSTS = "reviews, posts Security review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.";
 const CHECKS = `Mend: fallback ${POSTS}`;
 const OWN = `Mend: your reviewer ${POSTS}`;
-const NOT_FOUND = `Codex finding not found. ${CHECKS}`;
+const NOT_FOUND = `Codex open finding hidden. ${CHECKS}`;
 // (a review posted as the form says, each quoted line on a line of its own, is read as the checks and the count of
 // reviews read it: its kind, the head by its whole SHA, and both counts)
-const posting = (kind, sha, blocking, other) => form(kind).split(NEW_LINE).map((line) => line.slice(1, -1).replace("<whole SHA>", sha).replace("N.", `${blocking}.`).replace("M.", `${other}.`)).join("\n");
+const posting = (kind, sha, blocking, other) => form(kind).split(NEW_LINE).map((line) => line.replace("<whole SHA>", sha).replace("N.", `${blocking}.`).replace("M.", `${other}.`)).join("\n");
 ok(["Security", "Code"].every((kind) => { const body = posting(kind, HEAD, 2, 0); return postedKind(body) === kind.toLowerCase() && named(body).includes(HEAD) && blockingOf(body) === 2 && otherOf(body) === 0; })
   && form("Security").split(NEW_LINE).length === 3, "a review posted as each mend's form says is read whole: its kind, the head's whole SHA, its blocking and its other findings");
 const is = (verdict, isDone, words) => verdict?.sha === HEAD && verdict.done === isDone && verdict.why.includes(words);
@@ -215,10 +215,10 @@ const saw = (commits, comments, reviewComments = [], bound = true, more = {}) =>
 const onOld = { ...done, commit_sha: OLD };
 ok(is(judge({ ...bump, commits: 2 }, [said("Security review: read against the release notes")], [], its), true, "floor rule 17"), "Dependabot's own with a posted note naming no commit passes as it would with none");
 ok(is(saw(updated, [summary(onOld)]), true, "(on ccccccc, earlier than the head aaaaaaa, only updates from main since)") && is(saw(pushed, [summary(onHead)]), true, "has run (on aaaaaaa)"), "Codex's review of an earlier commit stands where only an update from main follows it, and the status says it saw an earlier commit");
-ok(is(saw(pushed, [summary(onOld)]), false, "Codex saw ccccccc, not the head. Mend: fallback") && is(saw(pushed, [summary({ ...done, commit_sha: null })]), false, "saw no commit"), "a commit of the pull request's own after it: it waits, saying the mend");
+ok(is(saw(pushed, [summary(onOld)]), false, "Codex saw ccccccc, not head. Mend: fallback reviews") && is(saw(pushed, [summary({ ...done, commit_sha: null })]), false, "saw none"), "a commit of the pull request's own after it: it waits, saying the mend");
 ok(is(saw(pushed, [summary(onOld), said(`Security review: the later commit checked, on ${HEAD}`)]), true, "a security review is posted on the pull request; Codex's saw ccccccc, earlier") && is(saw(pushed, [summary(onOld), said(`Security review: on ${HEAD.toUpperCase()}`)]), true, "Codex's saw"), "a posted review naming the head's whole SHA, in any case, settles it");
 ok(is(saw(pushed, [summary(onOld), said(`Security review: on ${OLD}`)]), false, "Codex saw") && is(saw(pushed, [summary(onOld), said(`Security review: on ${HEAD.slice(0, 39)}`)]), false, "Codex saw") && is(saw(pushed, [summary(onOld), said(`Security review: on ${HEAD}0`)]), false, "Codex saw"), "one naming an earlier commit, part of the head's SHA, or a longer one, does not");
-ok(is(saw(pushed, [said(`Security review: on ${HEAD}`)]), true, "is posted on the pull request") && is(saw(updated, [said(`Security review: on ${OLD}`)]), true, "posted on an earlier commit, only updates from main since") && is(saw(pushed, [said(`Security review: on ${OLD}`)]), false, "not on head. Mend:") && is(saw(pushed, [said("Security review: none needed")]), false, "not on head"), "with no review of Codex's: a posted one, or the note that none is needed, names the head, or a commit only updates from main follow");
+ok(is(saw(pushed, [said(`Security review: on ${HEAD}`)]), true, "is posted on the pull request") && is(saw(updated, [said(`Security review: on ${OLD}`)]), true, "posted on an earlier commit, only updates from main since") && is(saw(pushed, [said(`Security review: on ${OLD}`)]), false, "review not on head. Mend:") && is(saw(pushed, [said("Security review: none needed")]), false, "not on head"), "with no review of Codex's: a posted one, or the note that none is needed, names the head, or a commit only updates from main follow");
 ok(is(saw([step(OLD, "e".repeat(40)), step(HEAD, OLD, OLD)], [summary(onOld)]), false, "Codex saw") && is(saw([step(OLD, "e".repeat(40)), step("f".repeat(40), OLD), step(HEAD, OLD, "f".repeat(40))], [summary(onOld)]), false, "Codex saw") && is(saw([step(HEAD, OLD, {})].map((c) => ({ ...c, parents: [{ sha: OLD }, {}] })), [summary(onOld)]), false, "Codex saw"), "a merge of a commit of the pull request's own, or of one not named, is no update from main");
 ok(is(judge({ ...pull, commits: 300 }, [summary(onOld)], [], updated), false, "Codex saw") && is(judge(pull, [summary(onOld)], [], updated), false, "Codex saw"), "a list of commits GitHub cut short, or with no count to hold it to, proves no update from main");
 ok([-1, -300, 1.5, "2"].every((commits) => is(judge({ ...pull, commits }, [summary(onOld)], [], updated), false, "Codex saw")), "a count of commits that is no whole number of at least none proves no update from main");
@@ -245,7 +245,7 @@ const byApp = [saw(pushed, [summary(onOld)]), notGit[0], judge(pull, [summary(op
   across(twice, [idle, said(`Security review: on ${OLD}`)], [HEAD]), judge(pull, [idle]), judge(pull, [summary(running)]), two([summary(done)], [stepChange])];
 const byOwn = [notGit[2], saw(pushed, [said(`Security review: on ${OLD}`)]), judge(pull, [])];
 const names = (v, actor) => v?.done === false && mended(status(v, false).description) && status(v, false).description === `Waiting: ${v.why}`
-  && new RegExp(`Mend: (?:[^;,]+[;,] then )?${actor} `, "u").test(status(v, false).description) && new RegExp(`${actor} `, "u").test(status(v, true).description) && !/\bask\b/u.test(v.why);
+  && new RegExp(`Mend: (?:[^;,]+[;,] (?:then )?)?${actor} `, "u").test(status(v, false).description) && new RegExp(`${actor} `, "u").test(status(v, true).description) && !/\bask\b/u.test(v.why);
 ok(byApp.every((v) => names(v, "(?:the )?fallback(?: reviewer)?")) && unread.why === "no security review has run yet. Mend: wait 5 min; then the fallback reviewer reviews, posts one"
   && judge(pull, [summary(running)]).why === "no security review has run yet. Mend: wait 30 min for Codex's; then the fallback reviewer reviews, posts one", `where Codex's app reviews, each status that waits for a review posted names the fallback reviewer: ${byApp.map((v) => status(v, false).description).join(" | ")}`);
 ok(byOwn.every((v) => names(v, "your (?:security )?reviewer") && !/Mend: (?:the )?fallback/u.test(v.why)), `elsewhere it names the project's own security reviewer first: ${byOwn.map((v) => status(v, false).description).join(" | ")}`);
