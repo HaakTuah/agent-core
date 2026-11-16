@@ -105,14 +105,29 @@ function redirection(text, i, opens) {
 // The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone); where
 // no such line follows, none is left out.
 function withoutHereDocuments(lines) {
-  const out = [], at = new Map(); // (each line's text, trimmed, with the lines it stands on, in order: read once)
+  const skipped = new Set(hereDocuments(lines).flatMap(({ opens, body }) => body.map((_, k) => opens + 1 + k)));
+  return lines.filter((_, k) => !skipped.has(k));
+}
+// Each here-document of a step's lines, as { opens, body }: the line that opens it and the lines it holds.
+function hereDocuments(lines) {
+  const found = [], at = new Map(); // (each line's text, trimmed, with the lines it stands on, in order: read once)
   lines.forEach((l, k) => { const t = l.trim(); if (!at.has(t)) at.set(t, []); at.get(t).push(k); });
   for (let n = 0; n < lines.length; n++) {
-    out.push(lines[n]);
     const end = hereDocument(lines[n]), last = end ? next(at.get(end) ?? [], n) : -1;
-    if (last > n) n = last - 1;
+    if (last > n) { found.push({ opens: n, body: lines.slice(n + 1, last) }); n = last - 1; }
   }
-  return out;
+  return found;
+}
+// Where a here-document that names the copy's script is fed to a command that may run it (source /dev/stdin <<EOF,
+// bash <<EOF), a run that cannot be known, as { unread, unsure }; one fed to a command that runs no script (cat <<EOF)
+// is data.
+function fedRuns(run, script) {
+  const lines = run.split(/\r?\n/u).map(uncommented);
+  return hereDocuments(lines).flatMap(({ opens, body }) => {
+    const command = commands(lines[opens])[0] ?? [], word = command[pastWrappers(command)]?.text ?? "";
+    if (NO_RUNNER.has(path.posix.basename(word).toLowerCase()) || !body.some(l => l.replace(/\\/gu, "/").includes(script))) return [];
+    return [{ unread: `runs ${script} in a here-document fed to ${word || "a command"}, which the reader does not follow`, unsure: true }];
+  });
 }
 // The first of the sorted line numbers `list` past `n`, or -1.
 function next(list, n) {
@@ -277,7 +292,7 @@ const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `ru
 // Where a step's `run:`, in the folder `dir`, runs `script` (a path from the root, "core/scripts/copies.mjs") with
 // node: each as configAfter gives it.
 function runsIn(run, dir, script) {
-  const found = [];
+  const found = fedRuns(run, script);
   let moved = false;
   for (const words of commands(run)) {
     const { moves, inner, filled, shifted, at: i } = nodeRuns(words);
