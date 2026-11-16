@@ -137,7 +137,18 @@ export function doneMends({ body, queue, read, at = "" }) {
   // (each item read costs calls on the run's token, and anyone who opens a pull request writes what names them)
   const items = new Set([...joined(queue?.before, queue?.after), ...closes(body)]);
   if (items.size > MOST) return { mends: [`this pull request queues or closes ${items.size} items, more than the ${MOST} the description check reads. Mend: split it into pull requests that each queue or close ${MOST} or fewer (${at}tasks/done-when.md)`], notes };
-  const get = item => { const got = read(item); if (!got) notes.push(`${item} could not be read, so nothing is asked of it`); return got; };
+  // (each item read once; a read GitHub's rate limit refused fails, since an outsider can spend the limit to pass a
+  // feature's issue unasked; one that cannot be read at all, a private repository's issue to a token that reads none,
+  // is asked nothing)
+  const seen = new Map();
+  const get = item => {
+    if (seen.has(item)) return seen.get(item);
+    const got = read(item);
+    if (got?.limited) mends.push(`${item} could not be read: GitHub's rate limit for this repository's token was reached. Mend: run the check again once the hour turns (re-run its job), or later (${at}tasks/done-when.md)`);
+    else if (!got) notes.push(`${item} could not be read, so nothing is asked of it`);
+    seen.set(item, got?.limited ? null : got);
+    return seen.get(item);
+  };
   mends.push(...joinedMends(joined(queue?.before, queue?.after), get, at));
   if (own) mends.push(...entryFaults(own, "the description", at));
   // (each feature's issue closed is proved for its own lines; the description's stand for those that have none)
@@ -182,16 +193,21 @@ export const takesIt = (manifest, prefix) => !prefix || !leftOut(manifest).has("
 // The pages of an issue's notes read for its current text, newest first: an issue with more notes than these is read
 // from its newest PAGES hundred, so that its calls stay few however many notes anyone adds.
 export const PAGES = 3;
+const LIMITED = Symbol("rate limit");
 
 // An item as { labels, body }, its body the current text: an issue by gh from `repo`, an inbox file as the head's
 // commit holds it in the checkout at `dir` (from git, so that a link is read as its own text and never followed out of
-// the checkout); null where it cannot be read.
+// the checkout); { limited: true } where GitHub's rate limit refused it; null where it cannot be read.
 export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[0]) {
   if (item.startsWith("inbox/")) {
     const r = spawnSync("git", ["show", `HEAD:${item}`], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 });
     return r.status === 0 ? { labels: [], body: r.stdout } : null;
   }
-  const gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; };
+  const gh = route => {
+    const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 });
+    if (r.status !== 0 && /rate limit/iu.test(String(r.stderr))) throw LIMITED;
+    return r.status === 0 ? JSON.parse(r.stdout) : null;
+  };
   try {
     const n = item.slice(1), got = gh(`repos/${repo}/issues/${n}`);
     if (!got) return null;
@@ -203,5 +219,5 @@ export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[
       if (one.some(c => same(c.user?.login, owner) && String(c.body ?? "").includes(CURRENT))) break;
     }
     return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner) };
-  } catch { return null; }
+  } catch (e) { return e === LIMITED ? { limited: true } : null; }
 }

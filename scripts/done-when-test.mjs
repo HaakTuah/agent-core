@@ -89,6 +89,11 @@ r = doneMends({ body: Array.from({ length: 7000 }, (_, i) => `fix #${i + 1}`).jo
 ok(calls === 0 && r.mends.length === 1 && new RegExp(`queues or closes 7005 items, more than the ${MOST}`).test(r.mends[0]) && mended(`FAIL ${r.mends[0]}`), "more items than the check reads fail before any is read, saying the mend", r.mends);
 r = doneMends({ body: Array.from({ length: MOST }, (_, i) => `Fixes #${i + 20}`).join("\n"), queue: null, read: () => (calls++, null) });
 ok(calls === MOST && r.mends.length === 0, "as many as it reads are each read once", calls);
+calls = 0;
+r = doneMends({ body: "Fixes #6\n## Proved by use\n- Ran: a. Saw: b.\n- Ran: c. Saw: d.\n", queue: queue("#6"), read: item => (calls++, read(item)) });
+ok(calls === 1 && r.mends.length === 0, "an item both queued and closed is read once", calls);
+r = doneMends({ body: "Fixes #6\n", queue: queue("#5"), read: () => ({ limited: true }) });
+ok(r.mends.length === 2 && r.mends.every(m => /rate limit/.test(m) && mended(`FAIL ${m}`)) && r.notes.length === 0, "an item the rate limit refused fails, saying to run the check again", r);
 r = doneMends({ body: "Fixes #8\n", queue: queue(), read });
 ok(r.mends.length === 0 && r.notes.length === 1, "a closed issue that cannot be read is asked nothing, and that is said", r);
 
@@ -132,6 +137,8 @@ try {
       const got = readItem("o/r", "#7"), read = fs.readFileSync(log, "utf8").trim().split("\n");
       ok(got?.body === `${CURRENT}\nnewer` && got.labels.join() === "feature" && read.length === 1 + PAGES && read.at(-1).endsWith("page=3"),
         `the current text is the author's newest such note, read from the newest pages, ${PAGES} at most`, { got, read });
+      fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\necho 'gh: API rate limit exceeded for installation.' >&2\nexit 1\n", { mode: 0o755 });
+      ok(readItem("o/r", "#7")?.limited === true, "a read GitHub's rate limit refused is told from one that cannot be read");
     } finally { process.env.PATH = path0; }
   }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
