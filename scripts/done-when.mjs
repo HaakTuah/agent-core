@@ -61,7 +61,7 @@ export function entryOf(body) {
   const bare = s => s.replace(/^[*_]+/u, "");
   const e = { none: [], lines: [], scope: [], other: [] };
   for (const item of items) {
-    const t = bare(item), at = t.indexOf("Proof:"), proof = at < 0 ? null : t.slice(at + 6).trim();
+    const t = bare(item), at = t.lastIndexOf("Proof:"), proof = at < 0 ? null : t.slice(at + 6).trim();
     if (/^None\b/u.test(t)) e.none.push(t);
     else if (/^Out of scope\b/iu.test(t)) e.scope.push(t);
     else if (SHAPE.test(t)) e.lines.push({ text: t, shape: SHAPE.exec(t)[1], proof });
@@ -92,7 +92,7 @@ export function provedFaults(body, e, at = "") {
   const items = section(body, PROVED), want = Math.max(1, e.lines.length);
   const got = (items ?? []).filter(i => /\bRan:\s*\S/u.test(i) && /\bSaw:\s*\S/u.test(i)).length;
   if (got >= want) return [];
-  return [`the description's "${PROVED}" gives what was run and seen for ${got} of the entry's ${want} line${want === 1 ? "" : "s"}${items === null ? " (it has no such heading)" : ""}. Mend: use the change as its user would (start the program, play the round, run the command) and add under a heading "${PROVED}" one item for each "${HEADING}" line, saying "Ran: " what was run and "Saw: " what was seen; where it cannot be run here, "Saw: " says why and names the issue filed for it (${at}tasks/done-when.md)`];
+  return [`the description's "${PROVED}" gives what was run and seen for ${got} of the entry's ${want} line${want === 1 ? "" : "s"}${items === null ? " (it has no such heading)" : ""}. Mend: use the change as its user would (start the program, take its user's steps, run the command) and add under a heading "${PROVED}" one item for each "${HEADING}" line, saying "Ran: " what was run and "Saw: " what was seen; where it cannot be run here, "Saw: " says why and names the issue filed for it (${at}tasks/done-when.md)`];
 }
 
 // Whether an issue ({ labels, body }) is a feature's: it names the kind by its label or under "What to read".

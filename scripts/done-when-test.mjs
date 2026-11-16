@@ -20,6 +20,7 @@ ok(entryOf("No heading here.") === null && section("x", "Done when") === null, "
 ok(faults(good).length === 0, "two lines, an If, each with its proof, and one out of scope: in the form", faults(good));
 ok(faults("## Done when\n1. When a, it b. Proof: a check\n2. While c lasts, it d.\n   Proof: a picture\n3. If e, then f. Proof: \"the owner tries this\"\n4. Out of scope: g\n## Next\n- When x, y. Proof: nothing\n").length === 0,
   "a Markdown heading, numbered items, a line carried on indented, and the section ending at the next heading");
+ok(faults("**Done when**\n- When a line quotes \"Proof:\" before its own, it reads the last. Proof: a test\n- If e, then f. Proof: a check\n- Out of scope: g\n").length === 0, "the proof is what follows the line's last \"Proof:\"");
 ok(faults("**Done when**\n- None: the button is renamed.\n").length === 0, "the one line \"None:\" for a change said in one sentence");
 ok(faults("**Done when**\n- None: x\n- When a, b. Proof: a test\n").length === 1, "\"None:\" beside other lines is a fault");
 const one = faults("**Done when**\n- If a, then b. Proof: a test\n- Out of scope: c\n");
