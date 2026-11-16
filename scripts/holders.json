@@ -57,7 +57,7 @@
       "audit"
     ],
     "roles/shared/work-flow.md: An exemption leaves a mark": "check: scripts/pr-description.mjs, in part",
-    "tasks/cleaning.md: The state report leads with the outcomes": "check: scripts/outcomes-test.mjs",
+    "tasks/cleaning.md: The state report leads with the outcomes": "check: scripts/outcomes.mjs",
     "tasks/cleaning.md: No process number is a builder's goal": "audit",
     "roles/shared/inbox.md: Bugs don't wait": "check: GitHub's closing of an issue whose \"Fixes #n\" reaches the default branch, in part",
     "roles/orchestrator.md: A stalled lane": "check: scripts/stalled.mjs, in part",

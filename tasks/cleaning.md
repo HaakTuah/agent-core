@@ -88,7 +88,7 @@ code is held to: `tasks/code-shape.md`.
   alone gives it, twice its square root, and where one is under 30 the months before are added.
   `core/scripts/outcomes.mjs` writes it so, and whoever changes that script keeps the form. It does not mean a number
   is shown under an outcome it does not measure. Reason: most of what was counted were stand-ins, and a small count
-  read as a trend misleads. Held by `core/scripts/outcomes-test.mjs`.
+  read as a trend misleads. Held by `core/scripts/outcomes.mjs`, which writes the report so, its test holding the form.
 - **No process number is a builder's goal** (core archive 241; #302). By default the state report's numbers are read
   by the owner and the audits; whoever writes a brief, a rule or an entry sets none of them as a target, and only a
   property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
