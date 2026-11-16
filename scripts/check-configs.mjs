@@ -153,7 +153,7 @@ function part(text, i, add) {
   if (c === "'") { const e = text.indexOf("'", i + 1), j = e < 0 ? text.length : e; add(text.slice(i + 1, j), text.slice(i + 1, j).includes("${{")); return j; }
   if (c === '"') return doubleQuoted(text, i, add);
   if (c === "\\") { const next = text[i + 1] ?? ""; add(/[\w.-]/u.test(next) && /[\w.-]/u.test(text[i - 1] ?? "") ? `\\${next}` : next); return i + 1; }
-  add(c, c === "$" || c === "`" || c === "{"); // (an unquoted "{" may be a brace expansion, {a,b}, filled when it runs)
+  add(c, "$`{*?[".includes(c)); // (an unquoted "{", "*", "?" or "[" may be expanded, {a,b} or a glob, when it runs)
   return i;
 }
 function doubleQuoted(text, i, add) {
@@ -336,23 +336,25 @@ function runAt(words, i, dir, script) {
   const word = words[i];
   if (!word) return [];
   const name = path.posix.basename(script).toLowerCase(), at = located(word, dir.dynamic ? "." : dir.at);
-  // (a file whose own name, past the last "/", is plain and another's is no run of this script, whatever comes before:
-  // node ${{ github.action_path }}/index.js)
-  const own = word.text.slice(word.text.lastIndexOf("/") + 1);
-  if (!/[$`{}\\'"]/u.test(own) && own.toLowerCase() !== name) return [];
-  // (a script named only when the workflow runs, by a variable, braces, $'…' or a "\\", that looks like one of the
-  // core's, a .mjs file or a path through a folder scripts, may be this one; one given by a variable alone, node --test
-  // $RUN, is counted where the step names the path it holds (unaccounted))
-  if (at.dynamic || at.windows || /\{|\$'/u.test(word.text.replace(ROOT, ""))) {
-    // (an expression of GitHub's, ${{ … }}, may give any path: an input's default, a job's output)
-    return /\.mjs\b|scripts|\bcore\b|\$\{?CORE|\$\{\{/iu.test(word.text.replace(ROOT, "")) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
-  }
+  if (at.dynamic || at.windows || /[{*?[]|\$'/u.test(word.text.replace(ROOT, ""))) return unplaced(word, dir, name);
   if (path.posix.basename(plainPath(word.text)).toLowerCase() !== name) return []; // (another script)
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   if (dir.dynamic) return [{ unread: `runs ${word.text} in a folder named only when the workflow runs`, unsure: true }];
   // (only the copy's own path, letter for letter, is read; any other file of that name, in any case, is not: a runner
   // that ignores case may run the copy by it)
   return at.at === script ? [configAfter(words, i, dir, script)] : [{ unread: `runs ${word.text}, a file of the name of ${script} that the reader cannot tell from it`, unsure: true }];
+}
+// A run whose script is named only when the workflow runs (a variable, an expression of GitHub's, braces, a glob,
+// $'…', a "\\"): no run of this script where its folder plainly is no folder scripts (node --test tests/*.mjs) or its
+// own name plainly is another's (node ${{ github.action_path }}/index.js); else, where it looks like one of the
+// core's (a .mjs file, a folder scripts or core, an expression), not read; one given by a variable alone (node --test
+// $RUN) is counted where the step names the path it holds (unaccounted).
+function unplaced(word, dir, name) {
+  const plain = x => !/[$`{}\\'"*?[]/u.test(x), text = word.text.replace(ROOT, "").replace(/\/+$/u, "");
+  const cut = text.lastIndexOf("/"), folder = cut < 0 ? null : text.slice(0, cut), own = text.slice(cut + 1);
+  if (!dir.moved && !dir.dynamic && folder !== null && plain(folder) && !/(?:^|\/)scripts$/iu.test(path.posix.join(dir.at, folder))) return [];
+  if (plain(own) && own.toLowerCase() !== name) return [];
+  return /\.mjs\b|scripts|\bcore\b|\$\{?CORE|\$\{\{/iu.test(text) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
 }
 
 // A step's folder, from the root: its own `working-directory`, else its job's or its workflow's default.
@@ -372,7 +374,7 @@ const folder = (...dirs) => {
 // { where, from, run, dir }: the file it stands in, the workflow that runs it, its `run:` and its folder (an action's
 // steps run from the root, save where one names its own); an action the reader cannot read as { where, from,
 // unreadable }, its text.
-const ACTION_CALLS = 2000;
+const ACTION_DEPTH = 20, STEP_MOST = 20000;
 const STEPS_OF = new WeakMap(); // (each project's steps read once, however many checks ask)
 // What a step is given beside its run: its env:, its job's and its workflow's, its job's matrix, so that a script named
 // there is counted as named (unaccounted). Each mapping is read once, its text values (at any depth, a mapping or a
@@ -403,28 +405,41 @@ function leaves(o, depth = 0, out = Object.assign([], { whole: true })) {
 }
 function steps(p) {
   if (STEPS_OF.has(p)) return STEPS_OF.get(p);
-  const out = [];
-  let calls = 0;
-  // (an action is read at each call, with what that call gives it, its caller's env: and with: and its job's and
-  // workflow's env:; never within itself, and past ACTION_CALLS calls in all, the rest is said not read)
+  const out = [], parsed = new Map();
+  let full = false, calls = 0;
+  // (each action's file read and parsed once; an action is read at each call, with what that call gives it, its
+  // caller's env: and with: and what the caller is given, as one shared list; never within itself, no deeper than
+  // ACTION_DEPTH, and past STEP_MOST steps or calls in all, the rest is said not read)
+  const actionFile = at => {
+    if (!parsed.has(at)) {
+      let found = null;
+      for (const f of [`${at}/action.yml`, `${at}/action.yaml`]) {
+        const text = p.read(f);
+        if (text === null) continue;
+        let yaml = null;
+        try { yaml = parseYaml(text); } catch { /* (below) */ }
+        found = { f, yaml, text };
+        break;
+      }
+      parsed.set(at, found);
+    }
+    return parsed.get(at);
+  };
+  const tooMany = (where, from) => { if (!full) out.push({ where, from, tooMany: true }); full = true; };
   const action = (uses, from, envs, chain) => {
     const at = tidy(uses);
     if (chain.includes(at)) return;
-    if (++calls > ACTION_CALLS) { if (calls === ACTION_CALLS + 1) out.push({ where: at, from, tooMany: true }); return; }
-    for (const f of [`${at}/action.yml`, `${at}/action.yaml`]) {
-      const text = p.read(f);
-      if (text === null) continue;
-      let yaml = null;
-      try { yaml = parseYaml(text); } catch { /* (below) */ }
-      if (!yaml) { out.push({ where: f, from, unreadable: text }); return; }
-      walk(f, from, yaml.runs?.steps ?? [], step => folder(step["working-directory"]), envs, [...chain, at]);
-      return;
-    }
+    if (chain.length >= ACTION_DEPTH || ++calls > STEP_MOST) return tooMany(at, from);
+    const found = actionFile(at);
+    if (!found) return;
+    if (!found.yaml) { out.push({ where: found.f, from, unreadable: found.text }); return; }
+    walk(found.f, from, found.yaml.runs?.steps ?? [], step => folder(step["working-directory"]), envs, [...chain, at]);
   };
   const walk = (where, from, list, dirOf, envs = [], chain = []) => {
     for (const step of Array.isArray(list) ? list : []) {
-      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), given: [step?.env, ...envs] });
-      if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from, [step?.env, step?.with, ...envs], chain);
+      if (out.length >= STEP_MOST) return tooMany(where, from);
+      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), given: [step?.env, envs] });
+      if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from, [step?.env, step?.with, envs], chain);
     }
   };
   for (const [f, w] of Object.entries(p.workflows)) {
@@ -446,7 +461,7 @@ export function runsOwn(p, name) {
   readable(p, text => text.includes(name));
   const script = `${copyOf(p)}scripts/${name}`;
   return steps(p).flatMap(s => {
-    if (s.tooMany) return [{ where: s.where, from: s.from, unread: `the project's actions call each other past ${ACTION_CALLS} times, which the reader does not follow`, unsure: true }];
+    if (s.tooMany) return [{ where: s.where, from: s.from, unread: `the project's workflows and actions hold more steps, or actions calling each other more deeply, than the reader follows`, unsure: true }];
     if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know`, unsure: true }] : [];
     const runs = runsIn(s.run, s.dir, script);
     return [...runs, ...unaccounted(s.run, script, runs, givenNamings(s.given ?? [], name))].map(r => ({ where: s.where, from: s.from, ...r }));

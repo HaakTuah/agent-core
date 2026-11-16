@@ -606,6 +606,16 @@ ok(notRead("copies", { "a.yml": stepped("node ${{ inputs.script }} bad.json") })
 ok(notRead("copies", { "a.yml": { env: { CHECK: "core/scripts/copies.mjs" }, jobs: { j: { steps: [{ uses: "./.github/actions/c" }] } } } }, { ".github/actions/c/action.yml": "runs:\n  using: composite\n  steps:\n    - run: node \"$CHECK\" config/custom.json\n      shell: bash\n" })
   && copiesOf({ "a.yml": stepped("node ${{ github.action_path }}/index.js\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
   "a local action is read with what its caller gives it; a file of another plain name past an expression is no run of the script");
+// (the review of 165db25: actions read once, and their steps, calls and depth bounded; a glob or a "/" after the name)
+const fanFiles = { ".github/actions/a/action.yml": `runs:\n  using: composite\n  steps:\n${"    - uses: ./.github/actions/b\n".repeat(1999)}`, ".github/actions/b/action.yml": `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(2000)}` };
+const fanStarted = Date.now();
+ok(notRead("copies", { "a.yml": { jobs: { j: { steps: [{ uses: "./.github/actions/a" }] } } } }, fanFiles) && Date.now() - fanStarted < 5000, "actions called thousands of times are read once each, and past the bound the run is not read", `${Date.now() - fanStarted} ms`);
+const chainFiles = Object.fromEntries(Array.from({ length: 2000 }, (_, k) => [`.github/actions/c${k}/action.yml`, `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(50)}    - uses: ./.github/actions/c${k + 1}\n`]));
+const chainStarted = Date.now();
+ok(notRead("copies", { "a.yml": { env: { A: "x" }, jobs: { j: { steps: [{ uses: "./.github/actions/c0" }] } } } }, chainFiles) && Date.now() - chainStarted < 5000, "a long chain of actions is read no deeper than the bound", `${Date.now() - chainStarted} ms`);
+ok(['node "$CORE"/scripts/copies.mj? c.json', "node $CORE/scripts/copie[s].mjs c.json", "node $CORE/scripts/copies.* c.json", "node $C/copies.mjs/ c.json", "node ${{ github.action_path }}/copies.mjs/ c.json", "node core/scripts/copies.mj? c.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })) && copiesOf({ "a.yml": stepped("node --test tests/*.mjs\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
+  "a glob or a \"/\" after the script's name leaves the run not read; a glob in a folder that is no scripts folder is no run of it");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
