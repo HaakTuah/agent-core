@@ -796,6 +796,12 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     const after = step.check(project(d));
     execFileSync("git", ["rm", "-q", "-f", ".kiro/steering/g.md"], { cwd: d }); fs.rmSync(path.join(d, "notes"), { recursive: true });
     ok(before.includes(".kiro/steering/g.md:3") && after === null, "a broken pointer in a tool's file that links to a file git does not track is named, and once that file is mended, no longer", `${before}\n${after}`);
+    // (a tracked link to a device, or to a file outside the project, is never opened: the step reads on)
+    fs.symlinkSync("/dev/zero", path.join(d, "zero")); fs.symlinkSync(path.join(tmp, "copies-outside.json"), path.join(d, "outside.json"));
+    execFileSync("git", ["add", "zero", "outside.json"], { cwd: d });
+    const linked = step.check(project(d));
+    execFileSync("git", ["rm", "-q", "-f", "zero", "outside.json"], { cwd: d });
+    ok(linked === null, "a tracked link to a device or to a file outside the project is never opened, and the step reads on", `${linked}`);
   }
 }
 

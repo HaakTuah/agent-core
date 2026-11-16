@@ -25,6 +25,7 @@ import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
+import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
@@ -160,10 +161,13 @@ function toolFilesListed(p) {
   try { baseline = JSON.parse(p.read(config) ?? "")?.baseline; } catch { /* (its own run says what of the config it cannot read) */ }
   const index = git(["ls-files", "-s", "-z"]), state = crypto.createHash("sha256").update(index);
   for (const f of [...git(["ls-files", "-m", "-z"]).split("\0").filter(Boolean), config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
-  // (what a tracked link leads to, a file git does not track among them, as the checks read it through the link)
+  // (what a tracked link leads to, a file git does not track among them, as the checks read it through the link: only
+  // where they would, a regular file of at most READ_MOST bytes inside the project; anything else, a device, a pipe, a
+  // folder or a file outside, is never opened, and counts as nothing)
   for (const f of index.split("\0").filter(e => e.startsWith("120000 ")).map(e => e.slice(e.indexOf("\t") + 1))) {
+    const to = path.join(p.root, f);
     let text = "";
-    try { text = fs.readFileSync(path.join(p.root, f), "utf8"); } catch { /* (a link to nothing, or to a folder) */ }
+    try { if (!leadsOut(p.root, to)) { const stat = fs.statSync(to); if (stat.isFile() && stat.size <= READ_MOST) text = fs.readFileSync(to, "utf8"); } } catch { /* (a link to nothing) */ }
     state.update(`\0${f}\0${text}`);
   }
   const key = `${p.root}\0${state.digest("hex")}`;
