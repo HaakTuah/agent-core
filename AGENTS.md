@@ -283,5 +283,4 @@ Every reviewer reads `roles/shared/review-guidelines.md` whole and judges the ch
 changes what any project must do without saying so in the PR is a departure from the PR's description, and blocks; so
 does one that reads true only for some of the kinds of project "Rules are written for any project" names, and a raise of
 a size cap in a PR with no "Leanness check:" comment that found too little room. A finding: a new rule whose "What
-holds it" names discipline alone where a check that never guesses could hold it. A finding that the change breaks a written
-rule ends with its line `Rule:` (`roles/shared/review-guidelines.md`, "A finding names its rule").
+holds it" names discipline alone where a check that never guesses could hold it.

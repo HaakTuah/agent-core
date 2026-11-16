@@ -136,12 +136,13 @@ export function foundTwice(pulls, since = null) {
 }
 
 // The rules that stand, keyed as ruleOf keys a finding's line: those of the floor, the roles and the modules of the core
-// at `core` (rules.mjs), and those of the AGENTS.md at the root of the project at `project`, its own; null where they
-// cannot be read.
+// at `core` (rules.mjs), and those of the AGENTS.md and SECURITY.md at the root of the project at `project`, its own;
+// null where they cannot be read.
 export function standing(core = ROOT, project = process.cwd()) {
   try {
-    const own = path.join(project, "AGENTS.md");
-    return new Set([...rules(core), ...(fs.existsSync(own) ? rulesOf("AGENTS.md", fs.readFileSync(own, "utf8")) : [])].map(r => ruleOf(r.key)));
+    const own = ["AGENTS.md", "SECURITY.md"].filter(f => fs.existsSync(path.join(project, f)))
+      .flatMap(f => rulesOf(f, fs.readFileSync(path.join(project, f), "utf8")));
+    return new Set([...rules(core), ...own].map(r => ruleOf(r.key)));
   } catch { return null; }
 }
 

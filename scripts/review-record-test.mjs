@@ -137,9 +137,9 @@ ok(ruleOf("`floor/security.md: 1. Nothing secret in the repository`.") === "floo
   "a rule is read as one key however it is written, its quotes, bold, backticks, stop, case and a leading core/ aside, and no longer than 300");
 ok(ruleOf("a.md:\u001b[31m one\u0000\u202e two\u200b") === "a.md:[31m one two", "a key holds no control or format character, so none reaches a terminal or an issue");
 const stand = standing(), core = fileURLToPath(new URL("..", import.meta.url));
-ok(stand?.has("floor/security.md: 1. nothing secret in the repository") && stand.has("tasks/reviews.md: a finding seen twice becomes a check") && stand.has("agents.md: a check that fails says the mend") && !stand.has("agents.md: forged")
+ok(stand?.has("floor/security.md: 1. nothing secret in the repository") && stand.has("tasks/reviews.md: a finding seen twice becomes a check") && stand.has("agents.md: a check that fails says the mend") && [...stand].some(k => k.startsWith("security.md: ")) && !stand.has("agents.md: forged")
   && !standing(core, "/nonexistent/x").has("agents.md: a check that fails says the mend") && standing(core, "/nonexistent/x").has("floor/security.md: 1. nothing secret in the repository") && standing("/nonexistent/x", "/nonexistent/y")?.size === 0,
-  "the rules that stand are read as a finding's line keys them: the core's, and the project's own AGENTS.md where it has one");
+  "the rules that stand are read as a finding's line keys them: the core's, and the project's own AGENTS.md and SECURITY.md where it has them");
 ok(same(rulesIn("Why.\nRule: `AGENTS.md: A check that fails says the mend`\r\n- **Rule:** tasks/tests.md: Tests\n> Rule: quoted.md: no\nThe Rule: inside a sentence\nRule:\nRule:   "),
   ["agents.md: a check that fails says the mend", "tasks/tests.md: tests"]),
   "a rule is named on a line of its own that opens Rule:, in a list or bold too; a quoted line, one inside a sentence and an empty one name none");
