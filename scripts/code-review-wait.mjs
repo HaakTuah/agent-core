@@ -77,8 +77,8 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   // (where a merge from main that git would not make stops it, the status names that merge: #323)
   const cut = unproved(pull, flat(commits), sha, merges);
   const why = cut !== undefined && [...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))
-    ? `no code review of ${short}: merge ${cut.slice(0, 7)} is not the merge git makes. Mend: post ${form("Code")}`
-    : `no code review of ${short}. Mend: ask one, or another reviewer posts ${form("Code")}`;
+    ? `no code review; merge ${cut.slice(0, 7)} unproved. Mend: post ${form("Code")}`
+    : `no code review of ${short}. Mend: ask one, or post ${form("Code")}`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
