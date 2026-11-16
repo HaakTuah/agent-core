@@ -147,9 +147,10 @@ function keysOnce(p) {
 // `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
 // old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
 // holds and fails none; null where nothing is left to list.
-// Both checks read only the files git tracks, as the work tree holds them, and the copies check its config and baseline
-// besides: where none of those changed since the last reading in this process, that reading's answer stands, so the
-// two runs are made once for each state of the project (a sync reads it once; a test, many times).
+// Both checks read only the files git tracks, as the work tree holds them (a tracked link, what it leads to), and the
+// copies check its config and baseline besides: where none of those changed since the last reading in this process,
+// that reading's answer stands, so the two runs are made once for each state of the project (a sync reads it once; a
+// test, many times).
 const listedBefore = new Map();
 function toolFilesListed(p) {
   const config = copiesConfig(p);
@@ -157,8 +158,14 @@ function toolFilesListed(p) {
   const git = args => execFileSync("git", args, { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 });
   let baseline = null;
   try { baseline = JSON.parse(p.read(config) ?? "")?.baseline; } catch { /* (its own run says what of the config it cannot read) */ }
-  const state = crypto.createHash("sha256").update(git(["ls-files", "-s", "-z"]));
+  const index = git(["ls-files", "-s", "-z"]), state = crypto.createHash("sha256").update(index);
   for (const f of [...git(["ls-files", "-m", "-z"]).split("\0").filter(Boolean), config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
+  // (what a tracked link leads to, a file git does not track among them, as the checks read it through the link)
+  for (const f of index.split("\0").filter(e => e.startsWith("120000 ")).map(e => e.slice(e.indexOf("\t") + 1))) {
+    let text = "";
+    try { text = fs.readFileSync(path.join(p.root, f), "utf8"); } catch { /* (a link to nothing, or to a folder) */ }
+    state.update(`\0${f}\0${text}`);
+  }
   const key = `${p.root}\0${state.digest("hex")}`;
   if (!listedBefore.has(key)) listedBefore.set(key, toolFilesRead(p, config));
   return listedBefore.get(key);

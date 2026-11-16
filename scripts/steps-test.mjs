@@ -785,6 +785,18 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     ok(/the copies check's config `checks\/copies\.json` is no regular file of the project's own/.test(said), "a copies config whose link leads out of the project is not handed to the check", said);
   }
   ok(step.check(project(d)) === null, "and with each put back, the starter kit's project has nothing to list", step.check(project(d)) ?? "");
+  if (process.platform !== "win32") {
+    // (a tracked link to a file git does not track: what the step says follows that file, read through the link)
+    fs.mkdirSync(path.join(d, "notes"), { recursive: true });
+    fs.writeFileSync(path.join(d, "notes/g.md"), "# G\n\nAs `docs/nowhere-g.md` says.\n");
+    fs.symlinkSync("../../notes/g.md", path.join(d, ".kiro/steering/g.md"));
+    execFileSync("git", ["add", ".kiro/steering/g.md"], { cwd: d });
+    const before = step.check(project(d)) ?? "";
+    fs.writeFileSync(path.join(d, "notes/g.md"), "# G\n\nAs `AGENTS.md` says.\n");
+    const after = step.check(project(d));
+    execFileSync("git", ["rm", "-q", "-f", ".kiro/steering/g.md"], { cwd: d }); fs.rmSync(path.join(d, "notes"), { recursive: true });
+    ok(before.includes(".kiro/steering/g.md:3") && after === null, "a broken pointer in a tool's file that links to a file git does not track is named, and once that file is mended, no longer", `${before}\n${after}`);
+  }
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
