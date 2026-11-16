@@ -96,41 +96,70 @@ export function check({ issues, comments = [], notes = new Map(), owner, have, s
   const names = i => (i.labels ?? []).map(l => (typeof l === "string" ? l : l.name));
   const count = (i, list) => names(i).filter(n => list.includes(n)).length;
   const fresh = at => String(at ?? "") >= since;
-  const out = [];
-  const add = (what, items) => { if (items.length) out.push({ what, items }); };
+  const ctx = { issues, comments, notes, have, mine, names, count, fresh };
+  const found = [listedLabels, stateLabels, senderLabels, foundLines, commentOpeners, strayViewItems, standInMarks, currentTexts]
+    .map(part => part(ctx)).filter(f => f.items.length);
+  return [...found, ...unmarked(issues, comments, mine, names)];
+}
+
+// (each part of check below reads the same context and gives { what, items }, which check keeps where it has items)
+function listedLabels({ have }) {
   const missing = toMake(have ?? []);
-  add(`The labels of the list (core/scripts/labels.json), made or set to its colour and description: run \`node core/scripts/labels.mjs --make\``, missing.map(l => `${l.name} (${l.how === "make" ? "missing" : "otherwise"})`));
-  add(`One state label on each open issue, of ${STATES.join(", ")}: the one its last verdict gives it (the stand-in's, core/roles/shared/inbox.md; a bug is queued from its filing; another account's issue needs-owner until the owner's own comment takes it up), the others taken off`,
-    issues.filter(i => count(i, STATES) !== 1).map(i => `#${i.number}`));
-  add(`One sender label on each issue the owner's account filed, of ${SENDERS.join(", ")}: the sender its text names, by:owner only where the owner typed it`,
-    issues.filter(i => mine(i.user) && count(i, SENDERS) !== 1).map(i => `#${i.number}`));
-  add(`A "${LIST.headings.found}" line in each issue an agent filed, saying the role and the task it was on ("${LIST.headings.found} fixing #241 (a builder session)"): edit the issue to add it`,
-    issues.filter(i => mine(i.user) && byAgent(i.body) && fresh(i.created_at) && !found(i.body)).map(i => `#${i.number}`));
-  add(`An opening line from the list on each agent's comment (${LIST.openers.map(o => `"${o}:"`).join(", ")}, with ", on #<n>" for the task where there is one; the stand-in's verdict line; or a call such as "@codex review"): edit the comment to open with the one that says who wrote it`,
-    comments.filter(c => mine(c.user) && byAgent(c.body) && fresh(c.created_at) && !opens(c.body)).map(c => c.html_url ?? `#${c.issue}`));
+  return { what: `The labels of the list (core/scripts/labels.json), made or set to its colour and description: run \`node core/scripts/labels.mjs --make\``, items: missing.map(l => `${l.name} (${l.how === "make" ? "missing" : "otherwise"})`) };
+}
+
+function stateLabels({ issues, count }) {
+  return { what: `One state label on each open issue, of ${STATES.join(", ")}: the one its last verdict gives it (the stand-in's, core/roles/shared/inbox.md; a bug is queued from its filing; another account's issue needs-owner until the owner's own comment takes it up), the others taken off`,
+    items: issues.filter(i => count(i, STATES) !== 1).map(i => `#${i.number}`) };
+}
+
+function senderLabels({ issues, mine, count }) {
+  return { what: `One sender label on each issue the owner's account filed, of ${SENDERS.join(", ")}: the sender its text names, by:owner only where the owner typed it`,
+    items: issues.filter(i => mine(i.user) && count(i, SENDERS) !== 1).map(i => `#${i.number}`) };
+}
+
+function foundLines({ issues, mine, fresh }) {
+  return { what: `A "${LIST.headings.found}" line in each issue an agent filed, saying the role and the task it was on ("${LIST.headings.found} fixing #241 (a builder session)"): edit the issue to add it`,
+    items: issues.filter(i => mine(i.user) && byAgent(i.body) && fresh(i.created_at) && !found(i.body)).map(i => `#${i.number}`) };
+}
+
+function commentOpeners({ comments, mine, fresh }) {
+  return { what: `An opening line from the list on each agent's comment (${LIST.openers.map(o => `"${o}:"`).join(", ")}, with ", on #<n>" for the task where there is one; the stand-in's verdict line; or a call such as "@codex review"): edit the comment to open with the one that says who wrote it`,
+    items: comments.filter(c => mine(c.user) && byAgent(c.body) && fresh(c.created_at) && !opens(c.body)).map(c => c.html_url ?? `#${c.issue}`) };
+}
+
+function strayViewItems({ issues, comments, mine, names, fresh }) {
   const voiced = issues.filter(i => names(i).some(n => OWN_VOICE.includes(n)));
-  add(`A session's view in an item of the owner's voice stands under the heading "${LIST.headings.view}", not under another heading that names a view: edit the heading`,
-    [...voiced.filter(i => fresh(i.created_at) && strayViews(i.body).length).map(i => `#${i.number}`),
-      ...comments.filter(c => voiced.some(i => i.number === c.issue) && mine(c.user) && byAgent(c.body) && fresh(c.created_at) && strayViews(c.body).length).map(c => c.html_url ?? `#${c.issue}`)]);
+  return { what: `A session's view in an item of the owner's voice stands under the heading "${LIST.headings.view}", not under another heading that names a view: edit the heading`,
+    items: [...voiced.filter(i => fresh(i.created_at) && strayViews(i.body).length).map(i => `#${i.number}`),
+      ...comments.filter(c => voiced.some(i => i.number === c.issue) && mine(c.user) && byAgent(c.body) && fresh(c.created_at) && strayViews(c.body).length).map(c => c.html_url ?? `#${c.issue}`)] };
+}
+
+// The notes of an issue's thread that the owner's account wrote, oldest first.
+const ownerNotes = (notes, mine, i) => [...(notes.get(i.number) ?? [])].filter(c => mine(c.user)).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+
+function standInMarks({ issues, notes, mine, names }) {
   // (the stand-in's mark: its newest verdict a sure yes and no note in the owner's voice after it)
   const onYes = i => {
-    const all = [...(notes.get(i.number) ?? [])].filter(c => mine(c.user)).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    const all = ownerNotes(notes, mine, i);
     const last = all.findLastIndex(c => verdict(c.body));
     return last >= 0 && verdict(all[last].body).kind === "yes" && verdict(all[last].body).sure === "sure" && !all.slice(last + 1).some(c => ownVoiceNote(c.body));
   };
   const queued = issues.filter(i => names(i).includes("queued") && notes.has(i.number));
-  add("The mark stand-in-yes, where the project lets the stand-in's sure yes queue an idea (core/roles/shared/inbox.md), on a queued issue whose newest verdict is that yes with no note in the owner's voice after it; off once the owner's own word confirms or corrects it",
-    [...queued.filter(i => onYes(i) && !names(i).includes("stand-in-yes")).map(i => `#${i.number} (to mark)`),
-      ...issues.filter(i => names(i).includes("stand-in-yes") && notes.has(i.number) && !onYes(i)).map(i => `#${i.number} (to take off)`)]);
-  add(`A current text newer than the notes that change what the issue asks: where ${SEVERAL} or more notes in the owner's voice stand after it, an agent gathers them in a note that says at its top "${LIST.headings.current}", the older notes kept as they are (core/roles/shared/inbox.md)`,
-    issues.filter(i => names(i).includes("queued") && notes.has(i.number)).filter(i => {
-      const all = [...notes.get(i.number)].filter(c => mine(c.user)).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  return { what: "The mark stand-in-yes, where the project lets the stand-in's sure yes queue an idea (core/roles/shared/inbox.md), on a queued issue whose newest verdict is that yes with no note in the owner's voice after it; off once the owner's own word confirms or corrects it",
+    items: [...queued.filter(i => onYes(i) && !names(i).includes("stand-in-yes")).map(i => `#${i.number} (to mark)`),
+      ...issues.filter(i => names(i).includes("stand-in-yes") && notes.has(i.number) && !onYes(i)).map(i => `#${i.number} (to take off)`)] };
+}
+
+function currentTexts({ issues, notes, mine, names }) {
+  return { what: `A current text newer than the notes that change what the issue asks: where ${SEVERAL} or more notes in the owner's voice stand after it, an agent gathers them in a note that says at its top "${LIST.headings.current}", the older notes kept as they are (core/roles/shared/inbox.md)`,
+    items: issues.filter(i => names(i).includes("queued") && notes.has(i.number)).filter(i => {
+      const all = ownerNotes(notes, mine, i);
       // (the current text counts from its last edit, since a note that changes what the issue asks updates it)
       const current = all.filter(c => String(c.body ?? "").includes(LIST.headings.current)).at(-1);
       const at = current ? current.updated_at ?? current.created_at : i.created_at;
       return all.filter(c => String(c.created_at) > String(at) && ownVoiceNote(c.body)).length >= SEVERAL;
-    }).map(i => `#${i.number}`));
-  return [...out, ...unmarked(issues, comments, mine, names)];
+    }).map(i => `#${i.number}`) };
 }
 
 export const report = (found, repo) => found.length
@@ -178,12 +207,42 @@ export function gather(repo, since, gh = ghApi) {
   return { have, issues, comments, notes };
 }
 
+const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
+
+// The wrong option given, as the words of its failure, or null where the options are right.
+function optionError(args, at, by, since) {
+  if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\dZ)?$/.test(since ?? "")) return "--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z";
+  if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return "--owner needs the owner's account after it";
+  return null;
+}
+
+// --make: the labels the repository lacks made, those of the list set to its colour and description.
+function makeLabels(repo) {
+  const have = pagesOf(`repos/${repo}/labels`);
+  const todo = toMake(have);
+  // (a label set anew is named with what it was before it is set, so a project that used the name otherwise can
+  // restore it, even where a later call fails)
+  const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
+  for (const l of todo) {
+    if (l.how === "set") console.log(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
+    if (l.how === "make") ghApi("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+    else ghApi("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
+  }
+  console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
+}
+
+// What is said where gh gave no list: issues switched off, or no answer at all.
+function unreadMessage(repo, e) {
+  // (gh's own words are not printed: they may name a path of the machine, and this goes into a sync PR's description)
+  if (/\bHTTP 410\b/.test(String(e.message))) return `The labels and openers in ${repo} were not read: its issues are switched off, so the inbox's files carry state and sender as two lines (core/scripts/inbox.mjs).`;
+  return `The labels and openers in ${repo} could not be read here (gh is not installed, answers for no account, or gave no answer). Run \`node core/scripts/labels.mjs\` where gh answers, or read them with this session's own GitHub tools as core/scripts/labels.json says.`;
+}
+
 function main(args) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
   const at = args.indexOf("--since"), by = args.indexOf("--owner"), make = args.includes("--make");
   const since = at >= 0 ? args[at + 1] : sinceHere();
-  if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return fail("--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z");
-  if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return fail("--owner needs the owner's account after it");
+  const bad = optionError(args, at, by, since);
+  if (bad) return fail(bad);
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
   if (below.status !== 0 || below.stdout.trim() !== "") return fail("run it from the root of the project's git repository");
   const repo = repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
@@ -192,25 +251,10 @@ function main(args) {
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core itself, or no manifest yet) */ }
   const owner = by >= 0 ? args[by + 1] : ownerOf(manifest) ?? repo.split("/")[0];
   try {
-    if (make) {
-      const have = pagesOf(`repos/${repo}/labels`);
-      const todo = toMake(have);
-      // (a label set anew is named with what it was before it is set, so a project that used the name otherwise can
-      // restore it, even where a later call fails)
-      const was = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
-      for (const l of todo) {
-        if (l.how === "set") console.log(`Setting ${l.name}: it was ${l.was}, colour ${was.get(l.name.toLowerCase())?.color}, "${was.get(l.name.toLowerCase())?.description ?? ""}".`);
-        if (l.how === "make") ghApi("-X", "POST", `repos/${repo}/labels`, "-f", `name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
-        else ghApi("-X", "PATCH", `repos/${repo}/labels/${encodeURIComponent(l.was)}`, "-f", `new_name=${l.name}`, "-f", `color=${l.color}`, "-f", `description=${l.description}`);
-      }
-      console.log(todo.length ? `Made or set in ${repo}: ${todo.map(l => l.name).join(", ")}.` : `Every label of the list stands in ${repo} as it says.`);
-      return 0;
-    }
-    console.log(report(check({ ...gather(repo, since), owner, since }), repo));
+    if (make) makeLabels(repo);
+    else console.log(report(check({ ...gather(repo, since), owner, since }), repo));
   } catch (e) {
-    // (gh's own words are not printed: they may name a path of the machine, and this goes into a sync PR's description)
-    if (/\bHTTP 410\b/.test(String(e.message))) { console.log(`The labels and openers in ${repo} were not read: its issues are switched off, so the inbox's files carry state and sender as two lines (core/scripts/inbox.mjs).`); return 0; }
-    console.log(`The labels and openers in ${repo} could not be read here (gh is not installed, answers for no account, or gave no answer). Run \`node core/scripts/labels.mjs\` where gh answers, or read them with this session's own GitHub tools as core/scripts/labels.json says.`);
+    console.log(unreadMessage(repo, e));
   }
   return 0;
 }
