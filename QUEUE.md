@@ -44,6 +44,7 @@ wanted").
 | #404 | builder | #403, or built with it |
 | #405 | builder | |
 | #407 | builder | |
+| #397 | rule builder; it changes the review guidelines, with the owner's yes on the issue quoted in its pull request, and what the reviewer and the orchestrator read at their start | #467, whose table of the tools it builds on, and #407, whose check it extends |
 | #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #460, point 2 (the author's address) | builder; "Part of #460", the last to merge "Fixes #460" | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/copies.mjs` too |
