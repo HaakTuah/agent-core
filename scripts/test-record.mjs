@@ -3,10 +3,10 @@
 // this prints. For each test file: how long it takes (the median of its runs), how often it failed for a real reason
 // and when last, how often it failed for no reason (it failed, and passed, on the same commit in the same job), what it
 // alone catches of the faults put in on purpose (a mutation report whose faults name every test that caught them:
-// mutate.mjs --every, beside this file, or Stryker's with its bail turned off), whether a rule the project states names
-// it, whether it is the project's proof (the shape check's config, "select.proof") and whether it opens a screen (the
-// shape check's entries of the reader "screens"). A test that none of the three keeps (it alone catches a fault, a rule
-// names it, it failed for a real reason) is proposed for removal or for merging with its neighbour; the reader of the
+// mutate.mjs --every, beside this file, or Stryker's with its bail turned off), whether it guards a rule the project
+// states (a rule file names its path, or its opening line names a rule file or an issue), whether it is the project's proof (the shape check's config, "select.proof") and whether it opens a screen (the
+// shape check's entries of the reader "screens"). A test that none of the three keeps (it alone catches a fault, it
+// guards a stated rule, it failed for a real reason) is proposed for removal or for merging with its neighbour; the reader of the
 // audit decides, never by coverage alone, and one whose faults are not counted yet is never proposed. A test that
 // failed for no reason is named, to be mended or removed. It reports and fails nothing.
 //
@@ -100,7 +100,7 @@ export function record({ tests, runs, alone: caught, named, proof, screens }) {
     const mine = runs.filter(r => r.test === test), fails = mine.filter(r => !r.passed);
     const flaky = fails.filter(r => passedOn.has(`${r.test}\n${r.key}`)), real = fails.filter(r => !passedOn.has(`${r.test}\n${r.key}`));
     const only = caught === null ? null : caught.get(test) ?? 0;
-    const keeps = [only ? `alone catches ${only}` : "", named.has(test) ? "a rule names it" : "", real.length ? "failed for a real reason" : "", proof.has(test) ? "the project's proof" : ""].filter(Boolean);
+    const keeps = [only ? `alone catches ${only}` : "", named.has(test) ? "it guards a stated rule" : "", real.length ? "failed for a real reason" : "", proof.has(test) ? "the project's proof" : ""].filter(Boolean);
     const verdict = keeps.length ? `kept: ${keeps.join(", ")}` : only === null ? "not weighed: no run counted what it alone catches" : "proposed: for removal, or for merging with its neighbour";
     return { test, runs: mine.length, seconds: median(mine.map(r => r.seconds)), real: real.length, last: real.map(r => r.at).sort().at(-1) ?? null, flaky: flaky.length, alone: only, screen: screens.has(test), verdict };
   });
@@ -121,10 +121,18 @@ export function table(rows) {
 
 // ---- reading the project ----
 
-// The tests a rule of the project names: each test file whose path stands in its rule files or its holders' list.
-function namedByRules(tests) {
-  const texts = ["AGENTS.md", "SECURITY.md", "core-manifest.md", "scripts/holders.json"].filter(f => fs.existsSync(f)).map(f => fs.readFileSync(f, "utf8")).join("\n");
-  return new Set([...tests].filter(t => texts.includes(t)));
+// Whether a test's opening line, a comment, names a rule file (a path ending .md) or an issue (#n): what the test
+// says it guards (modules/tests.md, "A new test says what it guards").
+export const saysWhatItGuards = text => {
+  const first = String(text).split(/\r?\n/u).find(l => l.trim()) ?? "";
+  return /^\s*(\/\/|#|\/\*|<!--|"{3}|'{3})/u.test(first) && /(#\d+\b|[\w./-]+\.md\b)/u.test(first);
+};
+
+// The tests that guard a rule the project states: each test file whose path stands in its rule files or its holders'
+// list, or whose opening line names a rule file or an issue.
+function guarding(tests, texts) {
+  const rules = ["AGENTS.md", "SECURITY.md", "core-manifest.md", "scripts/holders.json"].filter(f => fs.existsSync(f)).map(f => fs.readFileSync(f, "utf8")).join("\n");
+  return new Set([...tests].filter(t => rules.includes(t) || saysWhatItGuards(texts[t] ?? "")));
 }
 
 function runsOf(opts, tests) {
@@ -157,7 +165,7 @@ function main(argv) {
   if (opts["--mutation"]) try { mutation = JSON.parse(fs.readFileSync(opts["--mutation"], "utf8")); } catch { refuse(`the mutation report ${opts["--mutation"]} could not be read as JSON`, "name the report of a whole run, in the mutation-testing-elements schema"); }
   const screens = new Set([...survey(now.texts, config, now.tests).entries.keys()].filter(id => id.startsWith("screen: ")).map(id => id.slice(8, id.indexOf(" -> "))));
   const proof = matcher(config.select.proof);
-  const rows = record({ tests: now.tests, runs: runsOf(opts, now.tests), alone: alone(mutation), named: namedByRules(now.tests), proof: new Set([...now.tests].filter(proof)), screens });
+  const rows = record({ tests: now.tests, runs: runsOf(opts, now.tests), alone: alone(mutation), named: guarding(now.tests, now.texts), proof: new Set([...now.tests].filter(proof)), screens });
   console.log(table(rows).join("\n"));
   return 0;
 }

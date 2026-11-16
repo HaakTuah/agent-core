@@ -18,12 +18,12 @@ counted from the first check's start to the last one's end on each one's last pu
 - **Its ruleset on the default branch** requires a pull request, the status checks `check`, CodeQL's two analyses,
   `size` and `tests` among them, and that a branch be up to date before it merges
   (`strict_required_status_checks_policy: true`). It requires no merge queue.
-- **A merge queue.** GitHub turns one on with the ruleset's "Require merge queue" (rule type `merge_queue`). The
-  documentation read today does not say which accounts may turn it on. It used to limit it to organisations (any
-  public repository an organisation owns, and private ones under GitHub Enterprise Cloud), and a personal account's
-  repository was not offered it. This look could not confirm either way, and changes no setting. The test is the
-  owner's own screen: the repository's Settings, Rules, the ruleset on the default branch, and whether "Require merge
-  queue" is offered among its rules.
+- **A merge queue: most likely not open to the account.** GitHub turns one on with the ruleset's "Require merge queue"
+  (rule type `merge_queue`). Its documentation has limited it to repositories an organisation owns (any public one,
+  and private ones under GitHub Enterprise Cloud), and the core's repository is a personal account's. The pages read
+  today no longer state the limit, so this look could not confirm the answer, and it changed no setting. The owner's
+  own screen confirms it: the repository's Settings, Rules, the ruleset on the default branch, where "Require merge
+  queue" is offered among its rules only if the account may use it.
 - **A branch updated only once its other checks have passed.** GitHub has no setting for that. "Require branches to be
   up to date" fails a pull request behind main, and auto-merge then waits; neither brings the branch up to date by
   itself (only a merge queue does). Bringing it up to date is a session's step, and when it takes it is the session's

@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { alone, fromJobs, fromJunit, record, stepsOf, table } from "./test-record.mjs";
+import { alone, fromJobs, fromJunit, record, saysWhatItGuards, stepsOf, table } from "./test-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -63,7 +63,9 @@ const rows = record({ tests, runs: [...runs, ...junit], alone: new Map([["test/a
 const row = name => rows.find(r => r.test === name);
 ok(row("test/a-test.mjs").runs === 3 && row("test/a-test.mjs").seconds === 4 && row("test/a-test.mjs").real === 1 && row("test/a-test.mjs").flaky === 0, "a test failing on one platform alone fails for a real reason", JSON.stringify(row("test/a-test.mjs")));
 ok(row("test/b-test.mjs").flaky === 1 && row("test/b-test.mjs").real === 0 && /^proposed/.test(row("test/b-test.mjs").verdict), "one that failed and passed on one commit in one job failed for no reason; caught nothing alone, no rule names it: proposed", JSON.stringify(row("test/b-test.mjs")));
-ok(/a rule names it/.test(row("test/c-test.mjs").verdict) && /failed for a real reason/.test(row("test/d-test.mjs").verdict) && row("test/d-test.mjs").last === "2.xml" && row("test/d-test.mjs").screen && /alone catches 2/.test(row("test/a-test.mjs").verdict),
+ok(saysWhatItGuards("// Tests modules/tests.md, \"A new test says what it guards\"\nx();\n") && saysWhatItGuards("\n# guards #275, point 8\n") && !saysWhatItGuards("// tests the selection\n") && !saysWhatItGuards("x(); // modules/a.md\n"),
+  "a test guards a stated rule where its opening line, a comment, names a rule file or an issue");
+ok(/it guards a stated rule/.test(row("test/c-test.mjs").verdict) && /failed for a real reason/.test(row("test/d-test.mjs").verdict) && row("test/d-test.mjs").last === "2.xml" && row("test/d-test.mjs").screen && /alone catches 2/.test(row("test/a-test.mjs").verdict),
   "a test is kept by what it alone catches, a rule that names it, or a real failure", JSON.stringify(rows));
 const unweighed = record({ tests: new Set(["test/x-test.mjs"]), runs: [], alone: null, named: new Set(), proof: new Set(), screens: new Set() });
 const proved = record({ tests: new Set(["test/x-test.mjs"]), runs: [], alone: new Map(), named: new Set(), proof: new Set(["test/x-test.mjs"]), screens: new Set() });
@@ -77,14 +79,14 @@ process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
 const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 execFileSync("git", ["init", "-q"], { cwd: dir });
 put("checks/shape.json", JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src", "test"], tests: ["test/"], screens: ["playwright"] }));
-put("src/a.mjs", "export const a = 1;\n"); put("test/a-test.mjs", "import '../src/a.mjs';\n"); put("test/e2e-test.mjs", "import 'playwright';\n");
+put("src/a.mjs", "export const a = 1;\n"); put("test/a-test.mjs", "import '../src/a.mjs';\n"); put("test/b-test.mjs", "// guards #12, the bug it caught\n"); put("test/e2e-test.mjs", "import 'playwright';\n");
 put("reports/1.xml", '<testcase classname="test/a-test.mjs" name="a" time="1"/><testcase classname="test/e2e-test.mjs" name="e" time="9"/>');
 put("reports/2.xml", '<testcase classname="test/a-test.mjs" name="a" time="3"><failure/></testcase><testcase classname="test/e2e-test.mjs" name="e" time="7"/>');
 put("mutation.json", JSON.stringify({ files: { "src/a.mjs": { mutants: [{ killedBy: ["test/a-test.mjs"] }] } } }));
 const script = fileURLToPath(new URL("./test-record.mjs", import.meta.url));
 const run = args => { const r = spawnSync(process.execPath, [script, ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 let r = run(["checks/shape.json", "--junit", "reports", "--mutation", "mutation.json"]);
-ok(r.status === 0 && /\| `test\/a-test\.mjs` \| 2 \| 2 \| 1 \(2\.xml\) \| 0 \| 1 \|/.test(r.out) && /\| `test\/e2e-test\.mjs` \| 2 \| 8 \| 0 \| 0 \| 0 \| yes \| proposed/.test(r.out) && /1 open a screen, 8 s of it/.test(r.out),
+ok(r.status === 0 && /\| `test\/a-test\.mjs` \| 2 \| 2 \| 1 \(2\.xml\) \| 0 \| 1 \|/.test(r.out) && /\| `test\/e2e-test\.mjs` \| 2 \| 8 \| 0 \| 0 \| 0 \| yes \| proposed/.test(r.out) && /1 open a screen, 8 s of it/.test(r.out) && /\| `test\/b-test\.mjs` \| 0 .*kept: it guards a stated rule/.test(r.out),
   "a whole run reads the reports, the faults and the tests that open a screen, and prints the table", r.out);
 for (const [args, what] of [[["checks/shape.json", "--junit", "nowhere"], "a folder of reports that is not there"], [["checks/shape.json", "--mutation", "reports/1.xml"], "a mutation report that is no JSON"],
   [["checks/shape.json", "--repo", "o/n"], "a repository with no workflow named"], [["checks/none.json"], "no config"], [["checks/shape.json", "--every"], "a word it does not know"]]) {

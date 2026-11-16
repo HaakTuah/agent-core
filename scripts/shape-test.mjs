@@ -124,9 +124,9 @@ const screened = survey({
   "src/e2e/c.test.js": "import { chromium } from 'playwright';\nimport { render } from '@testing-library/react';\n", "src/e2e/d.test.js": "const p = await import('playwright-core');\n",
   "src/tool.js": "import { chromium } from 'playwright';\n", "Tests/FormTests.cs": "using System.Windows.Forms;\nnamespace T;\nclass FormTests {}\n",
 }, screenCfg, new Set(["src/rules/a.test.js", "src/view/b.test.js", "src/e2e/c.test.js", "src/e2e/d.test.js", "Tests/FormTests.cs"]));
-ok(same(ids(screened).filter(id => id.startsWith("screen: ")), ["screen: Tests/FormTests.cs -> System.Windows.Forms", "screen: src/e2e/c.test.js -> @testing-library", "screen: src/e2e/c.test.js -> playwright", "screen: src/view/b.test.js -> view"])
-  && screened.read.screens === 3 && readerOf("screen: src/e2e/c.test.js -> playwright", screened.readers) === "screens" && fileOf("screen: src/e2e/c.test.js -> playwright") === "src/e2e/c.test.js",
-  "a test that imports what opens a screen (a package named, a module under it, a system of the display, in C# a namespace) is an entry of the reader \"screens\"; a test of the rules, code that is no test and a package that only starts with a name are not", ids(screened));
+ok(same(ids(screened).filter(id => id.startsWith("screen: ")), ["screen: Tests/FormTests.cs -> System.Windows.Forms", "screen: src/e2e/c.test.js -> @testing-library", "screen: src/e2e/c.test.js -> playwright"])
+  && screened.read.screens === 2 && readerOf("screen: src/e2e/c.test.js -> playwright", screened.readers) === "screens" && fileOf("screen: src/e2e/c.test.js -> playwright") === "src/e2e/c.test.js",
+  "a test that imports what opens a screen (a package named, a module under it, in C# a namespace) is an entry of the reader \"screens\"; a test of the display's own code, one of the rules, code that is no test and a package that only starts with a name are not", ids(screened));
 ok(screened.reach.get("src/e2e/d.test.js") === undefined && same([...screened.reach.get("src/rules/a.test.js")], ["src/rules/a.js"]), "each file's imports of the project's own files are told, for the selection", JSON.stringify([...screened.reach]));
 
 // ---- the readers of other code ----
@@ -214,7 +214,7 @@ v = judge({ now: {}, conf: cfg({ wait: 900 }), baseline: listed([]), base: baseO
 ok(mended(said(v)) && same(v.fail[0]?.slice(1), ["  mark: wait"]), "the wait's mark on a push's checks raised fails against the base, as a suite's does", said(v));
 v = judge({ now: {}, conf: cfg({ wait: 500 }), baseline: listed([]), base: baseOf(listed([]), {}, config({ wait: 600 })) });
 ok(v.fail.length === 0, "and lowered, passes", said(v));
-const view = { "src/view/b.js": "export const b = 1;\n" }, viewTest = { ...view, "src/view/b.test.js": "import { b } from './b.js';\n" };
+const view = { "src/view/b.js": "export const b = 1;\n" }, viewTest = { ...view, "src/view/b.test.js": "import { b } from './b.js';\nimport { chromium } from 'playwright';\n" };
 const screenJudge = (now, reads, baseTexts) => verdict({ config: screenCfg, at: "checks/shape.json", self: "core/scripts/shape.mjs", found: survey(now, screenCfg, new Set(Object.keys(now).filter(f => f.endsWith(".test.js")))), baselineText: JSON.stringify({ reads, listed: {} }),
   base: { name: "origin/main", baseline: JSON.stringify({ reads, listed: {} }), config: JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }), standing: () => ({ texts: baseTexts, tests: new Set(Object.keys(baseTexts).filter(f => f.endsWith(".test.js"))) }) } });
 v = screenJudge(viewTest, ["javascript", "jsx", "csharp", "python", "scripts"], viewTest);

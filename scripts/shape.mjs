@@ -34,7 +34,7 @@
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }); and those of what
 // the tests cost (modules/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
 // device (a package or module by the name it is imported under, or the start of one), so that each test file that
-// imports one, or a system of the domain "display", is an entry ("screen: <test> -> <what>", found by the reader
+// imports one is an entry ("screen: <test> -> <what>", found by the reader
 // "screens"), new ones failing as any breach does; "select", for select.mjs beside this file: "proof", pathspecs of the
 // tests never selected out, "whole", those of the tests that reach every file (one that copies or runs the whole
 // project), and "none", those of the files no test reads; "wait", the time mark in seconds on the checks of one push
@@ -232,18 +232,17 @@ function outside(ctx, from, spec, aliased) {
 }
 
 // A test that imports what opens a screen, a window or a device: one of the config's "screens", by any of the names it
-// is imported under (a name listed, or one that starts with it and a slash or a dot), or a system of the display.
-function opensScreen(ctx, from, names, system = null) {
+// is imported under (a name listed, or one that starts with it and a slash or a dot). A test of the display's own code
+// is none: importing it opens nothing.
+function opensScreen(ctx, from, names) {
   if (!ctx.tests.has(from.file)) return;
-  const what = system && ctx.config.systems[system].domain === "display" ? system
-    : ctx.config.screens.find(s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`)));
-  if (what !== undefined && what !== null) add(ctx, "screen", `${from.file} -> ${what}`, what);
+  const what = ctx.config.screens.find(s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`)));
+  if (what !== undefined) add(ctx, "screen", `${from.file} -> ${what}`, what);
 }
 
 // An import from one file of the project to another: across a boundary nobody declared, or past an entrance.
 function between(ctx, from, to) {
   const target = systemOf(ctx.config, to);
-  if (target) opensScreen(ctx, from, [], target);
   if (!target || target === from.system) return;
   const pair = `${from.system ?? NONE} -> ${target}`, key = `${pair}: ${from.file} -> ${to}`, entrance = ctx.config.systems[target].entrance;
   if (from.system && !(ctx.config.systems[from.system].uses ?? []).includes(target)) add(ctx, "crossing", key, pair);

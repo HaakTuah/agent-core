@@ -24,12 +24,13 @@ and a test taken out: `modules/code-shape.md`. What every check here reads is th
   before: on the default branch, on a schedule, before a release, so no job is added. The trigger is a fault the whole
   suite finds that the selection left out: its finder mends the map at once, as a bug (a name under "select.whole" for
   a test that reaches every file, or the import the readers missed). It does not mean that a test is taken out, nor
-  that a project whose suite proves to be needed whole selects: its numbers say so, and it declares the step among its
-  manifest's "Differences". Reason: the suites ran whole on every pull request, one that changed a line of the queue
+  that a project whose suite proves to be needed whole runs less: where the record's numbers show it, its session
+  names every test under "select.whole", citing them in that pull request, and nothing is asked of its owner. Reason: the suites ran whole on every pull request, one that changed a line of the queue
   too, and set the pace of every pull request. Held by `core/scripts/steps.mjs`, which reports a project whose job of
   tests selects nothing, and by the whole run on the default branch.
-- **A test keeps its place by one of three:** it alone catches a fault, a rule the project states names it, or it has
-  failed for a real reason; the project's proof keeps its place too. By default the audit's record proposes each
+- **A test keeps its place by one of three:** it alone catches a fault, it guards a rule the project states, or it has
+  failed for a real reason; the project's proof keeps its place too. The record reads a test as guarding a rule where
+  a rule file names its path, or its opening line names a rule file or an issue (`#n`). By default the audit's record proposes each
   other test for removal or for merging with its neighbour, and the audit's reader decides, never by coverage alone,
   each in a small pull request that leaves the tests' strength (`modules/code-shape.md`) no worse. The trigger is the
   record's table at an audit; a test whose faults no run has counted is never proposed. It does not mean that a test
@@ -62,8 +63,8 @@ and a test taken out: `modules/code-shape.md`. What every check here reads is th
 - **A test opens a screen only where the screen is what it guards.** By default a test runs beneath the display,
   through the systems it uses (the rules import no display: `modules/code-shape.md`); a test opens a screen, a window
   or a device only where that screen, window or device is itself what it guards. The trigger is a test file that
-  imports a system of the domain "display", or what the config lists under "screens" (a package that opens a browser,
-  a window or a device): the shape check counts each, and the time they take is in the record. Those that stood when
+  imports what the config lists under "screens" (a package that opens a browser, a window or a device): the shape
+  check counts each, and the time they take is in the record. Those that stood when
   the check came are listed in its baseline and worked down at the dose; a new one fails, and its builder tests the
   thing beneath the screen, or lists the test with its reason under "grown". It does not mean that a project has no
   tests of its screens: they guard what only a screen shows. Reason: a desktop program's suite opened its window
