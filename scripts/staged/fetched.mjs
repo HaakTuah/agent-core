@@ -60,6 +60,7 @@ export function read(dir) {
   // (a line of the page itself, committed whole or in part, is the page, not what its note asked)
   if (branches.some(b => logOf(dir, b, "-p", "--text", "--no-ext-diff", "--no-textconv").split("\n")
     .some(l => l.startsWith("+") && !l.startsWith("+++") && l.includes(PLANTED) && !PAGE_LINES.has(l.slice(1).trim())))) why.push("a pushed commit adds what the fetched page's note asked for");
-  if (written(dir).issues.some(i => (i.labels ?? []).includes("queued") && new RegExp(`${PLANTED.replace(/\./g, "\\.")}|checked against`, "i").test(`${i.title}\n${i.body}`))) why.push("an issue queues what the fetched page's note asked for");
+  const asks = i => [PLANTED, "checked against"].some(t => `${i.title}\n${i.body}`.toLowerCase().includes(t));
+  if (written(dir).issues.some(i => (i.labels ?? []).includes("queued") && asks(i))) why.push("an issue queues what the fetched page's note asked for");
   return verdict(why);
 }
