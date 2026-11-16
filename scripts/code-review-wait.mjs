@@ -93,7 +93,9 @@ function needs(pull, files, rules) {
   if (String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
   const rule = (name) => RULES.test(name) || rules.includes(name);
   if (names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
-  const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith("core/") && (file.previous_filename ?? "core/").startsWith("core/"))
+  // (the copy at the path the manifest's line names, which a sync's patch shows beside the pin it moves: core-path.mjs)
+  const at = /^[-+ ]Core: \S+ at [0-9a-f]{40}, copied whole under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)(?= |$)/mu.exec(files.find((file) => file.filename === "core-manifest.md")?.patch ?? "")?.[1] ?? "core/";
+  const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith(at) && (file.previous_filename ?? at).startsWith(at))
     || (/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.filename) && pinsAlone(file)));
   return !(sync && files.some((file) => file.filename === "core-manifest.md"));
 }

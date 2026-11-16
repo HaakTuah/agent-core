@@ -164,8 +164,9 @@ jobs:
           shape= merge= cloned= pure=
           if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \
             && [ "$(jq '[.[][]] | length' "$d/files.json")" = "$(jq '.changed_files' "$d/pull.json")" ] \
-            && jq -e 'any(.[][]; .filename == "core-manifest.md") and all(.[][]; .filename == "core-manifest.md"
-              or (.filename | startswith("core/")) or (.filename | test("^\\.github/workflows/[^/]+\\.ya?ml$")))' \
+            && jq -e '([.[][] | select(.filename == "core-manifest.md") | .patch // "" | capture("(?<l>^|\n)[-+ ]Core: \\S+ at [0-9a-f]{40}, copied whole under (?<p>([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( |\n|$)")? | .p] | first // "core/") as $at
+              | any(.[][]; .filename == "core-manifest.md") and all(.[][]; .filename == "core-manifest.md"
+              or (.filename | startswith($at)) or (.filename | test("^\\.github/workflows/[^/]+\\.ya?ml$")))' \
               "$d/files.json" > /dev/null
           then shape=1; fi
           if [ -f "$ROOT/scripts/clean-merges.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \

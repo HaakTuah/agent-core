@@ -160,6 +160,21 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     ok(r.status === 0, "the pointer check from a copy a submodule carries reads the project's AGENTS.md, and finds the submodule's files", r.stdout + r.stderr);
     r = pointers("# A consumer\n\nThe floor: `lib/core/floor/nowhere.md`.\n");
     ok(r.status !== 0 && /AGENTS\.md/.test(r.stderr) && /nowhere\.md/.test(r.stderr) && mended(r.stderr), "and fails the project's own pointer that leads nowhere, saying the mend", r.stdout + r.stderr);
+    // (and the start hook names what a branch's changed paths call for, its reading script and the core's modules read
+    // from the library's commit main pins, in the submodule's repository)
+    for (const f of ["work-saved.sh", "reading.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), "utf8"));
+    put(lib2, "core/roles/builder.md", fs.readFileSync(fileURLToPath(new URL("../roles/builder.md", import.meta.url)), "utf8"));
+    put(lib2, "core/tasks/notes.md", "# Notes\n\nRead when a note changes: the path `note.txt`.\n");
+    git(lib2, "add", "-A"); git(lib2, "commit", "-q", "-m", "the reading script");
+    git(path.join(consumer, "lib"), "pull", "-q", "origin", "main");
+    put(consumer, "AGENTS.md", "# A consumer\n\n@lib/core/floor/security.md\n");
+    git(consumer, "add", "-A"); git(consumer, "commit", "-q", "-m", "a consumer");
+    const origin2 = path.join(tmp, "a-consumer.git");
+    git(tmp, "init", "-q", "--bare", "-b", "main", origin2);
+    git(consumer, "remote", "add", "origin", origin2); git(consumer, "push", "-q", "-u", "origin", "main");
+    git(consumer, "checkout", "-q", "-b", "a-note"); put(consumer, "note.txt", "a note\n");
+    const said = spawnSync("sh", ["-c", hookCommands(readCore(carried())).start], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: consumer } }).stdout;
+    ok(/calls for `lib\/core\/tasks\/notes\.md`/.test(said), "the start hook, from a core a submodule carries, names the module the branch's changed paths call for", said);
   }
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);

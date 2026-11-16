@@ -86,6 +86,12 @@ const sync = [manifest, md("core/scripts/x.mjs"), { filename: ".github/workflows
 ok(is(had([], line, sync), true, "no code review is running") && is(had([], line, [...sync, md("src/x.js")]), false, "no code review") && is(had([], line, sync.slice(1)), false, "no code review")
   && is(had([], line, [sync[0], { ...sync[2], patch: "@@ -1 +1 @@\n-a\n+b" }]), false, "no code review") && is(had([], line, [md("core-manifest.md"), sync[1]]), false, "no code review"),
   "a sync's shape needs none; with anything more, with no manifest moved, a workflow changed beyond its pins or the manifest beyond its pin, it does");
+{
+  // (a copy at the path the manifest names, which the sync's patch shows: core-path.mjs)
+  const there = { ...manifest, patch: manifest.patch.replaceAll("under core/.", "under vendor/the-core/ (never edited here).") };
+  ok(is(had([], line, [there, md("vendor/the-core/scripts/x.mjs"), sync[2]]), true, "no code review is running") && is(had([], line, [there, md("core/scripts/x.mjs")]), false, "no code review"),
+    "a sync's shape at the path the manifest names needs none; a file under core/ beside it is no part of that copy");
+}
 ok(is(judge(pull, [], line, undefined), true, "no code review is running") && is(judge(pull, [], undefined, code), true, "no code review is running") && is(had([], line, []), true, "no code review is running"), "given no commits or no files, or a pull request that changes nothing, it waits only for a running review, as before");
 ok(is(had([], line, [md("README.md")], { ...pull, changed_files: 3001 }), false, "no code review") && is(had([summary({ ...done, commit_sha: OLD })], updated, code, { ...pull, commits: 251 }), false, "no code review")
   && is(had([summary(done)], line, code, { ...pull, commits: 251 }), true, "a code review has run"), "a list of files cut short needs a review; a list of commits cut short proves no update from main, and only a review of the head stands");

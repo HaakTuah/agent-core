@@ -42,7 +42,13 @@ if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
   reading=scripts/reading.mjs
   # (neither read fetches what a clone made without its files lacks, nor asks for a sign-in)
   [ -n "$at" ] && reading=${at}scripts/reading.mjs
-  r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show "refs/remotes/origin/main:$reading" 2>/dev/null) && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
+  r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show "refs/remotes/origin/main:$reading" 2>/dev/null)
+  # (where a library's submodule carries the core, from the library's commit main pins, in the submodule's repository)
+  lib=$(printf '%s\n' "$manifest" | sed -n -E 's#^Core: [^ ]+, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+) under .*#\1#p' | head -n 1)
+  if [ -z "$r" ] && [ -n "$lib" ] && pin=$(g --no-replace-objects rev-parse "refs/remotes/origin/main:${lib%/}" 2>/dev/null); then
+    r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g -C "$lib" --no-replace-objects show "$pin:${reading#"$lib"}" 2>/dev/null)
+  fi
+  [ -n "$r" ] && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
 fi
 issues=()
 dirty=$(g status --porcelain 2>/dev/null)
