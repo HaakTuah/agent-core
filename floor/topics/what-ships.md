@@ -17,7 +17,7 @@ review: the kinds `dependency`, `update`, `alert` and `security-review`.
   taken over (an advisory, the registry's notice, a review's finding) puts the project back on its last good version,
   or takes the package out where none was, in a pull request; and tells the owner at once, privately as rule 9 reports
   a weakness, naming every key and sign-in the build or a session could reach while that version was installed.
-  Replacing those is the owner's.
+  Replacing those is the owner's. Nothing changes it.
   - It does not mean a weakness with a fix, which an update takes (`tasks/updates.md`), nor that the pull request
     waits for the owner. Reason: the floor said this of a leaked secret and nothing of a bad package, and the first
     hour is when it matters.

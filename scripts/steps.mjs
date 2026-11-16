@@ -510,9 +510,18 @@ export const STEPS = [
   { lead: "16 November 2026, a new package looked up", cost: COST.workflow,
     check: p => {
       // (a project that calls the core's licences.yml or nuget.yml takes the lookup with the call; one that runs the
-      // checks from a workflow of its own, as a private repository does, adds the step beside the exact-versions check)
-      const own = Object.entries(p.workflows).filter(([, w]) => /core\/scripts\/exact-versions\.mjs/u.test(w.text ?? "") && !/core\/scripts\/lookup\.mjs/u.test(w.text ?? ""));
-      return own.length ? `In ${own.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\` on every pull request, its checkout given \`fetch-depth: 2\` so that the base is there (\`--nuget\` added, in a step of its own, where the project's packages come from NuGet).` : null;
+      // checks from a workflow of its own, as a private repository does, or a NuGet project whose sources need a
+      // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
+      // where it runs the NuGet check)
+      const lookups = text => [...text.matchAll(/core\/scripts\/lookup\.mjs[^\n]*/gu)].map(m => m[0]);
+      const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
+        const text = w.text ?? "", runs = lookups(text), at = `\`.github/workflows/${shown(f)}\``;
+        return [
+          /core\/scripts\/exact-versions\.mjs/u.test(text) && !runs.some(l => !/--nuget/u.test(l)) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
+          /core\/scripts\/nuget(?:-fetch)?\.mjs/u.test(text) && !runs.some(l => /--nuget/u.test(l)) ? `in ${at}, before the step that restores or runs \`core/scripts/nuget.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+        ].filter(Boolean);
+      });
+      return wrong.length ? `On every pull request, ${wrong.join("; ")}; its checkout given \`fetch-depth: 2\`, so that the base is there.` : null;
     },
     partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
 ];

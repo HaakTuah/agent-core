@@ -7,13 +7,17 @@ Read before a task adds or updates a dependency or a tool of an agent's own, and
 - Installed from the lock file (`npm ci` or its like), except where a PR adds or updates a package.
 - Never running a package's install scripts.
 - Pinned as rule 7 says.
-- A new one only with a reason, from a known publisher, and in this order: what the platform brings first, then a
-  tool that only runs, then a library; for what ships to users, the pull request that adds one says how many packages
-  it brings with it.
+- A new one only with a reason, from a known publisher.
+- **A new one is taken in an order:** the session that adds a package takes, for the job, what the platform brings
+  first, then a tool that only runs, then a library; and for what ships to users, its pull request says how many
+  packages the new one brings with it, as the lookup prints. Nothing changes it.
+  - It does not mean code written by hand comes before a package, nor that a library is refused where neither of the
+    first two does the job. Reason: what the platform brings installs nothing, and a tool that only runs ships nothing.
 - **A new one is looked up in its registry:** in a pull request that brings a package into a lock file, one that no
   lock file of its base held, the package check asks the registry of it, fails a name the registry does not know and
   one first published under 90 days ago, and prints the rest for the review (its last release, its repository, whether
   that is archived and names it back, its publisher, the packages it brings, its provenance), which no score decides.
+  Nothing changes it.
   - It does not mean a person approves each package, a list of approved ones, or that what a project held before is
     asked again. Reason: a model sometimes names a package that does not exist, the same names recur, and someone
     registers them; such a name is new and has no history.

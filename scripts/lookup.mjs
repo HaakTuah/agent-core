@@ -19,7 +19,7 @@
 //
 //   node core/scripts/lookup.mjs <the licence check's config> [--nuget]
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { logged, parseBounded } from "./guards.mjs";
@@ -49,8 +49,12 @@ export function npmPackages(text, lockPath) {
   const own = new Set(Object.keys(packages).filter((p) => !lockInstalled(p)));
   const names = (entry) => KINDS.flatMap((k) => (entry?.[k] && typeof entry[k] === "object" ? Object.keys(entry[k]) : []));
   const direct = new Set([...own].flatMap((p) => names(packages[p]).map((n) => resolve(packages, p, n)).filter(Boolean)));
+  const next = (at) => names(packages[at]).map((n) => resolve(packages, at, n)).filter(Boolean);
+  const reached = new Map([...direct].map((d) => [d, reach(d, next)]));
+  const nameOf = (p) => registryName(packages[p]?.resolved) ?? p.slice(p.lastIndexOf("node_modules/") + 13);
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link && registryName(e.resolved))
-    .map(([p, e]) => ({ name: registryName(e.resolved), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, (at) => names(packages[at]).map((n) => resolve(packages, at, n)).filter(Boolean)).size }));
+    .map(([p, e]) => ({ name: registryName(e.resolved), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
+      by: direct.has(p) ? [] : [...reached].filter(([, set]) => set.has(p)).map(([d]) => nameOf(d)) }));
 }
 
 // The lock entry npm installs for `name` as seen from the package at `from`: the nearest node_modules going up.
@@ -78,11 +82,13 @@ export function nugetPackages(text, lockPath) {
   for (const entries of Object.values(lock.dependencies)) {
     const lower = new Map(Object.keys(entries).map((id) => [id.toLowerCase(), id]));
     const next = (id) => Object.keys(entries[id]?.dependencies ?? {}).map((d) => lower.get(d.toLowerCase())).filter(Boolean);
+    const reached = Object.entries(entries).filter(([, e]) => e?.type === "Direct" || e?.type === "CentralTransitive").map(([id]) => [id, reach(id, next)]);
     for (const { id, version } of packages) {
       const entry = entries[lower.get(id.toLowerCase())];
       if (!entry || entry.resolved !== version) continue;
       const was = out.get(id.toLowerCase()), brings = reach(lower.get(id.toLowerCase()), next).size;
-      out.set(id.toLowerCase(), { name: id, version, path: id, direct: (was?.direct ?? false) || entry.type !== "Transitive", brings: Math.max(was?.brings ?? 0, brings) });
+      const by = reached.filter(([, set]) => set.has(lower.get(id.toLowerCase()))).map(([d]) => d);
+      out.set(id.toLowerCase(), { name: id, version, path: id, direct: (was?.direct ?? false) || entry.type !== "Transitive", brings: Math.max(was?.brings ?? 0, brings), by: [...new Set([...(was?.by ?? []), ...by])] });
     }
   }
   return [...out.values()];
@@ -151,22 +157,40 @@ export async function nugetFacts(index, page) {
 
 /** Each new package looked up with `get(url)` ({ status, json }): { failures, reports }, as of `now`. */
 export async function lookUp(packages, { get, now = Date.now(), nuget = false }) {
-  const failures = [], reports = [];
-  let asked = 0;
+  const failures = [], reports = [], github = { asked: 0 };
   await pool(packages, 8, async (p) => {
-    const at = `${p.lockPath}: ${said(p.name)}@${said(p.version)}`;
+    const at = `${p.lockPath}: ${said(p.name)}@${said(p.version)}`, where = nuget ? "NuGet's" : "npm's";
     let facts;
     try { facts = await registry(p, get, nuget); } catch (e) {
-      failures.push(`${at}: ${nuget ? "NuGet's" : "npm's"} registry could not be read (${said(e.message)}). Mend: run the job again; if it fails the same way, say so in the pull request and leave the package out until it passes`);
+      failures.push(`${at}: ${where} registry could not be read (${said(e.message)}). Mend: run the job again; if it fails the same way, say so in the pull request and leave the package out until it passes`);
       return;
     }
-    if (facts.missing) { failures.push(`${at}: ${nuget ? "NuGet's" : "npm's"} registry has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
-    const age = Math.floor((now - facts.first) / DAY);
-    if (age < YOUNG) failures.push(`${at}: first published ${day(facts.first)}, ${age} days ago, under the ${YOUNG} days floor rule 15 asks. Mend: take a package that does the job and was first published ${YOUNG} days ago or more, or wait until ${day(facts.first + YOUNG * DAY)} to add this one`);
-    const github = p.direct && facts.repo?.owner && asked++ < GITHUB_MOST ? await onGitHub(facts.repo, p.name, get, nuget) : null;
-    reports.push(`${at}: ${p.direct ? "named by the project" : "brought by another"}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${facts.repo ? said(facts.repo.url) : "not named"}${github ?? ""}; published by ${said(facts.publisher)}; brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it; provenance: ${facts.provenance}`);
+    if (facts.missing) { failures.push(`${at}: ${where} registry has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
+    const young = tooYoung(p, facts, now);
+    if (young) failures.push(`${at}: ${young}`);
+    reports.push(`${at}: ${await described(p, facts, now, { get, nuget, github })}`);
   });
   return { failures: failures.sort(), reports: reports.sort() };
+}
+
+const brought = (p) => (p.by ?? []).map(said).join(", ");
+
+// Where a package was first published under YOUNG days before `now`, what is wrong and its mend: for one the project
+// names, take another or wait; for one another brings, hold what brings it or take a version of that which does not.
+function tooYoung(p, facts, now) {
+  const age = Math.floor((now - facts.first) / DAY), until = day(facts.first + YOUNG * DAY), by = brought(p);
+  if (age >= YOUNG) return null;
+  const mend = p.direct ? `take a package that does the job and was first published ${YOUNG} days ago or more, or wait until ${until} to add this one`
+    : `hold the change that brings it${by ? ` (to ${by})` : ""} until ${until}, or take a version of ${by || "what brings it"} that does not bring it`;
+  return `first published ${day(facts.first)}, ${age} days ago, under the ${YOUNG} days floor rule 15 asks. Mend: ${mend}`;
+}
+
+// What the review is shown of one package, GitHub asked only of one the project names, and of GITHUB_MOST at most.
+async function described(p, facts, now, { get, nuget, github }) {
+  const age = Math.floor((now - facts.first) / DAY);
+  let repo = facts.repo ? said(facts.repo.url) : "not named";
+  if (p.direct && facts.repo?.owner) repo += github.asked++ < GITHUB_MOST ? await onGitHub(facts.repo, p.name, get, nuget) : `, GitHub not asked: past the ${GITHUB_MOST} packages a lookup asks of it`;
+  return `${p.direct ? "named by the project" : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it; provenance: ${facts.provenance}`;
 }
 
 async function registry(p, get, nuget) {
@@ -234,7 +258,7 @@ const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${messag
 /** The check on the project at `root`, read against `base` (a commit, or null), its config at `configPath` as the
  *  working folder names it: { lines, code }, each line as the workflow prints it. */
 export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now() }) {
-  if (!base) return { lines: ["ok   no pull request's base here, so no package is new: nothing looked up"], code: 0 };
+  if (!base) return { lines: [`ok   no pull request's base here, so no package is new: nothing looked up${process.env.GITHUB_EVENT_NAME?.startsWith("pull_request") ? " (note: this is a pull request, so its checkout lacks the base: give it fetch-depth: 2, or the lookup reads nothing)" : ""}`], code: 0 };
   let found;
   try {
     const config = nuget ? JSON.parse(readFileSync(configPath, "utf8")) : loadConfig(configPath);
@@ -255,5 +279,9 @@ if (started(import.meta.url)) {
   catch (e) { console.error(`FAIL: ${logged(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
   const { lines, code } = await run(configPath, { root, base: baseOf(root), nuget: process.argv.includes("--nuget") });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
+  // (what is printed for the review, also on the run's summary page, where a reviewer finds it beside the checks)
+  if (process.env.GITHUB_STEP_SUMMARY && lines.length > 1) {
+    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### The lookup${process.argv.includes("--nuget") ? " (NuGet)" : ""}\n\n${lines.map((l) => `- ${l.replace(/[<>&`*_[\]|]/gu, "?")}`).join("\n")}\n`); } catch { /* (a summary is a convenience: the log holds every line) */ }
+  }
   process.exit(code);
 }

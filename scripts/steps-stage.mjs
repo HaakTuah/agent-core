@@ -224,15 +224,15 @@ export const STAGES = {
     },
   },
   "16 November 2026, a new package looked up": {
-    // (an npm project that runs the licence and exact-versions checks from a workflow of its own, without the lookup)
+    // (a project that runs the licence, exact-versions and NuGet checks from a workflow of its own, without either lookup)
     stage: dir => {
       if (!fs.existsSync(at(dir, "package-lock.json"))) write(dir, "stage-npm/package-lock.json", "{}\n");
       const core = at(dir, ".github/workflows/licences.yml");
       if (fs.existsSync(core)) { write(dir, ".stage-lookup/licences.yml", fs.readFileSync(core, "utf8")); fs.rmSync(core); }
-      write(dir, ".github/workflows/packages-own.yml", "name: packages-own\n\non:\n  pull_request:\n\njobs:\n  packages:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/exact-versions.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n");
+      write(dir, ".github/workflows/packages-own.yml", "name: packages-own\n\non:\n  pull_request:\n\njobs:\n  packages:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/exact-versions.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n      - run: node core/scripts/nuget.mjs checks/licences.json --packages packages\n");
     },
     mend: dir => {
-      write(dir, ".github/workflows/packages-own.yml", `${read(dir, ".github/workflows/packages-own.yml")}      - run: node core/scripts/lookup.mjs checks/licences.json\n`);
+      write(dir, ".github/workflows/packages-own.yml", `${read(dir, ".github/workflows/packages-own.yml")}      - run: node core/scripts/lookup.mjs checks/licences.json\n      - run: node core/scripts/lookup.mjs checks/licences.json --nuget\n`);
       if (fs.existsSync(at(dir, ".stage-lookup"))) { write(dir, ".github/workflows/licences.yml", read(dir, ".stage-lookup/licences.yml")); fs.rmSync(at(dir, ".stage-lookup"), { recursive: true }); }
     },
   },

@@ -3,11 +3,12 @@
 // the registry gives, trimmed to what the lookup reads, and handed to it in place of the network (floor rule 8: no
 // live call, no real package). Run: node scripts/lookup-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "./lookup.mjs";
 import { mended } from "./mend.mjs";
+import { notDone, STEPS } from "./steps.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { if (!cond) { failed++; console.error(`FAIL ${what}`); } };
@@ -62,7 +63,7 @@ const by = (name) => read.find((p) => p.name === name);
 ok(read.length === 4, `npm: the four packages npm's registry gives are read, the one from git and the link left out (${read.map((p) => p.name)})`);
 ok(by("tidy-moss-helper")?.direct === true, "npm: an alias is read by the name its registry address gives, and counts as named by the project");
 ok(by("tidy-moss-format")?.direct === true && by("tidy-moss-format")?.brings === 2, "npm: a package the project names brings what its dependencies bring, deep too");
-ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.brings === 1, "npm: a package another brings is not named by the project");
+ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.brings === 1 && by("@invented/scoped-moss")?.by.join() === "tidy-moss-format", "npm: a package another brings is not named by the project, and names what does");
 
 const nugetLock = JSON.stringify({ version: 1, dependencies: { "net8.0": {
   "Invented.Moss.Core": { type: "Direct", requested: "[2.0.0, )", resolved: "2.0.0", contentHash: "aGFzaA==", dependencies: { "invented.moss.young": "1.0.0" } },
@@ -70,7 +71,7 @@ const nugetLock = JSON.stringify({ version: 1, dependencies: { "net8.0": {
   "Own.Project": { type: "Project" },
 } } });
 const nread = nugetPackages(nugetLock, "src/packages.lock.json");
-ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.brings === 1 && nread.find((p) => p.name === "Invented.Moss.Young")?.direct === false, `NuGet: its packages read, a dependency matched in any case, the project's own left out (${JSON.stringify(nread)})`);
+ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.brings === 1 && nread.find((p) => p.name === "Invented.Moss.Young")?.direct === false && nread.find((p) => p.name === "Invented.Moss.Young")?.by.join() === "Invented.Moss.Core", `NuGet: its packages read, a dependency matched in any case, the project's own left out (${JSON.stringify(nread)})`);
 
 // ---- What is new
 const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-helper" }], [{ name: "@invented/scoped-moss" }]]);
@@ -91,9 +92,13 @@ r = await one(pkg("never-published-moss"));
 ok(r.failures.length === 1 && /has no such package/u.test(r.failures[0]) && mended(`FAIL: ${r.failures[0]}`), `a name the registry does not know fails, saying the mend (${r.failures})`);
 r = await one(pkg("taken-off-moss"));
 ok(r.failures.length === 1 && /taken off the registry/u.test(r.failures[0]), `a package whose versions were taken off fails (${r.failures})`);
-r = await one(pkg("brand-new-moss", { direct: false }));
-ok(r.failures.length === 1 && r.failures[0].includes(`12 days ago, under the ${YOUNG} days`) && r.failures[0].includes(`wait until ${new Date(NOW + (YOUNG - 12) * 86400000).toISOString().slice(0, 10)}`) && mended(`FAIL: ${r.failures[0]}`), `a package first published under ${YOUNG} days ago fails, saying the day it may come (${r.failures})`);
-ok(r.reports.length === 1 && r.reports[0].includes("brought by another") && !asked.some((u) => u.includes("brand-new-moss") && u.includes("github")), "a young package is still printed for the review, and GitHub is asked only of a package the project names");
+const comes = new Date(NOW + (YOUNG - 12) * 86400000).toISOString().slice(0, 10);
+r = await one(pkg("brand-new-moss"));
+ok(r.failures.length === 1 && r.failures[0].includes(`12 days ago, under the ${YOUNG} days`) && r.failures[0].includes(`wait until ${comes} to add this one`) && mended(`FAIL: ${r.failures[0]}`), `a package the project names, first published under ${YOUNG} days ago, fails, saying the day it may come (${r.failures})`);
+asked.length = 0;
+r = await one(pkg("brand-new-moss", { direct: false, by: ["tidy-moss-format"] }));
+ok(r.failures.length === 1 && r.failures[0].includes(`hold the change that brings it (to tidy-moss-format) until ${comes}, or take a version of tidy-moss-format that does not bring it`) && mended(`FAIL: ${r.failures[0]}`), `one that another brings fails too, naming what brings it (${r.failures})`);
+ok(r.reports.length === 1 && r.reports[0].includes("brought by tidy-moss-format") && !asked.some((u) => u.includes("brand-new-moss") && u.includes("github")), "a young package is still printed for the review, and GitHub is asked only of a package the project names");
 r = await lookUp([pkg("tidy-moss-format")], { get, now: Date.parse(ago(800)) + YOUNG * 86400000 + (Date.parse(ago(0)) - NOW) });
 ok(r.failures.length === 0, `a package first published ${YOUNG} days ago to the day passes (${r.failures})`);
 for (const [what, json] of [["no versions", { time: { created: ago(800) } }], ["no time and no versions", { time: null }]]) {
@@ -110,7 +115,7 @@ const thrown = await lookUp([pkg("tidy-moss-format")], { get: async () => { thro
 ok(thrown.failures.length === 1 && /connect timed out/u.test(thrown.failures[0]), "a network that fails fails the lookup");
 asked.length = 0;
 r = await lookUp(Array.from({ length: 30 }, () => pkg("tidy-moss-format")), { get, now: NOW });
-ok(asked.filter((u) => u.startsWith("https://api.github.com/")).length === 20, "GitHub is asked of 20 packages at most, so a run never reaches its hourly limit");
+ok(asked.filter((u) => u.startsWith("https://api.github.com/")).length === 20 && r.reports.filter((l) => l.includes("GitHub not asked: past the 20")).length === 10, "GitHub is asked of 20 packages at most, so a run never reaches its hourly limit, and the rest say so");
 
 r = await one(pkg("Invented.Moss.Core", { version: "2.0.0" }), true);
 ok(r.failures.length === 0 && r.reports[0]?.includes(`first published ${ago(500).slice(0, 10)}`) && r.reports[0].includes(`last release ${ago(20).slice(0, 10)}`) && r.reports[0].includes("github.com/invented-org/moss-core, not archived") && r.reports[0].includes("Invented Authors (as the package writes its authors)"), `NuGet: a page is fetched where the index leaves it out, and an unlisted version's date of 1900 is no date (${JSON.stringify(r)})`);
@@ -149,6 +154,18 @@ try {
   writeFileSync(join(tmp, "package-lock.json"), "{ not json");
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && mended(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend (${r.lines})`);
+  // The sync's step, on a workflow of the project's own: each lookup is asked for apart, so one does not hide the other.
+  const step = STEPS.filter((x) => x.lead === "16 November 2026, a new package looked up");
+  mkdirSync(join(tmp, ".github/workflows"), { recursive: true });
+  const own = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
+  own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
+  let missed = notDone(tmp, step);
+  ok(missed.length === 1 && /runs `node core\/scripts\/lookup\.mjs <the licence check's config>`/u.test(missed[0].mend) && !/--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
+  own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget-fetch.mjs c.json", "node core/scripts/lookup.mjs c.json");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
+  own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
+  ok(notDone(tmp, step).length === 0, "and with both, the step is done");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");
