@@ -38,14 +38,15 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in four jobs
+  # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in five jobs
   # that run side by side, each under a time mark of its own: the core's checks from plain git and the sync on whole
-  # scratch projects, with the hostile tests of the core's inputs, the starter kit with the check of the core's copy,
-  # the licence, NuGet and agent-tools checks, with the hostile tests of build files and packages, and the rest, each
-  # step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
-  # are sized by the steps' times on Windows, where one runner takes half as long again as another: the first two so
-  # that each ends within its mark on the slow one too, the other two as they stood, which on the slow one may pass
-  # their marks (#425), beside the upgrade job, which takes longer; #387, #411, #424)
+  # scratch projects, with the hostile tests of the core's inputs; the starter kit, with the personal-terms check's own
+  # job; the check of the core's copy (core.yml) on scratch projects, alone; the licence, NuGet and agent-tools checks,
+  # with the hostile tests of build files and packages; and the rest, each step's condition naming the part it runs in,
+  # all on Linux, where one job runs them all. The parts are sized by the steps' times on Windows, where one runner
+  # takes half as long again as another, so that each ends within its mark on the slow one too, no mark raised: by
+  # three runs on main before #425, about 370 of 600, 320 of 600, 270 of 450, 270 of 450 and 280 of 480 seconds;
+  # beside the upgrade job, which takes longer; #387, #411, #424, #425)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
@@ -55,6 +56,7 @@ jobs:
           - { os: ubuntu-latest, part: all, suite: suites }
           - { os: windows-latest, part: projects, suite: suites-projects }
           - { os: windows-latest, part: kit, suite: suites-kit }
+          - { os: windows-latest, part: core, suite: suites-core }
           - { os: windows-latest, part: licences, suite: suites-licences }
           - { os: windows-latest, part: rest, suite: suites-rest }
     runs-on: ${{ matrix.os }}
@@ -238,7 +240,7 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/copy-tree-test.mjs ')) }}
         run: node scripts/copy-tree-test.mjs
       - name: The copy of the core's check (core.yml), its own job on scratch projects
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'kit') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-yml-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'core') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-yml-test.mjs ')) }}
         run: node scripts/core-yml-test.mjs
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/check-test.mjs ')) }}
@@ -262,7 +264,7 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/nuget-gate-test.mjs ')) }}
         run: node scripts/nuget-gate-test.mjs
       - name: The personal-terms check, its own job on scratch pull requests
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/personal-terms-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'kit') && (env.RUN == 'all' || contains(env.RUN, ' scripts/personal-terms-test.mjs ')) }}
         run: node scripts/personal-terms-test.mjs
       - name: The words check, the dated records' added lines too
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/general-test.mjs ')) }}
