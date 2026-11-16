@@ -88,6 +88,12 @@ try {
   ok(isFeature(readItem("o/r", "inbox/idea.md", dir)) && readItem("o/r", "inbox/none.md", dir) === null, "an inbox file is read from the checkout, and one not there is none");
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
+// the idea forms: the core's own and the one the starter kit writes
+for (const form of [".github/ISSUE_TEMPLATE/feature_request.md", "setup/template/issue-idea.md.tmpl"]) {
+  const text = fs.readFileSync(new URL(`../${form}`, import.meta.url), "utf8"), e = entryOf(text);
+  ok(e !== null && e.lines.some(l => l.shape === "If") && e.scope.length === 1 && /`feature`/.test(text), `${form} holds the heading "Done when" with an "If" and an out of scope, and names the kind`);
+}
+
 const slow = Date.now();
 const n = 100000;
 entryOf(`# x${" ".repeat(n)}${"#".repeat(n)}${" ".repeat(n)}y\n${"## ".concat(" \t".repeat(n), "#")}\n**${"a".repeat(n)}\n**Done when**\n- When ${" ".repeat(n)}Proof:${" ".repeat(n)}\n${"- When a, b. Proof: a test ".repeat(20000)}\n${"   x\n".repeat(50000)}${"1".repeat(n)}\n`);
