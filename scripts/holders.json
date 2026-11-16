@@ -36,6 +36,8 @@
     "tasks/game-design.md: The display is judged over the busiest scene": "check: scripts/screens.mjs, in part",
     "tasks/game-design.md: A player's settings are remembered": "check: scripts/screens.mjs, in part",
     "tasks/game-design.md: Same seed, same game": "check: a game's own tests, which replay its seeds, in part",
+    "tasks/game-design.md: Teaching has an order": "check: scripts/screens.mjs, in part",
+    "tasks/game-design.md: What must be remembered is decided once for each game": "check: a game's own test, which compares what the computer players are shown with what the game shows a person, in part",
     "roles/shared/work-flow.md: Work from `main`": "check: GitHub's ruleset on the default branch",
     "roles/shared/work-flow.md: Each PR has the headings": "check: scripts/pr-description.mjs, in part",
     "roles/shared/work-flow.md: Nothing waits silently": "check: scripts/pr-description.mjs, in part",

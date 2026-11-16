@@ -1,6 +1,6 @@
 // Tests the screen checks' baseline (screens.mjs, beside this file): the config and the findings it refuses, what is
 // new against the baseline and what a listed entry covers, a check that reports against one that binds, each check's
-// own mend (a game's settings too), an entry mended but still listed, the baseline lowered only on the screens run, and
+// own mend (a game's checks too), an entry mended but still listed, the baseline lowered only on the screens run, and
 // whole runs in a scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that
 // joins the baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline
 // moved, a config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each
@@ -68,6 +68,9 @@ ok(v.fail[0]?.includes("from the one system the direction names"), "a new findin
 const game = parseConfig(config({ settings: "binds" }), "c");
 v = verdict({ config: game, at: "c", self: "s", found: parseFound(found(["options"], { "settings: options: text size lost on reopening": true }), "f", game), baseline: { listed: new Map(), grown: {}, checks: new Set(["settings"]) } });
 ok(v.fail.length === 1 && v.fail[0].includes("keep it when the product is closed and opened again") && mended(v.fail[0]), "a game's settings check: a setting missing or lost fails with its own mend", v.fail.join("\n"));
+const first = parseConfig(config({ "first-choice": "binds" }), "c");
+v = verdict({ config: first, at: "c", self: "s", found: parseFound(found(["start"], { "first-choice: start: 95 seconds to the first real choice, past its target of 60": true }), "f", first), baseline: { listed: new Map(), grown: {}, checks: new Set(["first-choice"]) } });
+ok(v.fail.length === 1 && v.fail[0].includes("the first real choice the finding names") && v.fail[0].includes("Teaching has an order") && mended(v.fail[0]), "a game's first-choice check: the first real choice past its target fails with its own mend", v.fail.join("\n"));
 
 v = verdict({ config: c, at: "c", self: "s", found: f, baseline: { ...base, checks: new Set(["rendered"]) } });
 ok(v.fail.length === 1 && v.fail[0].includes("never listed what the values check finds") && mended(v.fail[0]), "a check turned on that the baseline has never listed fails, with its mend, and its findings are not read as new", v.fail.join("\n"));

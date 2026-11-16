@@ -161,3 +161,40 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `scripts/wait.mjs` and its line in the monthly state report, the core's own selection in its tests workflow, and
      the report on keeping up with main.
 
+
+
+240. **15 November 2026** (games; in chats with a session the owner works with, not the design session, as that
+     session recorded it on issue #311, labelled `by:chat`, under "What it is", saying the owner agreed to it; and as
+     the owner then told the orchestrator, who passed it on word for word to the builder of this rule). At the owner's
+     own asking the session checked the core's game rules against the field's practice and set out eight additions,
+     with what holds each: every game says on one page what it is for (what the player does from minute to minute,
+     what winning is, two or three kinds of experience it aims at, in the owner's words), a feature's entry says which
+     it serves, and a slot names the page; the first stage is the loop alone, nothing else built until it can be played
+     from start to finish; teaching has an order, one new thing at a time, first where a mistake costs nothing, then
+     under pressure, then combined, in play, not in text, and the time from opening the game to the first real choice
+     measured against a target on the page; standing measures from the simulations for every game (the win rate by
+     seat or starting place, how often the leader at a third of the game goes on to win, the spread of a game's
+     length, the time a player spends knocked out or with no real choice, the share of turns with only one sensible
+     move), each reported whenever the rules change against a target that is a first guess; a loss explains itself,
+     the player seeing after a round what beat them; chance before the choice where it can, a lever answering it
+     where it comes after; what must be remembered decided once for each game, shown to every player where remembering
+     is not meant as part of the skill, and where it is, the computer players remembering no better than a person at
+     their setting could; and sound with jobs (confirming an action, warning, marking a change of state), one voice
+     for each job, the music never covering them, how it sounds staying the owner's taste. Staying out: tricks that
+     hold a player (daily rewards, streaks, timers that punish leaving), difficulty that shifts in secret, helping
+     whoever is behind by breaking the rules for them, any theory used as a checklist, and a verdict on fun from a
+     model, which stays the owner's own play. The owner agreed to every addition that passes the owner's own test for
+     a rule (#303), and so to all eight; the test, in the owner's words:
+
+     > So the criteria is rules the agents can actually execute on, and which aids the output, makes it better or more
+     > robust.
+
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "Every game says what it is for, on one page", "The first stage is the loop alone", "Teaching has an
+     order", "A loss explains itself", "Standing measures from the simulations, for every game", "Chance comes before
+     the choice where it can", "What must be remembered is decided once for each game" and "Sound has jobs" in
+     `tasks/game-design.md`, the slot *game page*, and the check `first-choice` of `scripts/screens.mjs`.
