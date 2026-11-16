@@ -22,7 +22,8 @@
 // all the same: a bug counts against a pull request only where the owner's account filed it, and a line "Brought in by:
 // #N" (the bug form's last line) stands in its body or in a comment of the owner's account (the newest wins), N is a
 // pull request that was read and merged before the bug was filed; any other bug is not read, never none. No prose is
-// guessed at. It reads; it writes nothing and changes nothing. Git, gh and Node's own modules.
+// guessed at. Last it lists each rule the findings of two pull requests or more name, on their line "Rule:" (rulesNamed,
+// below). It reads; it writes nothing and changes nothing. Git, gh and Node's own modules.
 //
 //   node core/scripts/review-record.mjs [--since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
@@ -106,6 +107,31 @@ export function perPull(issueComments, inline, owner) {
   return { codexCode: codex("code"), postedCode: posted("code"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
 }
 
+// The rules a pull request's findings name (AGENTS.md of the core, "A finding seen twice becomes a check"; #254): each on
+// a line of its own that opens "Rule:", in a find of Codex's or a review posted by the owner's account, read as a key
+// the same however it is written: its backticks, bold and quotes, a closing stop and a leading "core/" left out, its
+// spaces made one and its case lowered. A quoted line names none.
+const RULE = /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Rule:(?:\*\*)?[ \t]+(\S.*)$/u;
+export const ruleOf = text => String(text).slice(0, 300).replace(/[`*"\u201c\u201d]/gu, "").replace(/\s+/gu, " ").trim()
+  .replace(/[.;]+$/u, "").trim().replace(/^core\//u, "").toLowerCase();
+export const rulesIn = body => lines(body).map(l => RULE.exec(l)?.[1]).filter(Boolean).map(ruleOf).filter(Boolean);
+export function rulesNamed(issueComments, inline, owner) {
+  const finds = [...inline, ...issueComments].filter(c => codexFind(c));
+  const posted = issueComments.filter(c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase() && ["security", "code", "design"].includes(postedKind(c.body)));
+  return [...new Set([...finds, ...posted].flatMap(c => rulesIn(c.body)))].sort();
+}
+
+// The rules the findings of two pull requests or more name, from `pulls` as { number, when, rules } (rulesNamed's
+// answer), each as { rule, pulls }, the most named first: those alone that a pull request merged on or after `since`
+// (a day, YYYY-MM-DD) named, where one is given, so that a month's report lists only what came up again in it.
+export function foundTwice(pulls, since = null) {
+  const by = new Map(), from = since ? Date.parse(`${since}T00:00:00Z`) : null;
+  for (const p of pulls) for (const rule of new Set(p.rules ?? [])) by.set(rule, [...(by.get(rule) ?? []), p]);
+  return [...by].filter(([, ps]) => ps.length > 1 && (from === null || ps.some(p => Date.parse(p.when) >= from)))
+    .map(([rule, ps]) => ({ rule, pulls: ps.map(p => p.number).sort((a, b) => a - b) }))
+    .sort((a, b) => b.pulls.length - a.pulls.length || a.rule.localeCompare(b.rule));
+}
+
 // The counts by review and by kind of pull request, from `pulls` as { number, kind, reviews } (perPull's answer).
 export function tally(pulls) {
   const t = {};
@@ -152,7 +178,7 @@ export function bugs(list, comments, merged, owner) {
   return out;
 }
 
-export function print(repo, since, pulls, t, bug) {
+export function print(repo, since, pulls, t, bug, twice = []) {
   const count = k => pulls.filter(p => p.kind === k).length;
   const out = [`The reviews in ${repo}, ${since ? `from ${since}` : "from the first merge read"}: ${pulls.length} merged pull requests (${KINDS.map(k => `${k} ${count(k)}`).join(", ")})`];
   out.push("A point blocks where it is P0 or P1 (Codex) or declared in the form read (a posted review); a posted review in any other wording is \"not read\", never none, and so for its other points.");
@@ -171,6 +197,10 @@ export function print(repo, since, pulls, t, bug) {
     + (bug.unmatched ? ` (no line ${bug.unlined}, a line naming no pull request read that merged before it ${bug.unmatched})` : "")
     + (bug.others ? `; filed by other accounts, left out: ${bug.others}` : ""));
   out.push("A bug is tied by a line \"Brought in by: #N\", alone on its line, in its body or in a comment of the owner's account; one without it is not read, never none.");
+  const naming = pulls.filter(p => p.rules?.length).length;
+  out.push("", `Found twice, a rule the findings of two pull requests or more name${since ? `, one of them merged from ${since}` : ""}: ${twice.length}${twice.length ? "" : " (none)"}`,
+    ...twice.map(f => `- ${f.rule}: ${f.pulls.map(n => `#${n}`).join(", ")}`),
+    `A finding names its rule on a line \"Rule: <file>: <bold lead>\" (AGENTS.md of the core, \"A finding seen twice becomes a check\"); one without it names none. Of the ${pulls.length} pull requests read, ${naming} have a finding that names one.`);
   return out.join("\n");
 }
 
@@ -182,9 +212,11 @@ function main(args) {
   if (args.includes("--owner") && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(by ?? "")) fail("--owner needs the owner's account after it");
   let rules;
   try { process.chdir(execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim()); rules = rulesFor(repoOf()); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
-  let repo, merged;
-  try { ({ repo, merged } = mergedPulls(rules, since)); } catch (e) { fail(e.message); }
+  let repo, all;
+  try { ({ repo, merged: all } = mergedPulls(rules)); } catch (e) { fail(e.message); }
   if (!repo) fail("the repository is not known (GITHUB_REPOSITORY, or origin's address)");
+  // (every merge is read for what was found twice, the first time often before --since; the counts read those from it)
+  const merged = since ? all.filter(m => Date.parse(m.when) >= Date.parse(`${since}T00:00:00Z`)) : all;
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
   const owner = by ?? repo.split("/")[0];
   const issueComments = pages(`repos/${repo}/issues/comments?sort=created&direction=asc`,
@@ -194,11 +226,13 @@ function main(args) {
   const issues = pages(`repos/${repo}/issues?state=all&labels=bug`,
     ".[] | {number, at: .created_at, login: .user.login, body, pull: (.pull_request != null)} | @json")
     .filter(b => !b.pull && (!since || b.at >= `${since}T00:00:00Z`)); // (pull requests are taken out after paging, so that a page's length is still GitHub's own)
-  const pulls = merged.map(m => ({ number: m.number, kind: m.kind,
-    reviews: perPull(issueComments.filter(c => c.issue === m.number), inline.filter(c => c.pull === m.number), owner) }));
+  const of = m => [issueComments.filter(c => c.issue === m.number), inline.filter(c => c.pull === m.number), owner];
+  const named = new Map(all.map(m => [m.number, rulesNamed(...of(m))]));
+  const pulls = merged.map(m => ({ number: m.number, kind: m.kind, reviews: perPull(...of(m)), rules: named.get(m.number) }));
   const t = tally(pulls);
   const bug = bugs(issues, issueComments, new Map(merged.map(m => [m.number, m])), owner);
-  console.log(print(repo, since, pulls, t, bug));
+  const twice = foundTwice(all.map(m => ({ number: m.number, when: m.when, rules: named.get(m.number) })), since);
+  console.log(print(repo, since, pulls, t, bug, twice));
 }
 
 if (started(import.meta.url)) main(process.argv.slice(2));
