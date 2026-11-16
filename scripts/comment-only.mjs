@@ -56,59 +56,39 @@ function node(rest, at) {
   const c = rest[at], next = rest[at + 1];
   const spaced = next === undefined || next === " ";
   if (c === "#") return rest[at - 1] === " " ? { kind: "empty", text: "", start: at, end: at, comment: at } : { why: "a # that opens no comment" };
-  if (c === "|" || c === ">") return header(rest, at);
-  const why = misplaced(c, spaced);
-  if (why) return { why };
-  if (c === "[" || c === "{") return flow(rest, at);
-  if (c === '"' || c === "'") return quoted(rest, at, c);
-  return plain(rest, at);
-}
-
-// a block scalar's header (`|` or `>`), to the line's end, with its comment if any
-function header(rest, at) {
-  const m = HEADER.exec(rest.slice(at));
-  if (!m) return { why: "a block scalar's header this proof does not read" };
-  const comment = m[1] === undefined ? null : rest.length - m[1].length;
-  const text = rest.slice(at, comment ?? rest.length).replace(/ +$/u, "");
-  return { kind: "block", text, start: at, end: rest.length, comment, fixed: /[1-9]/u.test(text) };
-}
-
-// why no node may start with `c` here, or null
-function misplaced(c, spaced) {
-  if (c === "-" && spaced) return "a sequence on a key's line";
-  if (c === ":" && spaced) return "a key with no name";
-  if ("&*!".includes(c)) return "an anchor, alias or tag";
-  if ("?%@`".includes(c)) return "an explicit key or a character YAML reserves";
-  if ("]},".includes(c)) return "a [ ] or { } out of place";
-  return null;
-}
-
-// a value in [ ] or { }, closed on its own line
-function flow(rest, at) {
-  let depth = 0, j = at;
-  for (; j < rest.length; j++) {
-    const ch = rest[j];
-    if (`"'#&*!`.includes(ch)) return { why: "a quote, #, anchor, alias or tag inside [ ] or { }" };
-    if (ch === "[" || ch === "{") depth++;
-    else if (ch === "]" || ch === "}") { depth--; if (depth === 0) { j++; break; } }
+  if (c === "|" || c === ">") {
+    const m = HEADER.exec(rest.slice(at));
+    if (!m) return { why: "a block scalar's header this proof does not read" };
+    const comment = m[1] === undefined ? null : rest.length - m[1].length;
+    const text = rest.slice(at, comment ?? rest.length).replace(/ +$/u, "");
+    return { kind: "block", text, start: at, end: rest.length, comment, fixed: /[1-9]/u.test(text) };
   }
-  if (depth !== 0) return { why: "a [ ] or { } that runs on to the next line" };
-  return after(rest, at, j, "flow");
-}
-
-// a value in the quotes `c`, closed on its own line
-function quoted(rest, at, c) {
-  let j = at + 1;
-  for (; j < rest.length; j++) {
-    if (c === '"' && rest[j] === "\\") { j++; continue; }
-    if (rest[j] === c) { if (c === "'" && rest[j + 1] === "'") { j++; continue; } break; }
+  if (c === "-" && spaced) return { why: "a sequence on a key's line" };
+  if (c === ":" && spaced) return { why: "a key with no name" };
+  if ("&*!".includes(c)) return { why: "an anchor, alias or tag" };
+  if ("?%@`".includes(c)) return { why: "an explicit key or a character YAML reserves" };
+  if ("]},".includes(c)) return { why: "a [ ] or { } out of place" };
+  if (c === "[" || c === "{") {
+    let depth = 0, j = at;
+    for (; j < rest.length; j++) {
+      const ch = rest[j];
+      if (`"'#&*!`.includes(ch)) return { why: "a quote, #, anchor, alias or tag inside [ ] or { }" };
+      if (ch === "[" || ch === "{") depth++;
+      else if (ch === "]" || ch === "}") { depth--; if (depth === 0) { j++; break; } }
+    }
+    if (depth !== 0) return { why: "a [ ] or { } that runs on to the next line" };
+    return after(rest, at, j, "flow");
   }
-  if (j >= rest.length) return { why: "a quoted value that runs on to the next line" };
-  return after(rest, at, j + 1, "quoted");
-}
-
-// a plain scalar: it ends at " #" (a comment) or at ": " or a final ":" (a key)
-function plain(rest, at) {
+  if (c === '"' || c === "'") {
+    let j = at + 1;
+    for (; j < rest.length; j++) {
+      if (c === '"' && rest[j] === "\\") { j++; continue; }
+      if (rest[j] === c) { if (c === "'" && rest[j + 1] === "'") { j++; continue; } break; }
+    }
+    if (j >= rest.length) return { why: "a quoted value that runs on to the next line" };
+    return after(rest, at, j + 1, "quoted");
+  }
+  // a plain scalar: it ends at " #" (a comment) or at ": " or a final ":" (a key)
   for (let j = at; j < rest.length; j++) {
     if (rest[j] === "#" && rest[j - 1] === " ") return { kind: "plain", text: rest.slice(at, j).replace(/ +$/u, ""), start: at, end: j, comment: j };
     if (rest[j] === ":" && (j + 1 === rest.length || rest[j + 1] === " ")) return { kind: "key", text: rest.slice(at, j), start: at, end: j + 1, comment: null };
@@ -141,116 +121,83 @@ export function readYaml(text) {
   // lines held until a line of its text follows. Blank lines after its last line
   // are no part of it unless kept, nor are they where YAML reads a line of spaces past its indentation as text; and its
   // last line, a blank one too, where the file ends with no line break, is marked, the break being part of the text
-  const st = { lines, comments, unread, block: null };
+  let block = null;
+  const close = () => { if (block.keep) lines.push(...block.blanks); block = null; };
   for (let i = 0; i < raw.length; i++) {
     const line = raw[i], n = i + 1;
     const indent = /^ */u.exec(line)[0].length;
-    const row = { n, line, indent, blank: indent === line.length, last: i === raw.length - 1 && !broken };
-    if (st.block && inBlock(st, row)) continue;
-    if (row.blank) continue;
-    readEntries(st, row);
+    const blank = indent === line.length;
+    if (block) {
+      if (blank && !(indent > (block.at ?? Infinity))) { block.blanks.push({ n, content: true, text: line, last: i === raw.length - 1 && !broken }); continue; }
+      if (block.at === undefined) {
+        block.at = Math.max(block.from + 1, indent);
+        if (indent >= block.at && block.blanks.some(b => b.text.length > indent)) unread.push(`line ${n}: a block scalar's first line less indented than a blank line before it`);
+      }
+      if (indent >= block.at) {
+        lines.push(...block.blanks, { n, content: true, text: line, last: i === raw.length - 1 && !broken });
+        block.blanks = [];
+        continue;
+      }
+      close();
+    }
+    if (blank) continue;
+    const rest = line.slice(indent);
+    if (rest[0] === "#") { comments.push({ text: rest, at: lines.length, own: true }); continue; }
+    if (/^(?:---|\.\.\.)(?: |$)/u.test(rest)) { unread.push(`line ${n}: a document marker`); continue; }
+    let at = 0, items = 0, dash = indent;
+    while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; dash = indent + at; at++; while (rest[at] === " ") at++; }
+    let first = node(rest, at), key = null, keyCol = null, value = first;
+    if (first.why) { unread.push(`line ${n}: ${first.why}`); continue; }
+    if (first.kind === "key") {
+      key = first.text; keyCol = indent + at;
+      value = node(rest, first.end);
+      if (value.why) { unread.push(`line ${n}: ${value.why}`); continue; }
+      if (value.kind === "key") { unread.push(`line ${n}: two keys on one line`); continue; }
+      if (value.kind !== "empty" && rest[first.end] !== " ") { unread.push(`line ${n}: a value with no space after its key`); continue; }
+    }
+    const cut = value.comment === null ? rest.length : value.comment;
+    const valueAt = value.kind === "empty" ? null : indent + value.start;
+    const note = rest.slice(cut);
+    if (note) comments.push({ text: note, at: lines.length, own: false });
+    lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
+    if (value.kind === "block") {
+      const from = key !== null ? keyCol : dash;
+      block = { from, at: value.fixed ? from + 1 : undefined, keep: value.text.includes("+"), blanks: [] };
+    }
   }
-  if (st.block) close(st);
+  if (block) close();
+  // one entry a line: a line that is no key and no item continues a value, or stands alone where YAML would read it so;
+  // and nothing deeper may follow a line that holds its value, where YAML would read it as that value running on
   const entries = lines.filter(l => !l.content);
-  oneEntryALine(entries, unread);
-  if (unread.length) return { lines: [], comments: [], unread };
-  markStepNames(entries);
-  return { lines, comments, unread };
-}
-
-// the block scalar ends: its trailing blank lines are kept only where it says so (`|+`)
-function close(st) { if (st.block.keep) st.lines.push(...st.block.blanks); st.block = null; }
-
-// a line read while in a block scalar: true where it is the block's (its text, or a blank line held), else the block
-// is closed and the line read as any other
-function inBlock(st, { n, line, indent, blank, last }) {
-  const block = st.block;
-  if (blank && !(indent > (block.at ?? Infinity))) { block.blanks.push({ n, content: true, text: line, last }); return true; }
-  if (block.at === undefined) {
-    block.at = Math.max(block.from + 1, indent);
-    if (indent >= block.at && block.blanks.some(b => b.text.length > indent)) st.unread.push(`line ${n}: a block scalar's first line less indented than a blank line before it`);
-  }
-  if (indent >= block.at) {
-    st.lines.push(...block.blanks, { n, content: true, text: line, last });
-    block.blanks = [];
-    return true;
-  }
-  close(st);
-  return false;
-}
-
-// a line that is no block scalar's and not blank: a comment line, or one with its entries, and the block it may open
-function readEntries(st, { n, line, indent }) {
-  const rest = line.slice(indent);
-  if (rest[0] === "#") { st.comments.push({ text: rest, at: st.lines.length, own: true }); return; }
-  if (/^(?:---|\.\.\.)(?: |$)/u.test(rest)) { st.unread.push(`line ${n}: a document marker`); return; }
-  let at = 0, items = 0, dash = indent;
-  while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; dash = indent + at; at++; while (rest[at] === " ") at++; }
-  const read = keyAndValue(rest, at, indent);
-  if (read.why) { st.unread.push(`line ${n}: ${read.why}`); return; }
-  const { key, keyCol, value } = read;
-  const cut = value.comment === null ? rest.length : value.comment;
-  const valueAt = value.kind === "empty" ? null : indent + value.start;
-  const note = rest.slice(cut);
-  if (note) st.comments.push({ text: note, at: st.lines.length, own: false });
-  st.lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
-  if (value.kind === "block") {
-    const from = key !== null ? keyCol : dash;
-    st.block = { from, at: value.fixed ? from + 1 : undefined, keep: value.text.includes("+"), blanks: [] };
-  }
-}
-
-// the key at `at`, if any, and its value: { key, keyCol, value }, or { why }
-function keyAndValue(rest, at, indent) {
-  const first = node(rest, at);
-  if (first.why) return first;
-  if (first.kind !== "key") return { key: null, keyCol: null, value: first };
-  const value = node(rest, first.end);
-  if (value.why) return value;
-  if (value.kind === "key") return { why: "two keys on one line" };
-  if (value.kind !== "empty" && rest[first.end] !== " ") return { why: "a value with no space after its key" };
-  return { key: first.text, keyCol: indent + at, value };
-}
-
-// one entry a line: a line that is no key and no item continues a value, or stands alone where YAML would read it so;
-// and nothing deeper may follow a line that holds its value, where YAML would read it as that value running on
-function oneEntryALine(entries, unread) {
   entries.forEach((l, k) => {
     if (l.key === null && l.items === 0) unread.push(`line ${l.n}: a value on a line of its own, or one that runs on from the line before`);
     const next = entries[k + 1];
     if (next && ["plain", "quoted", "flow"].includes(l.kind) && next.indent > (l.key !== null ? l.keyCol : l.indent)) unread.push(`line ${next.n}: a value that runs on from line ${l.n}`);
   });
-}
-
-// the steps' names: `- name: <value>` as the first key of an item under jobs.<job>.steps, read as text: holding no ${{
-// and no \ (a double-quoted name's escape, \x24 for $, would spell an expression the text does not show), quoted and
-// not empty, or plain from a letter and no word YAML reads as null or true or false
-function markStepNames(entries) {
+  if (unread.length) return { lines: [], comments: [], unread };
+  // the steps' names: `- name: <value>` as the first key of an item under jobs.<job>.steps, read as text: holding no ${{
+  // and no \ (a double-quoted name's escape, \x24 for $, would spell an expression the text does not show), quoted and
+  // not empty, or plain from a letter and no word YAML reads as null or true or false
+  const holder = (k) => {
+    const me = entries[k];
+    for (let p = k - 1; p >= 0; p--) {
+      const q = entries[p];
+      if (q.indent < me.indent || (q.indent === me.indent && q.items === 0 && me.items > 0)) return p;
+    }
+    return -1;
+  };
+  const opens = (p, key) => p >= 0 && entries[p].items === 0 && entries[p].kind === "empty" && (key === undefined ? entries[p].key !== null : entries[p].key === key);
   entries.forEach((l, k) => {
     if (l.items !== 1 || l.key !== "name" || l.value.includes("${{") || l.value.includes("\\")) return;
     if (!(l.kind === "quoted" ? l.value.length > 2 : l.kind === "plain" && /^[A-Za-z]/u.test(l.value) && !NOT_TEXT.test(l.value))) return;
-    const steps = holder(entries, k);
-    if (!opens(entries, steps, "steps")) return;
-    const job = holder(entries, steps);
-    if (!opens(entries, job)) return;
-    const jobs = holder(entries, job);
-    if (opens(entries, jobs, "jobs") && entries[jobs].indent === 0) l.stepName = true;
+    const steps = holder(k);
+    if (!opens(steps, "steps")) return;
+    const job = holder(steps);
+    if (!opens(job)) return;
+    const jobs = holder(job);
+    if (opens(jobs, "jobs") && entries[jobs].indent === 0) l.stepName = true;
   });
-}
-
-// the entry that holds entry `k`, or -1
-function holder(entries, k) {
-  const me = entries[k];
-  for (let p = k - 1; p >= 0; p--) {
-    const q = entries[p];
-    if (q.indent < me.indent || (q.indent === me.indent && q.items === 0 && me.items > 0)) return p;
-  }
-  return -1;
-}
-
-// whether entry `p` is a key, `key` where given, whose value is what follows it
-function opens(entries, p, key) {
-  return p >= 0 && entries[p].items === 0 && entries[p].kind === "empty" && (key === undefined ? entries[p].key !== null : entries[p].key === key);
+  return { lines, comments, unread };
 }
 
 /** Whether `before` and `after`, two versions of one YAML file, differ only in comments, blank lines between entries
