@@ -7,7 +7,7 @@ nothing is next, and a line leaves in the pull request that closes its issue.
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's word
 on the issue; *the owner*, no session takes it up before the owner's own word. **The owner's yes** that floor rule 3
 asks for is the one given when the line's issue was queued, relayed into its pull request (`AGENTS.md`, "Queued means
-wanted").
+wanted"). A line on points of #460 or #484 has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 
 ## In order
 
@@ -26,15 +26,15 @@ wanted").
 | #456 | rule builder; it changes the floor (rules 5 and 10), and its PR quotes the owner's yes on the issue | |
 | #457 | rule builder | |
 | #458 | rule builder | |
-| #459, and #484, points 8 to 10 | rule builder; for #484, "Part of #484", or "Fixes #484" if last | |
+| #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
 | #375 | rule builder | |
 | #376 | rule builder | #375, which changes the same files |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
-| #484, points 1 to 5 | rule builder; "Part of #484", or "Fixes #484" if last | |
-| #441, with #484, points 6 and 7 | builder; for #484, "Part of #484", or "Fixes #484" if last; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
+| #484, points 1 to 5 | rule builder | |
+| #441, with #484, points 6 and 7 | builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built now, whose work-down takes in `scripts/look.mjs` |
 | #350 | builder | |
 | #355 | builder | |
@@ -46,12 +46,12 @@ wanted").
 | #405 | builder | |
 | #407 | builder | |
 | #397 | rule builder; it changes the review guidelines (its PR quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
-| #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", or "Fixes #460" if last | |
-| #460, point 2 (the author's address) | builder; "Part of #460", or "Fixes #460" if last | #376, which changes the jobs its step joins |
-| #460, point 3 (a copy in a test) | builder; "Part of #460", or "Fixes #460" if last | #405, which changes `scripts/copies.mjs` too |
-| #460, point 4 (names in descriptions) | builder; "Part of #460", or "Fixes #460" if last | #405, which changes `scripts/pointers.mjs` too |
-| #460, point 5 (a report's size) | builder; "Part of #460", or "Fixes #460" if last | |
-| #460, point 6 (billed minutes) | builder; "Part of #460", or "Fixes #460" if last | |
+| #460, point 1 (a staged case for floor rule 9) | builder | |
+| #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
+| #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
+| #460, point 4 (names in descriptions) | builder | #405, which changes `scripts/pointers.mjs` too |
+| #460, point 5 (a report's size) | builder | |
+| #460, point 6 (billed minutes) | builder | |
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, which changes `tasks/game-design.md` and `scripts/screens.mjs` too |

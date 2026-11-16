@@ -44,7 +44,7 @@ export const CAPS = {
 // set at its first trim, as each project sets its own. A raise of it is read by the reviews, as any mark's is
 // (roles/shared/review-guidelines.md, "A mark on what every session reads"); this script checks only that the queue is
 // under it.
-export const QUEUE = { file: "QUEUE.md", mark: 5 * 1024 };
+export const QUEUE = { file: "QUEUE.md", mark: 4 * 1024 };
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
 const ANSWER = /^(?:\*\*)?Leanness check:/u;
 
