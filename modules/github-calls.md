@@ -1,9 +1,10 @@
 # GitHub's REST calls from a cloud session
 
 Read when a cloud session must open, mark ready, merge or inspect a PR, when a part of GitHub a rule needs cannot be
-reached, and when who may write is read (`modules/teams.md`). This is GitHub's part (`modules/hosts.md`). Claude's cloud
-sessions can't use GitHub's GraphQL API, so `gh pr create`, `list`, `view` and `ready` fail there; they use these REST
-calls (the `ccr/` routes are Claude's cloud proxy's, not GitHub's; `<owner>/<repo>` is the repository's own).
+reached, and when who may write is read (`modules/teams.md`): the kinds `cloud`, `host` and `team`. This is GitHub's
+part (`modules/hosts.md`). Claude's cloud sessions can't use GitHub's GraphQL API, so `gh pr create`, `list`, `view`
+and `ready` fail there; they use these REST calls (the `ccr/` routes are Claude's cloud proxy's, not GitHub's;
+`<owner>/<repo>` is the repository's own).
 
 ```bash
 gh api repos/<owner>/<repo>/pulls -f title=... -f head=<branch> -f base=main -f body=... # add -F draft=true: a draft

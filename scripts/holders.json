@@ -76,6 +76,7 @@
     "modules/roles.md: The roles, by what they do": "describes",
     "modules/teams.md: A person's approval follows the host": "check: GitHub's ruleset on the default branch",
     "modules/tools.md: One door in: `AGENTS.md`": "check: scripts/entry-files.mjs",
+    "modules/tools.md: One script says what to read": "check: scripts/reading.mjs, in part",
     "modules/tools.md: Hooks save time; checks are the guarantee": "check: scripts/holders.mjs, in part",
     "modules/tools.md: A change of tool loses nothing": "check: scripts/stalled.mjs, in part",
     "modules/tools.md: Proven by the staged cases, tool by tool": "check: scripts/staged.mjs, in part",
@@ -88,6 +89,21 @@
     "modules/antigravity.md: Hooks": "describes",
     "modules/antigravity.md: Its folders": "describes",
     "modules/codex.md: As a project's own agent": "describes",
-    "modules/kiro.md: Its includes": "check: scripts/entry-files.mjs"
+    "modules/kiro.md: Its includes": "check: scripts/entry-files.mjs",
+    "modules/roles.md: A file for each role": [
+      "check: scripts/size.mjs, in part",
+      "check: scripts/reading.mjs, in part"
+    ],
+    "roles/builder.md: Reads at its start": "check: scripts/reading.mjs, in part",
+    "roles/builder.md: Read by task, twice": "check: scripts/pr-description.mjs, in part",
+    "roles/builder.md: Hands over, gets back": "describes",
+    "roles/design.md: Reads at its start": "check: scripts/reading.mjs, in part",
+    "roles/design.md: Hands over, gets back": "describes",
+    "roles/orchestrator.md: Reads at its start": "check: scripts/reading.mjs, in part",
+    "roles/orchestrator.md: Hands over, gets back": "describes",
+    "roles/reviewer.md: Reads at its start": "check: scripts/reading.mjs, in part",
+    "roles/reviewer.md: Hands over, gets back": "describes",
+    "roles/stand-in.md: Reads at its start": "check: scripts/reading.mjs, in part",
+    "roles/stand-in.md: Hands over, gets back": "describes"
   }
 }

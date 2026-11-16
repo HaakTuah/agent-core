@@ -162,4 +162,17 @@ export const STAGES = {
     after: dir => fs.rmSync(at(dir, ".github/workflows/suites-staged.yml"), { force: true }),
     mend: dir => write(dir, ".github/workflows/suites-staged.yml", SUITE.replace("      - 'core-manifest.md'\n", `      - 'core-manifest.md'\n${callers(project(dir)).map(f => `      - '${f}'\n`).join("")}`)),
   },
+  "16 November 2026, a file for each role, and the script that says what to read": {
+    asked: true,
+    // (the manifest's "Paths:" line without the roles' folder, and AGENTS.md without the builder's file; the mend adds both)
+    stage: dir => {
+      write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)roles\/, /m, "$1"));
+      write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace(/^@core\/roles\/builder\.md[ \t]*\r?\n/m, ""));
+    },
+    mend: dir => {
+      const manifest = read(dir, "core-manifest.md"), agents = read(dir, "AGENTS.md");
+      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?modules\/, )/m, "$1roles/, "));
+      if (!/^@core\/roles\/builder\.md[ \t]*$/m.test(agents)) write(dir, "AGENTS.md", agents.replace(/^(@core\/floor\/security\.md[ \t]*\r?\n)/m, "$1@core/roles/builder.md\n"));
+    },
+  },
 };

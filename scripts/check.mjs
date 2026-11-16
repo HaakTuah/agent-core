@@ -1,4 +1,4 @@
-// The core's checks from plain git (modules/hosts.md, "One layer knows no host"; core archive 234; #250). Run from a
+// The core's checks from plain git (modules/hosts.md, "One layer knows no host"; core archive 236; #250). Run from a
 // project's root, on a person's machine or in any host's pipeline, it runs each workflow of the core's that the project
 // calls, as GitHub would run it for a pull request into main (`--base`, the commit it merges into) or for a push to main
 // (none given), on the commit checked out (for a pull request, merged into its base, as GitHub merges it, the base its first

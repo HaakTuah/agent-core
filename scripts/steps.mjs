@@ -23,7 +23,8 @@ import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tool
 import { CORE } from "./core-address.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
-import { parseConfig, where as shapeAt } from "./shape.mjs";
+import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
@@ -191,14 +192,20 @@ function strengthNamed(p) {
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
-// that config names. Null where both stand; else the mend.
+// that config names, which names every reader of the check's ("reads"; shape-readers.mjs), so that it lists what each
+// finds. Null where all of it stands; else the mend.
 function shapeWritten(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
   const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
   let config;
   try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
-  return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
+  const baseline = p.read(config.baseline);
+  if (baseline === null) return `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.`;
+  let reads = [];
+  try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader: its mend writes it again) */ }
+  const missing = Object.keys(READERS).filter(r => !reads.includes(r)).map(r => READERS[r]);
+  return missing.length ? `The shape check's baseline \`${config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
 }
 
 // The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
@@ -295,7 +302,9 @@ export const STEPS = [
   { lead: "12 November 2026, a slimmer copy", cost: COST.line,
     check: p => {
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
-      return want && !p.manifest.split("\n").includes(want) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
+      // (the roles' folder, which the line gained later, is its own entry's to ask: 16 November 2026, a file for each role)
+      const plain = line => line.replace("roles/, ", "");
+      return want && !p.manifest.split("\n").some(line => plain(line) === plain(want)) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
   { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
     partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
@@ -436,6 +445,14 @@ export const STEPS = [
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
   { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
     partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
+  { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,
+    check: p => {
+      const wrong = [];
+      if (!/^Paths:.*\broles\//mu.test(p.manifest)) wrong.push('add `roles/` to the folders the "Paths:" line of `core-manifest.md` names, so that it reads "one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/"');
+      if (!/^@core\/roles\/builder\.md[ \t]*$/mu.test(p.read("AGENTS.md") ?? "")) wrong.push("add the line `@core/roles/builder.md` to the `@` lines of `AGENTS.md`, after the floor's, and to each entry file the project holds the line `core/scripts/entry-files.mjs` then names");
+      return wrong.length ? `In one pull request, ${wrong.join("; and ")}.` : null;
+    },
+    partly: "whether the project's own folders have their kind of task in `checks/reading.json` is a reading of its folders; the sentence of `AGENTS.md` that names the script, step 2 of its \"Starting a task\" and the issue forms' \"What to read\" are differences `core/scripts/fresh.mjs` lists; the line `Read for it:` is held by the description check" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

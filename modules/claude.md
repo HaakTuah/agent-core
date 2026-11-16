@@ -1,6 +1,6 @@
 # Claude's part: models, effort and usage
 
-Read by Claude at the start of every task.
+Read by the tool `claude` at the start of every task.
 
 | Who | Model | Effort |
 | --- | --- | --- |

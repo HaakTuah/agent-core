@@ -2,8 +2,7 @@
 
 Read at the start of every task. The calls from a cloud session: `modules/github-calls.md`.
 
-- **Work from `main`:** each task on a branch of its own with a PR into `main`, which its builder merges (core archive 5
-  and 113; floor rule 12); every merge goes live or into the next release.
+- **Work from `main`:** each task on a branch of its own with a PR into `main` (core archive 5 and 113; floor rule 12).
 - **Each PR has the headings** "What the owner can try" (with whether the README is current) and "Readings taken" (core
   archive 16 and 153), and ends, above its attribution line, with the line `scripts/session-cost.mjs` prints, where it
   prints one: never worked out by hand (core archive 164).

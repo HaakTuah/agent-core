@@ -82,7 +82,7 @@ export const FILES = [
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
 // The files every session reads at its start, as the AGENTS.md template imports them: the reading-size check's marks,
 // and of the core's own (those under core/) what the core's cap counts (size.mjs).
-export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/modules/how-to-work.md",
+export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/modules/how-to-work.md",
   "core/modules/inbox.md", "core/modules/work-flow.md", "core/modules/git.md", "core/modules/claude.md", "core/modules/other-builders.md"];
 const KB = 1024;
 
