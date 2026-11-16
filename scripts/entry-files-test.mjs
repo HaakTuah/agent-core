@@ -69,9 +69,15 @@ try {
   git("init", "-q"); git("config", "user.email", "x@example.invalid"); git("config", "user.name", "x"); git("config", "commit.gpgsign", "false");
   write("AGENTS.md", AGENTS); write(".kiro/steering/core.md", "#[[file:core-manifest.md]]\n"); git("add", "-A"); git("commit", "-qm", "base");
   let r = run();
-  ok(r.status === 1 && mended(r.out) && r.out.includes("#[[file:core/floor/security.md]]"), "run with no base, a steering file that lacks one fails, saying its mend");
+  ok(r.status === 0 && r.out.includes("note") && r.out.includes("#[[file:core/floor/security.md]]"), "run in a project with no base, as on a push to main, a steering file that lacks one is noted and fails nothing");
+  const own = (() => { try { return { status: 0, out: execFileSync(process.execPath, [SCRIPT, "--core"], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }) }; } catch (e) { return { status: e.status, out: `${e.stdout}${e.stderr}` }; } })();
+  ok(own.status === 1 && mended(own.out) && own.out.includes("#[[file:core/floor/security.md]]"), "run as the core's own (--core), it fails, saying its mend");
   r = run({ ENTRY_BASE: "HEAD" });
   ok(r.status === 0 && r.out.includes("note") && r.out.includes("core/floor/security.md"), "run against a base that lacked it too, it is noted and passes");
+  write("AGENTS.md", `${AGENTS}@core/modules/git.md\n`);
+  r = run({ ENTRY_BASE: "HEAD" });
+  ok(r.status === 1 && mended(r.out) && r.out.includes("#[[file:core/modules/git.md]]"), "against its base, a file the pull request adds to AGENTS.md and to no entry file fails, saying its mend");
+  write("AGENTS.md", AGENTS);
   write(".kiro/steering/core.md", KIRO);
   ok(run().status === 0, "once the line is added, it passes");
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }

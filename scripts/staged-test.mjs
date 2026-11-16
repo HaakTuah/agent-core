@@ -302,11 +302,13 @@ ok(t.length === 2 && t.find(x => x.tool === "Claude Code").passed && !t.find(x =
 ok(tools({ runs: [inTool(run("2026-12-03"), "Kiro")] }, "2026-12-10")[0].open.length === CASES.length && tools({ runs: [inTool(run("2026-12-03"), "Kiro")] }, "2026-12-01")[0].passed,
   "a pass stands until the next release: runs before the newest release's day count for nothing");
 ok(tools({ runs: [inTool(run("2026-12-03", true, "stop"), "Kiro")] })[0].open.join() === "stop", "a pass found wrong passes nothing");
-const dueKiro = due({ at: "2026-12-04T00:00:00Z", record: { runs: kiro }, root: s.core, since: "2026-12-02" });
+const dueKiro = due({ at: "2026-12-04T00:00:00Z", record: { runs: kiro }, root: s.core, since: "2026-12-01" });
 ok(dueKiro.length === 0, "none is due for a tool that ran every case since the release, nor for the builder's tool in the month it ran");
 const dueAfter = due({ at: "2026-12-20T00:00:00Z", record: { runs: kiro }, root: s.core, since: "2026-12-15" });
-ok(dueAfter.length === CASES.length && dueAfter.every(d => d.tool === "Kiro" && /since the release of 2026-12-15/.test(d.why)), "after a release, every case is due again for a tool that has run");
+ok(dueAfter.filter(d => d.tool === "Kiro").length === CASES.length && dueAfter.every(d => /since the release of 2026-12-15/.test(d.why)), "after a release, every case is due again for a tool that has run");
 ok(due({ at: "2026-12-04T00:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core }).every(d => !d.tool), "no case is due for a tool that has never run");
+const dueOwn = due({ at: "2026-12-20T00:00:00Z", record: { runs: [run("2026-12-01")] }, root: s.core, since: "2026-12-15" });
+ok(dueOwn.length === CASES.length && dueOwn.every(d => !d.tool && /since the release of 2026-12-15/.test(d.why)), "after a release, every case is due again for the builder's tool too, though it ran that month");
 ok(!gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "Kiro")] }).failing.some(f => f.name === "stop"), "another tool's failing verdict holds no release: it says whether that tool works with the core");
 ok(toolNamed("claude  CODE") === TOOL && toolNamed("kiro") === "Kiro" && toolNamed("Claude Code (Opus)") === null, "a tool is named case and spacing aside, and only one the core has a part for");
 ok(gate({ runs: [...three, inTool(run("2027-01-05", ["stop"]), "claude code")] }).failing.some(f => f.name === "stop") && gate({ runs: [...three, inTool(run("2027-01-06", ["outsider"]), "Claude Code (Opus)")] }).failing.some(f => f.name === "outsider"),

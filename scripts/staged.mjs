@@ -123,8 +123,9 @@ export function toolsSaid(record, since = null) {
 }
 
 // The cases due on the day `at` (an ISO time): each with why, and the tool where it is not TOOL. A case is due where no
-// run of it falls in the month of `at`, or where a rule it holds reads otherwise than at its last run; and for each
-// other tool that has run, where that tool has no run of it on or after `since` (the newest release's day, or null).
+// run of it falls in the month of `at`, where a rule it holds reads otherwise than at its last run, or where it has no
+// run on or after `since` (the newest release's day, or null); and for each other tool that has run, where that tool
+// has no run of it on or after `since`.
 export function due({ at, record = readRecord(), root = ROOT, cases = CASES, since = null }) {
   const month = String(at).slice(0, 7), last = latest({ runs: record.runs.filter(r => toolOf(r) === TOOL) }), out = [];
   for (const c of cases) {
@@ -133,6 +134,7 @@ export function due({ at, record = readRecord(), root = ROOT, cases = CASES, sin
     const now = fingerprints(c, root), moved = Object.keys(now).filter(k => (was.rules ?? {})[k] !== now[k]);
     if (moved.length) out.push({ name: c.name, why: `a rule it holds changed since its last run (${was.at}): ${moved.join("; ")}` });
     else if (!record.runs.some(r => toolOf(r) === TOOL && String(r.at).startsWith(month) && r.cases?.[c.name])) out.push({ name: c.name, why: `no run in ${month}` });
+    else if (since && !record.runs.some(r => toolOf(r) === TOOL && String(r.at) >= since && r.cases?.[c.name])) out.push({ name: c.name, why: `no run since the release of ${since}` });
   }
   for (const tool of [...new Set(record.runs.map(toolOf))].filter(t => t !== TOOL).sort()) {
     for (const c of cases) {

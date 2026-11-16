@@ -11,7 +11,8 @@
 //
 // Nothing locks a project (AGENTS.md of the core): with ENTRY_BASE set to the pull request's base (as the copies
 // workflow sets it), what the base already lacked is noted and fails nothing, so only what the pull request itself
-// leaves out fails. In the core's own repository (`--core`) everything fails. Git and Node's own modules only.
+// leaves out fails; with no base, as on a push to main, everything is noted and nothing fails, so what a pull request
+// was let through with never turns main red. In the core's own repository (`--core`) everything fails. Git and Node's own modules only.
 //
 //   node core/scripts/entry-files.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/entry-files.mjs --core         in the core's own repository
@@ -85,7 +86,9 @@ const gitAt = rev => file => { try { return execFileSync("git", ["show", `${rev}
 
 if (started(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
-  const { fails, notes } = verdict(fileAt, base ? gitAt(base) : null);
+  const read = verdict(fileAt, base ? gitAt(base) : null);
+  // (in a project with no base to read against, nothing is new: each is a note)
+  const { fails, notes } = core || base ? read : { fails: [], notes: [...read.notes, ...read.fails] };
   for (const n of notes) console.log(`note (it stood so before this pull request, so it fails nothing): ${n}`);
   for (const f of fails) console.error(`FAIL: ${f}`);
   if (fails.length) process.exitCode = 1;
