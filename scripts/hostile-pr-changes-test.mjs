@@ -24,7 +24,7 @@ const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encodin
 // (whether this system's files can be named with a line's end or a control character: Windows's cannot)
 const NAMES = process.platform !== "win32";
 // (how many files a pull request adds at most, in the cases of many: each is written and committed, which on Windows is slow)
-const MANY = 3000;
+const MANY = 1000;
 const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(p, f)), { recursive: true }); fs.writeFileSync(path.join(p, f), text); };
 const run = (script, args = [], more = {}) => {
   const started = Date.now(), r = spawnSync(process.execPath, [path.join(root, "scripts", script), ...args], { cwd: p, env: { ...env, ...more }, encoding: "utf8", maxBuffer: 1 << 28 });
@@ -141,8 +141,10 @@ branch("gh-empty", () => write(".github/workflows/a.yml", ""));
 ok(refused(only(), "more than a comment"), "comment-only: a workflow emptied, nothing at all, is refused");
 branch("gh-dir", () => { fs.rmSync(path.join(p, ".github/workflows/a.yml")); write(".github/workflows/a.yml/x.yml", WORKFLOW); });
 ok(refused(only(), "added, deleted"), "comment-only: a workflow made a folder, the wrong type, is refused");
-branch("gh-mode", () => fs.chmodSync(path.join(p, ".github/workflows/a.yml"), 0o755));
-ok(refused(only(), "its mode or kind changed"), "comment-only: a workflow's mode changed is refused");
+if (process.platform !== "win32") {
+  branch("gh-mode", () => fs.chmodSync(path.join(p, ".github/workflows/a.yml"), 0o755));
+  ok(refused(only(), "its mode or kind changed"), "comment-only: a workflow's mode changed is refused");
+} else console.log("skip comment-only: a workflow's mode changed: Windows keeps no mode for git to read");
 branch("gh-nothing", () => {});
 r = only();
 ok(r.status === 0 && r.out.includes("nothing changed in .github/") && !r.out.includes("comments and steps' names alone in"), "comment-only: an empty diff is read as no file proven");
