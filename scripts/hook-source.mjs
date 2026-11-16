@@ -10,8 +10,8 @@
 // with the shell's quoting read, level after level, until reading it changes nothing (eight levels at most), its
 // backslashes, its backslash-newlines and the escapes of $'...' read as bash reads them; with every backslash read and
 // every quote taken out; and with cmd's "^" and PowerShell's backtick read as their escapes. A path written
-// `<ref>:<path>` and given to git show or git cat-file names the copy git holds at that ref, the remote's `main`
-// (refs/remotes/origin/main or origin/main) being the one that counts as `main`; and a file only tested for, by "[", "[[" or "test" where a command starts
+// `<the remote's main>:<path>` (refs/remotes/origin/main or origin/main) and given to git show or git cat-file -p, in
+// the one form FETCHED below reads, names main's copy, which is no file of the working tree; and a file only tested for, by "[", "[[" or "test" where a command starts
 // (`[ -f <path> ]`, `test -e <path>`), is neither run nor read, save where the command defines a function or alias of
 // that name. Not read here, and so the review's: a path the command builds from parts, reaches by changing folder or
 // through ".." past a link, names by a pattern (a glob or braces), or spells otherwise than the forms above; and
@@ -39,8 +39,8 @@ const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then
 const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
 const redefined = raw => DEFINED.test(raw) || raw.split(/[;&|\n]/u).some(c => /^\s*(?:(?:then|do|else|elif|if|while|until|builtin|command|!|\{|\()\s*)*alias\b/u.test(c) && /[\s"'](?:test|\[\[?)=/u.test(c));
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
-// --show-toplevel), perhaps closed by a quote)
-const ROOTED = /[\u0001)`]\\?["']?$/u;
+// --show-toplevel), or a ${...} with a default, perhaps closed by a quote)
+const ROOTED = /[\u0001)`}]\\?["']?$/u;
 
 // The quoted texts of a script, read left to right as the shell reads them: a single-quoted text is taken as written, a
 // double-quoted one with its backslashes read, and a backslash outside quotes keeps the next character; each quoted text
@@ -82,27 +82,17 @@ export function pathsIndex(files) {
 }
 const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
-const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`]["']?\/+)?$/u;
-const AT_MAIN = /(?:^|[\s"'])(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
-// Whether the command that `before` ends in is git's show or cat-file. Each closed $(...) and backtick's command is
-// first one mark, so what they hold (--show-toplevel, say) is not git's; the command runs from the last ";", "&", "|",
-// newline, or "(" or backtick still open; and git (by any path, with ".exe" or not) must be its first word, and
-// "show" or "cat-file" git's subcommand: its first word after git's own options (-C and -c take a word each).
-const GIT_OPTS_WITH_WORD = new Set(["-C", "-c"]);
-function gitShows(before) {
-  let text = before.replace(/`[^`]*`/gu, "\u0002");
-  for (let n = 0, last = ""; n < 64 && last !== text; n++) { last = text; text = text.replace(/\$\([^()]*\)/gu, "\u0002"); }
-  let from = -1;
-  for (const c of [";", "&", "|", "\n", "(", "`"]) from = Math.max(from, text.lastIndexOf(c));
-  const words = text.slice(from + 1).split(/\s+/u).map(w => w.replace(/["']/gu, "")).filter(Boolean);
-  let i = words.findIndex(w => !/^\w+=/u.test(w)); // (past a command's own variables, as FOO=1 git show)
-  if (i < 0 || words[i].replace(/^.*[\/\\]/u, "").replace(/\.exe$/iu, "") !== "git") return false;
-  for (i++; i < words.length && words[i].startsWith("-"); i++) if (GIT_OPTS_WITH_WORD.has(words[i])) i++;
-  return words[i] === "show" || words[i] === "cat-file";
-}
-// (a path fetched from main: `<the remote's main>:<path>` given to git show or git cat-file, within one command, not
-// one of a list such as java's -cp or LD_PRELOAD takes)
-const fetched = before => AT_MAIN.test(before) && gitShows(before.replace(/(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u, ""));
+const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
+// A path fetched from main, read in one form and no other, which the starter kit's hooks write: where a command starts
+// (at the start, after a newline, ";", "&", "|", "(", "$(" or a backtick), perhaps after keywords such as "then" or
+// "{" and the command's own variables (FOO=1), git (by its name or a path to it, ".exe" or not), its options -C or -c
+// each with one word, or --name or --name=word, then show or cat-file -p, then `<the remote's main>:<path>`. A word is
+// plain text, single- or double-quoted text, variables, $(...) without quotes in it and backtick spans, joined, and
+// holds no blank (each reading with the quotes taken out must still find the form). Any other form, git's or another
+// program's (java -cp origin/main:x, say), is no fetch: its path is read as taken, and the mend is the kit's form.
+const ARG = `(?:"(?:[^"\`$\\\\]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>])+`;
+const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])\\s*(?:(?:then|do|else|elif|if|while|until|!|\\{)\\s+)*(?:\\w+=${ARG}?\\s+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:\\s+(?:-[Cc]\\s+${ARG}|--[\\w-]+(?:=${ARG})?))*\\s+(?:show|cat-file\\s+-p)\\s+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
+const fetched = before => FETCHED.test(before);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
@@ -162,7 +152,7 @@ function scan(text, index, holds, found, tests) {
 
 // A word's path relative to the project's root: a path after a variable, a command's output or a backtick's is read
 // from the root, which is what such a thing holds in a hook; another path that starts at "/" is none of the project's.
-const ROOT = /^(?:\u0001|\$\([^)]*\)|`[^`]*`)\/+/u;
+const ROOT = /^(?:\u0001|\$\([^)]*\)|`[^`]*`|\$\{[^}]*\})\/+/u;
 function fromRoot(p, before, ref, quoted) {
   if (quoted && ROOT.test(p)) return p.replace(ROOT, "");
   if (!p.startsWith("/")) return p;
@@ -176,7 +166,7 @@ export function fromTree(command, holds, index = null) {
   const found = new Set(), tests = !redefined(raw);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    if ((ref !== null && MAIN.test(ref) && gitShows(before)) || (ref === null && ((tests && TESTED.test(before)) || fetched(before)))) return;
+    if ((ref !== null && MAIN.test(ref) && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || fetched(before)))) return;
     const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
     if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);

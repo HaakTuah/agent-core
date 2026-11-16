@@ -466,13 +466,20 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["shopt -s expand_aliases\nif true; then alias test=bash; fi\ntest -x scripts/x.py", ["scripts/x.py"]], ["shopt -s expand_aliases\n{ alias test=bash; }\ntest -x scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases\nbuiltin alias test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["java -cp git -cp show -cp origin/main:scripts/x.py Main", ["scripts/x.py"]],
       // (#476's code review of 64d440f: a command's output inside a ${...})
-      [": \"${REVIEW_UNSET:-$(bash scripts/x.py)}\"", ["scripts/x.py"]], [": ${A:-`bash scripts/x.py`}", ["scripts/x.py"]]])
+      [": \"${REVIEW_UNSET:-$(bash scripts/x.py)}\"", ["scripts/x.py"]], [": ${A:-`bash scripts/x.py`}", ["scripts/x.py"]],
+      // (#476's fallback security review of 4ade650: a fetch from main in one form alone; a ${...} with a default roots)
+      ["git show x '`' `java -cp origin/main:scripts/x.py M`", ["scripts/x.py"]], ["git show x \\` ; `java -cp origin/main:scripts/x.py M`", ["scripts/x.py"]],
+      ["if true; then git show origin/main:scripts/x.py | bash; fi", []], ["{ git show origin/main:scripts/x.py; } | bash", []], ["! git show origin/main:scripts/x.py | bash", []],
+      // (a fetch whose words hold a quoted blank is read with its quotes out too, where it is no longer the one form: it
+      // fails, and its mend is the kit's form; failing so is safe, as letting any such form through is not)
+      ["FOO=\"a b\" git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git -C \"my dir\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["FOO=ab git -C \"$r\" show origin/main:scripts/x.py | bash", []],
+      ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/x.py\"", ["scripts/x.py"]], ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}\"/scripts/x.py", ["scripts/x.py"]], ["bash ${CLAUDE_PROJECT_DIR:-`pwd`}/scripts/x.py", ["scripts/x.py"]]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     const began = Date.now();
-    for (const command of ["a.sh ".repeat(1 << 17), "test -f a.sh; ".repeat(1 << 16), "'".repeat(1 << 20), "$'".repeat(1 << 19), "alias\talias ".repeat(1 << 16), "git show ".repeat(1 << 16)]) fromTree(command, has, index);
+    for (const command of ["a.sh ".repeat(1 << 17), "test -f a.sh; ".repeat(1 << 16), "'".repeat(1 << 20), "$'".repeat(1 << 19), "alias\talias ".repeat(1 << 16), "git show ".repeat(1 << 16), `git ${"-C x ".repeat(1 << 15)}show origin/main:a.sh`, `git -C "${"$(a)".repeat(1 << 15)}`]) fromTree(command, has, index);
     ok(Date.now() - began < 30000, "and a command a megabyte long is read in seconds, never minutes", `${Date.now() - began} ms`);
   }
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
