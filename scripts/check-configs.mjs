@@ -344,6 +344,15 @@ function runAt(words, i, dir, script) {
   // that ignores case may run the copy by it)
   return at.at === script ? [configAfter(words, i, dir, script)] : [{ unread: `runs ${word.text}, a file of the name of ${script} that the reader cannot tell from it`, unsure: true }];
 }
+const literal = x => !/[$`'"\\]/u.test(x);
+// A run whose own name, and folder, are globs or braces and hold no variable, matched against the script's: one that
+// cannot match it (*.test.mjs, test/**) is no run of it, one that can (copies.mj?, * under core/scripts) is not read.
+function globbed(word, dir, folder, own, name, script) {
+  if (!globMatches(own, name)) return [];
+  const where = folder === null ? dir.at : path.posix.join(dir.at, folder);
+  if (!dir.moved && !dir.dynamic && literal(where) && !globMatches(where, path.posix.dirname(script))) return [];
+  return [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }];
+}
 // Whether a glob (*, ?, [...], {a,b}) can match a name, case left aside, read in one pass.
 function globMatches(glob, name) {
   let re = "";
@@ -368,15 +377,7 @@ function unplaced(word, dir, name, script) {
   const cut = text.lastIndexOf("/"), folder = cut < 0 ? null : text.slice(0, cut), own = text.slice(cut + 1);
   if (!dir.moved && !dir.dynamic && folder !== null && plain(folder) && !/(?:^|\/)scripts$/iu.test(path.posix.join(dir.at, folder))) return [];
   if (plain(own) && own.toLowerCase() !== name) return [];
-  // (an own name, and a folder, that are globs or braces and hold no variable are matched against the script's: one that
-  // cannot match it, *.test.mjs or test/**, is no run of it, one that can, copies.mj? or *, is not read)
-  const literal = x => !/[$`'"\\]/u.test(x);
-  if (literal(own)) {
-    if (!globMatches(own, name)) return [];
-    const where = folder === null ? dir.at : path.posix.join(dir.at, folder);
-    if (!dir.moved && !dir.dynamic && literal(where) && !globMatches(where, path.posix.dirname(script ?? `scripts/${name}`))) return [];
-    return [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }];
-  }
+  if (literal(own)) return globbed(word, dir, folder, own, name, script);
   return /\.mjs\b|scripts|\bcore\b|\$\{?CORE|\$\{\{/iu.test(text) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
 }
 
