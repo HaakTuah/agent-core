@@ -196,10 +196,13 @@ export function unlisted(faults, listedMap, open = new Map(), held = new Map()) 
 // has no baseline (the first), or where the pull request records a new whole run and changes no file of code or of the
 // tests (`touched` false), so that what the run found stood on the base. An entry that only carries the debt of a base
 // entry of a file the change touched (`wasGone`, opened() of the base's entries; a cleaning run's --lower) has not
-// joined: it is set against what that entry gave up, of the same file and fault, so their total does not grow.
-export function joinedUnsaid(now, was, touched = true, wasGone = new Map()) {
+// joined: it is set against what that entry measurably gave up, of the same file and fault, so their total does not
+// grow; a base entry gives up nothing of what its unchanged lines still hold (`wasHeld`, heldBy() of the base's
+// entries), whatever the pull request's baseline says of it.
+export function joinedUnsaid(now, was, touched = true, wasGone = new Map(), wasHeld = new Map()) {
   if (!was || (!touched && JSON.stringify(now.whole ?? null) !== JSON.stringify(was.whole ?? null))) return [];
-  const freed = new Map([...wasGone.keys()].map(id => [id, Math.max(0, (was.listed.get(id)?.count ?? 0) - (now.listed.get(id)?.count ?? 0))]));
+  const kept = id => Math.max(now.listed.get(id)?.count ?? 0, wasHeld.get(id) ?? 0);
+  const freed = new Map([...wasGone.keys()].map(id => [id, Math.max(0, (was.listed.get(id)?.count ?? 0) - kept(id))]));
   return [...now.listed].filter(([id, n]) => {
     let extra = (n.count ?? 0) - (was.listed.get(id)?.count ?? 0);
     if (extra <= 0 || (now.grown[id] ?? "").trim()) return false;
@@ -236,7 +239,7 @@ const placed = f => `${f.file}:${f.line}`;
 const said = f => `${f.mutatorName}: "${collapse(f.original, 40)}" ${f.replacement === "" ? "taken out" : `made "${collapse(f.replacement, 40)}"`}`;
 
 // What the check says of a pull request's run, and whether it fails: { lines, fails }.
-export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map(), held = new Map(), wasGone = new Map() }) {
+export function verdict({ faults, baseline, was, at, deleted, touched = true, gone = new Map(), held = new Map(), wasGone = new Map(), wasHeld = new Map() }) {
   const c = counted(faults), lines = [`How strong the tests are, on the lines this pull request changes: ${c.line}.`];
   for (const t of deleted) lines.push(`A test file this pull request deletes: ${t}. Its description says why, under "Readings taken", and the review checks it.`);
   if (!baseline && was) {
@@ -248,7 +251,7 @@ export function verdict({ faults, baseline, was, at, deleted, touched = true, go
     lines.push(`Reported only: there is no baseline at ${at} yet. The audit's whole run writes it (node core/scripts/strength.mjs --whole), and from then on a fault that survives on a changed line fails.`);
     return { lines, fails: false };
   }
-  const news = unlisted(faults, baseline.listed, gone, held), unsaid = joinedUnsaid(baseline, was, touched, wasGone);
+  const news = unlisted(faults, baseline.listed, gone, held), unsaid = joinedUnsaid(baseline, was, touched, wasGone, wasHeld);
   if (c.pending) lines.push(`${c.pending} faults on the changed lines were not run (the tool's budget): they are not held here, and the next whole run reads them.`);
   for (const f of news) lines.push(`FAIL: ${placed(f)}: a fault put in on purpose (${said(f)}) survived, and ${at} does not list it. Mend: write a test that fails on it and run the check again; only where the fault changes nothing the program does, list "${f.id}" in ${at} under "listed" with its count and under "grown" with that reason, say so in the pull request, and have a fresh session say there that it found no other way`);
   for (const id of unsaid) lines.push(`FAIL: ${at} lists "${id}" where the base did not, with no reason under "grown". Mend: take it out and write a test that catches the fault, or give its reason under "grown" (the fault changes nothing the program does), say so in the pull request, and have a fresh session say there that it found no other way`);
@@ -282,10 +285,13 @@ function onPullRequest(p, base) {
   const baseline = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const was = baselineFrom(tolerant(() => git(["show", `${base}:${p.at}`])), `${base}:${p.at}`);
   const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
-  const found = measured(p, changed, baseline, read);
-  const faults = found.filter(f => changed.get(f.file)?.has(f.line)), held = heldBy(baseline?.listed ?? new Map(), found.filter(f => !changed.get(f.file)?.has(f.line)));
+  // (the unchanged copies of the base's entries are run too, so that one the pull request drops from its baseline
+  // while its fault still survives frees nothing)
+  const both = new Map([...(was?.listed ?? []), ...(baseline?.listed ?? [])]);
+  const found = measured(p, changed, baseline, read, both), still = found.filter(f => !changed.get(f.file)?.has(f.line));
+  const faults = found.filter(f => changed.get(f.file)?.has(f.line)), held = heldBy(baseline?.listed ?? new Map(), still);
   const gone = baseline ? opened(baseline.listed, changed) : new Map(), wasGone = was ? opened(was.listed, changed) : new Map();
-  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched: touches(p, base), gone, held, wasGone });
+  const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched: touches(p, base), gone, held, wasGone, wasHeld: was ? heldBy(was.listed, still) : new Map() });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);
   return fails ? 1 : 0;
@@ -293,8 +299,8 @@ function onPullRequest(p, base) {
 
 // The faults the tool finds on the changed lines and on the unchanged ones that repeat a listed entry (witnesses()).
 // Before the baseline stands, a tool that cannot run is said and fails nothing.
-function measured(p, changed, baseline, read) {
-  const watched = baseline ? witnesses(baseline.listed, read, changed) : new Map();
+function measured(p, changed, baseline, read, listedMap) {
+  const watched = baseline ? witnesses(listedMap, read, changed) : new Map();
   const both = new Map([...changed].map(([f, l]) => [f, new Set([...l, ...(watched.get(f) ?? [])])]));
   try { return changed.size ? faultsOf(runTool(p.tool.command, linesArg(both)), both) : []; } catch (e) {
     if (baseline || !(e instanceof Refused)) throw e;

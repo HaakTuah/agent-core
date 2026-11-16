@@ -68,6 +68,9 @@ lowered(new Map([[was, { count: 1 }]]), new Map([[now2, 1]]), ["a.js"], origins)
 const afterLower = b({ [now2]: { count: 1 } }), beforeLower = b({ [was]: { count: 1 } }), baseGone = opened(beforeLower.listed, new Set(["a.js"]));
 ok(origins.get(now2) === was && same(joinedUnsaid(afterLower, beforeLower, true, baseGone), []) && same(joinedUnsaid(b({ [now2]: { count: 2 } }), beforeLower, true, baseGone), [now2]),
   "the pull request of a cleaning run that carried a rewritten line's debt to its new id passes; one that adds to it does not");
+const swapped = "survivor: a.js: return 2 > 1; [> -> >=]", kept = "survivor: a.js: return x > 1; [> -> >=]", baseKept = b({ [kept]: { count: 1 } });
+ok(same(joinedUnsaid(b({ [swapped]: { count: 1 } }), baseKept, true, opened(baseKept.listed, new Set(["a.js"])), new Map([[kept, 1]])), [swapped]) && same(joinedUnsaid(b({ [swapped]: { count: 1 } }), baseKept, true, opened(baseKept.listed, new Set(["a.js"])), new Map()), []),
+  "a pull request that drops an entry whose fault still survives on its unchanged line, and lists a new survivor in its place, fails; where the run finds that fault caught, the swap passes");
 const two = new Map([[twice, { count: 2 }]]), rewrittenOne = { ...f(rewritten, "Survived") };
 ok(same([...gone.keys()], [old]) && same(unlisted([renamed], new Map([[old, { count: 1 }]]), gone), []) && unlisted([renamed, renamed], new Map([[old, { count: 1 }]]), gone).length === 1 && unlisted([other], new Map([[old, { count: 1 }]]), gone).length === 1
   && same(unlisted([rewrittenOne], two, opened(two, new Set(["a.js"])), new Map([[twice, 1]])), []) && unlisted([rewrittenOne], two, opened(two, new Set(["a.js"])), new Map([[twice, 2]])).length === 1,
