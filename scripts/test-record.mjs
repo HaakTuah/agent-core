@@ -33,11 +33,13 @@ export const COUNT = 30;
 
 // Each step of a workflow that starts a test file, by its name: the step's name to the test. Read line by line (a
 // step's "- name:" and the "run:" under it, on its line or, after | or >, on the lines indented under it), so a
-// workflow's every form of YAML is read alike.
+// workflow's every form of YAML is read alike. A name that two steps give to different tests (in two jobs) is left
+// out, since a job's runs cannot be told apart by it: no run is put on the wrong test.
 export function stepsOf(workflowText, tests) {
   const out = new Map(), aTest = run => [...tests].find(t => new RegExp(`(^|[\\s/])${t.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?=\\s|$)`, "um").test(run));
   const lines = String(workflowText).split(/\r?\n/u), indent = l => /^\s*/u.exec(l)[0].length;
   let name = null;
+  const twice = new Set();
   for (let i = 0; i < lines.length; i++) {
     const step = /^\s*- name:\s*(.+?)\s*$/u.exec(lines[i]), run = /^\s*(?:- )?run:\s*(.*?)\s*$/u.exec(lines[i]);
     if (step) name = step[1].replace(/^(["'])(.*)\1$/u, "$2");
@@ -50,8 +52,9 @@ export function stepsOf(workflowText, tests) {
       text = under.join("\n");
     }
     const test = aTest(text);
-    if (test) out.set(name, test);
+    if (test) { if (out.has(name) && out.get(name) !== test) twice.add(name); out.set(name, test); }
   }
+  for (const name of twice) out.delete(name);
   return out;
 }
 

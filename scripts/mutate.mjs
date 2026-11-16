@@ -27,7 +27,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { tokens } from "./code-shape.mjs";
-import { notLinked, parseConfig, standing, where } from "./shape.mjs";
+import { links, reached } from "./select.mjs";
+import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 const LONGEST = 60; // seconds: a test slower as it stands (a whole upgrade) is no test a fault is run against
@@ -109,6 +110,22 @@ export function testsOf(file, tests) {
   const stem = path.posix.basename(file).replace(/\.[^.]+$/u, ""), name = path.posix.basename(file).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const named = new RegExp(`(^|[^\\w-])${name}`, "u"), own = t => new RegExp(`(^|/)${stem.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}[-.]test\\.`, "u").test(t);
   return Object.keys(tests).filter(t => named.test(tests[t])).sort((x, y) => Number(own(y)) - Number(own(x)) || x.localeCompare(y));
+}
+
+// For --every: each file's tests that reach it, through a barrel or a wrapper too, as the selection maps them
+// (select.mjs), so that every test that would catch a fault runs against it.
+function reachersOf(texts, tests, config) {
+  const out = new Map();
+  for (const [t, files] of reached(tests, links(texts, tests, survey(texts, config, tests).reach))) for (const f of files) if (f !== t) out.set(f, [...(out.get(f) ?? []), t]);
+  return out;
+}
+
+// Each fault on the lines wanted, with the tests it runs against: those that name its file, and with --every those
+// that reach it too.
+function jobsOf({ wanted, texts, tests, testTexts, config, every }) {
+  const reaching = every ? reachersOf(texts, tests, config) : null;
+  const testsFor = file => (reaching ? [...new Set([...testsOf(file, testTexts), ...(reaching.get(file) ?? [])])] : testsOf(file, testTexts));
+  return [...wanted].flatMap(([file, lines]) => faults(texts[file], lines).map(f => ({ ...f, file, text: texts[file], tests: testsFor(file) })));
 }
 
 // The tests running now, each stopped with what it started where the run is stopped (`stopAll`).
@@ -277,7 +294,7 @@ async function main(argv) {
   const stop = () => { stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
-    const jobs = [...wanted].flatMap(([file, lines]) => faults(texts[file], lines).map(f => ({ ...f, file, text: texts[file], tests: testsOf(file, testTexts) })));
+    const jobs = jobsOf({ wanted, texts, tests, testTexts, config, every });
     const width = Math.max(1, Math.min(os.cpus().length, jobs.length));
     for (let i = 0; i < width; i++) copies.push(copyOf(path.join(scratch, String(i))));
     const left = await judge(jobs, copies, budget, every);

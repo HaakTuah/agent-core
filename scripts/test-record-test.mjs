@@ -42,9 +42,17 @@ const flow = `jobs:
           node test/d-test.mjs
       - name: After the block
         run: echo nothing
+  other:
+    steps:
+      - name: Test
+        run: node test/a-test.mjs
+  third:
+    steps:
+      - name: Test
+        run: node test/c-test.mjs
 `;
 const steps = stepsOf(flow, tests);
-ok(same([...steps], [["The a check", "test/a-test.mjs"], ["The b check, timed", "test/b-test.mjs"], ["The d check, a block", "test/d-test.mjs"]]), "each step that starts a test file is read by its name, whatever form of YAML stands around it, a block's lines too", JSON.stringify([...steps]));
+ok(same([...steps], [["The a check", "test/a-test.mjs"], ["The b check, timed", "test/b-test.mjs"], ["The d check, a block", "test/d-test.mjs"]]), "each step that starts a test file is read by its name, whatever form of YAML stands around it, a block's lines too; a name two jobs give to different tests is left out", JSON.stringify([...steps]));
 
 const t = s => new Date(Date.UTC(2026, 10, 16, 12, 0, s)).toISOString();
 const step = (name, from, to, conclusion = "success") => ({ name, started_at: t(from), completed_at: t(to), conclusion });
