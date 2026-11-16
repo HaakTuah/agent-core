@@ -105,13 +105,10 @@ and before a polish-lane task. A feature is any move, rule or power a player can
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
   thing) are `modules/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
-- **How a game answers a player** (core archive 234). In a game played through a screen, by default each point below
-  binds the builder of a pull request that changes what it touches (an input's answer, an effect, what the game shows, a
-  setting, a sound), and the critique (`modules/screens.md`, point 18) reads it there. It does not mean that a game no
-  change touches is redone on demand: the polish lane and the checks' baselines bring what stands to it, task by task.
-  Each check named below is the project's, off until its *screen checks* name it, reporting first and keeping a baseline
-  that may not get worse (`modules/screens.md`, "What holds it"). Reason: a game's feel is lost in changes no one times
-  or pictures, and a standing game redone on demand would lock a project.
+- **How a game answers a player** (core archive 234). In a game played through a screen, each point below binds as
+  `modules/screens.md`'s points do ("Whom it binds, and when"), and each check it names is one of that module's, the
+  project's own and off until its *screen checks* name it ("What holds it" there). It does not mean that a game with no
+  screen is asked anything here. Reason: a game's feel is lost in changes no one times or pictures.
   - **Every action is answered within a tenth of a second.** By default `modules/screens.md` point 7's tenth of a second
     holds for every input of a game, even where its outcome comes later: a press shows pressed, a move starts, an order
     shows given. The builder of a change to how an input is handled makes it so. It does not mean the outcome comes that
