@@ -57,7 +57,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
-import { fromTree, wholePath } from "./hook-source.mjs";
+import { fromTree, pathsIndex } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 import { parseToml } from "./toml.mjs";
@@ -79,13 +79,14 @@ const show = value => JSON.stringify(value) ?? String(value);
 // reading them; and `sources`, each hook that takes a file of the project from the working tree, with those files
 // (hook-source.mjs). `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
 // that hold a SKILL.md; `files(dir)` the names in a folder of the project (here .kiro/hooks); `holds(file)` whether the
-// project holds a file there, as read() would read it.
-export function configured(read, skills, files = () => [], holds = f => read(f) !== null) {
+// project holds a file there, as read() would read it; `all()` the paths of every file the project holds.
+export function configured(read, skills, files = () => [], holds = f => read(f) !== null, all = () => []) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [];
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds, servers };
+  let index = null;
+  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds, servers, index: () => (index ??= pathsIndex(all())) };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -161,10 +162,10 @@ function readCodex(state, json, read) {
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
     // (its words are a program and its arguments, each one whole, so each is read as a single-quoted word of a command:
     // "scripts/my hook.py" stays one path)
-    // (and each word is read whole too, as a path and as a script of its own, as "sh -c" runs one: an apostrophe in a
-    // word splits the quoting)
+    // (and its words as written, joined, and each as a script of its own, as "sh -c" runs one: the project's files are
+    // found in them wherever they stand)
     const quoted = notify.map(w => `'${w.replace(/'/gu, "'\\''")}'`).join(" ");
-    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted, ...notify], whole: notify });
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted, notify.join(" "), ...notify] });
   }
   addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
 }
@@ -203,7 +204,7 @@ function readHooks(state, file, settings, tool = "") {
 }
 // One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
 // id, all of it; and the files of the project its `commands` take from the working tree.
-function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands, whole = [] }) {
+function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands }) {
   const name = `hook ${tool ? `${tool} ` : ""}${event}${matcher ? ` ${matcher}` : ""}: ${text}`;
   // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same)
   const id = canonical(tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
@@ -221,7 +222,7 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
-  const taken = [...commands.flatMap(c => fromTree(c, state.holds)), ...whole.map(w => wholePath(w, state.holds)).filter(Boolean)];
+  const taken = commands.flatMap(c => fromTree(c, state.holds, state.index()));
   if (taken.length) state.sources.set(name, [...new Set([...(state.sources.get(name) ?? []), ...taken])]);
 }
 
@@ -446,24 +447,34 @@ export function readProject(root, rev = null) {
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
-  return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null), links };
+  const all = rev ? () => [...listing(root, rev).blobs] : () => {
+    let out = "";
+    try { out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
+    return out.split("\0").filter(Boolean);
+  };
+  return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null, all), links };
 }
 
 // Whether the commit `rev` holds a file at a path, as configured()'s `holds` asks it word by word of a hook's command:
 // from one listing of the commit, git asked once, and through read() only where a link stands on the path's way.
 function heldAt(root, rev, read) {
-  let blobs = null, links = null;
   return f => {
-    if (blobs === null) {
-      let out = "";
-      try { out = execFileSync("git", ["ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
-      const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
-      // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
-      blobs = new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at));
-      links = entries.filter(([mode]) => mode === "120000").map(([, at]) => at);
-    }
+    const { blobs, links } = listing(root, rev);
     return links.some(at => f === at || f.startsWith(`${at}/`)) ? read(f) !== null : blobs.has(f);
   };
+}
+// The files and links of the commit `rev`, git asked once for each commit: { blobs, links }.
+const listings = new Map();
+function listing(root, rev) {
+  const key = `${root}\0${rev}`;
+  if (listings.has(key)) return listings.get(key);
+  let out = "";
+  try { out = execFileSync("git", ["ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
+  const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
+  // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
+  const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
+  listings.set(key, found);
+  return found;
 }
 
 // Whether the commit `rev` holds the path `at` as a link (git's mode 120000), not a file whose text names the same place.

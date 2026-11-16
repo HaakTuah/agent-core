@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed } from "./agent-tools.mjs";
-import { fromTree } from "./hook-source.mjs";
+import { fromTree, pathsIndex } from "./hook-source.mjs";
 import { mended } from "./mend.mjs";
 import { STEPS, notDone } from "./steps.mjs";
 import { parseToml } from "./toml.mjs";
@@ -376,7 +376,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     "Kiro's and Codex's hooks are read for it too", 'the hook "Kiro Stop: node', 'takes "scripts/fmt.mjs"', 'the hook "Codex notify: python3 scripts/notify.py"', 'takes "scripts/notify.py"');
   fails(run(pr(project({ ...listing() }), { "scripts/my hook.py": "", ".codex/config.toml": "notify = [\"python3\", \"scripts/my hook.py\"]\n", ...listing({ kind: "hook", name: "Codex notify: python3 scripts/my hook.py", publisher: "this project" }) })),
     "Codex's notify keeps each of its words whole, a path with a blank among them", 'takes "scripts/my hook.py" from the working tree');
-  for (const [words, file] of [[["sh", "-c", "echo \"don't wait\" && python3 \"scripts/x y.py\""], "scripts/x y.py"], [["bash", "-c", "python3 \"scripts/it's hook.py\""], "scripts/it's hook.py"], [["python3", "scripts/it's hook.py"], "scripts/it's hook.py"]]) {
+  for (const [words, file] of [[["sh", "-c", "echo \"don't wait\" && python3 \"scripts/x y.py\""], "scripts/x y.py"], [["bash", "-c", "python3 \"scripts/it's hook.py\""], "scripts/it's hook.py"], [["python3", "scripts/it's hook.py"], "scripts/it's hook.py"],
+    [["sh", "-c", "python3 \"scripts/it's.py\""], "scripts/it's.py"], [["node", "--require=scripts/it's.py"], "scripts/it's.py"], [["sh", "-c", "python3 scripts/it\\'s.py"], "scripts/it's.py"],
+    [["bash", "-c", "python3 $'scripts/it\\'s.py'"], "scripts/it's.py"], [["python3", "-c", "exec(open(\"scripts/it's.py\").read())"], "scripts/it's.py"], [["sh", "-c", "python3 scripts/a,b.py"], "scripts/a,b.py"]]) {
     const toml = `notify = [${words.map(w => JSON.stringify(w)).join(", ")}]\n`;
     fails(run(pr(project({ ...listing() }), { [file]: "", ".codex/config.toml": toml, ...listing({ kind: "hook", name: `Codex notify: ${words.join(" ")}`, publisher: "this project" }) })),
       `a notify word with an apostrophe is read whole: ${JSON.stringify(words)}`, `takes ${JSON.stringify(file)} from the working tree`);
@@ -428,6 +430,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},vendor/x`);
     git(sub, "commit", "-q", "-m", "a submodule");
     fails(run(pr(sub, { "vendor/x": "echo run\n" })), "a hook whose file was a submodule at the base, made a file, fails", 'takes "vendor/x" from the working tree');
+  }
+  {
+    // (given the project's files, each is found wherever its path stands whole, however the command quotes it, and only
+    // there: not within a longer name, not fetched from main, not only tested for)
+    const files = ["scripts/it's.py", "scripts/a(b).py", "scripts/a=b.py", "scripts/x.py", "a.sh"], index = pathsIndex(files), has = f => files.includes(f);
+    for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
+      ["test -f scripts/x.py", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
+      ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
+    const began = Date.now();
+    for (const command of ["a.sh ".repeat(1 << 17), "test -f a.sh; ".repeat(1 << 16), "'".repeat(1 << 20), "$'".repeat(1 << 19)]) fromTree(command, has, index);
+    ok(Date.now() - began < 30000, "and a command a megabyte long is read in seconds, never minutes", `${Date.now() - began} ms`);
   }
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
 }
