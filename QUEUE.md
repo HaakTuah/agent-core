@@ -41,12 +41,11 @@ wanted").
 | #357 | builder | |
 | #394 | builder | |
 | #404 | builder | #403, or built with it |
-| #405 | builder | |
 | #407 | builder | |
 | #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #460, point 2 (the author's address) | builder; "Part of #460", the last to merge "Fixes #460" | #376, which changes the jobs its step joins |
-| #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/copies.mjs` too |
-| #460, point 4 (names in descriptions) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/pointers.mjs` too |
+| #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | |
+| #460, point 4 (names in descriptions) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #460, point 5 (a report's size) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #460, point 6 (billed minutes) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #390 | builder | |

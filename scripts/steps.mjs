@@ -31,7 +31,7 @@ import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
-import { Unread, call, calls, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
+import { Unread, call, calls, copiesConfig, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
@@ -139,6 +139,32 @@ function strengthNamed(p) {
 function keysOnce(p) {
   const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
+}
+
+// Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
+// core, "Nothing locks a project": no old breach goes unlisted): each copy there in the copies check's baseline, which
+// `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
+// old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
+// holds and fails none; null where nothing is left to list.
+function toolFilesListed(p) {
+  const config = copiesConfig(p);
+  if (!p.safe(config)) throw new Unread(`the copies check's config \`${shown(config)}\` is no regular file of the project's own of at most ${READ_MOST} bytes`);
+  const run = (script, args, env) => {
+    const at = path.join(p.root, corePath(p.root) || "core/", "scripts", script);
+    if (!fs.existsSync(at)) throw new Unread(`no copy of ${script} to run`);
+    const r = spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, ...env } });
+    return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
+  };
+  // (a run that never reached its verdict read nothing: reported as not read, never as done)
+  const copies = run("copies.mjs", [config], { COPIES_BASE: "" });
+  if (copies.error || !(/^ok {3}no new copies/m.test(copies.out) || /^FAIL: (a new copy|.* lists \d+ windows that are gone)/m.test(copies.err))) throw new Unread(`the copies check did not run to its verdict on ${shown(config)}`);
+  const pointers = run("pointers.mjs", [], { POINTERS_BASE: "" });
+  if (pointers.error || !(/^ok {3}\d+ pointers/m.test(pointers.out) || /^FAIL: a broken pointer: /m.test(pointers.err))) throw new Unread("the pointer check did not run to its verdict");
+  const asks = [];
+  if (/^note an old copy in an agent tool's file, not yet in the baseline: /m.test(copies.out)) asks.push(`run \`node core/scripts/copies.mjs ${shown(config)} --tools\`, which lists in the copies check's baseline each copy an agent tool's files held before the check read them, and commit the baseline`);
+  const broken = [...pointers.out.matchAll(/^note a broken pointer in an agent tool's file: (.*?) \(with no base to read against/gm)].map(m => shown(m[1]));
+  if (broken.length) asks.push(`point each pointer in an agent tool's file that leads nowhere at the file, heading or numbered point that holds what it means, or take it out where that is gone: ${broken.join("; ")}`);
+  return asks.length ? `In a pull request of its own, ${asks.join("; and, in another, ")}. Until then what the pull request's base held there is noted, never failed.` : null;
 }
 
 // The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a
@@ -507,6 +533,7 @@ export const STEPS = [
   { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
   { lead: "16 November 2026, corrections counted and the outcomes read", cost: COST.line,
     unread: "whether the repository holds a label is GitHub's, in no file: the labels check run at each sync reports the label `correction` missing, its mend `core/scripts/labels.mjs --make`; the cost line is held by the description check, and the bug form's line is a difference `core/scripts/fresh.mjs` lists" },
+  { lead: "16 November 2026, the agent tools' files read for copies and pointers", cost: COST.config, check: toolFilesListed },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -273,6 +273,9 @@ jobs:
       - name: The pointer check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pointers-test.mjs ')) }}
         run: node scripts/pointers-test.mjs
+      - name: The copies check on the agent tools' files, what stood there noted until it is listed
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/copies-tools-test.mjs ')) }}
+        run: node scripts/copies-tools-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/pointers.mjs --core

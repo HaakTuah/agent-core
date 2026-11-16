@@ -9,15 +9,23 @@
 // held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
 // none of them. Node's own modules only, so the check needs no install. It runs from the project's root, whatever the
 // directory it is started from.
+// The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`),
+// and a project may hold copies in them from before. Nothing locks a project (AGENTS.md of the core): until the
+// baseline lists it, a copy in one of those files that the pull request's base held, in as many places, is noted and
+// fails nothing, as is every such copy where there is no base to read against (a push to main); one the base did not
+// hold fails. --tools lists them, and against the base the baseline may grow by those alone.
 //
 //   node core/scripts/copies.mjs <config>            the check
 //   node core/scripts/copies.mjs <config> --write    lower the baseline to what still stands (it never adds a copy)
+//   node core/scripts/copies.mjs <config> --tools    list in the baseline the copies in an agent tool's files, and
+//                                                    lower the rest as --write does
 //   node core/scripts/copies.mjs <config> --first    write the first baseline, the copies that stand when a project
 //                                                    takes the check; only where no baseline exists yet
 //
 // The config, a JSON file the project keeps (its *copies check* slot names it), says what is checked: "baseline", the
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
-// to add the project's rule files: those floor rule 3 names and those its SECURITY.md adds (rule-files.mjs, beside it).
+// to add the project's rule files: those floor rule 3 names, those its SECURITY.md adds, and an agent tool's
+// (rule-files.mjs, beside it).
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,7 +33,7 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { ruleFiles, toolFiles } from "./rule-files.mjs";
 import { projectAt } from "./core-path.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
@@ -41,7 +49,7 @@ const ROOT = where.root, CORE = where.prefix.replace(/scripts\/$/u, "");
 const SELF = `node ${CORE}scripts/copies.mjs`, TEMPLATE = `${CORE}setup/template/copies.json.tmpl`;
 const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const configPath = process.argv.slice(2).find(a => !a.startsWith("--"));
-if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --first]`);
+if (!configPath) fail(`no config was named. Mend: name it: ${SELF} <config> [--write | --tools | --first]`);
 // (the config's path from the root, as git names it at the base: git says it, as it says the root, so no spelling of a
 // path can differ, and unquoted, -z, so a name outside plain ASCII is the name itself)
 let CONFIG_AT;
@@ -66,8 +74,9 @@ if (!inProject(config.baseline) || leadsOut(ROOT, path.join(ROOT, config.baselin
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
 let fromSecurity = null;
-const security = () => { if (!fromSecurity) try { fromSecurity = ruleFiles(); } catch (e) { fail(e.message); } return fromSecurity; };
+const security = () => { if (!fromSecurity) try { fromSecurity = ruleFiles(undefined, undefined, { tools: true }); } catch (e) { fail(e.message); } return fromSecurity; };
 const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity ? security() : []);
+const TOOLS = process.argv.includes("--tools"), WRITE = TOOLS || process.argv.includes("--write");
 if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check. Mend: list the code in "code" and the prose in "prose", as git pathspecs, or set "proseFromSecurity" to true');
 const LINES = 8, MIN_CHARS = 240, WORDS = 12;
 const hash = s => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
@@ -92,11 +101,11 @@ function proseUnits(text) {
 }
 // Every run of `size` units found in two places that do not overlap; overlapping finds of one copy merge into one,
 // keyed by a hash of its first run, so its key stays the same while the copy stands.
-function find(files, units, size, joiner, minChars) {
+function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(f, "utf8")) {
   const perFile = new Map(), seen = new Map();
   const at = (u, i) => u.slice(i, i + size).map(x => x.t).join(joiner);
   for (const f of files) {
-    const u = units(fs.readFileSync(f, "utf8"));
+    const u = units(read(f));
     perFile.set(f, u);
     for (let i = 0; i + size <= u.length; i++) {
       const s = at(u, i);
@@ -135,6 +144,7 @@ function find(files, units, size, joiner, minChars) {
       for (let k = 0; k <= len - size; k++) windows.push(hash(at(u, i + k)));
       copies.push({
         windows,
+        files: places.map(p => p.file),
         places: places.map(p => { const pu = perFile.get(p.file); return `${p.file}:${pu[p.at].line}-${pu[Math.min(p.at + len - 1, pu.length - 1)].line}`; }),
         starts: at(u, i).replace(/\n/g, ' / ').slice(0, 80),
       });
@@ -215,6 +225,31 @@ function heldTo(commit) {
   const now = new Set([...called(null)].filter(held));
   return [...called(commit)].filter(at => !now.has(at)).map(at => ({ at, config: configAt(commit, at) })).filter(h => h.config);
 }
+// The files an agent tool takes its instructions from that the check read no other way (rule-files.mjs, `toolFiles`),
+// at a commit (`show` reads its files, `list` a folder of its tree) or in the work tree: where a project may hold
+// copies from before the check read them (#405). None where the config reads no rule files.
+function toolsOnly(show, list, specs) {
+  if (!config.proseFromSecurity) return new Set();
+  let rules;
+  try { rules = show ? ruleFiles(show, list) : ruleFiles(); } catch { return new Set(); }
+  const before = new Set(specs(PROSE_SPECS.concat(rules)));
+  return new Set(specs(show ? toolFiles(show, list) : toolFiles()).filter(f => !before.has(f)));
+}
+const TOOL_ONLY = toolsOnly(null, null, ls);
+// What a commit held of the copies in those files: each prose window that stood there with one of its places in such a
+// file, by its hash, and in how many places. Read only where a copy or the baseline asks it.
+function toolCopiesAt(commit) {
+  const show = f => { try { return git(["show", `${commit}:${f}`]); } catch { return null; } };
+  const list = dir => lsAt(commit, [dir]), there = specs => lsAt(commit, specs);
+  const tools = toolsOnly(show, list, there);
+  if (!tools.size) return new Map();
+  let rules;
+  try { rules = ruleFiles(show, list, { tools: true }); } catch { return new Map(); }
+  const { dup } = find(there(PROSE_SPECS.concat(rules)), proseUnits, WORDS, " ", 0, f => show(f) ?? "");
+  return new Map([...dup].filter(([, at]) => at.some(p => tools.has(p.file))).map(([h, at]) => [h, at.length]));
+}
+let atBase = null;
+const stood = (h, n) => !!process.env.COPIES_BASE && TOOL_ONLY.size > 0 && ((atBase ??= toolCopiesAt(process.env.COPIES_BASE)).get(h) ?? 0) >= n;
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
@@ -273,7 +308,9 @@ if (from) {
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
   const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
-  const raised = old ? Object.entries(base.windows).filter(([h, n]) => !(h in old) || n > old[h]) : [];
+  // (save a window of a copy in an agent tool's file that the base held in as many places: listing what stood is what
+  // --tools does, and the base is the list until it is written; #405)
+  const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !stood(h, n)) : [];
   if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
 }
 // Near-copies (tasks/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
@@ -292,23 +329,30 @@ function nearCopies() {
   };
   return find(ls(CODE_SPECS), text => codeUnits(text).map(u => ({ ...u, t: skeleton(u.t) })), LINES, "\n", NEAR_CHARS).copies.filter(c => new Set(c.places.map(exact)).size > 1);
 }
-if (!process.argv.includes("--write")) {
+if (!WRITE) {
   const near = nearCopies();
   if (near.length) console.log(`note ${near.length} ${near.length === 1 ? "run of code matches another" : "runs of code match others"} once names and numbers are set aside (reported, never failed: the audit's reader judges whether one function should serve both)`);
   for (const c of near.slice(0, 10)) console.log(`  ${logged(c.places.join(" and "))}`);
   if (near.length > 10) console.log(`  and ${near.length - 10} more`);
 }
+// (--tools: every window of a copy in an agent tool's file listed, in as many places as it stands in now)
+const inTools = c => c.files.some(f => TOOL_ONLY.has(f));
+if (TOOLS) for (const c of found.filter(inTools)) for (const h of c.windows) base.windows[h] = Math.max(base.windows[h] ?? 0, places.get(h));
 const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
-const fresh = found.filter(c => c.windows.some(over));
+// (a copy in an agent tool's file that the baseline does not list yet: noted where the base held it, or where there is
+// no base to read against; #405)
+const before = c => inTools(c) && (!process.env.COPIES_BASE || c.windows.filter(over).every(h => stood(h, places.get(h))));
+const fresh = found.filter(c => c.windows.some(over) && !before(c)), unlisted = found.filter(c => c.windows.some(over) && before(c));
 const shrunk = Object.keys(base.windows).filter(h => !places.has(h) || places.get(h) < base.windows[h]);
+for (const c of unlisted) console.log(`note ${logged(`an old copy in an agent tool's file, not yet in the baseline: ${c.places.join(" and ")} (it starts "${c.starts}")`)}: ${process.env.COPIES_BASE ? "the pull request's base held it" : "with no base to read against"}, so it fails nothing; list it with ${SELF} ${configPath} --tools, and commit ${logged(BASELINE)}`);
 for (const c of fresh) console.error(`FAIL: ${logged(`a new copy: ${c.places.join(' and ')} (it starts "${c.starts}")`)}. Mend: keep it in the one place it belongs and point there from the others`);
-if (process.argv.includes('--write')) {
+if (WRITE) {
   base.windows = Object.fromEntries(Object.entries(base.windows).filter(([h]) => places.has(h)).map(([h, n]) => [h, Math.min(n, places.get(h))]));
   fs.writeFileSync(BASELINE, JSON.stringify(base, null, 2) + '\n');
-  console.log(`${BASELINE}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped`);
+  console.log(`${logged(BASELINE)}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped${TOOLS ? `, the copies in an agent tool's files listed` : ""}`);
   if (fresh.length) process.exit(1);
 } else {
   if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${configPath} --write and commit the baseline it lowers`);
   if (fresh.length || shrunk.length) process.exit(1);
-  console.log(`ok   no new copies (${found.length} old ones, listed in ${BASELINE}, to be removed)`);
+  console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
 }
