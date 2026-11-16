@@ -57,7 +57,7 @@ export function npmPackages(text, lockPath) {
       by: direct.has(p) ? [] : [...reached].filter(([, set]) => set.has(p)).map(([d]) => nameOf(d)) }));
 }
 
-// The lock entry npm installs for `name` as seen from the package at `from`: the nearest node_modules going up.
+// The lock entry that an install puts in place for `name`, as seen from the package at `from`: the nearest node_modules going up.
 function resolve(packages, from, name) {
   for (let dir = from; ; dir = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "") {
     const key = posix.join(dir, "node_modules", name);
