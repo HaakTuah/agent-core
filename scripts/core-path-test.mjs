@@ -139,9 +139,11 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   ok(/the hook of main's pin ran: stop/.test(said) && !/working tree/.test(said), "and never the working tree's copy, edited", said);
   // (a check run from the carried copy reads the project it stands in, not the library: projectAt)
   const at = projectAt(path.join(project, "lib", "core", "scripts"));
-  ok(fs.realpathSync(at.root) === fs.realpathSync(project) && at.prefix === "lib/core/scripts/", "a script of a copy a submodule carries takes the project as its root, its prefix from there", JSON.stringify(at));
+  // (a root compared as the file system finds it, however git and Node each spell it)
+  const same = (a, b) => fs.realpathSync.native(a).toLowerCase() === fs.realpathSync.native(b).toLowerCase();
+  ok(same(at.root, project) && at.prefix === "lib/core/scripts/", "a script of a copy a submodule carries takes the project as its root, its prefix from there", JSON.stringify(at));
   const own = projectAt(lib);
-  ok(fs.realpathSync(own.root) === fs.realpathSync(lib) && own.prefix === "", "a repository of its own is its own root", JSON.stringify(own));
+  ok(same(own.root, lib) && own.prefix === "", "a repository of its own is its own root", JSON.stringify(own));
   // (and a check run from it reads the project's own files, the submodule's among them: the pointer check, from a library
   // that carries its scripts)
   {

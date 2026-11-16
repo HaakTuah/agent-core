@@ -95,9 +95,11 @@ export function projectAt(from) {
   if (!above) return { root: top, prefix };
   let line = {};
   try { line = readCore(fs.readFileSync(path.join(above, MANIFEST), "utf8")); } catch { return { root: top, prefix }; }
-  const carried = line.form === "carried" ? path.resolve(above, line.path) : null;
-  if (!carried || !(path.resolve(from) + path.sep).startsWith(carried + path.sep)) return { root: top, prefix };
-  return { root: above, prefix: `${path.relative(above, top).split(path.sep).join("/")}/${prefix}` };
+  // (where `from` stands in the project, spelled from git's own answers alone, since a folder's name as Node gives it
+  // may differ, as Windows' short names do from git's long ones)
+  const within = `${path.relative(above, top).split(path.sep).join("/")}/${prefix}`;
+  if (line.form !== "carried" || !within.startsWith(line.path)) return { root: top, prefix };
+  return { root: above, prefix: within };
 }
 
 /** The commands of Claude Code's hooks (.claude/settings.json) for a core at another path than core/, as the starter
