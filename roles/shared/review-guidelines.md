@@ -33,7 +33,8 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
 A finding, not blocking:
 - anything the change leaves behind (unused code, files or settings, commented-out code, a description made untrue);
 - content put where its readers must read past it;
-- a pointer no reader needs.
+- a pointer no reader needs;
+- "Done when" lines beyond what `tasks/done-when.md`, "No more than the change needs", allows.
 
 **Text users read** (core archive 49 and 141).
 - A finding for any line that reads machine-made (one shape again and again, filler, hedging, clichés, voices alike, the

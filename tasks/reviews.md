@@ -66,6 +66,12 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      not read shows where the form is not kept, and no check fails a pull request for it.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would (core archive 22).
+   - **It goes down the lines** (core archive 240; #305). By default, where the pull request's entry has "Done when"
+     lines (`tasks/done-when.md`), the design check asks of each whether it is met, with its proof and its "Ran:" and
+     "Saw:", whether the "If" case is tested, and whether anything outside the out of scope's line changed, and
+     reports each gap as blocking, and no preference. It does not mean it judges the lines' choice, which the
+     stand-in ruled on. Reason: a reading against the lines finds what the builder missed, one of taste what the
+     reviewer prefers. Held by no check: the design check's brief carries it.
 5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
    as floor rule 9 allows). A review from anyone else is advisory (core archive 130).
