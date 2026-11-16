@@ -63,11 +63,6 @@
       "depth": 0,
       "branches": 16
     },
-    "function: scripts/init.mjs#init": {
-      "lines": 59,
-      "depth": 2,
-      "branches": 19
-    },
     "function: scripts/labels.mjs#check": {
       "lines": 41,
       "depth": 0,
@@ -148,16 +143,6 @@
       "depth": 4,
       "branches": 81
     },
-    "function: scripts/nuget-fetch.mjs#fetchAll": {
-      "lines": 110,
-      "depth": 3,
-      "branches": 37
-    },
-    "function: scripts/nuget-fetch.mjs#one": {
-      "lines": 41,
-      "depth": 2,
-      "branches": 31
-    },
     "function: scripts/security-review.mjs#judge": {
       "lines": 45,
       "depth": 2,
@@ -172,11 +157,6 @@
       "lines": 35,
       "depth": 2,
       "branches": 24
-    },
-    "function: scripts/sync.mjs#sync": {
-      "lines": 85,
-      "depth": 3,
-      "branches": 35
     },
     "function: scripts/workflow-run.mjs#block": {
       "lines": 20,
