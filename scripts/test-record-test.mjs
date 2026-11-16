@@ -36,9 +36,15 @@ const flow = `jobs:
       - uses: actions/checkout@v4
         with:
           run: node test/c-test.mjs
+      - name: The d check, a block
+        run: |
+          echo first
+          node test/d-test.mjs
+      - name: After the block
+        run: echo nothing
 `;
 const steps = stepsOf(flow, tests);
-ok(same([...steps], [["The a check", "test/a-test.mjs"], ["The b check, timed", "test/b-test.mjs"]]), "each step that starts a test file is read by its name, whatever form of YAML stands around it", JSON.stringify([...steps]));
+ok(same([...steps], [["The a check", "test/a-test.mjs"], ["The b check, timed", "test/b-test.mjs"], ["The d check, a block", "test/d-test.mjs"]]), "each step that starts a test file is read by its name, whatever form of YAML stands around it, a block's lines too", JSON.stringify([...steps]));
 
 const t = s => new Date(Date.UTC(2026, 10, 16, 12, 0, s)).toISOString();
 const step = (name, from, to, conclusion = "success") => ({ name, started_at: t(from), completed_at: t(to), conclusion });
@@ -55,9 +61,9 @@ const junit = fromJunit({
 });
 ok(same(junit.map(r => [r.test, r.seconds, r.passed, r.key]), [["test/c-test.mjs", 2, true, "1.xml"], ["test/d-test.mjs", 2, false, "1.xml"], ["test/d-test.mjs", 3, false, "2.xml"]]), "a JUnit report is a run: each file's cases summed, failed where one fails or errs", JSON.stringify(junit));
 
-const report = { files: { "src/a.mjs": { mutants: [{ killedBy: ["1"] }, { killedBy: ["1", "2"] }, { killedBy: ["2"] }, { status: "Survived" }] } }, testFiles: { "test/a-test.mjs": { tests: [{ id: "1" }] }, "test/b-test.mjs": { tests: [{ id: "2" }] } } };
+const report = { files: { "src/a.mjs": { mutants: [{ killedBy: ["1"] }, { killedBy: ["1", "2"] }, { killedBy: ["2"] }, { killedBy: ["1", "1b"] }, { status: "Survived" }] } }, testFiles: { "test/a-test.mjs": { tests: [{ id: "1" }, { id: "1b" }] }, "test/b-test.mjs": { tests: [{ id: "2" }] } } };
 const caught = alone(report);
-ok(same([...caught], [["test/a-test.mjs", 1], ["test/b-test.mjs", 1]]) && alone({ files: { a: { mutants: [{ status: "Killed" }] } } }) === null, "what a test alone catches is counted where faults name their tests, and is none where none does", JSON.stringify([...caught ?? []]));
+ok(same([...caught], [["test/a-test.mjs", 2], ["test/b-test.mjs", 1]]) && alone({ files: { a: { mutants: [{ status: "Killed" }] } } }) === null, "what a test file alone catches is counted where faults name their tests, two cases of one file as that file, and is none where none does", JSON.stringify([...caught ?? []]));
 
 const rows = record({ tests, runs: [...runs, ...junit], alone: new Map([["test/a-test.mjs", 2]]), named: new Set(["test/c-test.mjs"]), proof: new Set(), screens: new Set(["test/d-test.mjs"]) });
 const row = name => rows.find(r => r.test === name);

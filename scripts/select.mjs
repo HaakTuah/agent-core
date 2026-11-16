@@ -34,11 +34,13 @@ const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args],
 const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
 const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-// Whether a path is one of git pathspecs': a plain one is the path or a folder above it, one of ":(glob)" a glob ("**"
-// any folders, "*" within one), and ":!" or ":(exclude)" leaves out what it matches.
+// Whether a path is one of git pathspecs': a plain one is the path or a folder above it, or, where it holds a
+// wildcard, matches as git's default does ("*" and "?" across folders too); one of ":(glob)" is a glob ("**" any
+// folders, "*" within one); and ":!" or ":(exclude)" leaves out what it matches.
 export function matcher(specs) {
   const one = spec => {
     const glob = spec.startsWith(":(glob)"), body = spec.replace(/^:\((glob|exclude)\)|^:!/u, "");
+    if (!glob && /[*?[]/u.test(body)) { const re = new RegExp(`^${body.split(/(\*|\?)/u).map(p => (p === "*" ? ".*" : p === "?" ? "." : escaped(p))).join("")}$`, "u"); return f => re.test(f); }
     if (!glob) { const plain = body.replace(/\/$/u, ""); return f => plain === "." || f === plain || f.startsWith(`${plain}/`); }
     const re = new RegExp(`^${body.split(/(\*\*\/|\*\*|\*)/u).map(p => (p === "**/" ? "(?:.*/)?" : p === "**" ? ".*" : p === "*" ? "[^/]*" : escaped(p))).join("")}$`, "u");
     return f => re.test(f);

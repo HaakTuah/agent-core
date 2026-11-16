@@ -26,6 +26,12 @@ const pulls = [
 ];
 const checks = { a: [check(0, 10)], b: [check(0, 4)], c: [check(0, 6)] };
 const gh = route => (route.includes("/pulls?") ? JSON.stringify(pulls) : JSON.stringify({ check_runs: checks[/commits\/(\w+)\//.exec(route)[1]] }));
+// (100 pull requests a page, the newest merges on the second: an old one updated lately fills the first)
+const page1 = [...Array.from({ length: 99 }, (_, k) => ({ merged_at: at(k % 10), updated_at: at(58), head: { sha: "a" } })), { merged_at: null, updated_at: at(57), head: { sha: "x" } }];
+const page2 = [{ merged_at: at(56), updated_at: at(56), head: { sha: "c" } }, { merged_at: at(55), updated_at: at(55), head: { sha: "b" } }];
+const paged = route => (route.includes("/pulls?") ? JSON.stringify([page1, page2][Number(/&page=(\d+)/.exec(route)[1]) - 1] ?? []) : JSON.stringify({ check_runs: checks[/commits\/(\w+)\//.exec(route)[1]] }));
+const deep = measure({ repo: "o/n", count: 2, gh: paged });
+ok(deep.median === 300 && deep.read === 2, "the newest merges are found past a page of older ones updated lately", JSON.stringify(deep));
 let m = measure({ repo: "o/n", count: 2, mark: 600, gh });
 ok(m.median === 300 && m.read === 2, "the last merged pull requests are read, newest first, one not merged left out", JSON.stringify(m));
 ok(/5\.0 min, the median of the last 2 merged pull requests' checks, within its mark of 10\.0 min/.test(line(m)), "the state report's line gives the median within its mark", line(m));

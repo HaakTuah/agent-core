@@ -30,11 +30,13 @@ export const median = xs => { const s = [...xs].sort((a, b) => a - b), k = s.len
 // The median wait of the last `count` merged pull requests of `repo`, read through `gh`: { median, read, mark }, mark
 // the config's, or undefined where it gives none.
 export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
-  const merged = [];
-  for (let page = 1; merged.length < count && page <= 10; page++) {
+  // (newest updated first: a pull request is updated when it merges, so once a page's last update is older than the
+  // count-th newest merge read, no later page holds a newer one)
+  const merged = [], kth = () => merged.map(p => p.merged_at).sort().reverse()[count - 1];
+  for (let page = 1; page <= 10; page++) {
     const rows = JSON.parse(gh(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`) || "[]");
     merged.push(...rows.filter(p => p.merged_at));
-    if (rows.length < 100) break;
+    if (rows.length < 100 || (merged.length >= count && String(rows.at(-1).updated_at) < kth())) break;
   }
   const times = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count)
     .map(p => waited(JSON.parse(gh(`repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`) || "{}").check_runs ?? [])).filter(t => t !== null);

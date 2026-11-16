@@ -32,15 +32,25 @@ export const COUNT = 30;
 // ---- the runs ----
 
 // Each step of a workflow that starts a test file, by its name: the step's name to the test. Read line by line (a
-// step's "- name:" and the "run:" under it), so a workflow's every form of YAML is read alike.
+// step's "- name:" and the "run:" under it, on its line or, after | or >, on the lines indented under it), so a
+// workflow's every form of YAML is read alike.
 export function stepsOf(workflowText, tests) {
-  const out = new Map(), aTest = run => [...tests].find(t => new RegExp(`(^|[\\s/])${t.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?=\\s|$)`, "u").test(run));
+  const out = new Map(), aTest = run => [...tests].find(t => new RegExp(`(^|[\\s/])${t.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?=\\s|$)`, "um").test(run));
+  const lines = String(workflowText).split(/\r?\n/u), indent = l => /^\s*/u.exec(l)[0].length;
   let name = null;
-  for (const line of String(workflowText).split(/\r?\n/u)) {
-    const step = /^\s*- name:\s*(.+?)\s*$/u.exec(line), run = /^\s*(?:- )?run:\s*(.+?)\s*$/u.exec(line);
+  for (let i = 0; i < lines.length; i++) {
+    const step = /^\s*- name:\s*(.+?)\s*$/u.exec(lines[i]), run = /^\s*(?:- )?run:\s*(.*?)\s*$/u.exec(lines[i]);
     if (step) name = step[1].replace(/^(["'])(.*)\1$/u, "$2");
-    else if (/^\s*- /u.test(line)) name = null;
-    if (run && name !== null) { const test = aTest(run[1]); if (test) out.set(name, test); }
+    else if (/^\s*- /u.test(lines[i])) name = null;
+    if (!run || name === null) continue;
+    let text = run[1];
+    if (/^[|>][-+0-9]*$/u.test(text)) { // (a block: the lines indented under it, to the first that is not)
+      const under = [];
+      for (let j = i + 1; j < lines.length && (!lines[j].trim() || indent(lines[j]) > indent(lines[i])); j++) under.push(lines[j]);
+      text = under.join("\n");
+    }
+    const test = aTest(text);
+    if (test) out.set(name, test);
   }
   return out;
 }
@@ -85,7 +95,8 @@ export function alone(report) {
   for (const f of Object.values(report?.files ?? {})) for (const m of f.mutants ?? []) {
     if (!Array.isArray(m.killedBy) || !m.killedBy.length) continue;
     named = true;
-    if (m.killedBy.length === 1) { const t = names.get(m.killedBy[0]) ?? m.killedBy[0]; counts.set(t, (counts.get(t) ?? 0) + 1); }
+    const files = new Set(m.killedBy.map(id => names.get(id) ?? id)); // (two cases of one file are that file alone)
+    if (files.size === 1) { const [t] = files; counts.set(t, (counts.get(t) ?? 0) + 1); }
   }
   return named ? counts : null;
 }
