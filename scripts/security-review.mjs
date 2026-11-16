@@ -200,7 +200,8 @@ export const named = (body) => (typeof body === "string" ? body.match(/(?<![0-9a
 // scripts/code-review-wait.mjs and scripts/clean-merges.mjs read it too.
 export function standsFrom(pull, commits, head, merges) {
   const chain = new Set([head]);
-  if (!Number.isInteger(pull.commits) || commits.length < pull.commits) return chain;
+  // (a count that is no whole number of at least none proves nothing: the head alone)
+  if (!Number.isInteger(pull.commits) || pull.commits < 0 || commits.length < pull.commits) return chain;
   const proved = merges === undefined ? undefined : new Set(Array.isArray(merges) ? merges : []);
   const by = new Map(commits.filter((commit) => typeof commit.sha === "string").map((commit) => [commit.sha, commit]));
   for (let at = head; chain.size <= by.size;) {
@@ -223,7 +224,7 @@ export function unproved(pull, commits, head, merges) {
 
 // whether GitHub gave every file the pull request changes (it gives at most 3000): a list cut short is read as one
 // that changes what runs by itself, never as one that does not
-export const whole = (pull, files) => Number.isInteger(pull.changed_files) && flat(files).length >= pull.changed_files;
+export const whole = (pull, files) => Number.isInteger(pull.changed_files) && pull.changed_files >= 0 && flat(files).length >= pull.changed_files;
 // what runs by itself, as comment-only.mjs reads it, the copy of the core under core/ aside (only a sync changes it,
 // and its code passed its reviews in the core's own pull request: floor rule 8); a file moved counts on either side
 const runs = (file) => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith("core/") && RUNS.test(name));
@@ -261,7 +262,9 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   if (review !== null && typeof review === "object" && review.status === "completed") {
     const at = typeof review.commit_sha === "string" && SHA.test(review.commit_sha) ? review.commit_sha : undefined;
     const on = at === undefined ? "" : at === sha ? ` (on ${short})` : ` (on ${at.slice(0, 7)}, earlier than the head ${short}${bind && stand(at) ? ", only updates from main since" : ""})`;
-    if (review.has_unresolved_findings !== true) {
+    // (only false, or null, which Codex gives where it found nothing, says no finding is open: true, or a value of any
+    // other type, is read as one open)
+    if (review.has_unresolved_findings === false || review.has_unresolved_findings === null) {
       // a review of an earlier commit stands only where nothing but updates from main follow it; otherwise a posted
       // review names the head, or a commit only such updates follow (a pure sync needs none, its review waited for)
       if (pure || !bind || (at !== undefined && stand(at))) return { sha, done: true, why: `Codex's security review has run${on}` };

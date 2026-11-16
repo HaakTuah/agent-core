@@ -29,7 +29,7 @@
 // reach users ([] if none); "tools", the folders within them whose files do not; and "skip", the folders or files
 // left out. Node's own modules only.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync, readlinkSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { commandLines, commands, fetched, otherFetch } from "./licence-commands.mjs";
@@ -175,7 +175,10 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) {
     if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
-    const text = binary.has(f) ? "" : readFileSync(join(root, f), "utf8");
+    // (a tracked link is read as git holds it, the path it names, and never followed: its target may lie outside the
+    // checkout, and one inside is a tracked file read in its own turn)
+    const at = join(root, f);
+    const text = binary.has(f) ? "" : lstatSync(at).isSymbolicLink() ? readlinkSync(at, "utf8") : readFileSync(at, "utf8");
     // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
     // scan cannot read; with none, as shell)
     const bare = !binary.has(f) && !/.\.\w+$/u.test(posix.basename(f)); // (".envrc" and the like have none either)
@@ -203,7 +206,9 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         else fetches(text.split(/\r?\n/u).map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
       }
       if (json !== undefined) {
-        for (const line of commandLines(json)) fetches(String(line), f, line.literal === true);
+        let lines = [];
+        try { lines = commandLines(json); } catch (e) { if (!byHand(f)) fail(`${f}: ${e.message}. Mend: nest it less deep, or name it in the "files" of the entry that audits it`); }
+        for (const line of lines) fetches(String(line), f, line.literal === true);
         const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
         if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
           fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile with npm, by its install given --package-lock-only, and name it in the config's "lockfiles"`);

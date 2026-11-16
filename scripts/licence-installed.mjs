@@ -19,15 +19,17 @@
 //   node core/scripts/licence-installed.mjs [the folder that holds the lock file, the current one if left out]
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
 import { lockInstalled, lockPathOk, lockRead, workspacesIn } from "./licences.mjs";
 import { started } from "./started.mjs";
 
 /** A licence as npm writes one into a lock file from a package.json's "license": the type of one written the old way,
  *  as an object; nothing for none or an empty one; else the value as it stands. */
 export function lockForm(licence) {
+  // (a type within a type is followed in a loop, never by recursion, however deep it nests)
+  while (licence && typeof licence === "object" && !Array.isArray(licence) && licence.type) licence = licence.type;
   if (!licence) return null;
   if (typeof licence !== "object") return licence;
-  if (!Array.isArray(licence) && licence.type) return lockForm(licence.type);
   return Object.keys(licence).length ? licence : null;
 }
 
@@ -108,6 +110,7 @@ export function check(dir, system = thisSystem()) {
   let lock;
   try { lock = JSON.parse(readFileSync(join(dir, name), "utf8")); } catch { throw new Error(`cannot read ${name} as JSON. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`); }
   if (!lock || typeof lock.packages !== "object" || !lock.packages || Array.isArray(lock.packages)) throw new Error(`${name} has no "packages" (npm's lockfile version 2 or 3). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only, with npm 7 or later`);
+  if (tooDeep(lock)) throw new Error(`${name} nests deeper than ${DEEPEST} objects and lists, as no lock file npm writes does. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`);
   const failures = [];
   // (every entry is written as npm writes one, or the lock file fails before anything is left out or read: lockPathOk,
   // in licences.mjs)
@@ -128,9 +131,12 @@ export function check(dir, system = thisSystem()) {
       else failures.push(`${shown(path)}: not installed, and no optional package of another system or of one alone, so what it says of itself cannot be read. Mend: install from the lock file first (npm ci), then run the check`);
       continue;
     }
+    // (read only inside the project: a package's folder reached through a link that leads out of it is not read)
+    if (leadsOut(dir, file)) { failures.push(`${shown(path)}: its package.json is reached through a link that leads out of the project, so it is not read. Mend: install from the lock file again (npm ci), which puts each package inside the project; where a link stays, replace the package that makes it`); continue; }
     let own;
     // (read as npm reads one: a byte-order mark before it is no part of it)
     try { const text = readFileSync(file, "utf8"); own = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text); } catch { own = null; }
+    if (tooDeep(own)) { failures.push(`${shown(path)}: its package.json nests deeper than ${DEEPEST} objects and lists, so it is not read. Mend: install from the lock file again (npm ci); where it still nests so deep, replace the package`); continue; }
     if (!own || typeof own !== "object" || Array.isArray(own)) { failures.push(`${shown(path)}: its package.json cannot be read as JSON. Mend: install from the lock file again (npm ci); where it still cannot be read, replace the package`); continue; }
     read++;
     if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${shown(path)}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only, which takes each licence from the package itself`);

@@ -33,6 +33,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CODE, OTHER } from "./code-shape.mjs";
+import { logged } from "./guards.mjs";
 import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
@@ -358,7 +359,7 @@ function onPullRequest(p, base) {
   const ids = baseline ? needed(faults, baseline, was, recordsWhole(baseline, was, touched)) : [];
   const kinds = new Set(ids.map(kindOf)), still = ids.length ? measured(p, watched(ids, read, changed), baseline).filter(f => kinds.has(kindOf(f.id))) : [];
   const { lines, fails } = verdict({ faults, still, baseline, was, at: p.at, deleted, touched, texts: read });
-  for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
+  for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(logged(l));
   summary(lines);
   return fails ? 1 : 0;
 }
@@ -449,5 +450,5 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${e.message}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
 }

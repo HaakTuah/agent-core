@@ -15,6 +15,7 @@
 //   node core/scripts/inbox.mjs          from a project's root: where the owner's inbox is, and any mend
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { aRepository } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 export const FOLDER = "inbox";
@@ -28,15 +29,16 @@ export const SENDERS = Object.keys(LIST.sender).map(s => s.replace(/^by:/, ""));
 // (each part a name, never "." or "..", so the call goes to that repository's route alone)
 export const repoOf = url => {
   const repo = /^(?:https:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(String(url ?? "").trim())?.[1] ?? null;
-  return repo && repo.split("/").every(part => !/^\.+$/.test(part)) ? repo : null;
+  return aRepository(repo) ? repo : null;
 };
 
 // GitHub's answer for the repository (`GET repos/{repo}`, as gh gives it) read as yes or no, with why.
 export function answer(repo) {
   if (!repo || typeof repo !== "object") return { yes: false, why: "GitHub gave no answer for the repository" };
   if (repo.has_issues !== true) return { yes: false, why: "its issues are switched off" };
+  // (each right a real true: a text or any other value GitHub never gives reads as no right)
   const p = repo.permissions ?? {};
-  if (!(p.admin || p.maintain || p.push || p.triage)) return { yes: false, why: "the account signed in here may not write its issues (a GitHub job's token may where its workflow's `permissions:` grants `issues: write`)" };
+  if (![p.admin, p.maintain, p.push, p.triage].some(right => right === true)) return { yes: false, why: "the account signed in here may not write its issues (a GitHub job's token may where its workflow's `permissions:` grants `issues: write`)" };
   return { yes: true, why: "" };
 }
 

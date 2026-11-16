@@ -24,13 +24,14 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
 // can differ)
-const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+const fail = msg => { console.error(`FAIL: ${logged(msg)}`); process.exit(1); };
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 let where;
 try {
@@ -63,6 +64,8 @@ const list = (v, key) => {
 };
 if (typeof config.baseline !== "string" || !config.baseline) fail(`the config names no "baseline". Mend: name the baseline's path in "baseline", as the starter kit writes it (${TEMPLATE})`);
 if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
+// (the baseline is read, and written, only inside the project, as a file of its own reached through no link out of it)
+if (!inProject(config.baseline) || leadsOut(ROOT, path.join(ROOT, config.baseline))) fail(`the config's "baseline", ${config.baseline}, lies outside the project. Mend: name the baseline by its path from the project's root, with no ".." that leads above it, as a file of the project's own reached through no link that leads out of it (${TEMPLATE})`);
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
 let fromSecurity = null;
@@ -147,7 +150,7 @@ function find(files, units, size, joiner, minChars) {
 const ls = (specs, env = process.env) => {
   if (!specs.length) return [];
   try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
-  catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${String(e.stderr || e.message).trim().split(/\r?\n/u)[0]}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
+  catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${unrooted(String(e.stderr || e.message).trim().split(/\r?\n/u)[0], ROOT)}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
 };
 // The files pathspecs read in a commit's tree, as git lists them there: from an index of that tree, written to a
 // folder of its own and taken away after, so that every pathspec reads as it does in the tree as it stands.
@@ -295,13 +298,13 @@ function nearCopies() {
 if (!process.argv.includes("--write")) {
   const near = nearCopies();
   if (near.length) console.log(`note ${near.length} ${near.length === 1 ? "run of code matches another" : "runs of code match others"} once names and numbers are set aside (reported, never failed: the audit's reader judges whether one function should serve both)`);
-  for (const c of near.slice(0, 10)) console.log(`  ${c.places.join(" and ")}`);
+  for (const c of near.slice(0, 10)) console.log(`  ${logged(c.places.join(" and "))}`);
   if (near.length > 10) console.log(`  and ${near.length - 10} more`);
 }
 const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 const fresh = found.filter(c => c.windows.some(over));
 const shrunk = Object.keys(base.windows).filter(h => !places.has(h) || places.get(h) < base.windows[h]);
-for (const c of fresh) console.error(`FAIL: a new copy: ${c.places.join(' and ')} (it starts "${c.starts}"). Mend: keep it in the one place it belongs and point there from the others`);
+for (const c of fresh) console.error(`FAIL: ${logged(`a new copy: ${c.places.join(' and ')} (it starts "${c.starts}")`)}. Mend: keep it in the one place it belongs and point there from the others`);
 if (process.argv.includes('--write')) {
   base.windows = Object.fromEntries(Object.entries(base.windows).filter(([h]) => places.has(h)).map(([h, n]) => [h, Math.min(n, places.get(h))]));
   fs.writeFileSync(BASELINE, JSON.stringify(base, null, 2) + '\n');

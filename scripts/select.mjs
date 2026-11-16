@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
+import { logged } from "./guards.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -37,9 +38,57 @@ const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args],
 const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
 const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-// One part of a pathspec with wildcards, as a regular expression: "*" any run, "?" one character, "[...]" one of a
-// set ("[!...]" one not in it), anything else itself.
-const wild = p => (p === "*" ? ".*" : p === "?" ? "." : /^\[!?[^\]]+\]$/u.test(p) ? `[${p.startsWith("[!") ? "^" : ""}${p.slice(p.startsWith("[!") ? 2 : 1, -1).replace(/[\\\]^]/gu, "\\$&")}]` : escaped(p));
+// A pattern as a list of steps, matched by walking every step a path could stand at at once, so a match takes time in
+// proportion to the path's length times the pattern's, whatever runs of wildcards it holds: each step is a character
+// ({ one: test }) or a run of any length ({ run: test }, which `skip` steps may pass over at once, for "**/", which
+// matches nothing or a run ending in "/").
+const LINE_END = /[\n\r\u2028\u2029]/u; // (where a wildcard of git's default stops, as "." does in a regular expression)
+const literal = c => ({ one: ch => ch === c });
+// One part of a pathspec with git's default wildcards: "*" any run (across folders too), "?" one character, "[...]"
+// one of a set ("[!...]" one not in it), anything else itself.
+function wild(spec) {
+  const steps = [];
+  for (const p of spec.split(/(\*+|\?|\[!?[^\]]+\])/u)) {
+    if (/^\*+$/u.test(p)) steps.push({ run: ch => !LINE_END.test(ch) }); // (a run of stars is one star)
+    else if (p === "?") steps.push({ one: ch => !LINE_END.test(ch) });
+    else if (/^\[!?[^\]]+\]$/u.test(p)) {
+      const not = p.startsWith("[!"), set = new RegExp(`^[${p.slice(not ? 2 : 1, -1).replace(/[\\\]^]/gu, "\\$&")}]$`, "u");
+      steps.push({ one: ch => set.test(ch) !== not });
+    } else for (const c of p) steps.push(literal(c));
+  }
+  return steps;
+}
+// One of ":(glob)": "**/" any folders, "**" any run, "*" a run within one folder, anything else itself.
+function globSteps(spec) {
+  const steps = [];
+  for (const p of spec.split(/(\*\*\/|\*\*|\*)/u)) {
+    if (p === "**/") steps.push({ run: () => true, skip: 2 }, literal("/"));
+    else if (p === "**") steps.push({ run: () => true });
+    else if (p === "*") steps.push({ run: ch => ch !== "/" });
+    else for (const c of p) steps.push(literal(c));
+  }
+  return steps;
+}
+// Whether the steps match the whole path.
+function walks(steps, f) {
+  const close = at => {
+    const all = new Set(at);
+    for (const i of all) if (steps[i]?.run) { all.add(i + 1); if (steps[i].skip) all.add(i + steps[i].skip); }
+    return all;
+  };
+  let at = close([0]);
+  for (const ch of f) {
+    const next = new Set();
+    for (const i of at) {
+      const step = steps[i];
+      if (step?.run) { if (step.run(ch)) next.add(i); }
+      else if (step?.one(ch)) next.add(i + 1);
+    }
+    if (!next.size) return false;
+    at = close(next);
+  }
+  return at.has(steps.length);
+}
 
 // Whether a path is one of git pathspecs': a plain one is the path or a folder above it, or, where it holds a
 // wildcard, matches as git's default does ("*", "?" and "[...]", across folders too); one of ":(glob)" is a glob ("**" any
@@ -47,10 +96,10 @@ const wild = p => (p === "*" ? ".*" : p === "?" ? "." : /^\[!?[^\]]+\]$/u.test(p
 export function matcher(specs) {
   const one = spec => {
     const glob = spec.startsWith(":(glob)"), body = spec.replace(/^:\((glob|exclude)\)|^:!/u, "");
-    if (!glob && /[*?[]/u.test(body)) { const re = new RegExp(`^${body.split(/(\*|\?|\[!?[^\]]+\])/u).map(wild).join("")}$`, "u"); return f => re.test(f); }
+    if (!glob && /[*?[]/u.test(body)) { const steps = wild(body); return f => walks(steps, f); }
     if (!glob) { const plain = body.replace(/\/$/u, ""); return f => plain === "." || f === plain || f.startsWith(`${plain}/`); }
-    const re = new RegExp(`^${body.split(/(\*\*\/|\*\*|\*)/u).map(p => (p === "**/" ? "(?:.*/)?" : p === "**" ? ".*" : p === "*" ? "[^/]*" : escaped(p))).join("")}$`, "u");
-    return f => re.test(f);
+    const steps = globSteps(body);
+    return f => walks(steps, f);
   };
   const out = s => s.startsWith(":!") || s.startsWith(":(exclude)");
   const ins = specs.filter(s => !out(s)).map(one), outs = specs.filter(out).map(one);
@@ -194,5 +243,5 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${e.message}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
 }

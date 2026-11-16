@@ -92,6 +92,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, r
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
+import { logged } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
@@ -402,7 +403,7 @@ const DECLARATION = new RegExp(`^<\\?xml${XB}+version${XB}*=${XB}*(?:"1\\.[0-9]+
 const ATTRIBUTES = /^(?:[ \t\r\n]+[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?[ \t\r\n]*=[ \t\r\n]*(?:"[^"<\u0000\u0001]*"|'[^'<\u0000\u0001]*'))*[ \t\r\n]*$/u;
 const AMPERSAND = /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/u;
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
-const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
+const shown = logged;
 
 /** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {
@@ -515,8 +516,16 @@ export function manifestLicence(text) {
   // no manifest can hold is left where each stood: a comment holds no "--", and an instruction is named, never "xml")
   let plain = "", at = 0;
   const ends = { "<!--": "-->", "<![CDATA[": "]]>", "<?": "?>" };
+  // (where each opening stands next, looked for again only once the reading has passed it, so the text is read once
+  // however many of them it holds: -1 for none left)
+  const next = new Map(Object.keys(ends).map((open) => [open, -2]));
   for (;;) {
-    const found = Object.keys(ends).map((open) => [text.indexOf(open, at), open]).filter(([i]) => i >= 0).sort((a, b) => a[0] - b[0])[0];
+    let found;
+    for (const [open, i] of next) {
+      const now = i !== -1 && i < at ? text.indexOf(open, at) : i;
+      next.set(open, now);
+      if (now >= 0 && (!found || now < found[0])) found = [now, open];
+    }
     if (!found) { plain += text.slice(at); break; }
     const end = text.indexOf(ends[found[1]], found[0] + found[1].length);
     if (end < 0) return malformed;

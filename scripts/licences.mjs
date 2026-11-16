@@ -32,6 +32,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inProject, leadsOut, logged } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { started } from "./started.mjs";
@@ -313,6 +314,7 @@ export function loadConfig(path) {
     if (!Array.isArray(s.served)) throw new Error('the config\'s "scan" does not say what reaches users. Mend: add "served", the folders whose files reach users, or "served": [] if none does');
     if (!config.audit) throw new Error('the config\'s "scan" needs an "audit" to hold what it finds. Mend: name the audit\'s file in "audit"');
   }
+  within(config);
   config = normalised(config);
   const beside = (config.lockfiles ?? []).map((f) => posix.join(posix.dirname(f), "package.json"));
   const loose = config.ships.filter((m) => !beside.includes(m));
@@ -323,6 +325,14 @@ export function loadConfig(path) {
   acceptedList(config.accepted, "accepted", ACCEPTED_NPM, "<name>@<version>", { entries: true });
   if ((config.accepted ?? []).some((a) => a.entry !== undefined) && !config.audit) throw new Error('the config\'s "accepted" names an audit entry, and the config names no "audit". Mend: name the audit\'s file in "audit", or take that yes out');
   return config;
+}
+
+/** The config's paths, each held to the project: one rooted, or with a ".." that leads above the project's root, is
+ *  refused, and, given the project's `root`, so is one whose file is reached through a link that leads out of it. */
+function within(config, root) {
+  const named = [...(config.lockfiles ?? []), ...(config.ships ?? []), ...(config.ignoreScriptsIn ?? []), config.audit, config.notices].filter((p) => p !== undefined);
+  const out = named.filter((p) => !inProject(p) || (root !== undefined && leadsOut(root, join(root, p))));
+  if (out.length) throw new Error(`the config names a path outside the project: ${out.map((p) => logged(p)).join(", ")}. Mend: name each file by its path from the project's root, with no ".." that leads above it, and make it a file of the project's own, reached through no link that leads out of it`);
 }
 
 /** Whether a lock file names an entry as npm writes one: "" for the project itself, else folders joined by "/", none
@@ -381,6 +391,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join
  * { failures, reports, summary }.
  */
 export function check(config, root, base = null, baseConfig = null) {
+  within(config, root);
   config = normalised(config);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
@@ -494,7 +505,7 @@ export function actionLists(config) {
 }
 
 if (started(import.meta.url)) {
-  const fail = (msg) => { console.error(`FAIL: ${msg}`); process.exit(1); };
+  const fail = (msg) => { console.error(`FAIL: ${logged(msg)}`); process.exit(1); };
   const configPath = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!configPath) fail("no config was named. Mend: name it: node core/scripts/licences.mjs <config> [--action]");
   let config, root;
@@ -507,8 +518,8 @@ if (started(import.meta.url)) {
   } else {
     let result;
     try { const base = baseOf(root); result = check(config, root, base, configAt(root, base, configPath)); } catch (e) { fail(e.message); }
-    for (const r of result.reports) console.log(`REPORT: ${r}`);
-    for (const f of result.failures) console.error(`FAIL: ${f}`);
+    for (const r of result.reports) console.log(`REPORT: ${logged(r)}`);
+    for (const f of result.failures) console.error(`FAIL: ${logged(f)}`);
     console.log(result.summary);
     process.exit(result.failures.length ? 1 : 0);
   }
