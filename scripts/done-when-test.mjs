@@ -51,7 +51,8 @@ ok(joined("| #2 | b | |\n", "| #4 | c | #2 |\n").join() === "#4" && joined(null,
 ok(closes("Fixes #12. Closes: #3, resolves #4 and fixed #12; see #9").join() === "#12,#3,#4", "the issues a description closes, as GitHub reads them, each once");
 
 // the whole, with issues read through a stand-in for gh
-const issues = { "#5": { labels: ["feature"], body: "What it is.\n" }, "#6": { labels: ["feature"], body: good }, "#7": { labels: ["bug"], body: "A bug.\n" } };
+const issues = { "#5": { labels: ["feature"], body: "What it is.\n" }, "#6": { labels: ["feature"], body: good }, "#7": { labels: ["bug"], body: "A bug.\n" },
+  "#9": { labels: ["enhancement"], body: "**Done when**\n- When ..., it .... Proof: ...\n" } };
 const read = item => issues[item] ?? null, queue = (...items) => ({ before: "| #1 | a | |\n", after: `| #1 | a | |\n${items.map(i => `| ${i} | b | |\n`).join("")}` });
 let r = doneMends({ body: "x", queue: queue("#5", "#6", "#7"), read });
 ok(r.mends.length === 1 && /#5, a feature's issue that joins the progress file, has no "Done when"/.test(r.mends[0]) && mended(`FAIL ${r.mends[0]}`), "of the issues that join, only a feature's with no entry fails, saying its mend", r.mends);
@@ -65,6 +66,8 @@ r = doneMends({ body: `Fixes #5\n${good}\n## Proved by use\n- Ran: a. Saw: b.\n-
 ok(r.mends.length === 0, "where the issue has none, the description's own lines are proved", r.mends);
 r = doneMends({ body: "Fixes #7\n", queue: null, read });
 ok(r.mends.length === 0 && r.notes.length === 0, "a bug's pull request with no entry is asked nothing", r);
+r = doneMends({ body: "Fixes #9\n", queue: queue("#9"), read });
+ok(r.mends.length === 0, "an issue of no feature, its template's heading left as it came, is asked nothing", r.mends);
 r = doneMends({ body: "Fixes #8\n", queue: queue(), read });
 ok(r.mends.length === 0 && r.notes.length === 1, "a closed issue that cannot be read is asked nothing, and that is said", r);
 

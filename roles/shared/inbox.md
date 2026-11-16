@@ -23,6 +23,11 @@ Read at the start of every task.
     owner's own comment on it says so.
   - Where issues cannot be read and written here (`core/scripts/inbox.mjs`, run at each sync), the same flow runs from
     files, as it says; turning issues on is the owner's setting, named once.
+  - **Questions before a larger feature** (core archive 240): before it files a feature of more than one pull
+    request, or a new project, the session the owner works with asks the owner its questions once, in one batch: the
+    hard parts, the edge cases and the trade-offs, none obvious; the answers go in the issue as the owner's word. It
+    does not mean a second batch, nor questions on a smaller change. Reason: a wrong reading caught before the code
+    costs a paragraph. Held by none.
 - **Labels and openers say who wrote what** (core archive 217): whoever files or acts on an issue gives it one state
   label and, where the *owner's account* filed it, one sender: the owner's voice (`by:owner`, `by:chat`, `by:design`) or
   an agent's; topics are the project's own short list. An agent's issue says "Found while:", its role and task; an

@@ -161,3 +161,37 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      `scripts/wait.mjs` and its line in the monthly state report, the core's own selection in its tests workflow, and
      the report on keeping up with main.
 
+
+240. **15 November 2026** (every project, the core among them; in chats with a session the owner works with, not the
+     design session, as that session recorded it on issue #305, labelled `by:chat`, under "What it is", saying the
+     owner agreed to it). The session checked the core's rules against the field's practice on nine topics and set
+     out additions with what holds each; the owner agreed to all of them that pass the owner's own test for a rule
+     (#303), and so to eight points: a feature's issue carries "Done when", two to six lines, each one thing a test, a
+     check or a named action can show, at least one saying what happens when something goes wrong, and one more
+     saying what is out of scope; the lines in three shapes ("When this happens, it does that." "While this lasts, it
+     does that." "If this goes wrong, then it does that."), one behaviour to a line; where an entry has no lines, the
+     builder writes them before any code, with its readings, on the draft pull request, the stand-in ruling on them at
+     once, sure or unsure, and the work going on, nothing waiting for the owner (the stand-in's part the session's own
+     step, marked so when put to the owner); each line naming what proves it, a test written first and seen to fail,
+     a check, a picture, or "the owner tries this"; the builder proving the change by using it as its user would, the
+     pull request showing what it ran and what it saw, line by line, passing tests alone not counting; the design
+     check going down the lines, reporting gaps, not preferences; a guard against overdoing it, no lines for a change
+     said in one sentence, never more than six, no user stories, no document of its own, never more words than the
+     code they ask for, a missing line never stopping work; and, before a larger feature or a new project is filed,
+     the session the owner works with asking its questions once, in one batch, the hard parts, the edge cases and the
+     trade-offs, the answers going into the issue as the owner's word. Kept out: the whole method of a spec-first
+     tool, the spec as the source with code that may not be edited by hand, a gate that makes work wait until an entry
+     is "ready", and user stories. The owner had asked:
+
+     > What are we lacking from our ruleset, that we can prescribe and get superior output in our projects, without
+     > having to manually iterate and re-prompt o so many times? Mistakes and wrong calls, the models are capable of
+     > avoiding or detecting themselves, but which the processs just doesn't automatically prompt them to do?
+
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `tasks/done-when.md`, the heading "Done when" in the idea templates, the design check's reading of the
+     lines in `tasks/reviews.md`, point 4, and its points in the review guidelines, the questions asked before a
+     larger feature is filed in `roles/shared/inbox.md`, and `scripts/done-when.mjs` in the description check.

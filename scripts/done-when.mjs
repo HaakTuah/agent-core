@@ -118,7 +118,8 @@ export const closes = body => [...new Set([...String(body ?? "").matchAll(/\b(?:
 
 // Every failure for a pull request: `body` its description, `queue` { before, after } the progress file's text,
 // `read(item)` an item ("#12" or an inbox file) as { labels, body } with its current text, or null where it cannot be
-// read. Returns { mends, notes }: the failures, each with its mend, and what was not asked and why.
+// read. Only a feature's issue is asked, so that an idea's template, which holds the heading, asks nothing of another.
+// Returns { mends, notes }: the failures, each with its mend, and what was not asked and why.
 export function doneMends({ body, queue, read, at = "" }) {
   const mends = [], notes = [], own = entryOf(body);
   const get = item => { const got = read(item); if (!got) notes.push(`${item} could not be read, so nothing is asked of it`); return got; };
@@ -132,10 +133,10 @@ export function doneMends({ body, queue, read, at = "" }) {
   let entry = own;
   for (const item of closes(body)) {
     const got = get(item);
-    if (!got) continue;
+    if (!got || !isFeature(got)) continue;
     const e = entryOf(got.body);
     if (e) entry = e;
-    else if (isFeature(got) && !own) mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}", and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
+    else if (!own) mends.push(`${item}, a feature's issue this pull request closes, has no "${HEADING}", and nor has the description. Mend: write the lines under a heading "${HEADING}" in the description, ${FORM}, and have the stand-in rule on them (${at}tasks/done-when.md)`);
   }
   if (entry) mends.push(...provedFaults(body, entry, at));
   return { mends, notes };
