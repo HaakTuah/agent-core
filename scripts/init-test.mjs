@@ -271,6 +271,22 @@ if (p.status === 0) {
   const movedBaseline = moveTo({ ...cfgMain, baseline: ".github/moved.json" });
   fs.rmSync(path.join(core, ".github/moved.json"));
   const movedWhole = moveTo(cfgMain), beside = moveTo({ ...cfgMain, prose: ["README.md"] }, { keepCall: true }), withShape = moveTo(cfgMain, { shapeToo: true });
+  // (two configs the base called, replaced by one: each is read on its own, so one's ":!" cancels nothing the other read)
+  const two = (() => {
+    const cfg = (at, prose) => { fs.writeFileSync(path.join(core, at), JSON.stringify({ baseline: cfgMain.baseline, code: [], prose })); git(core, "add", at); };
+    git(core, "checkout", "-q", "-b", "two-configs");
+    cfg(".github/copies-a.json", ["README.md"]);
+    cfg(".github/copies-b.json", ["AGENTS.md", ":!README.md"]);
+    fs.writeFileSync(tests, testsWas.replace("run: node scripts/copies.mjs .github/copies.json", "run: node scripts/copies.mjs .github/copies-a.json && node scripts/copies.mjs .github/copies-b.json"));
+    git(core, "commit", "-qam", "two configs");
+    cfg(".github/copies-new.json", ["AGENTS.md"]);
+    fs.writeFileSync(tests, testsWas.replace("run: node scripts/copies.mjs .github/copies.json", "run: node scripts/copies.mjs .github/copies-new.json"));
+    const r = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies-new.json"], { cwd: core, env: { ...env, COPIES_BASE: "two-configs" }, encoding: "utf8" });
+    git(core, "checkout", "-qf", "main");
+    git(core, "branch", "-qD", "two-configs");
+    return { status: r.status, out: r.stdout + r.stderr };
+  })();
+  ok(two.status === 1 && /reads 1 files fewer than two-configs's config read: README\.md \(prose\)/u.test(two.out) && mended(two.out), "against the base, two configs it called and one now are each read on their own: one's \":!\" leaves out nothing the other read", two.out);
   const calledInPlace = /\.github\/copies-two\.json, called in place of \.github\/copies\.json \(the config main's workflows call\),/u;
   const backMoved = /Mend: take the config back as main holds it \(git checkout main -- \.github\/copies\.json\), and name it in the call again/u;
   ok(movedNarrow.status === 1 && calledInPlace.test(movedNarrow.out) && narrowDropped.status === 1 && calledInPlace.test(narrowDropped.out) && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(movedNarrow.out) && backMoved.test(movedNarrow.out) && mended(movedNarrow.out)

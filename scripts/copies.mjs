@@ -256,7 +256,8 @@ if (from) {
     const who = moved ? `${CONFIG_AT}, called in place of ${at} (the config ${from}'s workflows call),` : CONFIG_AT;
     const back = `Mend: take the config back as ${from} holds it (git checkout ${from} -- ${at})${moved ? ", and name it in the call again" : ""}, then widen it if need be: a path may be added, never taken out`;
     if (!held.some(h => h.config.baseline === BASELINE)) fail(`${who} moves the baseline from ${held.map(h => h.config.baseline).join(" and ")} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
-    const specs = key => held.flatMap(h => Array.isArray(h.config[key]) ? h.config[key].filter(x => typeof x === "string" && x) : []);
+    // (each config the base called read on its own: one's ":!" leaves out only what that one read)
+    const specs = (h, key) => Array.isArray(h.config[key]) ? h.config[key].filter(x => typeof x === "string" && x) : [];
     const moves = renamed(from);
     const lost = (kind, before, now) => {
       const keep = new Set(ls(now));
@@ -266,7 +267,7 @@ if (from) {
     // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
     let wasRules = [];
     if (held.some(h => h.config.proseFromSecurity === true)) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }); } catch { /* the base read none */ }
-    const less = lost("code", specs("code"), CODE_SPECS).concat(lost("prose", specs("prose").concat(wasRules), proseSpecs));
+    const less = [...new Set(held.flatMap(h => lost("code", specs(h, "code"), CODE_SPECS).concat(lost("prose", specs(h, "prose").concat(h.config.proseFromSecurity === true ? wasRules : []), proseSpecs))))];
     if (less.length) fail(`${who} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
   }
   let there = true;
