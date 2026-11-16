@@ -29,7 +29,8 @@ ok(matcher(["test/*-test.mjs"])("test/a-test.mjs") && matcher(["test/*-test.mjs"
   "a plain pathspec with a wildcard matches as git's default does, across folders too");
 ok(matcher(["."])("any/file.md") && !matcher([])("a.js") && matcher([":(glob)reports/*.md"])("reports/a.md") && !matcher([":(glob)reports/*.md"])("reports/deep/a.md"), "\".\" is every file, no pathspec none, and \"*\" stays within a folder");
 ok(matcher([":(glob)src/**/*.js"])("src/a.js") && matcher([":(glob)src/**/*.js"])("src/a/b/c.js") && !matcher([":(glob)src/**/*.js"])("srcx/a.js") && matcher([":(glob)**/x"])("x") && matcher([":(glob)**/x"])("a/x")
-  && matcher([":(glob)a?[b]"])("a?[b]") && !matcher([":(glob)a?[b]"])("axb") && matcher(["a**b"])("a/c/b"), "a glob's \"**/\" is any folders or none, and its \"?\" and \"[\" are themselves; runs of \"*\" are one");
+  && matcher([":(glob)**/generated/**"])("src/generated/a.js") && matcher([":(glob)**/generated/**"])("generated/a.js") && !matcher([":(glob)**/generated/**"])("src/notgenerated/a.js") && !matcher([":(glob)a/**/b"])("a/xb")
+  && matcher([":(glob)a?[b]"])("a?[b]") && !matcher([":(glob)a?[b]"])("axb") && matcher(["a**b"])("a/c/b"), "a glob's \"**/\" is any whole folders or none, never part of a folder's name, and its \"?\" and \"[\" are themselves; runs of \"*\" are one");
 {
   // (in time that grows with the path's length, whatever runs of wildcards the pathspec holds)
   const from = Date.now();

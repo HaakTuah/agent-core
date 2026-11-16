@@ -40,8 +40,8 @@ const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 // A pattern as a list of steps, matched by walking every step a path could stand at at once, so a match takes time in
 // proportion to the path's length times the pattern's, whatever runs of wildcards it holds: each step is a character
-// ({ one: test }) or a run of any length ({ run: test }, which `skip` steps may pass over at once, for "**/", which
-// matches nothing or a run ending in "/").
+// ({ one: test }), a run of any length ({ run: test }), or a choice that consumes nothing ({ fork: n }: the next step,
+// or the step n on, as "**/" is nothing or a run that ends in "/", the choice made before the run, never inside it).
 const LINE_END = /[\n\r\u2028\u2029]/u; // (where a wildcard of git's default stops, as "." does in a regular expression)
 const literal = c => ({ one: ch => ch === c });
 // One part of a pathspec with git's default wildcards: "*" any run (across folders too), "?" one character, "[...]"
@@ -62,7 +62,7 @@ function wild(spec) {
 function globSteps(spec) {
   const steps = [];
   for (const p of spec.split(/(\*\*\/|\*\*|\*)/u)) {
-    if (p === "**/") steps.push({ run: () => true, skip: 2 }, literal("/"));
+    if (p === "**/") steps.push({ fork: 3 }, { run: () => true }, literal("/"));
     else if (p === "**") steps.push({ run: () => true });
     else if (p === "*") steps.push({ run: ch => ch !== "/" });
     else for (const c of p) steps.push(literal(c));
@@ -73,7 +73,7 @@ function globSteps(spec) {
 function walks(steps, f) {
   const close = at => {
     const all = new Set(at);
-    for (const i of all) if (steps[i]?.run) { all.add(i + 1); if (steps[i].skip) all.add(i + steps[i].skip); }
+    for (const i of all) if (steps[i]?.run || steps[i]?.fork) { all.add(i + 1); if (steps[i].fork) all.add(i + steps[i].fork); }
     return all;
   };
   let at = close([0]);
@@ -82,7 +82,7 @@ function walks(steps, f) {
     for (const i of at) {
       const step = steps[i];
       if (step?.run) { if (step.run(ch)) next.add(i); }
-      else if (step?.one(ch)) next.add(i + 1);
+      else if (step?.one?.(ch)) next.add(i + 1);
     }
     if (!next.size) return false;
     at = close(next);
