@@ -47,9 +47,19 @@ const kit = name => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../setup/t
 const kiroStop = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "Stop").action.command;
 const codex = kit("codex-hooks.json.tmpl").hooks, codexOf = event => codex[event][0].hooks[0].command;
 fs.mkdirSync(path.join(project, "sub"), { recursive: true });
+const nested = path.join(project, "sub", "other");
+git(tmp, "init", "-q", "-b", "main", nested);
+const inNested = (cmd) => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input: "{}", encoding: "utf8", cwd: nested, env: rest }); };
+r = inNested(kit("kiro-hook.json.tmpl").hooks[0].action.command);
+ok(r.status === 0 && !r.stderr && !r.stdout, "in a repository that holds no such hook file, as one cloned inside the project, Kiro's hook runs nothing", `${r.status} ${r.stderr}`);
+fs.rmSync(nested, { recursive: true, force: true });
+for (const [name, to] of [["kiro-hook.json.tmpl", ".kiro/hooks/work-saved.json"], ["codex-hooks.json.tmpl", ".codex/hooks.json"]]) {
+  fs.mkdirSync(path.dirname(path.join(project, to)), { recursive: true });
+  fs.copyFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), path.join(project, to));
+}
 const other = (cmd, input = "{}") => { const { CLAUDE_PROJECT_DIR: _, ...rest } = env; return spawnSync("sh", ["-c", cmd], { input, encoding: "utf8", cwd: path.join(project, "sub"), env: rest }); };
 r = other(kiroStop);
-ok(r.status === 2 && /not committed, such as note\.txt/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
+ok(r.status === 2 && /not committed/.test(r.stderr), "Kiro's stop hook, from the kit, runs main's copy at the project's root and keeps the agent going once", `${r.status} ${r.stderr}`);
 r = other(codexOf("Stop"), '{"stop_hook_active": true}');
 ok(r.status === 0, "Codex's stop hook lets a second stop in a row through", `${r.status} ${r.stderr}`);
 r = other(codexOf("SessionStart"));

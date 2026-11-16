@@ -7,7 +7,7 @@
       "trigger": "Stop",
       "action": {
         "type": "command",
-        "command": "bash -c 'r=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; f=$(git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/work-saved.sh 2>/dev/null) || exit 0; CLAUDE_PROJECT_DIR=\"$r\" bash -c \"$f\" work-saved stop'"
+        "command": "bash -c 'r=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -f \"$r/.kiro/hooks/work-saved.json\" ] || exit 0; f=$(git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/work-saved.sh 2>/dev/null) || exit 0; CLAUDE_PROJECT_DIR=\"$r\" bash -c \"$f\" work-saved stop'"
       },
       "timeout": 30
     }
