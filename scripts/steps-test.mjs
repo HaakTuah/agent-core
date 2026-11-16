@@ -575,6 +575,15 @@ ok(["node my_scripts/copies.mjs x.json\ntimeout 60 node core/scripts/copies.mjs 
   "gh alias set r '!node core/scripts/copies.mjs bad.json'\ngh r", "export NODE_OPTIONS='--import=./core/scripts/copies.mjs'\nnode x.mjs bad.json", "cp core/scripts/copies.mjs x.mjs\nnode x.mjs bad.json"]
   .every(run => notRead("copies", { "a.yml": stepped(run) })), "a naming by any other path, case, quote or ./ in it, and a command that sets up a run, leave the run not read");
 ok(copiesOf({ "a.yml": stepped("node core/scripts//copies.mjs config/c.json") }) === "config/c.json", "a path with // in it is read as the copy's");
+// (the review of 8b368b1: a naming however it ends, set in passing or in env:, in another case or spelling, and a run
+// by a path the reader cannot place, are not read; node --test $RUN, which names no script, reads as before)
+const withEnv = (run, env) => ({ "a.yml": { jobs: { j: { steps: [{ run, env }] } } } });
+ok(["S=${S:-core/scripts/copies.mjs}\nnode $S bad.json", "x=`echo core/scripts/copies.mjs`\nnode $x bad.json", "printf -v S core/scripts/copies.mjs\nnode $S bad.json",
+  ": ${S:=core/scripts/copies.mjs}\nnode $S bad.json", "node core/Scripts/copies.mjs bad.json", "node core/scripts/Copies.mjs bad.json",
+  "node core/scripts/{copies,}.mjs bad.json", "cd core/scripts && node copies.mjs bad.json", `${CURL} -so x.mjs file://$PWD/core/scripts/copies.mjs\nnode x.mjs bad.json`]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })) && notRead("copies", withEnv("node $S bad.json", { S: "core/scripts/copies.mjs" }))
+  && copiesOf({ "a.yml": stepped("node --test $RUN\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json" && copiesOf({ "a.yml": stepped("node core/scripts/x/../copies.mjs c.json") }) === "c.json",
+  "a naming however it ends, set in passing or in env:, in another case or spelling, and a run the reader cannot place, are not read; node --test $RUN is no run of it, and core/scripts/x/../copies.mjs is the copy's");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

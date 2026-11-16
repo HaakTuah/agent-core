@@ -265,16 +265,21 @@ function configAfter(words, i, dir, script) {
 function unaccounted(run, script, runs) {
   let named = 0, text = 0;
   for (const line of run.split(/\r?\n/u).map(uncommented).join("\n").replace(/\\\n/gu, " ").split("\n")) {
-    const k = namings(plainPath(line.replace(/['"]/gu, "")), path.posix.basename(script));
+    // (a "\\" read both as "/" and as nothing, as Windows and a shell read it)
+    const bare = line.replace(/['"]/gu, ""), name = path.posix.basename(script);
+    const k = Math.max(namings(plainPath(bare), name), namings(plainPath(bare.replace(/\\/gu, "")), name));
     named += k;
     if (k && lone(line)) text += k;
   }
+  if (runs.some(r => r.unsure)) return []; // (the step is not read already)
   return named > runs.filter(r => !r.unsure).length + text ? [{ unread: `names ${script} in a way the reader does not follow`, unsure: true }] : [];
 }
 // Whether a line is one command that runs no script, and nothing more.
 const lone = line => {
-  // (an operator outside quotes; a command's output, $(…) or `…`, anywhere, since double quotes run it too)
-  if (/`|\$\(/u.test(line) || /[|;&<>]/u.test(unquoted(line))) return false;
+  // (an operator outside quotes; a command's output, $(…) or `…`, or a variable set in passing, ${S:=…}, anywhere,
+  // since double quotes run them too; printf -v, which sets a variable, and curl writing a file)
+  if (/`|\$\(|\$\{(?!\{)/u.test(line) || /[|;&<>]/u.test(unquoted(line))) return false;
+  if (/^\s*printf\s+-v\b/u.test(line) || /^\s*curl\b.*\s(?:-[a-zA-Z]*[oOK]|--output|--remote-name|--config)\b/u.test(line)) return false;
   const [words = [], more] = commands(line);
   return !more && NO_RUNNER.has(path.posix.basename(words[pastWrappers(words)]?.text ?? "").toLowerCase());
 };
@@ -296,12 +301,9 @@ function unquoted(line) {
 // whose name ends in scripts), so that no naming of the copy's escapes the count; one of another file is then not
 // read, never a run hidden (one pass of indexOf, so no text makes it slow).
 function namings(text, name) {
-  const of = `scripts/${name}`;
+  const of = `scripts/${name}`.toLowerCase(), lower = text.toLowerCase();
   let n = 0;
-  for (let at = text.indexOf(of); at >= 0; at = text.indexOf(of, at + 1)) {
-    const end = at + of.length;
-    if (end === text.length || /[\s'";|&)<>]/u.test(text[end])) n++;
-  }
+  for (let at = lower.indexOf(of); at >= 0; at = lower.indexOf(of, at + 1)) if (!/[\w.-]/u.test(lower[at + of.length] ?? "")) n++;
   return n;
 }
 // (env's and sudo's options that run the command in another folder: env -C app, --chdir=app, sudo -D app)
@@ -328,13 +330,20 @@ function runsIn(run, dir, script) {
 // copy it runs cannot be known.
 function runAt(words, i, dir, script) {
   const word = words[i];
-  if (!word || !plainPath(word.text).endsWith(`scripts/${path.posix.basename(script)}`)) return [];
+  if (!word) return [];
+  const name = path.posix.basename(script).toLowerCase(), at = located(word, dir.dynamic ? "." : dir.at);
+  // (a script named only when the workflow runs, by a variable, braces, $'…' or a "\\", that looks like one of the
+  // core's, a .mjs file or a path through a folder scripts, may be this one; one given by a variable alone, node --test
+  // $RUN, is counted where the step names the path it holds (unaccounted))
+  if (at.dynamic || at.windows || /\{|\$'/u.test(word.text.replace(ROOT, ""))) {
+    return /\.mjs\b|scripts|\bcore\b|\$\{?CORE/iu.test(word.text) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
+  }
+  if (path.posix.basename(plainPath(word.text)).toLowerCase() !== name) return []; // (another script)
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
-  const at = dir.dynamic ? { dynamic: true } : located(word, dir.at);
-  if (at.windows) return [{ unread: `runs ${word.text}, a path with "\\" that Linux and Windows read as different files`, unsure: true }];
-  if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs`, unsure: true }];
-  // (a run of any other file of that name, out of the project or in it, accounts for no naming: unaccounted says so)
-  return at.at === script ? [configAfter(words, i, dir, script)] : [];
+  if (dir.dynamic) return [{ unread: `runs ${word.text} in a folder named only when the workflow runs`, unsure: true }];
+  // (only the copy's own path, letter for letter, is read; any other file of that name, in any case, is not: a runner
+  // that ignores case may run the copy by it)
+  return at.at === script ? [configAfter(words, i, dir, script)] : [{ unread: `runs ${word.text}, a file of the name of ${script} that the reader cannot tell from it`, unsure: true }];
 }
 
 // A step's folder, from the root: its own `working-directory`, else its job's or its workflow's default.
@@ -354,6 +363,9 @@ const folder = (...dirs) => {
 // steps run from the root, save where one names its own); an action the reader cannot read as { where, from,
 // unreadable }, its text.
 const STEPS_OF = new WeakMap(); // (each project's steps read once, however many checks ask)
+// The values a step's environment gives (its own env:, its job's, its workflow's), one a line, so that a script named
+// there is counted as named (unaccounted).
+const envOf = (step, envs) => [step?.env, ...envs].flatMap(e => (e && typeof e === "object" ? Object.values(e) : [])).map(v => String(v)).join("\n");
 function steps(p) {
   if (STEPS_OF.has(p)) return STEPS_OF.get(p);
   const out = [], seen = new Set();
@@ -371,9 +383,9 @@ function steps(p) {
       return;
     }
   };
-  const walk = (where, from, list, dirOf) => {
+  const walk = (where, from, list, dirOf, envs = []) => {
     for (const step of Array.isArray(list) ? list : []) {
-      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step) });
+      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), env: envOf(step, envs) });
       if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from);
     }
   };
@@ -381,7 +393,7 @@ function steps(p) {
     const where = `.github/workflows/${f}`;
     if (!w.yaml) continue;
     for (const job of Object.values(w.yaml.jobs ?? {})) {
-      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]));
+      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]), [job?.env, w.yaml.env]);
     }
   }
   STEPS_OF.set(p, out);
@@ -396,7 +408,7 @@ export function runsOwn(p, name) {
   return steps(p).flatMap(s => {
     if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know`, unsure: true }] : [];
     const runs = runsIn(s.run, s.dir, script);
-    return [...runs, ...unaccounted(s.run, script, runs)].map(r => ({ where: s.where, from: s.from, ...r }));
+    return [...runs, ...unaccounted(`${s.run}\n${s.env ?? ""}`, script, runs)].map(r => ({ where: s.where, from: s.from, ...r }));
   });
 }
 // The workflows of the project's own that run the script, themselves or through an action they use, once each; where
