@@ -82,6 +82,25 @@ const late = archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items
 ok(inStep(late).some(w => w.includes("item 246 adds the owner's words") && /Mend: /.test(w)), "the owner's words past item 245 fail, saying the mend", inStep(late).join("\n"));
 ok(["item 4 stands twice", "item 2 has no reasoning", "item 2 is missing", "item 3 quotes", "item 1 does not say what was decided", "item 4 names no issue"].every(w => outWrong.some(x => x.includes(w))) && outWrong.every(w => /Mend: /.test(w)),
   "an item twice, words with no reasoning, a gap, a quote, no decision and a new item with no issue each fail, saying the mend", outWrong.join("\n"));
+// (#394: of an item numbered twice, the one outside the file its number puts it in is the one to move, with the next
+// free number at the end of the newest file; one alone outside its file fails too; in the words, a twice-numbered item
+// takes its reasoning's number)
+const r3 = "3. **3 Nov**, #3: c.\n", r1 = "1. **1 Nov**, #1: a.\n\n2. **2 Nov**, #2: b.\n";
+const twiceAcross = inStep(archive({ "items-001.md": `${r1}\n3. **3 Nov**, #4: d.\n`, "items-003.md": r3 }));
+ok(twiceAcross.some(w => /archive\/instructions: item 3 stands twice, at archive\/instructions\/items-001\.md:5 and archive\/instructions\/items-003\.md:1\. Mend: give the one at archive\/instructions\/items-001\.md:5 the next free number, 4, at the end of archive\/instructions\/items-003\.md/.test(w)),
+  "of an item numbered twice, the one outside its number's file moves, whichever stands first, with the next free number (#394's own case)", twiceAcross.join("\n"));
+const twiceIn = inStep(archive({ "items-001.md": `${r1}\n2. **2 Nov**, #5: e.\n` }));
+ok(twiceIn.some(w => /item 2 stands twice, at [^ ]*items-001\.md:3 and [^ ]*items-001\.md:5\. Mend: give the one at archive\/instructions\/items-001\.md:5 the next free number, 3/.test(w)), "of two in their file, the later moves", twiceIn.join("\n"));
+const outside = inStep(archive({ "items-001.md": `${r1}\n4. **4 Nov**, #4: d.\n`, "items-003.md": r3 }));
+ok(outside.some(w => /archive\/instructions\/items-001\.md:5: item 4 stands outside archive\/instructions\/items-003\.md, the file its number puts it in\. Mend: /.test(w)), "an item alone in a file its number does not put it in fails, saying the mend", outside.join("\n"));
+const twoTwice = inStep(archive({ "items-001.md": `${r1}\n1. **1 Nov**, #6: f.\n\n2. **2 Nov**, #7: g.\n` }));
+ok(twoTwice.some(w => /item 1 stands twice.* the next free number, 3,/.test(w)) && twoTwice.some(w => /item 2 stands twice.* the next free number, 4,/.test(w)), "two numbers each used twice are each given a free number of their own", twoTwice.join("\n"));
+const below = inStep(archive({ "items-005.md": "5. **5 Nov**, #5: e.\n\n1. **1 Nov**, #1: a.\n" }));
+ok(below.some(w => /item 1 stands outside no file of archive\/instructions\/, since none starts at or below 1, .* Mend: /.test(w)) && !below.some(w => w.includes("undefined")), "an item below every file's first number says so, and never \"undefined\"", below.join("\n"));
+const wordsAstray = inStep(archive({ "items-001.md": `${r1}\n3. **3 Nov**, #3: c.\n` }, { "items-001.md": "1. **1 Nov**: a.\n\n3. **3 Nov**: c.\n", "items-003.md": "# Words\n" }));
+ok(wordsAstray.some(w => /words\/items-001\.md:3: item 3 stands outside words\/items-003\.md, the file its number puts it in\. Mend: move it there$/.test(w)), "in the words, an item outside its file is moved there, and given no other number", wordsAstray.join("\n"));
+const wordsTwice = inStep(archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n1. **1 Nov**: more.\n" }));
+ok(wordsTwice.some(w => /words: item 1 stands twice, .* Mend: give the one at words\/items-001\.md:3 the number its reasoning has in archive\/instructions\//.test(w)), "in the words, an item numbered twice takes the number its reasoning has, never a new one", wordsTwice.join("\n"));
 const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);
 ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of item numbers", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
   "behind: a key that is no rule, an item not in the archive, no list, and a pointer in a rule file each fail, saying the mend; a rule file alone is a key", behindBad.wrong.join("\n"));
