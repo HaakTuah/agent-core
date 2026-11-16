@@ -24,7 +24,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const m = matcher(["src", ":(glob)**/*.test.js", ":!src/gen/", "QUEUE.md"]);
 ok(m("src/a.js") && m("src/deep/b.js") && m("lib/x.test.js") && m("QUEUE.md") && !m("src/gen/c.js") && !m("srcs/a.js") && !m("docs/QUEUE.md"),
   "a pathspec is a path or a folder above it, a glob, or one left out");
-ok(matcher(["test/*-test.mjs"])("test/a-test.mjs") && matcher(["test/*-test.mjs"])("test/deep/b-test.mjs") && !matcher(["test/*-test.mjs"])("test/a.mjs") && matcher(["t?st/"])("test/") && matcher(["scripts/*-test.mjs"])("scripts/select-test.mjs"),
+ok(matcher(["test/*-test.mjs"])("test/a-test.mjs") && matcher(["test/*-test.mjs"])("test/deep/b-test.mjs") && !matcher(["test/*-test.mjs"])("test/a.mjs") && matcher(["t?st/"])("test/") && matcher(["scripts/*-test.mjs"])("scripts/select-test.mjs")
+  && matcher(["scripts/[ab]-test.mjs"])("scripts/a-test.mjs") && !matcher(["scripts/[ab]-test.mjs"])("scripts/c-test.mjs") && matcher(["scripts/[!ab]-test.mjs"])("scripts/c-test.mjs") && !matcher(["scripts/[!ab]-test.mjs"])("scripts/a-test.mjs"),
   "a plain pathspec with a wildcard matches as git's default does, across folders too");
 ok(matcher(["."])("any/file.md") && !matcher([])("a.js") && matcher([":(glob)reports/*.md"])("reports/a.md") && !matcher([":(glob)reports/*.md"])("reports/deep/a.md"), "\".\" is every file, no pathspec none, and \"*\" stays within a folder");
 
