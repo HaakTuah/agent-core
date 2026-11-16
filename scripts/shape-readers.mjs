@@ -19,6 +19,7 @@ export const READERS = {
   csharp: "C#",
   python: "Python",
   scripts: "scripts that share one global space",
+  screens: "the tests that open a screen, a window or a device",
 };
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];

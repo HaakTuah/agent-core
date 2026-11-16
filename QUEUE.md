@@ -17,12 +17,7 @@ wanted").
 | #256 | rule builder | |
 | #252 | rule builder | |
 | #296 | builder | |
-| #250 | rule builder | |
-| #275 | rule builder | |
-| #321 | rule builder | #275, or built with it |
 | #285 | rule builder | |
-| #286 | rule builder | |
-| #299 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
 | #305 | rule builder | |

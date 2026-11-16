@@ -7,8 +7,7 @@ sessions.
 `roles/shared/work-flow.md`.
 
 **Hands over, gets back:**
-- a builder: a line and its brief, the owner's word in it word for word; back, word when its pull request is ready and
-  when it merges.
+- a builder: a line and its brief; back, word when its pull request is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 
@@ -46,7 +45,7 @@ sessions.
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
     lane, one only the owner can do labelled `needs-owner`;
   - sync the core in a routine lane, as "Sessions" in `roles/shared/work-flow.md` says;
-  - run the scheduled look (`core/scripts/look.mjs`), which does nothing more where it ran less than 20 hours before;
+  - run the scheduled look, which does nothing more where it ran less than 20 hours before;
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.

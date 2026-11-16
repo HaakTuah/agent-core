@@ -1,5 +1,5 @@
 // The manifest against the modules and the slots (#157; AGENTS.md, "Nothing locks a project"): a project's
-// `core-manifest.md` names every module of `core/modules/` its "Modules:" line, where that is a list and not "all",
+// `core-manifest.md` names every module of the core in its "Modules:" line, where that is a list and not "all",
 // takes or leaves out with a reason, and fills every slot that a module it takes, or the floor, uses, unless the core
 // gives the slot a default (its README's "Slots" table says "left out" of such a slot). It REPORTS and never fails in a
 // project: a list or a row that was missing before this check came is no breach of the project's own, and each note

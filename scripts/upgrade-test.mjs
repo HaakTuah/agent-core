@@ -561,7 +561,10 @@ if (synced) {
 // at paths of its own, which its manifest's slots name, a comment naming the licence script before them. Its own old
 // sync script, run with no SHA, takes the core's newest main, which no release holds, and pure-sync.mjs says so; with
 // the release's full SHA the sync is pure, every check passes, its own workflow's too, no job starts that did not
-// before, and steps.mjs and fresh.mjs name the project's own configs. Once as Linux holds it, once as Windows does.
+// before, and steps.mjs and fresh.mjs name the project's own configs. Its own suite, which skips core/** and the manifest,
+// starts on the sync, whose moved caller pins it does not skip, and with each caller listed starts on none; and, held as
+// Windows holds it, its NuGet packages behind a packageSourceMapping leave a pull request that changes nothing NuGet
+// reads without a restore. Once as Linux holds it, once as Windows does.
 const PRE = "2532c6b"; // (12 November 2026: its sync.mjs takes main and knows no release; no core-moved.mjs)
 function preRelease(name, { windows }) {
   const eol = windows ? "\r\n" : "\n";
@@ -592,8 +595,12 @@ function preRelease(name, { windows }) {
     "      - uses: actions/checkout@0000000000000000000000000000000000000000", "      # core/scripts/licences.mjs reads the config below",
     "      - run: |", "          # core/scripts/licences.mjs takes its config first", "          node core/scripts/copies.mjs config/copies.json", "          node core/scripts/licences.mjs config/licences.json",
     "      - run: node core/scripts/pointers.mjs", "      - run: node core/scripts/reading-size.mjs config/sizes.json"));
-  write(dir, ".github/workflows/core.yml", lines("name: core", "", "on:", "  pull_request:", "", "jobs:", "  core:", `    uses: ${at()}/core.yml@${pre}`,
-    "  personal-terms:", `    uses: ${at()}/personal-terms.yml@${pre}`, "    secrets:", "      PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}", "  description:", `    uses: ${at()}/pr-description.yml@${pre}`));
+  // (a caller of its own for each workflow of the core's, and its own suite, which skips what changes only the copy)
+  const callers = { core: [], "personal-terms": ["    secrets:", "      PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}"], "pr-description": [] };
+  for (const [wf, more] of Object.entries(callers)) write(dir, `.github/workflows/${wf}.yml`, lines(`name: ${wf}`, "", "on:", "  pull_request:", "", "jobs:", `  ${wf}:`, `    uses: ${at()}/${wf}.yml@${pre}`, ...more));
+  const suite = extra => lines("name: suite", "", "on:", "  pull_request:", "    paths-ignore:", '      - "core/**"', "      - core-manifest.md", ...extra.map(f => `      - ${f}`), "",
+    "jobs:", "  tests:", "    runs-on: ubuntu-latest", "    steps:", '      - run: echo "the project\'s own tests"');
+  write(dir, ".github/workflows/suite.yml", suite([]));
   git(dir, "add", "-A");
   const first = node(dir, "core/scripts/copies.mjs", "config/copies.json", "--first");
   git(dir, "add", "-A");
@@ -626,6 +633,21 @@ function preRelease(name, { windows }) {
   ok(s.status === 0 && pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${name}: with the release's full SHA its own old sync script makes a pure sync to ${carrying}`, `${s.out}\n${pure.out}`);
   const onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}`, ownToo: true });
   ok(!failures(onSync) && onSync.some(([w, r]) => w.startsWith("checks.yml/") && r.ran), `${name}: every check passes on the sync's pull request, its own workflow's scripts from the new copy too (${started(onSync).length} jobs)`, failures(onSync));
+  // its own suite skips core/** and the manifest, but the sync moves its callers' pins too: with that filter alone the
+  // suite starts on every sync (the fault, #379); with each caller listed by its path, it does not
+  const callerFiles = Object.keys(callers).map(wf => `.github/workflows/${wf}.yml`);
+  ok(started(onSync).includes("suite.yml/tests") && git(dir, "diff", "--name-only", `${main0}...${syncHead}`).split("\n").some(f => callerFiles.includes(f)),
+    `${name}: with paths-ignore of core/** and the manifest alone, the sync's moved caller pins start its own suite (the fault, #379)`, started(onSync).join("\n"));
+  git(dir, "checkout", "-q", "-B", "remedy", main0);
+  write(dir, ".github/workflows/suite.yml", suite(callerFiles));
+  git(dir, "commit", "-q", "-am", "its suite skips its callers of the core's workflows too");
+  const remedied = git(dir, "rev-parse", "HEAD");
+  s = node(dir, "core/scripts/sync.mjs", head);
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
+  const onRemedied = started(checks(p, "pull_request", git(dir, "rev-parse", "HEAD"), { baseSha: remedied, title: `Sync the core to ${carrying}`, dry: true }));
+  ok(s.status === 0 && !onRemedied.includes("suite.yml/tests") && onRemedied.every(w => before.includes(w)), `${name}: with each caller listed in its suite's paths-ignore, the sync starts no job of its own suite, nor any it did not start before`, onRemedied.join("\n"));
+
   git(dir, "checkout", "-q", "main");
   git(dir, "merge", "-q", "--no-ff", "-m", "Merge the sync", "sync");
   git(dir, "push", "-q", "origin", "main");
@@ -633,6 +655,38 @@ function preRelease(name, { windows }) {
   const after = checks(p, "pull_request", docs(main1), { baseSha: main1, ownToo: true });
   const more = started(after).filter(w => !before.includes(w));
   ok(!failures(after) && !more.length, `${name}: a pull request of its own passes after the sync and starts no job it did not start before (${started(after).length} now, ${before.length} before)`, `${failures(after)}\n${more.join("\n")}`);
+
+  // its NuGet packages, as the sync notes ask once it has some: a project file, its lock file, a NuGet.Config whose
+  // packageSourceMapping maps every package to the registry, and a caller of the core's NuGet check. A pull request that
+  // changes nothing NuGet reads is told so by the check's first look, and its fetch and restore do not run
+  // (#380)
+  if (windows) {
+    git(dir, "checkout", "-q", "-B", "nuget", "main");
+    write(dir, "src/App/App.csproj", lines('<Project Sdk="Microsoft.NET.Sdk">', "  <PropertyGroup>", "    <OutputType>Exe</OutputType>", `    <TargetFramework>${tfm}</TargetFramework>`,
+      "    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>", "  </PropertyGroup>", "  <ItemGroup>", '    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />', "  </ItemGroup>", "</Project>"));
+    write(dir, "src/App/Program.cs", lines('System.Console.WriteLine("Hello");'));
+    // (one package, so that the first look's restore against its empty source looks a package up through the mapping:
+    // with none, it never would, and the case would pass without #380's fix. The look downloads nothing)
+    write(dir, "src/App/packages.lock.json", lines("{", '  "version": 1,', '  "dependencies": {', `    "${tfm}": {`, '      "Newtonsoft.Json": {', '        "type": "Direct",', '        "requested": "[13.0.3, )",',
+      '        "resolved": "13.0.3",', '        "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="', "      }", "    }", "  }", "}"));
+    write(dir, "NuGet.Config", lines('<?xml version="1.0" encoding="utf-8"?>', "<configuration>", "  <packageSources>", "    <clear />", '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />',
+      "  </packageSources>", "  <packageSourceMapping>", '    <packageSource key="nuget.org">', '      <package pattern="*" />', "    </packageSource>", "  </packageSourceMapping>", "</configuration>"));
+    write(dir, ".gitignore", lines("bin/", "obj/"));
+    write(dir, ".github/workflows/nuget.yml", lines("name: nuget", "", "on:", "  pull_request:", "", "jobs:", "  nuget:", `    uses: ${at()}/nuget.yml@${head}`, "    with:", "      config: config/licences.json"));
+    const config = path.join(dir, "config/licences.json");
+    write(dir, "config/licences.json", lines(JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } })));
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "its NuGet packages, and the core's NuGet check");
+    git(dir, "checkout", "-q", "main");
+    git(dir, "merge", "-q", "--no-ff", "-m", "Merge its NuGet packages", "nuget");
+    git(dir, "push", "-q", "origin", "main");
+    const main2 = git(dir, "rev-parse", "HEAD");
+    const look = checks(p, "pull_request", docs(main2), { baseSha: main2, only: "nuget.yml" });
+    const said = look.flatMap(([, r]) => r.steps).find(x => x.name === "Does the pull request change what NuGet reads?")?.out ?? "";
+    if (sdk) ok(!failures(look) && /nothing to restore/.test(said) && !ran(look, "nuget.yml", "Restore each project file from its lock file alone"),
+      `${name}: with packageSourceMapping, the NuGet check's first look finds nothing to restore on a pull request that changes nothing NuGet reads, and its restore does not run (#380)`, `${failures(look)}\n${said}`);
+    git(dir, "checkout", "-q", "main");
+  }
 
   // the steps and the differences name the configs where the project holds them, and read no comment as a run
   git(dir, "checkout", "-q", "main");
