@@ -131,7 +131,7 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     - Which of the tool's defaults is on this screen?
     - Would one of the product's users take it for a template?
 
-    In a game it also asks the questions of `modules/game-design.md`, "How a game answers a player".
+    It asks too the questions that another module the project takes adds to the critique.
 
     It posts its answers on the pull request. Its answers to the first two are then set beside the builder's three
     lines (point 16), and a difference is a finding; an answer that shows a point above broken is one too, judged as
@@ -148,8 +148,8 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
   a baseline picture;
 - the timed run: the answer to each action, a wait with nothing shown, the layout shift, the load;
 - the console check: no error in the console, no request that fails, no font or picture that does not load;
-- in a game, the settings check: each of a player's settings there, and still there after the game is closed and
-  opened again (`modules/game-design.md`, "A player's settings are remembered");
+- the settings check, where another module the project takes asks it: each of a user's settings there, and still
+  there after the product is closed and opened again;
 - the walk by the Tab key, a script that records where focus goes, and the list of the words on every screen, both
   for a reader to judge;
 - the critique (point 18).
