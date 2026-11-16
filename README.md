@@ -33,10 +33,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 - **The caps:** what a role reads at its start stays within that role's cap, which `scripts/size.mjs` sets (core archive
   164, 169, 171, 179, 181, 182, 187, 191, 201 and 233), checked on every PR here, so a new rule there replaces text
   rather than adding to it (core archive 134); a file read only when a task calls for it is held by the reviews'
-  "content put where its readers must read past it" (`modules/review-guidelines.md`). A cap keeps the rules lean and
-  decides nothing else: where a rule belongs and what it must say come first, and a change that honest trimming gives
-  no room for raises that role's cap one step, a whole KB, once a fresh session has read all the rules for room and
-  found too little (`AGENTS.md`).
+  "content put where its readers must read past it" (`modules/review-guidelines.md`). What a cap decides, and when one
+  may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
   (`scripts/holders.json`); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
@@ -275,7 +273,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      is none (`core.yml` fails another name).
    - **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on the path; where either is
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start,
-     where it also says how a session finds what to read (`reading.mjs`, from the copy merged into `main`). The
+     where it also names what the paths changed on the branch call for (`reading.mjs`, from the copy merged into `main`,
+     by `main`'s own roles and modules). The
      core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
      hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
@@ -367,11 +366,6 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 
 ## Pace
 <one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free; none: the default>
-
-## Reading
-| Path | Kind |
-| --- | --- |
-<one row per path of its own that belongs to a kind of task, each in backticks, as `src/screens/` and `screen`; none: only the core's own paths call a module>
 
 ## Differences
 <only where it differs from a module's rule ("How a project takes the core", point 7), one line each>

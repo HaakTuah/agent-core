@@ -409,7 +409,7 @@ export const STEPS = [
       if (!/^@core\/roles\/builder\.md[ \t]*$/mu.test(p.read("AGENTS.md") ?? "")) wrong.push("add the line `@core/roles/builder.md` to the `@` lines of `AGENTS.md`, after the floor's, and to each entry file the project holds the line `core/scripts/entry-files.mjs` then names");
       return wrong.length ? `In one pull request, ${wrong.join("; and ")}.` : null;
     },
-    partly: "whether the project's own paths have their kind of task under the manifest's \"Reading\" is a reading of its folders; the sentence of `AGENTS.md` that names the script, the issue forms' \"What to read\" and the \"Reading\" section are differences `core/scripts/fresh.mjs` lists; the line `Read for it:` is held by the description check" },
+    partly: "whether the project's own folders have their kind of task in `checks/reading.json` is a reading of its folders; the sentence of `AGENTS.md` that names the script and the issue forms' \"What to read\" are differences `core/scripts/fresh.mjs` lists; the line `Read for it:` is held by the description check" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

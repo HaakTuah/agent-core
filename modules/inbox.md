@@ -7,11 +7,16 @@ Read at the start of every task.
     it, and any departing from an owner's answer (core archive 199).
   - "Readings taken" lists the unsure first, and a departure with that answer's date, named when the owner is told of
     the merge; the owner's correction is built like any change.
-- **The stand-in** (`roles/stand-in.md`; core archive 142, 166 and 199), a fresh session, gives from the owner's words
-  the owner's most likely answer, marked sure or unsure; whenever it is called, its verdict on every open idea that
-  lacks one; and, on a PR its users will see, the owner's likely notes on its pictures and text.
+- **The stand-in** (`roles/stand-in.md`; core archive 142, 166 and 199), a fresh session, answers from the owner's words.
+  - It gives the owner's most likely answer, marked sure or unsure. Always unsure: a call of taste, such as a name,
+    music or a look, and one resting only on the core's archive where the account in the core's address in the
+    manifest is not the *owner's account*: those words give way to the project's own owner's.
+  - It gives, whenever it is called, its verdict on every open idea that lacks one, however new, and again on a "later"
+    once its condition is measured, as `scripts/stand-in-record.mjs --open` lists them (yes, later or no, with the
+    reason, a rough cost and what would settle a later), posted on it.
+  - It gives, on a PR its users will see, the owner's likely notes on its pictures and text.
   - **Its record:** whoever acts on the owner's answer to one of its points says there "The stand-in's verdict matched"
-    or "missed", which `scripts/stand-in-record.mjs` counts.
+    or "missed", which that script counts.
 - **Issues are the way in** (core archive 216): an idea, a bug or a decision of the owner's is an issue, assigned to the
   *owner's account* (`enhancement`, `bug`), with the template's headings (`.github/ISSUE_TEMPLATE/`), saying plainly
   what it is and why it matters; search first, never file twice. Its text lives there alone: a PR or report points to it.
@@ -59,5 +64,7 @@ Read at the start of every task.
 - **The owner's words are kept once** (floor rule 11).
   - A session the owner works with quotes an instruction in the issue, PR or report that acts on it, and records
     nothing more.
-  - Those that become standing rules are kept, and each rule written from them, by the design session alone
-    (`roles/design.md`).
+  - The design session (where the owner writes the rules; in a project with none, the session the owner gives a
+    standing rule to; core archive 131) keeps, word for word and dated in the archive (the project's, or the core's if
+    it holds for every project), those that become standing rules, and writes each rule where it applies; only it
+    writes rules from the owner's words.

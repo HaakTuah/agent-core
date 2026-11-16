@@ -9,11 +9,9 @@ The shared core of the owner's agent-built projects: a floor every project takes
 ## The core this repository takes
 
 The floor whole, and every module but those "Not taken" below gives its reason for (core archive 209 and 213).
-`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. What a session reads
-is set by its role and its task (`modules/tools.md`, "One script says what to read"): `node scripts/reading.mjs <role>
---issue <its line's issue>` prints it, and a session whose brief names no role is a builder. A builder reads these whole
-at the start of every task (Claude Code imports them), any other role the floor, its file under `roles/` and what that
-names:
+`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. A builder reads these
+whole at the start of every task (Claude Code imports them); what else a task calls for, and what another role reads,
+`node scripts/reading.mjs <role> --issue <its line's issue>` prints (`modules/tools.md`, "One script says what to read"):
 
 @floor/security.md
 @roles/builder.md
@@ -120,12 +118,15 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.
-- **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`, a cap for each role; core archive
-  179, 181 and 233): no rule is moved from where it belongs, cut short or left out to fit, nor is another rule's reason,
-  name or example cut to make room. A cap rises, one step of a whole KB, only as "A mark on what every session reads" in
-  `modules/review-guidelines.md` says of any such mark (core archive 182): here those files are what a role reads at
-  its start, as its file under `roles/` names them (core archive 201 and 233), and `.github/workflows/size.yml` fails a
-  raise of more than one step, and one in a PR with no "Leanness check:" comment.
+- **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`; core archive 179, 181 and 233). By
+  default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so whoever
+  adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little, that
+  builder raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every session reads" in
+  `modules/review-guidelines.md` says of any such mark (core archive 182 and 201). It does not mean a rule is moved from
+  where it belongs, cut short or left out to fit, nor another rule's reason, name or example cut to make room. Reason:
+  each start is paid at every task, and a cap that decided where a rule stands would hide it from who must keep it.
+  Held by `scripts/size.mjs`, and `.github/workflows/size.yml`, which fails a raise of more than one step, and one in
+  a PR with no "Leanness check:" comment.
 - **A release is cut on the owner's word** (core archive 195 and 196): another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, never by a session's own choice: the owner's standing word is that it may each time the

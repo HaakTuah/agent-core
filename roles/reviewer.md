@@ -6,11 +6,12 @@ security reviewer, the fallback reviewer, the design check, the leanness check).
 **Reads at its start:** `modules/review-guidelines.md`, `modules/how-to-work.md`; with its brief, the project's own
 guidelines and its `SECURITY.md`.
 
-**It judges by what the change calls for:** it runs `scripts/reading.mjs reviewer --changed <the pull request's
-base>`, with `--kind security-review` for a security review, reads what that prints and judges the change by those
-files too (`modules/tools.md`, "One script says what to read").
+**It judges by what the change calls for** (core archive 233; #304). By default a reviewer judges a change by what it
+reads at its start; where the change's paths call for more, it runs `scripts/reading.mjs reviewer --changed <the pull
+request's base>`, with `--kind security-review` for a security review, and judges by each file that prints too. It
+does not mean a finding needs a file the script printed. Reason: a reviewer that read only its own guidelines passed a
+change that broke the module written for it. Held by nothing yet: what a reviewer read leaves no mark a check reads.
 
 **Hands over, gets back:**
-- the builder: its findings, each concrete and marked blocking or not, with its score, in a comment that names the
-  commit it read by its whole SHA (`modules/reviews.md`); back, the pull request, the task's text and the *review
-  reference*.
+- the builder: its review, posted as `modules/reviews.md` says; back, the pull request, the task's text and the
+  *review reference*.

@@ -18,8 +18,9 @@
 // what its changed paths called for ("One script says what to read" in modules/tools.md; core archive 233; #304): each
 // file the reading script (reading.mjs, beside this file) gives for the paths the pull request changes, read from git
 // as the merge commit against its first parent, the base, stands in backticks on the description's line "Read for
-// it:". A pull request whose paths call for nothing needs no line, and where the change cannot be read (a checkout
-// without the base) nothing is asked.
+// it:". A renamed file counts by both its names, and the paths of the core's copy, in a project, by neither: a sync
+// moves them, and the core's own pull request held them to their reading. A pull request whose paths call for nothing
+// needs no line, and where the change cannot be read (a checkout without the base) nothing is asked.
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -27,7 +28,7 @@
 //   PR_BODY="$(...)" node core/scripts/pr-description.mjs "+Part three"     the two, and that one as well
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { calledByPaths, coreAt, library, lineMend, ownPaths } from "./reading.mjs";
+import { OWN, calledByPaths, coreAt, library, lineMend, ownOf, ownPaths } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
@@ -103,11 +104,11 @@ if (started(import.meta.url)) {
     if (then?.includes("export const WAITS_SINCE")) { const mend = waitsMend(process.env.PR_BODY); if (mend) mends.push(mend); }
     else console.log(`ok   the line "${WAITS}" is not asked here: ${why}`);
     if (created >= READS_SINCE && then?.includes("export const READS_SINCE")) {
-      const prefix = coreAt(process.cwd()), diff = spawnSync("git", ["diff", "--name-only", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
-      const paths = prefix === null || diff.status !== 0 ? null : diff.stdout.split("\n").filter(Boolean);
+      const prefix = coreAt(process.cwd()), diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      const paths = prefix === null || diff.status !== 0 ? null : ownOf(diff.stdout.split("\n").filter(Boolean), prefix);
       if (paths === null) console.log("ok   the line that lists what the changed paths call for is not asked here: the change could not be read against its base");
       else {
-        const own = prefix ? ownPaths(fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : "") : [];
+        const config = prefix ? OWN.find(f => fs.existsSync(f)) : undefined, own = config ? ownPaths(fs.readFileSync(config, "utf8")) : [];
         const called = calledByPaths(library(process.cwd(), prefix), paths, own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
         const mend = lineMend(process.env.PR_BODY, called, `node ${prefix}scripts/reading.mjs builder --changed --line`);
         if (mend) mends.push(mend);

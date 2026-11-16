@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Nothing is lost ("Push after every commit" in the core's modules/git.md): Claude Code runs this when a session starts
 # ("start") and whenever a reply is about to end ("stop"). start reports work left uncommitted, unpushed or stashed,
-# and says in a line where Node is not on the path, so the helper hook is off, how a session finds what to read (core
-# archive 233), and whether the owner's stop switch is set (core archive 201);
+# and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
+# for (core archive 233), and whether the owner's stop switch is set (core archive 201);
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
 # made never traps a session. It only reads the repository, with the git settings that run commands (fsmonitor, hooks)
 # turned off; the start asks origin for the switch with the user's own SSH and sign-in setup, never a prompt, and with
@@ -17,9 +17,10 @@ g rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 if [ "$mode" = start ] && ! command -v node >/dev/null 2>&1; then
   echo "The helper hook is off here: Node is not on the path, and Claude Code starts that hook with node (the core's README.md, \"On Windows\")."
 fi
-# What to read (the core's modules/tools.md, "One script says what to read"): at the start, the line the reading script
-# gives, from its copy merged into main as this hook is (never the working tree's), the core's own where no manifest
-# stands and the project's copy of it where one does. It reads the names of the roles' files and nothing in them;
+# What to read (the core's modules/tools.md, "One script says what to read"): at the start, what the paths changed on
+# this branch call for, as the reading script says it, from its copy merged into main as this hook is (never the
+# working tree's), the core's own where main holds no manifest and the project's copy of it where it does. The script
+# reads the roles and modules from main's own tree too; on a branch that has changed nothing that calls for a file,
 # without Node, or before main holds the script, nothing is said.
 if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
   reading=scripts/reading.mjs

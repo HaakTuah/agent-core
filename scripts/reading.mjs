@@ -1,8 +1,8 @@
-// What a session reads, by its role and its task (modules/tools.md, "One script says what to read"; modules/roles.md,
-// "A file for each role"; core archive 233; #304). Given a role and a task (its issue, its kinds, or the paths changed
-// so far), it prints the files to read: at the start the floor (floor/security.md, whole, whatever the role), the
-// role's own file under roles/ and the files that file names on its line "Reads at its start:" (a role's file named
-// there brings what it names too), with the part of each tool given; then, of the other modules, those the task
+// What a session reads, by its role and its task (modules/roles.md, "A file for each role"; modules/tools.md, "One
+// script says what to read"; core archive 233; #304). Given a role and a task (its issue, its kinds, or the paths
+// changed so far), it prints the files to read: at the start the floor (floor/security.md, whole, whatever the role),
+// the role's own file under roles/ and the files that file names on its line "Reads at its start:" (a role's file
+// named there brings what it names too), with the part of each tool given; then, of the other modules, those the task
 // calls for. A module says when it is read in its opening paragraph, which begins "Read", in words matched here:
 //   the kind `screen`, the kinds `screen` and `polish`       a kind of task: given with --kind, by a label of that
 //                                                              name on the task's issue, or under its "What to read"
@@ -10,19 +10,24 @@
 //                                                              wherever it lies (no /), or a path from the root (* and **)
 //   the tool `claude`, every tool but `claude`                the agent tool a session runs in or hands work to
 //   at the start, at its start                                read at a role's start: a role's file names it
-// A role's file opens "Read ... by the role `<its file's name>`". A project gives its own paths a kind in its manifest,
-// under "Reading", a table of a path and a kind in backticks. It needs only that a tool can run a command and read a
-// file: no tool's own import or hook; a hook may call it (work-saved.sh, beside this file, does at a session's start,
-// from the copy merged into main, so this file stands alone: Node's own modules, git and gh only, nothing beside it).
-// It reads only, and what it reads of an issue is data: a label or a word there picks among the core's own files and
-// can name no other.
+// A role's file opens "Read ... by the role `<its file's name>`". A project gives its own paths a kind in a config of
+// its own, checks/reading.json (or .github/reading.json): { "paths": { "src/screens/": "screen" } }; the paths of the
+// core's copy are no change of the project's, and call for nothing. It needs only that a tool can run a command and
+// read a file: no tool's own import or hook. A hook may call it: work-saved.sh, beside this file, does at a session's
+// start, handing node the copy merged into main, so this file stands alone (Node's own modules, git and gh only,
+// nothing beside it), and with --hook it reads the roles, the modules and the config from main's own tree, never from
+// the checked-out branch, so that nothing a branch holds reaches a session's start by this line but the fact that a
+// path changed. It reads only, with the git settings that run commands turned off, and what it reads of an issue is
+// data: a label or a word there picks among the core's own files and can name no other.
 //
 //   node core/scripts/reading.mjs <role> [--tool <t>]... [--kind <k>]... [--issue <n or an inbox file>] [--path <p>]...
-//   node core/scripts/reading.mjs <role> --changed [<base>]   and, for the paths changed since <base> (where the
-//                                                             branch left origin/main), with --line the line
+//   node core/scripts/reading.mjs <role> --changed [<base>]   for the paths changed since <base> (where the branch
+//                                                             left origin/main); with --line, the line
 //                                                             "Read for it:" for the pull request's description
 //   node core/scripts/reading.mjs --kinds                     each kind, with the files it calls for
 //   node scripts/reading.mjs --check                          in the core: every module and role says when it is read
+//   ... | node --input-type=module - --hook                   the start hook's line: what the branch's changed paths
+//                                                             call for, and nothing where they call for none
 // From a project's root (the core's copy under core/), or the core's own.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -30,13 +35,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const FLOOR = "floor/security.md";
-export const START = "Reads at its start:", READY = "Reads before its pull request is ready:";
+export const START = "Reads at its start:";
 // The line of a pull request's description that lists what its changed paths called for (pr-description.mjs asks it).
 export const READ_LINE = "Read for it:";
 // The floor's two files read when needed, by the topics the floor's own opening names, until they are a folder of
 // topics that each say when (#304, point 8): the floor's words are not changed for it here.
 export const FLOOR_WHEN = {
-  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml"] },
+  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "package*lock.json"] },
   "floor/threat-model.md": { kinds: ["security-review"], paths: [] },
 };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
@@ -86,7 +91,7 @@ export function matches(pattern, file) {
 // the Markdown files of a folder of the core, by their paths in it.
 export function gather(read, list) {
   const roles = {}, modules = {};
-  for (const f of list("roles")) { const text = read(f); roles[f] = { name: path.posix.basename(f, ".md"), when: whenOf(text), start: readsOf(text, START), ready: readsOf(text, READY) }; }
+  for (const f of list("roles")) { const text = read(f); roles[f] = { name: path.posix.basename(f, ".md"), when: whenOf(text), start: readsOf(text, START) }; }
   for (const f of list("modules")) modules[f] = whenOf(read(f));
   return { roles, modules };
 }
@@ -101,10 +106,12 @@ export function library(dir, prefix) {
   return gather(read, list);
 }
 
-// The kinds a project's manifest gives its own paths: the rows of the table under "## Reading", [{ path, kind }].
-export function ownPaths(manifest) {
-  const part = /^## Reading\n([\s\S]*?)(?=^## |(?![\s\S]))/mu.exec(String(manifest ?? "").replace(/\r\n/gu, "\n"))?.[1] ?? "";
-  return part.split("\n").map(l => /^\|\s*`([^`|]+)`\s*\|\s*`([^`|]+)`\s*\|\s*$/u.exec(l)).filter(Boolean).map(m => ({ path: m[1], kind: m[2] })).filter(r => WORD.test(r.kind));
+// The kinds a project gives its own paths, [{ path, kind }], from its config's text ({ "paths": { "<path>": "<kind>" } }).
+export const OWN = ["checks/reading.json", ".github/reading.json"];
+export function ownPaths(text) {
+  let paths = null;
+  try { paths = JSON.parse(String(text ?? "")).paths; } catch { /* (no config, or none that reads: no path of its own has a kind) */ }
+  return Object.entries(paths !== null && typeof paths === "object" && !Array.isArray(paths) ? paths : {}).filter(([p, k]) => p && typeof k === "string" && WORD.test(k)).map(([p, kind]) => ({ path: p, kind }));
 }
 
 // Every kind the modules name, each with the files it calls for.
@@ -119,7 +126,7 @@ export function kindsOf(lib) {
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
 export function calledByPaths(lib, paths, own = []) {
   const out = new Map(), kinds = new Map();
-  for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${p}, of the kind ${r.kind} by the manifest's "Reading"`);
+  for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${p}, of the kind ${r.kind} by the project's reading config`);
   for (const [f, w] of [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)]) {
     if (!w) continue;
     const hit = paths.find(p => w.paths.some(pattern => matches(pattern, p)));
@@ -144,19 +151,17 @@ function toolParts(lib, tools) {
 }
 
 // What a session reads: { start: [file], task: [{ file, why }] }, or { error } where the role has no file. `tools`,
-// `kinds` ([{ kind, why }] or names), `paths` and `named` (files an issue names) are the task; `ready` adds what the
-// role reads before its pull request is marked ready.
-export function reading(lib, { role, tools = [], kinds = [], paths = [], named = [], own = [], ready = false }) {
+// `kinds` ([{ kind, why }] or names), `paths` and `named` (files an issue names) are the task.
+export function reading(lib, { role, tools = [], kinds = [], paths = [], named = [], own = [] }) {
   const file = Object.keys(lib.roles).find(f => lib.roles[f].name === role);
   if (!file) return { error: `"${role}" is no role the core has a file for. Mend: give one of ${Object.values(lib.roles).map(r => r.name).join(", ")} (the builder, where your brief names none)` };
   const start = [FLOOR], task = new Map(), parts = toolParts(lib, tools);
-  // (a role's file named on another's line brings what it names too: `chain` holds the role's files so met, each once)
-  const chain = [], take = f => { if (start.includes(f)) return; start.push(f); if (lib.roles[f]) { chain.push(f); for (const g of lib.roles[f].start ?? []) take(g); } };
+  // (a role's file named on another's line brings what it names too)
+  const take = f => { if (start.includes(f)) return; start.push(f); for (const g of lib.roles[f]?.start ?? []) take(g); };
   take(file);
   for (const f of parts.start) take(f);
   const call = c => { if (!start.includes(c.file) && !task.has(c.file)) task.set(c.file, c.why); };
   parts.task.forEach(call);
-  if (ready) for (const f of chain) for (const g of lib.roles[f].ready ?? []) call({ file: g, why: "before the pull request is marked ready" });
   for (const f of named) call({ file: f, why: "the issue names it" });
   calledByKinds(lib, kinds.map(k => (typeof k === "string" ? { kind: k, why: `the kind ${k}` } : k))).forEach(call);
   calledByPaths(lib, paths, own).forEach(call);
@@ -170,7 +175,7 @@ function roleFaults(f, r, exists) {
   if (!WORD.test(r.name)) found.push(`${f}: its name is no word a session can give as its role. Mend: name the file in small letters, digits and hyphens`);
   if (!r.when?.roles.includes(r.name)) found.push(`${f} does not say when it is read. Mend: open it, under its title, with a paragraph that begins "Read" and holds "the role \`${r.name}\`"`);
   if (!r.start) found.push(`${f} names no file its role reads at its start. Mend: give it a paragraph that opens "**${START}**" and names each shared file in backticks, by its path in the core`);
-  for (const g of [...(r.start ?? []), ...(r.ready ?? [])]) {
+  for (const g of r.start ?? []) {
     if (!exists(g)) found.push(`${f} names ${g}, which is no file of the core. Mend: name the file as it now stands, or take it out`);
     if (g === FLOOR) found.push(`${f} names ${FLOOR}, which every role reads whatever its file names. Mend: take it out of the line`);
   }
@@ -185,7 +190,7 @@ function moduleFaults(f, w, named) {
   return found;
 }
 export function faults(lib, exists) {
-  const named = new Set(Object.values(lib.roles).flatMap(r => [...(r.start ?? []), ...(r.ready ?? [])]));
+  const named = new Set(Object.values(lib.roles).flatMap(r => r.start ?? []));
   return [...Object.entries(lib.roles).flatMap(([f, r]) => roleFaults(f, r, exists)), ...Object.entries(lib.modules).flatMap(([f, w]) => moduleFaults(f, w, named.has(f)))];
 }
 
@@ -202,12 +207,17 @@ export function lineMend(body, called, command) {
   return `the description's line "${READ_LINE}" ${listed(body) ? "does not list" : "is missing; it must list"} ${lacks.map(c => `\`${c.file}\` (${c.why})`).join(", ")}, which the changed paths call for. Mend: read each of those files whole, check the change against it, then add it in backticks to a line "${READ_LINE} ..." of the description (${command} prints the line)`;
 }
 
-const git = (dir, ...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
-// The paths changed since `base` (a commit; left out, where the branch left origin/main): committed or not, new files too.
+// git, read only, with the settings that run commands (fsmonitor, hooks) turned off: its output, or null where it fails.
+const git = (dir, ...args) => { const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"] }); return r.status === 0 ? r.stdout : null; };
+// The paths of a change that are the project's own: in a project, not those of the core's copy, which a sync moves and
+// the core's own pull request held to its reading.
+export const ownOf = (paths, prefix) => (prefix ? paths.filter(p => !p.startsWith(prefix)) : paths);
+// The paths changed since `base` (a commit; left out, where the branch left origin/main): committed or not, new files
+// too, a renamed file by both its names.
 export function changed(dir, base) {
   const from = base || git(dir, "merge-base", "origin/main", "HEAD")?.trim();
   if (!from) return null;
-  const diff = git(dir, "diff", "--name-only", "--end-of-options", from), fresh = git(dir, "ls-files", "--others", "--exclude-standard");
+  const diff = git(dir, "diff", "--name-only", "--no-renames", "--end-of-options", from), fresh = git(dir, "ls-files", "--others", "--exclude-standard");
   return diff === null ? null : [...new Set(`${diff}\n${fresh ?? ""}`.split("\n").filter(Boolean))];
 }
 
@@ -241,7 +251,7 @@ function taskOf(argv, dir, lib, self) {
     given.push(...got.labels.filter(l => kinds.has(l)).map(l => ({ kind: l, why: `the kind ${l}, the issue's label` })));
     for (const word of asked(got.body)) {
       const f = word.replace(/^core\//u, "");
-      if (lib.modules[f] !== undefined || lib.roles[f] || FLOOR_WHEN[f]) named.push(f);
+      if ([lib.modules, lib.roles, FLOOR_WHEN].some(of => Object.hasOwn(of, f))) named.push(f);
       else if (kinds.has(word)) given.push({ kind: word, why: `the kind ${word}, which the issue names` });
       else if (WORD.test(word)) notes.push(`the issue names "${word}" under "What to read", which is no kind or file of the core`);
     }
@@ -252,19 +262,26 @@ function taskOf(argv, dir, lib, self) {
     if (got === null) notes.push("the changed paths could not be read from git: give each with --path");
     else paths.push(...got);
   }
-  return { kinds: given, named, paths, notes };
+  return { kinds: given, named, paths: ownOf(paths, coreAt(dir)), notes };
 }
-// The modes that print of the core alone: the hook's line, the check, the kinds. Null where the arguments ask none.
-function alone(argv, dir, prefix, lib, self) {
-  const roles = Object.values(lib.roles).map(r => r.name).filter(n => WORD.test(n));
-  if (argv.includes("--hook")) {
-    if (roles.length) console.log(`What to read is set by your role and your task: \`${self} <role> --issue <its issue>\` prints it (the roles: ${roles.join(", ")}; the builder, where your brief names none), and again with \`--changed\` before a pull request is marked ready.`);
-    return 0;
-  }
+// The start hook's line: what the paths changed on the checked-out branch call for, by the roles, modules and config
+// of main's own tree (the copy under core/ where main holds a manifest), named by main's files alone; null where
+// they call for nothing, or main cannot be read.
+const MAIN = "refs/remotes/origin/main";
+export function hookLine(dir) {
+  const prefix = git(dir, "cat-file", "-e", `${MAIN}:core-manifest.md`) === null ? "" : "core/";
+  const read = f => git(dir, "--no-replace-objects", "show", `${MAIN}:${f}`);
+  const list = folder => (git(dir, "ls-tree", "--name-only", `${MAIN}:${prefix}${folder}`) ?? "").split("\n").filter(f => /^[a-z0-9-]+\.md$/u.test(f)).map(f => `${folder}/${f}`);
+  const lib = gather(f => read(`${prefix}${f}`), list), paths = ownOf(changed(dir) ?? [], prefix);
+  const called = calledByPaths(lib, paths, prefix ? ownPaths(OWN.map(read).find(text => text !== null)) : []);
+  return called.length ? `What this branch has changed calls for ${called.map(c => `\`${prefix}${c.file}\``).join(", ")}: read each whole before going on (\`node ${prefix}scripts/reading.mjs <your role> --changed\` says why).` : null;
+}
+// The modes that print of the core alone: the check, the kinds. Null where the arguments ask neither.
+function alone(argv, dir, prefix, lib) {
   if (argv.includes("--check")) {
     const found = faults(lib, f => fs.existsSync(path.join(dir, prefix, f)));
     for (const f of found) console.error(`FAIL: ${f}`);
-    if (!found.length) console.log(`each of the ${Object.keys(lib.modules).length} modules and ${roles.length} roles says when it is read, in words the reading script matches`);
+    if (!found.length) console.log(`each of the ${Object.keys(lib.modules).length} modules and ${Object.keys(lib.roles).length} roles says when it is read, in words the reading script matches`);
     return found.length ? 1 : 0;
   }
   if (!argv.includes("--kinds")) return null;
@@ -273,22 +290,21 @@ function alone(argv, dir, prefix, lib, self) {
 }
 
 function main(argv) {
-  const dir = process.cwd(), prefix = coreAt(dir);
-  if (prefix === null) {
-    if (argv.includes("--hook")) return 0;
-    console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core/ stands, or from the core's own root"); return 1;
-  }
+  const dir = process.cwd();
+  if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
+  const prefix = coreAt(dir);
+  if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core/ stands, or from the core's own root"); return 1; }
   const lib = library(dir, prefix), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
-  const mode = alone(argv, dir, prefix, lib, self);
+  const mode = alone(argv, dir, prefix, lib);
   if (mode !== null) return mode;
   const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "", tools = many(argv, "--tool"), task = taskOf(argv, dir, lib, self);
-  const own = prefix ? ownPaths((() => { try { return fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { return ""; } })()) : [];
+  const config = prefix ? OWN.find(f => fs.existsSync(path.join(dir, f))) : undefined, own = config ? ownPaths(fs.readFileSync(path.join(dir, config), "utf8")) : [];
   if (argv.includes("--line")) {
     const called = calledByPaths(lib, task.paths, own);
     console.log(`${READ_LINE} ${called.length ? called.map(c => `\`${at(c.file)}\``).join(", ") : "nothing its paths call for"}`);
     return 0;
   }
-  const got = reading(lib, { role, tools, kinds: task.kinds, paths: task.paths, named: task.named, own, ready: argv.includes("--changed") });
+  const got = reading(lib, { role, tools, kinds: task.kinds, paths: task.paths, named: task.named, own });
   if (got.error) { console.error(`FAIL: ${got.error}`); return 1; }
   console.log(`Read at the start, in the role ${role} (each whole):`);
   for (const f of got.start) console.log(`  ${at(f)}`);
@@ -296,8 +312,11 @@ function main(argv) {
   console.log(got.task.length ? "Read for this task:" : "Nothing more is called for by this task as given.");
   for (const t of got.task) console.log(`  ${at(t.file).padEnd(34)} ${t.why}`);
   for (const n of task.notes) console.log(`note ${n}`);
+  if (prefix && argv.includes("--changed") && !config) console.log(`note no path of this project's own has a kind: to have a changed screen or the like call its module, name each folder in ${OWN[0]} as { "paths": { "<folder>/": "<kind>" } } (${self} --kinds lists the kinds)`);
   return 0;
 }
 
-const direct = () => { try { return !process.argv[1] || process.argv[1] === "-" || [process.argv[1], fs.realpathSync(process.argv[1])].some(p => import.meta.url === pathToFileURL(p).href); } catch { return false; } };
+// (started by its own file, as started.mjs beside it tells, or handed to node on its input, as the start hook hands it:
+// node then names it "[eval1]" and its first argument is "-"; imported, or named in a `node -e`, it runs nothing)
+const direct = () => { try { return process.argv[1] === "-" ? import.meta.url.endsWith("/[eval1]") : Boolean(process.argv[1]) && [process.argv[1], fs.realpathSync(process.argv[1])].some(p => import.meta.url === pathToFileURL(p).href); } catch { return false; } };
 if (direct()) process.exitCode = main(process.argv.slice(2));

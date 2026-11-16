@@ -5,8 +5,8 @@ run is due: the kind `tool`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agen
 which role: `modules/roles.md`, "Tools are preferences".
 
 **One door in: `AGENTS.md`** (core archive 232; #249). By default every rule a session must know is reachable from the
-project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task
-(another role's: "One script says what to read"). A tool that
+project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task. A
+tool that
 reads a file of its own first gets a small entry file that pulls in each file those lines name, with its own part: the
 starter kit writes them (`CLAUDE.md`, `.kiro/steering/core.md`, `.agents/rules/core.md`), and a tool that reads
 `AGENTS.md` alone, as Codex does, needs none. Where a pull request adds a file to `AGENTS.md`'s `@` lines, its builder
@@ -15,21 +15,17 @@ uses (it declares the one it deletes under "Differences"). Reason: the `@` lines
 tool opened the files they name only by discipline. Held by `scripts/entry-files.mjs`, which fails an entry file that
 pulls in less than `AGENTS.md` names.
 
-**One script says what to read** (core archive 233; #304). By default a session reads, at a task's start, the floor's
-`security.md`, its role's file and what that names (`modules/roles.md`, "A file for each role"), and of every other
-module only those its task calls for: `scripts/reading.mjs`, given the role and the task (its issue, its kinds, or the
-paths changed so far), prints them, each module saying in its opening line when it is read, in words the script
-matches: a kind of task, a path, a tool. Whoever files an issue names its task's kinds under "What to read"; a project
-gives its own paths a kind in its manifest's "Reading". The task's builder runs the script again before the pull
-request is marked ready, on the paths in fact changed, reads each file that adds, checks the work against it and lists
-them on the description's line `Read for it:`; a reviewer runs the same, and judges the change by them. It does not
-mean a tool's own import or hook is needed (the script needs only that a tool can run a command and read a file; a
-hook may call it, as the work-saved hook does at a session's start), that a session opens no other file its work
-leads it to, nor that the floor is ever left to a pick: `floor/security.md` is read whole by every session. Reason: a
-session left to judge what it needs read everything or missed one, and each tool found the rules its own way. Held by
-`scripts/reading.mjs --check` (every module and role says when it is read) and the description check, which fails a
-description that leaves out a file its changed paths call for (`scripts/pr-description.mjs`), each in part: that a
-session then opens what is printed, by nothing yet.
+**One script says what to read** (core archive 233; #304). By default a session of any agent tool finds what it reads
+by one command, which the project's `AGENTS.md` names: `scripts/reading.mjs`, given a role and a task (its issue, its
+kinds, or the paths changed so far), prints the role's start (`modules/roles.md`, "A file for each role") and the
+modules the task calls for, each module saying in its opening line when it is read, in words the script matches: a
+kind of task, a path, a tool. Whoever sets a tool up for a project gives it nothing more to find them by: where the
+tool has a hook at a session's start, the work-saved hook there calls the script and names what the branch's changed
+paths call for; where it has none, the door's sentence is all. It does not mean an entry file stops pulling in a
+builder's start, nor that the floor is ever left to a pick: `floor/security.md` is read whole by every session.
+Reason: each tool found the rules its own way, and a session left to judge what it needs read everything or missed
+one. Held, in part, by `scripts/reading.mjs --check`, which fails a module or a role's file that does not say when it
+is read; that a session then opens what is printed, by nothing yet.
 
 **Hooks save time; checks are the guarantee** (core archive 232). By default no rule is held by a hook alone: what a
 tool's hook holds is also held where the tool does not matter, by a check on the pull request, a staged case or the

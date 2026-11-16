@@ -5,9 +5,11 @@ no role.
 
 **Reads at its start:** `modules/how-to-work.md`, `modules/inbox.md`, `modules/work-flow.md`, `modules/git.md`.
 
-**Reads before its pull request is ready:** `modules/reviews.md`; and what `scripts/reading.mjs builder --changed`
-prints for the paths it changed: each is read, the work checked against it, and listed on the description's line
-`Read for it:` (`modules/tools.md`).
+**Read by task, twice** (core archive 233; #304). By default the builder reads, at a task's start, what
+`scripts/reading.mjs builder --issue <its issue>` prints; before its PR is marked ready it runs that with `--changed`,
+reads each file it adds, checks the work against it and lists it on the description's line `Read for it:`. It does
+not mean it opens no other file. Reason: a session left to judge what it needs read everything or missed one. Held, in
+part, by the description check, which fails a line that leaves out a file the changed paths call for.
 
 **Hands over, gets back:**
 - the orchestrator: word when its PR is ready and when it merges; back, its line and brief.

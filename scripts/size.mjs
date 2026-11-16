@@ -59,6 +59,7 @@ export const rolesAt = (dir = ".") => Object.values(library(dir, "").roles).map(
 // a line a role, each a whole number of KB, spelled exactly as above; or, of a version from before each role had its
 // own, the one line that set CAP, read as the builder's (with `export` before it or, as it stood at first, without).
 // Null where there is no one such block or line, or both: a caller that gets null fails, and never guesses.
+const ONE = /^(?:export )?const CAP = ([1-9][0-9]{0,5}) \* 1024;\r?$/m;
 export function capsOf(text) {
   if (typeof text !== "string") return null;
   const blocks = [...text.matchAll(/^export const CAPS = \{\r?\n((?:  (?:[a-z][a-z0-9-]*|"[a-z][a-z0-9-]*"): [1-9][0-9]{0,5} \* 1024,\r?\n)+)\};\r?$/gm)];
@@ -84,15 +85,21 @@ export function answered(comments) {
 // raised one step and the raise has its answer. `base` and `head` are this file's text at the pull request's base and
 // as it would merge, and `running` the caps the head's script really holds the rules to: where the block read from its
 // text says another (a look-alike block in a comment, the real one spelled otherwise), the text is not trusted and the
-// check fails. A role the base gives no cap is at its first cap, which is no raise.
+// check fails. A role the base gives no cap is at its first cap: no raise against the one cap of before, which counted
+// no role but the builder; against a base with a cap a role, no raise up to the largest cap that base holds, and above
+// it a raise that needs its answer, so that a role's file given another name cannot take a cap of any size.
 export function raised(base, head, comments, running = capsOf(head)) {
   const from = capsOf(base), to = capsOf(head);
   const same = (a, b) => a !== null && b !== null && JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
   if (!same(to, running)) return "scripts/size.mjs: its block that sets CAPS is not the one block the check reads, or does not set the caps the script runs with. Mend: write it as export const CAPS = {, then a line a role as   <role>: <KB> * 1024, and }; with nothing else that sets CAPS or CAP";
   if (from === null) return "the base's scripts/size.mjs has no block that sets CAPS, nor the one line that set CAP, as the check reads them, so whether this pull request raises a cap cannot be told. Mend: bring the branch up to date with main, whose scripts/size.mjs sets them so, and run the check again";
   for (const [role, cap] of Object.entries(to)) {
-    const was = from[role];
-    if (was === undefined || cap <= was) continue;
+    const was = from[role], most = Math.max(...Object.values(from));
+    if (was === undefined) {
+      if (ONE.test(base) || cap <= most || answered(comments)) continue;
+      return `scripts/size.mjs: the role ${role}, new here, takes a first cap of ${cap} bytes, above the largest the base holds (${most}), and the pull request has no comment that opens "Leanness check:". Mend: have a fresh session read what the role reads at its start for room, post its answer in a comment that opens "Leanness check:", and run this check again; or set its cap at ${most / 1024} * 1024 or under`;
+    }
+    if (cap <= was) continue;
     if (cap - was !== 1024) return `scripts/size.mjs: the cap of the role ${role} rises from ${was} to ${cap} bytes, more than one step. Mend: set it to ${was / 1024 + 1} * 1024, one step of a whole KB, or leave it and say the rules in fewer words`;
     if (!answered(comments)) return `scripts/size.mjs: the cap of the role ${role} rises from ${was} to ${cap} bytes, and the pull request has no comment that opens "Leanness check:". Mend: have a fresh session read all the rules for room, post its answer in a comment that opens "Leanness check:", and run this check again; or leave the cap and say the rules in fewer words`;
   }

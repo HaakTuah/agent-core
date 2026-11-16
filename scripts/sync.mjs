@@ -103,7 +103,9 @@ function sync(tmp) {
     catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
   }
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
-  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"]]) {
+  // (last, the line that lists what the sync's own paths outside the copy call for, the pins of the project's
+  // workflows above all: reading.mjs, which the description check reads the line by)
+  for (const [script, ...args] of [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.mjs"], ["labels.mjs"], ["reading.mjs", "builder", "--changed", "HEAD", "--line"]]) {
     if (!fs.existsSync(path.join("core", "scripts", script))) continue;
     // (each given ten minutes, so that none can hold the sync. Of what it writes to stderr only its own "FAIL:" lines are
     // printed, which name no path of the machine: a crash's trace would, and this goes into a PR's description)

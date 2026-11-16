@@ -9,5 +9,5 @@ sessions.
 **Hands over, gets back:**
 - a builder: a line and its brief, the owner's word in it word for word; back, word when its pull request is ready and
   when it merges.
-- the stand-in: the call, once an open idea has waited a week with no verdict; back, a verdict on each open idea.
+- the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.

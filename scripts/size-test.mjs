@@ -43,8 +43,10 @@ ok(raised(two(27, 20), two(27, 20), []) === null && raised(two(27, 20), two(26, 
 ok(raised(two(27, 20), two(27, 21), yes) === null && raised(two(27, 20), two(28, 21), yes) === null, "a raise with its answer passes");
 ok(/the role reviewer rises from 20480 to 21504 bytes.*Leanness check:/.test(raised(two(27, 20), two(27, 21), [])) && /Leanness check:/.test(raised(two(27, 20), two(28, 20), [comment("Leanness check: x", "NONE")])), "a raise of one role's cap without one fails, naming the role and what is missing");
 ok(/the role builder rises.*one step of a whole KB/.test(raised(two(27, 20), two(29, 20), yes)) && /one step of a whole KB/.test(raised(two(27, 20), two(27, 30), [])), "a raise of more than one step fails, with its answer or without");
-ok(raised(at(27), two(27, 22), []) === null && raised(at(27), caps({ builder: 26, orchestrator: 41, "stand-in": 19 }), []) === null && raised(two(27, 20), caps({ builder: 27, reviewer: 20, design: 28 }), []) === null,
-  "a role the base gives no cap is at its first cap, which is no raise: so the pull request that first gives each role its own, and one that adds a role");
+ok(raised(at(27), two(27, 22), []) === null && raised(at(27), caps({ builder: 26, orchestrator: 41, "stand-in": 19 }), []) === null && raised(two(27, 20), caps({ builder: 27, reviewer: 20, design: 27 }), []) === null,
+  "a role the base gives no cap is at its first cap: no raise against the one cap of before, whatever it is, and none up to the largest cap a base with a cap a role holds");
+ok(/the role design, new here, takes a first cap of 28672 bytes, above the largest the base holds \(27648\).*Leanness check:.*Mend:/.test(raised(two(27, 20), caps({ builder: 27, reviewer: 20, design: 28 }), [])) && raised(two(27, 20), caps({ builder: 27, reviewer: 20, design: 28 }), yes) === null
+  && /new here/.test(raised(caps({ builder: 27, orchestrator: 42 }), caps({ builder: 27, orchestra: 60 }), [])), "above that it needs its answer: a role's file given another name cannot take a cap of any size");
 ok(/the role builder rises from 27648 to 28672 bytes.*Leanness check:/.test(raised(at(27), two(28, 22), [])) && raised(at(27), two(28, 22), yes) === null && /more than one step/.test(raised(at(27), two(29, 22), yes)),
   "against the one cap of before, the builder's cap is held as that cap was");
 const decoy = `/*\n${two(27, 20)}*/\nexport const CAPS = { builder: 60*1024 };\n`;

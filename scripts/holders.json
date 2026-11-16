@@ -73,10 +73,7 @@
     "modules/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part",
     "modules/roles.md: The roles, by what they do": "describes",
     "modules/tools.md: One door in: `AGENTS.md`": "check: scripts/entry-files.mjs",
-    "modules/tools.md: One script says what to read": [
-      "check: scripts/reading.mjs, in part",
-      "check: scripts/pr-description.mjs, in part"
-    ],
+    "modules/tools.md: One script says what to read": "check: scripts/reading.mjs, in part",
     "modules/tools.md: Hooks save time; checks are the guarantee": "check: scripts/holders.mjs, in part",
     "modules/tools.md: A change of tool loses nothing": "check: scripts/stalled.mjs, in part",
     "modules/tools.md: Proven by the staged cases, tool by tool": "check: scripts/staged.mjs, in part",
@@ -95,7 +92,7 @@
       "check: scripts/reading.mjs, in part"
     ],
     "roles/builder.md: Reads at its start": "check: scripts/reading.mjs, in part",
-    "roles/builder.md: Reads before its pull request is ready": "check: scripts/pr-description.mjs, in part",
+    "roles/builder.md: Read by task, twice": "check: scripts/pr-description.mjs, in part",
     "roles/builder.md: Hands over, gets back": "describes",
     "roles/design.md: Reads at its start": "check: scripts/reading.mjs, in part",
     "roles/design.md: Hands over, gets back": "describes",
