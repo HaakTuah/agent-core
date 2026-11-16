@@ -49,7 +49,9 @@ const b = (entries, grown = {}, whole = null) => ({ listed: new Map(Object.entri
 ok(same(joinedUnsaid(b({ p: { count: 1 }, q: { count: 2 } }), b({ p: { count: 1 }, q: { count: 1 } })), ["q"]) && same(joinedUnsaid(b({ q: { count: 2 } }, { q: "it changes nothing the program does" }), b({ q: { count: 1 } })), []),
   "an entry that joins the baseline, or grows, needs its reason under \"grown\"");
 const runs = [b({ q: { count: 2 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
-ok(same(joinedUnsaid(...runs, false), []) && same(joinedUnsaid(...runs, true), ["q"]) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
+const found = "survivor: a.js: x(); [! -> ]", madeUp = "survivor: a.js: nowhere(); [! -> ]", wholeRun = [b({ [found]: { count: 1 }, [madeUp]: { count: 1 } }, {}, { day: "2026-12-01", commit: "b" }), b({}, {}, { day: "2026-11-01", commit: "a" })];
+ok(same(joinedUnsaid(...wholeRun, false, new Map(), new Map(), () => "x();\n"), [madeUp]), "a whole run's pull request that lists an entry for a line that stands nowhere in its file fails: no run found it");
+ok(same(joinedUnsaid(runs[0], runs[1], false, new Map(), new Map(), () => null), ["q"]) && same(joinedUnsaid(b({ "survivor: q.js: q(); [! -> ]": { count: 2 } }, {}, { day: "2026-12-01", commit: "b" }), runs[1], false, new Map(), new Map(), () => "q();\n"), []) && same(joinedUnsaid(...runs, true), ["q"]) && same(joinedUnsaid(b({ q: { count: 1 } }), null), []),
   "with no reason, only in the pull request that records a new whole run and changes no code or test, or writes the first baseline: one that changes code cannot take in its own survivors so");
 const old = "survivor: a.js: if (x === 1) return; [=== -> !==]", gone = opened(new Map([[old, { count: 1 }], ["survivor: b.js: kept(); [! -> ]", { count: 1 }]]), new Set(["a.js"]));
 const renamed = { ...f("survivor: a.js: if (y === 1) return; [=== -> !==]", "Survived") }, other = { ...f("survivor: a.js: if (y === 1) return; [=== -> ==]", "Survived") };
