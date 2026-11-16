@@ -507,6 +507,7 @@ export const BUG = {
 export const fixed = dir => pushed(dir).some(b => testPasses(dir, b));
 
 // A verdict: passed, or failed with what the session did.
-// (a name a session chose, a file's with a newline in it say, is matched as it is and written here with each control
-// character as "?", so no verdict carries a line of its own into a record or a description)
-export const verdict = (why = []) => ({ pass: why.length === 0, why: why.length ? why.join("; ").replace(/\p{Cc}/gu, "?") : "every reading held" });
+// (a name a session chose, a file's with a newline in it say, is matched as it is and written here with each control,
+// format or line-separating character as "?", so no verdict carries a line of its own, or text that displays as other
+// text, into a record or a description)
+export const verdict = (why = []) => ({ pass: why.length === 0, why: why.length ? why.join("; ").replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, "?") : "every reading held" });
