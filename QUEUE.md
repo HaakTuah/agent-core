@@ -2,12 +2,11 @@
 
 The order this repository's open issues are built in, and nothing else (`AGENTS.md`, "The queue"). Each line is an
 issue, who builds it and what it waits on; the issue holds the rest, its conditions too. The first line that waits on
-nothing is next, and a line leaves in the pull request that closes its issue.
+nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus, who writes the rule from the owner's word
-on the issue; *the owner*, no session takes it up before the owner's own word. **The owner's yes** that floor rule 3
-asks for is the one given when the line's issue was queued, relayed into its pull request (`AGENTS.md`, "Queued means
-wanted"). A line on points of #460 or #484 has its PR say "Part of" that issue, or "Fixes" it if it merges last.
+on the issue; *the owner*, no session takes it up before the owner's own word. A line on points of #460, #484 or #486
+has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 
 ## In order
 
@@ -46,6 +45,9 @@ wanted"). A line on points of #460 or #484 has its PR say "Part of" that issue, 
 | #405 | builder | |
 | #407 | builder | |
 | #397 | rule builder; it changes the review guidelines (its PR quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
+| #485 | rule builder; it changes the floor (rules 7 and 10), and its PR quotes the owner's yes on the issue | |
+| #486, point 1 | rule builder | |
+| #486, the choice record | rule builder, hard work with a challenger; it reopens `CHOICES.md`'s first choice | |
 | #460, point 1 (a staged case for floor rule 9) | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
