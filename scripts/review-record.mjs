@@ -119,7 +119,8 @@ export function perPull(issueComments, inline, owner) {
 
 // What a pull request's reviews were asked or posted on, for its rounds (review-rounds.mjs): { sha, at, blocking }, sha
 // the commit the review names (a posted review's first line, the commit a receipt of Codex's names, the one a find of
-// Codex's was made on) and at the time it was asked or posted, read where no commit is named. A review asked is a line
+// Codex's was made on, and the one each review its summary says completed read, the newest alone, as its app keeps it)
+// and at the time it was asked or posted, read where no commit is named. A review asked is a line
 // "@codex review" alone, in a comment of the owner's account; a note that no security review is needed is none.
 export function reviewEvents(issueComments, inline, owner) {
   const mine = c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase();
@@ -130,6 +131,8 @@ export function reviewEvents(issueComments, inline, owner) {
     else if (mine(c) && lines(seen(c.body)).some(l => l.trim() === "@codex review")) out.push({ at: c.at, blocking: false });
     else if (codexs(c) && RECEIPT.test(c.body)) out.push({ sha: REVIEWED.exec(c.body)?.[1], at: c.at, blocking: false });
   }
+  const { state } = codexState(issueComments);
+  for (const review of [state?.code_review, state?.security_review]) if (review?.status === "completed" && review.commit_sha) out.push({ sha: review.commit_sha, blocking: false });
   for (const c of [...inline, ...issueComments]) {
     const find = codexFind(c);
     if (find) out.push({ sha: c.original_commit_id ?? c.commit_id, at: c.at, blocking: find.blocking });

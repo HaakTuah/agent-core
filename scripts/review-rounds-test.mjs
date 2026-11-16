@@ -53,6 +53,13 @@ ok(same(events.map(e => [e.sha ?? null, e.blocking]), [[null, false], [sha("e"),
   "the heads read: a review asked, each posted review's commit with its blocking count, a receipt of Codex's and each find's own commit; a note, a quote, another account's ask or receipt and an ask in a fence are none",
   JSON.stringify(events));
 ok(same(roundsOf(events, COMMITS), { rounds: 3, blocking: 2 }), "the comments of one pull request fold into its rounds");
+// Codex's summary: the newest head each of its reviews read, where it says that review completed
+const summary = (code, security) => issue(CODEX, `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: code, security_review: security })} -->\n`, 40);
+const read = (comments) => reviewEvents(comments, [], OWNER).map(e => e.sha);
+ok(same(read([summary({ status: "completed", commit_sha: sha("a") }, { status: "completed", commit_sha: sha("c") })]), [sha("a"), sha("c")])
+  && same(read([summary({ status: "running", commit_sha: sha("a") }, { status: "completed", commit_sha: null })]), [])
+  && same(read([issue(OWNER, `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: { status: "completed", commit_sha: sha("a") }, security_review: null })} -->\n`, 41)]), []),
+  "Codex's summary gives the head of each review it completed; one running, one with no commit, and the owner's look-alike give none");
 
 ok(median([]) === null && median([3]) === 3 && median([4, 1, 8]) === 4 && median([1, 2, 3, 9]) === 2.5, "the median of none is none, of an even count the mean of its middle two");
 
