@@ -448,7 +448,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     for (const [command, want] of [["bash $'scripts/x\\x2epy'", ["scripts/x.py"]], ["bash $'\\163cripts/x.py'", ["scripts/x.py"]], ["bash scripts/x.\\\npy", ["scripts/x.py"]], ["sh -c 'bash \"scripts/x.\\\npy\"'", ["scripts/x.py"]],
       ["sh -c 'python3 \"scripts/it'\\''s😀.py\"'", ["scripts/it's😀.py"]], ["sh -c 'bash \"$3\"' do test -x scripts/x.py", ["scripts/x.py"]], ["sh -c 'bash \"$2\"' {test -x scripts/x.py", ["scripts/x.py"]],
       ["test(){ bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]], [wrap("cat \"scripts/it's.py\"", 6), ["scripts/it's.py"]], ["cmd /c python scr^ipts\\x.py", ["scripts/x.py"]],
-      ["python scr`ipts/x.py", ["scripts/x.py"]], ["bash `pwd`/scripts/x.py", ["scripts/x.py"]], ["git show refs/remotes/origin/main:./scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then :; fi", []], ["x; ! test -e scripts/x.py", []]])
+      ["python scr`ipts/x.py", ["scripts/x.py"]], ["bash `pwd`/scripts/x.py", ["scripts/x.py"]], ["git show refs/remotes/origin/main:./scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then :; fi", []], ["x; ! test -e scripts/x.py", []],
+      // (#476's fallback security review of 11acb4d: a ref of main in a list no git show reads, a redirection's "&" or
+      // "|", and bash's other ways to define "test")
+      ["java -cp origin/main:./scripts/x.py Main", ["scripts/x.py"]], ["LD_PRELOAD=origin/main:scripts/x.py cmd", ["scripts/x.py"]], ["bash >&test -x scripts/x.py", ["scripts/x.py"]], ["bash >|[ -x scripts/x.py", ["scripts/x.py"]],
+      ["function test { bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]], ["function [ { bash \"$2\"; }; [ -x scripts/x.py ]", ["scripts/x.py"]], ["function test\n{ bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]],
+      ["shopt -s expand_aliases; alias a=b test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["cmd /c python \"scr\"^ipts\\x.py", ["scripts/x.py"]],
+      ["git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []], ["git cat-file -p origin/main:scripts/x.py | bash", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])

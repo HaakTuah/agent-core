@@ -10,8 +10,8 @@
 // with the shell's quoting read, level after level, until reading it changes nothing (eight levels at most), its
 // backslashes, its backslash-newlines and the escapes of $'...' read as bash reads them; with every backslash read and
 // every quote taken out; and with cmd's "^" and PowerShell's backtick read as their escapes. A path written
-// `<ref>:<path>` names the copy git holds at that ref, the remote's `main` (refs/remotes/origin/main or origin/main)
-// being the one that counts as `main`; and a file only tested for, by "[", "[[" or "test" where a command starts
+// `<ref>:<path>` and given to git show or git cat-file names the copy git holds at that ref, the remote's `main`
+// (refs/remotes/origin/main or origin/main) being the one that counts as `main`; and a file only tested for, by "[", "[[" or "test" where a command starts
 // (`[ -f <path> ]`, `test -e <path>`), is neither run nor read, save where the command defines a function or alias of
 // that name. Not read here, and so the review's: a path the command builds from parts, reaches by changing folder or
 // through ".." past a link, names by a pattern (a glob or braces), or spells otherwise than the forms above; and
@@ -28,12 +28,13 @@ const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
 // (a variable, as the shell, cmd and PowerShell write one, read as one mark: what it holds is not the command's text)
 const VARIABLE = /\$env:\w+|\$\{[^}]*\}|\$\w+|%\w+%/gu;
 // (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after a
-// newline, ";", "&", "|" or "(", or after a quote that opens), perhaps after keywords such as "then", "!" or "{", each a
+// newline, ";", "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", or after a quote that opens), perhaps after keywords such as "then", "!" or "{", each a
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
-const TESTED = /(?:^|[\n;&|(]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
-// (a command that defines "test", "[" or "[[" as a function or an alias: no file test of it is one)
-const REDEFINED = /(?:^|[\s;&|(])(?:function[ \t]+)?(?:test|\[\[?)[ \t]*\([ \t]*\)|\balias[ \t]+(?:test|\[\[?)=/u;
+const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+// (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
+// alias's operands: no file test of it is one)
+const REDEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)|\balias\b[^;&|\n]*\s(?:test|\[\[?)=/u;
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), perhaps closed by a quote)
 const ROOTED = /[\u0001)`]\\?["']?$/u;
@@ -79,7 +80,10 @@ export function pathsIndex(files) {
 const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
 const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`]["']?\/+)?$/u;
-const FETCHED = /(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
+// (a path fetched from main: `<the remote's main>:<path>` given to git show or git cat-file, within one command, not
+// one of a list such as java's -cp or LD_PRELOAD takes)
+const GIT_SHOW = /\bgit\b[^;&|\n]*\b(?:show|cat-file)\b[^;&|\n]*$/u;
+const FETCHED = /\bgit\b[^;&|\n]*\b(?:show|cat-file)\b[^;&|\n]*[\s"'](?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
@@ -153,7 +157,7 @@ export function fromTree(command, holds, index = null) {
   const found = new Set(), tests = !REDEFINED.test(raw);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    if ((ref !== null && MAIN.test(ref)) || (ref === null && ((tests && TESTED.test(before)) || FETCHED.test(before)))) return;
+    if ((ref !== null && MAIN.test(ref) && GIT_SHOW.test(before)) || (ref === null && ((tests && TESTED.test(before)) || FETCHED.test(before)))) return;
     const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
     if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);
@@ -168,7 +172,8 @@ export function fromTree(command, holds, index = null) {
     // PowerShell's escapes read)
     const variants = [text];
     for (let level = raw, n = 0; n < 8; n++) { const next = dequote(level); if (next === level) break; variants.push(next); level = next; }
-    variants.push(raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, ""), text.replace(/[\^`](.)/gsu, "$1"));
+    const bare = raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, "");
+    variants.push(bare, text.replace(/[\^`](.)/gsu, "$1"), text.replace(/[\^`](.)/gsu, "$1").replace(/["']/gu, ""));
     for (const variant of variants) scan(variant, index, holds, found, tests);
   }
   return [...found];
