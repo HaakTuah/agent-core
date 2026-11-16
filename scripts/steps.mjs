@@ -156,14 +156,13 @@ export function configs(p) {
 const licenceConfig = p => licenceConfigs(p).licences;
 const nugetConfig = p => nugetOf(p, () => licenceConfig(p));
 
-// Whether a file of the project's own code (its shape check's config's "code", which leaves the copy of the core out)
-// lies under that config's "tests".
+// Whether a test of the project's own lies under its shape check's config's "tests", wherever they stand beside its code:
+// a file of the copy of the core (core/) is none.
 function testsStand(p) {
   let config;
   try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
-  const files = specs => new Set(execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").filter(Boolean));
-  const code = files(config.code);
-  return config.tests.length > 0 && [...files(config.tests)].some(f => code.has(f));
+  if (!config.tests.length) return false;
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the

@@ -156,22 +156,28 @@ export function moved(listedMap, texts) {
   return out;
 }
 
-// What of each entry the lines a change left alone still hold (`texts`, a function of a file to its text; `changed`, a
-// Map of file to the Set of changed lines): for each unchanged line of the entry's text, as many as the fault's
-// replaced text stands in it, at least one, up to the count listed. A repeated line on a changed line cannot use them.
-export function heldBy(listedMap, texts, changed) {
+// The unchanged lines of the files a change touched whose text is that of a listed entry (`texts`, a function of a file
+// to its text; `changed`, a Map of file to the Set of changed lines): a Map of file to a Set of lines. The tool is run
+// on them too, so that what of each entry they still hold is measured, never guessed (heldBy()).
+export function witnesses(listedMap, texts, changed) {
   const out = new Map();
-  for (const [id, n] of listedMap) {
-    const parts = partsOf(id), text = parts && texts(parts.file);
+  for (const id of listedMap.keys()) {
+    const parts = partsOf(id), text = parts && changed.has(parts.file) && texts(parts.file);
     if (!text) continue;
-    const original = (/^\[(.*) -> .*\]$/u.exec(parts.what)?.[1] ?? "").replace(/…$/u, "");
-    let held = 0;
     text.split(/\r?\n/u).forEach((l, i) => {
-      if (changed.get(parts.file)?.has(i + 1) || collapse(l, 100) !== parts.line) return;
-      held += Math.max(1, original ? collapse(l, 1e9).split(original).length - 1 : 1);
+      if (changed.get(parts.file).has(i + 1) || collapse(l, 100) !== parts.line) return;
+      if (!out.has(parts.file)) out.set(parts.file, new Set());
+      out.get(parts.file).add(i + 1);
     });
-    if (held) out.set(id, Math.min(held, n.count ?? 0));
   }
+  return out;
+}
+
+// What of each entry the lines a change left alone still hold: the survivors the tool found on them (`faults`, those of
+// witnesses()), each up to the count listed. A repeated line on a changed line cannot use them.
+export function heldBy(listedMap, faults) {
+  const out = new Map();
+  for (const f of faults.filter(f => SURVIVED.includes(f.status) && listedMap.has(f.id))) out.set(f.id, Math.min((out.get(f.id) ?? 0) + 1, listedMap.get(f.id).count ?? 0));
   return out;
 }
 
@@ -266,16 +272,19 @@ function onPullRequest(p, base) {
   const changed = changedLines(base, p.code), deleted = deletedTests(base, p.config.tests);
   const baseline = baselineFrom(tolerant(() => fs.readFileSync(unlinked(p.at), "utf8")), p.at);
   const was = baselineFrom(tolerant(() => git(["show", `${base}:${p.at}`])), `${base}:${p.at}`);
-  let faults = [];
-  try { if (changed.size) faults = faultsOf(runTool(p.tool.command, linesArg(changed)), changed); } catch (e) {
+  const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
+  const watched = baseline ? witnesses(baseline.listed, read, changed) : new Map();
+  const both = new Map([...changed].map(([f, l]) => [f, new Set([...l, ...(watched.get(f) ?? [])])]));
+  let found = [];
+  try { if (changed.size) found = faultsOf(runTool(p.tool.command, linesArg(both)), both); } catch (e) {
     if (baseline || !(e instanceof Refused)) throw e;
     console.log(`Reported only, and not measured: ${e.message}`);
   }
+  const faults = found.filter(f => changed.get(f.file)?.has(f.line)), held = heldBy(baseline?.listed ?? new Map(), found.filter(f => !changed.get(f.file)?.has(f.line)));
   const from = tolerant(() => git(["merge-base", base, "HEAD"]).trim()) || base;
   const record = new Set([p.at, p.config.baseline]);
   const touched = git(["diff", "--name-only", "--no-renames", from, "--", ...p.config.code, ...p.config.tests]).split("\n").some(f => f && !record.has(f) && path.posix.extname(f) !== ".md");
-  const read = f => (p.code.includes(f) ? tolerant(() => fs.readFileSync(unlinked(f), "utf8")) : null);
-  const gone = baseline ? moved(baseline.listed, read) : new Map(), held = baseline ? heldBy(baseline.listed, read, changed) : new Map();
+  const gone = baseline ? moved(baseline.listed, read) : new Map();
   const { lines, fails } = verdict({ faults, baseline, was, at: p.at, deleted, touched, gone, held });
   for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
   summary(lines);

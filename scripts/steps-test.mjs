@@ -91,6 +91,16 @@ for (const [name, dir] of Object.entries(dirs)) {
   ok(said?.mend.includes("has tests now"), "the starter kit's mutation-tool row, none for no tests yet, is reported once the project's own code holds a test", JSON.stringify(said));
   execFileSync("git", ["rm", "-q", "--cached", "src/first.test.js"], { cwd: dir });
   fs.rmSync(test);
+  // (a test folder the config names beside its code, not inside it: its tests count too)
+  const config = path.join(dir, "checks/shape.json"), was = fs.readFileSync(config, "utf8"), apart = path.join(dir, "test", "a.js");
+  fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(was), code: ["src"], tests: ["test"] }, null, 2)}\n`);
+  fs.mkdirSync(path.dirname(apart), { recursive: true }); fs.writeFileSync(apart, "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const beside = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  ok(beside?.mend.includes("has tests now"), "and once a test stands in a folder of tests the config names apart from its code", JSON.stringify(beside));
+  execFileSync("git", ["rm", "-q", "--cached", "test/a.js"], { cwd: dir });
+  fs.rmSync(path.join(dir, "test"), { recursive: true }); fs.writeFileSync(config, was);
+  execFileSync("git", ["add", "-A"], { cwd: dir });
 }
 
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
