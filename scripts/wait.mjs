@@ -1,4 +1,4 @@
-// What a pull request waits on (modules/tests.md, "What a push waits on has a time mark"; #321), for every project
+// What a pull request waits on (tasks/tests.md, "What a push waits on has a time mark"; #321), for every project
 // that takes the core: of the pull requests merged last, the time the checks of each one's last push took, from the
 // first check's start to the last one's end, and their median, held to the mark the shape check's config gives under
 // "wait" (shape.mjs, beside this file, which lets the mark rise only as a suite's does). It reports and fails nothing:
@@ -47,7 +47,7 @@ export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
 export function line(m) {
   if (m.median === null) return `- what a push waits on: not read (no merged pull request's checks could be read).`;
   const minutes = s => `${(s / 60).toFixed(1)} min`;
-  const against = m.mark === undefined ? "; the shape check's config gives no mark under \"wait\"" : m.median > m.mark ? `, past its mark of ${minutes(m.mark)}: a task brings it down (modules/tests.md)` : `, within its mark of ${minutes(m.mark)}`;
+  const against = m.mark === undefined ? "; the shape check's config gives no mark under \"wait\"" : m.median > m.mark ? `, past its mark of ${minutes(m.mark)}: a task brings it down (tasks/tests.md)` : `, within its mark of ${minutes(m.mark)}`;
   return `- what a push waits on: ${minutes(m.median)}, the median of the last ${m.read} merged pull requests' checks${against}.`;
 }
 

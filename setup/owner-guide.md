@@ -16,7 +16,7 @@ request or a log holds a secret or anything personal about you (floor rules 1 an
 ## What it will ask of you
 
 A few yeses, and nothing else; everything else your agents decide on the best reading and say in the pull request, where
-you can correct it (floor rule 14, `modules/inbox.md`). A yes is asked for:
+you can correct it (floor rule 14, `roles/shared/inbox.md`). A yes is asked for:
 
 - a step that cannot be undone, or that spends money beyond what you set aside;
 - a package you want that is under a licence off the allowed list, or one whose licence only a person can read
@@ -33,7 +33,7 @@ you alone; the work goes on without it.
 
 Create a branch named `agents-stop` on your repository, from any device. Every agent reads it at its start and before
 each commit, and stops. Delete the branch to let them go on. It stops only that repository's agents
-(`modules/work-flow.md`).
+(`roles/shared/work-flow.md`).
 
 ## What it costs
 
@@ -67,5 +67,5 @@ printed at the end of `scripts/init.mjs` (`setup/starter-kit.md`).
 
 A fault, an idea or a question about the core itself is an issue on this repository, and so is a rule that did not fit
 your project, so that the core may learn from it (`README.md`, "Reporting to the core"). A weakness is never an issue,
-which anyone can read: it goes to this repository's Security tab, "Report a vulnerability" (`floor/topics.md`,
+which anyone can read: it goes to this repository's Security tab, "Report a vulnerability" (`floor/topics/weaknesses.md`,
 "Reporting a weakness").

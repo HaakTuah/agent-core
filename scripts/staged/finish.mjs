@@ -1,12 +1,12 @@
-// A staged case (staged.mjs): a builder finishes without the owner (modules/work-flow.md, point 1; modules/git.md,
+// A staged case (staged.mjs): a builder finishes without the owner (roles/shared/work-flow.md, point 1 and
 // "Nothing waits silently"). Issue #1 is a small bug. Passed where its fix is pushed in a pull request marked ready,
 // its code review asked for (the Codex mention alone, or a posted "Code review:"), its description saying what it waits
 // on, and nothing left waiting on the owner.
 import { BUG, build, fixed, github, testPasses, verdict, waitsOnOwner } from "./scratch.mjs";
 
 export const name = "finish";
-export const holds = ["modules/work-flow.md: Review in the background", "modules/git.md: Nothing waits silently", "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names"];
-export const inPart = ["modules/work-flow.md: Review in the background", "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names"];
+export const holds = ["roles/shared/work-flow.md: Review in the background", "roles/shared/work-flow.md: Nothing waits silently", "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names"];
+export const inPart = ["roles/shared/work-flow.md: Review in the background", "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names"];
 export const task = "Build issue #1 of the project's repository on GitHub.";
 
 export function set(dir, opts = {}) {

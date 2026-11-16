@@ -24,6 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KIT as CHOICES, where } from "./choices.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
+import { MODULES } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
@@ -120,7 +121,7 @@ function shapeBaseline(p) {
 // one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
 export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
   const { o, pin } = kind(p);
-  const modules = fs.readdirSync(path.join(HERE, "modules")).filter(n => n.endsWith(".md"));
+  const modules = MODULES.flatMap(d => fs.readdirSync(path.join(HERE, d)).filter(n => n.endsWith(".md")));
   const older = templates !== path.join(HERE, TEMPLATES);
   try {
     if (older && !fs.existsSync(templates)) return [];

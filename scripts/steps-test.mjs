@@ -15,7 +15,7 @@ import { NOTES } from "./releases.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
-import { COST, STEPS, configs, leads, notDone, plain, project, report, runsOwn } from "./steps.mjs";
+import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -23,7 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
-const modules = fs.readdirSync(path.join(root, "modules")).filter(n => n.endsWith(".md"));
+const modules = ["roles/shared", "tasks", "tools"].flatMap(d => fs.readdirSync(path.join(root, d)).filter(n => n.endsWith(".md")));
 const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
 // ---- every entry of the sync notes has its step, and each step is told done one way ----
@@ -47,7 +47,7 @@ function kit(name, o) {
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
@@ -67,7 +67,7 @@ for (const [name, dir] of Object.entries(dirs)) {
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
   // (the core's own manifest check, on the modules and floor of this commit: a slot a module it takes uses, with no row,
   // would be a note on the project's first day, #329)
-  const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: texts("modules"), floorTexts: texts("floor") });
+  const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: { ...texts("roles/shared"), ...texts("tasks"), ...texts("tools") }, floorTexts: texts("floor") });
   ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
 }
 // (a named tool is done only where a workflow on pull requests runs the check with its base)
@@ -380,6 +380,45 @@ fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.repla
 missedOwn = notDone(ownDir);
 const toolsMend = missedOwn.find(m => m.lead === "16 November 2026, an agent's own tools listed")?.mend ?? "";
 ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.json` beside it") && !/`(reads|takes)`/.test(toolsMend), "where it does not run the agent-tools check, the step's mend names the config the licence check is passed (#364)", toolsMend);
+
+// the step of the rules' move, on a project of its own making: a config that stands outside checks/, a copies config
+// written a pattern a line, a file a tool pulls the core's files in by, two old paths that are now one file, and a
+// dated record, which is left as it stands
+{
+  const moveDir = path.join(tmp, "moved-project"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(moveDir, f)), { recursive: true }); fs.writeFileSync(path.join(moveDir, f), text); };
+  const step = STEPS.find(x => x.lead === "16 November 2026, the rules in folders that say who reads them or when");
+  put("core-manifest.md", "# Core manifest\n\nPaths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/; any other is ours.\n");
+  put("AGENTS.md", "# A project\n\n@core/modules/work-flow.md\n@core/modules/git.md\n");
+  put("config/sizes.json", `${JSON.stringify({ read: ["core/modules/how-to-work.md"] })}\n`);
+  put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB}\n  ]\n}\n`);
+  put("docs/2026-01-05-what-was-read.md", "Read that day: `core/modules/inbox.md`.\n");
+  put("docs/reports/first.md", "Read: `core/modules/inbox.md`.\n");
+  execFileSync("git", ["init", "-q"], { cwd: moveDir });
+  let said = step.check(project(moveDir)) ?? "";
+  ok(said.startsWith("In one pull request") && said.includes("`core/modules/how-to-work.md` is now `core/roles/shared/how-to-work.md` (in `config/sizes.json`)") && said.includes(`after the pattern ${MOVED_GLOB} add the patterns`) && said.includes("(in `config/copies.json`)")
+    && said.includes("a file that named `core/modules/work-flow.md` beside the other path that now leads to `core/roles/shared/work-flow.md` names that file once") && !said.includes("inbox"),
+    "the step names an old path in a config wherever it stands, a copies config that reads the old folder alone, and two old paths that are now one file; a dated record it leaves as it stands", said);
+  // (a rule file is read whatever its name or its folder, a config in a folder named as a dated record's too)
+  put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `.cursorrules`, `docs/records/standing.md`;\n");
+  put(".cursorrules", "Read core/modules/screens.md first.\n"); put("docs/records/standing.md", "As `core/modules/choices.md` says.\n"); put(".github/reports/sizes.json", `${JSON.stringify(["core/modules/cleaning.md"])}\n`); put(".cursor/rules/core.mdc", "Read core/modules/helpers.md.\n"); put(".windsurfrules", "Read core/modules/reviews.md.\n");
+  said = step.check(project(moveDir)) ?? "";
+  ok(said.includes("`core/modules/screens.md` is now `core/tasks/screens.md` (in `.cursorrules`)") && said.includes("(in `docs/records/standing.md`)") && said.includes("(in `.github/reports/sizes.json`)") && said.includes("(in `.cursor/rules/core.mdc`)") && said.includes("(in `.windsurfrules`)") && !said.includes("inbox"),
+    "a rule file is read whatever its name or folder, a file where a tool keeps what it reads whatever its name, and a config wherever it lies; the dated records still are not", said);
+  for (const f of ["SECURITY.md", ".cursorrules", "docs/records/standing.md", ".github/reports/sizes.json", ".cursor/rules/core.mdc", ".windsurfrules"]) fs.rmSync(path.join(moveDir, f));
+  put(".kiro/steering/core.md", "#[[file:core/modules/how-to-work.md]]\n");
+  said = step.check(project(moveDir)) ?? "";
+  ok(said.startsWith("Before any other task, since a tool whose entry file pulls the core's files in follows no further import"), "where a file a tool pulls the core's files in by still names an old path, the step comes before any other task, and says why", said);
+  fs.rmSync(path.join(moveDir, ".kiro"), { recursive: true });
+  put("AGENTS.md", "# A project\n\n@core/roles/shared/work-flow.md\n"); put("config/sizes.json", `${JSON.stringify({ read: ["core/roles/shared/how-to-work.md"] })}\n`);
+  put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB},\n    ${NEW_GLOBS.join(",\n    ")}\n  ]\n}\n`);
+  ok(step.check(project(moveDir)) === null, "and it is done once each is named by its new path and the copies config reads the new folders beside the old, however its patterns are laid out", step.check(project(moveDir)) ?? "");
+}
+// the files that point from the paths the rules left: each names a file or a folder the core holds, and what one says
+// stands elsewhere than the rest of it stands there
+const coreRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const there = to => fs.existsSync(path.join(coreRoot, to)) && fs.statSync(path.join(coreRoot, to)).isDirectory() === to.endsWith("/");
+ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Object.values(moved.apart()).flat().every(a => there(a.to) && fs.readFileSync(path.join(coreRoot, a.to), "utf8").includes(`**${a.lead}**`)),
+  "each file at a path the rules left names a file or a folder that stands, and a rule it says stands elsewhere stands there", JSON.stringify([moved(), moved.apart()]));
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
 process.exitCode = failed ? 1 : 0;

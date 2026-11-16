@@ -1,4 +1,4 @@
-// The NuGet check (floor rules 7 and 10, in floor/topics.md beside this folder), for a project whose packages come
+// The NuGet check (floor rules 7 and 10, in floor/topics/ beside this folder), for a project whose packages come
 // from NuGet (.NET): every package its lock files install, the ones packages pull in included, is one exact version
 // and under a licence on its list. It reads two things, both NuGet's own: the project's lock files
 // (packages.lock.json, which a project writes once it sets RestorePackagesWithLockFile), and each installed package's

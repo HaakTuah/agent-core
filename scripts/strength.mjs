@@ -1,4 +1,4 @@
-// How strong the tests are (modules/code-shape.md, "How strong the tests are"; #253), for every project that takes the
+// How strong the tests are (tasks/code-shape.md, "How strong the tests are"; #253), for every project that takes the
 // core: whether the tests would fail if a fault were put into the code on purpose, measured on the lines a pull request
 // changes. The project's *mutation tool* (its manifest's row; the core's AGENTS.md names its own, mutate.mjs beside
 // this file) puts the faults in and writes what it found in the open form of a mutation report (the
@@ -17,9 +17,9 @@
 // read by kind, a file and what became what, whatever line a fault stands on: of each kind, the survivors on the
 // changed lines and what the lines left alone still hold may not pass what it lists, so debt that only moved stays
 // listed; and a pull request may not list fewer of a kind than still survive. The whole run is
-// the audit's, outside the suite (modules/cleaning.md): --whole runs the tool on every file of the code and writes the
+// the audit's, outside the suite (tasks/cleaning.md): --whole runs the tool on every file of the code and writes the
 // baseline from it. A test file the pull request deletes is named, for its description to say why (the review reads
-// it, modules/review-guidelines.md). A project whose row says `none` has the measure left out; one with no row is told
+// it, roles/shared/review-guidelines.md). A project whose row says `none` has the measure left out; one with no row is told
 // the step (setup/sync-notes.md). The code and the tests are the shape check's config's.
 //
 //   node core/scripts/strength.mjs           on a pull request, STRENGTH_BASE set to the branch it merges into

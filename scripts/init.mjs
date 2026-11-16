@@ -28,6 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { sizeOf } from "./file-size.mjs";
+import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 
@@ -80,10 +81,19 @@ export const FILES = [
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
-// The files every session reads at its start, as the AGENTS.md template imports them: the reading-size check's marks,
-// and of the core's own (those under core/) what the core's cap counts (size.mjs).
-export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/modules/how-to-work.md",
-  "core/modules/inbox.md", "core/modules/work-flow.md", "core/modules/git.md", "core/modules/claude.md", "core/modules/other-builders.md"];
+// What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
+// there name it: the files of READ that are the project's own, each file of the core its AGENTS.md and CLAUDE.md pull
+// in on a line of its own, and the part for every tool but Claude beside Claude's: the reading-size check's marks. For
+// the kit as it stands it is READ.
+export function startOf(written) {
+  const pulled = [...`${written["AGENTS.md"] ?? ""}\n${written["CLAUDE.md"] ?? ""}`.matchAll(/^@(core\/[\w./-]+\.md)[ \t]*$/gmu)].map(m => m[1]);
+  const claude = pulled.find(f => f.endsWith("/claude.md"));
+  return [...new Set([...READ.filter(f => !f.startsWith("core/")), ...pulled, ...(claude ? [claude.replace(/claude\.md$/u, "other-builders.md")] : [])])];
+}
+// The files every session reads at its start, as the AGENTS.md template of the kit as it stands imports them, and of
+// the core's own (those under core/) what the core's cap counts (size.mjs).
+export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/roles/shared/how-to-work.md",
+  "core/roles/shared/inbox.md", "core/roles/shared/work-flow.md", "core/tools/claude.md", "core/tools/other-builders.md"];
 const KB = 1024;
 
 // A project's name as it may stand in a rule file's heading: letters, digits and blanks, and the few marks a name
@@ -152,7 +162,7 @@ export function fill(text, words) {
   return out;
 }
 
-// A game's own rows of its manifest: the slots modules/game-design.md uses, each left for the project to fill (#329).
+// A game's own rows of its manifest: the slots tasks/game-design.md uses, each left for the project to fill (#329).
 export const GAME_ROWS = [
   ["computer players", "what the game calls its computer players, and where their logic lives"],
   ["measured players", "the computer players the measurement plays, and where they live"],
@@ -162,6 +172,12 @@ export const GAME_ROWS = [
   ["where rules are taught", "where a player learns the rules, such as the help screen's file"],
 ];
 
+// The modules' names as a commit of the core holds them: in the folders that say who reads them or when, or, at a commit
+// from before the rules moved there, in modules/.
+function modulesAt(pin) {
+  const namesIn = d => { try { return git(["ls-tree", "--name-only", `${pin}:${d}`], ROOT).split("\n").filter(n => n.endsWith(".md")); } catch { return []; } };
+  return MODULES.some(d => namesIn(d).length) ? MODULES.flatMap(namesIn) : namesIn("modules");
+}
 // Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
 // `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
@@ -230,7 +246,7 @@ function init(argv) {
   let main = null;
   try { main = git(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main"], ROOT); } catch { /* (no such ref: core.yml decides) */ }
   if (main) { try { git(["merge-base", "--is-ancestor", pin, main], ROOT); } catch { fail(`${pin} is not a commit of the core's main, as this clone knows it`); } }
-  const moduleNames = git(["ls-tree", "--name-only", `${pin}:modules`], ROOT).split("\n").filter(n => n.endsWith(".md"));
+  const moduleNames = modulesAt(pin);
 
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);
@@ -248,7 +264,7 @@ function init(argv) {
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
-  const marks = sizes(Object.fromEntries(READ.map(f => [f, sizeOf(path.join(here, f))])));
+  const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));
   write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
   write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
   git(["add", "--", ...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"], here, guarded());
@@ -258,10 +274,10 @@ function init(argv) {
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
-  console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/modules/code-shape.md)`);
+  console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/tasks/code-shape.md)`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");
   console.log("  where it has versions Dependabot cannot see, its versions check: the core's README, point 5");
-  console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/modules/inbox.md)");
+  console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/roles/shared/inbox.md)");
   if (o.nuget !== undefined) console.log("  its NuGet packages: lock files turned on (RestorePackagesWithLockFile in its project files or Directory.Build.props) and committed, and each packages.lock.json named in checks/licences.json under \"nuget\", as one whose packages ship or one of tools that only run");
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
   console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);

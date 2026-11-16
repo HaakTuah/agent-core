@@ -21,10 +21,10 @@ process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, 
 const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_/i.test(name)));
 Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const config = { paths: ["floor", "modules"], exempt: [], words: [
+const config = { paths: ["floor", "tasks"], exempt: [], words: [
   { pattern: "\\bgames?\\b", say: "the project" },
   { pattern: "\\b(he|him|his|himself|she|her|hers|herself)\\b", say: "the owner", added: ["archive", "reports"] }],
-  phrases: { paths: ["floor", "modules", "AGENTS.md"], list: [{ pattern: "\\bshould consider\\b", say: "name who does what" }] } };
+  phrases: { paths: ["floor", "tasks", "AGENTS.md"], list: [{ pattern: "\\bshould consider\\b", say: "name who does what" }] } };
 
 let n = 0;
 // A repository whose first commit holds `start` and whose second adds `change`; the check's exit and words.
@@ -33,7 +33,7 @@ function words(start, change, base = true, json = config) {
   const put = files => { for (const [f, text] of Object.entries(files)) { if (text === null) { fs.rmSync(path.join(dir, f)); continue; } fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };
   fs.mkdirSync(dir);
   git(dir, "init", "-q", "-b", "main");
-  put({ "floor/a.md": "# The floor\n", "modules/b.md": "# A module\n", "AGENTS.md": "# Here\n", "general.json": JSON.stringify(json), ...start });
+  put({ "floor/a.md": "# The floor\n", "tasks/b.md": "# A module\n", "AGENTS.md": "# Here\n", "general.json": JSON.stringify(json), ...start });
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "base");
   put(change);
@@ -44,8 +44,8 @@ function words(start, change, base = true, json = config) {
 }
 const OLD = "1. **1 November** (a game). The owner said, and he meant it:\n\n   > Fine.\n";
 
-let r = words({}, { "modules/b.md": "# A module\n\nFor every game.\n" });
-ok(r.status === 1 && r.out.includes("modules/b.md:3") && /fits only some projects\. Mend: say /.test(r.out) && mended(r.out), "a word that fits only some projects fails in a module, by file and line", r.out);
+let r = words({}, { "tasks/b.md": "# A module\n\nFor every game.\n" });
+ok(r.status === 1 && r.out.includes("tasks/b.md:3") && /fits only some projects\. Mend: say /.test(r.out) && mended(r.out), "a word that fits only some projects fails in a module, by file and line", r.out);
 r = words({ "archive/items.md": OLD }, { "archive/items.md": `${OLD}\n2. **2 November**. Asked, he said yes.\n` });
 ok(r.status === 1 && r.out.includes("archive/items.md:5:") && !r.out.includes("archive/items.md:1:") && mended(r.out), "a pronoun for the owner in a line a change adds to the archive fails, by its line; the older line in the same file does not", r.out);
 r = words({}, { "reports/2026-11-13-x.md": "# A report\n\nThe owner read it, and his answer was yes.\n" });
@@ -65,40 +65,40 @@ ok(r.status === 1 && /reports\/new\.md:2: "he"/.test(r.out), "a moved line added
 const bad = spawnSync(process.execPath, [script, "general.json", "--base", "--ext-diff"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 const none = spawnSync(process.execPath, [script, "general.json", "--base", "no-such-commit"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 ok(bad.status === 1 && none.status === 1 && /--base needs a commit/.test(bad.stdout + none.stdout) && mended(bad.stdout) && mended(none.stdout), "a --base that is an option, or no commit, is refused", `${bad.stdout}${bad.stderr}${none.stdout}`);
-r = words({}, { "modules/b.md": "# A module\n\nAsked, he said yes.\n" });
+r = words({}, { "tasks/b.md": "# A module\n\nAsked, he said yes.\n" });
 ok(r.status === 1, "in the floor and the modules the pronoun fails wherever it stands, as before", r.out);
 
 // the phrases a rule may not use
 const RULE = "- The builder should consider a test.\n";
-r = words({}, { "modules/b.md": `# A module\n\n${RULE}` });
-ok(r.status === 1 && r.out.includes("modules/b.md:3:") && r.out.includes("in a rule or brief this change writes. Mend: name who does what") && mended(r.out), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
+r = words({}, { "tasks/b.md": `# A module\n\n${RULE}` });
+ok(r.status === 1 && r.out.includes("tasks/b.md:3:") && r.out.includes("in a rule or brief this change writes. Mend: name who does what") && mended(r.out), "a phrase a rule may not use fails in a line a change adds to a module, by file and line", r.out);
 r = words({}, { "AGENTS.md": `# Here\n\n${RULE}` });
 ok(r.status === 1 && r.out.includes("AGENTS.md:3:"), "and in a line a change adds to a rule file the list names", r.out);
-r = words({ "modules/b.md": `# A module\n\n${RULE}` }, { "floor/a.md": "# The floor\n\nNothing here.\n" });
-ok(r.status === 0 && /modules\/b\.md:3: "should consider" reported/.test(r.out), "one that stood before the change is reported, and passes", r.out);
-r = words({ "modules/b.md": `# A module\n\n${RULE}` }, { "modules/b.md": "# A module\n", "floor/a.md": `# The floor\n\n${RULE}` });
+r = words({ "tasks/b.md": `# A module\n\n${RULE}` }, { "floor/a.md": "# The floor\n\nNothing here.\n" });
+ok(r.status === 0 && /tasks\/b\.md:3: "should consider" reported/.test(r.out), "one that stood before the change is reported, and passes", r.out);
+r = words({ "tasks/b.md": `# A module\n\n${RULE}` }, { "tasks/b.md": "# A module\n", "floor/a.md": `# The floor\n\n${RULE}` });
 ok(r.status === 0 && r.out.includes("floor/a.md:3:") && r.out.includes("reported"), "one moved word for word to another rule file is reported, not failed", r.out);
-r = words({}, { "modules/b.md": "# A module\n\n> The owner: we should consider it.\n\n- A phrase is named in code marks: `should consider`.\n" });
-ok(r.status === 0 && !r.out.includes("modules/b.md:"), "one in a line quoting the owner, or in code marks, is not read", r.out);
-r = words({}, { "modules/b.md": `# A module\n\n${RULE}` }, false);
-ok(r.status === 0 && r.out.includes("only reported") && r.out.includes("modules/b.md:3:"), "without a base each is only reported, and it says so", r.out);
+r = words({}, { "tasks/b.md": "# A module\n\n> The owner: we should consider it.\n\n- A phrase is named in code marks: `should consider`.\n" });
+ok(r.status === 0 && !r.out.includes("tasks/b.md:"), "one in a line quoting the owner, or in code marks, is not read", r.out);
+r = words({}, { "tasks/b.md": `# A module\n\n${RULE}` }, false);
+ok(r.status === 0 && r.out.includes("only reported") && r.out.includes("tasks/b.md:3:"), "without a base each is only reported, and it says so", r.out);
 r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["floor"], list: [] } });
 ok(r.status === 1 && r.out.includes("list of phrases a rule may not use is empty") && mended(r.out), "an empty list of phrases fails: it would pass anything", r.out);
 r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["rules"], list: config.phrases.list } });
 ok(r.status === 1 && r.out.includes("not there: rules") && mended(r.out), "a file or folder of the list that is not there fails", r.out);
 
-// a brief is written as a rule is (modules/helpers.md; #282): the list reads the starter kit's templates too, and holds
+// a brief is written as a rule is (tasks/helpers.md; #282): the list reads the starter kit's templates too, and holds
 // a title and a stake that are not real
 const kit = { ...config, phrases: { ...config.phrases, paths: [...config.phrases.paths, "setup/template"] } };
 r = words({}, { "setup/template/AGENTS.md.tmpl": `# {{project}}\n\n${RULE}`, "setup/template/workflows/a.yml.tmpl": "# should consider\n" }, true, kit);
 ok(r.status === 1 && r.out.includes("setup/template/AGENTS.md.tmpl:3:") && !r.out.includes("a.yml.tmpl") && mended(r.out), "one in a line a change adds to a Markdown template of a folder the list names fails; a workflow's template is not read", r.out);
-r = words({}, { "modules/a b.md": `# A module\n\n${RULE}`, "modules/\u00e9.md": `# A module\n\n${RULE}`, "modules/more/c.md": `# A module\n\n${RULE}`, "setup/template/x y.md.tmpl": `# {{project}}\n\n${RULE}`, "modules/z.yml.tmpl": "# should consider\n" }, true, kit);
-ok(r.status === 1 && ["modules/a b.md:3:", "modules/\u00e9.md:3:", "modules/more/c.md:3:", "setup/template/x y.md.tmpl:3:", "modules/z.yml.tmpl:1:"].every(f => r.out.includes(`FAIL ${f}`)), "one added to a file whose name git quotes (a space, a letter beyond ASCII) or that stands in a subfolder fails too, and so does a template of another kind outside a folder of templates", r.out);
+r = words({}, { "tasks/a b.md": `# A module\n\n${RULE}`, "tasks/\u00e9.md": `# A module\n\n${RULE}`, "tasks/more/c.md": `# A module\n\n${RULE}`, "setup/template/x y.md.tmpl": `# {{project}}\n\n${RULE}`, "tasks/z.yml.tmpl": "# should consider\n" }, true, kit);
+ok(r.status === 1 && ["tasks/a b.md:3:", "tasks/\u00e9.md:3:", "tasks/more/c.md:3:", "setup/template/x y.md.tmpl:3:", "tasks/z.yml.tmpl:1:"].every(f => r.out.includes(`FAIL ${f}`)), "one added to a file whose name git quotes (a space, a letter beyond ASCII) or that stands in a subfolder fails too, and so does a template of another kind outside a folder of templates", r.out);
 const real = JSON.parse(fs.readFileSync(path.join(path.dirname(script), "general.json"), "utf8"));
 const primed = { ...kit, phrases: { ...kit.phrases, list: real.phrases.list } };
 r = words({}, { "setup/template/AGENTS.md.tmpl": "# {{project}}\n\nYou are a world-class expert in this stack.\nThe fate of the world rests on it, and I will tip you.\n" }, true, primed);
 ok(r.status === 1 && r.out.includes("AGENTS.md.tmpl:3:") && r.out.includes("AGENTS.md.tmpl:4:") && /by what it does/.test(r.out) && /real reason/.test(r.out) && mended(r.out), "the core's list fails a brief that calls its reader an expert or gives it stakes that are not real", r.out);
-r = words({ "setup/template/AGENTS.md.tmpl": "# {{project}}\n" }, { "modules/b.md": "# A module\n\n- You built none of this; find what is wrong with it, as a demanding expert would. Its lower stakes stay low.\n" }, true, primed);
+r = words({ "setup/template/AGENTS.md.tmpl": "# {{project}}\n" }, { "tasks/b.md": "# A module\n\n- You built none of this; find what is wrong with it, as a demanding expert would. Its lower stakes stay low.\n" }, true, primed);
 ok(r.status === 0, "a role named by what it does, an expert named as a standard and stakes as a measure pass", r.out);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the words check`);

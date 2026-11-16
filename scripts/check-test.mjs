@@ -1,4 +1,4 @@
-// Tests of the core's checks from plain git (check.mjs; modules/hosts.md, "One layer knows no host"; #250): on a
+// Tests of the core's checks from plain git (check.mjs; tasks/hosts.md, "One layer knows no host"; #250): on a
 // project the starter kit writes, synced to the core as it stands here, it passes with each check run and each step
 // only the host runs named; a copy of the core edited, or a new copy of code, fails with that check's own failure and
 // its mend; a project that calls none of the core's workflows, as on another host, is checked by the kit's calls; and

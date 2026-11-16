@@ -9,35 +9,36 @@ The shared core of the owner's agent-built projects: a floor every project takes
 ## The core this repository takes
 
 The floor whole, and every module but those "Not taken" below gives its reason for (core archive 209 and 213).
-`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. A builder reads these
-whole at the start of every task (Claude Code imports them); what else a task calls for, and what another role reads,
-`node scripts/reading.mjs <role> --issue <its line's issue>` prints (`modules/tools.md`, "One script says what to read"):
+`scripts/own-modules.mjs` fails a module of `roles/shared/`, `tasks/` or `tools/` this section neither names nor gives
+one. A builder reads these whole at the start of every task (Claude Code imports them); what else a task calls for, and
+what another role reads, `node scripts/reading.mjs <role> --issue <its line's issue>` prints (`tasks/tools.md`, "One
+script says what to read"):
 
 @floor/security.md
 @roles/builder.md
-@modules/how-to-work.md
-@modules/inbox.md
-@modules/work-flow.md
-@modules/git.md
+@roles/shared/how-to-work.md
+@roles/shared/inbox.md
+@roles/shared/work-flow.md
 
-The last two are read so that whoever builds here finishes the pull request (core archive 209). Two things in them
+The last is read so that whoever builds here finishes the pull request (core archive 209). Two things in it
 have nothing to act on here: the polish lane, since no one uses the core through a screen, and the sync of a copy of
 the core in "Sessions", since this repository is the core and holds no copy.
 
-Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a session of any
-other tool, `modules/other-builders.md` and its tool's part (`modules/tools.md`), which its entry file pulls in.
+Read at the start of every task too: by Claude, `tools/claude.md` (`CLAUDE.md` imports it); by a session of any
+other tool, `tools/other-builders.md` and its tool's part, a file of `tools/` (`tasks/tools.md`, "Each tool's part"),
+which its entry file pulls in.
 
-Read when a task calls for it, each saying when in its opening line: `floor/topics.md`, `floor/threat-model.md`,
-`modules/roles.md`, `modules/helpers.md`, `modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/kiro.md`, `modules/antigravity.md`, `modules/github-calls.md`, `modules/hosts.md`, `modules/teams.md`,
-`modules/orchestrating.md`, `modules/updates.md`, `modules/choices.md`, `modules/code-shape.md`, `modules/tests.md` and
-`modules/cleaning.md`.
+Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
+`floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
+`tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
+`tasks/github-calls.md`, `tasks/hosts.md`, `roles/shared/teams.md`, `roles/orchestrator.md`, `tasks/updates.md`,
+`tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md` and `tasks/cleaning.md`.
 
 Not taken, each for its reason:
 
-- `modules/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
+- `tasks/game-design.md`: the core is no game; it has no players, computer players, rules of play or features a
   player chooses to use, which are all that module governs.
-- `modules/screens.md`: the core has no screen; no one uses it through one, so none of its points, its critique or its
+- `tasks/screens.md`: the core has no screen; no one uses it through one, so none of its points, its critique or its
   checks has anything to act on here, and `scripts/screens.mjs` is held by its test alone.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
@@ -50,8 +51,8 @@ the archive is `archive/instructions.md`, cited "(core archive N)"; the *settlin
 that change the same file, and all that add to what a role reads at its start, whose caps they share, in the
 queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
-issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`modules/roles.md`,
-`modules/orchestrating.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
+issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
+`roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
 the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
@@ -64,7 +65,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 
 - **An idea is built only from a line, and a line joins in a PR of its own** (core archive 211). A new or changed rule
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
-  holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `modules/inbox.md`.
+  holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
   audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
   that closes its issue.
@@ -75,7 +76,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
   description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
-  (`modules/work-flow.md`).
+  (`roles/shared/work-flow.md`).
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day (core archive 211 and 212): an issue or note from the
@@ -89,10 +90,10 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
   session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
-  item of its own, naming the issue as its source, and takes what it leaves open as `modules/inbox.md` says of any
+  item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
   difference from that module, where only the design session writes rules from the owner's words.
-- **An orchestrator may work the file** (`modules/orchestrating.md`) while it holds a line a session can take. The
+- **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
@@ -115,8 +116,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   beside the projects. Its audit and cleaning share is set by the state its own code is in, as any project's is, and
   the staged cases run on its repository. An issue here is done only when the core's own repository meets it.
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
-  push after every commit as `modules/git.md` says, then ready, its reviews, their findings fixed and the merge as
-  `modules/work-flow.md` says (point 1). A PR that changes a rule says what it changes in every project.
+  push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
+  says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.
@@ -124,7 +125,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
   whoever makes the change raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every
-  session reads" in `modules/review-guidelines.md` says of any such mark (core archive 182 and 201). It does not mean
+  session reads" in `roles/shared/review-guidelines.md` says of any such mark (core archive 182 and 201). It does not mean
   a rule is moved from where it belongs, cut short or left out to fit, nor another rule's reason, name or example cut
   to make room. Reason: each start is paid at every task, and a cap that decided where a rule stands would hide it
   from who must keep it. Held by `scripts/size.mjs`, and `.github/workflows/size.yml`, which fails a raise of more
@@ -157,7 +158,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   A baseline is a debt, not an exemption: the project's agents work it down by tasks, at the dose the codebase's state
   sets, never by a red check, and in the core's own repository none may stand (#259). The audits and the cleaning
   share run by themselves in every project; its owner may change the dose with one line of the manifest, and is not
-  asked to (`modules/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
+  asked to (`tasks/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
   alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
   waiting on its owner, for something it did not change. Held by `scripts/upgrade-test.mjs`, in
   `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
@@ -172,7 +173,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
   every difference from what the starter kit writes for a new project of the same kind (`scripts/fresh.mjs`); each is
-  a task the project's agents take (`modules/orchestrating.md`; with no orchestrator, the session that syncs), a step
+  a task the project's agents take (`roles/orchestrator.md`; with no orchestrator, the session that syncs), a step
   only the owner can do labelled so, and each difference kept on purpose declared in the manifest's "Differences".
   Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps (it stays pure), nor
@@ -214,7 +215,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   owner access, or whose manifest's row *shares its counts* says `yes`, found each time and listed nowhere by hand. A
   private project is not named, nor one of another owner's ("a project of another owner"), and of either only counts and
   conclusions are carried, nothing of its code or its discussions. It does not mean a project that is merely public is
-  read for the report, though a task may read it (`modules/how-to-work.md`). Reason: the owner wants to see how the
+  read for the report, though a task may read it (`roles/shared/how-to-work.md`). Reason: the owner wants to see how the
   core works in other projects, and only those that hold use to read.
 - **A rule moves here only when it holds in every project,** with the owner's words behind it in the archive. The core
   names no project outside its archive and reports.
@@ -244,7 +245,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   or the session was wrong. The cases advise until three months in a row have run every one with no verdict found
   wrong; from then `scripts/release.mjs` cuts no release while a case's last verdict fails. They are run under each
   agent tool the core is used with, again at each release, and a tool works with the core once it passes them
-  (`modules/tools.md`; #249). It does not mean that a
+  (`tasks/tools.md`; #249). It does not mean that a
   case runs on a pull request or in a project, nor that one stands where a check could read the breach. Reason: no
   check sees how a session behaves, and the core's two staged runs, each of which changed it, were never run again
   when the rules or the models changed. Held by `scripts/staged-test.mjs` (each case read as set, kept and broken;
@@ -278,7 +279,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 
 ## Review guidelines
 
-Every reviewer reads `modules/review-guidelines.md` whole and judges the change by it, with the floor. Here, a rule that
+Every reviewer reads `roles/shared/review-guidelines.md` whole and judges the change by it, with the floor. Here, a rule that
 changes what any project must do without saying so in the PR is a departure from the PR's description, and blocks; so
 does one that reads true only for some of the kinds of project "Rules are written for any project" names, and a raise of
 a size cap in a PR with no "Leanness check:" comment that found too little room. A finding: a new rule whose "What

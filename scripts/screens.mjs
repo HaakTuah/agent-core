@@ -1,4 +1,4 @@
-// The screen checks' baseline (modules/screens.md, "What holds it"; core archive 230; #284): a project that turns on a
+// The screen checks' baseline (tasks/screens.md, "What holds it"; core archive 230; #284): a project that turns on a
 // check of a screen names it in its config, and its own tool, which the core leaves to it, writes what it found; this
 // script holds that against the check's baseline, in the shape check's form (shape.mjs, beside this file; its
 // `unclaimed`), so nothing gets worse. A finding no listed entry covers is new: one of a check the config marks
@@ -7,7 +7,7 @@
 // grow, and one of a binding check that a run of its screen no longer finds fails until --write lowers the baseline;
 // a run covers only the screens a pull request changes, so an entry of a screen not run is never read as gone.
 // Against the pull request's base (SCREENS_BASE, set by the project's workflow) an entry may join the baseline only
-// with its reason under "grown", as in the shape check's (modules/code-shape.md, "Never worse"), and the config the
+// with its reason under "grown", as in the shape check's (tasks/code-shape.md, "Never worse"), and the config the
 // base holds may not be taken out.
 //
 // The config (left out: the one the manifest's *screen checks* row names, in backticks, else checks/screens.json; with
@@ -41,7 +41,7 @@ export const MENDS = {
   pictures: "build the state the finding names, or take its picture at the size it names; where the picture differs from its baseline on purpose, take the baseline picture again in this pull request and say why",
   timing: "make what the finding names answer within a tenth of a second, show work going on past a second and progress past ten, keep the layout from jumping while it loads, or bring the load within its limit",
   console: "mend the error, the failing request or the font or picture that does not load, which the finding names",
-  settings: "give the product the setting the finding names and keep it when the product is closed and opened again (the module that asks for the check names the settings: in a game, core/modules/game-design.md, \"A player's settings are remembered\": controls remapped, the size of text, less shake and flashing, each volume apart)",
+  settings: "give the product the setting the finding names and keep it when the product is closed and opened again (the module that asks for the check names the settings: in a game, core/tasks/game-design.md, \"A player's settings are remembered\": controls remapped, the size of text, less shake and flashing, each volume apart)",
 };
 export const CHECKS = Object.keys(MENDS);
 export const KIT = "checks/screens.json";
@@ -71,7 +71,7 @@ export const where = manifest => /`([\w./-]+\.json)`/u.exec(/^.*\*screen checks\
 
 // The config's text as the check reads it: { baseline, checks: Map of check to mode }; it throws where it cannot.
 export function parseConfig(text, at) {
-  const form = `write it as {"baseline": "<path>", "checks": {"<check>": "reports" or "binds"}}, each check one of ${CHECKS.join(", ")} (core/modules/screens.md, "What holds it")`;
+  const form = `write it as {"baseline": "<path>", "checks": {"<check>": "reports" or "binds"}}, each check one of ${CHECKS.join(", ")} (core/tasks/screens.md, "What holds it")`;
   const c = json(text, at, form);
   if (!isObject(c) || typeof c.baseline !== "string" || !/^[\w.-][\w./-]*$/u.test(c.baseline) || c.baseline.includes("..") || !isObject(c.checks)) refuse(`${at} is not in the form the check reads`, form);
   const unknown = Object.keys(c).filter(k => !["baseline", "checks"].includes(k));
@@ -239,7 +239,7 @@ function run(config, at, self, found, command) {
 
 // Where no config stands: every check is off, unless the base held one, which no pull request takes out.
 function off(at, named) {
-  if (named) refuse(`there is no config at ${at}`, `write it as core/modules/screens.md, "What holds it", says, or run with no config named`);
+  if (named) refuse(`there is no config at ${at}`, `write it as core/tasks/screens.md, "What holds it", says, or run with no config named`);
   const held = baseOf()?.config(at);
   if (held) refuse(`${held} is gone, and ${process.env.SCREENS_BASE} holds it: no pull request takes the screen checks' config out`, `take it back as ${process.env.SCREENS_BASE} holds it (git checkout ${process.env.SCREENS_BASE} -- ${held}), with its row in core-manifest.md where the base had one`);
   console.log(`ok   no screen check is on here (${at} does not stand): each is off until the project names it`);

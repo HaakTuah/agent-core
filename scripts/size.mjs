@@ -3,11 +3,11 @@
 // reading script gives for it (reading.mjs, beside this file): the floor's security.md, the role's own file under
 // roles/ and the files that names, with every module a tool's session reads at its start (a builder's own part); a
 // file read only when a task calls for it is held instead by the reviews' "content put where its readers must read
-// past it" (modules/review-guidelines.md; core archive 201). A cap keeps the rules lean and decides nothing else: no
+// past it" (roles/shared/review-guidelines.md; core archive 201). A cap keeps the rules lean and decides nothing else: no
 // rule is moved, cut short or left out to fit, and a change that honest trimming gives no room for raises that role's
 // cap in the same pull request, saying why, once a fresh session has read all the rules for room and found too little
 // (AGENTS.md, "How changes are made here"; core archive 179 and 181). That session's answer stands in the pull
-// request as a comment that opens "Leanness check:" (modules/review-guidelines.md, "A mark on what every session
+// request as a comment that opens "Leanness check:" (roles/shared/review-guidelines.md, "A mark on what every session
 // reads"), and with --raise this script fails a pull request that raises a role's cap and has no such comment from the
 // repository's owner, a member or a collaborator, by GitHub's own word for who wrote it, and one that raises it by more
 // than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
@@ -38,9 +38,9 @@ export const CAPS = {
   "stand-in": 19 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
-// project's size marks give each such file (modules/inbox.md, "The progress file holds order only"; core archive 216):
+// project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):
 // set at its first trim, as each project sets its own. A raise of it is read by the reviews, as any mark's is
-// (modules/review-guidelines.md, "A mark on what every session reads"); this script checks only that the queue is
+// (roles/shared/review-guidelines.md, "A mark on what every session reads"); this script checks only that the queue is
 // under it.
 export const QUEUE = { file: "QUEUE.md", mark: 4 * 1024 };
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's

@@ -52,6 +52,15 @@ ok(r.code === 0 && !/floor rule|core archive/.test(r.out.split("\n").filter(l =>
 r = run(cites("As floor rule 19 says (core archive 999)."));
 ok(r.code === 0 && /note .*floor rule 19: no such rule in the floor/.test(r.out) && /note .*core archive 999: no such item in the archive/.test(r.out), "in a project, a floor rule or an archive item that is not there is listed, each named, and fails nothing: a sync never fails a project over a citation of its own");
 ok(/read and not found/.test(r.out) && !/\(2 in forms it cannot read/.test(r.out), "and it is listed as read and not found, not as a form it cannot read", r.out);
+// a file that only points: a pointer through it leads to what stands where it names
+const MOVED = { "core/modules/roles.md": "# Moved: Who does what\n\n[`tasks/roles.md`](../tasks/roles.md) holds these rules now: read it whole.\n\nNow in [`roles/orchestrator.md`](../roles/orchestrator.md): **The builders**.\n",
+  "core/tasks/roles.md": "# Who does what\n\n**The roles.** Text.\n", "core/roles/orchestrator.md": "# The orchestrator\n\n**The builders** are picked so:\n1. One.\n2. Two.\n",
+  "core/modules/git.md": "# Moved: Git\n\n[`roles/shared/git.md`](../roles/shared/git.md) holds these rules now: read it whole.\n", "core/roles/shared/git.md": "# Git\n\n- **Push after every commit,** always.\n\n1. One.\n2. Two.\n",
+  "core/floor/topics.md": "# Moved: the floor, by topic\n\n[`floor/topics/`](topics/) holds these rules now, a file a topic: read the one the task touches.\n", "core/floor/topics/licences.md": "# Licences\n\n**10. Licences.** Text.\n\n## Reporting\n\nText.\n" };
+r = run({ ...cites("As `core/modules/git.md`, \"Push after every commit\", says, with `core/modules/git.md`, point 2, and \"Reporting\" in `core/floor/topics.md`, and `core/floor/topics.md`, rule 10; and `core/modules/roles.md`, \"The builders\", point 2, with \"The roles\" in `core/modules/roles.md`; and `core/modules/roles.md`, point 2."), ...MOVED });
+ok(r.code === 0, "a pointer through a file that only points leads to the section or the point where it now stands, in the file it names or a folder's own files, and a rule it says went elsewhere is found there, its numbered points too, named with the rule or by the old file alone");
+r = run({ ...cites("As `core/modules/git.md`, \"Push once\", says, with `core/modules/git.md`, point 3, and `core/modules/roles.md`, point 9."), ...MOVED });
+ok(r.code === 1 && /"push once" is no heading or bold lead-in/i.test(r.out) && /point 3: no such numbered point/.test(r.out) && /point 9: no such numbered point/.test(r.out), "and one that stands in neither place still fails, named");
 // the core's own run: there it fails
 const coreDir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-core-"));
 try {
@@ -59,23 +68,29 @@ try {
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 1 says, and rule 10 (core archive 1).\n");
   put("floor/topics.md", "# Topics\n\n**10. Licences.** Text.\n");
   put("floor/threat-model.md", "# The threat model\n\n19. A list item, no rule.\n");
-  put("modules/a.md", "# A module\n\nAs floor rule 19 says (core archive 999).\n");
+  put("tasks/a.md", "# A module\n\nAs floor rule 19 says (core archive 999).\n");
   put("archive/instructions/items-001.md", "# Items\n\n1. **1 November 2026**. Words.\n");
   fs.mkdirSync(path.join(coreDir, "scripts"));
   for (const f of ["pointers.mjs", "rule-files.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
   for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: coreDir, stdio: "ignore" });
   const c = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" });
-  ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: modules\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
+  ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: tasks\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
   const core = (file, text) => { put(file, text); execFileSync("git", ["add", "-A"], { cwd: coreDir, stdio: "ignore" }); const r = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
-  put("modules/a.md", "# A module\n\nNothing cited.\n");
+  put("tasks/a.md", "# A module\n\nNothing cited.\n");
   const ten = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 10 says.\n");
   ok(ten.status === 0 && !/rule 10/.test(ten.out), "a lone rule in the floor's own file is found in any of the floor's files: rule 10 in topics.md, cited from security.md", ten.out);
   const nineteen = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 19 says.\n");
   ok(nineteen.status === 1 && mended(nineteen.out) && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor\. Mend: point it at/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** Text.\n");
-  const capital = core("modules/a.md", "# A module\n\nFloor rule 16 says so (Core archive 998).\n");
+  // (a file that points from a path the rules left is read too: the path it names and its import line)
+  const points = core("modules/a.md", "# Moved: A module\n\n[`tasks/a.md`](../tasks/a.md) holds these rules now: read it whole.\n\n@../tasks/a.md\n");
+  ok(points.status === 0, "in the core's own run a file at a path the rules left is read: the path it names and its import line, each leading to a file", points.out);
+  const astray = core("modules/a.md", "# Moved: A module\n\n[`tasks/gone.md`](../tasks/gone.md) holds these rules now: read it whole.\n\n@../tasks/gone.md\n");
+  ok(astray.status === 1 && mended(astray.out) && /modules\/a\.md:3: `tasks\/gone\.md` is no tracked file or folder/.test(astray.out) && /modules\/a\.md:5: the import line @\.\.\/tasks\/gone\.md leads to no tracked file/.test(astray.out), "and one whose path or import line leads nowhere fails, each named", astray.out);
+  fs.rmSync(path.join(coreDir, "modules"), { recursive: true });
+  const capital = core("tasks/a.md", "# A module\n\nFloor rule 16 says so (Core archive 998).\n");
   ok(capital.status === 1 && /floor rule 16/i.test(capital.out) && /core archive 998/i.test(capital.out), "a citation opening a sentence, \"Floor rule\" or \"Core archive\", is read too", capital.out);
-  const backwards = core("modules/a.md", "# A module\n\nAs core archive 1 to 0 says.\n");
+  const backwards = core("tasks/a.md", "# A module\n\nAs core archive 1 to 0 says.\n");
   ok(backwards.status === 1 && /core archive 1 to 0/.test(backwards.out), "a range written backwards leads nowhere, and is named", backwards.out);
 } finally { fs.rmSync(coreDir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);

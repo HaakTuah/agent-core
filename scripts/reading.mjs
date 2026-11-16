@@ -1,4 +1,4 @@
-// What a session reads, by its role and its task (modules/roles.md, "A file for each role"; modules/tools.md, "One
+// What a session reads, by its role and its task (tasks/roles.md, "A file for each role"; tasks/tools.md, "One
 // script says what to read"; core archive 234; #304). Given a role and a task (its issue, its kinds, or the paths
 // changed so far), it prints the files to read: at the start the floor (floor/security.md, whole, whatever the role),
 // the role's own file under roles/ and the files that file names on its line "Reads at its start:" (a role's file
@@ -39,12 +39,16 @@ export const FLOOR = "floor/security.md";
 export const START = "Reads at its start:";
 // The line of a pull request's description that lists what its changed paths called for (pr-description.mjs asks it).
 export const READ_LINE = "Read for it:";
-// The floor's two files read when needed, by the topics the floor's own opening names, until they are a folder of
-// topics that each say when (#304, point 8): the floor's words are not changed for it here.
-export const FLOOR_WHEN = {
-  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "*-shrinkwrap.json", "go.sum"] },
-  "floor/threat-model.md": { kinds: ["security-review"], paths: [] },
-};
+// The folders of the units a task calls for or a role's file names, each file saying when it is read: who (a role's
+// shared files, a tool's part) or when (a kind of task, a topic of the floor).
+export const UNITS = ["roles/shared", "tasks", "tools", "floor/topics"];
+// Of those, the folders of the modules: the units a project takes or leaves out by name, each name standing once.
+export const MODULES = ["roles/shared", "tasks", "tools"];
+// What a path any project may hold is of, whatever its folders: a lock file of any package manager is an update. The
+// patterns stand here once, and each file an update calls names the kind alone.
+export const KINDS_BY_PATH = ["*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "*-shrinkwrap.json", "go.sum"].map(pattern => ({ path: pattern, kind: "update" }));
+// The floor's threat model, read with a security review, whose words are not changed to say so.
+export const FLOOR_WHEN = { "floor/threat-model.md": { kinds: ["security-review"], paths: [] } };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
 const ticks = text => [...String(text).matchAll(/`([^`\n]+)`/gu)].map(m => m[1]);
 const LIST = "((?:`[^`\\n]+`(?:,? (?:and |or )?)?)+)";
@@ -93,7 +97,7 @@ export function matches(pattern, file) {
 export function gather(read, list) {
   const roles = {}, modules = {};
   for (const f of list("roles")) { const text = read(f); roles[f] = { name: path.posix.basename(f, ".md"), when: whenOf(text), start: readsOf(text, START) }; }
-  for (const f of list("modules")) modules[f] = whenOf(read(f));
+  for (const f of UNITS.flatMap(list)) modules[f] = whenOf(read(f));
   return { roles, modules };
 }
 
@@ -111,12 +115,14 @@ export function library(dir, prefix) {
 // module, and its "Not taken:" line does. Where the line says "all", or cannot be read, none is left out: in doubt a
 // module is taken (manifest-reads.mjs reads the two lines the same way).
 export function leftOut(manifest) {
-  const text = String(manifest ?? ""), names = t => [...t.matchAll(/`(?:modules\/)?([\w.-]+?)(?:\.md)?`/gu)].map(m => `${m[1]}.md`);
-  const line = /\bModules:\s*([^\n]*)/u.exec(text)?.[1].trim() ?? "", taken = new Set(/^all\b/iu.test(line) ? [] : names(line));
-  return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "").filter(n => !taken.has(n)) : []);
+  const text = String(manifest ?? ""), NAME = "`(?:[\\w-]+\\/)*([\\w.-]+?)(?:\\.md)?`";
+  const names = (t, after) => [...t.matchAll(new RegExp(NAME + after, "gu"))].map(m => `${m[1]}.md`);
+  const line = /\bModules:\s*([^\n]*)/u.exec(text)?.[1].trim() ?? "", taken = new Set(/^all\b/iu.test(line) ? [] : names(line, ""));
+  // (a name's reason, in the brackets after it, names no module, whatever it holds in backticks)
+  return new Set(taken.size ? names(/^Not taken:\s*(.*)$/mu.exec(text)?.[1] ?? "", "(?:\\s*\\([^)]*\\))?").filter(n => !taken.has(n)) : []);
 }
-// The core's roles and modules without the modules a project leaves out.
-export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => !out.has(path.posix.basename(f)))) });
+// The core's roles and units without the modules a project leaves out; a topic of the floor is never left out.
+export const taken = (lib, out) => ({ roles: lib.roles, modules: Object.fromEntries(Object.entries(lib.modules).filter(([f]) => f.startsWith("floor/") || !out.has(path.posix.basename(f)))) });
 
 // The kinds a project gives its own paths, [{ path, kind }], from its config's text ({ "paths": { "<path>": "<kind>" } }).
 export const OWN = ["checks/reading.json", ".github/reading.json"];
@@ -141,6 +147,7 @@ const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.s
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
 export function calledByPaths(lib, paths, own = []) {
   const out = new Map(), kinds = new Map();
+  for (const p of paths) for (const r of KINDS_BY_PATH) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}`);
   for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}, of the kind ${r.kind} by the project's reading config`);
   for (const [f, w] of [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)]) {
     if (!w) continue;

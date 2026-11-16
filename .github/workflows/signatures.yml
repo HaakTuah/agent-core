@@ -73,7 +73,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: steps.what.outputs.run != 'false' # anything but a plain no checks
         with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: Install from the lock file, from the registry alone, running no package's install script
         if: steps.what.outputs.run != 'false' # anything but a plain no checks
         working-directory: ${{ inputs.directory }}

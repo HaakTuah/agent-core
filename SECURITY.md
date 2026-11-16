@@ -1,6 +1,6 @@
 # Security
 
-This repository takes the floor whole, `floor/security.md` and `floor/topics.md`, with its threat model,
+This repository takes the floor whole, `floor/security.md` and `floor/topics/`, with its threat model,
 `floor/threat-model.md`. What this repository adds under the floor's numbers:
 
 - **Rule 3, the protected files:** every file here, changed by the sessions the owner starts in this repository, of
@@ -19,4 +19,4 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics.md`
 
 ## Reporting a weakness
 
-"Reporting a weakness" in `floor/topics.md`: privately, through the Security tab's "Report a vulnerability".
+"Reporting a weakness" in `floor/topics/weaknesses.md`: privately, through the Security tab's "Report a vulnerability".

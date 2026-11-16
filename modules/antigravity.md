@@ -1,16 +1,3 @@
-# Antigravity's part
+# Moved: Antigravity's part
 
-Read by a session of the tool `antigravity`, and by whoever hands it a task or a review. Taken from its
-documentation's page on rules (antigravity.google, read on 15 November 2026) and nothing else, until it passes the
-staged cases (`modules/tools.md`).
-
-- **What it reads:** `AGENTS.md`, GEMINI.md and the rules under .agents/rules (or the older .agent/rules), in the
-  folder it works in and each folder above it up to the repository's root, never one below. In a rule,
-  `@[<name>](<path from the rule's folder>)` pulls a file in, and `trigger: always_on` loads the rule on every turn.
-  The starter kit writes `.agents/rules/core.md` for it, one such line for each file named on an `@` line of
-  `AGENTS.md`, with this part and the part for a session of another tool.
-- **Handed a task:** in its editor, the brief as a new conversation's first message; the core knows no command line of
-  its.
-- **Hooks:** its documentation names none; for a review it is asked in the way of `modules/tools.md`, "Each tool's
-  part".
-- **Its folders:** .agents and .agent, with GEMINI.md, which floor rule 3 protects.
+[`tools/antigravity.md`](../tools/antigravity.md) holds these rules now: read it whole.

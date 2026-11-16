@@ -31,7 +31,7 @@ jobs:
           fetch-depth: 0 # the day labels.mjs came, which the labels' check reads from git's history
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The scheduled look
         env:
           GH_TOKEN: ${{ github.token }}

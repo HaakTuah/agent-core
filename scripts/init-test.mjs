@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
-import { FILES, GAME_ROWS, TEMPLATES, files, fill, filtered, licences, linked, modules, named, options, sizes } from "./init.mjs";
+import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, sizes, startOf, TEMPLATES } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
@@ -73,6 +73,9 @@ ok(template("security-review.yml.tmpl").includes("on:\n  pull_request:\n    type
 ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \* \* \*'.*\n  workflow_dispatch:\n/m.test(template("look.yml.tmpl")) && template("look.yml.tmpl").includes("    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n"), "the daily look runs daily or by hand, in a job that may read the repository, its pull requests, checks and statuses, and write issues");
 const fromFolder = name => fs.readFileSync(path.join(root, TEMPLATES, name), "utf8");
 const whole = files({ owner: "someone", name: "P", packages: "tools" }, A, ["git.md"], fromFolder).map(([, text]) => text).join("\n");
+ok(JSON.stringify(startOf(Object.fromEntries(files({ owner: "someone", name: "P" }, A, ["git.md"], fromFolder)))) === JSON.stringify(READ)
+  && JSON.stringify(startOf({ "AGENTS.md": "@core/floor/security.md\n@core/modules/git.md\n", "CLAUDE.md": "@AGENTS.md\n@core/modules/claude.md\n" })) === JSON.stringify([...READ.filter(f => !f.startsWith("core/")), "core/floor/security.md", "core/modules/git.md", "core/modules/claude.md", "core/modules/other-builders.md"]),
+  "the start files the kit measures are those its own entry files name: for the kit as it stands the list it holds, and for a kit from before the rules moved the paths that kit names");
 const dependabot = o => files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/dependabot.yml")[1];
 const ecosystems = text => (text.match(/package-ecosystem: "/g) ?? []).length;
 ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    directory: "/"\n') && ecosystems(dependabot({ nuget: "." })) === 2 && dependabot({ nuget: "src" }).includes('directory: "/src"\n') && ecosystems(dependabot({})) === 1 && !dependabot({}).includes("nuget"), "a project whose packages come from NuGet gets Dependabot's updates for them, for its folder, beside the actions' own, and one that named no installer gets the actions' alone");
@@ -176,14 +179,14 @@ if (p.status === 0) {
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
-  const how = path.join(core, "modules/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
+  const how = path.join(core, "roles/shared/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
   fs.appendFileSync(how, `\n${fs.readFileSync(path.join(core, "floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
   const ownCopy = run(core, "scripts/copies.mjs", ".github/copies.json");
   fs.writeFileSync(how, howWas);
   fs.rmSync(path.join(core, ".github/copies-baseline.json"));
   const ownNone = run(core, "scripts/copies.mjs", ".github/copies.json");
   git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
-  ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*modules\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
+  ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*roles\/shared\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
     "the core's own copies check passes on the core, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and

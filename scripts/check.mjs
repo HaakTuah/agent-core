@@ -1,4 +1,4 @@
-// The core's checks from plain git (modules/hosts.md, "One layer knows no host"; core archive 236; #250). Run from a
+// The core's checks from plain git (tasks/hosts.md, "One layer knows no host"; core archive 236; #250). Run from a
 // project's root, on a person's machine or in any host's pipeline, it runs each workflow of the core's that the project
 // calls, as GitHub would run it for a pull request into main (`--base`, the commit it merges into) or for a push to main
 // (none given), on the commit checked out (for a pull request, merged into its base, as GitHub merges it, the base its first
@@ -10,12 +10,12 @@
 // runs, since each runs the copy's scripts; with no call to core.yml, or none run, it fails. Each called workflow is
 // read from the core at the call's pin, fetched from the core's address by git, as GitHub reads it, never from the
 // copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
-// not from that copy (modules/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
+// not from that copy (tasks/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
 // nothing in the project. The steps run the change's own code, so they get only the variables a program needs to start
 // and reach the network, named in KEPT, with a home folder of their own and git's rewrites of an address alone (they
-// still run as the caller's user: modules/hosts.md says where it runs). What only the host can do (a review app's status, the dependency review, code scanning, a job started by a
+// still run as the caller's user: tasks/hosts.md says where it runs). What only the host can do (a review app's status, the dependency review, code scanning, a job started by a
 // schedule) is not run here and is named: that is the host's part, and where a host has none, what stands in is in its
-// part (modules/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
+// part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
 // Git, bash and Node's own modules.
@@ -49,7 +49,7 @@ const env = plainEnv();
 // a program needs to start and reach the network, by name, with a home folder of its own in the scratch folder, no
 // system git settings, and of git's settings given here only the rewrites of an address (url.*.insteadOf), so no token
 // in this environment or in git's settings reaches them. They still run as the caller's own user, so a pipeline runs
-// this where no sign-in is held (modules/hosts.md).
+// this where no sign-in is held (tasks/hosts.md).
 const KEPT = /^(PATH|LANG|LC_[A-Z]+|TZ|TMPDIR|TEMP|TMP|SYSTEMROOT|WINDIR|COMSPEC|PATHEXT|HTTPS?_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|GIT_ALLOW_PROTOCOL)$/i;
 function stepEnv(home) {
   const kept = Object.fromEntries(Object.entries(env).filter(([name]) => KEPT.test(name)));

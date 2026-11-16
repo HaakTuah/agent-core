@@ -1,4 +1,4 @@
-// The shape check (modules/code-shape.md; core archive 226; #246), for every project that takes the core: how its code
+// The shape check (tasks/code-shape.md; core archive 226; #246), for every project that takes the core: how its code
 // is put together may not get worse. It reads the project's JavaScript and TypeScript (JSX among them), C# and Python,
 // each with its reader (shape-readers.mjs, beside this file), and fails what is new of:
 //   - a function past a mark ("marks": its lines, how deep its blocks nest, how often it branches), tests left out;
@@ -17,7 +17,7 @@
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
 // config reads that branch's code (the check reads more: a system named, a mark lowered, the first baseline), or
 // where the baseline gives its reason under "grown", as a raised mark's is given, which the reviews read
-// (modules/review-guidelines.md, "What blocks"). Neither the config nor the baseline is read or written through a
+// (roles/shared/review-guidelines.md, "What blocks"). Neither the config nor the baseline is read or written through a
 // link. What a change to the config itself makes the check read (a use declared, a folder left out) no rule here
 // judges, since none could without guessing what was meant: the config is a protected file, and the reviews read
 // its change (floor rule 3). An entry that is gone is taken out with --write, which lowers the
@@ -32,7 +32,7 @@
 // The config's other keys: "code" and "tests", git pathspecs of what is read (tests for their imports alone);
 // "aliases", each prefix an import may start with to the path it stands for; "suites", each suite's time mark in
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }); and those of what
-// the tests cost (modules/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
+// the tests cost (tasks/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
 // device (a package or module by the name it is imported under, or the start of one), so that each test file that
 // imports one is an entry ("screen: <test> -> <what>", found by the reader
 // "screens"), new ones failing as any breach does; "select", for select.mjs beside this file: "proof", pathspecs of the
@@ -573,7 +573,7 @@ function notesOf(read) {
   const notes = [];
   if (read.nowhere) notes.push(`${plural(read.nowhere, "import leads", "imports lead")} nowhere the check can tell (no file, no package the project declares, no alias the config names): not held`);
   if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone${read.systems ? ", and a new one fails" : ""}`);
-  if (read.screens) notes.push(`${plural(read.screens, "test file")} of ${read.tests} ${read.screens === 1 ? "opens" : "open"} a screen, a window or a device (modules/tests.md): each is listed, and a new one fails`);
+  if (read.screens) notes.push(`${plural(read.screens, "test file")} of ${read.tests} ${read.screens === 1 ? "opens" : "open"} a screen, a window or a device (tasks/tests.md): each is listed, and a new one fails`);
   if (read.noEntrance && read.systems > 1) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
   return notes;
 }

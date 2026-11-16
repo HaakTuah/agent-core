@@ -1,5 +1,5 @@
 // The core takes its own modules (AGENTS.md, "The core abides by its own rules"; core archive 213; #255): each file of
-// modules/ is named in the section of the core's AGENTS.md that says what this repository takes, read there at the
+// roles/shared/, tasks/ and tools/ is named in the section of the core's AGENTS.md that says what this repository takes, read there at the
 // start of every task or when needed, or is listed under that section's "Not taken" with the reason it cannot apply to
 // a repository of rules and scripts. It fails a module the section names nowhere, a name there that is no module, a
 // module listed as not taken with no reason or in no form it can read, and one both listed so and named elsewhere in
@@ -12,12 +12,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { MODULES } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 export const SECTION = "## The core this repository takes";
 const NOT_TAKEN = /^Not taken\b/u;
-const NAMED = /(?:^@|`)modules\/([^`\s/]+\.md)/gmu;
-const BULLET = /^- `modules\/([^`\s/]+\.md)`:(.*)$/u;
+const AT = MODULES.map(d => d.replace("/", "\\/")).join("|");
+const NAMED = new RegExp(`(?:^@|\`)((?:${AT})\\/[^\`\\s/]+\\.md)`, "gmu");
+const BULLET = new RegExp(`^- \`((?:${AT})\\/[^\`\\s/]+\\.md)\`:(.*)$`, "u");
 
 // What AGENTS.md (its text) says of the modules this repository takes: the section's lines, the modules it names as
 // taken (where it is read), the "Not taken" list with each reason, and what is wrong with the list's form. `error`
@@ -42,8 +44,8 @@ export function readSection(agents) {
       inList.add(i);
       if (section[i].startsWith("  ")) { notTaken.set(current, `${notTaken.get(current)} ${section[i].trim()}`); continue; }
       const m = BULLET.exec(section[i]);
-      if (!m) { found.push(`AGENTS.md, "Not taken": "${section[i]}" is not in the form it reads. Mend: write it - \`modules/<name>\`: <the reason>`); current = null; continue; }
-      if (notTaken.has(m[1])) found.push(`AGENTS.md, "Not taken": modules/${m[1]} is listed twice. Mend: keep one of its lines, with its reason`);
+      if (!m) { found.push(`AGENTS.md, "Not taken": "${section[i]}" is not in the form it reads. Mend: write it - \`<its folder>/<name>.md\`: <the reason>`); current = null; continue; }
+      if (notTaken.has(m[1])) found.push(`AGENTS.md, "Not taken": ${m[1]} is listed twice. Mend: keep one of its lines, with its reason`);
       current = m[1];
       notTaken.set(current, m[2].trim());
     }
@@ -59,15 +61,19 @@ export function faults(agents, modules) {
   const { error, taken, notTaken, found } = readSection(agents);
   if (error) return [error];
   const all = new Set(modules);
+  // (a manifest takes or leaves out a module by its file's name alone, so a name stands in one folder of the modules)
+  const byName = new Map();
+  for (const m of [...all].sort()) byName.set(path.posix.basename(m), [...(byName.get(path.posix.basename(m)) ?? []), m]);
+  for (const [name, at] of byName) if (at.length > 1) found.push(`${name} stands in ${at.length} folders of the modules (${at.join(", ")}), and a manifest names a module by its file's name alone. Mend: give one of them a name of its own, or join the two`);
   for (const name of [...taken, ...notTaken.keys()].filter(n => !all.has(n)).sort()) {
-    found.push(`AGENTS.md, "${SECTION.slice(3)}", names modules/${name}, which is no module of modules/. Mend: correct the name, or take it out where the module is gone`);
+    found.push(`AGENTS.md, "${SECTION.slice(3)}", names ${name}, which is no module of the core. Mend: correct the name, or take it out where the module is gone`);
   }
   for (const name of [...all].sort()) {
     if (notTaken.has(name)) {
-      if (notTaken.get(name) === "") found.push(`AGENTS.md, "Not taken": modules/${name} has no reason. Mend: give why it cannot apply to a repository of rules and scripts, or take it`);
-      if (taken.has(name)) found.push(`AGENTS.md, "${SECTION.slice(3)}": modules/${name} is both taken and listed as not taken. Mend: keep one`);
+      if (notTaken.get(name) === "") found.push(`AGENTS.md, "Not taken": ${name} has no reason. Mend: give why it cannot apply to a repository of rules and scripts, or take it`);
+      if (taken.has(name)) found.push(`AGENTS.md, "${SECTION.slice(3)}": ${name} is both taken and listed as not taken. Mend: keep one`);
     } else if (!taken.has(name)) {
-      found.push(`modules/${name} is neither taken nor given a reason. Mend: name it in AGENTS.md, "${SECTION.slice(3)}", where it is read, or list it there under "Not taken" with why it cannot apply here`);
+      found.push(`${name} is neither taken nor given a reason. Mend: name it in AGENTS.md, "${SECTION.slice(3)}", where it is read, or list it there under "Not taken" with why it cannot apply here`);
     }
   }
   return found;
@@ -78,9 +84,9 @@ function main() {
   let agents, modules;
   try {
     agents = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8");
-    modules = fs.readdirSync(path.join(root, "modules")).filter(f => f.endsWith(".md"));
+    modules = MODULES.flatMap(d => fs.readdirSync(path.join(root, d)).filter(f => f.endsWith(".md")).map(f => `${d}/${f}`));
   } catch (e) {
-    console.error(`FAIL: AGENTS.md or modules/ could not be read (${e.message}). Mend: run it from a clone of the core, where both stand`);
+    console.error(`FAIL: AGENTS.md or a folder of the modules could not be read (${e.message}). Mend: run it from a clone of the core, where both stand`);
     return 1;
   }
   const found = faults(agents, modules);

@@ -77,7 +77,7 @@ const rows = record({ tests, runs: [...runs, ...junit], alone: new Map([["test/a
 const row = name => rows.find(r => r.test === name);
 ok(row("test/a-test.mjs").runs === 3 && row("test/a-test.mjs").seconds === 4 && row("test/a-test.mjs").real === 1 && row("test/a-test.mjs").flaky === 0, "a test failing on one platform alone fails for a real reason", JSON.stringify(row("test/a-test.mjs")));
 ok(row("test/b-test.mjs").flaky === 1 && row("test/b-test.mjs").real === 0 && /^proposed/.test(row("test/b-test.mjs").verdict), "one that failed and passed on one commit in one job failed for no reason; caught nothing alone, no rule names it: proposed", JSON.stringify(row("test/b-test.mjs")));
-ok(saysWhatItGuards("// Tests modules/tests.md, \"A new test says what it guards\"\nx();\n") && saysWhatItGuards("\n# guards #275, point 8\n") && !saysWhatItGuards("// tests the selection\n") && !saysWhatItGuards("x(); // modules/a.md\n"),
+ok(saysWhatItGuards("// Tests tasks/tests.md, \"A new test says what it guards\"\nx();\n") && saysWhatItGuards("\n# guards #275, point 8\n") && !saysWhatItGuards("// tests the selection\n") && !saysWhatItGuards("x(); // modules/a.md\n"),
   "a test guards a stated rule where its opening line, a comment, names a rule file or an issue");
 ok(/it guards a stated rule/.test(row("test/c-test.mjs").verdict) && /failed for a real reason/.test(row("test/d-test.mjs").verdict) && row("test/d-test.mjs").last === "2.xml" && row("test/d-test.mjs").screen && /alone catches 2/.test(row("test/a-test.mjs").verdict),
   "a test is kept by what it alone catches, a rule that names it, or a real failure", JSON.stringify(rows));

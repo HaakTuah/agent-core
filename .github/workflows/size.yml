@@ -1,11 +1,11 @@
 # The core's own rules, checked on every pull request here: the caps (README.md, "Two layers"; scripts/size.mjs) fail
 # one that grows what a role reads at its start past that role's cap, and one that raises a cap by more than one step or
 # with no "Leanness check:" comment (a fresh session's answer that it read all the rules for room:
-# modules/review-guidelines.md, "A mark on what every session reads"); and the words check (scripts/general.mjs) fails
+# roles/shared/review-guidelines.md, "A mark on what every session reads"); and the words check (scripts/general.mjs) fails
 # one that uses a word true only for some of the projects that take the core, a gendered pronoun for the owner in a
 # line it adds to the dated records, or a phrase a rule may not use in a line it adds to a rule file or to a Markdown
 # template of the starter kit, read against the base, and reports the phrases that stood before it (AGENTS.md, "A rule
-# is written to one pattern"; modules/helpers.md, "A brief is written as a rule is"); and the shape check on the core's
+# is written to one pattern"; tasks/helpers.md, "A brief is written as a rule is"); and the shape check on the core's
 # own scripts (scripts/shape.mjs, with .github/shape.json), which a project runs from the copies workflow. This
 # repository only; no project calls it. Reads only, with no secret: the raise is read from git alone, the merge commit against its
 # first parent, the base, and of the pull request's comments only who wrote each and how it opens is used, in a file
@@ -39,7 +39,7 @@ jobs:
           fetch-depth: 2 # the merge commit and its parents: a raise of a cap is read against the base
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: What each role reads at its start stays under its cap
         run: node scripts/size.mjs
       # (two steps, so the token reaches gh alone and never the pull request's own script; a base or a list of

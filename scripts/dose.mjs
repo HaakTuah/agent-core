@@ -1,4 +1,4 @@
-// The dose (modules/cleaning.md, "The state of a codebase sets the dose"; core archive 226; #246): the state a
+// The dose (tasks/cleaning.md, "The state of a codebase sets the dose"; core archive 226; #246): the state a
 // codebase is in, read from the shape check's baseline (shape.mjs, beside this file), and what that state makes due.
 // The state is the share of what the check reads, its functions and its imports, that the baseline lists: in debt
 // past DEBT, in standard at STANDARD or under, paying down between; a project's owner may name it instead, in one
@@ -143,7 +143,7 @@ export function cleaningBody(r, { changes, commits }, got, home) {
     `**The cleaning lane's share while it is so:** ${SHARE[r.state]}. What it got: ${share}. No check holds the share: it is shown, and the orchestrator hands out lanes by it.`, "",
     `**Clean first** (where change meets tangle: what the baseline lists of a file, times its changes in the newest ${commits} commits git holds here), after the files the queue's next entries will touch:`,
     ...first.map(f => `- \`${f.file.replace(/`/gu, "'")}\`: ${f.entries} listed, changed ${f.changes} times`), "",
-    `**How** (\`${home}modules/cleaning.md\`): each a small pull request of its own that proves behaviour unchanged by the tests, takes its entries out of the baseline (\`node ${home}scripts/shape.mjs --write\`) and changes nothing a user sees; where the tests cannot prove it, they come first. A fault the tests' strength baseline lists is cleaning too: a test that catches it, and the entry taken out with \`node ${home}scripts/strength.mjs --lower <its file>\`. \`node ${home}scripts/dose.mjs\` gives this list as it stands.`].join("\n");
+    `**How** (\`${home}tasks/cleaning.md\`): each a small pull request of its own that proves behaviour unchanged by the tests, takes its entries out of the baseline (\`node ${home}scripts/shape.mjs --write\`) and changes nothing a user sees; where the tests cannot prove it, they come first. A fault the tests' strength baseline lists is cleaning too: a test that catches it, and the entry taken out with \`node ${home}scripts/strength.mjs --lower <its file>\`. \`node ${home}scripts/dose.mjs\` gives this list as it stands.`].join("\n");
 }
 
 // The audit task's text, or null where none is due.
@@ -152,7 +152,7 @@ export function auditBody(r, at, home) {
   if (!due) return null;
   return { owner: due.owner, body: [`An audit by a reader is due: ${due.why}.`, "", stateLine(r), "",
     ...(due.owner ? [`**For the owner to see:** the project is in debt and its baseline is no smaller than at the last audit (${auditOf(r.baseline.audited).listed} then). Nothing fails and no work waits: the share the cleaning lane gets is the owner's to change.`, ""] : []),
-    `**How** (\`${home}modules/cleaning.md\`, "The audit's reader"): a fresh session that built none of what it reads answers the fixed questions, each with its evidence and on the one scale, from \`node ${home}scripts/code-shape.mjs\` and the code itself, and changes nothing; the session that takes this task writes its answers as a report beside the last one's and records the audit with \`node ${home}scripts/dose.mjs --audited\`, in one pull request. Where the project names a *mutation tool*, the same pull request holds the tests' whole run, outside the suite: \`node ${home}scripts/strength.mjs --whole\` writes their strength baseline, whose number the reader reads beside the last one's. The report holds the table of \`node ${home}scripts/test-record.mjs\` (each test's time, failures and what it alone catches), and the reader decides on each test it proposes (\`${home}modules/tests.md\`).`].join("\n") };
+    `**How** (\`${home}tasks/cleaning.md\`, "The audit's reader"): a fresh session that built none of what it reads answers the fixed questions, each with its evidence and on the one scale, from \`node ${home}scripts/code-shape.mjs\` and the code itself, and changes nothing; the session that takes this task writes its answers as a report beside the last one's and records the audit with \`node ${home}scripts/dose.mjs --audited\`, in one pull request. Where the project names a *mutation tool*, the same pull request holds the tests' whole run, outside the suite: \`node ${home}scripts/strength.mjs --whole\` writes their strength baseline, whose number the reader reads beside the last one's. The report holds the table of \`node ${home}scripts/test-record.mjs\` (each test's time, failures and what it alone catches), and the reader decides on each test it proposes (\`${home}tasks/tests.md\`).`].join("\n") };
 }
 
 // The rules a project's dose is read from, and where its copy of the core lies: its manifest, else the core's own

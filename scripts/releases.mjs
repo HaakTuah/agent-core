@@ -9,6 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { CORE, OWNER } from "./core-address.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
+import { MODULES } from "./reading.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 // a release's name: the word and a whole number above zero, written without leading zeros
@@ -108,7 +109,7 @@ export const OWN_FILES = ["QUEUE.md", ".github/workflows/own-description.yml", "
 // something the project takes.
 export function matters(file, manifest) {
   if (/^scripts\/[^/]+-test\.mjs$/.test(file) || file.startsWith(".github/ISSUE_TEMPLATE/") || OWN_FILES.includes(file)) return false;
-  const module = /^modules\/([^/]+\.md)$/.exec(file)?.[1];
+  const module = MODULES.includes(file.slice(0, Math.max(0, file.lastIndexOf("/")))) && file.endsWith(".md") ? file.slice(file.lastIndexOf("/") + 1) : undefined;
   const { taken, notTaken } = modulesOf(manifest);
   return !(module && taken instanceof Set && !taken.has(module) && notTaken.has(module));
 }

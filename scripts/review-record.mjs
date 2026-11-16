@@ -4,14 +4,14 @@
 // and the issues labelled `bug`, and counts for each kind of pull request, in five reviews, which got the review, in how
 // many it blocked, how many blocking points it raised and how many other points:
 //   Codex's code review      its own account (`chatgpt-codex-connector[bot]`, a Bot): a top-level inline comment with a
-//                            P-badge and no security marker is a find; P0 and P1 block (modules/review-guidelines.md),
+//                            P-badge and no security marker is a find; P0 and P1 block (roles/shared/review-guidelines.md),
 //                            P2 and P3 count as other points; it ran where its summary (scripts/security-review.mjs
 //                            `codexState`) says completed, or a receipt or a find of it is there
 //   Codex's security review  the same, for the finds that open with its security marker
 //   posted reviews           comments of the owner's account (--owner, else the repository's account: floor rule 4)
 //                            whose first line opens "Security review:", "Code review:" or "Design check:"; a security
 //                            review posted is the second one, beside Codex's. Its points are read only from the lines
-//                            of its form (modules/reviews.md, "What a posted review declares"; #299): the blocking ones
+//                            of its form (tasks/reviews.md, "What a posted review declares"; #299): the blocking ones
 //                            from a line that opens with "Blocking findings: N." (N points), or "No blocking finding.",
 //                            "No finding.", "Nothing blocks." or "Blocking: none." (none), the others from one that
 //                            opens with "Other findings: M." or "No other finding." ("No finding." too), with or

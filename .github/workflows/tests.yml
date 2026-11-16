@@ -6,19 +6,20 @@
 # (scripts/init-dotnet-test.mjs). Another writes projects with the starter kit of each of the last two releases, syncs
 # them to the commit under test and runs every check of the core on them, taking one package from npm's registry
 # (scripts/upgrade-test.mjs): it reads the core's whole history and its release tags, so its checkout fetches them, and
-# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them. The staged cases'
-# test, which writes a scratch project with the starter kit for each case it reads, runs after it in that job.
+# it runs in a job of its own, beside the suites, since on Windows it takes as long as a third of them, and there in
+# two jobs, a part of it each. The staged cases' test, which writes a scratch project with the starter kit for each case
+# it reads, runs after it in that job, on Windows after the second part.
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
-# The suites together, each of their three parts on Windows, and the upgrade test, are each held to a time mark (the
-# "suites" of .github/shape.json, by scripts/shape.mjs; modules/tests.md, "The tests have a time mark").
+# The suites together, each of their four parts on Windows, and the upgrade test, are each held to a time mark (the
+# "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
-# says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; modules/tests.md,
+# says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,
 # "A pull request runs the tests its change can reach"); the checks of the core itself, each a step of its own after
 # the suites, run every time.
 # After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
-# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; modules/code-shape.md, "How
+# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
 # strong the tests are"), in working copies of its own, with no secret.
 name: tests
 
@@ -37,11 +38,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in three jobs
-  # that run side by side, each under a time mark of its own: the starter kit and the sync on whole scratch projects,
-  # the licence, NuGet and agent-tools checks, and the rest, each step's condition naming the part it runs in, all on
-  # Linux, where one job runs them all; the parts are sized by the steps' times on Windows, about five minutes each,
-  # beside the upgrade job, which takes longer; #387, #411)
+  # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in four jobs
+  # that run side by side, each under a time mark of its own: the core's checks from plain git and the sync on whole
+  # scratch projects, the starter kit with the check of the core's copy, the licence, NuGet and agent-tools checks, and
+  # the rest, each step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
+  # are sized by the steps' times on Windows, where one runner takes half as long again as another: the first two so
+  # that each ends within its mark on the slow one too, the other two as they stood, which on the slow one may pass
+  # their marks (#425), beside the upgrade job, which takes longer; #387, #411, #424)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
@@ -50,6 +53,7 @@ jobs:
         include:
           - { os: ubuntu-latest, part: all, suite: suites }
           - { os: windows-latest, part: projects, suite: suites-projects }
+          - { os: windows-latest, part: kit, suite: suites-kit }
           - { os: windows-latest, part: licences, suite: suites-licences }
           - { os: windows-latest, part: rest, suite: suites-rest }
     runs-on: ${{ matrix.os }}
@@ -192,7 +196,7 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/copy-tree-test.mjs ')) }}
         run: node scripts/copy-tree-test.mjs
       - name: The copy of the core's check (core.yml), its own job on scratch projects
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-yml-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'kit') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-yml-test.mjs ')) }}
         run: node scripts/core-yml-test.mjs
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/check-test.mjs ')) }}
@@ -207,10 +211,10 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/started-test.mjs ')) }}
         run: node scripts/started-test.mjs
       - name: The starter kit, and the core's own checks on a project it writes
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'kit') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-test.mjs ')) }}
         run: node scripts/init-test.mjs
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-dotnet-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'kit') && (env.RUN == 'all' || contains(env.RUN, ' scripts/init-dotnet-test.mjs ')) }}
         run: node scripts/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/nuget-gate-test.mjs ')) }}
@@ -298,11 +302,18 @@ jobs:
           MUTATE_BUDGET: "240"
         run: node scripts/strength.mjs
 
+  # (on Windows the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
+  # of the two releases with the copy older than the first, and the newer release, which the staged cases' test
+  # follows; on Linux one job runs it whole; #304)
   upgrade:
+    name: upgrade (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - { os: ubuntu-latest, part: all }
+          - { os: windows-latest, part: older }
+          - { os: windows-latest, part: newer }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -320,12 +331,14 @@ jobs:
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
         run: node scripts/select.mjs .github/shape.json --env RUN
-      - name: A project of each of the last two releases, synced to this commit, passes every check unchanged
+      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
         if: ${{ env.RUN == 'all' || contains(env.RUN, ' scripts/upgrade-test.mjs ') }}
-        run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs
+        env:
+          PART: ${{ matrix.part }}
+        run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node scripts/upgrade-test.mjs --part "$PART"
       # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time)
       - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
-        if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' scripts/staged-test.mjs ')) }}
+        if: ${{ !cancelled() && matrix.part != 'older' && (env.RUN == 'all' || contains(env.RUN, ' scripts/staged-test.mjs ')) }}
         run: node scripts/shape.mjs .github/shape.json --suite staged -- node scripts/staged-test.mjs
 
   # (the one check the ruleset asks for by name: it passes only where the suites, and the upgrade test with the staged

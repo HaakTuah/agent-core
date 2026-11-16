@@ -56,13 +56,13 @@ ok(/cannot be told/.test(raised("no cap here", two(27, 20), yes)) && /cannot be 
 // what it counts
 const template = name => fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8");
 const imported = [...`${template("AGENTS.md.tmpl")}\n${template("CLAUDE.md.tmpl")}`.matchAll(/^@core\/(\S+)$/gmu)].map(m => m[1]);
-const named = /`core\/(modules\/other-builders\.md)`/u.exec(template("AGENTS.md.tmpl"))?.[1];
+const named = /`core\/(tools\/other-builders\.md)`/u.exec(template("AGENTS.md.tmpl"))?.[1];
 const expected = [...imported, named].sort(), builder = counted("builder", root);
-ok(named && eq([...builder].sort(), expected) && !builder.includes("floor/topics.md") && !builder.includes("modules/reviews.md"),
+ok(named && eq([...builder].sort(), expected) && !builder.includes("floor/topics.md") && !builder.includes("tasks/reviews.md"),
   "for the builder it counts what the starter kit's templates have a builder read at its start (the floor's security.md, its role's file, the modules read then, each tool's own part), and no file read only when a task calls for it", `${builder} against ${expected}`);
 ok(eq(rolesAt(root).sort(), Object.keys(CAPS).sort()) && rolesAt(root).every(r => counted(r, root).includes("floor/security.md") && counted(r, root).includes(`roles/${r}.md`)) && counted("nobody", root) === null,
   "every role the core has a file for has a cap, and its count holds the floor and its own file");
-ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator", root).includes("modules/orchestrating.md") && !counted("builder", root).includes("modules/orchestrating.md") && !counted("stand-in", root).includes("modules/git.md"),
+ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator", root).includes("roles/orchestrator.md") && !counted("builder", root).includes("roles/orchestrator.md") && !counted("stand-in", root).includes("roles/shared/git.md"),
   "a role's count holds what its file names, a role's file named there with what that names, and nothing another role alone reads");
 
 // the script itself
@@ -86,13 +86,13 @@ const over = put("over.mjs", caps({ ...kb, builder: kb.builder - 2 }));
 ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set it to /.test(run("--raise", over, one).out) && mended(run("--raise", over, one).out), "a raise of more than one step fails, saying the cap to set", run("--raise", over, one).out);
 // (a copy of the core whose script's real caps are not the ones its readable block says, run as itself; and one a
 // role's start has outgrown)
-for (const part of ["scripts", "roles", "modules", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
+for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
 const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 ok(at2().status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(at2().out) && mended(at2().out) && !/the role builder reads at its start is/.test(at2().out), "a role whose start has outgrown its cap fails, it alone, saying the mend", at2().out);
-fs.writeFileSync(path.join(tmp, "roles", "planner.md"), "# The planner\n\nRead at its start by the role `planner`.\n\n**Reads at its start:** `modules/git.md`.\n");
+fs.writeFileSync(path.join(tmp, "roles", "planner.md"), "# The planner\n\nRead at its start by the role `planner`.\n\n**Reads at its start:** `roles/shared/git.md`.\n");
 ok(/the role planner has no cap\. Mend: give it a line in CAPS/.test(at2().out) && mended(at2().out), "a role with a file and no cap fails, saying the line to add", at2().out);
 fs.rmSync(path.join(tmp, "roles", "planner.md")); fs.rmSync(path.join(tmp, "roles", "reviewer.md"));
 ok(/gives the role reviewer a cap, and roles\/ holds no file for it\. Mend:/.test(at2().out) && mended(at2().out), "a cap for a role with no file fails, saying the mend", at2().out);

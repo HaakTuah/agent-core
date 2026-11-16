@@ -1,4 +1,4 @@
-// The owner's yes (floor rule 10, in floor/topics.md beside this folder: "one the owner wants anyway waits for the
+// The owner's yes (floor rule 10, in floor/topics/licences.md beside this folder: "one the owner wants anyway waits for the
 // owner's yes"), for the licence check (licences.mjs, beside this file) and the NuGet check (nuget.mjs): how a config
 // names what is off its list and accepted all the same, and what no yes takes in. A package is named with its one
 // exact version, as { "package": "<name>@<version>", "licence": what it is under (an SPDX expression of ids the

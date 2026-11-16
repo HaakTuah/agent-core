@@ -1,4 +1,4 @@
-// The tests a pull request runs (modules/tests.md, "A pull request runs the tests its change can reach"; #275), for
+// The tests a pull request runs (tasks/tests.md, "A pull request runs the tests its change can reach"; #275), for
 // every project that takes the core: of the files the pull request changes against its base, each test that can reach
 // one, with the tests it adds or changes, those that failed last time (`--failed`), and those the project names as its
 // proof that behaviour was kept, which are never selected out. What it ran is said, on the job's summary too.

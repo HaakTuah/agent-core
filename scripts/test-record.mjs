@@ -1,5 +1,5 @@
-// What each test is worth (modules/tests.md, "Each test is measured" and "A test keeps its place by one of three";
-// #275), for every project that takes the core, read at its audit (modules/cleaning.md), whose report shows the table
+// What each test is worth (tasks/tests.md, "Each test is measured" and "A test keeps its place by one of three";
+// #275), for every project that takes the core, read at its audit (tasks/cleaning.md), whose report shows the table
 // this prints. For each test file: how long it takes (the median of its runs), how often it failed for a real reason
 // and when last, how often it failed for no reason (it failed, and passed, on the same commit in the same job), what it
 // alone catches of the faults put in on purpose (a mutation report whose faults name every test that caught them:
@@ -136,7 +136,7 @@ export function table(rows) {
 // ---- reading the project ----
 
 // Whether a test's opening line, a comment, names a rule file (a path ending .md) or an issue (#n): what the test
-// says it guards (modules/tests.md, "A new test says what it guards").
+// says it guards (tasks/tests.md, "A new test says what it guards").
 export const saysWhatItGuards = text => {
   const first = String(text).split(/\r?\n/u).find(l => l.trim()) ?? "";
   return /^\s*(\/\/|#|\/\*|<!--|"{3}|'{3})/u.test(first) && /(#\d+\b|[\w./-]+\.md\b)/u.test(first);

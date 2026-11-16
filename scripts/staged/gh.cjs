@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The stand-in for GitHub in a staged case's scratch project (scratch.mjs, beside this file, copies it to the case's
-// bin/gh): `gh api` for the REST routes a session of the core calls (core/modules/github-calls.md), answered from the
+// bin/gh): `gh api` for the REST routes a session of the core calls (core/tasks/github-calls.md), answered from the
 // file github.json beside its folder, which it rewrites with every call that writes; each call is added to that file's
 // "calls". GraphQL, which a cloud session cannot reach, is refused as there. It reaches no network. Node's own modules
 // and, for --jq, the jq command where one is installed.
@@ -25,7 +25,7 @@ const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 
 if (args[0] === "auth") { process.stdout.write(`github.com\n  ✓ Logged in to github.com account ${state.owner}\n`); process.exit(0); }
 if (args[0] !== "api") {
-  process.stderr.write(`gh ${args[0] ?? ""}: GitHub's GraphQL API cannot be reached from here, so \`gh pr\`, \`gh issue\` and the like fail; use \`gh api\` with GitHub's REST routes (core/modules/github-calls.md).\n`);
+  process.stderr.write(`gh ${args[0] ?? ""}: GitHub's GraphQL API cannot be reached from here, so \`gh pr\`, \`gh issue\` and the like fail; use \`gh api\` with GitHub's REST routes (core/tasks/github-calls.md).\n`);
   process.exit(1);
 }
 
@@ -53,7 +53,7 @@ if (input !== null) {
   const text = input === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(input, "utf8");
   try { body = { ...JSON.parse(text), ...fields }; } catch { fail(400, "Problems parsing JSON"); }
 }
-if (route === "graphql") fail(403, "GraphQL is not reachable from here: use the REST routes (core/modules/github-calls.md)");
+if (route === "graphql") fail(403, "GraphQL is not reachable from here: use the REST routes (core/tasks/github-calls.md)");
 method ??= Object.keys(body).length ? "POST" : "GET";
 const [pathPart, query = ""] = route.replace(/^\//, "").split("?");
 const params = Object.fromEntries(new URLSearchParams(query));

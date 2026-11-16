@@ -1,4 +1,4 @@
-// Who wrote an item and what state it is in, and how an agent's comment opens (modules/inbox.md, "Labels and openers say
+// Who wrote an item and what state it is in, and how an agent's comment opens (roles/shared/inbox.md, "Labels and openers say
 // who wrote what"; core archive 217): the list is labels.json, beside this file. Run from a project's root, it asks
 // GitHub, through gh, for the repository origin names, and reports, each with its mend, worded so an agent acts on it
 // alone with no rule file open:
@@ -82,7 +82,7 @@ export function check({ issues, comments = [], notes = new Map(), owner, have, s
   const add = (what, items) => { if (items.length) out.push({ what, items }); };
   const missing = toMake(have ?? []);
   add(`The labels of the list (core/scripts/labels.json), made or set to its colour and description: run \`node core/scripts/labels.mjs --make\``, missing.map(l => `${l.name} (${l.how === "make" ? "missing" : "otherwise"})`));
-  add(`One state label on each open issue, of ${STATES.join(", ")}: the one its last verdict gives it (the stand-in's, core/modules/inbox.md; a bug is queued from its filing; another account's issue needs-owner until the owner's own comment takes it up), the others taken off`,
+  add(`One state label on each open issue, of ${STATES.join(", ")}: the one its last verdict gives it (the stand-in's, core/roles/shared/inbox.md; a bug is queued from its filing; another account's issue needs-owner until the owner's own comment takes it up), the others taken off`,
     issues.filter(i => count(i, STATES) !== 1).map(i => `#${i.number}`));
   add(`One sender label on each issue the owner's account filed, of ${SENDERS.join(", ")}: the sender its text names, by:owner only where the owner typed it`,
     issues.filter(i => mine(i.user) && count(i, SENDERS) !== 1).map(i => `#${i.number}`));
@@ -101,10 +101,10 @@ export function check({ issues, comments = [], notes = new Map(), owner, have, s
     return last >= 0 && verdict(all[last].body).kind === "yes" && verdict(all[last].body).sure === "sure" && !all.slice(last + 1).some(c => ownVoiceNote(c.body));
   };
   const queued = issues.filter(i => names(i).includes("queued") && notes.has(i.number));
-  add("The mark stand-in-yes, where the project lets the stand-in's sure yes queue an idea (core/modules/inbox.md), on a queued issue whose newest verdict is that yes with no note in the owner's voice after it; off once the owner's own word confirms or corrects it",
+  add("The mark stand-in-yes, where the project lets the stand-in's sure yes queue an idea (core/roles/shared/inbox.md), on a queued issue whose newest verdict is that yes with no note in the owner's voice after it; off once the owner's own word confirms or corrects it",
     [...queued.filter(i => onYes(i) && !names(i).includes("stand-in-yes")).map(i => `#${i.number} (to mark)`),
       ...issues.filter(i => names(i).includes("stand-in-yes") && notes.has(i.number) && !onYes(i)).map(i => `#${i.number} (to take off)`)]);
-  add(`A current text newer than the notes that change what the issue asks: where ${SEVERAL} or more notes in the owner's voice stand after it, an agent gathers them in a note that says at its top "${LIST.headings.current}", the older notes kept as they are (core/modules/inbox.md)`,
+  add(`A current text newer than the notes that change what the issue asks: where ${SEVERAL} or more notes in the owner's voice stand after it, an agent gathers them in a note that says at its top "${LIST.headings.current}", the older notes kept as they are (core/roles/shared/inbox.md)`,
     issues.filter(i => names(i).includes("queued") && notes.has(i.number)).filter(i => {
       const all = [...notes.get(i.number)].filter(c => mine(c.user)).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
       // (the current text counts from its last edit, since a note that changes what the issue asks updates it)

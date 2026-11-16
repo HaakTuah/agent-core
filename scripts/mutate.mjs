@@ -1,4 +1,4 @@
-// The core's own mutation tool (modules/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
+// The core's own mutation tool (tasks/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
 // AGENTS.md names, and one any project whose code is JavaScript run by Node, and whose tests are files run by
 // `node <file>`, may name too. It puts faults into the code on purpose, one at a time: an equality or comparison
 // turned (=== to !==, < to <=), and or or swapped, true and false swapped, a ! dropped, + and - swapped; and for each
@@ -20,7 +20,7 @@
 //       whole run, outside the suite); the config is the one the shape check reads (shape.mjs, where()). The budget,
 //       where none is given, is MUTATE_BUDGET's, else none. Each fault caught names the tests that failed on it
 //       ("killedBy"); with --every, all of them, each fault run against every test that names its file, so that what
-//       a test alone catches can be counted (test-record.mjs; modules/tests.md), at a cost of more runs.
+//       a test alone catches can be counted (test-record.mjs; tasks/tests.md), at a cost of more runs.
 // Reads the project; writes the report and its working copies, which it takes away. git and Node's own modules.
 import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";

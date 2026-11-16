@@ -22,7 +22,7 @@ const posted = body => issue(OWNER, body);
 // a posted review: the kind, and the one form that gives its blocking points
 ok(postedKind("Security review: the fallback reviewer's.") === "security" && postedKind("**Security review:** a fresh") === "security"
   && postedKind("Code review: of 42b5") === "code" && postedKind("\n\nDesign check: 31bb") === "design" && postedKind("**Code review:** x") === "code"
-  && postedKind("Security review: none needed for 1..2 (modules/reviews.md)") === "none-needed" && postedKind("**Security review:** none needed for this change.") === "none-needed" && postedKind("**Security review: none needed**") === "none-needed" && postedKind("Leanness check: a fresh session") === null,
+  && postedKind("Security review: none needed for 1..2 (tasks/reviews.md)") === "none-needed" && postedKind("**Security review:** none needed for this change.") === "none-needed" && postedKind("**Security review: none needed**") === "none-needed" && postedKind("Leanness check: a fresh session") === null,
   "a posted review is told by its first line; a note that none is needed, and a leanness check, are none");
 ok(postedKind("Security review: x\r\nBlocking findings: 1.") === "security" && blockingOf("Security review: x\r\nBlocking findings: 1.\r\nOther findings: 2.\r\n") === 1 && otherOf("Code review: x\r\nOther findings: 2.\r\n") === 2
   && broughtBy("What.\r\nBrought in by: #12\r\n") === 12 && postedKind("Code review:\r\n") === "code",

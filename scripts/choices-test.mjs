@@ -58,13 +58,13 @@ ok(none.title === TITLE && none.body === null && !none.unread, "with no records 
 const kit = project("kit", { "docs/choices.md": file("2026-11-15") });
 ok(look({ manifest: "", at: at("2027-01-01"), root: kit }).body === null, "records read less than half a year ago: nothing due");
 const body = look({ manifest: "", at: at("2027-06-01"), root: kit }).body ?? "";
-ok(/`docs\/choices\.md` holds 2 records/.test(body) && /1 of them name no sign/.test(body) && /`node core\/scripts\/choices\.mjs`/.test(body) && /core\/modules\/choices\.md/.test(body) && /needs-owner/.test(body),
+ok(/`docs\/choices\.md` holds 2 records/.test(body) && /1 of them name no sign/.test(body) && /`node core\/scripts\/choices\.mjs`/.test(body) && /core\/tasks\/choices\.md/.test(body) && /needs-owner/.test(body),
   "once due in a project, its issue names the file, the records, those with no sign, the rule and the script", body);
 const named = project("named", { "design.md": file("2026-01-01") });
 ok(/`design\.md` holds 2/.test(look({ manifest: "| *choice records* | `design.md` |", at: at("2027-06-01"), root: named }).body ?? ""), "the file the manifest names is read");
 const core = project("core", { "AGENTS.md": "the *choice records*: `CHOICES.md`;", "CHOICES.md": file("2026-01-01") });
 const ofCore = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
-ok(/`CHOICES\.md`/.test(ofCore) && /`node scripts\/choices\.mjs`/.test(ofCore) && /`modules\/choices\.md`/.test(ofCore), "in the core, its AGENTS.md names the file and the paths are the core's own", ofCore);
+ok(/`CHOICES\.md`/.test(ofCore) && /`node scripts\/choices\.mjs`/.test(ofCore) && /`tasks\/choices\.md`/.test(ofCore), "in the core, its AGENTS.md names the file and the paths are the core's own", ofCore);
 const linked = project("linked", { "real.md": file("2020-01-01") });
 fs.mkdirSync(path.join(linked, "docs"), { recursive: true });
 let link = true;
@@ -123,7 +123,7 @@ spawnSync(process.execPath, [path.join(here, "shape.mjs"), "checks/shape.json", 
 g("add", "-A"); g("commit", "-q", "-m", "a project");
 const trip = signs({ manifest: "", root: measuredProject });
 ok(/`docs\/choices\.md`/.test(trip.body ?? "") && /- `one 'folder' @someone`: `files > 1`, and it reads 2 files of code the shape check reads\./.test(trip.body) && /`unknown > 2`/.test(trip.body)
-  && /needs-owner in place of queued/.test(trip.body) && /`core\/modules\/choices\.md`/.test(trip.body) && /`node core\/scripts\/choices\.mjs`/.test(trip.body) && trip.owner === undefined,
+  && /needs-owner in place of queued/.test(trip.body) && /`core\/tasks\/choices\.md`/.test(trip.body) && /`node core\/scripts\/choices\.mjs`/.test(trip.body) && trip.owner === undefined,
   "where a condition holds, the look keeps an issue naming the choice in a code span, the condition, the number read, what names no measure, and what its session does; its labels are the session's to change", trip.body);
 putIn("docs/choices.md", sign("`files > 2`"));
 ok(signs({ manifest: "", root: measuredProject }).body === null && !signs({ manifest: "", root: measuredProject }).unread, "once no condition holds (the sign written anew), the look closes the issue");
