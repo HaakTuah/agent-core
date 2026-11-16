@@ -28,7 +28,6 @@
 // done-when.mjs, beside this file, reads them, at most a dozen items read through gh; one it cannot read is asked
 // nothing. And, of one opened since the copy on its base held PLAN_SINCE, the milestones of the *progress file*
 // (tasks/planning.md; #322), as milestones.mjs, beside this file, reads them, where the manifest takes that module.
-// nothing.
 // It asks in the same way, of a pull request opened since the copy on its base held COST_SINCE, the line the cost script
 // prints (session-cost.mjs, beside this file), or in its place the mark NO_COST, so that a line left out by the rule can
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302).
