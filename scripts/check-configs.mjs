@@ -47,7 +47,7 @@ const tidy = f => path.posix.normalize(f.replace(/\/+$/u, "")).replace(/^\.\//u,
 // A file a call or a config names, as a path from the root: one that leads out of the project, or starts at the
 // machine's root, is no file of the project's, and not read.
 const inside = (f, what) => {
-  const at = tidy(f);
+  const at = tidy(f.replace(/\\/gu, "/"));
   if (at === ".." || at.startsWith("../") || at.startsWith("/")) throw new Unread(`${what} names ${f}, outside the project`);
   return at;
 };
@@ -90,15 +90,34 @@ export function commands(run) {
   for (const ws of out) for (const w of ws) w.dynamic ||= /%\w+%/u.test(w.text);
   return out;
 }
-// The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone).
+// The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone); where
+// no such line follows, none is left out.
 function withoutHereDocuments(lines) {
   const out = [];
   for (let n = 0; n < lines.length; n++) {
     out.push(lines[n]);
-    const end = /<<-?[ \t]*(['"]?)([\w.-]+)\1/u.exec(lines[n])?.[2];
-    if (end) while (n + 1 < lines.length && lines[n + 1].trim() !== end) n++;
+    const end = hereDocument(lines[n]), last = end ? lines.findIndex((l, k) => k > n && l.trim() === end) : -1;
+    if (last > n) n = last - 1;
   }
   return out;
+}
+// The word that ends a here-document a line opens: a `<<` outside quotes and arithmetic, never `<<<`, then the word,
+// quoted, after a "\\" or bare, starting with a letter or "_"; null where it opens none.
+function hereDocument(line) {
+  for (let i = 0, quote = ""; i < line.length; i++) {
+    const c = line[i];
+    if (quote) { if (c === "\\" && quote === '"') i++; else if (c === quote) quote = ""; }
+    else if (line.startsWith("((", i)) { const e = line.indexOf("))", i + 2); if (e < 0) return null; i = e + 1; }
+    else if (c === "'" || c === '"') quote = c;
+    else if (c === "\\") i++;
+    else if (line.startsWith("<<<", i)) i += 2;
+    else if (line.startsWith("<<", i)) {
+      const at = /^<<-?[ \t]*(?:\\|(['"]))?([A-Za-z_][\w.-]*)\1/u.exec(line.slice(i));
+      if (at) return at[2];
+      i++;
+    }
+  }
+  return null;
 }
 // One part of a word, at `i`: given to `add` as what it spells, and whether it is filled only when the workflow runs;
 // it returns where the part ends.
@@ -139,7 +158,8 @@ const slashed = word => word.text.replace(/\\/gu, "/");
 const NODE = /(?:^|\/)node(?:\.exe)?$/iu;
 const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup", "sudo"]);
 // A shell given its commands as one word (`bash -c "…"`), whose commands are read as the step's own.
-const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu, INLINE = /^(?:-c|-command)$/iu;
+// (its option that takes them: -c, alone or last in a cluster such as -ec, or PowerShell's -Command)
+const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu, INLINE = /^(?:-[a-z]*c|-command)$/iu;
 // Node's options that take the next word as their value, so that it is no script.
 const VALUED = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--title", "--input-type"]);
 const CHDIR = /^(?:cd|pushd|popd|chdir|set-location|sl)$/iu;
@@ -148,18 +168,29 @@ const CHDIR = /^(?:cd|pushd|popd|chdir|set-location|sl)$/iu;
 // and node's own options; { moves } where the command changes the folder; { inner }, the commands a shell is given as
 // one word; {} where it runs nothing with node.
 function nodeRuns(words) {
-  let i = 0;
-  while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text))) i++;
+  let i = pastWrappers(words);
   if (i < words.length && CHDIR.test(words[i].text)) return { moves: true };
-  if (i + 2 < words.length && SHELL.test(words[i].text) && INLINE.test(words[i + 1].text)) return { inner: words[i + 2].text };
+  if (i < words.length && SHELL.test(words[i].text)) return inline(words, i);
   if (i >= words.length || !NODE.test(words[i].text)) return {};
   for (i++; i < words.length && words[i].text.startsWith("-"); i++) if (VALUED.has(words[i].text)) i++;
   return { at: i };
 }
+// Where a command's own word starts: past the variables it sets and its wrappers, with their options (sudo -E, env -i).
+function pastWrappers(words) {
+  let i = 0;
+  while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text))) for (i++; WRAPPERS.has(words[i - 1].text) && words[i]?.text.startsWith("-"); i++);
+  return i;
+}
+// The commands a shell at word `i` is given as one word, past its other options, as { inner }; {} where it is given none.
+function inline(words, i) {
+  let k = i + 1;
+  while (k < words.length && words[k].text.startsWith("-") && !INLINE.test(words[k].text)) k++;
+  return k + 1 < words.length && INLINE.test(words[k].text) ? { inner: words[k + 1].text } : {};
+}
 // How each script picks its config from its arguments, as it reads them: the first that does not start with "--"; of
 // the reading-size and exact-versions checks, the first whatever it is; of the NuGet check, never the value of its
-// "--packages", and none where it is run "--projects", which lists files and reads no config.
-const PICKS = { "reading-size.mjs": { first: true }, "exact-versions.mjs": { first: true }, "nuget.mjs": { valued: ["--packages"], none: ["--projects"] } };
+// "--packages", and none where it is run "--projects" or "--imports", which list files and read no config.
+const PICKS = { "reading-size.mjs": { first: true }, "exact-versions.mjs": { first: true }, "nuget.mjs": { valued: ["--packages"], none: ["--projects", "--imports"] } };
 // The config a run passes the script at word `i`, as that script picks it (PICKS), as { config }, a path from the
 // root; { unread } with why it cannot be known; null where the run reads no config.
 function configAfter(words, i, dir, script) {
@@ -207,16 +238,15 @@ const folder = (...dirs) => {
 // Each step the project runs from its workflows, and from the local actions (`uses: ./…`) they use, as
 // { where, from, run, dir }: the file it stands in, the workflow that runs it, its `run:` and its folder (an action's
 // steps run from the root, save where one names its own); an action the reader cannot read as { where, from,
-// unreadable }, its text. (An action two workflows use is read once, as the first's.)
+// unreadable }, its text.
 const STEPS_OF = new WeakMap(); // (each project's steps read once, however many checks ask)
 function steps(p) {
   if (STEPS_OF.has(p)) return STEPS_OF.get(p);
   const out = [], seen = new Set();
-  STEPS_OF.set(p, out);
   const action = (uses, from) => {
     const at = tidy(uses);
-    if (seen.has(at)) return;
-    seen.add(at);
+    if (seen.has(`${from}\0${at}`)) return; // (an action two workflows use is read for each)
+    seen.add(`${from}\0${at}`);
     for (const f of [`${at}/action.yml`, `${at}/action.yaml`]) {
       const text = p.read(f);
       if (text === null) continue;
@@ -240,6 +270,7 @@ function steps(p) {
       walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]));
     }
   }
+  STEPS_OF.set(p, out);
   return out;
 }
 
@@ -326,7 +357,8 @@ export function copiesConfig(p) {
   if (found !== undefined) return found;
   notElsewhere(p, ["copies.mjs"]);
   const cell = /^\|\s*\*copies check\*\s*\|([^|\n]*)/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? [];
-  return cell.map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !/^(\.\/)?core\//.test(v)) ?? KIT_CONFIGS.copies;
+  const named = cell.map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !/^(\.\/)?core\//.test(v));
+  return named === undefined ? KIT_CONFIGS.copies : inside(named, "the manifest's *copies check* slot");
 }
 // The size marks: what the calls to the core's copies.yml pass as `sizes` and the project's own runs of the
 // reading-size script, else the manifest's *size marks* slot, else the kit's.
@@ -334,14 +366,14 @@ export function marksConfig(p) {
   const found = one([...passed(p, "copies.yml", "sizes"), ...fromRuns(p, "reading-size.mjs")], "the size marks");
   if (found !== undefined) return found;
   notElsewhere(p, ["reading-size.mjs"]);
-  return slot(p.manifest, "size marks", KIT_CONFIGS.sizes);
+  return inside(slot(p.manifest, "size marks", KIT_CONFIGS.sizes), "the manifest's *size marks* slot");
 }
 // The folder the signature check reads package-lock.json in, from the root: what the calls to the core's
 // signatures.yml pass as `directory` ("." where one passes none), undefined where none calls it.
 export function packagesFolder(p) {
   const found = given(p, "signatures.yml", "directory").map(({ where, value }) => {
     if (value !== undefined && typeof value !== "string") throw new Unread(`${where} passes the core's signatures.yml a directory that is no text`);
-    return { where, value: tidy(value ?? ".") || "." };
+    return { where, value: value === undefined ? "." : inside(value, `${where}'s call to the core's signatures.yml`) || "." };
   });
   return one(found, "the signature check's folder");
 }
