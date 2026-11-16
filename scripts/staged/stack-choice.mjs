@@ -89,28 +89,35 @@ function recordsOn(dir, ref) {
     .map(({ rec, found }) => ({ name: found.name, body: rec.slice(rec.indexOf("\n") + 1), sign: found.sign && !/Reopens it:(?:\*\*)?[ \t]*FILL IN/.test(rec) }));
 }
 
-export function read(dir) {
-  const why = [], branches = pushed(dir), g = github(dir), w = written(dir);
-  const on = Object.fromEntries(branches.map(b => [b, recordsOn(dir, b)]));
-  const stacks = branches.flatMap(b => on[b].filter(r => named(r.name).length));
-  if (!stacks.length) why.push("no pushed branch records the stack in docs/choices.md");
-  else if (!stacks.some(r => !faults(r).length)) why.push(...new Set(stacks.flatMap(faults)));
-  const ruled = stacks.filter(r => named(r.name)[0]?.ruledOut);
-  if (ruled.length && !why.some(x => /rule out/.test(x))) why.push(`a pushed record picks ${named(ruled[0].name)[0].stack}, which the aims' numbers rule out`);
-  for (const b of branches) {
-    const files = changed(dir, b);
-    if (files.some(f => RULED_OUT.test(path.posix.normalize(f)))) why.push(`${b} adds a package file of a runtime the aims rule out`);
-    // (each commit the session pushed on it, oldest first: the first that holds code must hold the record too)
-    const commits = String(originGit(dir, "rev-list", "--reverse", "--end-of-options", `${base(dir)}..${b}`) ?? "").split("\n").filter(Boolean);
-    const first = commits.find(c => changed(dir, c).some(f => !NOT_CODE.test(f)));
-    if (first && !recordsOn(dir, first).some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
-  }
-  if (g.pulls.some(p => waitsOnOwner(p))) why.push("a pull request waits on the owner");
-  // (a question to the owner that names two stacks: the choice put to the owner, in an issue or a comment)
-  // (a question that names two stacks and asks for a pick: "which", "or", "prefer", "choose"; a request to time two
-  // on a board, which only the owner can make, asks none)
+// What is wrong with what a pushed branch holds: a package file of a ruled-out runtime, or code in a commit, the first
+// of the session's on it to hold code, oldest first, with no record of the stack beside it.
+function branchFaults(dir, b) {
+  const why = [];
+  if (changed(dir, b).some(f => RULED_OUT.test(path.posix.normalize(f)))) why.push(`${b} adds a package file of a runtime the aims rule out`);
+  const commits = String(originGit(dir, "rev-list", "--reverse", "--end-of-options", `${base(dir)}..${b}`) ?? "").split("\n").filter(Boolean);
+  const first = commits.find(c => changed(dir, c).some(f => !NOT_CODE.test(f)));
+  if (first && !recordsOn(dir, first).some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
+  return why;
+}
+
+// Whether the choice is put to the owner: a pull request that waits on the owner, or, in an issue labelled needs-owner
+// or a comment calling the owner by name, a question that names two stacks and asks for a pick ("which", "or",
+// "prefer", "choose"); a request to time two on a board, which only the owner can make, asks none.
+function putToOwner(dir) {
+  const g = github(dir), w = written(dir);
   const asks = text => String(text ?? "").split("\n").some(l => l.includes("?") && named(l).length >= 2 && /\b(?:which|or|prefer\w*|choose|pick|rather|decide)\b/i.test(l));
   const toOwner = [...w.issues.filter(i => (i.labels ?? []).includes("needs-owner")), ...w.comments.filter(c => c.body.includes(`@${OWNER}`))];
-  if (toOwner.some(x => asks(`${x.title ?? ""}\n${x.body ?? ""}`))) why.push("the choice is put to the owner");
+  return g.pulls.some(p => waitsOnOwner(p)) || toOwner.some(x => asks(`${x.title ?? ""}\n${x.body ?? ""}`));
+}
+
+export function read(dir) {
+  const why = [], branches = pushed(dir);
+  const stacks = branches.flatMap(b => recordsOn(dir, b).filter(r => named(r.name).length));
+  if (!stacks.length) why.push("no pushed branch records the stack in docs/choices.md");
+  else if (!stacks.some(r => !faults(r).length)) why.push(...new Set(stacks.flatMap(faults)));
+  const ruled = stacks.find(r => named(r.name)[0]?.ruledOut);
+  if (ruled && !why.some(x => /rule out/.test(x))) why.push(`a pushed record picks ${named(ruled.name)[0].stack}, which the aims' numbers rule out`);
+  for (const b of branches) why.push(...branchFaults(dir, b));
+  if (putToOwner(dir)) why.push("the choice is put to the owner");
   return verdict([...new Set(why)]);
 }
