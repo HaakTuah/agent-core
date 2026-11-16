@@ -158,8 +158,8 @@ jobs:
           # the push) and checks out nothing, all within the job's time so its status is always written, so no file of
           # the pull request's is on disk and none runs; git sends the token to this repository's own address alone,
           # from each command's environment, never written to disk. Fetched for two proofs alone: where the pull
-          # request has a sync's shape (the manifest among its files, all of them whole, and none outside the copy, core/
-          # or the path the manifest's line in the patch names, it and the workflows), and where its head is an update from main (a merge whose second parent is no commit of the
+          # request has a sync's shape (the manifest among its files, all of them whole, and each of them the manifest,
+          # a workflow or a file of the copy, at core/ or the path the base's line in the manifest's patch names), and where its head is an update from main (a merge whose second parent is no commit of the
           # pull request's)
           shape= merge= cloned= pure=
           if [ -f "$ROOT/scripts/pure-sync.mjs" ] && [[ "$head" =~ ^[0-9a-f]{40}$ ]] \

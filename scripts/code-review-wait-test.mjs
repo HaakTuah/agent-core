@@ -56,7 +56,7 @@ const M = "e".repeat(40), F = "f".repeat(40), MAIN = "9".repeat(40);
 const commit = (sha, ...parents) => ({ sha, parents: parents.map((p) => ({ sha: p })) });
 const line = [commit(OLD, "8".repeat(40)), commit(HEAD, OLD)]; // OLD, then HEAD on it
 const code = [{ filename: "src/x.js", status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }];
-const had = (comments, commits = line, files = code, p = pull, rules = [], bound = true) => judge({ commits: commits.length, changed_files: files.length, ...p }, comments, commits, files, rules, bound);
+const had = (comments, commits = line, files = code, p = pull, rules = [], bound = true, copy = null) => judge({ commits: commits.length, changed_files: files.length, ...p }, comments, commits, files, rules, bound, undefined, copy);
 ok(is(had([]), false, "no code review of cccccc") && is(had([summary({ commit_sha: null, status: null })]), false, "ask one, or another reviewer posts"), "one that needs a code review and had none waits, and says how to mend it");
 ok(is(had([summary(done)]), true, "a code review has run") && is(had([said(`Code review: of ${HEAD}`)]), true, "a code review has run") && is(had([said(`**Code review:** of ${HEAD}`, "COLLABORATOR")]), true, "a code review has run"), "Codex's completed on the head, or one posted naming the head whole, settles it");
 ok(is(had([summary({ ...done, commit_sha: OLD })]), false, "no code review") && is(had([said(`Code review: of ${OLD}`)]), false, "no code review"), "one of an earlier commit with a commit of the builder's after it does not");
@@ -91,10 +91,15 @@ ok(is(had([], line, sync), true, "no code review is running") && is(had([], line
   const there = { ...manifest, patch: manifest.patch.replaceAll("under core/.", "under vendor/the-core/ (never edited here).") };
   // (the copy's path as the default branch's manifest names it, which the script adds to the rule files: a Markdown file
   // of the copy is a rule file, so a change to it alone needs its code review)
-  ok(is(had([], line, [md("vendor/the-core/roles/shared/review-guidelines.md")], pull, ["vendor/the-core/"]), false, "no code review") && is(had([], line, [md("vendor/the-core/floor/topics/workflows.md")], pull, ["vendor/the-core/"]), false, "no code review")
+  const at = (files, rules = []) => had([], line, files, pull, rules, true, "vendor/the-core/");
+  ok(is(at([md("vendor/the-core/roles/shared/review-guidelines.md")]), false, "no code review") && is(at([md("vendor/the-core/floor/topics/workflows.md")]), false, "no code review")
     && is(had([], line, [md("vendor/the-core/roles/shared/review-guidelines.md")]), true, "no code review is running"),
     "a Markdown file of a copy at the path the default branch's manifest names is a rule file: a change to it alone needs its code review (and, where no manifest names that path, is docs)");
-  ok(is(had([], line, [there, md("vendor/the-core/scripts/x.mjs"), sync[2]], pull, ["vendor/the-core/"]), true, "no code review is running"), "and a sync's shape at that path needs none");
+  ok(is(at([there, md("vendor/the-core/scripts/x.mjs"), sync[2]]), true, "no code review is running"), "and a sync's shape at that path needs none");
+  // (a folder the project's SECURITY.md lists among its rule files is no copy: a pin moved beside a change there needs a
+  // review, as a project's own file beside a sync always did)
+  ok(is(at([there, md("docs/rules/run.mjs")], ["docs/rules/"]), false, "no code review") && is(at([md("docs/rules/run.mjs")], ["docs/rules/"]), false, "no code review"),
+    "a folder among the project's rule files is never taken for the copy");
   ok(is(had([], line, [there, md("vendor/the-core/scripts/x.mjs"), sync[2]]), true, "no code review is running") && is(had([], line, [there, md("core/scripts/x.mjs")]), false, "no code review"),
     "a sync's shape at the path the manifest names needs none; a file under core/ beside it is no part of that copy");
 }
