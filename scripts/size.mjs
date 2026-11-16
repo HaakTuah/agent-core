@@ -99,43 +99,41 @@ export function raised(base, head, comments, running = capsOf(head)) {
   return null;
 }
 
+function raise(baseFile, commentsFile) {
+  let base = null, comments = null;
+  try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
+  if (comments === null) { console.error("FAIL: the base's size.mjs or the pull request's comments could not be read. Mend: name both, readable: node scripts/size.mjs --raise <base> <comments, as JSON>"); return 1; }
+  const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAPS);
+  if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
+  const from = capsOf(base), up = Object.keys(CAPS).filter(r => from[r] !== undefined && from[r] < CAPS[r]);
+  console.log(up.length ? `ok   the cap of ${up.join(", ")} rises one step, and the pull request holds a leanness check's answer` : "ok   no role's cap is raised");
+  return 0;
+}
+// What is wrong with one role's start against its cap, as the failure with its mend; null where nothing, its count printed.
+function over(role, roles) {
+  const files = roles.includes(role) ? counted(role) : null, cap = CAPS[role];
+  if (files === null) return `scripts/size.mjs gives the role ${role} a cap, and roles/ holds no file for it. Mend: take its line out of CAPS, or put its file back`;
+  if (cap === undefined) return `the role ${role} has no cap. Mend: give it a line in CAPS of scripts/size.mjs, the whole KB next above what it reads at its start, and say so in the pull request`;
+  const missing = files.filter(f => !fs.existsSync(f));
+  if (missing.length) return `what the role ${role} reads at its start cannot be counted: ${missing.join(", ")}. Mend: put back the file moved or taken out, or name it as it now stands in roles/${role}.md`;
+  const total = files.reduce((sum, f) => sum + sizeOf(f), 0);
+  console.log(`what the role ${role} reads at its start (${files.join(", ")}): ${total} bytes of ${cap}`);
+  return total <= cap ? null : `what the role ${role} reads at its start is ${total - cap} bytes over its cap. Mend: say the rules this\n`
+    + "pull request changes in fewer words and trim what is said twice; raise the role's cap by one KB only once a fresh session\n"
+    + "has read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".";
+}
+
 function main([flag, baseFile, commentsFile]) {
-  if (flag === "--raise") {
-    let base = null, comments = null;
-    try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
-    if (comments === null) { console.error("FAIL: the base's size.mjs or the pull request's comments could not be read. Mend: name both, readable: node scripts/size.mjs --raise <base> <comments, as JSON>"); return 1; }
-    const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAPS);
-    if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
-    const from = capsOf(base), up = Object.keys(CAPS).filter(r => from[r] !== undefined && from[r] < CAPS[r]);
-    console.log(up.length ? `ok   the cap of ${up.join(", ")} rises one step, and the pull request holds a leanness check's answer` : "ok   no role's cap is raised");
-    return 0;
-  }
-  let status = 0;
+  if (flag === "--raise") return raise(baseFile, commentsFile);
   const roles = rolesAt();
   if (!roles.length || !fs.existsSync(QUEUE.file)) { console.error(`FAIL: what each role reads at its start cannot be counted: ${roles.length ? QUEUE.file : "roles/"} is not here. Mend: run it from the core's root, where roles/ and ${QUEUE.file} stand, or put back what was moved or taken out`); return 1; }
-  for (const role of [...new Set([...roles, ...Object.keys(CAPS)])]) {
-    const files = roles.includes(role) ? counted(role) : null, cap = CAPS[role];
-    if (files === null) { console.error(`FAIL: scripts/size.mjs gives the role ${role} a cap, and roles/ holds no file for it. Mend: take its line out of CAPS, or put its file back`); status = 1; continue; }
-    if (cap === undefined) { console.error(`FAIL: the role ${role} has no cap. Mend: give it a line in CAPS of scripts/size.mjs, the whole KB next above what it reads at its start, and say so in the pull request`); status = 1; continue; }
-    const missing = files.filter(f => !fs.existsSync(f));
-    if (missing.length) { console.error(`FAIL: what the role ${role} reads at its start cannot be counted: ${missing.join(", ")}. Mend: put back the file moved or taken out, or name it as it now stands in roles/${role}.md`); status = 1; continue; }
-    const total = files.reduce((sum, f) => sum + sizeOf(f), 0);
-    console.log(`what the role ${role} reads at its start (${files.join(", ")}): ${total} bytes of ${cap}`);
-    if (total > cap) {
-      console.error(`FAIL: what the role ${role} reads at its start is ${total - cap} bytes over its cap. Mend: say the rules this\n`
-        + "pull request changes in fewer words and trim what is said twice; raise the role's cap by one KB only once a fresh session\n"
-        + "has read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".");
-      status = 1;
-    }
-  }
+  const wrong = [...new Set([...roles, ...Object.keys(CAPS)])].map(role => over(role, roles)).filter(Boolean);
   const queue = sizeOf(QUEUE.file);
   console.log(`the queue (${QUEUE.file}): ${queue} bytes of its mark, ${QUEUE.mark}`);
-  if (queue > QUEUE.mark) {
-    console.error(`FAIL: ${QUEUE.file} is ${queue - QUEUE.mark} bytes past its mark. Mend: take out each finished line, and any\n`
-      + "note, which belongs in the description of its line's pull request: the file holds what is next and nothing done.");
-    status = 1;
-  }
-  return status;
+  if (queue > QUEUE.mark) wrong.push(`${QUEUE.file} is ${queue - QUEUE.mark} bytes past its mark. Mend: take out each finished line, and any\n`
+    + "note, which belongs in the description of its line's pull request: the file holds what is next and nothing done.");
+  for (const w of wrong) console.error(`FAIL: ${w}`);
+  return wrong.length ? 1 : 0;
 }
 
 if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));

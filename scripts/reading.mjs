@@ -129,56 +129,64 @@ export function calledByPaths(lib, paths, own = []) {
   return [...out].map(([file, why]) => ({ file, why }));
 }
 
+// What the kinds given call for ([{ kind, why }]): [{ file, why }], the floor's topics among them.
+function calledByKinds(lib, given) {
+  return [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)].map(([file, w]) => ({ file, why: given.find(g => w?.kinds.includes(g.kind))?.why })).filter(c => c.why);
+}
+// The part of each tool given: the modules that name it, or name every tool but others, as { start: [file], task: [{ file, why }] }.
+function toolParts(lib, tools) {
+  const start = [], task = [];
+  for (const [file, w] of Object.entries(lib.modules)) {
+    const tool = w ? tools.find(t => w.tools.includes(t) || (w.others.length && !w.others.includes(t))) : undefined;
+    if (tool !== undefined) (w.start ? start : task).push(w.start ? file : { file, why: `the tool ${tool}` });
+  }
+  return { start, task };
+}
+
 // What a session reads: { start: [file], task: [{ file, why }] }, or { error } where the role has no file. `tools`,
 // `kinds` ([{ kind, why }] or names), `paths` and `named` (files an issue names) are the task; `ready` adds what the
 // role reads before its pull request is marked ready.
 export function reading(lib, { role, tools = [], kinds = [], paths = [], named = [], own = [], ready = false }) {
-  const names = Object.values(lib.roles).map(r => r.name);
   const file = Object.keys(lib.roles).find(f => lib.roles[f].name === role);
-  if (!file) return { error: `"${role}" is no role the core has a file for. Mend: give one of ${names.join(", ")} (the builder, where your brief names none)` };
-  const start = [FLOOR], task = new Map();
-  const take = (f, key, add) => { if (lib.roles[f]) { if (key === "start") add(f); for (const g of lib.roles[f][key] ?? []) take(g, key, add); } else add(f); };
-  take(file, "start", f => { if (!start.includes(f)) start.push(f); });
-  const call = (f, why) => { if (!start.includes(f) && !task.has(f)) task.set(f, why); };
-  for (const [f, w] of Object.entries(lib.modules)) {
-    if (!w) continue;
-    const tool = tools.find(t => w.tools.includes(t) || (w.others.length && !w.others.includes(t)));
-    if (tool === undefined) continue;
-    if (w.start) { if (!start.includes(f)) start.push(f); } else call(f, `the tool ${tool}`);
-  }
-  if (ready) take(file, "ready", f => call(f, "before the pull request is marked ready"));
-  for (const f of named) call(f, "the issue names it");
-  const given = kinds.map(k => (typeof k === "string" ? { kind: k, why: `the kind ${k}` } : k));
-  for (const [f, w] of [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)]) {
-    const k = given.find(g => w?.kinds.includes(g.kind));
-    if (k) call(f, k.why);
-  }
-  for (const c of calledByPaths(lib, paths, own)) call(c.file, c.why);
+  if (!file) return { error: `"${role}" is no role the core has a file for. Mend: give one of ${Object.values(lib.roles).map(r => r.name).join(", ")} (the builder, where your brief names none)` };
+  const start = [FLOOR], task = new Map(), parts = toolParts(lib, tools);
+  // (a role's file named on another's line brings what it names too: `chain` holds the role's files so met, each once)
+  const chain = [], take = f => { if (start.includes(f)) return; start.push(f); if (lib.roles[f]) { chain.push(f); for (const g of lib.roles[f].start ?? []) take(g); } };
+  take(file);
+  for (const f of parts.start) take(f);
+  const call = c => { if (!start.includes(c.file) && !task.has(c.file)) task.set(c.file, c.why); };
+  parts.task.forEach(call);
+  if (ready) for (const f of chain) for (const g of lib.roles[f].ready ?? []) call({ file: g, why: "before the pull request is marked ready" });
+  for (const f of named) call({ file: f, why: "the issue names it" });
+  calledByKinds(lib, kinds.map(k => (typeof k === "string" ? { kind: k, why: `the kind ${k}` } : k))).forEach(call);
+  calledByPaths(lib, paths, own).forEach(call);
   return { start, task: [...task].map(([f, why]) => ({ file: f, why })) };
 }
 
 // What is wrong, one line each with its mend, with how the core's roles and modules say when they are read.
-export function faults(lib, exists) {
-  const found = [], named = new Set();
-  const form = "the kind `<a word>`, the path `<a path>` or the tool `<its name>`";
-  for (const [f, r] of Object.entries(lib.roles)) {
-    if (!WORD.test(r.name)) found.push(`${f}: its name is no word a session can give as its role. Mend: name the file in small letters, digits and hyphens`);
-    if (!r.when?.roles.includes(r.name)) found.push(`${f} does not say when it is read. Mend: open it, under its title, with a paragraph that begins "Read" and holds "the role \`${r.name}\`"`);
-    if (!r.start) found.push(`${f} names no file its role reads at its start. Mend: give it a paragraph that opens "**${START}**" and names each shared file in backticks, by its path in the core`);
-    for (const g of [...(r.start ?? []), ...(r.ready ?? [])]) {
-      named.add(g);
-      if (!exists(g)) found.push(`${f} names ${g}, which is no file of the core. Mend: name the file as it now stands, or take it out`);
-      if (g === FLOOR) found.push(`${f} names ${FLOOR}, which every role reads whatever its file names. Mend: take it out of the line`);
-    }
-  }
-  for (const [f, w] of Object.entries(lib.modules)) {
-    if (!w) { found.push(`${f} does not say when it is read. Mend: open it, under its title, with a paragraph that begins "Read" and says when, in words the reading script matches: ${form}; or have a role's file name it`); continue; }
-    for (const k of w.kinds) if (!WORD.test(k)) found.push(`${f}: \`${k}\` is no kind the script can match. Mend: write the kind as one word of small letters, digits and hyphens`);
-    const by = w.kinds.length + w.paths.length + w.tools.length + w.others.length;
-    if (!by && !named.has(f)) found.push(`${f} says "Read" but not when in words the reading script matches, and no role's file names it. Mend: add to its opening paragraph ${form}, or name it on a role's line "${START}"`);
-    if (w.start && !named.has(f) && !w.tools.length && !w.others.length) found.push(`${f} says it is read at the start, and no role's file names it. Mend: name it on the line "${START}" of each role that reads it then (roles/), or say when a task calls for it`);
+const FORM = "the kind `<a word>`, the path `<a path>` or the tool `<its name>`";
+function roleFaults(f, r, exists) {
+  const found = [];
+  if (!WORD.test(r.name)) found.push(`${f}: its name is no word a session can give as its role. Mend: name the file in small letters, digits and hyphens`);
+  if (!r.when?.roles.includes(r.name)) found.push(`${f} does not say when it is read. Mend: open it, under its title, with a paragraph that begins "Read" and holds "the role \`${r.name}\`"`);
+  if (!r.start) found.push(`${f} names no file its role reads at its start. Mend: give it a paragraph that opens "**${START}**" and names each shared file in backticks, by its path in the core`);
+  for (const g of [...(r.start ?? []), ...(r.ready ?? [])]) {
+    if (!exists(g)) found.push(`${f} names ${g}, which is no file of the core. Mend: name the file as it now stands, or take it out`);
+    if (g === FLOOR) found.push(`${f} names ${FLOOR}, which every role reads whatever its file names. Mend: take it out of the line`);
   }
   return found;
+}
+function moduleFaults(f, w, named) {
+  if (!w) return [`${f} does not say when it is read. Mend: open it, under its title, with a paragraph that begins "Read" and says when, in words the reading script matches: ${FORM}; or have a role's file name it`];
+  const found = w.kinds.filter(k => !WORD.test(k)).map(k => `${f}: \`${k}\` is no kind the script can match. Mend: write the kind as one word of small letters, digits and hyphens`);
+  const tool = w.tools.length + w.others.length;
+  if (!(w.kinds.length + w.paths.length + tool) && !named) found.push(`${f} says "Read" but not when in words the reading script matches, and no role's file names it. Mend: add to its opening paragraph ${FORM}, or name it on a role's line "${START}"`);
+  if (w.start && !named && !tool) found.push(`${f} says it is read at the start, and no role's file names it. Mend: name it on the line "${START}" of each role that reads it then (roles/), or say when a task calls for it`);
+  return found;
+}
+export function faults(lib, exists) {
+  const named = new Set(Object.values(lib.roles).flatMap(r => [...(r.start ?? []), ...(r.ready ?? [])]));
+  return [...Object.entries(lib.roles).flatMap(([f, r]) => roleFaults(f, r, exists)), ...Object.entries(lib.modules).flatMap(([f, w]) => moduleFaults(f, w, named.has(f)))];
 }
 
 // The files a description's line lists: its last line that starts "Read for it:", or null where there is none.
@@ -222,14 +230,32 @@ function issue(dir, which) {
   try { const got = JSON.parse(r.status === 0 ? r.stdout : "null"); return got && { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: String(got.body ?? "") }; } catch { return null; }
 }
 
-function main(argv) {
-  const dir = process.cwd(), prefix = coreAt(dir);
-  const many = flag => argv.flatMap((a, i) => (a === flag && argv[i + 1] !== undefined && !argv[i + 1].startsWith("--") ? [argv[i + 1]] : []));
-  if (prefix === null) {
-    if (argv.includes("--hook")) return 0;
-    console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core/ stands, or from the core's own root"); return 1;
+const many = (argv, flag) => argv.flatMap((a, i) => (a === flag && argv[i + 1] !== undefined && !argv[i + 1].startsWith("--") ? [argv[i + 1]] : []));
+// The task the arguments give: its kinds ([{ kind, why }]), the files its issue names, its paths, and what to note.
+function taskOf(argv, dir, lib, self) {
+  const kinds = kindsOf(lib), notes = [], given = many(argv, "--kind").map(k => ({ kind: k, why: `the kind ${k}` })), named = [];
+  for (const k of given) if (!kinds.has(k.kind)) notes.push(`no module is read for the kind "${k.kind}" (${self} --kinds lists them)`);
+  for (const which of many(argv, "--issue")) {
+    const got = issue(dir, which);
+    if (!got) { notes.push(`the issue ${which} could not be read: give its kinds with --kind (${self} --kinds lists them)`); continue; }
+    given.push(...got.labels.filter(l => kinds.has(l)).map(l => ({ kind: l, why: `the kind ${l}, the issue's label` })));
+    for (const word of asked(got.body)) {
+      const f = word.replace(/^core\//u, "");
+      if (lib.modules[f] !== undefined || lib.roles[f] || FLOOR_WHEN[f]) named.push(f);
+      else if (kinds.has(word)) given.push({ kind: word, why: `the kind ${word}, which the issue names` });
+      else if (WORD.test(word)) notes.push(`the issue names "${word}" under "What to read", which is no kind or file of the core`);
+    }
   }
-  const lib = library(dir, prefix), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
+  const paths = many(argv, "--path");
+  if (argv.includes("--changed")) {
+    const got = changed(dir, many(argv, "--changed")[0]);
+    if (got === null) notes.push("the changed paths could not be read from git: give each with --path");
+    else paths.push(...got);
+  }
+  return { kinds: given, named, paths, notes };
+}
+// The modes that print of the core alone: the hook's line, the check, the kinds. Null where the arguments ask none.
+function alone(argv, dir, prefix, lib, self) {
   const roles = Object.values(lib.roles).map(r => r.name).filter(n => WORD.test(n));
   if (argv.includes("--hook")) {
     if (roles.length) console.log(`What to read is set by your role and your task: \`${self} <role> --issue <its issue>\` prints it (the roles: ${roles.join(", ")}; the builder, where your brief names none), and again with \`--changed\` before a pull request is marked ready.`);
@@ -241,42 +267,35 @@ function main(argv) {
     if (!found.length) console.log(`each of the ${Object.keys(lib.modules).length} modules and ${roles.length} roles says when it is read, in words the reading script matches`);
     return found.length ? 1 : 0;
   }
-  const kinds = kindsOf(lib);
-  if (argv.includes("--kinds")) { for (const [k, files] of kinds) console.log(`${k.padEnd(16)} ${files.map(at).join(", ")}`); return 0; }
-  const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "";
-  const notes = [], given = many("--kind").map(k => ({ kind: k, why: `the kind ${k}` })), named = [];
-  for (const k of given) if (!kinds.has(k.kind)) notes.push(`no module is read for the kind "${k.kind}" (${self} --kinds lists them)`);
-  for (const which of many("--issue")) {
-    const got = issue(dir, which);
-    if (!got) { notes.push(`the issue ${which} could not be read: give its kinds with --kind (${self} --kinds lists them)`); continue; }
-    for (const l of got.labels) if (kinds.has(l)) given.push({ kind: l, why: `the kind ${l}, the issue's label` });
-    for (const word of asked(got.body)) {
-      const f = word.replace(/^core\//u, "");
-      if (lib.modules[f] !== undefined || lib.roles[f] || FLOOR_WHEN[f]) named.push(f);
-      else if (kinds.has(word)) given.push({ kind: word, why: `the kind ${word}, which the issue names` });
-      else if (WORD.test(word)) notes.push(`the issue names "${word}" under "What to read", which is no kind or file of the core`);
-    }
+  if (!argv.includes("--kinds")) return null;
+  for (const [k, files] of kindsOf(lib)) console.log(`${k.padEnd(16)} ${files.map(f => `${prefix}${f}`).join(", ")}`);
+  return 0;
+}
+
+function main(argv) {
+  const dir = process.cwd(), prefix = coreAt(dir);
+  if (prefix === null) {
+    if (argv.includes("--hook")) return 0;
+    console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core/ stands, or from the core's own root"); return 1;
   }
-  let paths = many("--path");
-  if (argv.includes("--changed")) {
-    const got = changed(dir, many("--changed")[0]);
-    if (got === null) notes.push("the changed paths could not be read from git: give each with --path");
-    else paths = [...paths, ...got];
-  }
+  const lib = library(dir, prefix), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
+  const mode = alone(argv, dir, prefix, lib, self);
+  if (mode !== null) return mode;
+  const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "", tools = many(argv, "--tool"), task = taskOf(argv, dir, lib, self);
   const own = prefix ? ownPaths((() => { try { return fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { return ""; } })()) : [];
   if (argv.includes("--line")) {
-    const called = calledByPaths(lib, paths, own);
+    const called = calledByPaths(lib, task.paths, own);
     console.log(`${READ_LINE} ${called.length ? called.map(c => `\`${at(c.file)}\``).join(", ") : "nothing its paths call for"}`);
     return 0;
   }
-  const got = reading(lib, { role, tools: many("--tool"), kinds: given, paths, named, own, ready: argv.includes("--changed") });
+  const got = reading(lib, { role, tools, kinds: task.kinds, paths: task.paths, named: task.named, own, ready: argv.includes("--changed") });
   if (got.error) { console.error(`FAIL: ${got.error}`); return 1; }
   console.log(`Read at the start, in the role ${role} (each whole):`);
   for (const f of got.start) console.log(`  ${at(f)}`);
-  if (!many("--tool").length) console.log("  and your tool's part: give --tool <its name> (a module names its tool in its opening line)");
+  if (!tools.length) console.log("  and your tool's part: give --tool <its name> (a module names its tool in its opening line)");
   console.log(got.task.length ? "Read for this task:" : "Nothing more is called for by this task as given.");
   for (const t of got.task) console.log(`  ${at(t.file).padEnd(34)} ${t.why}`);
-  for (const n of notes) console.log(`note ${n}`);
+  for (const n of task.notes) console.log(`note ${n}`);
   return 0;
 }
 

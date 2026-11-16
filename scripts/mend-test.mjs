@@ -45,6 +45,7 @@ const CHECKS = {
   "scripts/manifest-reads.mjs": "scripts/manifest-reads-test.mjs",
   "scripts/holders.mjs": "scripts/holders-test.mjs",
   "scripts/entry-files.mjs": "scripts/entry-files-test.mjs",
+  "scripts/reading.mjs": "scripts/reading-test.mjs",
   "scripts/shape.mjs": "scripts/shape-test.mjs",
   ".github/workflows/core.yml": "scripts/core-yml-test.mjs",
   ".github/workflows/nuget.yml": "scripts/nuget-gate-test.mjs",

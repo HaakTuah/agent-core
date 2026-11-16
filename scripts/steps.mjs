@@ -261,7 +261,9 @@ export const STEPS = [
   { lead: "12 November 2026, a slimmer copy", cost: COST.line,
     check: p => {
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
-      return want && !p.manifest.split("\n").includes(want) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
+      // (the roles' folder, which the line gained later, is its own entry's to ask: 16 November 2026, a file for each role)
+      const plain = line => line.replace("roles/, ", "");
+      return want && !p.manifest.split("\n").some(line => plain(line) === plain(want)) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
   { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
     partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
@@ -400,6 +402,14 @@ export const STEPS = [
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
+  { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,
+    check: p => {
+      const wrong = [];
+      if (!/^Paths:.*\broles\//mu.test(p.manifest)) wrong.push('add `roles/` to the folders the "Paths:" line of `core-manifest.md` names, so that it reads "one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/"');
+      if (!/^@core\/roles\/builder\.md[ \t]*$/mu.test(p.read("AGENTS.md") ?? "")) wrong.push("add the line `@core/roles/builder.md` to the `@` lines of `AGENTS.md`, after the floor's, and to each entry file the project holds the line `core/scripts/entry-files.mjs` then names");
+      return wrong.length ? `In one pull request, ${wrong.join("; and ")}.` : null;
+    },
+    partly: "whether the project's own paths have their kind of task under the manifest's \"Reading\" is a reading of its folders; the sentence of `AGENTS.md` that names the script, the issue forms' \"What to read\" and the \"Reading\" section are differences `core/scripts/fresh.mjs` lists; the line `Read for it:` is held by the description check" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

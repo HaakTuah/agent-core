@@ -17,19 +17,26 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
   `security.md`, whose opening says what it and `topics.md` hold and when each is read, and `threat-model.md`, the
   shared threat model.
-- **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
-  its top when it is read (a provider's part: when that provider is asked). At the start of every task:
-  `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
-  When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
+- **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying in
+  its opening line when it is read, in words a script matches: a kind of task, a path, a tool (a tool's part: when that
+  tool is asked). A builder reads at the start of every task `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and
+  its tool's own (`claude.md`, or `other-builders.md`). When a task calls for it: `roles.md`, `helpers.md`,
+  `reviews.md`, `review-guidelines.md`, `tools.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`,
   `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
   project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
-- **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
-  stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
-  every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
-  needed is held by the reviews' "content put where its readers must read past it" (`modules/review-guidelines.md`).
-  It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a change
-  that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all the
-  rules for room and found too little (`AGENTS.md`).
+- **The roles** (`roles/`; core archive 233): one file for each role (the builder, the orchestrator, a reviewer, the
+  stand-in, the design session), read at that role's start with the shared files it names: `modules/roles.md`, "A file
+  for each role".
+- **Reading by role and by task:** `scripts/reading.mjs` (under `core/` in a project) prints the files a session of a
+  given role reads for a given task, for any agent tool that can run a command, and names what a pull request's changed
+  paths called for: `modules/tools.md`, "One script says what to read".
+- **The caps:** what a role reads at its start stays within that role's cap, which `scripts/size.mjs` sets (core archive
+  164, 169, 171, 179, 181, 182, 187, 191, 201 and 233), checked on every PR here, so a new rule there replaces text
+  rather than adding to it (core archive 134); a file read only when a task calls for it is held by the reviews'
+  "content put where its readers must read past it" (`modules/review-guidelines.md`). A cap keeps the rules lean and
+  decides nothing else: where a rule belongs and what it must say come first, and a change that honest trimming gives
+  no room for raises that role's cap one step, a whole KB, once a fresh session has read all the rules for room and
+  found too little (`AGENTS.md`).
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
   (`scripts/holders.json`); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
@@ -100,8 +107,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    step of the copies workflow, reads the list against `core/modules/` on every pull request: a module the list
    neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
    with the line to add, and never fail.
-3. **Pointer lines:** its `AGENTS.md` names the manifest and every file read at the start of every task, each on a line
-   of its own (Claude Code imports them through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
+3. **Pointer lines:** its `AGENTS.md` names the manifest and every file a builder reads at the start of every task, each
+   on a line of its own, and the reading script for any other role and for the modules a task calls for
+   (`core/scripts/reading.mjs`; Claude Code imports the lines through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
    kit writes, each held to that list by `core/scripts/entry-files.mjs`; any other tool reads them because `AGENTS.md`
    says to: `core/modules/tools.md`),
    and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
@@ -143,7 +151,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      workflow after its own tool, which holds what that tool found against a baseline in the shape check's form, which
      only shrinks (the *screen checks*; `modules/screens.md`, "What holds it"). The core runs it nowhere by itself.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
-     description lacks one of the headings `modules/git.md` names (or those the project gives it).
+     description lacks one of the headings `modules/git.md` names (or those the project gives it), the line that says
+     what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`); the two lines
+     only of a pull request opened since the project's copy held them.
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -264,7 +274,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The default branch is `main`,** which the hooks read their scripts from, letting every call through where there
      is none (`core.yml` fails another name).
    - **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on the path; where either is
-     missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start. The
+     missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start,
+     where it also says how a session finds what to read (`reading.mjs`, from the copy merged into `main`). The
      core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
      hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
