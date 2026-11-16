@@ -37,7 +37,6 @@ wanted").
 | #426 | builder | |
 | #357 | builder | |
 | #394 | builder | |
-| #403 | builder | |
 | #404 | builder | #403, or built with it |
 | #405 | builder | |
 | #407 | builder | |
