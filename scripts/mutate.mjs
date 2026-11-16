@@ -138,7 +138,12 @@ function noLinkOnTheWay(dir, f) {
     at = path.join(at, part);
     let stat = null;
     try { stat = fs.lstatSync(at); } catch { return; }
-    if (stat.isSymbolicLink()) { unlink(at); return; }
+    if (!stat.isSymbolicLink()) continue;
+    unlink(at);
+    let still = false;
+    try { still = fs.lstatSync(at).isSymbolicLink(); } catch { /* (taken away) */ }
+    if (still) refuse(`a link in the working copy, ${path.join(dir, f)}, could not be taken away`, "take the link out of the project's HEAD, or commit the file that replaced it, and run again");
+    return;
   }
 }
 
@@ -149,7 +154,7 @@ function copyOf(dir) {
   const differ = [...git(["diff", "-z", "--name-only", "--no-renames", "HEAD"]).split("\0"), ...git(["ls-files", "-z", "--others", "--exclude-standard"]).split("\0")].filter(Boolean);
   for (const f of differ) {
     const from = path.join(".", f), to = path.join(dir, f);
-    if (!fs.existsSync(from) || fs.lstatSync(from).isSymbolicLink()) continue;
+    if (!fs.existsSync(from) || fs.lstatSync(from).isSymbolicLink() || fs.statSync(from).isDirectory()) continue; // (a folder's files come one by one)
     noLinkOnTheWay(dir, f);
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
