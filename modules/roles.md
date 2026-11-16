@@ -1,6 +1,7 @@
 # Who does what
 
-Read when a task needs one: who takes a role, who builds a line, who reviews a change.
+Read at its start by the orchestrator, and when a task needs one (who takes a role, who builds a line, who reviews a
+change): the kind `role`.
 
 **The roles, by what they do** (core archive 232): the orchestrator starts builder sessions and hands out lines
 (`modules/orchestrating.md`); a builder builds one line to its merge; the session that syncs the core moves the copy

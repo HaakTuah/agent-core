@@ -1,7 +1,8 @@
 # Cleaning, and the audit of how code is put together
 
 Read by a builder that takes a cleaning task, by the session that takes an audit's task and by its reader, and by the
-orchestrator when it hands out lanes (core archive 226). What the code is held to: `modules/code-shape.md`.
+orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` and `audit`. What the code is held to:
+`modules/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check

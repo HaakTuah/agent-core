@@ -1,8 +1,8 @@
 # Kiro's part
 
-Read by a session of Kiro, and by whoever hands Kiro a task or a review. From Kiro's documentation alone (kiro.dev,
-its pages on steering, hooks and the command line, read on 15 November 2026), as `modules/tools.md` asks until Kiro
-has passed the staged cases.
+Read by a session of the tool `kiro`, and by whoever hands Kiro a task or a review. From Kiro's documentation alone
+(kiro.dev, its pages on steering, hooks and the command line, read on 15 November 2026), as `modules/tools.md` asks
+until Kiro has passed the staged cases.
 
 - **What it reads:** an `AGENTS.md` at the root, always, and one in any folder it works in; the steering files under
   .kiro/steering, in which `#[[file:<path from the root>]]` pulls a file in. Its entry file from the starter kit,

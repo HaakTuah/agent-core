@@ -1,7 +1,7 @@
 # GitHub's REST calls from a cloud session
 
 Read when a cloud session must open, mark ready, merge or inspect a PR, and when a part of GitHub a rule needs cannot
-be reached. Claude's cloud sessions can't use GitHub's
+be reached: the kinds `cloud` and `host`. Claude's cloud sessions can't use GitHub's
 GraphQL API, so `gh pr create`, `list`, `view` and `ready` fail there; they use these REST calls (the `ccr/` routes are
 Claude's cloud proxy's, not GitHub's; `<owner>/<repo>` is the repository's own).
 

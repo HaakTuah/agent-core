@@ -1,7 +1,7 @@
 # Review guidelines
 
-What every reviewer judges a change by, read whole with its brief, the project's own guidelines, its `SECURITY.md` and
-the floor. Changes only on the owner's word (core archive 56).
+Read at its start by every reviewer (`roles/reviewer.md`): what it judges a change by, read whole with its brief, the
+project's own guidelines, its `SECURITY.md` and the floor. Changes only on the owner's word (core archive 56).
 
 ## How a review passes
 

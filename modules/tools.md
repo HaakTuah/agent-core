@@ -1,7 +1,8 @@
 # Agent tools
 
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
-run is due. Which tool takes which role: `modules/roles.md`, "Tools are preferences".
+run is due: the kind `tool`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
+which role: `modules/roles.md`, "Tools are preferences".
 
 **One door in: `AGENTS.md`** (core archive 232; #249). By default every rule a session must know is reachable from the
 project's `AGENTS.md` in plain sentences, its `@` lines naming the files read at the start of every task. A tool that
