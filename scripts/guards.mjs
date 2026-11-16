@@ -8,25 +8,37 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/** Whether `p`, a path a project's file names, stays inside the project: a non-empty string, not rooted (no leading
- *  "/" or "\", no drive), and no ".." part that leads above where it starts. "./x" and "a/../b" stay inside. */
+/** Whether `p`, a path a project's file names, stays inside the project: a non-empty string with no control character,
+ *  not rooted (no leading "/" or "\", no drive), and no ".." part that leads above where it starts. "./x" and "a/../b"
+ *  stay inside. */
 export function inProject(p) {
-  if (typeof p !== "string" || p === "" || p.includes("\0")) return false;
+  if (typeof p !== "string" || p === "" || /[\u0000-\u001f\u007f]/u.test(p)) return false;
   const s = p.replace(/\\/gu, "/");
   if (s.startsWith("/") || /^[A-Za-z]:/u.test(s)) return false;
   const n = path.posix.normalize(s);
   return n !== ".." && !n.startsWith("../");
 }
 
-/** Whether the file or folder at `at` stands, and its real place, every link on its way followed, lies outside the
- *  folder `root` (its own real place). A path that does not stand is not said to lead out: the reader's own error
- *  names it. */
+/** Whether the file or folder at `at`, every link on its way followed, lies outside the folder `root` (its own real
+ *  place): where `at` does not stand yet, the nearest folder above it that does is read, so a file about to be written
+ *  under a linked folder leads out too; a link that leads nowhere counts as leading out. */
 export function leadsOut(root, at) {
-  let real, top;
-  try { real = fs.realpathSync(at); } catch { return false; }
+  let top;
   try { top = fs.realpathSync(root); } catch { return true; }
-  const rel = path.relative(top, real);
-  return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
+  for (let p = path.resolve(at); ;) {
+    let real;
+    try { real = fs.realpathSync(p); } catch {
+      let found;
+      try { found = fs.lstatSync(p, { throwIfNoEntry: false }); } catch { found = undefined; }
+      if (found?.isSymbolicLink()) return true;
+      const up = path.dirname(p);
+      if (up === p) return true;
+      p = up;
+      continue;
+    }
+    const rel = path.relative(top, real);
+    return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
+  }
 }
 
 /** Text from a project, made safe to print on one line of a workflow's log: "%", a carriage return and a line feed

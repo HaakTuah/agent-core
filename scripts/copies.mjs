@@ -234,7 +234,7 @@ if (!base || typeof base.windows !== "object" || base.windows === null || Array.
 // A count is a whole number of places, at least two; anything else would let a copy through, so it fails.
 const counted = (w, where) => {
   const bad = Object.entries(w || {}).filter(([h, n]) => !/^[0-9a-f]{12}$/.test(h) || !Number.isInteger(n) || n < 2);
-  if (bad.length) { console.error(`FAIL: ${where} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); process.exit(1); }
+  if (bad.length) { console.error(`FAIL: ${logged(where)} holds ${bad.length} windows without a whole count of two or more. Mend: take the baseline back as main holds it (git checkout origin/main -- ${BASELINE}), then run --write to lower it`); process.exit(1); }
   return w;
 };
 counted(base.windows, BASELINE);
@@ -277,7 +277,7 @@ if (from) {
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
   const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
   const raised = old ? Object.entries(base.windows).filter(([h, n]) => !(h in old) || n > old[h]) : [];
-  if (raised.length) { console.error(`FAIL: ${BASELINE} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
+  if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
 }
 // Near-copies (tasks/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
 // numbers are set aside, and are no exact copy. Reported, never failed: code that only looks alike is no second copy
@@ -311,7 +311,7 @@ if (process.argv.includes('--write')) {
   console.log(`${BASELINE}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped`);
   if (fresh.length) process.exit(1);
 } else {
-  if (shrunk.length) console.error(`FAIL: ${BASELINE} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${configPath} --write and commit the baseline it lowers`);
+  if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${configPath} --write and commit the baseline it lowers`);
   if (fresh.length || shrunk.length) process.exit(1);
   console.log(`ok   no new copies (${found.length} old ones, listed in ${BASELINE}, to be removed)`);
 }

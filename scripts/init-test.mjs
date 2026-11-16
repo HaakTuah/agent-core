@@ -162,6 +162,15 @@ if (p.status === 0) {
     fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), baseline }));
     return spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: p.dir, env, encoding: "utf8" });
   });
+  // (a first baseline under a folder linked out of the project is refused, never written there; a junction on Windows)
+  const away = fs.mkdtempSync(path.join(os.tmpdir(), "copies-away-"));
+  fs.symlinkSync(away, path.join(p.dir, "linked"), "junction");
+  fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), baseline: "linked/baseline.json" }));
+  const linked = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: p.dir, env, encoding: "utf8" });
+  const wroteAway = fs.existsSync(path.join(away, "baseline.json"));
+  fs.rmSync(path.join(p.dir, "linked"));
+  fs.rmSync(away, { recursive: true, force: true });
+  ok(linked.status === 1 && mended(linked.stderr) && /lies outside the project/u.test(linked.stderr) && !wroteAway, "a first baseline under a folder linked out of the project is refused, never written there, saying its mend", linked.stdout + linked.stderr);
   fs.writeFileSync(cfgP, cfgPWas);
   ok(aboveSpec.status === 1 && mended(aboveSpec.stderr) && !aboveSpec.stderr.includes(p.dir) && !aboveSpec.stderr.includes(fs.realpathSync(p.dir))
     && outside.every((r) => r.status === 1 && mended(r.stderr) && /the config's "baseline", .*, lies outside the project/u.test(r.stderr)) && !fs.existsSync(path.join(p.dir, "..", "baseline.json")),

@@ -208,6 +208,12 @@ for (const [what, change, why] of [
     if (links) {
       const linkedAudit = run((dir) => { fs.rmSync(path.join(dir, "audit.json")); fs.symlinkSync(path.join(elsewhere, "audit.json"), path.join(dir, "audit.json")); });
       ok(linkedAudit.some((m) => outside.test(m)), "refuses an audit reached through a link that leads out of the project", linkedAudit.join("\n"));
+      fs.writeFileSync(path.join(elsewhere, "settings.npmrc"), "fund=false\n");
+      const linkedNpmrc = run((dir) => fs.symlinkSync(path.join(elsewhere, "settings.npmrc"), path.join(dir, ".npmrc")));
+      ok(linkedNpmrc.some((m) => /^\.npmrc is reached through a link that leads out of the project, so it is not read\. Mend: /u.test(m)) && !linkedNpmrc.some((m) => m.includes("fund=false")), "an npm config file reached through a link out of the project is not read, and fails saying its mend", linkedNpmrc.join("\n"));
+      fs.writeFileSync(path.join(elsewhere, "package.json"), JSON.stringify({ name: "elsewhere" }));
+      const linkedManifest = run((dir) => { LOCK("MIT")(dir); fs.rmSync(path.join(dir, "package.json")); fs.symlinkSync(path.join(elsewhere, "package.json"), path.join(dir, "package.json")); });
+      ok(linkedManifest.some((m) => /package\.json is reached through a link that leads out of the project, so it is not read\. Mend: /u.test(m)), "a package.json beside a lockfile reached through a link out of the project is not read, saying its mend", linkedManifest.join("\n"));
       const linkedFile = run((dir) => fs.symlinkSync(path.join(elsewhere, "notice.js"), path.join(dir, "site", "tools", "linked.js")));
       ok(linkedFile.length === 0, "reads a tracked link as the path it names, never the file it leads to", linkedFile.join("\n"));
     }
@@ -222,6 +228,8 @@ for (const [what, change, why] of [
   ok(nested.some((m) => /site\/tools\/deep\.json: it nests deeper than 200/u.test(m)) && mendSaid(nested), "fails on JSON nested past the bound, saying its mend", nested.join("\n"));
   const audited = run((dir) => { write("site/tools/deep.json", deep)(dir); handAudited("site/tools/deep.json")(dir); });
   ok(audited.length === 0, "passes JSON nested past the bound that an entry audits by hand", audited.join("\n"));
+  const deepLock = run((dir) => { LOCK("MIT")(dir); fs.writeFileSync(path.join(dir, "package-lock.json"), `{"lockfileVersion":3,"packages":{"node_modules/mossgrip-lib":{"version":"1.0.0","license":${"[".repeat(20000)}"MIT"${"]".repeat(20000)}}}}`); });
+  ok(deepLock.some((m) => /package-lock\.json cannot be read as JSON \(it nests deeper than 200 objects and lists\)\. Mend: /u.test(m)), "a lock file nested past the bound is refused as JSON that cannot be read, saying its mend", deepLock.join("\n").slice(0, 400));
   const long = run(write("site/tools/long.json", JSON.stringify({ command: Array.from({ length: 150000 }, (_, k) => `arg${k}`) })));
   ok(long.length === 0, "reads a command's list of any length", long.join("\n"));
 }

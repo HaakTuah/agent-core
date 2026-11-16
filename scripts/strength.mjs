@@ -33,7 +33,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CODE, OTHER } from "./code-shape.mjs";
-import { logged } from "./guards.mjs";
+import { logged, parseBounded } from "./guards.mjs";
 import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
@@ -122,7 +122,7 @@ const aMutant = m => m && typeof m.status === "string" && typeof m.mutatorName =
 // mutatorName, replacement }. It throws a Refused where the report is not in the form.
 export function faultsOf(text, wanted, root = ".") {
   let r;
-  try { r = JSON.parse(text); } catch { refuse("the mutation tool's report could not be read as JSON", "have the tool write its report in the mutation-testing-elements schema (Stryker's \"json\" reporter writes it) to the path {report} stands for"); }
+  try { r = parseBounded(text); } catch { refuse("the mutation tool's report could not be read as JSON", "have the tool write its report in the mutation-testing-elements schema (Stryker's \"json\" reporter writes it) to the path {report} stands for"); }
   if (!r || typeof r.files !== "object" || r.files === null) refuse("the mutation tool's report has no \"files\"", "have the tool write the mutation-testing-elements schema, whose \"files\" holds each file's \"source\" and \"mutants\"");
   const out = [];
   for (const [name, f] of Object.entries(r.files)) {
@@ -283,7 +283,7 @@ export function joinedUnsaid(now, was, touched = true, texts = () => null, found
 function baselineFrom(text, at) {
   if (text === null || text === undefined) return null;
   const b = parseBaseline(text, at, `write it again from the audit's whole run (node core/scripts/strength.mjs --whole), or take it back as the base holds it`);
-  return { ...b, whole: tolerant(() => JSON.parse(text).whole) ?? null };
+  return { ...b, whole: tolerant(() => parseBounded(text).whole) ?? null };
 }
 
 // The tool run, as the row says, on the lines given: the report's text. It throws a Refused where the tool fails or

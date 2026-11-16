@@ -32,7 +32,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, logged } from "./guards.mjs";
+import { inProject, leadsOut, logged, parseBounded } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { started } from "./started.mjs";
@@ -262,6 +262,22 @@ export function scriptsOff(npmrc) {
   return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
+/** A file of the project's own at `f`, from its root `root`, as text: one reached through a link that leads out of the
+ *  project is refused, never read. */
+function ownText(root, f) {
+  if (leadsOut(root, join(root, f))) throw new Error(`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link`);
+  return readFileSync(join(root, f), "utf8");
+}
+
+/** What every npm config file of the project sets that is not allowed: each line, or the file, where a link leads it
+ *  out of the project, which is not read. */
+function npmrcFailures(root) {
+  return npmrcFiles(root).flatMap((f) => {
+    if (leadsOut(root, join(root, f))) return [`${f} is reached through a link that leads out of the project, so it is not read. Mend: make it a file of the project's own, in place of the link, or take it out`];
+    return registryOverrides(readFileSync(join(root, f), "utf8")).map((l) => `${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
+  });
+}
+
 /** Every npm config file under `root` (`.npmrc`, or any name ending in it), but in `node_modules` and `.git`. */
 function npmrcFiles(root, dir = "") {
   return readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) => {
@@ -370,9 +386,12 @@ export function lockRead(packages, workspaces) {
 }
 
 /** Every package each lockfile installs, with its licence, whether it ships, and the name its registry address gives. */
-function lockfilePackages(root, lockPath, ships, text = (f) => readFileSync(join(root, f), "utf8")) {
+function lockfilePackages(root, lockPath, ships, text = (f) => ownText(root, f)) {
   const base = posix.dirname(lockPath) === "." ? "" : posix.dirname(lockPath);
-  const read = (p) => JSON.parse(text(posix.join(base, p)));
+  const read = (p) => {
+    const f = posix.join(base, p), t = text(f);
+    try { return parseBounded(t); } catch (e) { throw new Error(`${f} cannot be read as JSON (${e.message}). Mend: write it as npm does, the lock file anew with npm, never by hand: its install, given --package-lock-only`); }
+  };
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const odd = Object.entries(lock.packages).find(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
@@ -436,7 +455,7 @@ export function check(config, root, base = null, baseConfig = null) {
   }
   let entries = [];
   if (config.audit) {
-    try { entries = JSON.parse(readFileSync(join(root, config.audit), "utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    try { entries = parseBounded(readFileSync(join(root, config.audit), "utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
     // (an entry held at the base as it stands: the same name, version and licence)
     let before = [];
@@ -478,9 +497,7 @@ export function check(config, root, base = null, baseConfig = null) {
   }
   const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? []) : undefined;
   if (scanned) failures.push(...scanned.failures);
-  for (const f of npmrcFiles(root)) {
-    for (const l of registryOverrides(readFileSync(join(root, f), "utf8"))) failures.push(`${f}: npm setting not allowed (a package is known by the npm registry it comes from): ${l}. Mend: take that line out of ${f}`);
-  }
+  failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }

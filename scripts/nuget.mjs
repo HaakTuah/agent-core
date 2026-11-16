@@ -92,7 +92,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, r
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
-import { logged } from "./guards.mjs";
+import { logged, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 
@@ -472,7 +472,7 @@ export function sdkPacks(env = process.env, root = null) {
 export function lockPackages(text, lockPath) {
   const failures = [], split = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
+  try { lock = parseBounded(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
     return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies"). Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split };
   }
@@ -781,7 +781,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     let manifest = {};
     const text = textOf(f);
     if (text === null) continue;
-    try { manifest = JSON.parse(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
+    try { manifest = parseBounded(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
     if (!fetched) {
       for (const [id, entry] of Object.entries(manifest?.tools ?? {})) if (typeof entry?.version === "string") toolsRead.add(key(id, entry.version));
       continue;
@@ -804,7 +804,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   if (config.audit) {
     const bytes = readProject(root, config.audit);
     if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`);
-    try { entries = JSON.parse(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    try { entries = parseBounded(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)

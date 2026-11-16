@@ -14,7 +14,7 @@ let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600)}`}`); } };
 
 ok(["a.json", "./a.json", "a/b/c.json", "a/../b.json", "a\\b.json", ".github/x.json"].every(inProject), "a path from the project's root, however written, stays inside it");
-ok(!["../a.json", "a/../../b.json", "..", "/etc/a.json", "\\a.json", "C:/a.json", "c:a.json", "..\\a.json", "", "a\0b", null, 5, ["a"]].some(inProject), "a rooted path, one with a \"..\" that leads above the root, and one that is no path stay out");
+ok(!["../a.json", "a/../../b.json", "..", "/etc/a.json", "\\a.json", "C:/a.json", "c:a.json", "..\\a.json", "", "a\0b", "a\nb.json", "a\rb", "a\u007fb", null, 5, ["a"]].some(inProject), "a rooted path, one with a \"..\" that leads above the root, one with a control character, and one that is no path stay out");
 
 const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "guards-test-")));
 try {
@@ -31,7 +31,12 @@ try {
   fs.symlinkSync(elsewhere, path.join(project, "away"), "junction");
   ok(!leadsOut(project, path.join(project, "inner", "own.json")) && !leadsOut(project, path.join(project, "in", "own.json")), "a file of the project's, or one reached through a link inside it, does not lead out");
   ok((!fileLink || leadsOut(project, path.join(project, "out.json"))) && leadsOut(project, path.join(project, "away", "other.json")), "a file reached through a link out of the project, at the file or a folder on its way, leads out");
-  ok(!leadsOut(project, path.join(project, "none.json")), "a path that does not stand is left to its reader's own error");
+  ok(!leadsOut(project, path.join(project, "none.json")) && !leadsOut(project, path.join(project, "inner", "new", "x.json")), "a path that does not stand yet, under a folder of the project's, does not lead out");
+  ok(leadsOut(project, path.join(project, "away", "new.json")) && leadsOut(project, path.join(project, "away", "deeper", "new.json")), "a path that does not stand yet, under a folder linked out of the project, leads out");
+  if (fileLink) {
+    fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
+    ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");
+  }
   ok(unrooted(`ENOENT: open '${path.join(project, "core-manifest.md")}'`, project) === `ENOENT: open '.${path.sep}core-manifest.md'`, "a message names the project's place as \".\"", unrooted(path.join(project, "core-manifest.md"), project));
   ok(!unrooted(`at '${project.replace(/\\/gu, "/")}' and ${project}`, project).includes(tmp), "in each spelling of the place", unrooted(`at '${project.replace(/\\/gu, "/")}' and ${project}`, project));
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
