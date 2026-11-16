@@ -215,15 +215,22 @@ if (p.status === 0) {
     "against the base, a baseline moved or a file left out of the config fails, saying its mend, and the mend passes; a config widened passes", `${same.out}${moved.out}${narrowed.out}${narrowedCode.out}${widened.out}${mendedRun.stdout}${mendedRun.stderr}`);
   // (a file the base's config read, renamed out of every spec, is held by its new name, and the mend as worded passes;
   // a file deleted is no narrowing; #371)
-  const baseRun = (config = ".github/copies.json") => { const r = spawnSync(process.execPath, ["scripts/copies.mjs", config], { cwd: core, env: { ...env, COPIES_BASE: "main" }, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+  // (each run's temporary folder is one of its own, so that the base's index, written there, is seen taken away after)
+  const baseRun = (config = ".github/copies.json") => {
+    const scratchTmp = fs.mkdtempSync(path.join(tmp, "copies-tmp-"));
+    const r = spawnSync(process.execPath, ["scripts/copies.mjs", config], { cwd: core, env: { ...env, COPIES_BASE: "main", TMPDIR: scratchTmp, TEMP: scratchTmp, TMP: scratchTmp }, encoding: "utf8" });
+    const left = fs.readdirSync(scratchTmp);
+    fs.rmSync(scratchTmp, { recursive: true, force: true });
+    return { status: r.status, out: r.stdout + r.stderr + (left.length ? `\nleft in its temporary folder: ${left.join(", ")}` : ""), left: left.length };
+  };
   git(core, "mv", "roles/shared/how-to-work.md", "elsewhere.md");
   const renamedOut = baseRun();
   git(core, "mv", "elsewhere.md", "roles/shared/how-to-work.md");
   git(core, "rm", "-q", "roles/shared/how-to-work.md");
   const deleted = baseRun();
   git(core, "reset", "-q", "--hard", "main");
-  ok(renamedOut.status === 1 && /reads 1 files fewer than main's config read: elsewhere\.md \(prose\)\. Mend: take the config back/u.test(renamedOut.out) && mended(renamedOut.out) && deleted.status === 0,
-    "against the base, a file its config read and renamed out of every spec fails, by its new name, with its mend; one deleted passes", `${renamedOut.out}${deleted.out}`);
+  ok(renamedOut.status === 1 && /reads 1 files fewer than main's config read: elsewhere\.md \(prose\)\. Mend: take the config back/u.test(renamedOut.out) && mended(renamedOut.out) && deleted.status === 0 && !renamedOut.left && !deleted.left,
+    "against the base, a file its config read and renamed out of every spec fails, by its new name, with its mend; one deleted passes; and the base's index is taken away after", `${renamedOut.out}${deleted.out}`);
   // (a config moved with the call that names it is held to the one the base called: narrowed or its baseline moved,
   // it fails with its mend; moved whole, it passes; one beside a config still called is a first, held to nothing; #370)
   const tests = path.join(core, ".github/workflows/tests.yml"), testsWas = fs.readFileSync(tests, "utf8"), cfgMain = JSON.parse(cfgWas);
