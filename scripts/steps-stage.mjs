@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { callers, project } from "./steps.mjs";
+import { callers, moved, project } from "./steps.mjs";
 
 const at = (dir, f) => path.join(dir, f);
 const read = (dir, f) => fs.readFileSync(at(dir, f), "utf8");
@@ -171,8 +171,26 @@ export const STAGES = {
     },
     mend: dir => {
       const manifest = read(dir, "core-manifest.md"), agents = read(dir, "AGENTS.md");
-      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?modules\/, )/m, "$1roles/, "));
+      if (!/^Paths:.*\broles\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^(Paths:.*?floor\/, (?:modules\/, )?)/m, "$1roles/, "));
       if (!/^@core\/roles\/builder\.md[ \t]*$/m.test(agents)) write(dir, "AGENTS.md", agents.replace(/^(@core\/floor\/security\.md[ \t]*\r?\n)/m, "$1@core/roles/builder.md\n"));
+    },
+  },
+  "16 November 2026, the rules in folders that say who reads them or when": {
+    asked: true,
+    // (a rule file that names two of the core's files where they stood, and the manifest's line with the old folders;
+    // the mend names each by the path the step words)
+    stage: dir => {
+      write(dir, "AGENTS.md", read(dir, "AGENTS.md").replace("core/roles/shared/git.md", "core/modules/git.md").replace("core/tools/other-builders.md", "core/modules/other-builders.md"));
+      write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(Paths:.*?)tasks\/, tools\/, /m, "$1"));
+    },
+    mend: dir => {
+      const map = moved(at(dir, "core")), names = Object.keys(map).sort((a, b) => b.length - a.length);
+      for (const f of project(dir).files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/.test(f))) {
+        const text = read(dir, f), next = names.reduce((t, old) => t.split(`core/${old}`).join(`core/${map[old].endsWith("/") ? `${map[old]}input.md` : map[old]}`), text);
+        if (next !== text) write(dir, f, next);
+      }
+      const manifest = read(dir, "core-manifest.md"), want = /^Paths: .*$/m.exec(read(dir, "core/setup/template/core-manifest.md.tmpl"))[0];
+      if (!/^Paths:.*\btasks\/.*\btools\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^Paths: .*$/m, want));
     },
   },
 };

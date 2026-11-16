@@ -285,11 +285,37 @@ function hostileTests(p) {
   return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
 }
 
+// The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the
+// files that point from the old paths say it themselves: each opens "This file only points" and names where its rules
+// stand, in backticks.
+export function moved(core = HERE) {
+  const out = {};
+  for (const old of [...(fs.existsSync(path.join(core, "modules")) ? fs.readdirSync(path.join(core, "modules")).filter(f => f.endsWith(".md")).map(f => `modules/${f}`) : []), "floor/topics.md"]) {
+    let text = "";
+    try { text = fs.readFileSync(path.join(core, old), "utf8"); } catch { continue; }
+    const to = /^This file only points:[^`]*`([^`]+)`/mu.exec(text)?.[1];
+    if (to) out[old] = to;
+  }
+  return out;
+}
+// Where a project's own files still name an old path of the core's, and its manifest's "Paths:" line the old folders:
+// the mend, naming each file and each path's new one; null where none does.
+function movedPaths(p) {
+  const map = moved(), found = new Map();
+  const old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.]/gu, "\\.")).join("|")})(?![\\w/-])`, "gu");
+  for (const f of p.files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f))) {
+    for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
+  }
+  const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""} (in ${files.map(f => `\`${f}\``).join(", ")})`);
+  if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
+  return wrong.length ? `In one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/tools/other-builders.md` at the start of every task");
+      if (!/core\/(?:modules|tools)\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/tools/other-builders.md` at the start of every task");
       if (/^\|\s*\*Codex's checks\*\s*\|/m.test(p.manifest)) wrong.push("the manifest's row *Codex's checks* is renamed *other builders' checks*");
       return wrong.length ? `${wrong.join("; ")}.` : null;
     },
@@ -302,9 +328,8 @@ export const STEPS = [
   { lead: "12 November 2026, a slimmer copy", cost: COST.line,
     check: p => {
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
-      // (the roles' folder, which the line gained later, is its own entry's to ask: 16 November 2026, a file for each role)
-      const plain = line => line.replace("roles/, ", "");
-      return want && !p.manifest.split("\n").some(line => plain(line) === plain(want)) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
+      // (the folders the line gained or lost later are their own entries' to ask: 16 November 2026)
+      return want && /^Paths:.*\breports\//mu.test(p.manifest) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
   { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
     partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
@@ -453,6 +478,8 @@ export const STEPS = [
       return wrong.length ? `In one pull request, ${wrong.join("; and ")}.` : null;
     },
     partly: "whether the project's own folders have their kind of task in `checks/reading.json` is a reading of its folders; the sentence of `AGENTS.md` that names the script, step 2 of its \"Starting a task\" and the issue forms' \"What to read\" are differences `core/scripts/fresh.mjs` lists; the line `Read for it:` is held by the description check" },
+  { lead: "16 November 2026, the rules in folders that say who reads them or when", cost: COST.line, check: movedPaths,
+    partly: "a path the project builds from parts, or names in a file that is no text, is no match a check finds: the pointer check fails it once the files that point from the old paths go" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -183,7 +183,7 @@ if (p.status === 0) {
   fs.rmSync(path.join(core, ".github/copies-baseline.json"));
   const ownNone = run(core, "scripts/copies.mjs", ".github/copies.json");
   git(core, "checkout", "-q", "--", ".github/copies-baseline.json");
-  ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*modules\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
+  ok(coreRun.status === 0 && ownCopy.status === 1 && /a new copy: .*roles\/shared\/how-to-work\.md:.*\. Mend: keep it in the one place/u.test(ownCopy.out) && mended(ownCopy.out)
     && ownNone.status === 1 && /Mend: write the project's first with node scripts\/copies\.mjs \.github\/copies\.json --first/u.test(ownNone.out) && mended(ownNone.out),
     "the core's own copies check passes on the core, and fails a copy added there, its mends naming the core's own paths", `${coreRun.out}${ownCopy.out}${ownNone.out}`);
   // (against the base, the config is held to the base's (#348): a baseline moved, or a file the base's config read and
