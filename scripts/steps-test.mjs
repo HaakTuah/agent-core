@@ -15,7 +15,7 @@ import { NOTES } from "./releases.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
-import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
+import { COST, MOVED_GLOB, NEW_GLOBS, READ_MOST, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -265,6 +265,29 @@ fs.writeFileSync(path.join(plainProject, "checks/copies.json"), JSON.stringify({
 found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter kit writes it today)") && project(plainProject).read("../a-game/AGENTS.md") === null,
   "a path that leads out of the project reads as missing, never as another folder's file", found.join("\n"));
+
+// ---- what the steps read is a regular file of the project's own, of a size a rule file or config keeps to (#362, #423):
+// a link (in or out), a folder link that leads out, an endless device and a file past the size read as missing, and the
+// last is named in the report ----
+{
+  const dir = path.join(tmp, "links"), outside = path.join(tmp, "outside");
+  fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+  fs.mkdirSync(outside, { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# own\n");
+  fs.writeFileSync(path.join(outside, "secret.md"), "outside\n");
+  fs.writeFileSync(path.join(dir, "docs/big.md"), "x".repeat(READ_MOST + 1));
+  const linked = [];
+  for (const [at, to, type] of [["in.md", "AGENTS.md", "file"], ["out.md", path.join(outside, "secret.md"), "file"], ["far", outside, "dir"], ...(process.platform === "win32" ? [] : [["zero.md", "/dev/zero", "file"]])]) {
+    try { fs.symlinkSync(to, path.join(dir, at), type); linked.push(at); } catch { /* (a system that makes no link here: that case is not run) */ }
+  }
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const p = project(dir);
+  const reads = p.read("AGENTS.md") === "# own\n" && linked.every(at => p.read(at === "far" ? "far/secret.md" : at) === null) && p.read("docs") === null && p.read("docs/big.md") === null;
+  const said = report(Object.assign([], { unread: p.unread }));
+  ok(reads && p.unread.join() === "docs/big.md" && said.includes(`Left unread, each past ${READ_MOST} bytes`) && said.includes("`docs/big.md`"),
+    `the steps read a regular file of the project's own and nothing else: a link in or out (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, said);
+}
 
 // ---- a NuGet project set up at its root, its project file nested; a difference declared: neither is a difference ----
 const rootNuget = kit("a-root-nuget-project", { nuget: ".", private: true });

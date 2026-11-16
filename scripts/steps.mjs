@@ -52,9 +52,21 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 export function project(root) {
   const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
-  // (a path the project's own files name is read only inside the project: one that leads out of it reads as missing)
-  const inside = f => { const to = path.resolve(root, f), rel = path.relative(path.resolve(root), to); return rel && !rel.startsWith("..") && !path.isAbsolute(rel) ? to : null; };
-  const read = f => { const to = inside(f); if (!to) return null; try { return fs.readFileSync(to, "utf8").replace(/\r\n/g, "\n"); } catch { return null; } };
+  // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on the way
+  // followed, lies inside it (#362, #423): a path that leads out, a link, a device, a pipe or a folder reads as missing,
+  // and a file past the size as missing too, named in `unread`, so that no file the project holds stops the report)
+  const home = fs.realpathSync(root), unread = [];
+  const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
+  const read = f => {
+    const to = path.resolve(home, f);
+    if (!within(to)) return null;
+    try {
+      const stat = fs.lstatSync(to);
+      if (!stat.isFile() || !within(fs.realpathSync(to))) return null;
+      if (stat.size > READ_MOST) { if (!unread.includes(f)) unread.push(f); return null; }
+      return fs.readFileSync(to, "utf8").replace(/\r\n/g, "\n");
+    } catch { return null; }
+  };
   const manifest = read("core-manifest.md") ?? "";
   const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
@@ -62,8 +74,10 @@ export function project(root) {
     try { yaml = parseYaml(read(f)); } catch { /* (a workflow this reader cannot read: a check that needs it says so) */ }
     return [f.slice(".github/workflows/".length), { text: read(f), yaml }];
   }));
-  return { root, files: listed, read, manifest, differences, workflows };
+  return { root, files: listed, read, unread, manifest, differences, workflows };
 }
+// The most a file the steps read may hold: past any rule file, config or workflow a project writes.
+export const READ_MOST = 4 << 20;
 
 // A workflow the core's reader cannot read (workflow-run.mjs reads the forms the core's own workflows use): a check that
 // would read it throws, naming it, so the step is reported as not read, never as done or as missing.
@@ -576,14 +590,16 @@ export function notDone(root, steps = STEPS) {
     try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read the entry in \`core/${NOTES}\` against it.`; }
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
   }
+  out.unread = p.unread;
   return out;
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are.
 export function report(missed) {
-  if (!missed.length) return "Every step a check reads is done (`core/scripts/steps.mjs`).";
+  const unread = missed.unread?.length ? `\n\nLeft unread, each past ${READ_MOST} bytes, which no file a step reads reaches: ${missed.unread.map(f => `\`${f}\``).join(", ")}. A step that reads one may have read it as missing: make it smaller, or take it out of git if it is no file of the project's.` : "";
+  if (!missed.length) return `Every step a check reads is done (\`core/scripts/steps.mjs\`).${unread}`;
   return [`Steps not done (\`core/scripts/steps.mjs\`; core/${NOTES}): each a task the project's agents take, in a pull request of its own, none waiting on another${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
-    ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n");
+    ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n") + unread;
 }
 
 if (started(import.meta.url)) {
