@@ -22,7 +22,7 @@ wanted").
 | #309 | rule builder | |
 | #318 | rule builder | |
 | #310 | rule builder | |
-| #325 | rule builder | #322 |
+| #325 | rule builder | |
 | #314 | rule builder | |
 | #456 | rule builder; it changes the floor (rules 5 and 10), and its pull request quotes the owner's yes on the issue | |
 | #457 | rule builder | |
