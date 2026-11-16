@@ -131,7 +131,7 @@ ok(gather({ repo: "o/r", owner: "o", to: Date.parse(iso(11)), pulls: fixtures.pu
 
 // ---- the command ----
 const run = args => spawnSync(process.execPath, [path.join(root, "scripts/outcomes-read.mjs"), ...args], { encoding: "utf8" });
-for (const args of [[], ["--repo", "o/r"], ["--repo", "../x", "--month", "2026-10"], ["--repo", "o/r", "--month", "2026-13"], ["--repo", "o/r", "--from", "2026-10-01"]]) {
+for (const args of [[], ["--repo", "o/r"], ["--repo", "../x", "--month", "2026-10"], ["--repo", "o/r", "--month", "2026-13"], ["--repo", "o/r", "--from", "2026-10-01"], ["--repo", "o/r", "--from", "2026-10-01", "--to", "2026-11-01", "--root", "/no/such/folder"]]) {
   const r = run(args);
   ok(r.status === 1 && mended(r.stderr), `a wrong call (${args.join(" ") || "none"}) fails with its mend`, r.stderr);
 }

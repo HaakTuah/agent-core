@@ -7,7 +7,8 @@
 //   node scripts/outcomes-read.mjs --repo owner/name --month YYYY-MM     the lines for a month (the state report's)
 //   node scripts/outcomes-read.mjs --repo owner/name --from YYYY-MM-DD --to YYYY-MM-DD [--corrections file.json]
 //                                       a fixed span, as the first reading took it, the corrections given as
-//                                       [{ at, pull, kind }] where they were found by reading
+//                                       [{ at, pull, kind }] where they were found by reading, and with
+//                                       --root <folder> how the code grows in that checkout
 import fs from "node:fs";
 import { blockingOf, codexFind, otherOf, postedKind } from "./review-record.mjs";
 import { priced, reading as costOf, sessionOf } from "./core-cost.mjs";
@@ -99,12 +100,20 @@ export function report({ repo, month, manifest = null, root = ".", previous = nu
   return lines({ rows: measure(data, month), grown, share, first: firstOf(repo, root), previous });
 }
 
+// How the code grows in the project at `root` (its manifest's shape check, or the core's AGENTS.md where it has no
+// manifest); null where it cannot be read.
+export function grownAt(root) {
+  let manifest = null;
+  try { manifest = fs.readFileSync(`${root}/core-manifest.md`, "utf8"); } catch { /* the core's own */ }
+  try { return growth(shapeReading(rulesOf(manifest, root).rules, root), root); } catch { return null; }
+}
+
 if (started(import.meta.url)) {
   const args = process.argv.slice(2), at = f => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined);
-  const repo = at("--repo"), month = at("--month"), from = at("--from"), to = at("--to"), given = at("--corrections");
+  const repo = at("--repo"), month = at("--month"), from = at("--from"), to = at("--to"), given = at("--corrections"), dir = at("--root");
   const day = /^\d{4}-\d\d-\d\d$/u;
-  if (!/^[\w-]+\/(?!\.+$)[\w.-]+$/u.test(repo ?? "") || !(month ? /^\d{4}-(?:0[1-9]|1[0-2])$/u.test(month) : day.test(from ?? "") && day.test(to ?? ""))) {
-    console.error("FAIL: it takes --repo owner/name and either --month YYYY-MM or --from and --to YYYY-MM-DD. Mend: name the repository and the span, as `node scripts/outcomes.mjs --repo owner/name --month 2026-10`");
+  if (!/^[\w-]+\/(?!\.+$)[\w.-]+$/u.test(repo ?? "") || !(month ? /^\d{4}-(?:0[1-9]|1[0-2])$/u.test(month) : day.test(from ?? "") && day.test(to ?? "")) || (args.includes("--root") && !fs.existsSync(dir ?? ""))) {
+    console.error("FAIL: it takes --repo owner/name and either --month YYYY-MM or --from and --to YYYY-MM-DD, and --root only with a folder that stands. Mend: name the repository and the span, as `node scripts/outcomes-read.mjs --repo owner/name --month 2026-10`");
     process.exitCode = 1;
   } else if (month) console.log(report({ repo, month }).join("\n"));
   else {
@@ -112,7 +121,8 @@ if (started(import.meta.url)) {
     const data = read(repo, w.from, w.to);
     if (given) data.corrections = JSON.parse(fs.readFileSync(given, "utf8"));
     const rows = MEASURES.map(m => ({ key: m.key, outcome: m.outcome, direct: m.direct, label: m.label, text: m.of(data, w).text, months: 1 }));
-    console.log(lines({ rows, grown: null }).join("\n"));
-    console.log(JSON.stringify(Object.fromEntries(rows.map(r => [r.key, r.text]))));
+    const grown = dir ? grownAt(dir) : null;
+    console.log(lines({ rows, grown }).join("\n"));
+    console.log(JSON.stringify(Object.fromEntries([...rows.map(r => [r.key, r.text]), ...(grown ? [["size", `${grown.kb} KB in ${grown.files} files, ${grown.large} of them over 20 KB`], ["functions", Object.entries(grown.over).map(([k, n]) => `${n} over ${grown.marks[k]} ${k}`).join(", ")]] : [])])));
   }
 }
