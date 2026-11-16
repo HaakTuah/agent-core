@@ -87,6 +87,18 @@ try {
   ok(t.status === 1 && mended(t.out) && /^FAIL: a broken pointer: \.agents\/rules\/new\.md:3: `docs\/gone\.md` is no tracked file or folder\. Mend: /m.test(t.out) && /^FAIL: a broken pointer: GEMINI\.md:3: "building it" is no heading/m.test(t.out)
     && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/own\.md:5: .*the pull request's base held it/m.test(t.out) && !/FAIL.*own\.md/.test(t.out),
     "one it did not hold fails, in a tool's folder or GEMINI.md, saying its mend, while the old one, its line moved, is still noted", t.out);
+  // (a new break in the same file as an old one fails; a tool's file SECURITY.md already names fails as before)
+  put(".kiro/steering/own.md", `${fs.readFileSync(path.join(tools, ".kiro/steering/own.md"), "utf8")}\nAnd \"Testing it\" in \`docs/developing.md\`.\n`);
+  put(".kiro/steering/listed.md", "# Listed\n\nAs \"Releasing it\" in `docs/developing.md` says.\n");
+  put("SECURITY.md", FILES["SECURITY.md"].replace("`docs/developing.md`;", "`docs/developing.md`, `.kiro/steering/listed.md`;"));
+  g("add", "-A");
+  t = check();
+  ok(t.status === 1 && /^FAIL: a broken pointer: \.kiro\/steering\/listed\.md:3: "releasing it"/m.test(t.out), "a tool's file that SECURITY.md names as a rule file fails as before, with no base", t.out);
+  t = check({ POINTERS_BASE: base });
+  ok(t.status === 1 && /^FAIL: a broken pointer: \.kiro\/steering\/own\.md:7: "testing it"/m.test(t.out) && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/own\.md:5: /m.test(t.out), "a new break in the same file as an old one fails, the old one still noted", t.out);
+  put(".kiro/steering/own.md", fs.readFileSync(path.join(tools, ".kiro/steering/own.md"), "utf8").replace(/\nAnd "Testing it".*\n/u, ""));
+  put("SECURITY.md", FILES["SECURITY.md"]);
+  g("rm", "-q", "-f", ".kiro/steering/listed.md"); g("add", "-A");
   t = check({ POINTERS_BASE: "no-such-branch" });
   ok(t.status === 1 && mended(t.out) && /^FAIL: POINTERS_BASE no-such-branch is not a commit here\. Mend: fetch it/m.test(t.out), "a base that is no commit here fails, saying to fetch it", t.out);
   put(".agents/rules/new.md", "# A rule\n\nAs `docs/developing.md` says.\n");

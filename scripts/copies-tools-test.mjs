@@ -28,17 +28,21 @@ try {
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/a.md`;\n");
   put("docs/a.md", `# Developing\n\n${OTHER}.\n`);
   put("checks/copies.json", `${JSON.stringify({ baseline: "checks/copies-baseline.json", code: [], prose: [], proseFromSecurity: true })}\n`);
-  put("checks/copies-baseline.json", "{\n  \"windows\": {}\n}\n");
-  // (the project as it stood before the check read its agent tools' files: a steering file that repeats AGENTS.md)
+  // (the project as it stood before the check read its agent tools' files: an old copy of its own listed, and a
+  // steering file that repeats AGENTS.md, which the baseline, written before, does not list)
+  const LISTED = "the tests a change can reach are run on each pull request and the whole suite on main";
+  put("AGENTS.md", `# A project\n\n${SAID}.\n\n${LISTED}.\n`);
+  put("docs/a.md", `# Developing\n\n${OTHER}.\n\n${LISTED}.\n`);
+  g("init", "-q"); g("add", "-A");
+  spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir });
   put(".kiro/steering/own.md", `# Steering\n\n${SAID}.\n`);
-  g("init", "-q");
   const base = commit("base");
   const check = (env = {}, ...flags) => {
     const r = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", ...flags], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: "", ...env } });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   };
   const OLD = /^note an old copy in an agent tool's file, not yet in the baseline: (AGENTS\.md:3-3 and \.kiro\/steering\/own\.md:3-3|\.kiro\/steering\/own\.md:3-3 and AGENTS\.md:3-3) /m;
-  const NOTED = /^ok {3}no new copies \(0 old ones, listed in checks\/copies-baseline\.json, to be removed; 1 in an agent tool's files, noted above\)$/m;
+  const NOTED = /^ok {3}no new copies \(1 old ones, listed in checks\/copies-baseline\.json, to be removed; 1 in an agent tool's files, noted above\)$/m;
   let r = check();
   ok(r.status === 0 && OLD.test(r.out) && NOTED.test(r.out) && /with no base to read against, so it fails nothing; list it with node core\/scripts\/copies\.mjs checks\/copies\.json --tools/.test(r.out), "with no base, a copy in an agent tool's file is noted, with how to list it, and fails nothing", r.out);
   r = check({ COPIES_BASE: base });
@@ -61,7 +65,7 @@ try {
   const listed = JSON.parse(fs.readFileSync(path.join(dir, "checks/copies-baseline.json"), "utf8")).windows;
   ok(r.status === 0 && Object.keys(listed).length > 0 && Object.values(listed).every(n => n === 2) && /the copies in an agent tool's files listed/.test(r.out), "--tools lists in the baseline each window of the copy in an agent tool's file, in as many places as it stands", r.out);
   r = check({ COPIES_BASE: base });
-  ok(r.status === 0 && !/not yet in the baseline/.test(r.out) && /no new copies \(1 old ones/.test(r.out), "and against the base, whose baseline lists none, the baseline that lists what stood there passes, the copy no longer noted", r.out);
+  ok(r.status === 0 && !/not yet in the baseline/.test(r.out) && /no new copies \(2 old ones/.test(r.out), "and against the base, whose baseline lists none, the baseline that lists what stood there passes, the copy no longer noted", r.out);
   const written = commit("the copies in an agent tool's files listed");
   r = check({ COPIES_BASE: written });
   ok(r.status === 0 && !/not yet in the baseline/.test(r.out), "and once it stands on the base, it passes there too", r.out);

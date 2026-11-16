@@ -761,5 +761,31 @@ const there = to => fs.existsSync(path.join(coreRoot, to)) && fs.statSync(path.j
 ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Object.values(moved.apart()).flat().every(a => there(a.to) && fs.readFileSync(path.join(coreRoot, a.to), "utf8").includes(`**${a.lead}**`)),
   "each file at a path the rules left names a file or a folder that stands, and a rule it says stands elsewhere stands there", JSON.stringify([moved(), moved.apart()]));
 
+// the agent tools' files step: where the copies or pointer check cannot run to its verdict, it is not read, never done
+{
+  const step = STEPS.find(s => s.lead === "16 November 2026, the agent tools' files read for copies and pointers"), d = dirs["an-npm-project"];
+  const unread = () => { try { step.check(project(d)); return ""; } catch (e) { return e instanceof Unread ? e.message : `${e}`; } };
+  const cfg = path.join(d, "checks/copies.json"), was = fs.readFileSync(cfg, "utf8");
+  fs.writeFileSync(cfg, "{ not json");
+  let said = unread();
+  fs.writeFileSync(cfg, was);
+  ok(/the copies check did not run to its verdict on checks\/copies\.json/.test(said), "where the copies check stops before its verdict, the step is not read", said);
+  for (const script of ["copies.mjs", "pointers.mjs"]) {
+    const at = path.join(d, "core/scripts", script);
+    fs.renameSync(at, `${at}.away`);
+    said = unread();
+    fs.renameSync(`${at}.away`, at);
+    ok(said === `no copy of ${script} to run`, `with no copy of ${script}, the step is not read`, said);
+  }
+  if (process.platform !== "win32") {
+    const outside = path.join(tmp, "copies-outside.json");
+    fs.writeFileSync(outside, was); fs.rmSync(cfg); fs.symlinkSync(outside, cfg);
+    said = unread();
+    fs.rmSync(cfg); fs.writeFileSync(cfg, was);
+    ok(/the copies check's config `checks\/copies\.json` is no regular file of the project's own/.test(said), "a copies config whose link leads out of the project is not handed to the check", said);
+  }
+  ok(step.check(project(d)) === null, "and with each put back, the starter kit's project has nothing to list", step.check(project(d)) ?? "");
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
 process.exitCode = failed ? 1 : 0;
