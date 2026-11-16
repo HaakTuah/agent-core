@@ -1,6 +1,6 @@
 # The core's queue
 
-The order this repository's open issues are built in, and nothing else (`AGENTS.md`, "The queue"). The first line that
+The order this repository's open issues are built in (`AGENTS.md`, "The queue"). The first line that
 waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
@@ -50,7 +50,7 @@ it merges last.
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | #486's record |
-| #460, point 1 (a staged case for floor rule 9) | builder | |
+| #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
 | #460, point 4 (names in descriptions) | builder | #405, which changes `scripts/pointers.mjs` too |
