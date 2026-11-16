@@ -41,7 +41,10 @@ const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+
 // (whether a command, read command by command, defines an alias whose name `name` matches)
 const ALIASES = /^\s*(?:(?:then|do|else|elif|if|while|until|builtin|command|!|\{|\()\s*)*alias\b/u;
 const aliases = (raw, name) => raw.split(/[;&|\n]/u).some(c => ALIASES.test(c) && name.test(c));
-const redefined = raw => DEFINED.test(raw) || aliases(raw, /[\s"'](?:test|\[\[?)=/u);
+const redefined = raw => DEFINED.test(raw) || aliases(raw, /[\s"'](?:test|\[\[?)=/u) || RUNTIME.test(raw);
+// (a command that could define either at its run, by text no reading here sees whole: eval, source or ".", an alias of
+// any name, or bash's table of aliases; no file test nor fetch of it is one)
+const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias)(?=[\s;&|)`]|$)|BASH_ALIASES/u;
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), or a ${...} with a default, perhaps closed by a quote)
 const ROOTED = /[\u0001)`}]\\?["']?$/u;
@@ -64,7 +67,7 @@ function quotedTexts(script, depth = 0, out = []) {
     // (a quote never closed opens nothing, and reading goes on after it; an apostrophe in a comment or a here-document
     // that a later quote of its kind closes is read as a pair, which the shell would not, and stays the review's)
     if (j >= script.length) continue;
-    out.push([body, script.slice(Math.max(0, i - 200), i)]);
+    out.push([body, windowAt(script, i)]);
     quotedTexts(body, depth + 1, out);
     i = j;
   }
@@ -101,7 +104,7 @@ const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|w
 const fetched = before => FETCHED.test(before);
 // (a command that defines git as a function or an alias: no fetch of its is one)
 const GIT_DEFINED = /(?:^|[\s;&|(])git[ \t]*\([ \t]*\)|\bfunction[ \t\n]+git(?=[\s({]|$)/u;
-const gitDefined = raw => GIT_DEFINED.test(raw) || aliases(raw, /[\s"']git=/u);
+const gitDefined = raw => GIT_DEFINED.test(raw) || aliases(raw, /[\s"']git=/u) || RUNTIME.test(raw);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
@@ -123,6 +126,8 @@ function dequote(s) {
     const c = s[i];
     if (c === "\\") { if (s[i + 1] !== "\n") out += s[i + 1] ?? ""; i += 2; continue; }
     const ansi = c === "$" && s[i + 1] === "'";
+    // (bash's $"..." is read as "...")
+    if (c === "$" && s[i + 1] === '"') { i++; continue; }
     if (c !== "'" && c !== '"' && !ansi) { out += c; i++; continue; }
     const [text, next] = quotedAt(s, i + (ansi ? 2 : 1), ansi ? "$'" : c);
     out += text;
@@ -151,6 +156,10 @@ function dequotings(script) {
   return levels;
 }
 
+// What stands before `i` in `text`, its last 200 characters at most; where it is cut, its start is marked as no command's
+// start (" x "), so no regex here reads the cut as one.
+const windowAt = (text, i) => (i > 200 ? ` x ${text.slice(i - 200, i)}` : text.slice(0, i));
+
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
 function scan(text, index, holds, found, tests, fetches, only = () => true) {
   for (let i = 0; i < text.length; i++) {
@@ -159,7 +168,7 @@ function scan(text, index, holds, found, tests, fetches, only = () => true) {
     for (let j = i; j < text.length && (node = node.get(text[j])); j++) { // (by UTF-16 unit, as pathsIndex keys them)
       if (!node.has("") || (j + 1 < text.length && /[\w./-]/u.test(text[j + 1]))) continue;
       const at = text.slice(i, j + 1);
-      if (!found.has(at) && only(at) && takenAt(text.slice(Math.max(0, i - 200), i), tests, fetches) && holds(at)) found.add(at);
+      if (!found.has(at) && only(at) && takenAt(windowAt(text, i), tests, fetches) && holds(at)) found.add(at);
     }
   }
 }
@@ -185,10 +194,10 @@ export function fromTree(command, holds, index = null, operand = false) {
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  // (a ${...}'s default is a word, not a command of its own: no file test stands at its start; and a definition of test
+  // (a ${...}'s default is a word, not a command of its own: no file test nor fetch stands at its start; and a definition of test
   // or git is looked for in the command as written and in every reading of its quoting, as alias g'it'=x defines git)
   const forms = [raw, ...dequotings(raw), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, "")];
-  const found = new Set(), tests = !operand && !forms.some(redefined), fetches = !forms.some(gitDefined);
+  const found = new Set(), tests = !operand && !forms.some(redefined), fetches = !operand && !forms.some(gitDefined);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
     if ((ref !== null && MAIN.test(ref) && fetches && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || (fetches && fetched(before))))) return;
@@ -200,12 +209,12 @@ export function fromTree(command, holds, index = null, operand = false) {
   // (each word as written, and as the shell unquotes it, so a path through a link inside the checkout, which no list of
   // the project's files holds, is found however it is quoted)
   for (let level = text, n = 0; n < 4; n++) {
-    for (const m of level.matchAll(WORD)) take(m[0], level.slice(Math.max(0, m.index - 200), m.index));
+    for (const m of level.matchAll(WORD)) take(m[0], windowAt(level, m.index));
     const next = dequote(level);
     if (next === level) break;
     level = next;
   }
-  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), text.slice(Math.max(0, m.index - 200), m.index));
+  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index));
   for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
   if (index) {
     // (as written, Windows' separators read; with the shell's quoting read level after level, as scripts within scripts

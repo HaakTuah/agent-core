@@ -507,6 +507,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["shopt -s expand_aliases; alias git=bash\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 117c2d0: a definition read with its quoting read too)
       ["runner() { bash \"${2#*:}\"; }; shopt -s expand_aliases; alias g'it'=runner;\ngit show origin/main:scripts/x.py", ["scripts/x.py"]], ["shopt -s expand_aliases; alias \"te\"st=bash\ntest -x scripts/x.py", ["scripts/x.py"]],
+      ["f() { bash \"${3#*:}\"; }; f ${x:-git show origin/main:scripts/x.py}", ["scripts/x.py"]],
+      ["printf %s ${x:-git show origin/main:scripts/x.py} | cut -d: -f2 | xargs bash", ["scripts/x.py"]],
+      [`cat --${" ".repeat(220)}test -f scripts/x.py 2>/dev/null | bash`, ["scripts/x.py"]],
+      [`x() { bash "\${3#*:}"; }; x${" ".repeat(220)}git show origin/main:scripts/x.py`, ["scripts/x.py"]],
+      [`cat -- /${"a".repeat(300)}/sh -c test -f scripts/x.py 2>/dev/null | bash`, ["scripts/x.py"]],
+      ["runner() { bash \"${2#*:}\"; }; shopt -s expand_aliases; eval 'alias git=runner'\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["runner() { bash \"${2#*:}\"; }; BASH_ALIASES[git]=runner\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["runner() { bash \"${2#*:}\"; }; shopt -s expand_aliases; alias $\"git\"=runner\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["runner() { bash \"${2#*:}\"; }; shopt -s expand_aliases; alias g{,}it=runner\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["runner() { bash \"${2#*:}\"; }; g=git; shopt -s expand_aliases; alias $g=runner\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["shopt -s expand_aliases; BASH_ALIASES[test]=bash\ntest -x scripts/x.py", ["scripts/x.py"]],
+      ["source <(echo 'git() { bash \"${2#*:}\"; }')\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
       ["bash 'scripts/$notify.sh'", ["scripts/$notify.sh"]], ["bash scripts/\\$notify.sh", ["scripts/$notify.sh"]],
       // (#476's fallback security review of 9dc381f: a shell's -c script starts a command only where the shell does)
