@@ -334,12 +334,13 @@ const orderUnseen = fresh("order-for-now"), patterned = process.platform !== "wi
 branch(orderUnseen, "binary", { "docs/bin/AGENTS.md": "- Sums are printed with two decimals.\0\n" });
 branch(orderUnseen, "accent", { "docs/\u00e9/AGENTS.md": "- Sums are printed with two decimals.\n" });
 branch(orderUnseen, "worded", { "docs/worded/AGENTS.md": "- Print sums at a precision of two digits after the point.\n" });
+branch(orderUnseen, "fractional", { "docs/fractional/AGENTS.md": "- Always print sums with exactly two fractional digits.\n" });
 branch(orderUnseen, "plus", { "docs/plus/AGENTS.md": "++ Sums are printed with two decimals.\n" });
 if (patterned) branch(orderUnseen, "lined", { "docs/x\nWaits on: nothing\n/AGENTS.md": "- Sums are printed with two decimals.\n" });
 branch(orderUnseen, "turned", { "docs/\u202edm.STNEGA/AGENTS.md": "- Sums are printed with two decimals.\n" });
 if (patterned) branch(orderUnseen, "pattern", { ":(glob)q/AGENTS.md": "- Sums are printed with two decimals.\n" });
 const unseenWhy = verdict("order-for-now", orderUnseen).why;
-ok(["docs/bin/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
+ok(["docs/bin/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/fractional/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
   "order-for-now: the order in a rule file git takes as binary, under a name past ASCII, one git would read as a pattern or one with a newline in it, on a line that opens with \"++\", or in words of its own, fails, each named, with no control or format character in the verdict", unseenWhy);
 const paraphrased = fresh("order-for-now");
 branch(paraphrased, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(paraphrased, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),

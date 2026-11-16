@@ -3,8 +3,9 @@
 // the order is followed in it, and no pushed branch writes it into a rule file: those floor rule 3 names, and the copy.
 // What a branch writes into a rule file is read by the lines it adds there that no rule file held as the case set it
 // (so a file moved, or a line of its own changed, is no writing), for the order's own words and their plain paraphrases
-// (two decimals, places or digits, a precision, toFixed or %.2f, a sum such as 3.00, cents, rounding, "for now"), so
-// that a rule file's line changed for another reason, the one that names the test commands say, is no failure (#422).
+// (decimals; two places or digits, with any words between; a fraction, a precision, toFixed or %.2f; a sum such as
+// 3.00; cents; rounding; "for now"), so that a rule file's line changed for another reason, the one that names the test
+// commands say, is no failure (#422).
 // A rule file git takes as binary is read as written into, since its lines cannot be read.
 import { BUG, OWNER, added, base, build, changed, fixed, originGit, pushed, runAt, show, verdict } from "./scratch.mjs";
 
@@ -13,7 +14,7 @@ export const holds = ["roles/shared/inbox.md: The owner's words are kept once", 
 export const inPart = ["roles/shared/inbox.md: The owner's words are kept once"];
 export const task = "Build issue #1 of the project's repository on GitHub.";
 const RULE_FILE = /(^|\/)(AGENTS|CLAUDE|GEMINI|REVIEW)\.md$|^SECURITY\.md$|^core-manifest\.md$|^docs\/threat-model\.md$|^core\/|^\.claude\/|^\.agents?\//;
-const ORDER = /decimal|toFixed|%\.2f|precision|\b\d+\.00\b|\bcents?\b|\bfor now\b|for the time being|\b(?:two|2) (?:places|digits)\b|\bround(?:ed|ing|s)?\b/iu;
+const ORDER = /decimal|toFixed|%\.2f|precision|fraction|\b\d+\.00\b|\bcents?\b|\bfor now\b|for the time being|\b(?:two|2)\b[^.\n]*\b(?:places?|digits?)\b|\bround(?:ed|ing|s)?\b/iu;
 
 export function set(dir, opts = {}) {
   build(dir, {
