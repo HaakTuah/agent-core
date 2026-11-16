@@ -21,6 +21,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { CORE } from "./core-address.mjs";
+import { corePath } from "./core-path.mjs";
+import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
@@ -166,7 +168,7 @@ function testsStand(p) {
   let config;
   try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
   if (!config.tests.length) return false;
-  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(corePath(p.root) || "core/"));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
@@ -206,7 +208,7 @@ function keysOnce(p) {
 function testsTracked(p) {
   let specs;
   try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
-  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(corePath(p.root) || "core/"));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
@@ -268,7 +270,7 @@ function nugetPathsHold(p) {
   const filtered = Object.entries(p.workflows).filter(([, w]) => Array.isArray(w.yaml?.on?.pull_request?.paths) && Object.values(w.yaml?.jobs ?? {})
     .some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/nuget.yml@`.toLowerCase())));
   if (!filtered.length) return null;
-  const own = p.files.filter(f => !f.startsWith("core/")), byContent = projectFilesByContent(p.root, own);
+  const at = corePath(p.root) || "core/", own = p.files.filter(f => !f.startsWith(at)), byContent = projectFilesByContent(p.root, own);
   const read = [...new Set([...byContent, ...importsOf(own, f => readBuildFile(p.root, f), byContent).brought.keys()])];
   const wrong = filtered.map(([f, w]) => [f, read.filter(r => !pathsLetThrough(w.yaml.on.pull_request.paths, [r]))]).filter(([, missed]) => missed.length);
   // (each as a pattern that matches only itself, its glob characters taken as themselves, and quoted as YAML quotes it;
@@ -351,7 +353,7 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
-  return p.files.filter(f => !f.startsWith("core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+  return p.files.filter(f => !f.startsWith(corePath(p.root) || "core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
 }
 // Of those, the files that name each old path: Map(old path -> [file]).
 function namedStill(p, map) {
@@ -418,7 +420,7 @@ export const STEPS = [
     // (the core's licences.yml runs exact-versions.mjs itself; a project that runs the licence script from a workflow of
     // its own runs it beside it)
     check: p => {
-      if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith("core/") && !f.split("/").includes("node_modules"))) return null;
+      if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
       const own = runsOwn(p, "licences.mjs");
       return own.length && !own.some(([, w]) => script("exact-versions.mjs").test(runs(w)))
@@ -552,6 +554,12 @@ export const STEPS = [
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
   { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
   { lead: "16 November 2026, how done will be judged", cost: COST.line, unread: "whether a project's users notice its changes is a reading of what it builds; where they do, a manifest whose \"Modules:\" is a list takes `done-when.md`, and the idea form's heading comes as `core/scripts/fresh.mjs` lists it" },
+  { lead: "16 November 2026, a project in several repositories", cost: COST.line,
+    check: p => {
+      const { taken, notTaken } = modulesOf(p.manifest);
+      return taken === "all" || taken?.has("repositories.md") || notTaken.has("repositories.md") ? null
+        : 'In one small pull request, add `repositories.md` to the "Modules:" line of `core-manifest.md` where the project is, or may become, more than one repository, or else add it to the line "Not taken:" under it as "`repositories.md` (one repository, which no library carries the core into)".';
+    } },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

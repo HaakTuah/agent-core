@@ -34,6 +34,7 @@ import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
 import { commandLines, commands, fetched, otherFetch } from "./licence-commands.mjs";
+import { copyOf } from "./core-path.mjs";
 
 const OWN = `${OWNER}/`;
 const SHELL = /\.(ya?ml|sh|bash|zsh|fish|mk|toml|envrc)$|(^|\/)(Dockerfile[^/]*|Makefile|GNUmakefile|\.envrc)$/iu;
@@ -148,7 +149,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
   const tracked = git("ls-files", "-z").split("\0").filter(Boolean);
   const project = tracked.includes("core-manifest.md"); // (a project, whose copy of the core the core audits)
-  const files = tracked.filter((f) => !(project && f.startsWith("core/")) && !under(f, settings.skip));
+  const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
   const served = (f) => under(f, settings.served) && !under(f, settings.tools);
   const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));

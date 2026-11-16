@@ -50,6 +50,14 @@ const CHECKS = {
   "scripts/shape.mjs": "scripts/shape-test.mjs",
   "scripts/strength.mjs": "scripts/strength-test.mjs",
   ".github/workflows/core.yml": "scripts/core-yml-test.mjs",
+  // (their own step that fails is the one that reads where the core's copy stands)
+  ".github/workflows/copies.yml": "scripts/core-path-test.mjs",
+  ".github/workflows/core-moved.yml": "scripts/core-path-test.mjs",
+  ".github/workflows/licences.yml": "scripts/core-path-test.mjs",
+  ".github/workflows/look.yml": "scripts/core-path-test.mjs",
+  ".github/workflows/pr-description.yml": "scripts/core-path-test.mjs",
+  ".github/workflows/signatures.yml": "scripts/core-path-test.mjs",
+  ".github/workflows/versions.yml": "scripts/core-path-test.mjs",
   ".github/workflows/nuget.yml": "scripts/nuget-gate-test.mjs",
   ".github/workflows/personal-terms.yml": "scripts/personal-terms-test.mjs",
 };

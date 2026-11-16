@@ -42,6 +42,12 @@
     "roles/shared/work-flow.md: Push after every commit": "check: scripts/work-saved.sh, in part",
     "roles/shared/work-flow.md: Updates, Dependabot and CodeQL": "describes",
     "tasks/hosts.md: One layer knows no host": "check: .github/workflows/tests.yml, in part",
+    "tasks/repositories.md: The manifest says where the core's copy is": ["check: scripts/core-path.mjs", "check: .github/workflows/core.yml"],
+    "tasks/repositories.md: A repository may take the core through a dependency that carries it": "check: .github/workflows/core.yml, in part",
+    "tasks/repositories.md: Before a split, one repository": "check: scripts/shape.mjs, in part",
+    "tasks/repositories.md: The core's files are in the checkout when a session starts": "check: .github/workflows/core.yml",
+    "tasks/repositories.md: A session that cannot read its floor does nothing else": "check: scripts/work-saved.sh, in part",
+    "tasks/repositories.md: Proven tool by tool; until then, a copy of the floor": "check: .github/workflows/core.yml, in part",
     "tasks/helpers.md: A brief is written as a rule is": "check: scripts/general.mjs, in part",
     "roles/shared/how-to-work.md: Read little, print little": "check: scripts/reading-size.mjs, in part",
     "roles/shared/how-to-work.md: One fact, one place": [
