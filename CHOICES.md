@@ -11,8 +11,8 @@ Read whole: 2026-11-15
   needs a licence check, a registry or an install, and the sync runs outside the owner's test box with Node and Git
   alone (`setup/server.md`, point 7). The one exact Node is `.node-version`'s.
 - Reopened on 16 November 2026 (#486, point 3), its sign having tripped: the readers written here by hand to stand in
-  for a package passed 600 lines (the lexer of `scripts/code-shape.mjs`, `scripts/shape-csharp.mjs` and
-  `scripts/shape-python.mjs`), and a reader for Rust was asked for. What stands: the scripts in JavaScript, run by the
+  for a package pass 600 lines together, though none alone (the lexer of `scripts/code-shape.mjs`,
+  `scripts/shape-csharp.mjs` and `scripts/shape-python.mjs`), and a reader for Rust, another, was asked for. What stands: the scripts in JavaScript, run by the
   pinned Node from the copy, a project's sessions installing nothing, and the scripts' own code with no type checker
   (the third record below). What gives way: a format or a language someone else defines is read by a package carried
   in the copy at one exact version, or by a tool that runs only in the core's own checks (#486, points 6 to 8); the
@@ -51,11 +51,12 @@ counter and its commands are in the pull request that adds this record (#487).
     installed. Wrong where the toolchain is missing where the checks run, or its measures cannot be set to the core's.
 - **The trial, on the hardest part.** A Rust file of 87 lines and a C# file of 104, invented to trip a reader, counted
   by hand: Rust 11 functions, 72 lines, 19 branches; C# 10, 86 and 25. Then, held out, a Rust file of 197 lines and a
-  C# file of 208, written and counted by hand by a fresh session that never saw the counter, the counter's definition
+  C# file of 210, written and counted by hand by a fresh session that never saw the counter, the counter's definition
   frozen first: Rust 19, 162 and 34; C# 19, 164 and 42 (its `do … while` read as one loop, where the hand count had
   two).
   - A: on C#, the core's reader found every function in both files; its lines came to 77 and 149, since it counts
-    from the opening brace (a definition, not a misread), and its branches to 23 and 39, since it counts no `when`.
+    from the opening brace (a definition, not a misread), and its branches to 23 and 39, since it counts no `when`,
+    and once counted a `??=`.
     No bug filed here names a language reader. On Rust there is no reader; one would need its own lexer (a lifetime
     that looks like a character, a raw string, a `||` that opens a closure and is no "or"), not timed.
   - B: the first files exact in every function. Held out, Rust exact in every function, first time; C# counted one
@@ -92,8 +93,8 @@ counter and its commands are in the pull request that adds this record (#487).
      verified, and the diff of what can be read (the grammar, its node types, its tests) read against the release
      notes, the WebAssembly named as what they do not explain, as the rule asks of anything so. The pinned Node of
      `scripts/node.sh` passes it the same way. Provenance is asked only where the old version had it.
-  4. Taken, and the pick changed to carrying: the runtime and all six grammars the core would read (Rust, C#, Python,
-     JavaScript, TypeScript, TSX) come to 10.5 MB, and 0.93 MB compressed, as git stores them; so a copy carries them
+  4. Taken, and the pick changed to carrying: the runtime and all seven grammars the core would read (Rust, C#,
+     Python, JavaScript, TypeScript, TSX, Bash) come to 11.9 MB, and 1.1 MB compressed, as git stores them; so a copy carries them
      all at little cost, works offline and on Windows, and is held byte for byte by the copy check
      (`.github/workflows/core.yml`), with no fetch to fail. Only the `.wasm` and the runtime's file are taken from a
      package, never its native builds, and no install script runs.
@@ -102,30 +103,54 @@ counter and its commands are in the pull request that adds this record (#487).
 - **The pick: B, carried in the copy.** It alone met criteria 1 and 3 together, with a definition of about ten lines
   for each language. The runtime and each grammar the core reads stand in the core at one exact version, their SHA-256
   in one list a test reads, each update passing floor rule 7's check of its source in its own pull request, and their
-  MIT notices kept in the core's third-party notices (floor rule 10). The
+  MIT notices kept in the core's third-party notices (floor rule 10), the test that reads the list reading each
+  file's licence too. The
   readers by hand that work (JavaScript, C#, Python) stay until the parser replaces each, a line each; Rust's reader
   is the first built this way, and #426's .NET readers the next.
 - **What a sync asks of a project:** for this record, nothing. The line that builds the first reader the picked way
   says what its sync asks; by this record, no install, no host to reach, and a reader's new findings listed in the
   check's baseline, as any new reading is ("Nothing locks a project").
-- **What is written by hand today** (#486, point 10; counted on 16 November 2026: lines, and bugs filed under `bug`
-  that name the script), worst first, each replaced at the dose as cleaning is (`tasks/cleaning.md`):
-  - readers of languages: `scripts/code-shape.mjs`'s lexer (in 881 lines), `scripts/shape-csharp.mjs` (318) and
-    `scripts/shape-python.mjs` (388), no bug filed: replace with the parser, once its Rust reader stands;
-  - readers of YAML: `scripts/yaml-keys.mjs` (155), run in every project's workflow check, and the YAML of
-    `scripts/workflow-run.mjs` (395), run only by the core's upgrade test: replace, the first with a YAML package
-    carried in the copy, the second with one in the core's tests alone;
-  - the reader of shell commands in `scripts/check-configs.mjs` (661 lines in all): replace its Bash with the parser's
-    Bash grammar; its PowerShell is kept until a grammar of a known publisher exists;
-  - the matching of file patterns, written three times (`check-configs.mjs`, `workflow-run.mjs`, `select.mjs`):
-    replace with one, Node's own `path.matchesGlob` where its tests show it matches GitHub's filters;
-  - the package checks planned for Cargo (#278): Cargo's own `cargo metadata`, a tool that only runs, where Cargo is;
-  - what Node itself brings (#486, point 11): none of the 76 tests uses `node:test` or `node:assert`, and none of the
-    51 scripts that read their arguments uses `util.parseArgs`: replace each where its file is next changed;
-  - kept: the host's workflow check (`scripts/workflows.mjs`, which searches a word and reads no YAML on purpose) and
-    the finding of copies (`scripts/copies.mjs`, 9 bugs filed, the most of any, but what a copy is the core's own rule
-    defines), with the mutation tool, the licence checks for npm and NuGet, and the readers of the core's own rules
-    and settings, as #486 leaves them.
+- **What is written by hand today** (#486, point 10). Counted on 16 November 2026: each stand-in's lines, and the
+  issues labelled `bug` that name its script (of the 50 so labelled). In the order of what each is worth, each
+  replaced by itself, with a trial of its own, at the dose, as cleaning is (`tasks/cleaning.md`):
+  1. **What Node itself brings** (point 11): none of the 76 tests uses `node:test` or `node:assert`, and none of the
+     51 scripts that read their arguments uses `util.parseArgs`. Replace each where its file is next changed; no
+     package is needed.
+  2. **YAML, shell commands and the host's workflows:**
+     - `scripts/yaml-keys.mjs` (155 lines, no bug), the key read twice that every project's workflow check fails:
+       replace with a YAML package carried in the copy, one that reports a key given twice;
+     - `scripts/workflow-run.mjs` (395 lines, no bug), which reads the host's workflow format, its expressions and
+       its steps for the core's upgrade test alone: replace its YAML with a package in the core's tests alone, and
+       keep its runner until a trial shows a tool that only runs can run the upgrade test where the sessions work;
+     - the reader of shell commands in `scripts/check-configs.mjs` (661 lines in all, no bug): replace its Bash with
+       the parser's Bash grammar (1.4 MB, the tree-sitter organisation's); keep its PowerShell until a grammar of a
+       known publisher exists;
+     - the matching of file patterns, written three times (`check-configs.mjs`, `workflow-run.mjs`, `select.mjs`,
+       about 70 lines together, no bug): replace with one, on Node's own `path.matchesGlob` where its tests show it
+       matches the host's filters;
+     - the host's workflow check (`scripts/workflows.mjs`, 119 lines, 1 bug): keep its search for a word, which reads
+       no YAML on purpose; its keys given twice go with `yaml-keys.mjs`.
+  3. **The readers of languages:** the lexer of `scripts/code-shape.mjs` (in 881 lines), `scripts/shape-csharp.mjs`
+     (318) and `scripts/shape-python.mjs` (388), no bug: replace with the parser. Rust's reader is no replacement,
+     and is built the picked way first, as is any reader of a language not read yet.
+  4. **Cargo's own tool, once a project picks Rust:** the package checks planned for Cargo (#278): use `cargo
+     metadata`, a tool that only runs, where Cargo is installed.
+  5. **Markdown in a project's documents:** the pointer check (`scripts/pointers.mjs`, 237 lines, no bug), where it
+     reads a project's own documents: replace that reading with a Markdown package carried in the copy, where its
+     trial shows it reads every pointer form the check lists.
+  6. **Schemas for the settings,** last: the checks written by hand of the shape of the settings files
+     (`.github/shape.json`, `.github/copies.json`, the licence check's config, `scripts/labels.json`,
+     `scripts/holders.json`), spread through the scripts that read them and counted apart only when taken: replace
+     with a schema each and one checker of schemas, a tool that only runs where its trial shows it says the mend.
+  - **Weighed like the rest:** the licence checks for npm and NuGet (`scripts/licences.mjs`, 545 lines, 4 bugs;
+    `scripts/nuget.mjs`, 928, 7; `scripts/licence-scan.mjs`, 239, 1; `scripts/licence-installed.mjs`, 179, 1;
+    `scripts/licence-commands.mjs`, 432, none): replace the reading underneath (the lock files, how a licence is
+    written out) with packages or each system's own tool, each by a trial, and keep the policy on top (the floor's
+    list, the owner's yes, the week's wait, the same publisher, failures that say the mend) the core's own. With 12
+    bugs between them, the most of any stand-in, they go with the second group.
+  - **Kept:** the finding of copies (`scripts/copies.mjs`, 314 lines, 9 bugs), since what a copy is the core's own
+    rule defines; its reading of code goes through the parser once the readers of languages do. Left as they are, as
+    #486 says: the core's own mutation tool, and the readers of the core's own rule files.
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
   or from real code of a project's, beyond a mend of its definition; a grammar a project of the owner's needs is
   missing, or fails to parse more than 1 file in 100 of that project's code; a runtime update leaves a grammar the
