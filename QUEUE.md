@@ -33,15 +33,17 @@ wanted").
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
+| #441 | builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
+| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, built now, whose work-down takes in `scripts/look.mjs` |
 | #350 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
 | #426 | builder | |
-| #357 | builder | |
 | #394 | builder | |
 | #404 | builder | #403, or built with it |
 | #405 | builder | |
+| #397 | rule builder; it changes the review guidelines (its pull request quotes the owner's yes on the issue) and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
 | #460, point 1 (a staged case for floor rule 9) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #460, point 2 (the author's address) | builder; "Part of #460", the last to merge "Fixes #460" | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder; "Part of #460", the last to merge "Fixes #460" | #405, which changes `scripts/copies.mjs` too |
@@ -49,6 +51,9 @@ wanted").
 | #460, point 5 (a report's size) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #460, point 6 (billed minutes) | builder; "Part of #460", the last to merge "Fixes #460" | |
 | #390 | builder | |
+| #204 | builder; it changes what a builder and the orchestrator read at their start | |
+| #416 | builder | #441, which changes `tasks/game-design.md` and `scripts/screens.mjs` too |
+| #477 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
@@ -62,7 +67,6 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #204 | builder | a stop that was ignored, as the staged case `stop` shows by failing |
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
 | #400 | a session of Kiro | a session of Kiro, which no session here can start |
 | #315 | the owner | the count of its point 3, which the orchestrator posts on it before the release |

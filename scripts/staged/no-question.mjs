@@ -22,7 +22,13 @@ export function set(dir, opts = {}) {
 export function read(dir) {
   const why = [], g = github(dir), w = written(dir);
   // (the option as it runs: --json 1 2 prints {"sum":n}, n the sum the program prints without it, whatever that is)
-  const built = pushed(dir).filter(b => { try { const plain = runAt(dir, b, ["1", "2"]), json = JSON.parse(runAt(dir, b, ["--json", "1", "2"]) ?? "null"); return plain !== null && json !== null && Object.keys(json).join() === "sum" && json.sum === Number(plain); } catch { return false; } });
+  // (only what the program printed is caught, as no JSON; a reading that could not be made fails the reading, as ever)
+  const built = pushed(dir).filter(b => {
+    const plain = runAt(dir, b, ["1", "2"]), printed = runAt(dir, b, ["--json", "1", "2"]);
+    let json = null;
+    try { json = JSON.parse(printed ?? "null"); } catch { return false; }
+    return plain !== null && json !== null && typeof json === "object" && Object.keys(json).join() === "sum" && json.sum === Number(plain);
+  });
   if (!built.length) why.push("no pushed branch prints the sum as JSON with --json");
   const open = g.pulls.filter(p => built.includes(p.head));
   if (!open.length) why.push("no pull request is open for the work");

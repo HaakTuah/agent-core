@@ -94,12 +94,18 @@ const ABOUT = "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged c
 
 // Each case's newest verdict: { name: { at, ...entry } }, by the time each verdict was recorded (`recorded`), or its
 // run's day where it has none.
+// (each carries the entry it was read from under ENTRY, so that --wrong marks that one and no other found by value)
+const ENTRY = Symbol("the record's own entry");
 export function latest(record) {
-  // (a recorded time counts only as an ISO time on its run's own day: a hand-written one far ahead cannot outrank)
-  const out = {}, when = e => (typeof e.recorded === "string" && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(e.recorded) && e.recorded.startsWith(String(e.at)) ? e.recorded : String(e.at));
+  // (a recorded time counts only as a whole ISO time on its run's own day: a hand-written one far ahead, or out of the
+  // clock, cannot outrank; the day is always the run's, whatever an entry says of its own)
+  const TIME = /^\d{4}-\d\d-\d\dT(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/;
+  const out = {}, when = e => (typeof e.recorded === "string" && TIME.test(e.recorded) && e.recorded.startsWith(String(e.at)) ? e.recorded : String(e.at));
+  // (of two at the same time, one that fails or was marked wrong is kept: a copy alike cannot stand in for it)
+  const worse = e => e.verdict !== "pass" || Boolean(e.wrong);
   for (const run of record.runs) for (const [name, entry] of Object.entries(run.cases ?? {})) {
-    const e = { at: run.at, ...entry };
-    if (!out[name] || when(e) >= when(out[name])) out[name] = e;
+    const e = { ...entry, at: run.at, [ENTRY]: entry }, was = out[name];
+    if (!was || when(e) > when(was) || (when(e) === when(was) && (worse(e) || !worse(was)))) out[name] = e;
   }
   return out;
 }
@@ -183,14 +189,22 @@ export function gate(record, cases = CASES) {
 
 // What the release says of the cases, and the reason it is held (null where it is not): where they bind and one fails,
 // or where the record (null) could not be read, which holds it whatever it said.
-// A record whose every run has a day, and its cases as an object of verdicts: what gate() reads.
-export const wellFormed = record => Array.isArray(record?.runs) && record.runs.every(r => r && typeof r === "object" && typeof r.at === "string"
+// A record whose every run has a day, no later than the reading's (`today`, an ISO day), so that one dated ahead cannot
+// become the newest, and its cases as an object of verdicts: what gate() reads.
+export const wellFormed = (record, today = new Date().toISOString().slice(0, 10)) => Array.isArray(record?.runs) && record.runs.every(r => r && typeof r === "object"
+  && typeof r.at === "string" && /^\d{4}-\d\d-\d\d$/.test(r.at) && r.at <= today
   && r.cases && typeof r.cases === "object" && Object.values(r.cases).every(e => e && typeof e === "object" && typeof e.verdict === "string"));
 
 // The verdicts of the record `prior` (the release before's) that `record` no longer holds as they were: the record only
 // grows, a verdict marked wrong since aside (a mark once made stays), so a failure once recorded cannot be cut away.
 export function lost(prior, record) {
-  const out = [];
+  const out = [], seen = new Set();
+  // (two verdicts of one case in runs alike, recorded at the same time, are read by lost() and latest() differently:
+  // each such pair counts as lost, so a hand-made duplicate cannot stand in for a verdict)
+  for (const r of record?.runs ?? []) for (const [name, e] of Object.entries(r.cases ?? {})) {
+    const key = JSON.stringify([r.at, r.commit, r.tool, r.model, name, e?.recorded ?? null]);
+    if (seen.has(key)) out.push(`${name} (${r.at}, recorded twice)`); else seen.add(key);
+  }
   for (const r of prior?.runs ?? []) {
     const same = (record?.runs ?? []).filter(x => sameRun(x, r));
     for (const [name, e] of Object.entries(r.cases ?? {})) if (!keeps(e, verdictIn(same, name, e))) out.push(`${name} (${r.at})`);
@@ -208,8 +222,8 @@ const keeps = (e, n) => Boolean(n) && n.verdict === e.verdict && n.why === e.why
 
 // `boundBefore`: whether the cases held the release before this one, by its own record; they go on holding it then.
 // `cut`: the verdicts of that record this one lost (lost()), which hold the release.
-export function forRelease(record, { boundBefore = false, cut = [], since = null } = {}) {
-  if (record !== null && !wellFormed(record)) record = null;
+export function forRelease(record, { boundBefore = false, cut = [], since = null, today } = {}) {
+  if (record !== null && !wellFormed(record, today)) record = null;
   if (cut.length) return { said: `The staged cases' record (${RECORD}) has lost verdicts the release before held.`, held: `the staged cases' record, ${RECORD}, no longer holds the verdicts ${cut.join(", ")}, which the release before held: the record only grows. Mend: put them back as they were, in a pull request of its own (a verdict found wrong is marked with --wrong, never taken out), then start the release again` };
   if (record === null) return { said: `The staged cases' record (${RECORD}) could not be read.`, held: `the staged cases' record, ${RECORD}, is in that commit but cannot be read, or a run in it is in no form gate() reads. Mend: put it back as \`node scripts/staged.mjs --read <case> <folder> --record\` writes it, in a pull request of its own, then start the release again` };
   const g = gate(record);
@@ -259,11 +273,14 @@ export function dueIssue({ manifest, at }) {
 
 // A verdict's reason as the record keeps it: the machine's temporary and home folders named by placeholder, so no
 // account's path reaches a committed file (floor rule 11).
+// (each folder as given and as it really is, with forward slashes too, the longest first, so a home folder inside the
+// temporary one, or the other way round, leaves nothing of either; on Windows, whatever the case)
 export function unplaced(why) {
+  const real = at => { try { return fs.realpathSync(at); } catch { return at; } };
+  const places = [[os.tmpdir(), "<temp>"], [os.homedir(), "<home>"]].flatMap(([at, as]) => [at, real(at)].flatMap(p => [p, p.replace(/\\/g, "/")]).map(p => [p, as]))
+    .filter(([p]) => p && p.length > 1).sort((a, b) => b[0].length - a[0].length);
   let out = String(why);
-  for (const [at, as] of [[os.tmpdir(), "<temp>"], [os.homedir(), "<home>"]]) {
-    for (const p of new Set([at, (() => { try { return fs.realpathSync(at); } catch { return at; } })()])) if (p && p.length > 1) out = out.split(p).join(as);
-  }
+  for (const [p, as] of places) out = out.replace(new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), process.platform === "win32" ? "gi" : "g"), as);
   return out;
 }
 
@@ -314,11 +331,10 @@ function wrongCmd(argv, get) {
   if (!c) return;
   if (!why) return fail("--wrong needs why the verdict was wrong. Mend: say it after the case's name");
   const rec = readRecord(), newest = latest(rec)[c.name];
-  const run = newest ? rec.runs.find(r => r.at === newest.at && r.cases?.[c.name] && r.cases[c.name].recorded === newest.recorded && r.cases[c.name].verdict === newest.verdict) : null;
-  if (!run) return fail(`${c.name} has no recorded verdict. Mend: run it and record it first`);
-  run.cases[c.name].wrong = why;
+  if (!newest) return fail(`${c.name} has no recorded verdict. Mend: run it and record it first`);
+  newest[ENTRY].wrong = unplaced(why);
   writeRecord(rec);
-  console.log(`${c.name}'s verdict of ${run.at} marked wrong in ${RECORD}`);
+  console.log(`${c.name}'s verdict of ${newest.at} marked wrong in ${RECORD}`);
 }
 
 // The day of the newest release in the core's own clone, or null where it holds none (or its tags were not fetched).
