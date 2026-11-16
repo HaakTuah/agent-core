@@ -355,16 +355,15 @@ function globbed(word, dir, folder, own, name, script) {
   }
   return [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }];
 }
-// Whether a glob can match a name, case left aside. Only a plain one (letters, "*", "?", "[…]") is ever told no:
-// braces, "**" or a class it does not read whole ([[:alpha:]]) may match. "*" stands for any run, "/" included, and a
-// class for any one character, so the answer errs to "may", never "no" where one is (one pass of two pointers, so no
-// glob makes it slow).
+// Whether a glob can match a name, case left aside. Only a plain one (letters, "*", "?") is ever told no: braces,
+// "**" or a class ("[…]", in any form) may match. "*" stands for any run, "/" included, so the answer errs to "may",
+// never "no" where one is (one pass of two pointers, so no glob makes it slow).
 function globMatches(glob, name) {
   // (what stands before its first wildcard must begin the name, whatever follows: test/** never matches core/scripts)
   const lead = /^[^*?[{]*/u.exec(glob)[0].toLowerCase();
   if (!name.toLowerCase().startsWith(lead)) return false;
-  if (/[{}]|\*\*|\[\[|\[[^\]]*$/u.test(glob)) return true;
-  const g = glob.toLowerCase().replace(/\[[^\]]*\]/gu, "?"), s = name.toLowerCase();
+  if (/[{}[\]]|\*\*/u.test(glob)) return true; // (braces, a class or ** may match: none is read)
+  const g = glob.toLowerCase(), s = name.toLowerCase();
   let i = 0, j = 0, star = -1, from = 0;
   while (j < s.length) {
     if (i < g.length && (g[i] === "?" || g[i] === s[j])) { i++; j++; }
@@ -398,7 +397,7 @@ const folder = (...dirs) => {
   const text = d;
   // (one named only when the workflow runs, or holding a "\\", which Linux and Windows read as different folders)
   if (/\$|\\/u.test(text)) return { dynamic: true };
-  const at = path.posix.normalize(text.replace(ROOT, ""));
+  const at = path.posix.normalize(text.replace(ROOT, "")).replace(/(.)\/+$/u, "$1"); // (core/scripts/ is core/scripts)
   return at === ".." || at.startsWith("../") || at.startsWith("/") ? { dynamic: true } : { at };
 };
 

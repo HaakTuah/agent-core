@@ -628,6 +628,11 @@ ok(["cd app && node core/scripts/c*.mjs c.json", "pushd x; node ../core/scripts/
   "a glob after a cd, in a folder named only when it runs, or with braces, a class or ** that may match, is not read");
 const stars = Date.now();
 ok(notRead("copies", { "a.yml": stepped(`node core/scripts/${"*".repeat(40)}x c.json\nnode core/${"*".repeat(40)}/copies.mjs c.json`) }) && Date.now() - stars < 1500, "a glob of many stars is read in one pass", `${Date.now() - stars} ms`);
+// (the review of 5f229be: any class may match, read in one pass; a folder's "/" at its end is no other folder)
+const classes = Date.now();
+ok(["core/scripts/copie[]s].mjs", "core/scripts/copie[!]a].mjs", "core/scripts/[a[:alpha:]]opies.mjs", "core/scripts/[^[:digit:]]opies.mjs", `core/scripts/${"[a".repeat(100000)}]x`]
+  .every(f => notRead("copies", { "a.yml": stepped(`node ${f} c.json`) })) && notRead("copies", { "a.yml": stepped("node copies.mj? c.json", { "working-directory": "core/scripts/" }) }) && Date.now() - classes < 3000,
+  "a class in any form may match, read in one pass; a folder named with a \"/\" at its end is that folder", `${Date.now() - classes} ms`);
 const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenStarted = Date.now();
