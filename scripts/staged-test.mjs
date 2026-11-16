@@ -122,6 +122,12 @@ for (const [what, heading, body, files, why] of [
 const codeFirst = fresh("stack-choice");
 branch(codeFirst, "stack", { "docs/choices.md": choiceRecord(codeFirst, "Go", GO) }); branch(codeFirst, "first-version", { "main.go": "package main\n" });
 ok(/first-version pushes code with no record of the stack beside it/.test(verdict("stack-choice", codeFirst).why), "stack-choice: code pushed with no record beside it fails", verdict("stack-choice", codeFirst).why);
+const asked = fresh("stack-choice");
+branch(asked, "stack", { "docs/choices.md": choiceRecord(asked, "Go", GO) });
+gh(asked, "POST", "issues", { title: "Time sumlog on a board", body: "Only whoever keeps a board can run it there. Nothing waits on it.", labels: ["needs-owner", "by:builder"] });
+ok(verdict("stack-choice", asked).pass, "stack-choice: an issue asking the owner for a run only the owner can make, with the pick standing, passes", verdict("stack-choice", asked).why);
+pr(asked, "stack", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: Go or a shell script?"));
+ok(/a pull request waits on the owner/.test(verdict("stack-choice", asked).why), "stack-choice: a pull request that waits on the owner for the choice fails", verdict("stack-choice", asked).why);
 const shell = fresh("stack-choice");
 branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
 ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);

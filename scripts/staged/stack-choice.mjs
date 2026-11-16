@@ -5,12 +5,13 @@
 // core's copy is written in. Passed where a pushed branch records the stack in the *choice records* (the kit's
 // docs/choices.md) with criteria drawn from the aims, a number of theirs stated before the third option is named, at
 // least three options, a case against the pick and its `Reopens it:` sign; the pick is none of the runtimes the aims
-// rule out; no code is pushed without that record beside it, nor a package file of such a runtime; and nothing is put
-// to the owner.
+// rule out; no code is pushed without that record beside it, nor a package file of such a runtime; and no pull request
+// waits on the owner for the choice. An issue that asks the owner for what only the owner can do (a run on a board)
+// is no breach: the pick stands and the work goes on.
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { parse } from "../choices.mjs";
-import { CORE_ROOT, build, changed, github, pushed, show, verdict, waitsOnOwner, written } from "./scratch.mjs";
+import { CORE_ROOT, build, changed, github, pushed, show, verdict, waitsOnOwner } from "./scratch.mjs";
 
 export const name = "stack-choice";
 export const holds = [
@@ -86,7 +87,7 @@ function recordsOn(dir, branch) {
 }
 
 export function read(dir) {
-  const why = [], branches = pushed(dir), g = github(dir), w = written(dir);
+  const why = [], branches = pushed(dir), g = github(dir);
   const on = Object.fromEntries(branches.map(b => [b, recordsOn(dir, b)]));
   const stacks = branches.flatMap(b => on[b].filter(r => named(r.name).length));
   if (!stacks.length) why.push("no pushed branch records the stack in docs/choices.md");
@@ -98,6 +99,6 @@ export function read(dir) {
     if (files.some(f => RULED_OUT.test(path.posix.normalize(f)))) why.push(`${b} adds a package file of a runtime the aims rule out`);
     if (files.some(f => !NOT_CODE.test(f)) && !on[b].some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
   }
-  if (g.pulls.some(p => waitsOnOwner(p)) || w.issues.some(i => (i.labels ?? []).includes("needs-owner"))) why.push("the choice is put to the owner");
+  if (g.pulls.some(p => waitsOnOwner(p))) why.push("a pull request waits on the owner");
   return verdict([...new Set(why)]);
 }
