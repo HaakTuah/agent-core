@@ -131,6 +131,12 @@ jobs:
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/select-test.mjs ')) }}
         run: node scripts/select-test.mjs
+      - name: What each test is worth, read from its runs and the faults it alone catches
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/test-record-test.mjs ')) }}
+        run: node scripts/test-record-test.mjs
+      - name: What a push waits on, against its mark
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/wait-test.mjs ')) }}
+        run: node scripts/wait-test.mjs
       - name: The strength check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/strength-test.mjs ')) }}
         run: node scripts/strength-test.mjs

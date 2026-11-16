@@ -6,6 +6,7 @@
     "whole": ["scripts/init-test.mjs", "scripts/init-dotnet-test.mjs", "scripts/upgrade-test.mjs", "scripts/staged-test.mjs", "scripts/core-yml-test.mjs", "scripts/pure-sync-test.mjs", "scripts/copy-tree-test.mjs"],
     "none": ["QUEUE.md", "archive/", ":(glob)reports/*.md"]
   },
+  "wait": 1200,
   "systems": {
     "tools": { "domain": "tools", "paths": ["scripts/"] }
   },
