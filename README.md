@@ -101,7 +101,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
    with the line to add, and never fail.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file read at the start of every task, each on a line
-   of its own (Claude Code imports them through `CLAUDE.md`; any other tool reads them because `AGENTS.md` says to),
+   of its own (Claude Code imports them through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
+   kit writes, each held to that list by `core/scripts/entry-files.mjs`; any other tool reads them because `AGENTS.md`
+   says to: `core/modules/tools.md`),
    and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
 4. **Its own security files:** its `SECURITY.md` says the floor holds whole and adds, under the same numbers, what only
    it has, listing under rule 3 after `**the rule files:**` its rule files besides `AGENTS.md`, `CLAUDE.md`,
@@ -140,6 +142,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The screen checks,** where a project with a screen turns one on: `screens.mjs`, run by the project's own
      workflow after its own tool, which holds what that tool found against a baseline in the shape check's form, which
      only shrinks (the *screen checks*; `modules/screens.md`, "What holds it"). The core runs it nowhere by itself.
+   - **The tests' strength:** `strength.mjs`, a step of the project's own job that runs its tests, with
+     `STRENGTH_BASE` the pull request's base: it runs the project's mutation tool (the *mutation tool*) on the lines
+     the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
+     has written its baseline, beside the shape check's, a fault that survives there unlisted fails
+     (`modules/code-shape.md`). `mutate.mjs` is the core's own tool, for code run by Node with tests that are files
+     run by `node`.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `modules/git.md` names (or those the project gives it).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
@@ -158,8 +166,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `modules/orchestrating.md`), and opens no pull request, since one a workflow opens gets
      no checks. A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
-     reading no pull request, check or status with that job's token, until it moves to the template's. A session
-     of the trusted builder's (floor rule 3) started with no orchestrator asks the same at its start
+     reading no pull request, check or status with that job's token, until it moves to the template's. A builder
+     session started with no orchestrator asks the same at its start
      (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
      `modules/work-flow.md`), so that issue is the backstop for the days no session starts.
    - **Only a sync PR moves those pins,** and only when the called workflow changed; `core.yml` fails a call pinned
@@ -169,7 +177,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167).
+     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167). A path filter
+     sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
+     that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
+     not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -261,10 +272,13 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on the path; where either is
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start. The
      core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
-   - **Another tool's session** has neither hook, which are Claude Code's: what holds its work is its reading of
-     `AGENTS.md` and the checks on every pull request.
+   - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
+     hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
+     kit writes); no rule rests on a hook alone (`modules/tools.md`).
    - **The copy's own files** (`core/AGENTS.md`, `core/CLAUDE.md`, `core/.github/`, `core/.claude/`) are this
      repository's, not the project's: its issue templates and settings are its own, written for its *owner's account*.
+     A tool that loads a rule file of any folder it works in (`modules/tools.md`) finds `core/AGENTS.md` opening with
+     that.
 6. **What only it has** stays in its own rule files: what it is, its commands, its queue, its own rules, with pointers
    into `core/`.
 7. **Where a module's rule does not fit it,** its manifest lists the difference under "Differences" (core archive 161):
@@ -302,6 +316,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` |
 | *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`modules/code-shape.md`); left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`modules/cleaning.md`; `scripts/dose.mjs` reads it); left out, the state read from the shape check's baseline |
+| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`modules/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`modules/cleaning.md`); left out, `docs/audits/` |
 | *large file* | how large a file is before it is never read whole |
 | *one at a time* | what never runs as parallel lanes |
@@ -312,10 +327,10 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *major version checks* | the extra checks a new major version gets |
 | *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`modules/choices.md`; `scripts/choices.mjs` reads it); left out, `docs/choices.md`, which the starter kit writes |
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`modules/choices.md`); left out, none |
-| *other builders' checks* | what a builder of another provider runs before it finishes (`modules/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
-| *other builders* | which other providers' tools build here, in order, and for each one the core has no part for, how it is handed a task; left out, Codex first, then the others as the project's rules list them (`modules/roles.md`, "The builders") |
-| *code reviewers* | who reviews whose work, in order, with the fallback reviewer last, how each one the core has no part for is asked (it has Codex's and Copilot's, `modules/`), and which of its findings block where it marks none so; left out, the core's own: first a reviewer that cannot build here, then another builder's, last Claude's (`modules/roles.md`) |
-| *security reviewer* | who gives a PR its security review (floor rule 8) and how it is asked; left out, Codex, of what its own provider built too: the code review of that work is another provider's, and floor rule 3's two reviews stand (`modules/reviews.md`, point 3) |
+| *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`modules/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
+| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so; left out, or a row left out, the core's default (`modules/roles.md`, "Tools are preferences") |
+| *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `modules/orchestrating.md`, "The pace is the owner's", names; left out, no pace but the default |
+| *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row; left out, that row |
 | *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`modules/screens.md`, points 1 and 2); left out, `docs/direction.md`, written before its first screen |
 | *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`modules/screens.md`); left out, 360, 768 and 1280 wide |
 | *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`modules/screens.md`, point 9); left out, the module's own |
@@ -340,6 +355,14 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 | Slot | Here |
 | --- | --- |
 <one row per slot it has>
+
+## Tools
+| Role | Preferred | When it is not at hand |
+| --- | --- | --- |
+<one row per role it orders otherwise than the core's default; none: the default>
+
+## Pace
+<one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free; none: the default>
 
 ## Differences
 <only where it differs from a module's rule ("How a project takes the core", point 7), one line each>
@@ -391,13 +414,14 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   saying how the session takes it out (core archive 207); only the random id of a link to a Claude Code session, which
   can hold a short term by chance, is left unread (#261), and `LICENSE` and `NOTICE`, at the root and in `core/`,
   while they keep the shape the check's header gives, so a copyright holder may stand there (floor rule 11; #257).
-- Where another provider is to build, any one of: the tool that runs the agents side by side (below); its plug-in in
-  Claude Code, installed and signed in on the machine the sessions run on (for Codex, `/codex:setup` says whether it
-  is); or another way, which the project's rules name in a line each (how the tool is handed a task, and how it is asked
-  for a review) and the project tells the core ("Reporting to the core"), so that the tool gains a part here. Nothing
-  more is asked of the owner: the sessions hand over by the first way they find, and with none Claude's build
-  (`modules/roles.md`, "The builders"; core archive 169). A tool that pushes its own branch gets a sign-in that cannot
-  change a workflow (as `setup/server.md`, point 5), or its workflows wait for an approval before they run.
+- Where another tool is to take a role, any one of: the tool that runs the agents side by side (below); its plug-in in
+  the orchestrator's tool, installed and signed in on the machine the sessions run on (for Codex in Claude Code,
+  `/codex:setup` says whether it is); or another way, which the manifest's "Tools" table names (how the tool is handed
+  a task, and how it is asked for a review) and the project tells the core ("Reporting to the core"), so that the tool
+  gains a part here (`modules/tools.md`). Nothing more is asked of the owner: the sessions hand over by the first way
+  they find, and with none the tool at hand takes the role (`modules/roles.md`, "The builders"; core archive 169 and
+  232). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
+  or the repository's workflows wait for an approval before they run.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`modules/work-flow.md`). It stops only that repository's agents.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.

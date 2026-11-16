@@ -25,6 +25,7 @@ import { importsOf, projectFilesByContent, readProject as readBuildFile } from "
 import { NOTES } from "./releases.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { started } from "./started.mjs";
+import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,10 +33,10 @@ const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Roughly what a step costs a project where it is not done yet (a step done costs nothing).
 export const COST = {
   check: "nothing while its check passes; else what the failure says, in the pull request it fails",
-  line: "a line or two of a protected file: one small pull request of the trusted builder's",
+  line: "a line or two of a protected file: one small pull request of a builder's",
   workflow: "a workflow's change: one small pull request, with floor rule 3's two security reviews",
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
-  config: "a check's config and its first baseline: one small pull request of the trusted builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
+  config: "a check's config and its first baseline: one small pull request of a builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
 };
 
@@ -155,6 +156,39 @@ export function configs(p) {
 const licenceConfig = p => licenceConfigs(p).licences;
 const nugetConfig = p => nugetOf(p, () => licenceConfig(p));
 
+// Whether a test of the project's own lies under its shape check's config's "tests", wherever they stand beside its code:
+// a file of the copy of the core (core/) is none.
+function testsStand(p) {
+  let config;
+  try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
+  if (!config.tests.length) return false;
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+}
+
+// Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
+// step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
+const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
+const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
+const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
+function strengthRuns(p) {
+  readable(p, text => text.includes("strength.mjs"));
+  return Object.values(p.workflows).some(({ yaml }) => onPullRequests(yaml?.on) && Object.values(yaml.jobs ?? {})
+    .some(job => (job?.steps ?? []).some(step => typeof step?.run === "string" && STRENGTH_RUN.test(step.run) && based(step.env, job.env, yaml.env))));
+}
+
+// Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the
+// strength check (core/modules/code-shape.md, "How strong the tests are is measured on the lines a pull request
+// changes").
+function strengthNamed(p) {
+  const tool = toolOf(p.manifest);
+  const row = "Add to the manifest's slots the row `| *mutation tool* | `<command>` |`, the command that runs the project's mutation tool (a tool of development only) on `{lines}` and writes its report in the mutation-testing-elements schema to `{report}`; or `| *mutation tool* | `none`: <why> |`, where no such tool exists for its language";
+  if (!tool) return `${row}. Until then the measure does not run, and nothing fails for it.`;
+  if (tool.none !== undefined && !tool.none) return "The manifest's row *mutation tool* says `none` with no reason: add the reason after it (`none`: <why>).";
+  if (tool.none !== undefined) return tool.none.startsWith("no tests yet") && testsStand(p) ? `The manifest's row *mutation tool* says \`none\`: no tests yet, as the starter kit wrote it, and the project has tests now: ${row.charAt(0).toLowerCase()}${row.slice(1)}.` : null;
+  if (strengthRuns(p)) return null;
+  return "The manifest names a mutation tool and no workflow runs it: add a step `node core/scripts/strength.mjs` after the tests in the job that runs them, with `STRENGTH_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first), as `core/setup/sync-notes.md` says (\"how strong the tests are\").";
+}
+
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
 // that config names. Null where both stand; else the mend.
@@ -165,6 +199,27 @@ function shapeWritten(p) {
   let config;
   try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
   return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
+}
+
+// The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
+// `core.yml` checks on every pull request.
+const coreCall = job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/`.toLowerCase());
+export const callers = p => (readable(p, text => text.toLowerCase().includes(`${CORE}/.github/workflows/`.toLowerCase())), Object.entries(p.workflows))
+  .filter(([, w]) => { const jobs = Object.values(w.yaml?.jobs ?? {}); return jobs.length > 0 && jobs.every(coreCall); }).map(([f]) => `.github/workflows/${f}`);
+
+// Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
+// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
+// (a file's name as the mend shows it: a control character or a backtick, which would bend a description, as "?")
+const shown = f => String(f).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029`]/gu, "?");
+function suitesOnPins(p) {
+  const pins = callers(p);
+  readable(p, text => /paths(-ignore)?\s*:/.test(text));
+  const started = Object.entries(p.workflows).filter(([f]) => !pins.includes(`.github/workflows/${f}`)).flatMap(([f, w]) => {
+    const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
+    const by = Array.isArray(only) ? pins.filter(c => pathsLetThrough(only, [c])) : Array.isArray(ignore) ? pins.filter(c => !pathsLetThrough(ignore, [c])) : [];
+    return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
+  });
+  return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -227,7 +282,7 @@ export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a builder of another provider to read `core/modules/other-builders.md` at the start of every task");
+      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/modules/other-builders.md` at the start of every task");
       if (/^\|\s*\*Codex's checks\*\s*\|/m.test(p.manifest)) wrong.push("the manifest's row *Codex's checks* is renamed *other builders' checks*");
       return wrong.length ? `${wrong.join("; ")}.` : null;
     },
@@ -242,7 +297,8 @@ export const STEPS = [
       const want = /^Paths: .*$/m.exec(fs.readFileSync(path.join(HERE, "setup", "template", "core-manifest.md.tmpl"), "utf8"))?.[0];
       return want && !p.manifest.split("\n").includes(want) ? `The manifest's "Paths:" line reads, whole: ${want}` : null;
     } },
-  { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, unread: "which suites a project's workflows run for which change is their own logic" },
+  { lead: "12 November 2026, a sync and the project's own suites", cost: COST.workflow, check: suitesOnPins,
+    partly: "which suites a project's workflows run for a change under `core/` is their own logic, read by the review" },
   { lead: "12 November 2026, the way work is handed over", cost: COST.read, unread: "what a project's rules say of handing work over is a reading of them" },
   { lead: "12 November 2026, a feature may wait for a later stage", cost: COST.line, unread: "whether a line of the manifest's \"Differences\" says this is a reading of its words" },
   { lead: "12 November 2026, the signature check on every pull request", cost: COST.workflow,
@@ -378,6 +434,8 @@ export const STEPS = [
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
+  { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
+    partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

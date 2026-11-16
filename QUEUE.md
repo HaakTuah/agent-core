@@ -17,22 +17,20 @@ wanted").
 | #256 | rule builder | |
 | #252 | rule builder | |
 | #296 | builder | |
-| #249 | rule builder | |
-| #250 | rule builder | #249 |
-| #253 | rule builder | |
-| #275 | rule builder | #253 |
+| #250 | rule builder | |
+| #275 | rule builder | |
 | #321 | rule builder | #275, or built with it |
-| #285 | rule builder | #249 |
+| #285 | rule builder | |
 | #286 | rule builder | |
 | #299 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
-| #304 | rule builder, on Fable at high for this batch (its note of 15 November) | #249 |
+| #304 | rule builder, on Fable at high for this batch (its note of 15 November) | |
 | #305 | rule builder | #304 |
 | #322 | rule builder | #304 and #305 |
 | #306 | rule builder | #304 |
 | #307 | rule builder | |
-| #308 | rule builder | #253 and #304 |
+| #308 | rule builder | #304 |
 | #309 | rule builder | #304 |
 | #318 | rule builder | #304 |
 | #310 | rule builder | #256 and #285 |
@@ -55,6 +53,11 @@ wanted").
 | #386 | builder | #362, which changes the same file |
 | #393 | builder | |
 | #394 | builder | |
+| #403 | builder | #299, whose rule its mends name |
+| #404 | builder | #299, whose rule it holds, and #403, or built with it |
+| #405 | builder | #371, which changes `scripts/copies.mjs` too |
+| #407 | builder | |
+| #408 | builder | |
 | #390 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
@@ -71,6 +74,7 @@ They read and change no rule.
 | --- | --- | --- |
 | #204 | builder | a stop that was ignored, as the staged case `stop` shows by failing |
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
+| #400 | a session of Kiro | a session of Kiro, which no session here can start |
 | #315 | the owner | the count of its point 3, which the orchestrator posts on it before the release |
 | #163 | the owner | on hold |
 | #187 | the owner | on hold |

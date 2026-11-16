@@ -13,6 +13,9 @@
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
 # The suites together, each of their two parts on Windows, and the upgrade test, are each held to a time mark (the
 # "suites" of .github/shape.json, by scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
+# After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
+# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; modules/code-shape.md, "How
+# strong the tests are"), in working copies of its own, with no secret.
 name: tests
 
 on:
@@ -111,6 +114,12 @@ jobs:
       - name: The dose a codebase's state sets
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/dose-test.mjs
+      - name: The strength check
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/strength-test.mjs
+      - name: The core's own mutation tool
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/mutate-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/stand-in-record-test.mjs
@@ -219,6 +228,12 @@ jobs:
       - name: The core's own AGENTS.md fills each slot its modules use
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/manifest-reads.mjs --core
+      - name: The entry-files check
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/entry-files-test.mjs
+      - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
+        if: ${{ !cancelled() && matrix.part != 'projects' }}
+        run: node scripts/entry-files.mjs --core
       - name: None of the core's own workflows names the forbidden trigger
         if: ${{ !cancelled() && matrix.part != 'projects' }}
         run: node scripts/workflows.mjs
@@ -242,6 +257,14 @@ jobs:
         env:
           SUITE: ${{ matrix.suite }}
         run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
+      # (after the time mark, which it is no part of: the faults put into the lines a pull request changes, with the
+      # base the copies baseline fetched; the tool stops at its budget and says what it left unrun)
+      - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && github.event_name == 'pull_request' }}
+        env:
+          STRENGTH_BASE: origin/${{ github.base_ref }}
+          MUTATE_BUDGET: "240"
+        run: node scripts/strength.mjs
 
   upgrade:
     strategy:

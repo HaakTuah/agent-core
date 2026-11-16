@@ -143,7 +143,7 @@ const FILLS = [
   [/^FILL IN: what this project is.*$/m, "scratch: a small command-line tool that prints the sum of the numbers it is given. Node, no dependencies; its owner and a few friends use it."],
   [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum.test.mjs`) and prints \"ok sum\"; nothing to build."],
   [/^1\. FILL IN: the first task.*$/m, "1. #1, builder: sum() leaves out the last number."],
-  [/^( *)FILL IN: who may change the protected files.*$/m, "$1Claude's builder sessions, as the floor has them."],
+  [/^( *)FILL IN: who may change the protected files.*$/m, "$1as the floor has it."],
   [/^( *)FILL IN: each input anyone but the user at hand can shape.*$/m, "$1None: it reads only its own command line."],
   [/^( *)FILL IN: what reaches its users' machines.*$/m, "$1Nothing but its own source; it has no dependencies."],
   [/^( *)FILL IN: what ships.*$/m, "$1Nothing ships yet."],

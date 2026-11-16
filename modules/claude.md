@@ -24,4 +24,5 @@ Read by Claude at the start of every task.
   - a fresh eye (reviewer, design check, stand-in) and a helper for cost (search, routine parts) whatever your level;
   - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it (core
     archive 73).
-- **Other providers first** (`modules/roles.md`, "The builders"): Claude's usage is also the owner's own.
+- **Who builds** is picked as `modules/roles.md`, "The builders", says: Claude's usage is also the owner's own, and is
+  saved for the orchestrator where Claude runs it.

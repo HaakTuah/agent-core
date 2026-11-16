@@ -4,7 +4,8 @@
 // changes a file it names (a file an Import brings in among them, as the project's copy of the core's script lists
 // them), and, where none changed, wherever NuGet finds a lock file that no longer holds what its
 // project asks for, however the project asks (in an import, two imports on a line, through a property, a link, a name
-// outside plain ASCII), or a package downloaded beside it; and not to where only other files change. No package is
+// outside plain ASCII), or a package downloaded beside it; and not to where only other files change, a project's
+// NuGet.Config that maps its packages to their sources included. No package is
 // downloaded: the step restores against an empty source. The whole job, on a project with no package: its restore and
 // its check pass, and a lock file that no longer holds what its project asks for fails the restore. Where there is no
 // .NET SDK (never on GitHub's runners) only the first look is tried. On Linux and on Windows. Git, bash, jq, the .NET
@@ -99,6 +100,11 @@ if (!sdk) console.log("skip NuGet's own word: no .NET SDK here");
 else {
   skips("a pull request that changes only a doc", { "README.md": "# A project\n\nMore.\n" });
   skips("one that changes only another workflow", { ".github/workflows/other.yml": "name: other\n" });
+  // (a NuGet.Config that maps every package to the registry, against a confusion of sources: the empty source the look
+  // restores from is mapped to none, which NuGet names as its own error, NU1100, not as a package not found; #380)
+  const MAPPED = '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <packageSources>\n    <clear />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />\n  </packageSources>\n  <packageSourceMapping>\n    <packageSource key="nuget.org">\n      <package pattern="*" />\n    </packageSource>\n  </packageSourceMapping>\n</configuration>\n';
+  skips("a pull request that changes only a doc, in a project whose NuGet.Config maps its packages to their sources", { "README.md": "# A project\n\nMore.\n" }, { start: { "NuGet.Config": MAPPED } });
+  restores("one that adds a package only in an imported file, in such a project", { "build/deps.xml": ADDS }, { start: { "NuGet.Config": MAPPED } });
   restores("one that adds a package only in a file a project file imports", { "build/deps.xml": ADDS });
   restores("one that adds it in the second of two imports on a line", { "build/two.xml": ADDS }, { start: { "src/App/App.csproj": project('  <Import Project="..\\..\\build\\deps.xml" /><Import Project="..\\..\\build\\two.xml" />\n'), "build/two.xml": EMPTY } });
   restores("one that asks for a package by a text file a build file reads, which no listing can name", { "build/flag.txt": "yes\n" }, { start: { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" } });

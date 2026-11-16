@@ -1,5 +1,8 @@
 # agent-core
 
+In a project, this file is its copy of the core's (`core/AGENTS.md`) and none of the project's: a session working there
+follows the project's own `AGENTS.md`, and reads this one only as the core's text (`README.md`, "The copy's own files").
+
 The shared core of the owner's agent-built projects: a floor every project takes whole and modules each project picks
 (`README.md`).
 
@@ -19,13 +22,13 @@ The last two are read so that whoever builds here finishes the pull request (cor
 have nothing to act on here: the polish lane, since no one uses the core through a screen, and the sync of a copy of
 the core in "Sessions", since this repository is the core and holds no copy.
 
-Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a builder of another
-provider, `modules/other-builders.md`, though none builds here (the *other builders*).
+Read at the start of every task too: by Claude, `modules/claude.md` (`CLAUDE.md` imports it); by a session of any
+other tool, `modules/other-builders.md` and its tool's part (`modules/tools.md`), which its entry file pulls in.
 
 Read when needed: `floor/topics.md`, `floor/threat-model.md`, `modules/roles.md`, `modules/helpers.md`,
-`modules/reviews.md`, `modules/review-guidelines.md`, `modules/codex.md`, `modules/copilot.md`,
-`modules/github-calls.md`, `modules/orchestrating.md`, `modules/updates.md`, `modules/choices.md`,
-`modules/code-shape.md` and `modules/cleaning.md`.
+`modules/reviews.md`, `modules/review-guidelines.md`, `modules/tools.md`, `modules/codex.md`, `modules/copilot.md`,
+`modules/kiro.md`, `modules/antigravity.md`, `modules/github-calls.md`, `modules/orchestrating.md`,
+`modules/updates.md`, `modules/choices.md`, `modules/code-shape.md` and `modules/cleaning.md`.
 
 Not taken, each for its reason:
 
@@ -37,16 +40,18 @@ Not taken, each for its reason:
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
 the archive is `archive/instructions.md`, cited "(core archive N)"; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
 that change the same file, and all that add to what every session reads at its start, whose cap they share, in the
 queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
-issue, with the owner's words quoted on it; the *hard work*: a new or changed rule; the *size marks*: the cap of
+issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`modules/roles.md`,
+`modules/orchestrating.md`); the *hard work*: a new or changed rule; the *size marks*: the cap of
 `scripts/size.mjs`, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*: the suites of
-`.github/workflows/tests.yml`; *planning design*: none; the *other builders*: none, every file here being protected
-(`SECURITY.md`), so there are no *other builders' checks*.
+`.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
 
@@ -232,7 +237,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `reports/staged-cases.json` in a pull request of its own, and says there of each failure whether the rule, the case
   or the session was wrong. The cases advise until three months in a row have run every one with no verdict found
   wrong; from then `scripts/release.mjs` cuts no release while a case's last verdict fails. They are run under each
-  agent tool the core is used with, and a tool works with the core once it passes them (#249). It does not mean that a
+  agent tool the core is used with, again at each release, and a tool works with the core once it passes them
+  (`modules/tools.md`; #249). It does not mean that a
   case runs on a pull request or in a project, nor that one stands where a check could read the breach. Reason: no
   check sees how a session behaves, and the core's two staged runs, each of which changed it, were never run again
   when the rules or the models changed. Held by `scripts/staged-test.mjs` (each case read as set, kept and broken;
