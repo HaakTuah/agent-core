@@ -209,7 +209,10 @@ function called(commit) {
 function heldTo(commit) {
   const here = configAt(commit, CONFIG_AT);
   if (here) return [{ at: CONFIG_AT, config: here }];
-  const now = new Set([...called(null)].filter(at => fs.lstatSync(at, { throwIfNoEntry: false })?.isFile())); // (a call to a config the tree no longer holds could never run)
+  // (a call to a config the tree no longer holds could never run; a path the system cannot even look up, too long or
+  // through a file, holds none, the safe side, so the base's config is held)
+  const held = at => { try { return fs.lstatSync(at, { throwIfNoEntry: false })?.isFile() === true; } catch { return false; } };
+  const now = new Set([...called(null)].filter(held));
   return [...called(commit)].filter(at => !now.has(at)).map(at => ({ at, config: configAt(commit, at) })).filter(h => h.config);
 }
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];

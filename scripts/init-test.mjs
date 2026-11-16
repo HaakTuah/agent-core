@@ -251,7 +251,8 @@ if (p.status === 0) {
     let calls = testsWas;
     if (!keepCall) calls = calls.replace("run: node scripts/copies.mjs .github/copies.json", "run: node scripts/copies.mjs .github/copies-two.json # was: node scripts/copies.mjs .github/copies.json");
     // (`dropOld`: the base's config deleted, a call to it left where it never runs)
-    if (dropOld) { git(core, "rm", "-q", ".github/copies.json"); calls = calls.replace("jobs:\n", "jobs:\n  never:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/copies.mjs .github/copies.json\n"); }
+    // (and calls to paths the system cannot look up: a name past any length, one through a file)
+    if (dropOld) { git(core, "rm", "-q", ".github/copies.json"); calls = calls.replace("jobs:\n", `jobs:\n  never:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/copies.mjs .github/copies.json\n      - run: node scripts/copies.mjs ${"n".repeat(300)}.json\n      - run: node scripts/copies.mjs AGENTS.md/x.json\n`); }
     fs.writeFileSync(tests, calls);
     if (shapeToo) {
       put(".github/shape-two.json", shapeWas);
