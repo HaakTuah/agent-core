@@ -448,6 +448,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (#476's fallback security review of 9dc381f: noted only where its text is the base's letter for letter)
     const deep = command => `{"version":"v1","hooks":[{"name":"h","trigger":"Stop","action":{"type":"command","command":${JSON.stringify(command)}}}],"pad":${"[".repeat(250)}0${"]".repeat(250)}}`;
     fails(run(pr(project({ ".kiro/hooks/deep.json": deep("echo ok"), ...listing() }), { ".kiro/hooks/deep.json": deep("bash scripts/x.sh") })), "an unreadable file the base held, changed by the pull request, fails", ".kiro/hooks/deep.json cannot be read as a JSON object");
+    // (any problem met reading a file the base held as it stands: a matcher holding ": "; #476's code review of f6196c2)
+    const colon = { hooks: { PreToolUse: [{ matcher: "Bash: .*", hooks: [{ type: "command", command: "echo ok" }] }] } };
+    const heldColon = run(pr(project({ ".codex/hooks.json": colon, ...listing() }), { "README.md": "a change of its own\n" }));
+    ok(heldColon.status === 0 && /note as the base held it, nothing fails here: \.codex\/hooks\.json: the "PreToolUse" hooks' matcher/.test(heldColon.out), "a matcher holding \": \" the base held unchanged is noted", heldColon.out);
+    fails(run(pr(project({ ...listing() }), { ".codex/hooks.json": colon })), "and one the pull request writes fails", "holds \": \", which a hook's name splits at");
   }
   // (a submodule at the base is no file the base held: one the pull request makes a script a hook runs fails; #476's
   // fallback security review)

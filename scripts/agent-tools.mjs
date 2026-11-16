@@ -84,22 +84,21 @@ const show = value => JSON.stringify(value) ?? String(value);
 export function configured(read, skills, files = () => [], holds = f => read(f) !== null, all = () => [], kit = false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
-  // (`unreadable`: each problem of a file that cannot be read, by the problem, with that file's text, so the base's can be
-  // told unchanged)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], unreadable = new Map();
+  // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map();
+  const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
   // (whether the project holds a path is asked once a path: a hook may name one a thousand times, and the asking reads
   // the file and may start git)
   let index = null;
   const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
-  const state = { tools, problems, unreadable, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, kit, index: () => (index ??= pathsIndex(all())) };
+  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, kit, index: () => (index ??= pathsIndex(all())) };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
     try { const v = parseBounded(text); if (v && typeof v === "object" && !Array.isArray(v)) return v; } catch { /* (below) */ }
     const problem = `${file} cannot be read as a JSON object, nested no deeper than ${DEEPEST} objects and lists. Mend: correct it to JSON, as the tool that reads it takes it`;
-    problems.push(problem);
-    unreadable.set(problem, text);
+    flag(problem, file, text);
     return null;
   };
   const markets = new Map(), plugins = [];
@@ -116,7 +115,7 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, unreadable, sources, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, sources, pins: pinsOf(plugins, markets, servers) };
 }
 
 // The tool servers of one file's "mcpServers" (or Codex's "mcp_servers"), into configured()'s `state`, each named
@@ -126,7 +125,7 @@ function addServers(state, file, servers, tool) {
   if (!servers || typeof servers !== "object" || Array.isArray(servers)) return;
   for (const [name, server] of Object.entries(servers)) {
     const key = `server ${tool}${name}`, there = state.tools.get(key);
-    if (there !== undefined && there !== file) { state.problems.push(`${file}: the tool server ${show(tool + name)} is configured in ${there} too, so the list cannot say which it holds. Mend: give one of the two another name, or take one out`); continue; }
+    if (there !== undefined && there !== file) { state.flag(`${file}: the tool server ${show(tool + name)} is configured in ${there} too, so the list cannot say which it holds. Mend: give one of the two another name, or take one out`, file); continue; }
     state.tools.set(key, file);
     // (a server is its whole entry: its command, arguments, address and all, so one the pull request changes is another)
     state.add(key, canonical(["server", file, name, server ?? null]));
@@ -163,8 +162,7 @@ function readCodex(state, json, read) {
   let config;
   try { config = parseToml(text); } catch (e) {
     const problem = `.codex/config.toml cannot be read as TOML (${e.message}). Mend: correct it to TOML, as Codex reads it`;
-    state.problems.push(problem);
-    state.unreadable.set(problem, text);
+    state.flag(problem, ".codex/config.toml", text);
     return;
   }
   readHooks(state, ".codex/config.toml", config, "Codex");
@@ -222,13 +220,13 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   // hooks share a name)
   if (matcher.includes(": ") && !state.clashed.has(`matcher ${file} ${event} ${matcher}`)) {
     state.clashed.add(`matcher ${file} ${event} ${matcher}`);
-    state.problems.push(`${file}: the ${show(event)} hooks' matcher ${show(matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`);
+    state.flag(`${file}: the ${show(event)} hooks' matcher ${show(matcher)} holds ": ", which a hook's name splits at. Mend: write the matcher without it, as a pattern that matches the same tools`, file);
   }
   // (a command and a hook of another type whose text reads as that command share a name, and the list could not tell
   // them apart; two command hooks of one command, a timeout apart, are one name for the list, each kept)
   const kinds = state.shapes.get(name) ?? new Set();
   kinds.add(runs);
-  if (kinds.size > 1 && !state.clashed.has(name)) { state.clashed.add(name); state.problems.push(`${file}: a command and a hook of another type share the name ${show(name.slice(5))}. Mend: give the one a command of its own, or take one out`); }
+  if (kinds.size > 1 && !state.clashed.has(name)) { state.clashed.add(name); state.flag(`${file}: a command and a hook of another type share the name ${show(name.slice(5))}. Mend: give the one a command of its own, or take one out`, file); }
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
@@ -512,10 +510,10 @@ function configAtBase(root, base, file) {
 
 // What stood before the check read more, which is noted, not failed, where a list stands and a base is read (never in
 // the core's own repository): a tool the base held as it stands, which its list did not name either, and a tool's
-// file the base held unreadable, its text the same letter for letter (Kiro's and Codex's files are read since #407).
+// file's problem the base held, the file's text the same letter for letter (Kiro's and Codex's files are read since #407).
 function heldBefore(checked, { head, baseProject, baseList, held, core }) {
   if (core || !baseProject) return new Set();
-  const sameUnread = p => head.unreadable.has(p) && baseProject.unreadable.has(p) && head.unreadable.get(p) === baseProject.unreadable.get(p);
+  const sameUnread = p => head.texts.has(p) && head.texts.get(p) === baseProject.texts.get(p);
   return new Set([...checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem), ...head.problems.filter(sameUnread)]);
 }
 
