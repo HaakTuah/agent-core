@@ -457,7 +457,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []], ["git cat-file -p origin/main:scripts/x.py | bash", []],
       // (#476's fallback security review of 789f5c1: "show" only as a word of its own, and not across a command's output)
       ["java -Droot=\"$(git rev-parse --show-toplevel)\" -cp origin/main:scripts/x.py Main", ["scripts/x.py"]], ["env -C \"$(git rev-parse --show-toplevel)\" java -cp origin/main:scripts/x.py Main", ["scripts/x.py"]],
-      ["git show HEAD:a $(java -cp origin/main:scripts/x.py M)", ["scripts/x.py"]], ["shopt -s expand_aliases; alias 'test=bash'\ntest -x scripts/x.py", ["scripts/x.py"]]])
+      ["git show HEAD:a $(java -cp origin/main:scripts/x.py M)", ["scripts/x.py"]], ["shopt -s expand_aliases; alias 'test=bash'\ntest -x scripts/x.py", ["scripts/x.py"]],
+      // (#476's fallback security review of 64d440f: git's own arguments may hold a command's output; git by its path or
+      // as git.exe; an alias after a keyword; "show" only as git's subcommand)
+      ["git -C \"$(git rev-parse --show-toplevel)\" show origin/main:scripts/x.py | bash", []], ["git -C \"$(git rev-parse --show-toplevel)\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []],
+      ["git -C `git rev-parse --show-toplevel` show origin/main:scripts/x.py | bash", []], ["git --git-dir=\"$(pwd)/.git\" show origin/main:scripts/x.py | python3 -", []],
+      ["/usr/bin/git show origin/main:scripts/x.py | bash", []], ["git.exe show origin/main:scripts/x.py | bash", []], ["git -c core.pager=cat show origin/main:scripts/x.py | bash", []],
+      ["shopt -s expand_aliases\nif true; then alias test=bash; fi\ntest -x scripts/x.py", ["scripts/x.py"]], ["shopt -s expand_aliases\n{ alias test=bash; }\ntest -x scripts/x.py", ["scripts/x.py"]],
+      ["shopt -s expand_aliases\nbuiltin alias test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["java -cp git -cp show -cp origin/main:scripts/x.py Main", ["scripts/x.py"]]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])

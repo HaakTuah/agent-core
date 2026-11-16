@@ -35,7 +35,7 @@ const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then
 // (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
 // alias's operands, quoted or not: no file test of it is one)
 const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
-const redefined = raw => DEFINED.test(raw) || raw.split(/[;&|\n]/u).some(c => /^\s*alias\b/u.test(c) && /[\s"'](?:test|\[\[?)=/u.test(c));
+const redefined = raw => DEFINED.test(raw) || raw.split(/[;&|\n]/u).some(c => /^\s*(?:(?:then|do|else|elif|if|while|until|builtin|command|!|\{|\()\s*)*alias\b/u.test(c) && /[\s"'](?:test|\[\[?)=/u.test(c));
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), perhaps closed by a quote)
 const ROOTED = /[\u0001)`]\\?["']?$/u;
@@ -82,13 +82,21 @@ const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
 const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`]["']?\/+)?$/u;
 const AT_MAIN = /(?:^|[\s"'])(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
-// Whether the command that `before` ends in (from its last ";", "&", "|", newline, "(", ")" or backtick on) is git's
-// show or cat-file: "git" and, after it, "show" or "cat-file", each a word of its own (not --show-toplevel).
+// Whether the command that `before` ends in is git's show or cat-file. Each closed $(...) and backtick's command is
+// first one mark, so what they hold (--show-toplevel, say) is not git's; the command runs from the last ";", "&", "|",
+// newline, or "(" or backtick still open; and git (by any path, with ".exe" or not) must be its first word, and
+// "show" or "cat-file" git's subcommand: its first word after git's own options (-C and -c take a word each).
+const GIT_OPTS_WITH_WORD = new Set(["-C", "-c"]);
 function gitShows(before) {
+  let text = before.replace(/`[^`]*`/gu, "\u0002");
+  for (let n = 0, last = ""; n < 64 && last !== text; n++) { last = text; text = text.replace(/\$\([^()]*\)/gu, "\u0002"); }
   let from = -1;
-  for (const c of [";", "&", "|", "\n", "(", ")", "`"]) from = Math.max(from, before.lastIndexOf(c));
-  const words = before.slice(from + 1).split(/[\s"']+/u), git = words.indexOf("git");
-  return git >= 0 && words.slice(git + 1).some(w => w === "show" || w === "cat-file");
+  for (const c of [";", "&", "|", "\n", "(", "`"]) from = Math.max(from, text.lastIndexOf(c));
+  const words = text.slice(from + 1).split(/\s+/u).map(w => w.replace(/["']/gu, "")).filter(Boolean);
+  let i = words.findIndex(w => !/^\w+=/u.test(w)); // (past a command's own variables, as FOO=1 git show)
+  if (i < 0 || words[i].replace(/^.*[\/\\]/u, "").replace(/\.exe$/iu, "") !== "git") return false;
+  for (i++; i < words.length && words[i].startsWith("-"); i++) if (GIT_OPTS_WITH_WORD.has(words[i])) i++;
+  return words[i] === "show" || words[i] === "cat-file";
 }
 // (a path fetched from main: `<the remote's main>:<path>` given to git show or git cat-file, within one command, not
 // one of a list such as java's -cp or LD_PRELOAD takes)
@@ -182,7 +190,9 @@ export function fromTree(command, holds, index = null) {
     const variants = [text];
     for (let level = raw, n = 0; n < 8; n++) { const next = dequote(level); if (next === level) break; variants.push(next); level = next; }
     const bare = raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, "");
-    variants.push(bare, text.replace(/[\^`](.)/gsu, "$1"), text.replace(/[\^`](.)/gsu, "$1").replace(/["']/gu, ""));
+    // (a closed backtick span holding a blank is the shell's command output, kept as one mark, not PowerShell's escape)
+    const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
+    variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
     for (const variant of variants) scan(variant, index, holds, found, tests);
   }
   return [...found];
