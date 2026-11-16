@@ -196,28 +196,28 @@ jobs:
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/labels-test.mjs ')) }}
         run: node scripts/labels-test.mjs
       - name: The hostile tests of an input, a pull request's description
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-text-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-text-test.mjs ')) }}
         run: node scripts/hostile-pr-text-test.mjs
       - name: The hostile tests of an input, comments and reviews on a pull request
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-comments-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-comments-test.mjs ')) }}
         run: node scripts/hostile-pr-comments-test.mjs
       - name: The hostile tests of an input, what a pull request changes
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-changes-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-changes-test.mjs ')) }}
         run: node scripts/hostile-pr-changes-test.mjs
       - name: The hostile tests of an input, issues, their comments and labels
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-issues-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-issues-test.mjs ')) }}
         run: node scripts/hostile-issues-test.mjs
       - name: The hostile tests of an input, what GitHub's API answers
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-github-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-github-test.mjs ')) }}
         run: node scripts/hostile-github-test.mjs
       - name: The hostile tests of an input, a project's configs of the core's checks, its manifest and SECURITY.md
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-configs-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-configs-test.mjs ')) }}
         run: node scripts/hostile-configs-test.mjs
       - name: The hostile tests of an input, a project's build, package and workflow files
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-build-files-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-build-files-test.mjs ')) }}
         run: node scripts/hostile-build-files-test.mjs
       - name: The hostile tests of an input, what a package brings
-        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-packages-test.mjs ')) }}
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-packages-test.mjs ')) }}
         run: node scripts/hostile-packages-test.mjs
       # (on every pull request, whatever the selection: a hostile test added with no step, which the selection would run
       # alone, is what it finds)
