@@ -244,7 +244,7 @@ function runner(p, tmp) {
 function coreFile(tmp, sha, file, list = false) {
   if (!coreClone) {
     coreClone = path.join(tmp, "core.git");
-    try { git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); } catch (e) { fail(`the core could not be fetched from https://github.com/${CORE} (${String(e.stderr ?? e.message).trim().split("\n").pop()}).`, `let this machine reach github.com, or point git at a copy of the core it can reach (git config url.<the copy>.insteadOf https://github.com/${CORE}), and run this check again.`); }
+    try { git(tmp, "clone", "-q", "--bare", `https://github.com/${CORE}`, coreClone); } catch (e) { fail(`the core could not be fetched from https://github.com/${CORE} (${String(e.stderr ?? e.message).trim().split("\n").pop().replace(/:\/\/[^/@\s]*@/g, "://")}).`, `let this machine reach github.com, or point git at a copy of the core it can reach (git config url.<the copy>.insteadOf https://github.com/${CORE}), and run this check again.`); }
   }
   if (!/^[0-9a-f]{40}$/.test(sha)) return null;
   try { return list ? git(tmp, "--git-dir", coreClone, "ls-tree", "--name-only", `${sha}:${file}`) : git(tmp, "--git-dir", coreClone, "show", `${sha}:${file}`); } catch { return null; }
