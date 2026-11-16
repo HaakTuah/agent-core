@@ -27,11 +27,13 @@ import { library, reading } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 // Each role's cap, a whole number of KB: one line a role, spelled exactly so. The builder's is the one cap of before,
-// which held what every session read at its start; the others were first set at their size on 16 November 2026.
+// which held what every session read at its start, raised one step on 16 November 2026 for the builder's own file
+// (#304), its leanness check having found 108 bytes of room for the 1,038 that file needed; the others were first set
+// that day, each the whole KB next above its start.
 export const CAPS = {
-  builder: 27 * 1024,
-  design: 28 * 1024,
-  orchestrator: 42 * 1024,
+  builder: 28 * 1024,
+  design: 29 * 1024,
+  orchestrator: 43 * 1024,
   reviewer: 22 * 1024,
   "stand-in": 19 * 1024,
 };

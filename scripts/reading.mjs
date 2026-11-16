@@ -306,14 +306,19 @@ function main(argv) {
   }
   const got = reading(lib, { role, tools, kinds: task.kinds, paths: task.paths, named: task.named, own });
   if (got.error) { console.error(`FAIL: ${got.error}`); return 1; }
+  const notes = [...task.notes];
+  if (prefix && argv.includes("--changed") && !config) notes.push(`no path of this project's own has a kind: to have a changed screen or the like call its module, name each folder in ${OWN[0]} as { "paths": { "<folder>/": "<kind>" } } (${self} --kinds lists the kinds)`);
+  print(role, got, at, tools.length > 0, notes);
+  return 0;
+}
+// What a session reads, printed: the start, then what the task calls for with why, then the notes.
+function print(role, got, at, tool, notes) {
   console.log(`Read at the start, in the role ${role} (each whole):`);
   for (const f of got.start) console.log(`  ${at(f)}`);
-  if (!tools.length) console.log("  and your tool's part: give --tool <its name> (a module names its tool in its opening line)");
+  if (!tool) console.log("  and your tool's part: give --tool <its name> (a module names its tool in its opening line)");
   console.log(got.task.length ? "Read for this task:" : "Nothing more is called for by this task as given.");
   for (const t of got.task) console.log(`  ${at(t.file).padEnd(34)} ${t.why}`);
-  for (const n of task.notes) console.log(`note ${n}`);
-  if (prefix && argv.includes("--changed") && !config) console.log(`note no path of this project's own has a kind: to have a changed screen or the like call its module, name each folder in ${OWN[0]} as { "paths": { "<folder>/": "<kind>" } } (${self} --kinds lists the kinds)`);
-  return 0;
+  for (const n of notes) console.log(`note ${n}`);
 }
 
 // (started by its own file, as started.mjs beside it tells, or handed to node on its input, as the start hook hands it:
