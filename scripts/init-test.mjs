@@ -231,13 +231,33 @@ if (p.status === 0) {
   git(core, "reset", "-q", "--hard", "main");
   ok(renamedOut.status === 1 && /reads 1 files fewer than main's config read: elsewhere\.md \(prose\)\. Mend: take the config back/u.test(renamedOut.out) && mended(renamedOut.out) && deleted.status === 0 && !renamedOut.left && !deleted.left,
     "against the base, a file its config read and renamed out of every spec fails, by its new name, with its mend; one deleted passes; and the base's index is taken away after", `${renamedOut.out}${deleted.out}`);
+  // (a file of the core's copy that a sync moves out of what the project's config reads fails nothing: the core's own
+  // pull request held the move)
+  const coreFile = fs.readdirSync(path.join(p.dir, "core/tasks")).find(f => f.endsWith(".md"));
+  git(p.dir, "mv", `core/tasks/${coreFile}`, `core/elsewhere-${coreFile}`);
+  const synced = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json"], { cwd: p.dir, env: { ...env, COPIES_BASE: "HEAD" }, encoding: "utf8" });
+  git(p.dir, "reset", "-q", "--hard", "HEAD");
+  ok(synced.status === 0, "against the base, a file of the core's copy that a sync renames out of the project's config fails nothing", synced.stdout + synced.stderr);
   // (a config moved with the call that names it is held to the one the base called: narrowed or its baseline moved,
   // it fails with its mend; moved whole, it passes; one beside a config still called is a first, held to nothing; #370)
   const tests = path.join(core, ".github/workflows/tests.yml"), testsWas = fs.readFileSync(tests, "utf8"), cfgMain = JSON.parse(cfgWas);
-  const moveTo = (config, keepCall = false) => {
-    fs.writeFileSync(path.join(core, ".github/copies-two.json"), JSON.stringify(config));
-    git(core, "add", ".github/copies-two.json");
-    if (!keepCall) fs.writeFileSync(tests, testsWas.replaceAll(".github/copies.json", ".github/copies-two.json"));
+  // (`keepCall`: the call still names the base's config; `shapeToo`: the shape check's config, which names a baseline
+  // too, moved with its call at the same time)
+  const shapeWas = fs.readFileSync(path.join(core, ".github/shape.json"), "utf8");
+  const moveTo = (config, { keepCall = false, shapeToo = false } = {}) => {
+    const put = (at, text) => { fs.writeFileSync(path.join(core, at), text); git(core, "add", at); };
+    put(".github/copies-two.json", JSON.stringify(config));
+    // (the call alone moved, a comment still naming the old call, as a project's caller names its config in a comment)
+    let calls = testsWas;
+    if (!keepCall) calls = calls.replace("run: node scripts/copies.mjs .github/copies.json", "run: node scripts/copies.mjs .github/copies-two.json # was: node scripts/copies.mjs .github/copies.json");
+    fs.writeFileSync(tests, calls);
+    if (shapeToo) {
+      put(".github/shape-two.json", shapeWas);
+      for (const f of fs.readdirSync(path.join(core, ".github/workflows"))) {
+        const at = path.join(core, ".github/workflows", f);
+        fs.writeFileSync(at, fs.readFileSync(at, "utf8").replaceAll(".github/shape.json", ".github/shape-two.json"));
+      }
+    }
     const r = baseRun(".github/copies-two.json");
     git(core, "reset", "-q", "--hard", "main");
     return r;
@@ -246,13 +266,13 @@ if (p.status === 0) {
   fs.copyFileSync(path.join(core, ".github/copies-baseline.json"), path.join(core, ".github/moved.json"));
   const movedBaseline = moveTo({ ...cfgMain, baseline: ".github/moved.json" });
   fs.rmSync(path.join(core, ".github/moved.json"));
-  const movedWhole = moveTo(cfgMain), beside = moveTo({ ...cfgMain, prose: ["README.md"] }, true);
+  const movedWhole = moveTo(cfgMain), beside = moveTo({ ...cfgMain, prose: ["README.md"] }, { keepCall: true }), withShape = moveTo(cfgMain, { shapeToo: true });
   const calledInPlace = /\.github\/copies-two\.json, called in place of \.github\/copies\.json \(the config main's workflows call\),/u;
   const backMoved = /Mend: take the config back as main holds it \(git checkout main -- \.github\/copies\.json\), and name it in the call again/u;
   ok(movedNarrow.status === 1 && calledInPlace.test(movedNarrow.out) && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(movedNarrow.out) && backMoved.test(movedNarrow.out) && mended(movedNarrow.out)
     && movedBaseline.status === 1 && calledInPlace.test(movedBaseline.out) && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(movedBaseline.out) && mended(movedBaseline.out)
-    && movedWhole.status === 0 && beside.status === 0,
-    "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, it passes", `${movedNarrow.out}${movedBaseline.out}${movedWhole.out}${beside.out}`);
+    && movedWhole.status === 0 && beside.status === 0 && withShape.status === 0,
+    "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, or with another check's config moved too, it passes", `${movedNarrow.out}${movedBaseline.out}${movedWhole.out}${beside.out}${withShape.out}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;

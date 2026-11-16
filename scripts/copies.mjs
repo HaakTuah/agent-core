@@ -25,6 +25,7 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ruleFiles } from "./rule-files.mjs";
+import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
 // (git says it, as the path from the root to this folder, so no spelling of a path, such as Windows' short names,
@@ -158,33 +159,57 @@ function lsAt(commit, specs) {
     return ls(specs, env);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
-// What became of a commit's files in the tree as git holds it now: { to: each renamed file's new name, gone: those deleted }.
+// What became of a commit's files in the tree as git holds it now: { to: each renamed file's new name, gone: those
+// deleted }. A file of the core's copy (core/ in a project) that moved counts as gone, not followed: a sync moves
+// those, and the core's own pull request held the move, so a sync never fails for it.
 function renamed(commit) {
   const to = new Map(), gone = new Set(), parts = git(["diff", "-M", "--name-status", "-z", "--cached", commit, "--"]).split("\0");
   for (let i = 0; i + 1 < parts.length;) {
     const status = parts[i];
-    if (/^[RC]/u.test(status)) { if (status[0] === "R") to.set(parts[i + 1], parts[i + 2]); i += 3; }
+    if (/^[RC]/u.test(status)) {
+      if (status[0] === "R" && CORE && parts[i + 1].startsWith(CORE)) gone.add(parts[i + 1]);
+      else if (status[0] === "R") to.set(parts[i + 1], parts[i + 2]);
+      i += 3;
+    }
     else { if (status === "D") gone.add(parts[i + 1]); i += 2; }
   }
   return { to, gone };
 }
-// A config of this check's at a path of a commit (an object that names its baseline), or null.
+// A config of this check's at a path of a commit, or null: an object of this check's keys alone that names its
+// baseline, and that baseline, there, an object of "windows", so that another check's config (the shape check's, which
+// names a baseline too) is never taken for one.
 function configAt(commit, at) {
-  try { const c = JSON.parse(git(["show", `${commit}:${at}`])); return c && typeof c === "object" && !Array.isArray(c) && typeof c.baseline === "string" ? c : null; } catch { return null; }
+  const json = file => { try { return JSON.parse(git(["show", `${commit}:${file}`])); } catch { return null; } };
+  const object = v => v !== null && typeof v === "object" && !Array.isArray(v);
+  const c = json(at);
+  if (!object(c) || typeof c.baseline !== "string" || Object.keys(c).some(k => !KEYS.includes(k))) return null;
+  const windows = json(c.baseline)?.windows;
+  return object(windows) ? c : null;
 }
-// The paths of JSON files the workflows name, at a commit or (null) in the tree as it stands, each as a word of their text.
-function namedJson(commit) {
+// The configs the workflows call this check with, at a commit or (null) as git holds them now: each `config:` value
+// and each word after `copies.mjs` on a line, comments left out, of each file git lists that is a file (no link
+// followed); what is no config of this check's is passed over where it is read (configAt).
+const CALLED = [/^[ \t-]*config:[ \t]*(["']?)([^\s"']+)\1[ \t]*$/u, /copies\.mjs["']?[ \t]+(["']?)([^\s"';&|]+)\1/gu];
+function called(commit) {
   const files = (commit ? lsAt(commit, [".github/workflows"]) : ls([".github/workflows"])).filter(f => /\.ya?ml$/iu.test(f));
-  const text = files.map(f => { try { return commit ? git(["show", `${commit}:${f}`]) : fs.readFileSync(f, "utf8"); } catch { return ""; } }).join("\n");
-  return new Set([...text.matchAll(/[^\s"'`:,;=()[\]{}]+\.json(?![^\s"'`,;)\]}])/gu)].map(m => m[0].replace(/^\.\//u, "")));
+  const found = new Set();
+  for (const f of files) {
+    let text = "";
+    if (commit) try { text = git(["show", `${commit}:${f}`]); } catch { /* (no such file there: none called) */ }
+    else if (fs.lstatSync(f, { throwIfNoEntry: false })?.isFile()) text = fs.readFileSync(f, "utf8");
+    for (const line of text.split(/\r\n|\r|\n/u).map(uncommented)) {
+      for (const m of [CALLED[0].exec(line), ...line.matchAll(CALLED[1])]) if (m) found.add(m[2].replace(/^\.\//u, ""));
+    }
+  }
+  return found;
 }
 // The base's config, each as { at, config }: the one at this config's path; where the base holds none there, each its
-// workflows named that the tree's workflows name no more (a config moved with its call); else none.
+// workflows called that the tree's workflows call no more (a config moved with its call); else none.
 function heldTo(commit) {
   const here = configAt(commit, CONFIG_AT);
   if (here) return [{ at: CONFIG_AT, config: here }];
-  const now = namedJson(null);
-  return [...namedJson(commit)].filter(at => !now.has(at)).map(at => ({ at, config: configAt(commit, at) })).filter(h => h.config);
+  const now = called(null);
+  return [...called(commit)].filter(at => !now.has(at)).map(at => ({ at, config: configAt(commit, at) })).filter(h => h.config);
 }
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
 const found = runs.flatMap(r => r.copies);
@@ -218,7 +243,7 @@ if (from) {
   // stays where the base keeps it (one moved would be held to nothing), and every file the base's config read is read
   // still, as code or prose as it was: each the base's specs read in the tree as it stands, and each they read at the
   // base, followed through a rename, a file deleted being no narrowing (#371). The base's config is the one at this
-  // path, or, where the base holds none here, each config its workflows named that the tree's workflows name no more,
+  // path, or, where the base holds none here, each config its workflows called that the tree's workflows call no more,
   // so that a config moved with its call is held all the same (#370). A config beside one still called, or where the
   // base called none, is the check's first on that branch, held to nothing. Any widening passes.
   const held = heldTo(from);
