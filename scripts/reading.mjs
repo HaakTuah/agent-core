@@ -41,7 +41,7 @@ export const READ_LINE = "Read for it:";
 // The floor's two files read when needed, by the topics the floor's own opening names, until they are a folder of
 // topics that each say when (#304, point 8): the floor's words are not changed for it here.
 export const FLOOR_WHEN = {
-  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "npm-shrinkwrap.json", "go.sum"] },
+  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "*-shrinkwrap.json", "go.sum"] },
   "floor/threat-model.md": { kinds: ["security-review"], paths: [] },
 };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
