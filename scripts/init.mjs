@@ -28,6 +28,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { sizeOf } from "./file-size.mjs";
+import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 
@@ -230,7 +231,7 @@ function init(argv) {
   let main = null;
   try { main = git(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main"], ROOT); } catch { /* (no such ref: core.yml decides) */ }
   if (main) { try { git(["merge-base", "--is-ancestor", pin, main], ROOT); } catch { fail(`${pin} is not a commit of the core's main, as this clone knows it`); } }
-  const moduleNames = git(["ls-tree", "--name-only", `${pin}:modules`], ROOT).split("\n").filter(n => n.endsWith(".md"));
+  const moduleNames = MODULES.flatMap(d => git(["ls-tree", "--name-only", `${pin}:${d}`], ROOT).split("\n").filter(n => n.endsWith(".md")));
 
   const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
   const out = files(o, pin, moduleNames, read);
