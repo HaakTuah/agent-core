@@ -656,9 +656,12 @@ function preRelease(name, { windows }) {
   if (windows) {
     git(dir, "checkout", "-q", "-B", "nuget", "main");
     write(dir, "src/App/App.csproj", lines('<Project Sdk="Microsoft.NET.Sdk">', "  <PropertyGroup>", "    <OutputType>Exe</OutputType>", `    <TargetFramework>${tfm}</TargetFramework>`,
-      "    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>", "  </PropertyGroup>", "</Project>"));
+      "    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>", "  </PropertyGroup>", "  <ItemGroup>", '    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />', "  </ItemGroup>", "</Project>"));
     write(dir, "src/App/Program.cs", lines('System.Console.WriteLine("Hello");'));
-    write(dir, "src/App/packages.lock.json", lines("{", '  "version": 1,', '  "dependencies": {', `    "${tfm}": {}`, "  }", "}"));
+    // (one package, so that the first look's restore against its empty source looks a package up through the mapping:
+    // with none, it never would, and the case would pass without #380's fix. The look downloads nothing)
+    write(dir, "src/App/packages.lock.json", lines("{", '  "version": 1,', '  "dependencies": {', `    "${tfm}": {`, '      "Newtonsoft.Json": {', '        "type": "Direct",', '        "requested": "[13.0.3, )",',
+      '        "resolved": "13.0.3",', '        "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="', "      }", "    }", "  }", "}"));
     write(dir, "NuGet.Config", lines('<?xml version="1.0" encoding="utf-8"?>', "<configuration>", "  <packageSources>", "    <clear />", '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />',
       "  </packageSources>", "  <packageSourceMapping>", '    <packageSource key="nuget.org">', '      <package pattern="*" />', "    </packageSource>", "  </packageSourceMapping>", "</configuration>"));
     write(dir, ".gitignore", lines("bin/", "obj/"));
