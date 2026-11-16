@@ -360,8 +360,8 @@ export const STEPS = [
     check: p => {
       if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
-      const own = runFiles(p, "licences.mjs"), beside = runFiles(p, "exact-versions.mjs");
-      return own.length && !own.some(f => beside.includes(f))
+      const own = runFiles(p, "licences.mjs");
+      return own.length && !own.some(f => runFiles(p, "exact-versions.mjs").includes(f))
         ? `The workflow that runs the licence check, ${own.join(", ")}, runs \`node core/scripts/exact-versions.mjs <its config>\` beside it, as the core's \`licences.yml\` does.` : null;
     },
     partly: "that the licence check passes with its new step is held by that check" },

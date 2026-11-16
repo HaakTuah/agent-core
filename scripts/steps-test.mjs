@@ -513,6 +513,18 @@ ok(["time echo \"node core/scripts/copies.mjs config/c.json\"", "nohup echo 'nod
   "sudo chmod +x ${{ github.workspace }}/core/scripts/copies.mjs", "time echo ${{ github.workspace }}/core/scripts/copies.mjs"]
   .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "a word that only holds the script's name, quoted or filled by an expression, is no run");
 ok(["env -S'node core/scripts/copies.mjs config/c.json'", "env --split-string='node core/scripts/copies.mjs config/c.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })), "env's -S joined to the commands it splits is read as giving them");
+ok(copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs '$GITHUB_WORKSPACE/config/c.json'") }) === "$GITHUB_WORKSPACE/config/c.json" && copiesOf({ "a.yml": stepped("node '$GITHUB_WORKSPACE/core/scripts/copies.mjs' c.json") }) === "checks/copies.json",
+  "the root's name in single quotes is text, never the root");
+// (the review of 1dd5dbf: a shell's file and that file's arguments are never its own commands; a command that runs no
+// script names it as text; env -S read only as env's; the exact-versions step asks of companions only where the licence
+// check runs)
+ok(["bash -e ./run.sh -c 'node core/scripts/copies.mjs other.json'", "bash -x script.sh -c 'node core/scripts/copies.mjs other.json'", "pwsh -File x.ps1 -Command 'node core/scripts/copies.mjs other.json'",
+  "echo Then run node core/scripts/copies.mjs your.json", "cp node core/scripts/copies.mjs /tmp", "echo env -S 'node core/scripts/copies.mjs x'"]
+  .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"), "a shell's file and its arguments, and a command that runs no script, give no run");
+const longEnv = Date.now();
+ok(notRead("copies", { "a.yml": stepped(`env ${"-S ".repeat(20000)}'node core/scripts/copies.mjs c.json'`) }) && Date.now() - longEnv < 1500, "many of env's options are read in one pass", `${Date.now() - longEnv} ms`);
+const versionsStep = STEPS.find(s => s.lead === "12 November 2026, exact versions");
+ok(versionsStep.check(inMemory({ "a.yml": stepped("cd tools && node scripts/exact-versions.mjs x.json") }, { "package-lock.json": "{}" })) === null, "where the project runs no licence check of its own, a companion run it cannot place asks nothing");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

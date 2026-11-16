@@ -167,7 +167,8 @@ const ROOT = /^(?:\$GITHUB_WORKSPACE|\$\{GITHUB_WORKSPACE\}|\$\{\{\s*github\.wor
 // A word as a path from the project's root, run in the folder `dir` (from the root): { at } where it is known, at null
 // where it leads out of the project; { dynamic } where it is named only when the workflow runs.
 function located(word, dir) {
-  const text = slashed(word), rooted = ROOT.test(text), rest = text.replace(ROOT, "");
+  // (the root's name is filled only where the word lets the shell fill it: in single quotes it is text)
+  const text = slashed(word), rooted = word.dynamic && ROOT.test(text), rest = rooted ? text.replace(ROOT, "") : text;
   if (word.dynamic && /\$|`|%\w+%|\{/u.test(rest)) return { dynamic: true };
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
@@ -211,10 +212,12 @@ function pastWrappers(words) {
 // where it is given none.
 function inline(words, i) {
   let k = i + 1;
-  // (an option's value, -o pipefail or -ExecutionPolicy Bypass, passed over with it)
-  while (k < words.length && !INLINE.test(words[k].text) && (words[k].text.startsWith("-") || words[k].text.startsWith("+") || words[k - 1].text.startsWith("-") || words[k - 1].text.startsWith("+"))) k++;
+  // (an option passed over, with its value where it is one known to take one; a word that is no option, a script
+  // file the shell runs, ends the search: what follows it is that file's)
+  for (; k < words.length && !INLINE.test(words[k].text) && /^[-+]/u.test(words[k].text); k++) if (SHELL_VALUED.test(words[k].text)) k++;
   return k + 1 < words.length && INLINE.test(words[k].text) ? { inner: words[k + 1].text, filled: words[k + 1].dynamic } : {};
 }
+const SHELL_VALUED = /^(?:[-+]o|[-+]O|--rcfile|--init-file|-executionpolicy|-workingdirectory|-inputformat|-outputformat|-configurationname|-settingsfile|-windowstyle|-version)$/iu;
 // How each script picks its config from its arguments, as it reads them: the first that does not start with "--"; of
 // the reading-size and exact-versions checks, the first whatever it is; of the NuGet check, never the value of its
 // "--packages", and none where it is run "--projects" or "--imports", which list files and read no config.
@@ -231,33 +234,19 @@ function configAfter(words, i, dir, script) {
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
-// Where a command the reader did not read as a run of the script still runs it with node past where the reader
-// stopped (timeout 60s node …, sudo -u bot node …), or gives env such a run to split (env -S '…'), a run that cannot
-// be known (never one that is not there), as { unread, unsure }; else nothing. A word that only holds the script's
-// name, quoted (echo "node core/scripts/…", git commit -m '…'), is no run.
-const unfollowed = (words, script, from) =>
-  (hides(words, script, from) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : []);
-// The commands env is given to split, after its -S (or --split-string), as one word or joined to the option.
-const SPLIT = /^(?:-S|--split-string)(?:=?)(.*)$/su;
-const splitBy = (words, j) => {
-  const at = SPLIT.exec(words[j].text);
-  if (!at || !words.slice(0, j).some(w => w.text === "env")) return null;
-  return at[1] || words[j + 1]?.text || null;
-};
-// Whether, past `from`, a node word is followed (past node's own options) by the copy's script, by its path, or env
-// is given such a run to split (each a shorter text than the word that holds it, so the reading ends).
-function hides(words, script, from) {
-  const names = w => !!w && slashed(w).replace(ROOT, "").replace(/^\.\//u, "") === script;
-  return words.some((w, j) => {
-    if (j <= from) return false;
-    const split = splitBy(words, j);
-    if (split !== null) return commands(split).some(inner => hides(inner, script, -1));
-    if (!NODE.test(w.text)) return false;
-    let k = j + 1;
-    for (; k < words.length && words[k].text.startsWith("-"); k++) if (VALUED.has(words[k].text)) k++;
-    return names(words[k]);
-  });
+// Where a command the reader did not read as a run of the script names the copy's script all the same (timeout 60s
+// node …, sudo -u bot node …, env -S '…'), a run that cannot be known (never one that is not there), as
+// { unread, unsure }; else nothing. A command that runs no script (echo, cp, git: NO_RUNNER) names it as text, and a
+// shell given a file runs that file, which the reader does not run (notElsewhere says so where nothing else runs the
+// check).
+function unfollowed(words, script) {
+  const at = pastWrappers(words), command = words[at]?.text ?? "";
+  if (NO_RUNNER.has(path.posix.basename(command)) || SHELL.test(command)) return [];
+  // (a word that is the script, by its path, or a string of commands that holds it, as env -S is given)
+  const names = w => { const t = slashed(w).replace(ROOT, "").replace(/^\.\//u, ""); return t === script || (/\s/u.test(t) && new RegExp(`(?:^|[\\s'"/])${script.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?:$|[\\s'"])`, "u").test(t)); };
+  return words.some(names) ? [{ unread: `runs ${script} in a way the reader does not follow`, unsure: true }] : [];
 }
+const NO_RUNNER = new Set(["echo", "printf", "cp", "mv", "rm", "ln", "chmod", "chown", "git", "cat", "head", "tail", "ls", "test", "[", "grep", "sed", "awk", "touch", "mkdir", "tee", "wc", "diff", "stat", "readlink", "realpath", "basename", "dirname", "which", "type", "true", "false", ":", "export", "set", "unset", "cd"]);
 // The runs read inside a shell's command string, each not read where the outer shell fills the string when it runs
 // (`bash -c "node … '$CONFIG'"`: the inner quotes keep nothing from it).
 const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `runs ${script} in a command string the workflow fills only when it runs`, unsure: true })) : runs);
@@ -270,7 +259,7 @@ function runsIn(run, dir, script) {
     const { moves, inner, filled, at: i } = nodeRuns(words);
     moved ||= !!moves;
     if (inner !== undefined) found.push(...within(runsIn(inner, moved ? { dynamic: true } : dir, script), filled, script));
-    else if (i === undefined) found.push(...(moves ? [] : unfollowed(words, script, 0)));
+    else if (i === undefined) found.push(...(moves ? [] : unfollowed(words, script)));
     else found.push(...runAt(words, i, moved ? { dynamic: true, moved } : dir, script));
   }
   return found;
@@ -280,7 +269,7 @@ function runsIn(run, dir, script) {
 // copy it runs cannot be known.
 function runAt(words, i, dir, script) {
   const word = words[i];
-  if (!word || !slashed(word).endsWith(`scripts/${path.posix.basename(script)}`)) return unfollowed(words, script, i - 1);
+  if (!word || !slashed(word).endsWith(`scripts/${path.posix.basename(script)}`)) return unfollowed(words, script);
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   const at = dir.dynamic ? { dynamic: true } : located(word, dir.at);
   if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs`, unsure: true }];
