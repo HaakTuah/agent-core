@@ -466,6 +466,16 @@ let failOnce = true;
 const flaky = { ...inMemory({ "a.yml": { jobs: { j: { steps: [{ uses: "./.github/actions/t" }] } } }, "b.yml": stepped("node core/scripts/copies.mjs config/b.json") }), read: f => { if (failOnce) { failOnce = false; throw new Error("once"); } return null; } };
 try { configs(flaky); } catch { /* (the first reading throws) */ }
 ok(configs(flaky).copies === "config/b.json", "a reading that throws keeps nothing, so the next reads every step");
+// (the review of eb6c597: every option of a wrapper passed, and a run behind one it cannot follow said not read; a
+// here-document's end found in one pass; a "((" with no "))" opens two subshells; a path spelled for Windows in a call or a slot not read)
+ok(copiesOf({ "a.yml": stepped("sudo -E -H node core/scripts/copies.mjs config/c.json") }) === "config/c.json"
+  && notRead("copies", { "a.yml": stepped("sudo -u bot node core/scripts/copies.mjs config/c.json") }) && notRead("copies", { "a.yml": stepped("bash -o pipefail -c 'node core/scripts/copies.mjs config/c.json'") }),
+  "every option of a wrapper is passed, and a run behind an option's value or a shell's option the reader cannot follow is not read");
+const opened = `${"cat <<EOF\n".repeat(20000)}node core/scripts/copies.mjs config/c.json`, started = Date.now();
+ok(copiesOf({ "a.yml": stepped(opened) }) === "config/c.json" && Date.now() - started < 1500, "here-documents with no end leave every line read, in one pass", `${Date.now() - started} ms`);
+ok(copiesOf({ "a.yml": stepped("((echo a) ; cat <<EOF)\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json", "a \"((\" with no \"))\" hides no here-document after it");
+ok(notRead("copies", { "a.yml": coreCall("copies.yml", { config: "config\\c.json", sizes: "s.json" }) }) && notRead("packages", { "s.yml": coreCall("signatures.yml", { directory: "app\\web" }) })
+  && notRead("copies", {}, {}, "| *copies check* | `core/scripts/copies.mjs` with `C:/c.json` |\n"), "a path a call or a slot spells for Windows is not read");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

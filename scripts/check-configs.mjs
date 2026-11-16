@@ -44,10 +44,13 @@ const passed = (p, name, key = "config") => given(p, name, key).map(({ where, va
 });
 // A path as the project's root reads it: "./" and a slash at its end left out, and any "." or ".." in it taken.
 const tidy = f => path.posix.normalize(f.replace(/\/+$/u, "")).replace(/^\.\//u, "");
-// A file a call or a config names, as a path from the root: one that leads out of the project, or starts at the
-// machine's root, is no file of the project's, and not read.
+// A file a call or a config names, as a path from the root: one that leads out of the project, starts at the
+// machine's root, or is spelled for Windows, is no file of the project's, and not read.
+// (the core's workflows run on Linux, where a "\\" is part of a file's name, and a drive letter names no file of the
+// project's: either is not read)
 const inside = (f, what) => {
-  const at = tidy(f.replace(/\\/gu, "/"));
+  if (/\\|^[A-Za-z]:/u.test(f)) throw new Unread(`${what} names ${f}, a path spelled for Windows, which the check reads as no file of the project's`);
+  const at = tidy(f);
   if (at === ".." || at.startsWith("../") || at.startsWith("/")) throw new Unread(`${what} names ${f}, outside the project`);
   return at;
 };
@@ -93,13 +96,20 @@ export function commands(run) {
 // The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone); where
 // no such line follows, none is left out.
 function withoutHereDocuments(lines) {
-  const out = [];
+  const out = [], at = new Map(); // (each line's text, trimmed, with the lines it stands on, in order: read once)
+  lines.forEach((l, k) => { const t = l.trim(); if (!at.has(t)) at.set(t, []); at.get(t).push(k); });
   for (let n = 0; n < lines.length; n++) {
     out.push(lines[n]);
-    const end = hereDocument(lines[n]), last = end ? lines.findIndex((l, k) => k > n && l.trim() === end) : -1;
+    const end = hereDocument(lines[n]), last = end ? next(at.get(end) ?? [], n) : -1;
     if (last > n) n = last - 1;
   }
   return out;
+}
+// The first of the sorted line numbers `list` past `n`, or -1.
+function next(list, n) {
+  let low = 0, high = list.length;
+  while (low < high) { const mid = (low + high) >> 1; if (list[mid] <= n) low = mid + 1; else high = mid; }
+  return low < list.length ? list[low] : -1;
 }
 // The word that ends a here-document a line opens: a `<<` outside quotes and arithmetic, never `<<<`, then the word,
 // quoted, after a "\\" or bare, starting with a letter or "_"; null where it opens none.
@@ -107,7 +117,7 @@ function hereDocument(line) {
   for (let i = 0, quote = ""; i < line.length; i++) {
     const c = line[i];
     if (quote) { if (c === "\\" && quote === '"') i++; else if (c === quote) quote = ""; }
-    else if (line.startsWith("((", i)) { const e = line.indexOf("))", i + 2); if (e < 0) return null; i = e + 1; }
+    else if (line.startsWith("((", i)) { const e = line.indexOf("))", i + 2); if (e >= 0) i = e + 1; } // (with no "))", two subshells)
     else if (c === "'" || c === '"') quote = c;
     else if (c === "\\") i++;
     else if (line.startsWith("<<<", i)) i += 2;
@@ -175,10 +185,14 @@ function nodeRuns(words) {
   for (i++; i < words.length && words[i].text.startsWith("-"); i++) if (VALUED.has(words[i].text)) i++;
   return { at: i };
 }
-// Where a command's own word starts: past the variables it sets and its wrappers, with their options (sudo -E, env -i).
+// Where a command's own word starts: past the variables it sets and its wrappers, with their options (sudo -E -H, env
+// -i); an option's value (sudo -u bot) it cannot tell from the command, and runsIn says so.
 function pastWrappers(words) {
   let i = 0;
-  while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text))) for (i++; WRAPPERS.has(words[i - 1].text) && words[i]?.text.startsWith("-"); i++);
+  while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text))) {
+    const wrapper = WRAPPERS.has(words[i].text);
+    for (i++; wrapper && words[i]?.text.startsWith("-"); i++);
+  }
   return i;
 }
 // The commands a shell at word `i` is given as one word, past its other options, as { inner }; {} where it is given none.
@@ -203,6 +217,13 @@ function configAfter(words, i, dir, script) {
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
+// Where a command that starts with a wrapper or a shell the reader could not get past names the script, a run that
+// cannot be known (never one that is not there), as { unread }; else nothing.
+const unfollowed = (words, script) => {
+  const first = words.find(w => !/^\w+=/u.test(w.text)), name = path.posix.basename(script);
+  return first && (WRAPPERS.has(first.text) || SHELL.test(first.text)) && words.some(w => slashed(w).includes(`scripts/${name}`))
+    ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
+};
 // Where a step's `run:`, in the folder `dir`, runs `script` (a path from the root, "core/scripts/copies.mjs") with
 // node: each as configAfter gives it.
 function runsIn(run, dir, script) {
@@ -212,6 +233,7 @@ function runsIn(run, dir, script) {
     const { moves, inner, at: i } = nodeRuns(words);
     moved ||= !!moves;
     if (inner !== undefined) found.push(...runsIn(inner, moved ? { dynamic: true } : dir, script));
+    else if (i === undefined && !moves) found.push(...unfollowed(words, script));
     const word = words[i ?? words.length];
     if (!word || !slashed(word).endsWith(`scripts/${name}`)) continue;
     // (after a cd, or in a folder named only when it runs, which copy it runs cannot be known)
