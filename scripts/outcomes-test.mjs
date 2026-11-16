@@ -105,8 +105,9 @@ const report = body({ core: false, month: "2026-11", measures: null, previous: n
 ok(report.indexOf(`**${HEADING} in 2026-10**`) > 0 && report.indexOf(`**${HEADING} in 2026-10**`) < report.indexOf("**The measures against their baselines**"), "the state report leads with the outcomes");
 ok(body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], holders: [], scripts: "scripts" }).includes("- Not read: `scripts/outcomes-read.mjs` was not run for 2026-10."), "and says where they were not read");
 const carried = outcomesFrom(report);
-ok(carried.startsWith("outcomes in 2026-10: corrections that the task was misread") && carried.includes("the code's size 500 KB in 100 files") && countsFrom(report, false)?.includes("outcomes in 2026-10"),
-  "a project's outcomes reach the core's report as one part of its line", carried);
+ok(carried.startsWith("outcomes in 2026-10: corrections that the task was misread") && carried.includes("the code's size 500 KB in 100 files") && countsFrom(report, true)?.includes("outcomes in 2026-10")
+  && countsFrom(report, false, undefined, true)?.includes("outcomes in 2026-10"), "a public project's outcomes reach the core's report as one part of its line", carried);
+ok(!(countsFrom(report, false) ?? "").includes("outcomes"), "a private project's outcomes do not");
 const forged = report.replace("- the code's size: 500 KB", "- the code's size: our secret plan 500 KB").replace("- dropped errors", "- a name of ours: 3");
 ok(!outcomesFrom(forged).includes("secret") && !outcomesFrom(forged).includes("name of ours") && outcomesFrom("no heading") === null, "a word or a measure not its own is not carried", outcomesFrom(forged));
 

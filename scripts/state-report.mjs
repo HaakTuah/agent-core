@@ -155,10 +155,10 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
 // A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
 // whole-line form that holds numbers and fixed words alone, and written anew from what it holds, so no other text of
 // the project's reaches the core's report, and after them the rules its roles cited (cited.mjs's citedFrom, which lets
-// through the core's own rule names alone, `known`), and its outcomes (outcomes.mjs's outcomesFrom, which lets through
-// its own measures' names and words alone); null where none is in its form. The commit its copy holds is kept
+// through the core's own rule names alone, `known`), and, of a public project (`open`), its outcomes (outcomes.mjs's
+// outcomesFrom, which lets through its own measures' names and words alone); null where none is in its form. The commit its copy holds is kept
 // only where `named` (the owner's public project).
-export function countsFrom(text, named, known = new Set(rules().map(r => r.key))) {
+export function countsFrom(text, named, known = new Set(rules().map(r => r.key)), open = named) {
   const part = String(text ?? "").split(`**${COUNTS}**`)[1] ?? "";
   const out = [];
   for (const line of part.split(/\r?\n/)) {
@@ -171,7 +171,7 @@ export function countsFrom(text, named, known = new Set(rules().map(r => r.key))
   }
   const cited = citedFrom(text, known);
   if (cited) out.push(cited);
-  const outcomes = outcomesFrom(text);
+  const outcomes = open ? outcomesFrom(text) : null; // (a private project's outcomes are not carried: #450's security review)
   if (outcomes) out.push(outcomes);
   return out.length ? out.join("; ") : null;
 }
@@ -212,7 +212,7 @@ function projects(named) {
     let counts = "its counts could not be read here: a session started in it reads its newest state report and passes back the lines under its heading";
     try {
       const report = reportOf(pagesOf(`repos/${name}/issues?state=all&labels=by%3Alook`, gh), r.owner);
-      const read = report && countsFrom(report.body, own && !r.private);
+      const read = report && countsFrom(report.body, own && !r.private, undefined, !r.private);
       if (read) counts = `from its report of ${report.title.slice(-7)}: ${read}`;
       else if (!report) counts = "it has no state report yet";
     } catch { /* (the default above) */ }

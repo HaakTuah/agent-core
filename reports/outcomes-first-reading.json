@@ -24,37 +24,19 @@
   },
   "projects": [
     {
-      "shown": "a project of another owner",
-      "outcomes": {
-        "misread": "0 (± 0) of 212 merged, 0 for every ten",
-        "missing": "1 (± 2) of 212 merged, 0.05 for every ten",
-        "queued": "none",
-        "looks": "1 (± 2) of 212 merged, 0.05 for every ten",
-        "failed": "4 (± 4) of 212, 2%",
-        "live": "14.5 h (of 18)",
-        "broke": "4 (± 4) of 212 merged, 0.19 for every ten",
-        "mending": "14 (± 7) of 212, 7%",
-        "corrected": "6 (± 5) of 212 merged, 0.28 for every ten",
-        "cost": "none priced, of 212",
-        "uncorrected": "none priced, of 212",
-        "carried": "none priced",
-        "idle": "80% of 586 open hours (of the 60 newest merged)",
-        "rework": "56 (± 15) in 60 pull requests: a review finding 0, a failed check 7, neither (measuring again, or the builder's own) 49; and 97 bringing the branch up to date",
-        "size": "7627 KB in 546 files, 96 of them over 20 KB",
-        "functions": "201 over 60 lines, 15 over 4 depth, 236 over 15 branches"
-      },
-      "code at its first commit, 11 October 2026 (it is younger than the span)": {
-        "size": "1739 KB in 52 files, 21 of them over 20 KB",
-        "functions": "82 over 60 lines, 11 over 4 depth, 85 over 15 branches"
-      }
+      "shown": "a project of another owner (private)",
+      "outcomes": null,
+      "why": "read, and its numbers not published: a private project's measures stand in the core's public files only where its own owner has said they may"
     },
     {
       "shown": "`HaakTuah/amarna-letters`",
-      "outcomes": null
+      "outcomes": null,
+      "why": "not read here (#451)"
     },
     {
       "shown": "`HaakTuah/barkstreet-snakes`",
-      "outcomes": null
+      "outcomes": null,
+      "why": "not read here (#451)"
     }
   ]
 }
