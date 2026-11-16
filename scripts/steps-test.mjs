@@ -601,6 +601,11 @@ ok(notRead("copies", { "a.yml": stepped("node ${{ inputs.script }} bad.json") })
   && notRead("copies", { "a.yml": { jobs: { j: { strategy: { matrix: { s: Array.from({ length: 100001 }, (_, k) => `v${k}`) } }, steps: [{ run: "echo x" }] } } } })
   && notRead("copies", { "a.yml": { jobs: { j: { steps: [{ run: "node $__proto__ bad.json", env: parseYaml("__proto__: core/scripts/copies.mjs\n") }] } } } }),
   "a script given by an expression of GitHub's, a mapping too large to read whole, and a key named __proto__ leave the run not read");
+// (Codex's review of 8237183 and the review after it: a local action's steps are given what its caller is given; a
+// file of another plain name past an expression is no run of the script)
+ok(notRead("copies", { "a.yml": { env: { CHECK: "core/scripts/copies.mjs" }, jobs: { j: { steps: [{ uses: "./.github/actions/c" }] } } } }, { ".github/actions/c/action.yml": "runs:\n  using: composite\n  steps:\n    - run: node \"$CHECK\" config/custom.json\n      shell: bash\n" })
+  && copiesOf({ "a.yml": stepped("node ${{ github.action_path }}/index.js\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
+  "a local action is read with what its caller gives it; a file of another plain name past an expression is no run of the script");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
