@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { body } from "./state-report.mjs";
+import { body, pushWait } from "./state-report.mjs";
 import { line, measure, median, waited } from "./wait.mjs";
 
 let failed = 0, count = 0;
@@ -34,6 +34,8 @@ ok(/gives no mark under "wait"/.test(line({ ...m, mark: undefined })) && /not re
 
 const report = body({ core: false, month: "2026-11", measures: null, wait: line(m), previous: null, overdue: [], scripts: "core/scripts" });
 ok(report.includes(`**The measures against their baselines**\n${line(m)}`), "the monthly state report gives the line among its measures", report);
+
+ok(/^- what a push waits on: not read \(GitHub did not answer/.test(pushWait("o/n", ".", null, () => { throw new Error("403"); })) && /6\.0 min/.test(pushWait("o/n", ".", null, gh)), "the state report says the wait not read where GitHub does not answer, never leaves it out", pushWait("o/n", ".", null, () => { throw new Error("403"); }));
 
 const script = fileURLToPath(new URL("./wait.mjs", import.meta.url));
 for (const args of [[], ["--repo", "not a repo"], ["--repo", "o/n", "--count", "many"]]) {

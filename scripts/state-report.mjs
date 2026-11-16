@@ -61,13 +61,13 @@ function strength(root, config) {
   try { return { at, count: Object.values(JSON.parse(fs.readFileSync(path.join(root, at), "utf8")).listed).reduce((n, e) => n + (e.count ?? 0), 0) }; } catch { return null; }
 }
 
-// What a push waits on (wait.mjs), against the shape check's mark "wait", read through gh: the report's line, or null
-// where nothing of it could be read.
+// What a push waits on (wait.mjs), against the shape check's mark "wait", read through gh: the report's line, which
+// says "not read", and why, where GitHub did not answer.
 export function pushWait(repo, root, manifest, gh) {
-  try {
-    const r = reading(rulesOf(manifest, root).rules, root);
-    return waitLine(measureWait({ repo, mark: r?.config.wait, ...(gh ? { gh } : {}) }));
-  } catch { return null; }
+  let mark;
+  try { mark = reading(rulesOf(manifest, root).rules, root)?.config.wait; } catch { mark = undefined; }
+  try { return waitLine(measureWait({ repo, mark, ...(gh ? { gh } : {}) })); }
+  catch { return "- what a push waits on: not read (GitHub did not answer for the pull requests' checks: the look's job needs `pull-requests: read` and `checks: read`)."; }
 }
 
 // The lines of the measures against their baselines: each with its count at the last report, where that report gave it.
