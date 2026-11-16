@@ -27,9 +27,12 @@
 //
 //   node core/scripts/review-record.mjs [--since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
 import { FINDING, codexState, codexs } from "./security-review.mjs";
 import { started } from "./started.mjs";
+import { ROOT, rules, rulesOf } from "./rules.mjs";
 import { pages } from "./stand-in-record.mjs";
 
 const RECEIPT = /^<!-- codex-review-receipt:v1 -->/u;
@@ -107,12 +110,12 @@ export function perPull(issueComments, inline, owner) {
   return { codexCode: codex("code"), postedCode: posted("code"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
 }
 
-// The rules a pull request's findings name (AGENTS.md of the core, "A finding seen twice becomes a check"; #254): each on
+// The rules a pull request's findings name (the core's tasks/reviews.md, point 8; #254): each on
 // a line of its own that opens "Rule:", in a find of Codex's or a review posted by the owner's account, read as a key
 // the same however it is written: its backticks, bold and quotes, a closing stop and a leading "core/" left out, its
-// spaces made one and its case lowered. A quoted line names none.
+// spaces made one, its case lowered and its control and format characters taken out. A quoted line names none.
 const RULE = /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Rule:(?:\*\*)?[ \t]+(\S.*)$/u;
-export const ruleOf = text => String(text).slice(0, 300).replace(/[`*"\u201c\u201d]/gu, "").replace(/\s+/gu, " ").trim()
+export const ruleOf = text => String(text).slice(0, 300).replace(/[\p{Cc}\p{Cf}`*"\u201c\u201d]/gu, "").replace(/\s+/gu, " ").trim()
   .replace(/[.;]+$/u, "").trim().replace(/^core\//u, "").toLowerCase();
 export const rulesIn = body => lines(body).map(l => RULE.exec(l)?.[1]).filter(Boolean).map(ruleOf).filter(Boolean);
 export function rulesNamed(issueComments, inline, owner) {
@@ -130,6 +133,16 @@ export function foundTwice(pulls, since = null) {
   return [...by].filter(([, ps]) => ps.length > 1 && (from === null || ps.some(p => Date.parse(p.when) >= from)))
     .map(([rule, ps]) => ({ rule, pulls: ps.map(p => p.number).sort((a, b) => a - b) }))
     .sort((a, b) => b.pulls.length - a.pulls.length || a.rule.localeCompare(b.rule));
+}
+
+// The rules that stand, keyed as ruleOf keys a finding's line: those of the floor, the roles and the modules of the core
+// at `core` (rules.mjs), and those of the AGENTS.md at the root of the project at `project`, its own; null where they
+// cannot be read.
+export function standing(core = ROOT, project = process.cwd()) {
+  try {
+    const own = path.join(project, "AGENTS.md");
+    return new Set([...rules(core), ...(fs.existsSync(own) ? rulesOf("AGENTS.md", fs.readFileSync(own, "utf8")) : [])].map(r => ruleOf(r.key)));
+  } catch { return null; }
 }
 
 // The counts by review and by kind of pull request, from `pulls` as { number, kind, reviews } (perPull's answer).
@@ -178,7 +191,9 @@ export function bugs(list, comments, merged, owner) {
   return out;
 }
 
-export function print(repo, since, pulls, t, bug, twice = []) {
+// `known`: the rules that stand, as ruleOf keys them (standing, below), or null where they were not read; a rule found
+// twice that is none of them is listed apart, for no issue is filed for it.
+export function print(repo, since, pulls, t, bug, twice = [], known = null) {
   const count = k => pulls.filter(p => p.kind === k).length;
   const out = [`The reviews in ${repo}, ${since ? `from ${since}` : "from the first merge read"}: ${pulls.length} merged pull requests (${KINDS.map(k => `${k} ${count(k)}`).join(", ")})`];
   out.push("A point blocks where it is P0 or P1 (Codex) or declared in the form read (a posted review); a posted review in any other wording is \"not read\", never none, and so for its other points.");
@@ -198,9 +213,12 @@ export function print(repo, since, pulls, t, bug, twice = []) {
     + (bug.others ? `; filed by other accounts, left out: ${bug.others}` : ""));
   out.push("A bug is tied by a line \"Brought in by: #N\", alone on its line, in its body or in a comment of the owner's account; one without it is not read, never none.");
   const naming = pulls.filter(p => p.rules?.length).length;
-  out.push("", `Found twice, a rule the findings of two pull requests or more name${since ? `, one of them merged from ${since}` : ""}: ${twice.length}${twice.length ? "" : " (none)"}`,
-    ...twice.map(f => `- ${f.rule}: ${f.pulls.map(n => `#${n}`).join(", ")}`),
-    `A finding names its rule on a line \"Rule: <file>: <bold lead>\" (AGENTS.md of the core, \"A finding seen twice becomes a check\"); one without it names none. Of the ${pulls.length} pull requests read, ${naming} have a finding that names one.`);
+  const stands = twice.filter(f => known?.has(f.rule)), not = twice.filter(f => !known?.has(f.rule));
+  const listed = fs => fs.map(f => `- ${f.rule}: ${f.pulls.map(n => `#${n}`).join(", ")}`);
+  out.push("", `Found twice, a rule that stands which the findings of two pull requests or more name${since ? `, one of them merged from ${since}` : ""}: ${stands.length}${stands.length ? "" : " (none)"}`,
+    ...listed(stands),
+    ...(not.length ? [`Named twice but no rule that stands${known ? "" : " (the rules could not be read)"}, so no issue is filed for it: ${not.length}`, ...listed(not)] : []),
+    `A finding names its rule on a line \"Rule: <file>: <bold lead>\" (the core's tasks/reviews.md, point 8); one without it names none. Of the ${pulls.length} pull requests read, ${naming} have a finding that names one.`);
   return out.join("\n");
 }
 
@@ -232,7 +250,7 @@ function main(args) {
   const t = tally(pulls);
   const bug = bugs(issues, issueComments, new Map(merged.map(m => [m.number, m])), owner);
   const twice = foundTwice(all.map(m => ({ number: m.number, when: m.when, rules: named.get(m.number) })), since);
-  console.log(print(repo, since, pulls, t, bug, twice));
+  console.log(print(repo, since, pulls, t, bug, twice, standing()));
 }
 
 if (started(import.meta.url)) main(process.argv.slice(2));

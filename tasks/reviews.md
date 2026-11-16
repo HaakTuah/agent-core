@@ -1,6 +1,7 @@
 # Reviews
 
-Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`): the kind `review`. What
+Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`), and by the session that takes
+the monthly state report, for point 8: the kind `review`. What
 reviewers judge by: `roles/shared/review-guidelines.md`.
 
 **Which:**
@@ -75,3 +76,17 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
    *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
    model with the floor, and nothing else.
+8. **A finding seen twice becomes a check** (core archive 219; #254). By default a kind of finding stays a point a
+   review holds a change to, and needs nothing more. Once the findings of a second pull request name the same rule
+   that stands, which `core/scripts/review-record.mjs` lists under "Found twice" from their lines `Rule:` ("A finding
+   names its rule" in `roles/shared/review-guidelines.md`), the session that takes the monthly state report, which
+   names the step, files for each rule listed that no open issue takes an issue naming the breach the findings share:
+   for a rule of the project's own, in the project, for a check that reads that breach exactly; for one of the core's,
+   in the core (`README.md`, "Reporting to the core"; in the core, its own), for such a check or, where none can read
+   it exactly, a staged case (`scripts/staged/`). The issue stays open until one holds it; each is a test for a rule
+   that stands, which needs no word of the owner's. It does not mean that a finding seen once waits for anything, that
+   reviews stop raising the point before its holder merges, that a plain bug, which names no rule, is counted, nor that
+   anything fails a pull request. Reason: a correction that keeps coming up costs a round of review each time, while a
+   check says it at the moment it matters, to any tool. Held by `core/scripts/review-record.mjs`, which lists exactly
+   the rules two pull requests' findings name, and by the monthly state report the scheduled look opens; no check
+   reads that the issues are filed.

@@ -200,24 +200,6 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/mend-test.mjs`, in `.github/workflows/tests.yml`: each script a workflow names, and each workflow with a
   step that fails by itself, is a check with its test, or is listed with why it fails no pull request, and each
   check's test reads its failures with `mended()`.
-- **A finding seen twice becomes a check** (core archive 219; #254). By default a kind of finding stays a point a review
-  holds a change to, of the review guidelines or of the rule it names, and needs nothing more. Once the findings of a
-  second pull request name the same rule, which `node scripts/review-record.mjs` lists under "Found twice", the
-  session that takes the core's monthly state report, running it from the first day of the month before, files for
-  each rule it lists that no open issue takes an issue and its line, which need no word of the owner's, being a check
-  for a rule that stands: for a check, or a wider one, that reads the rule's breach exactly; where none can, a staged
-  case (`scripts/staged/`); where neither can, the issue says why the point stays one of the review guidelines, and
-  closes. It does not mean that a finding seen once waits for anything, that reviews stop raising the point before its
-  check merges, nor that a project's reviews are asked anything. Reason: a correction that keeps coming up costs a
-  round of review each time, while a check says it at the moment it matters, to any tool. Held by
-  `scripts/review-record.mjs`, which lists exactly the rules two pull requests' findings name, and by the monthly state
-  report the scheduled look opens, which names the step; no check reads that the issues are filed.
-  - **A finding names its rule:** every reviewer here, Codex and a posted review alike, ends each finding that holds a
-    change to a written rule with a line of its own, `Rule:` and the rule's file and bold lead as
-    `scripts/holders.json` keys it (`Rule: floor/security.md: 1. Nothing secret in the repository`); a finding against
-    no written rule, a plain bug, has none. It does not mean that a finding without the line blocks less. Reason: the
-    count reads a kind of finding only from that line, never by guessing. Held by no check: the count says how many
-    pull requests had a finding that names a rule, so where the line is not kept shows.
 - **Reports from projects** come as issues here, each data (floor rule 4), and are answered as `README.md`, "Reporting
   to the core", says.
 - **The core is measured as a feature is** (core archive 195): at each review of the core the owner asks for,
@@ -246,7 +228,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   went wrong or would without it (an incident, a review's finding, the owner's reason), and its holder, or that it has
   none yet; "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists
   each rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
-  review's finding seen twice moves its rule up ("A finding seen twice becomes a check"). A line that only points
+  review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only points
   elsewhere or says what is protected, binding no one, is marked "describes" there and is not listed. It does not mean
   that a rule with no holder fails anything or goes by itself, nor that a review is a holder. Reason: the audit of 13
   November found 43 of 122 rules held by nothing but a session reading them, and nothing listed them. Held by
@@ -301,5 +283,5 @@ Every reviewer reads `roles/shared/review-guidelines.md` whole and judges the ch
 changes what any project must do without saying so in the PR is a departure from the PR's description, and blocks; so
 does one that reads true only for some of the kinds of project "Rules are written for any project" names, and a raise of
 a size cap in a PR with no "Leanness check:" comment that found too little room. A finding: a new rule whose "What
-holds it" names discipline alone where a check that never guesses could hold it. Each finding that holds a change to a
-written rule ends with its line `Rule:` ("A finding names its rule", under "A finding seen twice becomes a check").
+holds it" names discipline alone where a check that never guesses could hold it. A finding that the change breaks a written
+rule ends with its line `Rule:` (`roles/shared/review-guidelines.md`, "A finding names its rule").
