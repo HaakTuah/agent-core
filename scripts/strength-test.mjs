@@ -67,8 +67,8 @@ ok(same(unlisted([renamed], one), []) && unlisted([renamed, renamed], one).lengt
   "a listed fault whose line a change rewrote is claimed by the same fault on the new line, once, also where another copy of the line stands and holds the rest; another fault there is the change's own");
 const repeated = "survivor: a.js: return true; [true -> false]", file = "function f() {\n  return true;\n}\nfunction g() {\n  return true;\n}\nconst h = () => true || false;\n";
 const entry = new Map([[repeated, { count: 1 }]]), seen = watched([repeated], () => file, new Map([["a.js", new Set([4, 5, 6])]]));
-ok(same([...seen.get("a.js")], [2, 7]) && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Survived")]).length === 1 && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Killed")]).length === 0 && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Pending")]).length === 1 && watched([repeated], () => file, new Map([["b.js", new Set([1])]])).size === 1 && watched(["survivor: b.js: x [! -> ]"], () => file, new Map()).size === 0,
-  "every unchanged line that could hold a listed kind is run: where its fault still survives, a changed line cannot use the entry; where a test catches it there, the entry is the changed line's; where it was not run, it holds the entry");
+ok(same([...seen.get("a.js")], [2, 7]) && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Survived")]).length === 1 && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Killed")]).length === 0 && unlisted([f(repeated, "Survived")], entry, [f(repeated, "Pending")]).length === 0 && watched([repeated], () => file, new Map([["b.js", new Set([1])]])).size === 1 && watched(["survivor: b.js: x [! -> ]"], () => file, new Map()).size === 0,
+  "every unchanged line that could hold a listed kind is run: where its fault still survives, a changed line cannot use the entry; where a test catches it there, the entry is the changed line's; where it was not run, as on a changed line, it holds nothing, so a budget that runs out turns nothing red");
 // (a line rewritten once and left unlisted under its old id: a later change that adds the same fault elsewhere in the
 // file finds the rewritten line holding the entry)
 ok(unlisted([{ ...f("survivor: a.js: if (z === 1) return; [=== -> !==]", "Survived"), line: 9 }], one, [renamed]).length === 1,
@@ -92,6 +92,13 @@ ok(swap([f(kept, "Survived")]).fails && !swap([f(kept, "Killed")]).fails && same
 const dropped = still => verdict({ faults: [], still, baseline: b({}), was: baseKept, at: "s.json", deleted: [] });
 ok(dropped([f(kept, "Survived")]).fails && mended(dropped([f(kept, "Survived")]).lines.join("\n")) && !dropped([f(kept, "Killed")]).fails && same(needed([], b({}), baseKept), [kept]) && same(needed([], b({}), baseKept, true), []) && same(undercut(b({}), baseKept, [f(kept, "Survived")]).map(k => k.held), [1]),
   "a pull request that drops an entry while its fault still survives fails, with its mend; once a test catches it, the entry goes; a whole run's pull request is not measured so", dropped([f(kept, "Survived")]).lines.join("\n"));
+// (a file split: one of b.js's two listed survivors moved into a.js, with the same fault)
+const inB = "survivor: b.js: if (x === 1) return; [=== -> !==]", inA = "survivor: a.js: if (x === 1) return; [=== -> !==]";
+const fB = id => ({ ...f(id, "Survived"), file: id.split(": ")[1] }), split = { [inB]: { count: 1 }, [inA]: { count: 1 } }, unsplit = b({ [inB]: { count: 2 } });
+const moved = (listed, faults, still) => verdict({ faults, still, baseline: b(listed), was: unsplit, at: "s.json", deleted: [] });
+ok(!moved(split, [fB(inA)], [fB(inB)]).fails && moved(split, [fB(inA)], [fB(inB), fB(inB)]).fails && moved({ [inB]: { count: 1 }, [inA]: { count: 2 } }, [fB(inA)], [fB(inB)]).fails && moved(split, [fB(inA)], [fB(inB), { ...fB(inB), status: "Pending" }]).fails
+  && mended(moved(split, [fB(inA)], [fB(inB), fB(inB)]).lines.join("\n")),
+  "debt a split carried to another file, listed there and as much fewer where it left, passes; where the old file still holds it, or the new lists more than the run found, it fails, with its mend", moved(split, [fB(inA)], [fB(inB)]).lines.join("\n"));
 
 // ---- the verdict ----
 const before = verdict({ faults: [f("survivor: z", "Survived"), f("k", "Killed")], baseline: null, was: null, at: "checks/strength-baseline.json", deleted: ["test/a.test.js"] });
