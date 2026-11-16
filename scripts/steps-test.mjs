@@ -392,8 +392,10 @@ ok(copiesOf({ "a.yml": stepped('echo "mend: node core/scripts/copies.mjs <config
 ok(copiesOf({ "a.yml": stepped('node core/scripts/copies.mjs "config/a # b.json"') }) === "config/a # b.json" && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs config/c.json # its config") }) === "config/c.json",
   "a \" #\" inside quotes cuts nothing short; one outside them starts a comment");
 ok(["node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json", 'node "${{ github.workspace }}/core/scripts/copies.mjs" "$GITHUB_WORKSPACE/config/c.json"',
-  "node ${GITHUB_WORKSPACE}/core/scripts/copies.mjs ./config/c.json", "node core\\scripts\\copies.mjs config\\c.json", "node --no-warnings core/scripts/copies.mjs --first config/c.json"]
-  .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "the checkout's root as a workflow names it, a Windows path and node's options read as the shell reads them");
+  "node ${GITHUB_WORKSPACE}/core/scripts/copies.mjs ./config/c.json", "node --no-warnings core/scripts/copies.mjs --first config/c.json"]
+  .every(run => copiesOf({ "a.yml": stepped(run) }) === "config/c.json"), "the checkout's root as a workflow names it and node's options read as the shell reads them");
+ok(["node core\\scripts\\copies.mjs config\\c.json", 'node "core\\scripts\\copies.mjs" "config\\c.json"', "node core/scripts/copies.mjs 'config\\c.json'"].every(run => copiesOf({ "a.yml": stepped(run) }) === null),
+  "a path with \"\\\", one file on Windows and another on Linux, is not read");
 ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", { "working-directory": "app" }) }) === "config/c.json"
   && copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", {}, { defaults: { run: { "working-directory": "app" } } }) }) === "config/c.json",
   "a step run in a folder of its own reads its paths from there");
@@ -442,10 +444,10 @@ ok(nugetOf("node core/scripts/nuget.mjs --packages restored config/n.json") === 
   && configs(inMemory({ "a.yml": stepped("node core/scripts/reading-size.mjs -x") })).sizes === "-x" && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs -x") }) === "-x",
   "each script's config is the argument it picks itself: never the NuGet check's folder, none where it lists files, and an option of one dash taken as the scripts take it");
 ok(notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs c.json", { "working-directory": { toString: "x" } }) }), "a folder that is no text is not read, and stops no other reading");
-ok(copiesOf({ "a.yml": stepped('node "core\\scripts\\copies.mjs" "config\\c.json"') }) === "config/c.json" && copiesOf({ "a.yml": stepped('bash -c "node core/scripts/copies.mjs config/c.json"') }) === "config/c.json"
+ok(copiesOf({ "a.yml": stepped('bash -c "node core/scripts/copies.mjs config/c.json"') }) === "config/c.json"
   && copiesOf({ "a.yml": stepped("sudo node core/scripts/copies.mjs config/c.json") }) === "config/c.json"
   && notRead("copies", { "a.yml": stepped("cat <<EOF > notes.md\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }),
-  "a Windows path in quotes, a shell given its commands as one word and sudo are read as runs; a here-document's lines are never read as one, and naming the script they leave its run not read");
+  "a shell given its commands as one word and sudo are read as runs; a here-document's lines are never read as one, and naming the script they leave its run not read");
 ok(notRead("copies", { "a.yml": coreCall("copies.yml", { config: "../../x.json", sizes: "s.json" }) }) && notRead("sizes", { "a.yml": coreCall("copies.yml", { config: "c.json", sizes: "/s.json" }) }),
   "a file a call names outside the project is not read");
 // (the review of 94b6a6c: a "<<" that opens no here-document hides no line, a wrapper's and a shell's options pass, an

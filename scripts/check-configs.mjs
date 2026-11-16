@@ -152,7 +152,7 @@ function part(text, i, add) {
   // (GitHub fills its expressions before the shell runs, single quotes or not)
   if (c === "'") { const e = text.indexOf("'", i + 1), j = e < 0 ? text.length : e; add(text.slice(i + 1, j), text.slice(i + 1, j).includes("${{")); return j; }
   if (c === '"') return doubleQuoted(text, i, add);
-  if (c === "\\") { const next = text[i + 1] ?? ""; add(/[\w.-]/u.test(next) && /[\w.-]/u.test(text[i - 1] ?? "") ? `/${next}` : next); return i + 1; }
+  if (c === "\\") { const next = text[i + 1] ?? ""; add(/[\w.-]/u.test(next) && /[\w.-]/u.test(text[i - 1] ?? "") ? `\\${next}` : next); return i + 1; }
   add(c, c === "$" || c === "`" || c === "{"); // (an unquoted "{" may be a brace expansion, {a,b}, filled when it runs)
   return i;
 }
@@ -169,17 +169,17 @@ function doubleQuoted(text, i, add) {
 // The root of the checkout as a workflow names it, at a path's start: read as the project's root.
 const ROOT = /^(?:\$GITHUB_WORKSPACE|\$\{GITHUB_WORKSPACE\}|\$\{\{\s*github\.workspace\s*\}\}|\$env:GITHUB_WORKSPACE|%GITHUB_WORKSPACE%)\//u;
 // A word as a path from the project's root, run in the folder `dir` (from the root): { at } where it is known, at null
-// where it leads out of the project; { dynamic } where it is named only when the workflow runs.
+// where it leads out of the project; { dynamic } where it is named only when the workflow runs; { windows } where it
+// holds a "\\", a folder's parting on Windows and part of a file's name on Linux, so no one file.
 function located(word, dir) {
+  if (word.text.includes("\\")) return { windows: true };
   // (the root's name is filled only where the word lets the shell fill it: in single quotes it is text)
-  const text = slashed(word), rooted = word.dynamic && ROOT.test(text), rest = rooted ? text.replace(ROOT, "") : text;
+  const text = word.text, rooted = word.dynamic && ROOT.test(text), rest = rooted ? text.replace(ROOT, "") : text;
   if (word.dynamic && /\$|`|%\w+%|\{/u.test(rest)) return { dynamic: true };
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
   return { at: at === ".." || at.startsWith("../") ? null : at.replace(/^\.\//u, "") };
 }
-// (a "\" left in a word, quoted or not, read as "/": a path spelled for Windows)
-const slashed = word => word.text.replace(/\\/gu, "/");
 const NODE = /(?:^|\/)node(?:\.exe)?$/iu;
 const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup", "sudo"]);
 // The shell's words that start a command's place without being one (if …; then node …), passed over as wrappers are.
@@ -253,6 +253,7 @@ function configAfter(words, i, dir, script) {
   const arg = k < 0 ? words.length : i + 1 + k;
   if (arg >= words.length) return { unread: `runs ${script} with no config` };
   const config = located(words[arg], dir.at);
+  if (config.windows) return { unread: `passes ${script} its config as ${words[arg].text}, a path with "\\" that Linux and Windows read as different files` };
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
   return config.at === null ? { unread: `passes ${script} its config as ${words[arg].text}, outside the project` } : { config: config.at };
 }
@@ -330,6 +331,7 @@ function runAt(words, i, dir, script) {
   if (!word || !plainPath(word.text).endsWith(`scripts/${path.posix.basename(script)}`)) return [];
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   const at = dir.dynamic ? { dynamic: true } : located(word, dir.at);
+  if (at.windows) return [{ unread: `runs ${word.text}, a path with "\\" that Linux and Windows read as different files`, unsure: true }];
   if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs`, unsure: true }];
   // (a run of any other file of that name, out of the project or in it, accounts for no naming: unaccounted says so)
   return at.at === script ? [configAfter(words, i, dir, script)] : [];
