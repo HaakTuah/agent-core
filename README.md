@@ -92,7 +92,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the core's owner names when handing the release on and `scripts/release.mjs` prints with each release, and from then
    on its new script takes the releases by itself (#365).
 
-   **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 227). By
+   **A release that brings nothing a project takes asks no sync of it** (#242 and #342; core archive 224 and 245). By
    default every release past a project's pin is synced. Where the pin is the release just before the newest and nothing
    the project takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes
    nothing, and `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every

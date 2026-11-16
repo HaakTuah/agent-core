@@ -91,13 +91,14 @@ The index, and how an item is written: `archive/instructions.md`.
 
 166. **12 November 2026** (the core, in the design chat). Asked: how the stand-in should treat the core's archive in a
      project of another owner, whose copy carries it; the first wording of the same day kept that stand-in from the
-     core's archive altogether. The owner asked whether that was not a fair answer, whether it should be opt-in whether
-     the stand-in also looks to the core's archive for past decisions, or whether they would not make sense for that
-     project anyway, and thought some general principles of engineering and software design stand regardless. Answered:
-     not opt-in, which would need that project's owner to say so, but searched by default, the project owner's own words
-     first, and an answer that rests on the core's archive alone marked unsure, so that the project's owner sees it
-     first and can overrule it. Decided: that answer stands. Behind: the rule that an answer resting only on the core's
-     archive, where the core's owner is another, is always unsure, in `modules/inbox.md`, "The stand-in".
+     core's archive altogether. The owner held that the owner's answers are logical enough to stand in another project,
+     and asked whether it should be opt-in whether the stand-in also looks to the core's archive for past decisions, or
+     whether they would not make sense for that project anyway, and thought some general principles of engineering and
+     software design stand regardless. Answered: not opt-in, which would need that project's owner to say so, but
+     searched by default, the project owner's own words first, and an answer that rests on the core's archive alone
+     marked unsure, so that the project's owner sees it first and can overrule it. Decided: that answer stands. Behind:
+     the rule that an answer resting only on the core's archive, where the core's owner is another, is always unsure, in
+     `modules/inbox.md`, "The stand-in".
 
 167. **12 November 2026** (the core, in the design chat). Asked: whether there should be rules not to run tests on
      anything already tested, since duplicated tests and reviews take resources and time and should ideally be

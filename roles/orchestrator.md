@@ -66,10 +66,9 @@ sessions.
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges. One session per task, continued for its review
   fixes while its context is under an hour old and small; otherwise a fresh one.
-- **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can
-: once its task merged, or it stopped with its work pushed and its note in its PR's description (for
-  usage too: a fresh builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound
-  to it.
+- **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
+  once its task merged, or it stopped with its work pushed and its note in its PR's description (for usage too: a fresh
+  builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
 - **A lane for every independent entry.** Where the look's cleaning issue stands, cleaning gets

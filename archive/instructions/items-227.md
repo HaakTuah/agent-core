@@ -107,8 +107,8 @@ The index, and how an item is written: `archive/instructions.md`.
      with sessions the owner works with, issue #249, its note "What this issue asks to be built, in one place" gathering
      what the owner agreed to). Asked: the owner asked for an audit of whether the core works perfectly with Kiro, to
      see whether it can be used in future work projects as well. Shown the audit, the owner said the core should slot in
-     with anything, ideally, that these were all areas for improvement, and asked what happens when the main tool runs
-     out of Claude usage and uses Antigravity instead, or when someone uses only Codex: everything must still work.
+     with anything, ideally, that these were all areas for improvement, and asked what happens when a tool runs out of
+     Claude usage and Antigravity is used instead, or when someone uses only Codex: everything must still work.
      Decided: the owner agreed to the session's six points: one door in, `AGENTS.md`, with each tool's small entry file
      written from one list and held to it by a check; roles by what they do, not by whose tool; hooks save time and
      checks are the guarantee, no rule held by a hook alone, the hooks then carried to each tool that has the event; a

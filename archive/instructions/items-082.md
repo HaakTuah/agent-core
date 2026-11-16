@@ -17,7 +17,7 @@ The index, and how an item is written: `archive/instructions.md`.
 
 85. **27 October 2026** (Barkstreet Snakes, 27 October 2026, 09:35 UTC). Asked: whether that game should also test each
     new feature by playing computer players that use it against ones that ignore it, as Amarna Letters does. Decided: If
-    the design session's own expert opinion is that it should, it goes ahead and does it.
+    the design session's own opinion is that it should, it goes ahead and does it.
 
 86. **28 October 2026** (Amarna Letters, item 18). Asked: a report that found script kings using an item's features won
     no more than those ignoring them. Decided: That the mechanics do not benefit the computer players right now is a big

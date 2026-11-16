@@ -68,9 +68,11 @@ Read at the start of every task.
     nothing more: never a bare yes, which it records as the owner's agreement to what it names, nor words addressed to
     a session.
   - The design session (where the owner writes the rules; in a project with none, the session the owner gives a
-    standing rule to) keeps those that become standing rules, dated, in the archive (the project's, or the core's if
-    it holds for every project, whose item names the issue that holds them), and writes each rule where it applies;
+    standing rule to) keeps those that become standing rules, dated, in the project's archive, or, where one holds for
+    every project, as an item of the core's that names the issue holding them, and writes each rule where it applies;
     only it writes rules from the owner's words.
+  - It does not mean the words are kept nowhere: the issue holds them, in its form. Reason: the same words kept twice
+    drift, and a bare yes quoted at every item is noise each search pays for.
   - **An order for now is not a rule.** By default an order of the owner's holds for the task, the session or the
     batch it was given in: the session acts on it, says so where it acts, and changes no rule file. It becomes a rule
     only where the owner says so in words ("make it a rule", "from now on in every project") or agrees to a proposal

@@ -31,8 +31,8 @@ The index, and how an item is written: `archive/instructions.md`.
 
 8. **28 October 2026** (Amarna Letters, item 19). Asked: the owner remarked that the principles answer most of the open
    questions if one just reasons them out, and it was proposed to write the answers down. Decided: The answers are
-   written down. In addition, code notes where it has made an assumption, as it does now with questions, so the
-   assumptions can be checked afterwards.
+   written down. In addition, Claude Code notes where it has made an assumption, as it does now with questions,
+   so the assumptions can be checked afterwards.
 
 9. **28 October 2026** (Amarna Letters, item 20; for both games). Asked: whether tests should run only where they
    matter, and then a check of what slows the work as the build grows. Decided: Tests run only where they impact

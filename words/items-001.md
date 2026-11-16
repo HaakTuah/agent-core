@@ -193,6 +193,6 @@ What these are and how they are kept: `words/README.md`.
     agreed.
 
 40. **2 November 2026** (Amarna Letters, items 161 and 162; for both games): "Is the ideas and bugs reporting pathway
-    showing fruits by bringing forward insights that would otherwise go lost?" To every reviewer naming one idea: the
-    owner agreed. Then: "Should we limit them to just being able to suggest 1?" and, to one per review with its guards:
+    showing fruits by bringing forward insights that would otherwise go lost?" To every reviewer naming one idea:
+    "Yes, address everything you just raised!" Then: "Should we limit them to just being able to suggest 1?" and, to one per review with its guards:
     the owner agreed.

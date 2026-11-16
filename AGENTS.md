@@ -229,18 +229,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   out of the copy as it keeps `reports/`). Whoever adds an item writes its number, its date, the issue that carries
   the owner's word and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
   words are recorded here, a bare yes is never quoted (the record says the owner agreed, and to what), words that
-  carry a decision or a reason stay quoted, and words addressed to a session are left out. It does not mean the items
-  that stand are rewritten: they keep the words they hold, in `words/`, beside their reasoning. Reason: a project of
-  another owner imported the owner's dated messages with the rules, and a stand-in needs the reasoning, not the
-  wording. Held by `scripts/holders.mjs`, which fails the two forms out of step (`scripts/archive.mjs`), and by
-  `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes` keeps here.
+  carry a decision or a reason stay quoted, and words addressed to a session are left out. Nothing changes it. It does
+  not mean the items that stand are rewritten: they keep the words they hold, in `words/`, beside their reasoning.
+  Reason: a project of another owner imported the owner's dated messages with the rules, and a stand-in needs the
+  reasoning, not the wording. Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step
+  (`scripts/archive.mjs`), and by `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes`
+  keeps here; what is quoted, by no check, since none can tell a bare yes from a decision.
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
   floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
-  rule adds its items to that list in the same pull request. It does not mean a rule loses its one-line reason, which
-  stays in it ("A rule is written to one pattern"), nor that a project's own rule files are asked anything. Reason:
-  about 60 such pointers stood in what every session reads at its start, and a builder on an ordinary task never
-  opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list names
+  rule adds its items to that list in the same pull request. Nothing changes it. It does not mean a rule loses its
+  one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are
+  asked anything. Reason: about 60 such pointers stood in what every session reads at its start, and a builder on an
+  ordinary task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list names
   that is not in the archive.
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
@@ -291,8 +292,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   differs is a slot, and what holds for one kind alone goes in a module of its own. `scripts/general.mjs` fails a word
   in the floor or the modules that fits only some (`scripts/general.json`); a word a project finds untrue for it joins
   that list in the PR that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a
-  PR adds under `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words, as the
-  archive keeps them) and a record moved word for word aside, while the older records stay as they were.
+  PR adds under `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words, as
+  `words/` keeps them) and a record moved word for word aside, while the older records stay as they were.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `scripts/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
