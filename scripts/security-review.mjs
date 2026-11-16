@@ -81,14 +81,19 @@ const SHA = /^[0-9a-f]{40}$/u;
 // description (#395; tasks/reviews.md, point 3). Where Codex's app starts the review by itself (its summary holds
 // a security review, or cannot be read), the fallback reviewer, after its own check of the newest commit, never Codex asked by
 // a comment, which it answers with a code review; elsewhere, the security reviewer the project uses, asked again.
-const CHECKS = 'the fallback reviewer checks the head, posts "Security review: <whole SHA>"';
-const HIDDEN = `an open finding of Codex's is in no comment. Mend: ${CHECKS}`;
+// (what a posted review carries, which the count of reviews reads: its kind and the whole SHA it read, and the lines
+// "Blocking findings: N." or "No blocking finding." and "Other findings: M." or "No other finding." (#299, #403), named
+// here as one so that each mend says it whole within GitHub's 140 characters; the code-review wait names its own kind)
+export const form = kind => `"${kind} review: <SHA>"+"Blocking/Other findings: N."`;
+const FORM = form("Security");
+const CHECKS = `the fallback reviewer posts ${FORM}`;
+const HIDDEN = `Codex's open finding is in no comment. Mend: ${CHECKS}`;
 function mendsFor(read) {
   const app = read.unread === true || (read.review !== null && typeof read.review === "object");
   // (one begun gets about 30 minutes, one not begun about 5: point 3)
   const begun = RUNNING.includes(read.review?.status);
   return app ? { post: CHECKS, none: `wait ${begun ? "30 min for Codex's" : "5 min"}; then the fallback reviewer reviews, posts one` }
-    : { post: 'your security reviewer checks the head, posts "Security review: <whole SHA>"', none: "your security reviewer reviews; with Codex's app, the fallback reviewer after 5 min" };
+    : { post: `your security reviewer posts ${FORM}`, none: "your security reviewer reviews; with Codex's app, the fallback reviewer after 5 min" };
 }
 // the words Codex's app writes for a review under way; any other (completed, none, or one not known) is none running,
 // so that a form nobody documents can never hold a pull request for good (scripts/code-review-wait.mjs reads them too)
@@ -271,8 +276,8 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
       if (pure || !bind || (at !== undefined && stand(at))) return { sha, done: true, why: `Codex's security review has run${on}` };
       if (forHead.length > 0) return { sha, done: true, why: `${postedWhy}; Codex's saw ${at === undefined ? "a commit not named" : `${at.slice(0, 7)}, earlier`}` };
       const saw = at === undefined ? "no named commit" : at.slice(0, 7);
-      if (cut !== undefined && at !== undefined && standsFrom(pull, flat(commits), sha).has(at)) return hold(`Codex saw ${saw}, before unproved merge ${cut.slice(0, 7)}. Mend: ${CHECKS}`, `Codex's review saw ${saw}${notGits}`);
-      return hold(`Codex saw ${saw}, not the head ${short}. Mend: ${CHECKS}`, `Codex's review saw ${saw}, not the head ${short}`);
+      if (cut !== undefined && at !== undefined && standsFrom(pull, flat(commits), sha).has(at)) return hold(`Codex saw ${saw}; merge ${cut.slice(0, 7)} unproved. Mend: ${CHECKS}`, `Codex's review saw ${saw}${notGits}`);
+      return hold(`Codex saw ${saw}, not the head. Mend: ${CHECKS}`, `Codex's review saw ${saw}, not the head ${short}`);
     }
     // a finding of it is marked open: only a review posted after its newest finding, and its summary's last change,
     // settles it, and one that names the head (or a commit only updates from main follow)
@@ -283,13 +288,13 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
       if (last <= found) {
         // (one whose review followed the finding but names no commit the head stands on, from before the check: told)
         if (!bound && ever > found) return hold("", `a review follows Codex's newest security finding, but names not the head ${short}`);
-        return { sha, done: false, why: `no review after Codex's finding. Mend: answer it; then ${CHECKS}` };
+        return { sha, done: false, why: `Codex's finding unreviewed. Mend: answer; then ${CHECKS}` };
       }
       // after the newest found, but a newer one may be given in a review's own body alone, which is not fetched: the
       // review settles the mark only if posted after Codex's summary last changed too, the latest that one can have
       // come (#293)
       if (last > changed) return { sha, done: true, why: `Codex's security review has run${on}, and a review is posted after its newest finding` };
-      return hold(`Codex's summary changed after the newest review. Mend: ${CHECKS}`, "Codex's summary changed after the review that followed its newest finding");
+      return hold(`Codex's summary changed after the review. Mend: ${CHECKS}`, "Codex's summary changed after the review that followed its newest finding");
     }
     // none is to be found among the comments (one in a review's own body, say): only a review posted after Codex's
     // summary last changed settles it, the latest the finding can have come (#251)
@@ -313,7 +318,7 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
   // (one naming a commit that only a merge from main git would not make follows: that merge named, #323)
   const loose = cut === undefined ? undefined : standsFrom(pull, all, sha);
   if (cut !== undefined && posted.some((comment) => named(comment.body).some((at) => loose.has(at)))) return hold(`a review predates unproved merge ${cut.slice(0, 7)}. Mend: ${mends.post}`, `a security review saw an earlier commit${notGits}`);
-  if (posted.length > 0) return hold(`a posted review names not the head ${short}. Mend: ${mends.post}`, `a security review is posted, but names not the head ${short}`);
+  if (posted.length > 0) return hold(`a posted review names not the head. Mend: ${mends.post}`, `a security review is posted, but names not the head ${short}`);
   return { sha, done: false, why: `no security review has run yet. Mend: ${mends.none}` };
 }
 
