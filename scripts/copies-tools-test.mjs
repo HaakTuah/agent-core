@@ -1,7 +1,8 @@
 // Checks the copies check (copies.mjs, beside this file) on the files an agent tool takes its instructions from (#405),
 // in a small project made for it: a copy the pull request's base held there is noted and fails nothing until --tools
-// lists it, and with no base each is noted; one the base did not hold fails, as does a baseline that lists one; and a
-// file whose link leads out of the project is not read. On Linux and on Windows. Git and Node's own modules only.
+// lists it, and with no base each is noted; one the base did not hold fails, as does a baseline that lists one; a
+// file whose link leads out of the project is not read, and one whose name holds a line break is named on one line.
+// On Linux and on Windows. Git and Node's own modules only.
 //
 //   node scripts/copies-tools-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -90,6 +91,13 @@ try {
       r = check({ COPIES_BASE: written });
       ok(r.status === 0 && !/out\.md/.test(r.out), "a file in a tool's folder whose link leads out of the project is not read", r.out);
     } finally { fs.rmSync(away, { recursive: true, force: true }); }
+    // (a name that holds a line break, which a log could read as a command of its own, is printed on one line)
+    const odd = ".agents/rules/x\n::error::y.md";
+    put(odd, `# Odd\n\n${OTHER}.\n`);
+    g("add", "-A");
+    r = check({ COPIES_BASE: written });
+    ok(r.status === 1 && /^FAIL: a new copy: .*x%0A::error::y\.md/m.test(r.out) && !/^::error::/m.test(r.out), "a file in a tool's folder whose name holds a line break is named on one line, escaped", r.out);
+    g("rm", "-q", "-f", odd);
   }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);
