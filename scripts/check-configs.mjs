@@ -123,10 +123,11 @@ function next(list, n) {
 // The word that ends a here-document a line opens: a `<<` outside quotes and arithmetic, never `<<<`, then the word,
 // quoted, after a "\\" or bare, starting with a letter or "_"; null where it opens none.
 function hereDocument(line) {
+  const closes = line.lastIndexOf("))"); // (so that a "((" with none after it is passed in one step)
   for (let i = 0, quote = ""; i < line.length; i++) {
     const c = line[i];
     if (quote) { if (c === "\\" && quote === '"') i++; else if (c === quote) quote = ""; }
-    else if (line.startsWith("((", i)) { const e = line.indexOf("))", i + 2); if (e >= 0) i = e + 1; } // (with no "))", two subshells)
+    else if (line.startsWith("((", i)) { if (closes > i) i = line.indexOf("))", i + 2) + 1; } // (with no "))" after it, two subshells)
     else if (c === "'" || c === '"') quote = c;
     else if (c === "\\") i++;
     else if (line.startsWith("<<<", i)) i += 2;
@@ -230,10 +231,14 @@ function configAfter(words, i, dir, script) {
 }
 // Where a command that starts with a wrapper or a shell the reader could not get past names the script, a run that
 // cannot be known (never one that is not there), as { unread }; else nothing.
-const unfollowed = (words, script) => {
-  const first = words.find(w => !/^\w+=/u.test(w.text)), name = path.posix.basename(script);
-  return first && (WRAPPERS.has(first.text) || SHELL.test(first.text)) && words.some(w => slashed(w).includes(`scripts/${name}`))
-    ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
+// (only past `from`, where the reader stopped: a node word that the copy's script follows, by its path, or a shell's
+// -c whose string names it)
+const unfollowed = (words, script, from) => {
+  const first = words.find(w => !/^\w+=/u.test(w.text));
+  if (!first || !(WRAPPERS.has(first.text) || SHELL.test(first.text))) return [];
+  const names = w => !!w && slashed(w).replace(ROOT, "").replace(/^\.\//u, "") === script;
+  const hidden = words.some((w, j) => j > from && ((NODE.test(w.text) && names(words[j + 1])) || (INLINE.test(w.text) && !!words[j + 1] && slashed(words[j + 1]).includes(script))));
+  return hidden ? [{ unread: `runs ${script} through a wrapper or a shell whose options the reader does not follow` }] : [];
 };
 // The runs read inside a shell's command string, each not read where the outer shell fills the string when it runs
 // (`bash -c "node … '$CONFIG'"`: the inner quotes keep nothing from it).
@@ -241,22 +246,28 @@ const within = (runs, filled, script) => (filled ? runs.map(() => ({ unread: `ru
 // Where a step's `run:`, in the folder `dir`, runs `script` (a path from the root, "core/scripts/copies.mjs") with
 // node: each as configAfter gives it.
 function runsIn(run, dir, script) {
-  const found = [], name = path.posix.basename(script);
+  const found = [];
   let moved = false;
   for (const words of commands(run)) {
     const { moves, inner, filled, at: i } = nodeRuns(words);
     moved ||= !!moves;
     if (inner !== undefined) found.push(...within(runsIn(inner, moved ? { dynamic: true } : dir, script), filled, script));
-    else if (i === undefined && !moves) found.push(...unfollowed(words, script));
-    const word = words[i ?? words.length];
-    if (!word || !slashed(word).endsWith(`scripts/${name}`)) continue;
-    // (after a cd, or in a folder named only when it runs, which copy it runs cannot be known)
-    const at = dir.dynamic || moved ? { dynamic: true } : located(word, dir.at);
-    if (moved) found.push({ unread: `runs ${word.text} after a command that changes its folder` });
-    else if (at.dynamic) found.push({ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs` });
-    else if (at.at === script) { const config = configAfter(words, i, dir, script); if (config) found.push(config); }
+    else if (i === undefined) found.push(...(moves ? [] : unfollowed(words, script, 0)));
+    else found.push(...runAt(words, i, moved ? { dynamic: true, moved } : dir, script));
   }
   return found;
+}
+// The run of a command whose node is given the word at `i`, as runsIn gives it: where that word is no script of the
+// copy's, a run the reader could not place (unfollowed); after a cd, or in a folder named only when it runs, which
+// copy it runs cannot be known.
+function runAt(words, i, dir, script) {
+  const word = words[i];
+  if (!word || !slashed(word).endsWith(`scripts/${path.posix.basename(script)}`)) return unfollowed(words, script, i - 1);
+  if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder` }];
+  const at = dir.dynamic ? { dynamic: true } : located(word, dir.at);
+  if (at.dynamic) return [{ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs` }];
+  const config = at.at === script ? configAfter(words, i, dir, script) : null;
+  return config ? [config] : [];
 }
 
 // A step's folder, from the root: its own `working-directory`, else its job's or its workflow's default.
