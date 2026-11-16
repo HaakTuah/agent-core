@@ -3,7 +3,7 @@
 // the registry gives, trimmed to what the lookup reads, and handed to it in place of the network (floor rule 8: no
 // live call, no real package). Run: node scripts/lookup-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "./lookup.mjs";
@@ -38,6 +38,10 @@ const answers = {
     { catalogEntry: { version: "0.1.0", published: "1900-01-01T00:00:00+00:00" } },
     { catalogEntry: { version: "1.0.0", published: ago(500) } },
   ] } },
+  "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.lines/index.json": { status: 200, json: { items: [
+    { items: [{ catalogEntry: { version: "1.0.0", published: ago(10) } }] },
+    { items: [{ catalogEntry: { version: "2.0.0", published: ago(700), authors: "Old Line" } }] },
+  ] } },
   "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.young/index.json": { status: 200, json: { items: [{ items: [{ catalogEntry: { version: "1.0.0", published: ago(40) } }] }] } },
   "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.astray/index.json": { status: 200, json: { items: [{ "@id": "https://elsewhere.invalid/page.json", lower: "1.0.0", upper: "2.0.0" }] } },
   "https://api.github.com/repos/invented-org/moss-core": { status: 200, json: { archived: false } },
@@ -49,7 +53,8 @@ const pkg = (name, extra = {}) => ({ name, version: "1.1.0", path: `node_modules
 // ---- What a lock file holds
 const tgz = (name, v = "1.1.0") => `https://registry.npmjs.org/${name}/-/${name.slice(name.indexOf("/") + 1)}-${v}.tgz`;
 const lock = { lockfileVersion: 3, packages: {
-  "": { dependencies: { "tidy-moss-format": "1.1.0", "moss-alias": "npm:tidy-moss-helper@1.1.0", local: "file:local" } },
+  "": { dependencies: { "tidy-moss-format": "1.1.0", "moss-alias": "npm:tidy-moss-helper@1.1.0", local: "file:local" }, devDependencies: { "dev-moss": "1.0.0" } },
+  "node_modules/dev-moss": { version: "1.0.0", resolved: tgz("dev-moss", "1.0.0"), devDependencies: { "brand-new-moss": "1.1.0" } },
   "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), dependencies: { "brand-new-moss": "1.1.0" } },
   "node_modules/moss-alias": { version: "1.1.0", resolved: tgz("tidy-moss-helper") },
   "node_modules/brand-new-moss": { version: "1.1.0", resolved: tgz("brand-new-moss"), dependencies: { "@invented/scoped-moss": "1.1.0" } },
@@ -60,7 +65,8 @@ const lock = { lockfileVersion: 3, packages: {
 } };
 const read = npmPackages(JSON.stringify(lock), "package-lock.json");
 const by = (name) => read.find((p) => p.name === name);
-ok(read.length === 4, `npm: the four packages npm's registry gives are read, the one from git and the link left out (${read.map((p) => p.name)})`);
+ok(by("dev-moss")?.direct === true && by("dev-moss")?.brings === 0, "npm: a development dependency of the project's own is named by it, and an installed package's own development dependencies bring nothing");
+ok(read.length === 5, `npm: the five packages npm's registry gives are read, the one from git and the link left out (${read.map((p) => p.name)})`);
 ok(by("tidy-moss-helper")?.direct === true, "npm: an alias is read by the name its registry address gives, and counts as named by the project");
 ok(by("tidy-moss-format")?.direct === true && by("tidy-moss-format")?.brings === 2, "npm: a package the project names brings what its dependencies bring, deep too");
 ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.brings === 1 && by("@invented/scoped-moss")?.by.join() === "tidy-moss-format", "npm: a package another brings is not named by the project, and names what does");
@@ -75,7 +81,7 @@ ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.bri
 
 // ---- What is new
 const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-helper" }], [{ name: "@invented/scoped-moss" }]]);
-ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
+ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,dev-moss,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
 ok(newPackages([["a/package-lock.json", [pkg("x", { direct: false })]], ["b/package-lock.json", [pkg("x")]]], []).length === 1, "a package new in two lock files is looked up once, where the project names it");
 ok(newPackages([["a/package-lock.json", [pkg("x")]], ["b/package-lock.json", [pkg("x", { direct: false })]]], [])[0]?.lockPath === "a/package-lock.json", "and once named by the project, it stays so where another lock file only brings it");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]], true).length === 0, "NuGet: an id the base held in another case is not new");
@@ -85,6 +91,8 @@ ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: 
 const one = async (p, nuget = false) => lookUp([p], { get, now: NOW, nuget });
 let r = await one(pkg("tidy-moss-format", { brings: 2 }));
 ok(r.failures.length === 0 && r.reports.length === 1, `an old package that exists passes (${JSON.stringify(r)})`);
+const odd = await lookUp([pkg("tidy-moss-format", { lockPath: "a\n::error::b/packages.lock.json" })], { get, now: NOW });
+ok(!/[\r\n]/u.test(odd.reports[0] ?? "\n"), "a lock file's path is printed on one line, whatever its folder's name");
 const report = r.reports[0] ?? "";
 for (const fact of ["named by the project", `first published ${ago(800).slice(0, 10)} (800 days ago)`, `last release ${ago(30).slice(0, 10)}`, "repository github.com/invented-org/tidy-moss-format, archived, naming the package back", "published by invented-publisher", "brings 2 packages with it", "provenance: yes"])
   ok(report.includes(fact), `the report says "${fact}" (${report})`);
@@ -119,12 +127,20 @@ ok(asked.filter((u) => u.startsWith("https://api.github.com/")).length === 20 &&
 
 r = await one(pkg("Invented.Moss.Core", { version: "2.0.0" }), true);
 ok(r.failures.length === 0 && r.reports[0]?.includes(`first published ${ago(500).slice(0, 10)}`) && r.reports[0].includes(`last release ${ago(20).slice(0, 10)}`) && r.reports[0].includes("github.com/invented-org/moss-core, not archived") && r.reports[0].includes("Invented Authors (as the package writes its authors)"), `NuGet: a page is fetched where the index leaves it out, and an unlisted version's date of 1900 is no date (${JSON.stringify(r)})`);
+r = await one(pkg("Invented.Moss.Lines", { version: "1.0.0" }), true);
+ok(r.failures.length === 0 && r.reports[0]?.includes(`first published ${ago(700).slice(0, 10)}`) && r.reports[0].includes(`last release ${ago(10).slice(0, 10)}`), `NuGet: every page is read, since a lower version may be the newer (${JSON.stringify(r)})`);
 r = await one(pkg("invented.moss.young", { version: "1.0.0" }), true);
 ok(r.failures.length === 1 && /40 days ago/u.test(r.failures[0]), `NuGet: a young package fails (${r.failures})`);
 for (const [what, answer] of [["no pages", { status: 200, json: { items: [] } }], ["a page that does not answer", { status: 200, json: { items: [{ "@id": "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.gone/page/1.0.0/2.0.0.json", lower: "1.0.0", upper: "2.0.0" }] } }]]) {
   r = await lookUp([pkg("Invented.Moss.Gone")], { get: async (url) => (url.endsWith("index.json") ? answer : { status: 500 }), now: NOW, nuget: true });
   ok(r.failures.length === 1 && /could not be read/u.test(r.failures[0]), `NuGet: an index with ${what} fails the lookup (${r.failures})`);
 }
+r = await lookUp([pkg("Invented.Moss.Absent")], { get, now: NOW, nuget: true, sources: 1 });
+ok(r.failures.length === 0 && /from a source the config names/u.test(r.reports[0] ?? ""), `NuGet: where the config names sources of its own, an id NuGet's registry lacks is from one of them, reported and not failed (${JSON.stringify(r)})`);
+r = await lookUp([pkg("Invented.Moss.Core", { version: "9.9.9" })], { get, now: NOW, nuget: true });
+ok(r.failures.length === 1 && /no version 9\.9\.9 of it/u.test(r.failures[0]), `NuGet: an id the registry knows at no such version fails, where the config names no other source (${r.failures})`);
+r = await lookUp([pkg("Invented.Moss.Core", { version: "9.9.9" })], { get, now: NOW, nuget: true, sources: 1 });
+ok(r.failures.length === 0 && /from a source the config names/u.test(r.reports[0] ?? ""), "NuGet: and is from a source of the config's where it names one, its old public dates never read for it");
 r = await one(pkg("Invented.Moss.Absent"), true);
 ok(r.failures.length === 1 && /NuGet registry has no such package/u.test(r.failures[0]), "NuGet: an id the registry does not know fails");
 r = await one(pkg("Invented.Moss.Astray"), true);
@@ -165,7 +181,10 @@ try {
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
   own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
-  ok(notDone(tmp, step).length === 0, "and with both, the step is done");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `with both, a checkout of one commit is still reported, since the lookup would read no base (${missed.map((m) => m.mend)})`);
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), `${readFileSync(join(tmp, ".github/workflows/own.yml"), "utf8").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n")}`);
+  ok(notDone(tmp, step).length === 0, "and with both, on a checkout that holds the base, the step is done");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");

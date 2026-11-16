@@ -514,14 +514,18 @@ export const STEPS = [
       // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
       // where it runs the NuGet check)
       const lookups = text => [...text.matchAll(/core\/scripts\/lookup\.mjs[^\n]*/gu)].map(m => m[0]);
+      // (and a workflow that runs a lookup fetches the base beside the head, or the lookup finds nothing new: a checkout
+      // fetches one commit unless its fetch-depth is 0, all, or 2 or more)
+      const deep = /fetch-depth:\s*["']?(?:0|[2-9]|\d{2,})["']?\s*(?:#.*)?$/mu;
       const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
         const text = w.text ?? "", runs = lookups(text), at = `\`.github/workflows/${shown(f)}\``;
         return [
           /core\/scripts\/exact-versions\.mjs/u.test(text) && !runs.some(l => !/--nuget/u.test(l)) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
           /core\/scripts\/nuget(?:-fetch)?\.mjs/u.test(text) && !runs.some(l => /--nuget/u.test(l)) ? `in ${at}, before the step that restores or runs \`core/scripts/nuget.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+          runs.length && !deep.test(text) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
         ].filter(Boolean);
       });
-      return wrong.length ? `On every pull request, ${wrong.join("; ")}; its checkout given \`fetch-depth: 2\`, so that the base is there.` : null;
+      return wrong.length ? `On every pull request, ${wrong.join("; ")}; the checkout with \`fetch-depth: 2\` holds the pull request's base, which the lookup reads against.` : null;
     },
     partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
 ];

@@ -34,6 +34,7 @@ const DAY = 86400000;
 const NPM = "https://registry.npmjs.org/";
 const registryOf = (nuget) => `${nuget ? "NuGet" : "the npm"} registry`;
 const NUGET = "https://api.nuget.org/v3/registration5-gz-semver2/";
+const NUGET_PAGES = 100;
 // (a name as npm's registry gives one, an old one in capitals too: at most a scope and a name, nothing an address reads)
 const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/iu;
 const KINDS = ["dependencies", "optionalDependencies", "peerDependencies"];
@@ -48,8 +49,10 @@ export function npmPackages(text, lockPath) {
   const lock = parseBounded(text), packages = lock?.packages;
   if (!packages || typeof packages !== "object" || Array.isArray(packages)) throw new Error(`${lockPath} holds no "packages". Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const own = new Set(Object.keys(packages).filter((p) => !lockInstalled(p)));
-  const names = (entry) => KINDS.flatMap((k) => (entry?.[k] && typeof entry[k] === "object" ? Object.keys(entry[k]) : []));
-  const direct = new Set([...own].flatMap((p) => names(packages[p]).map((n) => resolve(packages, p, n)).filter(Boolean)));
+  // (what the project's own packages ask for, their development dependencies too, it names itself; what an installed
+  // package asks for, its development dependencies left out, it brings)
+  const names = (entry, kinds = KINDS) => kinds.flatMap((k) => (entry?.[k] && typeof entry[k] === "object" ? Object.keys(entry[k]) : []));
+  const direct = new Set([...own].flatMap((p) => names(packages[p], [...KINDS, "devDependencies"]).map((n) => resolve(packages, p, n)).filter(Boolean)));
   const next = (at) => names(packages[at]).map((n) => resolve(packages, at, n)).filter(Boolean);
   const reached = new Map([...direct].map((d) => [d, reach(d, next)]));
   const nameOf = (p) => registryName(packages[p]?.resolved) ?? p.slice(p.lastIndexOf("node_modules/") + 13);
@@ -142,30 +145,33 @@ export function repository(field) {
 /** What NuGet's registry says of a package, from its registration index and the pages `page(item)` gives. */
 export async function nugetFacts(index, page) {
   if (!index || !Array.isArray(index.items) || !index.items.length) throw new Error("its answer holds no pages of versions");
-  const real = (leaves) => leaves.map((l) => when(l?.catalogEntry?.published)).filter((t) => !Number.isNaN(t) && new Date(t).getUTCFullYear() > 1900);
-  let first = NaN, last = NaN, entry = null;
-  for (const item of index.items) { const dates = real(await page(item)); if (dates.length) { first = Math.min(...dates); break; } }
-  for (const item of [...index.items].reverse()) {
-    const leaves = await page(item), dates = real(leaves);
-    if (dates.length) { last = Math.max(...dates); entry = leaves.at(-1)?.catalogEntry ?? null; break; }
-  }
-  if (Number.isNaN(first)) throw new Error("its answer gives no date any version was published");
+  if (index.items.length > NUGET_PAGES) throw new Error(`its answer holds more than ${NUGET_PAGES} pages of versions`);
+  // (every page is read: pages are bounded by version, not by date, so a lower version may be the newer; an unlisted
+  // version's date, 1900, is no date)
+  const leaves = [];
+  for (const item of index.items) leaves.push(...(await page(item)));
+  const dated = leaves.map((l) => ({ entry: l?.catalogEntry, at: when(l?.catalogEntry?.published) })).filter((l) => !Number.isNaN(l.at) && new Date(l.at).getUTCFullYear() > 1900);
+  if (!dated.length) throw new Error("its answer gives no date any version was published");
+  const first = Math.min(...dated.map((l) => l.at)), last = Math.max(...dated.map((l) => l.at));
+  const entry = dated.find((l) => l.at === last)?.entry ?? null;
+  const versions = new Set(leaves.map((l) => (typeof l?.catalogEntry?.version === "string" ? l.catalogEntry.version.toLowerCase() : null)).filter(Boolean));
   const project = typeof entry?.projectUrl === "string" ? entry.projectUrl : null;
-  return { first, last, repo: project ? repository(project) : null, publisher: typeof entry?.authors === "string" ? `${entry.authors} (as the package writes its authors)` : "not named", provenance: "not offered by NuGet's registry" };
+  return { first, last, versions, repo: project ? repository(project) : null, publisher: typeof entry?.authors === "string" ? `${entry.authors} (as the package writes its authors)` : "not named", provenance: "not offered by NuGet's registry" };
 }
 
 // ---- The lookup
 
 /** Each new package looked up with `get(url)` ({ status, json }): { failures, reports }, as of `now`. */
-export async function lookUp(packages, { get, now = Date.now(), nuget = false }) {
+export async function lookUp(packages, { get, now = Date.now(), nuget = false, sources = 0 }) {
   const failures = [], reports = [], github = { asked: 0 };
   await pool(packages, 8, async (p) => {
-    const at = `${p.lockPath}: ${said(p.name)}@${said(p.version)}`, where = registryOf(nuget);
+    const at = `${said(p.lockPath)}: ${said(p.name)}@${said(p.version)}`, where = registryOf(nuget);
     let facts;
-    try { facts = await registry(p, get, nuget); } catch (e) {
+    try { facts = await registry(p, get, nuget, sources); } catch (e) {
       failures.push(`${at}: ${where} could not be read (${said(e.message)}). Mend: run the job again; if it fails the same way, say so in the pull request and leave the package out until it passes`);
       return;
     }
+    if (facts.elsewhere) { reports.push(`${at}: not in ${where} at this version, so from a source the config names, which the lookup does not read; the NuGet check holds it to the lock file's content hash`); return; }
     if (facts.missing) { failures.push(`${at}: ${where} has no such package (${facts.missing}). Mend: take it out of the project's package list and its lock file, and name a package the registry has: a name a model gave may be one nobody published, or one someone registered to be taken`); return; }
     const young = tooYoung(p, facts, now);
     if (young) failures.push(`${at}: ${young}`);
@@ -194,7 +200,10 @@ async function described(p, facts, now, { get, nuget, github }) {
   return `${p.direct ? "named by the project" : `brought by ${brought(p) || "another"}`}; first published ${day(facts.first)} (${age} days ago); last release ${day(facts.last)}; repository ${repo}; published by ${said(facts.publisher)}; brings ${p.brings} package${p.brings === 1 ? "" : "s"} with it; provenance: ${facts.provenance}`;
 }
 
-async function registry(p, get, nuget) {
+// What the registry says of the package: its facts, { missing } where it has no such package, or, on NuGet where the
+// config names sources of its own, { elsewhere } where NuGet's registry has no such id or version, which one of those
+// gives (the NuGet check holds what is restored to the lock file's content hash).
+async function registry(p, get, nuget, sources = 0) {
   if (!nuget) {
     if (!NPM_NAME.test(p.name)) throw new Error("its name is not one npm's registry gives");
     const r = await get(`${NPM}${p.name.replaceAll("/", "%2F")}`);
@@ -203,9 +212,9 @@ async function registry(p, get, nuget) {
     return npmFacts(r.json, p.version);
   }
   const r = await get(`${NUGET}${encodeURIComponent(p.name.toLowerCase())}/index.json`);
-  if (r.status === 404) return { missing: "the registry answers that it knows no such id" };
+  if (r.status === 404) return sources ? { elsewhere: true } : { missing: "the registry answers that it knows no such id" };
   if (r.status !== 200) throw new Error(`it answered ${r.status}`);
-  return nugetFacts(r.json, async (item) => {
+  const facts = await nugetFacts(r.json, async (item) => {
     if (Array.isArray(item?.items)) return item.items;
     // (a page's address is built here from the bounds the index gives, and the index must name that same page: no
     // address an answer gives is fetched, floor rule 5)
@@ -217,6 +226,8 @@ async function registry(p, get, nuget) {
     if (page.status !== 200 || !Array.isArray(page.json?.items)) throw new Error(`a page of its versions answered ${page.status}`);
     return page.json.items;
   });
+  if (facts.versions.has(p.version.toLowerCase())) return facts;
+  return sources ? { elsewhere: true } : { missing: `the registry knows the id, and no version ${said(p.version)} of it` };
 }
 
 // Whether the repository is archived, and, on npm, whether its package.json (in the folder the package names) names
@@ -260,13 +271,14 @@ const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${messag
  *  working folder names it: { lines, code }, each line as the workflow prints it. */
 export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now() }) {
   if (!base) return { lines: [`ok   no pull request's base here, so no package is new: nothing looked up${process.env.GITHUB_EVENT_NAME?.startsWith("pull_request") ? " (note: this is a pull request, so its checkout lacks the base: give it fetch-depth: 2, or the lookup reads nothing)" : ""}`], code: 0 };
-  let found;
+  let found, sources = 0;
   try {
     const config = nuget ? JSON.parse(readFileSync(configPath, "utf8")) : loadConfig(configPath);
     const { head, base: held } = packagesOf(config, root, base, nuget);
     found = newPackages(head, held, nuget);
+    if (nuget) sources = nugetConfig(config).sources.length;
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
-  const { failures, reports } = await lookUp(found, { get, now, nuget });
+  const { failures, reports } = await lookUp(found, { get, now, nuget, sources });
   const s = found.length === 1 ? "" : "s";
   return { lines: [...reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`),
     failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${registryOf(nuget)}, each printed above for the review`], code: failures.length ? 1 : 0 };
