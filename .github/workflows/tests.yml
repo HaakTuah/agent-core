@@ -243,6 +243,9 @@ jobs:
       - name: What holds each rule names only rules that stand
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
         run: node scripts/holders.mjs
+      - name: Which rules each role cites, counted for the state report
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/cited-test.mjs ')) }}
+        run: node scripts/cited-test.mjs
       - name: The check that the core takes each module or gives its reason
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/own-modules-test.mjs ')) }}
         run: node scripts/own-modules-test.mjs
