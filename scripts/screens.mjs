@@ -12,7 +12,8 @@
 //
 // The config (left out: the one the manifest's *screen checks* row names, in backticks, else checks/screens.json; with
 // none, every check is off and nothing is read): { "baseline": "<path>", "checks": { "<check>": "reports" | "binds" } },
-// each check one of CHECKS. What was found (a file the project's tool writes): { "screens": [<the screens it ran>],
+// each check one of CHECKS (`settings`, a player's settings kept, is the one a game asks: game-design.md, beside the
+// module). What was found (a file the project's tool writes): { "screens": [<the screens it ran>],
 // "all": true where it ran every screen, "found": { "<check>: <screen>: <what>": true | { "count": <n> } } }. The
 // baseline holds, beside shape.mjs's "listed" and "grown", "checks": those whose findings it listed from a run over
 // every screen. A check turned on that it has not listed fails until --write lists it from such a run, so what stands

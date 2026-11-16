@@ -1,10 +1,10 @@
 // Tests the screen checks' baseline (screens.mjs, beside this file): the config and the findings it refuses, what is
 // new against the baseline and what a listed entry covers, a check that reports against one that binds, each check's
-// own mend (a game's settings too), an entry mended but still listed, the baseline lowered only on the screens run, and whole runs in a
-// scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that joins the
-// baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline moved, a
-// config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each failure
-// is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// own mend (a game's settings too), an entry mended but still listed, the baseline lowered only on the screens run, and
+// whole runs in a scratch repository: no config, the first baseline, a new finding failing with its mend, an entry that
+// joins the baseline against the base, one of a check the base did not turn on, a base that is no commit, a baseline
+// moved, a config taken out, one the base's manifest named taken out with its row, and a path outside the project. Each
+// failure is read for its mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/screens-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
