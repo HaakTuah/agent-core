@@ -49,8 +49,11 @@ counter and its commands are in the pull request that adds this record (#487).
     Wrong where a grammar misparses common code, or its files cannot pass floor rule 7's check.
   - **C. Each language's own tooling** (Rust's compiler and Clippy, C#'s Roslyn, Python's own `ast`), run where it is
     installed. Wrong where the toolchain is missing where the checks run, or its measures cannot be set to the core's.
-- **The trial, on the hardest part.** A Rust file of 87 lines and a C# file of 104, invented to trip a reader, counted
-  by hand: Rust 11 functions, 72 lines, 19 branches; C# 10, 86 and 25. Then, held out, a Rust file of 197 lines and a
+- **The trial, on the hardest part,** run on the packages themselves (`web-tree-sitter` 0.27.2, `tree-sitter-rust`
+  0.24.0 and `tree-sitter-c-sharp` 0.23.5 from the npm registry, and the Python, JavaScript, TypeScript and Bash
+  grammars for their sizes), each at one exact version, fetched with install scripts off into a scratch folder outside
+  the repository, nothing of them committed: the trial is not their arrival, which waits on #488 as the pick says. A
+  Rust file of 87 lines and a C# file of 104, invented to trip a reader, counted by hand: Rust 11 functions, 72 lines, 19 branches; C# 10, 86 and 25. Then, held out, a Rust file of 197 lines and a
   C# file of 210, written and counted by hand by a fresh session that never saw the counter, the counter's definition
   frozen first: Rust 19, 162 and 34; C# 19, 164 and 42 (its `do … while` read as one loop, where the hand count had
   two).
@@ -119,7 +122,7 @@ counter and its commands are in the pull request that adds this record (#487).
   1. **What Node itself brings** (point 11): none of the 76 tests uses `node:test` or `node:assert`, and none of the
      51 scripts that read their arguments uses `util.parseArgs`. Replace each where its file is next changed; no
      package is needed.
-  2. **YAML, shell commands and the host's workflows:**
+  2. **YAML, TOML, shell commands and the host's workflows:**
      - `scripts/yaml-keys.mjs` (155 lines, no bug), the key read twice that every project's workflow check fails:
        replace with a YAML package carried in the copy, one that reports a key given twice;
      - `scripts/workflow-run.mjs` (395 lines, no bug), which reads the host's workflow format, its expressions and
@@ -131,6 +134,8 @@ counter and its commands are in the pull request that adds this record (#487).
      - the matching of file patterns, written three times (`check-configs.mjs`, `workflow-run.mjs`, `select.mjs`,
        about 70 lines together, no bug): replace with one, on Node's own `path.matchesGlob` where its tests show it
        matches the host's filters;
+     - the reader of TOML (`scripts/toml.mjs`, 193 lines, coming with #476, which reads Codex's own settings in a
+       project): replace with a TOML package carried in the copy, one that refuses a key given twice as the tool does;
      - the host's workflow check (`scripts/workflows.mjs`, 119 lines, 1 bug): keep its search for a word, which reads
        no YAML on purpose; its keys given twice go with `yaml-keys.mjs`.
   3. **The readers of languages:** the lexer of `scripts/code-shape.mjs` (in 881 lines), `scripts/shape-csharp.mjs`
