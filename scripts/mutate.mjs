@@ -142,7 +142,7 @@ function noLinkOnTheWay(dir, f) {
     unlink(at);
     let still = false;
     try { still = fs.lstatSync(at).isSymbolicLink(); } catch { /* (taken away) */ }
-    if (still) refuse(`a link in the working copy, ${path.join(dir, f)}, could not be taken away`, "take the link out of the project's HEAD, or commit the file that replaced it, and run again");
+    if (still) refuse(`a link at ${f} in a working copy could not be taken away`, "take the link out of the project's HEAD, or commit the file that replaced it, and run again");
     return;
   }
 }
