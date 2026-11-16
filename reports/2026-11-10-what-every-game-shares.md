@@ -113,7 +113,7 @@ how it is designed.
 
 ## The owner's answers
 
-To #36 he answered "Yes, expertly to all!" (core archive 112), to the nine readings with the design session's
+To #36 the owner agreed to all of it (core archive 112), to the nine readings with the design session's
 additions, which it added to this PR: "Same seed, same game"; the careful-player test, for every game, in "No rule
 untaught"; "Models only where they matter", in "Code decides facts"; and "Readable by every player" (colour, motion and
 one name for each thing). The other five stand as built.

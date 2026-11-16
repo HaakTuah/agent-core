@@ -14,23 +14,23 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
 1. **Ask** the code reviewer (`tasks/roles.md`) as its part (`tools/codex.md`, `tools/copilot.md`) or the project
    says.
 2. **No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review:** the next reviewer,
-   last the fallback reviewer, takes the PR at once (core archive 19 and 20).
-   - **A review already running is waited for,** never merged past (core archive 206): the `code-review` status holds a
+   last the fallback reviewer, takes the PR at once.
+   - **A review already running is waited for,** never merged past: the `code-review` status holds a
      code review as `security-review` holds the security review. The reviewer that takes one over posts its review in
      a comment that opens "Code review:" and names the commit it read by its whole SHA, which ends the wait.
    - **A late review is still read,** the security reviewer's too: a finding of the last week by a reviewer the project
      asks, made after its PR merged, with no reply, is answered as point 5 says, and what holds is a bug (a weakness:
      floor rule 9). No other account's comment is read for this (floor rule 4); who looks: "Sessions" in
-     `roles/shared/work-flow.md` (core archive 181).
+     `roles/shared/work-flow.md`.
    - **A reviewer, the security reviewer too, that gave the last three PRs it was asked on no review** (the project's
      newest PRs that asked it show) is asked and not waited for, which the PR says: the next takes it at once, and the
      fallback reviewer its security review, over the whole diff. A security review that starts by itself is still
      waited for (floor rule 8).
-3. **Security** (core archive 47 to 51, 174, 177).
+3. **Security.**
    - A *security reviewer* the session calls reviews the finished work once, aimed at the ways in it touches, and again
      only if a later commit touches one.
      - Where the change touches a product's accounts, roles or a server (floor topic 19), its brief names the OWASP Top
-       10 in its newest edition, by year, and asks for the change read against each entry (core archive 227).
+       10 in its newest edition, by year, and asks for the change read against each entry.
    - Where one starts by itself (Codex's app; floor rule 8), such a later commit, or a security finding's fix, gets the
      fallback reviewer's check.
    - One not begun in about 5 minutes or finished in about 30 is the fallback reviewer's, over the whole diff, where the
@@ -42,7 +42,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    - A session posts one, naming the tool and the commit it read by its whole SHA, or that none is needed, naming the
      head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
      check reads.
-   - **What a posted review stands for** (#99; core archive 220): by default the commit it names, and the head only
+   - **What a posted review stands for** (#99): by default the commit it names, and the head only
      where nothing but updates from `main` follow that commit; after any other commit, where no review of the head has
      run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
      needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), and
@@ -53,7 +53,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
-   - **What a posted review declares** (#299; core archive 235): by default a review posted in a comment that opens
+   - **What a posted review declares** (#299): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
      finding.". Whoever posts it, session or reviewer, writes both. The one condition that changes it: a note that no
@@ -65,14 +65,14 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      yet: `core/scripts/review-record.mjs` counts a review without its line as "not read", never as none, so the share
      not read shows where the form is not kept, and no check fails a pull request for it.
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
-   "Readings taken" as the stand-in would (core archive 22).
-   - **It goes down the lines** (core archive 240; #305). By default, where the pull request's entry has "Done when"
+   "Readings taken" as the stand-in would.
+   - **It goes down the lines** (#305). By default, where the pull request's entry has "Done when"
      lines (`tasks/done-when.md`), the design check asks of each whether it is met, with its proof and its "Ran:" and
      "Saw:", whether the "If" case is tested, and whether anything outside the out of scope's line changed, and
      reports each gap as blocking, and no preference. It does not mean it judges the lines' choice, which the
      stand-in ruled on. Reason: a reading against the lines finds what the builder missed, one of taste what the
      reviewer prefers. Held by no check: the design check's brief carries it.
-   - **It asks whether the approach was known** (core archive 243; #322). By default, of a pull request that does the
+   - **It asks whether the approach was known** (#322). By default, of a pull request that does the
      *hard work*, the design check asks whether its approach was known before it was built, or found by a trial queued
      before it (`tasks/planning.md`, "Finding out is a task of its own"), and where neither, reports so as a finding
      that does not block, naming what a trial would have measured. Nothing changes it. It does not mean a trial is asked for after the
@@ -80,7 +80,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      check: the design check's brief carries it.
 5. **When a PR passes,** whatever its score: every blocking point fixed; every other fixed if it lies in the change,
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
-   as floor rule 9 allows). A review from anyone else is advisory (core archive 130).
+   as floor rule 9 allows). A review from anyone else is advisory.
 6. **Rounds end:** after a fix, one request to its reviewer, and a security check only as point 3 says, and none for an
    update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
    - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
@@ -88,7 +88,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
    *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
    model with the floor, and nothing else.
-8. **A finding seen twice becomes a check** (core archive 219; #254). By default a kind of finding stays a point a
+8. **A finding seen twice becomes a check** (#254). By default a kind of finding stays a point a
    review holds a change to, and needs nothing more. Once the findings of a second pull request name the same rule
    that stands (the core's, or the project's own in its `AGENTS.md` or `SECURITY.md`), which
    `core/scripts/review-record.mjs` lists under "Found twice" from their lines `Rule:` ("A finding

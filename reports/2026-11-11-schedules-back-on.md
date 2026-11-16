@@ -8,6 +8,6 @@ versions check, the weekly CodeQL scan and any other scheduled check stop silent
 prevent it either commit to `main` on a timer (floor rule 12 forbids it) or need a personal access token with write
 access to Actions kept as a secret, a standing credential for a small gain. A project that rests has no orchestrator
 running either, so the first wake when work resumes turns them back on, with the session's own access. Asked for by
-the owner in the design session ("fix all of it, expertly!", on the list of what would break if the setup froze).
+the owner in the design session ("fix all of it!", on the list of what would break if the setup froze).
 
 **What it changes in every project:** `modules/orchestrating.md` only.

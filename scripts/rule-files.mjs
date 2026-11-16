@@ -14,16 +14,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { leadsOut } from "./guards.mjs";
 // Each agent tool's entry file, as the starter kit writes it (tasks/tools.md, "One door in").
-export const ENTRY_FILES = { claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" };
+export const ENTRY_FILES = Object.freeze({ claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" });
 // The folders a tool takes its instructions from (floor rule 3; tools/kiro.md and antigravity.md): every file in them.
-export const FOLDERS = [".kiro/steering", ".kiro/agents", ".agents/rules", ".agent/rules"];
+export const FOLDERS = Object.freeze([".kiro/steering", ".kiro/agents", ".agents/rules", ".agent/rules"]);
 // (a file of the work tree is read only where, every link on its way followed, it lies inside the project and is a
 // file: one that leads out, or to a folder, reads as not there)
 const inside = f => !leadsOut(process.cwd(), f);
 const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(f => f && inside(f)); } catch { return []; } };
 const readHere = f => { try { return inside(f) && fs.statSync(f).isFile() ? fs.readFileSync(f, "utf8") : null; } catch { return null; } };
-const FLOOR = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"];
-const TOOL_FILES = ["GEMINI.md", ...Object.values(ENTRY_FILES)];
+export const FLOOR = Object.freeze(["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"]);
+export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FILES)]);
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
 // to its base: every link on a path followed, the file's own and a folder's on its way, while it leads inside that tree,
 // at most 40 in all; null where one leads out of it or nowhere, and for what is no file (a folder, a submodule). Run

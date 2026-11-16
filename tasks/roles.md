@@ -3,14 +3,14 @@
 Read at its start by the orchestrator, and when a task needs one (who takes a role, who builds a line, who reviews a
 change): the kind `role`.
 
-**The roles, by what they do** (core archive 232): the orchestrator starts builder sessions and hands out lines
+**The roles, by what they do:** the orchestrator starts builder sessions and hands out lines
 (`roles/orchestrator.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
 (`roles/shared/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`tasks/reviews.md`);
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
 against the design and the owner's words; escalation takes what has beaten a builder twice. Any agent tool the owner
 has may take any of them.
 
-**A file for each role** (core archive 234; #304). By default what a role reads at its start is the floor's
+**A file for each role** (#304). By default what a role reads at its start is the floor's
 `security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
 session's) and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
 puts one that a single role needs in that role's file, and one that several roles share in one shared file their files
@@ -21,7 +21,7 @@ with no file here (a helper, planning design, escalation) reads more than its br
 every other role's rules at each start. Held by `scripts/size.mjs`, a cap for each role's start, and
 `scripts/reading.mjs --check`, which fails a role's file that names no start; where a rule stands, by nothing yet.
 
-**Tools are preferences** (core archive 232; #249). By default each role goes to the tool this table prefers, and,
+**Tools are preferences** (#249). By default each role goes to the tool this table prefers, and,
 where that tool is not at hand, to the next it names:
 
 | Role | Preferred | When it is not at hand |
@@ -44,7 +44,7 @@ where that tool is not at hand, to the next it names:
   with another tool alone could fill none.
 - Held by nothing yet: which tool took a role leaves no mark a check reads.
 
-**No session reviews its own work** (core archive 232): the session that reviews a change is never the session that
+**No session reviews its own work:** the session that reviews a change is never the session that
 wrote it. A fresh session of the same tool serves; a different tool is a preference, the table's. It does not mean a
 second tool is needed. Reason: a reviewer that wrote the change reads its own intent instead of the diff. Held by
 nothing yet: builder and reviewer post under one login (#187).
@@ -52,5 +52,5 @@ nothing yet: builder and reviewer post under one login (#187).
 **Planning design** is asked at most once per task (its PR says when it was), with a self-contained brief, when it needs
 a new or better plan.
 
-**Escalation** (core archive 25): what has beaten a builder twice may go to a fresh solver with a self-contained brief;
+**Escalation:** what has beaten a builder twice may go to a fresh solver with a self-contained brief;
 the builder applies and checks the answer.

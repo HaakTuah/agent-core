@@ -2,7 +2,7 @@
 
 Read when its rule says, and by a security review: the kinds `account` and `security-review`.
 
-**19. Accounts, roles and a server** (core archive 227). Read before a task touches a product's accounts, its roles
+**19. Accounts, roles and a server.** Read before a task touches a product's accounts, its roles
 or a server of its own; whoever writes or changes code that touches them keeps what follows, in that pull request.
 - Who may do what is decided on the side the user cannot alter (never in code or data the user's own device holds),
   and a request is refused unless a rule allows it.

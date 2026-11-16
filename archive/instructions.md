@@ -1,12 +1,14 @@
-# The owner's words behind the core
+# The reasons behind the core
 
-Every core rule rests on something the owner said. His words are quoted here word for word, numbered, each with the game
-and archive entry it came from: an Amarna Letters entry by its item number, a Barkstreet Snakes entry by its date. The
-text between his quotes is a short note of what he was answering, in plain words; only what is inside quotation marks is
-his. "[…]" marks a personal detail left out (`floor/security.md`, rule 11); "(…)" marks a part about one game only, left
-in that game's archive; "[...]" is a gap the game's own archive left in the quote. "Core archive N" anywhere in the core
-is item N here. A new item goes at the end of the newest file below, numbered after the last, with its date and its
-source; once that file passes about 20 KB, the next item starts a new one, named for its number.
+Every core rule rests on something the owner decided. Each decision is an item here, numbered, in the core's own words:
+its date and source, what was asked, what was decided and what it stands behind. "Core archive N" anywhere is item N
+here, in the core and in a project's copy alike; the core's own rule files name no item, and `scripts/holders.json`
+lists under "behind" the items behind each rule (`AGENTS.md`, "The archive is pointed to from the list"). The owner's
+own words of items 1 to 245 stay in the core's repository alone, in `words/` under the same numbers, which a project's
+copy leaves out; `scripts/holders.mjs` holds the two forms in step. A new item goes at the end of the newest file
+below, numbered after the last, with its date, the issue that carries the owner's word and one line of the reasoning,
+the words themselves staying on the issue; once that file passes about 20 KB, the next item starts a new one, named for
+its number.
 
 Item N is in the file below whose first number is the highest at or below N. Search them rather than read them whole.
 

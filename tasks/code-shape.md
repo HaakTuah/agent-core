@@ -1,6 +1,6 @@
 # How code is put together
 
-Read when a system is designed, added or named, when code is ported or rewritten (core archive 226), and when a pull
+Read when a system is designed, added or named, when code is ported or rewritten, and when a pull
 request deletes a test or weakens one (#253): the kinds `system`, `port` and `test`. How what already stands is brought
 to it: `tasks/cleaning.md`. What the tests cost, their time marks among it: `tasks/tests.md`.
 

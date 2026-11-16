@@ -4,7 +4,7 @@ Read when a project sets up an agent tool, hands a role to one or changes its to
 run is due: the kind `tool`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
 which role: `tasks/roles.md`, "Tools are preferences".
 
-**One door in: `AGENTS.md`** (core archive 232; #249). By default every rule a session must know is reachable from the
+**One door in: `AGENTS.md`** (#249). By default every rule a session must know is reachable from the
 project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task. A
 tool that
 reads a file of its own first gets a small entry file that pulls in each file those lines name, with its own part: the
@@ -15,7 +15,7 @@ uses (it declares the one it deletes under "Differences"). Reason: the `@` lines
 tool opened the files they name only by discipline. Held by `scripts/entry-files.mjs`, which fails an entry file that
 pulls in less than `AGENTS.md` names.
 
-**One script says what to read** (core archive 234; #304). By default a session of any agent tool finds what it reads
+**One script says what to read** (#304). By default a session of any agent tool finds what it reads
 by one command, which the project's `AGENTS.md` names: `scripts/reading.mjs`, given a role and a task (its issue, its
 kinds, or the paths changed so far), prints the role's start (`tasks/roles.md`, "A file for each role") and the
 modules the task calls for, each module saying in its opening line when it is read, in words the script matches: a
@@ -27,7 +27,7 @@ Reason: each tool found the rules its own way, and a session left to judge what 
 one. Held, in part, by `scripts/reading.mjs --check`, which fails a module or a role's file that does not say when it
 is read; that a session then opens what is printed, by nothing yet.
 
-**Hooks save time; checks are the guarantee** (core archive 232). By default no rule is held by a hook alone: what a
+**Hooks save time; checks are the guarantee.** By default no rule is held by a hook alone: what a
 tool's hook holds is also held where the tool does not matter, by a check on the pull request, a staged case or the
 daily look. Where a rule's only holder in `scripts/holders.json` is a hook, `scripts/holders.mjs` lists it in the core's
 monthly state report as held by none, until another holder is named. Each hook is carried to every tool whose
@@ -37,14 +37,14 @@ failing check would cost. Nor does a session review a change to a tool's own fol
 whose hooks would run as they stand there: it reads the diff. Reason: a session of a tool with no hooks must meet the
 same rules.
 
-**A change of tool loses nothing** (core archive 232). The state of a task is in the repository and never only in a
+**A change of tool loses nothing.** The state of a task is in the repository and never only in a
 session: its branch, pushed after every commit, its pull request's description with the note where to pick up, its
 line in the *progress file* and what it waits on (`roles/shared/work-flow.md`). Where a builder's tool stops (its usage spent,
 say), a fresh builder of any tool picks up from the branch (`roles/orchestrator.md`, "A stalled lane"). It does not
 mean that the tool that stopped hands over by itself. Reason: when one provider's usage ran out, everything held only
 in its sessions stopped with them. Held, in part, by `scripts/stalled.mjs`, which the look and the orchestrator run.
 
-**Proven by the staged cases, tool by tool** (core archive 232; `AGENTS.md`, "Staged cases hold what no check
+**Proven by the staged cases, tool by tool** (`AGENTS.md`, "Staged cases hold what no check
 reads"). A tool works with the core once a session of it has passed every staged case (`node scripts/staged.mjs
 --read <case> <folder> --record --tool <its name>`), and that stands until the next release, at which its cases are
 due again. Until then the core says of the tool only what its documentation says, naming where and the day it was
@@ -53,7 +53,7 @@ a scratch project opened in Kiro. It does not mean a tool is refused a role befo
 documentation says what it reads, not whether its model keeps the rules, and the tools change monthly. Held by
 `scripts/staged.mjs`, which says each tool's standing, the release's notes too, and names the cases due for each.
 
-**Each tool's part** (core archive 232): how it is handed a task, how it is asked for a review, what it cannot do that a
+**Each tool's part:** how it is handed a task, how it is asked for a review, what it cannot do that a
 rule needs, and its own folders, which floor rule 3 protects by name; the model it runs at is the project's "Pace", or
 `tools/claude.md` for Claude. A tool with no review app on the host is asked for a review by a fresh session of it
 given the review's brief (`tasks/reviews.md`, point 7) and told to change nothing; its answer is posted on the PR in a
