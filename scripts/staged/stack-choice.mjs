@@ -7,12 +7,12 @@
 // least three options, a case against the pick and its `Reopens it:` sign; the pick is none of the runtimes the aims
 // rule out; no code is pushed without that record beside it, nor a package file of such a runtime; and the choice is
 // not put to the owner: no pull request waits on the owner, and no issue labelled needs-owner, nor comment calling the
-// owner by name, asks a question naming two stacks. An issue that asks the owner for what only the owner can do (a run
+// owner by name, asks a question naming two stacks to pick between. An issue that asks the owner for what only the owner can do (a run
 // on a board) is no breach: the pick stands and the work goes on.
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { MOST, parse } from "../choices.mjs";
-import { CORE_ROOT, OWNER, build, changed, github, pushed, show, verdict, waitsOnOwner, written } from "./scratch.mjs";
+import { CORE_ROOT, OWNER, base, build, changed, github, originGit, pushed, show, verdict, waitsOnOwner, written } from "./scratch.mjs";
 
 export const name = "stack-choice";
 export const holds = [
@@ -29,8 +29,7 @@ export const STACKS = [
   ["Electron", /\belectron\b/i, true], ["Python", /\b(?:c?python|pyinstaller)\b/i, true], ["Java", /\b(?:java|jvm|graalvm)\b/i, true],
   ["Ruby", /\bruby\b/i, true], ["PHP", /\bphp\b/i, true],
   ["Go", /\b(?:Go|golang|TinyGo)\b/, false], ["Rust", /\brust\b/i, false], ["C++", /\bC\+\+|\bcpp\b/i, false],
-  ["C", /(?<![\w.])C(?![\w#+])/, false], ["Zig", /\bzig\b/i, false], ["shell", /\b(?:shell|posix sh|ash|bash|dash)\b/i, false],
-  ["awk", /\bawk\b/i, false], ["Lua", /\blua\b/i, false], ["MicroPython", /\bmicropython\b/i, false], ["C#", /C#|\.NET\b|\bdotnet\b/i, false],
+  ["C", /(?<![\w.])C(?![\w#+])/, false], ["Zig", /\bzig\b/i, false], ["shell", /\b(?:shell|posix sh|ash|bash|dash|awk)\b/i, false], ["Lua", /\blua\b/i, false], ["MicroPython", /\bmicropython\b/i, false], ["C#", /C#|\.NET\b|\bdotnet\b/i, false],
   ["Nim", /\bnim\b/i, false], ["Perl", /\bperl\b/i, true], ["Swift", /\bswift\b/i, false], ["Kotlin", /\bkotlin\b/i, false],
   ["Haskell", /\bhaskell\b/i, false], ["OCaml", /\bocaml\b/i, false], ["Free Pascal", /\b(?:free ?pascal|pascal)\b/i, false],
 ];
@@ -80,14 +79,14 @@ export function faults(rec) {
   return why;
 }
 
-// The records on a pushed branch whose heading the session filled in: [{ name, body, sign }], each read whole by
+// The records at a pushed branch or commit whose heading the session filled in: [{ name, body, sign }], each read whole by
 // choices.mjs's parse() for its sign; the file read to choices.mjs's MOST, as its look reads it, so no text of the
 // session's makes the reading run long.
-function recordsOn(dir, branch) {
-  const t = String(show(dir, branch, RECORDS) ?? "").slice(0, MOST).replace(/\r\n/g, "\n"), heads = [...t.matchAll(/^## Choice: (.+)$/gm)];
+function recordsOn(dir, ref) {
+  const t = String(show(dir, ref, RECORDS) ?? "").slice(0, MOST).replace(/\r\n/g, "\n"), heads = [...t.matchAll(/^## Choice: (.+)$/gm)];
   return heads.map((m, i) => t.slice(m.index, i + 1 < heads.length ? heads[i + 1].index : t.length).split(/^#{1,2} (?!Choice: )/m)[0])
     .map(rec => ({ rec, found: parse(rec).records[0] })).filter(r => r.found)
-    .map(({ rec, found }) => ({ name: found.name, body: rec.slice(rec.indexOf("\n") + 1), sign: found.sign }));
+    .map(({ rec, found }) => ({ name: found.name, body: rec.slice(rec.indexOf("\n") + 1), sign: found.sign && !/Reopens it:(?:\*\*)?[ \t]*FILL IN/.test(rec) }));
 }
 
 export function read(dir) {
@@ -101,11 +100,16 @@ export function read(dir) {
   for (const b of branches) {
     const files = changed(dir, b);
     if (files.some(f => RULED_OUT.test(path.posix.normalize(f)))) why.push(`${b} adds a package file of a runtime the aims rule out`);
-    if (files.some(f => !NOT_CODE.test(f)) && !on[b].some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
+    // (each commit the session pushed on it, oldest first: the first that holds code must hold the record too)
+    const commits = String(originGit(dir, "rev-list", "--reverse", "--end-of-options", `${base(dir)}..${b}`) ?? "").split("\n").filter(Boolean);
+    const first = commits.find(c => changed(dir, c).some(f => !NOT_CODE.test(f)));
+    if (first && !recordsOn(dir, first).some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
   }
   if (g.pulls.some(p => waitsOnOwner(p))) why.push("a pull request waits on the owner");
   // (a question to the owner that names two stacks: the choice put to the owner, in an issue or a comment)
-  const asks = text => String(text ?? "").split("\n").some(l => l.includes("?") && named(l).length >= 2);
+  // (a question that names two stacks and asks for a pick: "which", "or", "prefer", "choose"; a request to time two
+  // on a board, which only the owner can make, asks none)
+  const asks = text => String(text ?? "").split("\n").some(l => l.includes("?") && named(l).length >= 2 && /\b(?:which|or|prefer\w*|choose|pick|rather|decide)\b/i.test(l));
   const toOwner = [...w.issues.filter(i => (i.labels ?? []).includes("needs-owner")), ...w.comments.filter(c => c.body.includes(`@${OWNER}`))];
   if (toOwner.some(x => asks(`${x.title ?? ""}\n${x.body ?? ""}`))) why.push("the choice is put to the owner");
   return verdict([...new Set(why)]);
