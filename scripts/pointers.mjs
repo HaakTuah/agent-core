@@ -69,13 +69,15 @@ const sectionIn = (file, title) => parse(file).anchors.find(a => a.title === tit
 // A file that only points: each file of the core's at a path its rules left (under modules/, and floor/topics.md) says
 // in a line which file or folder "holds these rules now", as a link whose text is the path from the core's root, and in
 // a line "Now in [`<path>`](..): **<lead>**." which rule stands elsewhere than the rest. A pointer through it leads to
-// what stands there: for a rule it names so, the file that rule went to; else the file named or, for a folder, the
-// folder's own files. No other file is followed, whatever it says, and a file that names nothing is read as itself.
+// what stands there: for a rule it names so, the file that rule went to; for any other rule, the file named or, for a
+// folder, the folder's own files; and with no rule named, each of them. No other file is followed, whatever it says, and a file that names nothing is read as itself.
 function standsIn(file, title) {
   if (!file.startsWith(`${HOME}modules/`) && file !== `${HOME}floor/topics.md`) return [file];
   const text = parse(file).lines.join("\n");
-  const apart = [...text.matchAll(/^Now in \[`([^`\s]+)`\]\([^)\s]+\): \*\*([^*]+?)\*\*\.$/gmu)].filter(m => plain(m[2]) === title).map(m => m[1]);
-  const to = apart.length ? apart : [/^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now\b/mu.exec(text)?.[1]].filter(Boolean);
+  const elsewhere = [...text.matchAll(/^Now in \[`([^`\s]+)`\]\([^)\s]+\): \*\*([^*]+?)\*\*\.$/gmu)], apart = elsewhere.filter(m => plain(m[2]) === title).map(m => m[1]);
+  const held = [/^\[`([^`\s]+)`\]\([^)\s]+\) holds these rules now\b/mu.exec(text)?.[1]].filter(Boolean);
+  // (with no rule named, as for a numbered point cited by the file alone: every file this one names)
+  const to = apart.length ? apart : title === undefined ? [...held, ...elsewhere.map(m => m[1])] : held;
   const there = to.flatMap(t => (t.endsWith("/") ? tracked.filter(f => f.startsWith(HOME + t) && f.endsWith(".md") && !f.slice((HOME + t).length).includes("/")) : tracked.filter(f => f === HOME + t)));
   return there.length ? there : [file];
 }

@@ -400,11 +400,11 @@ ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.j
     "the step names an old path in a config wherever it stands, a copies config that reads the old folder alone, and two old paths that are now one file; a dated record it leaves as it stands", said);
   // (a rule file is read whatever its name or its folder, a config in a folder named as a dated record's too)
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `.cursorrules`, `docs/records/standing.md`;\n");
-  put(".cursorrules", "Read core/modules/screens.md first.\n"); put("docs/records/standing.md", "As `core/modules/choices.md` says.\n"); put(".github/reports/sizes.json", `${JSON.stringify(["core/modules/cleaning.md"])}\n`);
+  put(".cursorrules", "Read core/modules/screens.md first.\n"); put("docs/records/standing.md", "As `core/modules/choices.md` says.\n"); put(".github/reports/sizes.json", `${JSON.stringify(["core/modules/cleaning.md"])}\n`); put(".cursor/rules/core.mdc", "Read core/modules/helpers.md.\n"); put(".windsurfrules", "Read core/modules/reviews.md.\n");
   said = step.check(project(moveDir)) ?? "";
-  ok(said.includes("`core/modules/screens.md` is now `core/tasks/screens.md` (in `.cursorrules`)") && said.includes("(in `docs/records/standing.md`)") && said.includes("(in `.github/reports/sizes.json`)") && !said.includes("inbox"),
-    "a rule file is read whatever its name or folder, and a config wherever it lies; the dated records still are not", said);
-  for (const f of ["SECURITY.md", ".cursorrules", "docs/records/standing.md", ".github/reports/sizes.json"]) fs.rmSync(path.join(moveDir, f));
+  ok(said.includes("`core/modules/screens.md` is now `core/tasks/screens.md` (in `.cursorrules`)") && said.includes("(in `docs/records/standing.md`)") && said.includes("(in `.github/reports/sizes.json`)") && said.includes("(in `.cursor/rules/core.mdc`)") && said.includes("(in `.windsurfrules`)") && !said.includes("inbox"),
+    "a rule file is read whatever its name or folder, a file where a tool keeps what it reads whatever its name, and a config wherever it lies; the dated records still are not", said);
+  for (const f of ["SECURITY.md", ".cursorrules", "docs/records/standing.md", ".github/reports/sizes.json", ".cursor/rules/core.mdc", ".windsurfrules"]) fs.rmSync(path.join(moveDir, f));
   put(".kiro/steering/core.md", "#[[file:core/modules/how-to-work.md]]\n");
   said = step.check(project(moveDir)) ?? "";
   ok(said.startsWith("Before any other task, since a tool whose entry file pulls the core's files in follows no further import"), "where a file a tool pulls the core's files in by still names an old path, the step comes before any other task, and says why", said);

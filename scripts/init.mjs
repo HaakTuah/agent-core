@@ -81,16 +81,17 @@ export const FILES = [
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
-// The files every session reads at its start, as the AGENTS.md template imports them: the reading-size check's marks,
-// and of the core's own (those under core/) what the core's cap counts (size.mjs).
 // What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
-// there name it: the files below that are the project's own, each file of the core its AGENTS.md and CLAUDE.md pull in
-// on a line of its own, and the part for every tool but Claude beside Claude's. For the kit as it stands it is READ.
+// there name it: the files of READ that are the project's own, each file of the core its AGENTS.md and CLAUDE.md pull
+// in on a line of its own, and the part for every tool but Claude beside Claude's: the reading-size check's marks. For
+// the kit as it stands it is READ.
 export function startOf(written) {
   const pulled = [...`${written["AGENTS.md"] ?? ""}\n${written["CLAUDE.md"] ?? ""}`.matchAll(/^@(core\/[\w./-]+\.md)[ \t]*$/gmu)].map(m => m[1]);
   const claude = pulled.find(f => f.endsWith("/claude.md"));
   return [...new Set([...READ.filter(f => !f.startsWith("core/")), ...pulled, ...(claude ? [claude.replace(/claude\.md$/u, "other-builders.md")] : [])])];
 }
+// The files every session reads at its start, as the AGENTS.md template of the kit as it stands imports them, and of
+// the core's own (those under core/) what the core's cap counts (size.mjs).
 export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/roles/shared/how-to-work.md",
   "core/roles/shared/inbox.md", "core/roles/shared/work-flow.md", "core/tools/claude.md", "core/tools/other-builders.md"];
 const KB = 1024;
@@ -171,14 +172,14 @@ export const GAME_ROWS = [
   ["where rules are taught", "where a player learns the rules, such as the help screen's file"],
 ];
 
-// Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
-// `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 // The modules' names as a commit of the core holds them: in the folders that say who reads them or when, or, at a commit
 // from before the rules moved there, in modules/.
 function modulesAt(pin) {
   const namesIn = d => { try { return git(["ls-tree", "--name-only", `${pin}:${d}`], ROOT).split("\n").filter(n => n.endsWith(".md")); } catch { return []; } };
   return MODULES.some(d => namesIn(d).length) ? MODULES.flatMap(namesIn) : namesIn("modules");
 }
+// Every file the kit writes for these options, as [path, text], before the copy of the core: the templates' files.
+// `read` gives a template's text by its name under setup/template/ (the program reads it from the pinned commit).
 export function files(o, pin, moduleNames, read) {
   const words = { owner: o.owner, project: o.name, core: CORE, pin, npm: o.packages, nuget: o.nuget, modules: modules(moduleNames, o.game), declined: o.game ? "" : "\nNot taken: `game-design.md` (the project is no game).",
     games: o.game ? GAME_ROWS.map(([slot, what]) => `\n| *${slot}* | FILL IN: ${what} |`).join("") : "" };

@@ -314,12 +314,13 @@ export const MOVED_GLOB = '"core/modules/*.md"', NEW_GLOBS = ['"core/floor/topic
 // day (2026-11-16...), or one in a folder named archive, reports or records, outside the folders a host or a tool reads.
 const dated = f => /\.(md|txt)$/u.test(f) && !/^\.(github|claude|codex|kiro|agents?)\//u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.test(f) || /(^|\/)(archive|reports|records)\//u.test(f));
 // The project's own files that may name a file of the core and that a check, a tool or a session reads as they stand
-// now: each rule file and each file a tool takes its instructions from, whatever its name or folder, and every other
-// file of text that is no dated record.
+// now: each rule file and each file a tool takes its instructions from, whatever its name or folder; every file at the
+// root whose name, or whose folder's, opens with a dot, where tools keep what they read, whatever its name; and every
+// other file of text that is no dated record.
 function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
-  return p.files.filter(f => !f.startsWith("core/") && (rules.includes(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+  return p.files.filter(f => !f.startsWith("core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
 }
 // Of those, the files that name each old path: Map(old path -> [file]).
 function namedStill(p, map) {
