@@ -34,7 +34,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   `node core/scripts/reading.mjs --kinds`), so that a changed screen calls its module; the starter kit writes none. A module the manifest leaves out is never
   named.
 - **The caps:** what a role reads at its start stays within that role's cap, which `scripts/size.mjs` sets (core archive
-  164, 169, 171, 179, 181, 182, 187, 191, 201 and 233), checked on every PR here, so a new rule there replaces text
+  164, 169, 171, 179, 181, 182, 187, 191, 201 and 234), checked on every PR here, so a new rule there replaces text
   rather than adding to it (core archive 134); a file read only when a task calls for it is held by the reviews'
   "content put where its readers must read past it" (`modules/review-guidelines.md`). What a cap decides, and when one
   may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
