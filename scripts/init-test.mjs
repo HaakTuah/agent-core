@@ -244,12 +244,14 @@ if (p.status === 0) {
   // (`keepCall`: the call still names the base's config; `shapeToo`: the shape check's config, which names a baseline
   // too, moved with its call at the same time)
   const shapeWas = fs.readFileSync(path.join(core, ".github/shape.json"), "utf8");
-  const moveTo = (config, { keepCall = false, shapeToo = false } = {}) => {
+  const moveTo = (config, { keepCall = false, shapeToo = false, dropOld = false } = {}) => {
     const put = (at, text) => { fs.writeFileSync(path.join(core, at), text); git(core, "add", at); };
     put(".github/copies-two.json", JSON.stringify(config));
     // (the call alone moved, a comment still naming the old call, as a project's caller names its config in a comment)
     let calls = testsWas;
     if (!keepCall) calls = calls.replace("run: node scripts/copies.mjs .github/copies.json", "run: node scripts/copies.mjs .github/copies-two.json # was: node scripts/copies.mjs .github/copies.json");
+    // (`dropOld`: the base's config deleted, a call to it left where it never runs)
+    if (dropOld) { git(core, "rm", "-q", ".github/copies.json"); calls = calls.replace("jobs:\n", "jobs:\n  never:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/copies.mjs .github/copies.json\n"); }
     fs.writeFileSync(tests, calls);
     if (shapeToo) {
       put(".github/shape-two.json", shapeWas);
@@ -263,16 +265,17 @@ if (p.status === 0) {
     return r;
   };
   const movedNarrow = moveTo({ ...cfgMain, prose: cfgMain.prose.filter(x => x !== "CLAUDE.md") });
+  const narrowDropped = moveTo({ ...cfgMain, prose: cfgMain.prose.filter(x => x !== "CLAUDE.md") }, { dropOld: true });
   fs.copyFileSync(path.join(core, ".github/copies-baseline.json"), path.join(core, ".github/moved.json"));
   const movedBaseline = moveTo({ ...cfgMain, baseline: ".github/moved.json" });
   fs.rmSync(path.join(core, ".github/moved.json"));
   const movedWhole = moveTo(cfgMain), beside = moveTo({ ...cfgMain, prose: ["README.md"] }, { keepCall: true }), withShape = moveTo(cfgMain, { shapeToo: true });
   const calledInPlace = /\.github\/copies-two\.json, called in place of \.github\/copies\.json \(the config main's workflows call\),/u;
   const backMoved = /Mend: take the config back as main holds it \(git checkout main -- \.github\/copies\.json\), and name it in the call again/u;
-  ok(movedNarrow.status === 1 && calledInPlace.test(movedNarrow.out) && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(movedNarrow.out) && backMoved.test(movedNarrow.out) && mended(movedNarrow.out)
+  ok(movedNarrow.status === 1 && calledInPlace.test(movedNarrow.out) && narrowDropped.status === 1 && calledInPlace.test(narrowDropped.out) && /reads 1 files fewer than main's config read: CLAUDE\.md \(prose\)/u.test(movedNarrow.out) && backMoved.test(movedNarrow.out) && mended(movedNarrow.out)
     && movedBaseline.status === 1 && calledInPlace.test(movedBaseline.out) && /moves the baseline from \.github\/copies-baseline\.json to \.github\/moved\.json against main/u.test(movedBaseline.out) && mended(movedBaseline.out)
     && movedWhole.status === 0 && beside.status === 0 && withShape.status === 0,
-    "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, or with another check's config moved too, it passes", `${movedNarrow.out}${movedBaseline.out}${movedWhole.out}${beside.out}${withShape.out}`);
+    "against the base, a config moved with its call is held to the one the base called, narrowed or its baseline moved failing with its mend; moved whole, or beside one still called, or with another check's config moved too, it passes; a call left to the old config, deleted, counts for nothing", `${movedNarrow.out}${narrowDropped.out}${movedBaseline.out}${movedWhole.out}${beside.out}${withShape.out}`);
   // (a total set when it counted the core's copy too passes, and a note gives the mark to set, even after the core
   // grew past the room that total had left; a total of the project's own says nothing)
   const sizesAt = path.join(p.dir, "checks/sizes.json"), was = fs.readFileSync(sizesAt, "utf8"), own = JSON.parse(was).total;

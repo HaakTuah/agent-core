@@ -204,11 +204,12 @@ function called(commit) {
   return found;
 }
 // The base's config, each as { at, config }: the one at this config's path; where the base holds none there, each its
-// workflows called that the tree's workflows call no more (a config moved with its call); else none.
+// workflows called that the tree's workflows call no more, or call where the tree no longer holds it (a config moved
+// with its call); else none.
 function heldTo(commit) {
   const here = configAt(commit, CONFIG_AT);
   if (here) return [{ at: CONFIG_AT, config: here }];
-  const now = called(null);
+  const now = new Set([...called(null)].filter(at => fs.lstatSync(at, { throwIfNoEntry: false })?.isFile())); // (a call to a config the tree no longer holds could never run)
   return [...called(commit)].filter(at => !now.has(at)).map(at => ({ at, config: configAt(commit, at) })).filter(h => h.config);
 }
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
