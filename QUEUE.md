@@ -55,6 +55,7 @@ wanted").
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, which changes `tasks/game-design.md` and `scripts/screens.mjs` too |
+| #477 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
