@@ -1,8 +1,8 @@
 # Screens
 
-Read when a screen is designed, added or changed, in a project people use through one, and before a polish-lane task
-(core archive 230): the kinds `screen` and `polish`. A screen is what a project's users see and act through: a page of
-a site, an app's view, a desktop program's window. A project with no screen has nothing here to act on.
+Read when a screen is designed, added or changed, in a project people use through one, and before a polish-lane task:
+the kinds `screen` and `polish`. A screen is what a project's users see and act through: a page of a site, an app's
+view, a desktop program's window. A project with no screen has nothing here to act on.
 
 **Whom it binds, and when.** By default each point below binds the builder of a pull request that adds or changes a
 screen, for what that change touches, and the critique (point 18) reads it there. It does not mean that a screen no
@@ -61,7 +61,7 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
    where they are. Held by the rendered check for targets, the pictures for the states and the walk by the Tab key.
 9. **An accessibility floor, in numbers:** contrast of 4.5:1 for text, and 3:1 for large text and for controls; a
    target of at least 24 pixels, and 44 where touch is the main input; body text of at least 16 pixels, which scales;
-   lines of 45 to 75 characters; nothing told by colour alone (core archive 112, 204 and 205). The numbers are defaults,
+   lines of 45 to 75 characters; nothing told by colour alone. The numbers are defaults,
    which a project tightens in its *accessibility floor* and never loosens. It does not mean the strictest level
    everywhere: the standard level is the floor. Reason: the limits have published numbers, so "looks fine" can fail.
    Held by the rendered check; colour alone by the critique ("Is anything lost in grey?").
@@ -74,17 +74,17 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     a choice, recorded with its reason (`tasks/choices.md`). It does not mean nothing new: a departure with its reason
     stands. Reason: users bring habits, and a control that breaks one is read as broken. Held by the critique ("Does
     anything look pressable that is not?") and the record.
-12. **Words.** One name for each thing, everywhere (core archive 112, 204 and 205). A button says what it does. An
+12. **Words.** One name for each thing, everywhere. A button says what it does. An
     error says what happened and what to do next, in the user's words. Nothing destructive happens without a way back
     or a question first. A feature is explained where the user meets it, and its help changes in the same change as the
-    feature (core archive 84 and 90). Reason: a user who meets two names, or an error in the code's words, cannot tell
+    feature. Reason: a user who meets two names, or an error in the code's words, cannot tell
     what to do. Held by the list of words, read by the critic, and the critique ("Can every step be undone or left?").
 13. **Readable and true.** What a screen shows tells at a glance what is happening and what the user can do. Reduced
     motion keeps whatever informs. Nothing shown implies what is untrue, and what is shown from the past shows its age.
     A user's mistake is the screen's, a bug fixed before the next test, unless a careful user seeing the same could
     have known better. Feedback appears at the place and the moment of the action: status can be seen, and an error
     stands beside what caused it. What a machine reads from the screen (a screen reader, a test, an agent) carries the
-    same information, in the same order, as what a person sees (core archive 112, 114, 204 and 205). Reason: a user acts
+    same information, in the same order, as what a person sees. Reason: a user acts
     on what the screen says, and only on that. Held by the critique's first and third questions and the pictures with
     reduced motion on; what a machine reads, by discipline alone.
 14. **In keeping with the product:** its materials and its words belong to the product's world and to the direction,

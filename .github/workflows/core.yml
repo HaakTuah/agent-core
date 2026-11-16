@@ -156,14 +156,17 @@ jobs:
           # (the copy a folder, and entry by entry as the core's scripts/copy-tree.mjs compares, which says why; each path
           # quoted as git quotes it, so none prints raw or passes for two entries)
           entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
-          # (the pin's tree without its top-level reports entry, built as scripts/copy-tree.mjs builds it, so that no
-          # name inside that folder, however git quotes it, is taken for part of the copy)
+          # (the pin's tree without each top-level entry its .gitattributes keeps in the core, reports and words, built
+          # as scripts/copy-tree.mjs builds it, so that no name inside such a folder, however git quotes it, is taken for
+          # part of the copy)
           tree=$PIN
-          if grep -q -s -x '/reports export-ignore' .core-at-pin/.gitattributes; then
-            # (the whole entry matched, its name after the first tab exactly "reports"; grep's "none left" is no fault,
-            # any other failure is)
-            tree=$(git -C .core-at-pin ls-tree -z "$PIN" | { grep -z -v -x -e $'[^\t]*\treports' || [ $? -eq 1 ]; } | git -C .core-at-pin mktree -z)
-          fi
+          for kept in reports words; do
+            if grep -q -s -x "/$kept export-ignore" .core-at-pin/.gitattributes; then
+              # (the whole entry matched, its name after the first tab exactly that folder's; grep's "none left" is no
+              # fault, any other failure is)
+              tree=$(git -C .core-at-pin ls-tree -z "$tree" | { grep -z -v -x -e "[^"$'\t'"]*"$'\t'"$kept" || [ $? -eq 1 ]; } | git -C .core-at-pin mktree -z)
+            fi
+          done
           rev=${COPY%%:*} dir=${COPY#*:} want=$(entries .core-at-pin "$tree") id=$(git -C "$SRC" rev-parse -q --verify "$COPY" || true)
           if [ -n "$id" ] && [ "$(git -C "$SRC" ls-tree "$rev" -- "$dir")" = "040000 tree $id"$'\t'"$dir" ]; then have=$(entries "$SRC" "$COPY")
           else echo "FAIL $AT is no folder of this commit (a submodule, a file, a link or nothing). Mend: $again"; have=""; bad=1; fi
