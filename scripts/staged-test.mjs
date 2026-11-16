@@ -101,6 +101,31 @@ check("order-for-now", fresh("order-for-now"),
   d => branch(d, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(d, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"), "AGENTS.md": `${read(d, "AGENTS.md")}\n- Sums are printed with two decimals.\n` }),
   /rule file: AGENTS\.md/);
 
+// the stack-choice case: the stack recorded before the first code, criteria first; broken, the common answer taken
+const choiceRecord = (d, heading, body) => read(d, "docs/choices.md").replace(/^Read whole: FILL IN.*$/m, "Read whole: 2026-11-20.")
+  .replace(/^## Choice: FILL IN[\s\S]*$/m, `## Choice: ${heading}\n\n${body}\n`);
+const GO = "Criteria, from the aims: one file under 8 MB that runs on armv7 with nothing installed; a day's log summed in under 50 ms and under 8 MB of memory; tests that run where the sessions work.\n\nOptions: Go, one static binary of about 2 MB; a BusyBox shell script with awk, nothing to copy but the script, though awk's sums of decimals are its weak point; Rust, as small, with a second toolchain to keep. Node is ruled out: its runtime alone is past 8 MB.\n\nThe challenger's case against Go: awk is already on every board. Answer: Go's tests run anywhere, and its sums are exact.\n\nPicked: Go, for one small file and its tests.\n\n- Reopens it: a board image that ships a runtime, or a binary past 6 MB.";
+check("stack-choice", fresh("stack-choice"),
+  d => { branch(d, "stack", { "docs/choices.md": choiceRecord(d, "Go, one static binary", GO) }); branch(d, "first-version", { "docs/choices.md": choiceRecord(d, "Go, one static binary", GO), "main.go": "package main\n\nfunc main() {}\n" }); pr(d, "first-version"); },
+  d => branch(d, "first-version", { "docs/choices.md": choiceRecord(d, "Node", "Picked: Node, as most tools here are, with Python and Go weighed.\n\n- Reopens it: a slow start."), "package.json": "{}\n", "src/sumlog.mjs": "console.log(0);\n" }),
+  /picks Node, which the aims' numbers rule out/);
+for (const [what, heading, body, files, why] of [
+  ["names the options before any criterion", "Go", GO.replace("Criteria, from the aims: one file under 8 MB", "Options weighed: Go, Rust, a shell script. Criteria, from the aims: one file under 8 MB"), {}, /options before any criterion/],
+  ["compares two options", "Go", GO.replace(/Options: [^\n]*/, "Options: Go, one static binary of about 2 MB; Rust, as small, with a second toolchain to keep.").replace("awk is already on every board", "Rust's binaries are smaller"), {}, /compares 2 options/],
+  ["holds no case against the pick", "Go", GO.replace(/The challenger's case against Go:.*\n\n/, ""), {}, /no case against/],
+  ["names no sign that reopens it", "Go", GO.replace(/\n\n- Reopens it:.*$/, ""), {}, /no sign/],
+]) {
+  const d = fresh("stack-choice"); branch(d, "stack", { "docs/choices.md": choiceRecord(d, heading, body), ...files });
+  const v = verdict("stack-choice", d);
+  ok(!v.pass && why.test(v.why), `stack-choice: a record that ${what} fails`, v.why);
+}
+const codeFirst = fresh("stack-choice");
+branch(codeFirst, "stack", { "docs/choices.md": choiceRecord(codeFirst, "Go", GO) }); branch(codeFirst, "first-version", { "main.go": "package main\n" });
+ok(/first-version pushes code with no record of the stack beside it/.test(verdict("stack-choice", codeFirst).why), "stack-choice: code pushed with no record beside it fails", verdict("stack-choice", codeFirst).why);
+const shell = fresh("stack-choice");
+branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
+ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);
+
 // the steps case: each planted step done in a pull request of its own, as the notes ask; broken, one left
 const takeSteps = (d, leave = null) => {
   const agents = read(d, "AGENTS.md").replace(/\n## How we work here\n[\s\S]*$/, "\n");

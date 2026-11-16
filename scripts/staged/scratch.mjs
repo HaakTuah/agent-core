@@ -165,8 +165,9 @@ export const fakeKey = () => ["sk", "live", crypto.randomBytes(12).toString("hex
 // [{ issue, body, user }]), `github` sets the rest of the stand-in's state, and `branches` are pushed beside main
 // ({ name: { file: text } }, each a commit on main). `at` is the core's commit the kit writes from (its HEAD where left
 // out), `core` the clone it runs from, and `kit` the kit's own options; `loose` files are left in the working folder,
-// never committed. Gives the paths.
-export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}, issues = [], comments = [], github = {}, branches = {}, kit = [] } = {}) {
+// never committed; `fills` fill the kit's marks before FILLS does ([regex, text]), for a project other than the sum's.
+// Gives the paths.
+export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}, issues = [], comments = [], github = {}, branches = {}, kit = [], fills = [] } = {}) {
   dir = folderFit(dir);
   for (const d of [dir, sealOf(dir)]) if (fs.existsSync(d) && fs.readdirSync(d).length) throw new Error(`${d} is not empty: a case is set in a folder of its own`);
   fs.mkdirSync(sealOf(dir), { recursive: true });
@@ -174,7 +175,7 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   repos(dir, project, origin);
   const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
-  fillIn(project);
+  fillIn(project, fills);
   writeAll(project, { ...PROGRAM, ...files });
   git(project, "add", "-A");
   git(project, "commit", "-q", "-m", "The project as it stands");
@@ -205,14 +206,14 @@ function repos(dir, project, origin) {
   if (path.resolve(git(project, "remote", "get-url", "--push", "origin")) !== path.resolve(origin)) throw new Error("the project's pushes would not reach its own bare origin");
 }
 
-// The kit's FILL IN marks filled as FILLS says, outside the copy of the core.
-function fillIn(project) {
+// The kit's FILL IN marks filled as `fills`, then FILLS, says, outside the copy of the core.
+function fillIn(project, fills = []) {
   for (const f of git(project, "ls-files", "--cached", "--others", "--exclude-standard").split("\n").filter(Boolean)) {
     if (f.startsWith("core/")) continue;
     const file = path.join(project, f), text = fs.readFileSync(file, "utf8");
     if (!text.includes("FILL IN")) continue;
     let filled = text;
-    for (const [re, to] of FILLS) filled = filled.replace(re, to);
+    for (const [re, to] of [...fills, ...FILLS]) filled = filled.replace(re, to);
     fs.writeFileSync(file, filled);
   }
 }
