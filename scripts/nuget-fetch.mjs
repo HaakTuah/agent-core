@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
 import { NOT_A_FILE, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
-import { projectAt } from "./core-path.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
 const TOOLS = "dotnet-tools.json"; // its name, in any case, in .config/ or in any folder, as dotnet reads it
@@ -253,7 +253,7 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
       wanted.set(k, { ...p, from: f }); // (the last lock file's entry, as before this was said: the file fetched then)
     }
   }
-  for (const f of tracked.filter((t) => !t.startsWith("core/") && isTools(t))) {
+  for (const f of tracked.filter((t) => !t.startsWith(copyOf(root)) && isTools(t))) {
     const text = textOf(f);
     if (text === null) continue;
     const read = toolsOf(text, f), before = toolsAt(root, base, f);

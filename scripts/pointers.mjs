@@ -35,7 +35,8 @@ import { ruleFiles } from "./rule-files.mjs";
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-const tracked = git(['ls-files', '-z']).split('\0').filter(Boolean);
+// (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
+const tracked = git(['ls-files', '-z', '--recurse-submodules']).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
 let RULES;
 try { RULES = CORE ? tracked.filter(f => /^(floor|floor\/topics|modules|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }

@@ -41,7 +41,8 @@ if (shape.includes(false)) {
 marks.past ??= {};
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-const tracked = new Set(git(["ls-files", "-z"]).split("\0").filter(Boolean));
+// (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
+const tracked = new Set(git(["ls-files", "-z", "--recurse-submodules"]).split("\0").filter(Boolean));
 const kb = n => (n / 1024).toFixed(1);
 // (the core's copy at the manifest's path, and the floor's own copy a repository whose core a library carries keeps:
 // tasks/repositories.md; core-path.mjs)

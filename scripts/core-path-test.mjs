@@ -142,6 +142,25 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   ok(fs.realpathSync(at.root) === fs.realpathSync(project) && at.prefix === "lib/core/scripts/", "a script of a copy a submodule carries takes the project as its root, its prefix from there", JSON.stringify(at));
   const own = projectAt(lib);
   ok(fs.realpathSync(own.root) === fs.realpathSync(lib) && own.prefix === "", "a repository of its own is its own root", JSON.stringify(own));
+  // (and a check run from it reads the project's own files, the submodule's among them: the pointer check, from a library
+  // that carries its scripts)
+  {
+    const lib2 = path.join(tmp, "a-library-with-scripts"), consumer = path.join(tmp, "a-consumer");
+    for (const f of ["pointers.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), "utf8"));
+    put(lib2, "core/floor/security.md", "# The floor\n\n**1. Nothing secret in the repository.**\n");
+    put(lib2, "core-manifest.md", copied());
+    put(lib2, "AGENTS.md", "# The library\n");
+    git(tmp, "init", "-q", "-b", "main", lib2); git(lib2, "add", "-A"); git(lib2, "commit", "-q", "-m", "a library");
+    git(tmp, "init", "-q", "-b", "main", consumer);
+    git(consumer, "submodule", "add", "-q", lib2, "lib");
+    put(consumer, "core-manifest.md", carried());
+    put(consumer, "SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** none of its own;\n");
+    const pointers = text => { put(consumer, "AGENTS.md", text); git(consumer, "add", "-A"); return spawnSync(process.execPath, [path.join(consumer, "lib/core/scripts/pointers.mjs")], { cwd: consumer, encoding: "utf8" }); };
+    let r = pointers("# A consumer\n\n@lib/core/floor/security.md\n");
+    ok(r.status === 0, "the pointer check from a copy a submodule carries reads the project's AGENTS.md, and finds the submodule's files", r.stdout + r.stderr);
+    r = pointers("# A consumer\n\nThe floor: `lib/core/floor/nowhere.md`.\n");
+    ok(r.status !== 0 && /AGENTS\.md/.test(r.stderr) && /nowhere\.md/.test(r.stderr) && mended(r.stderr), "and fails the project's own pointer that leads nowhere, saying the mend", r.stdout + r.stderr);
+  }
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);
   ok(/^STOP: the floor cannot be read at lib\/core\/floor\/security\.md.*Mend: /m.test(said) && !/hook of main's pin ran/.test(said), "where the submodule is not checked out, the start stops the session, saying the mend", said);

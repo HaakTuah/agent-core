@@ -94,7 +94,7 @@ import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
-import { projectAt } from "./core-path.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 
 const PROJECT = /\.(?:cs|fs|vb)proj$/iu;
 // Whether the commit `rev` held a file of its own (a regular file, never a folder, a link or a submodule of that name)
@@ -577,7 +577,7 @@ export function manifestLicence(text) {
 }
 
 /** The project files among `tracked` that are the project's own: what the workflow restores, each from its lock file. */
-export const projectFiles = (tracked) => tracked.filter((f) => !f.startsWith("core/") && PROJECT.test(f));
+export const projectFiles = (tracked, copy = "core/") => tracked.filter((f) => !f.startsWith(copy) && PROJECT.test(f));
 
 /** What the restore's folder holds, as { id, version }: a folder for each package, one for each version in it. */
 function restoredPackages(packagesDir) {
@@ -614,9 +614,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     if (!heldIn.has(lock)) heldIn.set(lock, new Set(lockPackages(textAt(root, base, lock) ?? "", lock).packages.map((q) => key(q.id, q.version))));
     return heldIn.get(lock).has(k);
   };
-  const own = tracked.filter((f) => !f.startsWith("core/"));
+  const own = tracked.filter((f) => !f.startsWith(copyOf(root)));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
-  for (const f of projectFiles(tracked)) {
+  for (const f of projectFiles(tracked, copyOf(root))) {
     if (!locks.has(posix.join(posix.dirname(f), LOCK))) failures.push(`${f} has no ${LOCK} beside it that git knows. Mend: set RestorePackagesWithLockFile to true in it, restore, and commit the lock file (floor rule 15)`);
   }
   for (const f of own.filter((f) => posix.basename(f).toLowerCase() === "packages.config")) failures.push(`${f}: packages.config has no lock file this check can read. Mend: move the project to PackageReference`);
@@ -639,7 +639,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
       let entries = "";
       try { entries = execFileSync("git", ["ls-tree", "-r", "-z", base], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (no base to read: it held nothing) */ }
       tree = new Map();
-      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith("core/")) tree.set(m[3], { mode: m[1], id: m[2] }); }
+      for (const e of entries.split("\0")) { const m = /^(100644|100755|120000|160000) (?:blob|commit) ([0-9a-f]+)\t(.*)$/su.exec(e); if (m && !m[3].startsWith(copyOf(root))) tree.set(m[3], { mode: m[1], id: m[2] }); }
     }
     return tree;
   };
@@ -871,7 +871,7 @@ if (started(import.meta.url)) {
   };
   if (args.includes("--projects")) {
     let files;
-    try { files = projectFiles(project().tracked); } catch (e) { fail(e.message); }
+    try { const p = project(); files = projectFiles(p.tracked, copyOf(p.root)); } catch (e) { fail(e.message); }
     // (a line each, for a shell to read: a name that would be more than one line is refused, never cut)
     const odd = files.filter((f) => shown(f) !== f);
     if (odd.length) fail(`a project file whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
@@ -881,7 +881,7 @@ if (started(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), own = tracked.filter((f) => !f.startsWith("core/")), byContent = projectFilesByContent(root, own);
+      const { root, tracked } = project(), own = tracked.filter((f) => !f.startsWith(copyOf(root))), byContent = projectFilesByContent(root, own);
       files = [...new Set([...byContent, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => shown(f) !== f);
