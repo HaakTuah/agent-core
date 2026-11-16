@@ -1,8 +1,8 @@
 # Antigravity's part
 
-Read by a session of Antigravity, and by whoever hands it a task or a review. Taken from its documentation's page on
-rules (antigravity.google, read on 15 November 2026) and nothing else, until it passes the staged cases
-(`modules/tools.md`).
+Read by a session of the tool `antigravity`, and by whoever hands it a task or a review. Taken from its
+documentation's page on rules (antigravity.google, read on 15 November 2026) and nothing else, until it passes the
+staged cases (`modules/tools.md`).
 
 - **What it reads:** `AGENTS.md`, GEMINI.md and the rules under .agents/rules (or the older .agent/rules), in the
   folder it works in and each folder above it up to the repository's root, never one below. In a rule,

@@ -7,6 +7,7 @@ What `AGENTS.md` names on its `@` lines, which Antigravity takes as plain text, 
 (`modules/tools.md`, "One door in").
 
 @[security.md](../../floor/security.md)
+@[builder.md](../../roles/builder.md)
 @[how-to-work.md](../../modules/how-to-work.md)
 @[inbox.md](../../modules/inbox.md)
 @[work-flow.md](../../modules/work-flow.md)

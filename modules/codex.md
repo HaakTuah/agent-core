@@ -1,6 +1,6 @@
 # Codex's part
 
-Read by a session of Codex, and by whoever hands Codex a task or asks it for a review.
+Read by a session of the tool `codex`, and by whoever hands Codex a task or asks it for a review.
 
 **On GitHub,** its login `chatgpt-codex-connector[bot]`:
 - Its code review is asked by a comment `@codex review` alone: it answers every mention of itself, even in backticks, so

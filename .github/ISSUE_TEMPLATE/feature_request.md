@@ -25,4 +25,7 @@ The file and section, if there is one. The commit of the core your project holds
 **The kind of project**
 No closer than this: public or private; the platform it is built on; the cloud or the owner's own computer.
 
+**What to read**
+The kinds of task it is, each in backticks (`node scripts/reading.mjs --kinds` lists them), or a module by its path. Left empty, the builder's start reading and what its changed paths call for.
+
 Found while: for an agent, the role and the task it was on, as "fixing #241 (a builder session)"; a person leaves this line out.

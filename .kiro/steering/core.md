@@ -7,6 +7,7 @@ Kiro reads `AGENTS.md` by itself but not the files its `@` lines name, so they a
 (`modules/tools.md`, "One door in").
 
 #[[file:floor/security.md]]
+#[[file:roles/builder.md]]
 #[[file:modules/how-to-work.md]]
 #[[file:modules/inbox.md]]
 #[[file:modules/work-flow.md]]

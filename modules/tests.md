@@ -1,8 +1,9 @@
 # What the tests cost
 
 Read when a test or a suite is added, changed or taken out, when the jobs that run them or a pull request's checks
-change, when a measurement may run an hour or more, and by the audit's reader (#275, #321). How strong the tests are,
-and a test taken out: `modules/code-shape.md`. What every check here reads is the *shape check*'s config.
+change, when a measurement may run an hour or more, and by the audit's reader (#275, #321): the kinds `test`,
+`workflow` and `audit`. How strong the tests are, and a test taken out: `modules/code-shape.md`. What every check here
+reads is the *shape check*'s config.
 
 - **Each test is measured.** By default every test file of a project has its numbers: how long it takes, when it last
   failed for a real reason, how often it failed for no reason (it failed, and passed, on the same commit in the same

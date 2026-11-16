@@ -1,8 +1,8 @@
 # Screens
 
 Read when a screen is designed, added or changed, in a project people use through one, and before a polish-lane task
-(core archive 230). A screen is what a project's users see and act through: a page of a site, an app's view, a desktop
-program's window. A project with no screen has nothing here to act on.
+(core archive 230): the kinds `screen` and `polish`. A screen is what a project's users see and act through: a page of
+a site, an app's view, a desktop program's window. A project with no screen has nothing here to act on.
 
 **Whom it binds, and when.** By default each point below binds the builder of a pull request that adds or changes a
 screen, for what that change touches, and the critique (point 18) reads it there. It does not mean that a screen no
@@ -131,6 +131,8 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     - Which of the tool's defaults is on this screen?
     - Would one of the product's users take it for a template?
 
+    It asks too the questions that another module the project takes adds to the critique.
+
     It posts its answers on the pull request. Its answers to the first two are then set beside the builder's three
     lines (point 16), and a difference is a finding; an answer that shows a point above broken is one too, judged as
     `modules/review-guidelines.md` says ("A screen changed"). It does not mean the critic judges by its own taste: it
@@ -146,6 +148,8 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
   a baseline picture;
 - the timed run: the answer to each action, a wait with nothing shown, the layout shift, the load;
 - the console check: no error in the console, no request that fails, no font or picture that does not load;
+- the settings check, where another module the project takes asks it: each of a user's settings there, and still
+  there after the product is closed and opened again;
 - the walk by the Tab key, a script that records where focus goes, and the list of the words on every screen, both
   for a reader to judge;
 - the critique (point 18).

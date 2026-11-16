@@ -17,19 +17,27 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
   `security.md`, whose opening says what it and `topics.md` hold and when each is read, and `threat-model.md`, the
   shared threat model.
-- **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying at
-  its top when it is read (a provider's part: when that provider is asked). At the start of every task:
-  `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and each builder's own (`claude.md`, or `other-builders.md`).
-  When needed: `roles.md`, `helpers.md`, `reviews.md`, `review-guidelines.md`, `codex.md`, `copilot.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md` and `cleaning.md`; for a
-  project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
-- **The cap:** what every session reads at its start (the floor's `security.md` and the modules each session reads then)
-  stays within the cap `scripts/size.mjs` sets (core archive 164, 169, 171, 179, 181, 182, 187, 191 and 201), checked on
-  every PR here, so a new rule there replaces text rather than adding to it (core archive 134); a file read only when
-  needed is held by the reviews' "content put where its readers must read past it" (`modules/review-guidelines.md`).
-  It keeps the rules lean and decides nothing else: where a rule belongs and what it must say come first, and a change
-  that honest trimming gives no room for raises the cap one step, a whole KB, once a fresh session has read all the
-  rules for room and found too little (`AGENTS.md`).
+- **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying in
+  its opening line when it is read, in words a script matches: a kind of task, a path, a tool (a tool's part: when that
+  tool is asked). A builder reads at the start of every task `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and
+  its tool's own (`claude.md`, or `other-builders.md`); in a team's project, `teams.md` too. When a task calls for it: `roles.md`, `helpers.md`,
+  `reviews.md`, `review-guidelines.md`, `tools.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`,
+  `orchestrating.md`, `github-calls.md`, `hosts.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md` and
+  `cleaning.md`; for a project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
+- **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
+  stand-in, the design session), read at that role's start with the shared files it names: `modules/roles.md`, "A file
+  for each role".
+- **Reading by role and by task:** `scripts/reading.mjs` (under `core/` in a project) prints the files a session of a
+  given role reads for a given task, for any agent tool that can run a command, and names what a pull request's changed
+  paths called for: `modules/tools.md`, "One script says what to read". A project gives its own folders a kind of task
+  in a config of its own, `checks/reading.json` (`{ "paths": { "src/screens/": "screen" } }`; the kinds:
+  `node core/scripts/reading.mjs --kinds`), so that a changed screen calls its module; the starter kit writes none. A module the manifest leaves out is never
+  named.
+- **The caps:** what a role reads at its start stays within that role's cap, which `scripts/size.mjs` sets (core archive
+  164, 169, 171, 179, 181, 182, 187, 191, 201 and 234), checked on every PR here, so a new rule there replaces text
+  rather than adding to it (core archive 134); a file read only when a task calls for it is held by the reviews'
+  "content put where its readers must read past it" (`modules/review-guidelines.md`). What a cap decides, and when one
+  may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
   (`scripts/holders.json`); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
@@ -49,8 +57,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
    `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
-   inbox is (`scripts/inbox.mjs`) and what its labels and openers lack (`scripts/labels.mjs`), for the sync PR's
-   description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
+   inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
+   (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
    release says what it asks, step by step"). The core's
    `core.yml`, which the project calls on every PR as a required check, fails one whose `core/` differs from the core at
    its pin, entry by entry by git's object ids and types, as `pure-sync.mjs` compares too: a file's content, a link or a
@@ -100,8 +108,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    step of the copies workflow, reads the list against `core/modules/` on every pull request: a module the list
    neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
    with the line to add, and never fail.
-3. **Pointer lines:** its `AGENTS.md` names the manifest and every file read at the start of every task, each on a line
-   of its own (Claude Code imports them through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
+3. **Pointer lines:** its `AGENTS.md` names the manifest and every file a builder reads at the start of every task, each
+   on a line of its own, and the reading script for any other role and for the modules a task calls for
+   (`core/scripts/reading.mjs`; Claude Code imports the lines through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
    kit writes, each held to that list by `core/scripts/entry-files.mjs`; any other tool reads them because `AGENTS.md`
    says to: `core/modules/tools.md`),
    and keeps a "Review guidelines" section pointing to `core/modules/review-guidelines.md` and its own.
@@ -156,7 +165,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      tests that open a screen, holds the suites' and a push's time marks, and reads the selection's lists from its
      config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
-     description lacks one of the headings `modules/git.md` names (or those the project gives it).
+     description lacks one of the headings `modules/git.md` names (or those the project gives it), the line that says
+     what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`); the two lines
+     only of a pull request opened since the project's copy held them.
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -277,7 +288,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The default branch is `main`,** which the hooks read their scripts from, letting every call through where there
      is none (`core.yml` fails another name).
    - **On Windows** Claude Code runs both hooks in Git Bash, and the second needs Node on the path; where either is
-     missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start. The
+     missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start,
+     where it also names what the paths changed on the branch call for (`reading.mjs`, from the copy merged into `main`,
+     by `main`'s own roles and modules). The
      core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
      hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
@@ -312,7 +325,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 
 | Slot | What the project fills in |
 | --- | --- |
-| *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`) |
+| *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`modules/inbox.md`); in a team's project one of its owners, who are each person the host lets write, and the one owner where the host's rights cannot be read (`modules/teams.md`) |
 | *shares its counts* | `yes`, in backticks, where a project of another owner's lets the core's state report read its counts though it gave the core's owner no access (`scripts/state-report.mjs`); left out, no |
 | *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
 | *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`modules/inbox.md`) |
@@ -351,7 +364,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 # Core manifest
 
 Core: HaakTuah/agent-core at <full commit SHA>, copied whole under core/ (never edited here).
-Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.
+Paths: in the core's files, one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/; any other is ours.
 Floor: whole. Modules: <all, or the list of those taken>.
 Not taken: <where it is a list: each module left out as `name.md` (its reason), one line>.
 
@@ -388,7 +401,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
   required, branches up to date (core archive 201).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
-  approvals; status checks required (the project's CI and `core / core`), branches up to date; where the repository has
+  approvals (a team's project may ask some: `modules/teams.md`); status checks required (the project's CI and `core / core`), branches up to date; where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
   quality results required at Errors, and Copilot's review requested automatically, advisory (core archive 130).
 - Each repository's Actions settings (Settings, Actions, General): "Require actions to be pinned to a full-length commit
@@ -429,6 +442,11 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   they find, and with none the tool at hand takes the role (`modules/roles.md`, "The builders"; core archive 169 and
   232). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
   or the repository's workflows wait for an approval before they run.
+- A project on a host other than GitHub: its pipeline runs the core's checks from plain git (`modules/hosts.md`, "One
+  layer knows no host"), and the host's own protection of `main` stands in for the ruleset above. Until a project there has run it and reported so, the core says of that host only that it
+  "should work".
+- A team's project: the owners are each person the host lets write, and its admins or maintainers give the floor's
+  yeses (`modules/teams.md`); nothing is kept in a list.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`modules/work-flow.md`). It stops only that repository's agents.
 - The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
@@ -447,7 +465,8 @@ is public, and so is every word of an issue, so a report holds only what the lig
 
 - **It says:** which rule, hook, check or script of the core (its file, and its section or line); the commit of the core
   the project holds; what happened; what was expected; and the kind of project, no closer than this: public or private,
-  the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer.
+  the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer. A bug names, where it is
+  known, the core's merged pull request that brought it in, on the form's last line, "Brought in by: #N".
 - **It never says:** anything of the project itself (its code, file names, logs, paths, what it does, who uses it, its
   company or its people; its name only if the project is public), anything secret, any person's name, or how to get
   past a check, a hook or a rule.

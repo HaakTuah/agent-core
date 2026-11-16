@@ -1,6 +1,6 @@
 # For a session of another tool
 
-Read at the start of every task by a session of any agent tool but Claude Code (whose part is `modules/claude.md`).
+Read at the start of every task by a session of every tool but `claude` (whose part is `modules/claude.md`).
 
 - The project's `AGENTS.md` and each file it names apply to you in full; its `@` lines are Claude Code's way of
   pulling a file in, so open each yourself. Your tool's part: `modules/tools.md`.
