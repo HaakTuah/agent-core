@@ -11,6 +11,7 @@
 // and a check passes a `read` and a `list` that read a commit's tree, to hold the base's list.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import { leadsOut } from "./guards.mjs";
 // Each agent tool's entry file, as the starter kit writes it (tasks/tools.md, "One door in").
 export const ENTRY_FILES = { claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" };
@@ -23,9 +24,36 @@ const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--
 const readHere = f => (fs.existsSync(f) && inside(f) ? fs.readFileSync(f, "utf8") : null);
 const FLOOR = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"];
 const TOOL_FILES = ["GEMINI.md", ...Object.values(ENTRY_FILES)];
-// The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES that stand,
-// then those git tracks under FOLDERS.
-export const toolFiles = (read = readHere, list = tracked) => TOOL_FILES.filter(f => read(f) !== null).concat(FOLDERS.flatMap(d => list(d)));
+// A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
+// to its base: a link followed while it leads to a file of that tree, at most 40 deep; null where it leads out of it or
+// nowhere, and for what is no file (a folder, a submodule). Run from the project's root.
+export function readAt(commit) {
+  const run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
+  let modes = null;
+  const mode = f => {
+    if (!modes) {
+      modes = new Map();
+      try { for (const e of run(["ls-tree", "-r", "-z", commit]).split("\0")) { const m = /^(\d+) \S+ \S+\t([\s\S]+)$/u.exec(e); if (m) modes.set(m[2], m[1]); } } catch { /* (no such commit: nothing there) */ }
+    }
+    return modes.get(f);
+  };
+  return f => {
+    for (let at = f, hops = 0; hops <= 40; hops++) {
+      const m = mode(at);
+      if (m === undefined || !/^1[02]0/u.test(m)) return null;
+      let text;
+      try { text = run(["show", `${commit}:${at}`]); } catch { return null; }
+      if (m !== "120000") return text;
+      if (/^([\\/]|[A-Za-z]:)/u.test(text)) return null;
+      at = path.posix.normalize(path.posix.join(path.posix.dirname(at), text.replace(/\\/gu, "/")));
+      if (at === ".." || at.startsWith("../")) return null;
+    }
+    return null;
+  };
+}
+// The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
+// git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).
+export const toolFiles = (read = readHere, list = tracked) => TOOL_FILES.concat(FOLDERS.flatMap(d => list(d))).filter(f => read(f) !== null);
 export function ruleFiles(read = readHere, list = tracked, { tools = false } = {}) {
   const security = read("SECURITY.md");
   if (security === null) throw new Error('the project has no SECURITY.md yet, where the checks read its rule files. Mend: write it from the starter kit\'s template (core/setup/template/SECURITY.md.tmpl), its rule 3 with the line "**the rule files:** ...;"');

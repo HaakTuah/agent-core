@@ -36,7 +36,7 @@ import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
-import { ruleFiles, toolFiles } from "./rule-files.mjs";
+import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
@@ -45,11 +45,13 @@ process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-topleve
 // the broken pointers in its agent tools' files, each by its file and its words, as one JSON list; #405)
 const AT = process.argv.includes("--tools-at") ? process.argv[process.argv.indexOf("--tools-at") + 1] : null;
 if (AT !== null && !/^[0-9a-f]{40}$/u.test(AT ?? "")) { console.error("FAIL: --tools-at takes a commit's full SHA, which this script gives itself. Mend: run it without --tools-at"); process.exit(1); }
-const text = f => { if (!AT) return fs.readFileSync(f, 'utf8'); try { return git(["show", `${AT}:${f}`]); } catch { return ""; } };
+// (at a commit, a link inside its tree followed as the work tree follows it: rule-files.mjs, `readAt`)
+const atCommit = AT ? readAt(AT) : null;
+const text = f => (AT ? atCommit(f) ?? "" : fs.readFileSync(f, 'utf8'));
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
 const tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
-const show = AT ? f => (tracked.includes(f) ? text(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
+const show = AT ? f => (tracked.includes(f) ? atCommit(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
 let RULES, TOOLS;
 try {
   // (an agent tool's files that no other way names a rule file, tracked, as git lists them)

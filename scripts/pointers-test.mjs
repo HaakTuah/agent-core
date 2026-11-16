@@ -99,8 +99,10 @@ try {
   put(".kiro/steering/own.md", fs.readFileSync(path.join(tools, ".kiro/steering/own.md"), "utf8").replace(/\nAnd "Testing it".*\n/u, ""));
   put("SECURITY.md", FILES["SECURITY.md"]);
   g("rm", "-q", "-f", ".kiro/steering/listed.md"); g("add", "-A");
-  t = check({ POINTERS_BASE: "no-such-branch" });
-  ok(t.status === 1 && mended(t.out) && /^FAIL: POINTERS_BASE no-such-branch is not a commit here\. Mend: fetch it/m.test(t.out), "a base that is no commit here fails, saying to fetch it", t.out);
+  for (const bad of ["no-such-branch", "--output=x"]) {
+    t = check({ POINTERS_BASE: bad });
+    ok(t.status === 1 && mended(t.out) && t.out.includes(`FAIL: POINTERS_BASE ${bad} is not a commit here. Mend: fetch it`) && !fs.existsSync(path.join(tools, "x")), `a base that is no commit (${bad}) fails, saying to fetch it, and is never read as an option`, t.out);
+  }
   put(".agents/rules/new.md", "# A rule\n\nAs `docs/developing.md` says.\n");
   put("GEMINI.md", "# Gemini\n\nAs \"Running it\" in `docs/developing.md` says.\n");
   g("add", "-A");
@@ -115,6 +117,13 @@ try {
     t = check({ POINTERS_BASE: base });
     fs.rmSync(away, { recursive: true, force: true });
     ok(t.status === 0 && !/nowhere/.test(t.out), "a file in a tool's folder whose link leads out of the project is not read", t.out);
+    // (one whose link leads inside the project is read through it, at the base as in the work tree)
+    fs.rmSync(path.join(tools, ".kiro/steering/out.md"));
+    put("docs/linked.md", "# Linked\n\nAs `docs/nowhere-inside.md` says.\n");
+    fs.symlinkSync("../../docs/linked.md", path.join(tools, ".kiro/steering/inside.md"));
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a steering file that is a link inside");
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 0 && /^note a broken pointer in an agent tool's file: \.kiro\/steering\/inside\.md:3: .*the pull request's base held it/m.test(t.out), "a tool's file that is a link inside the project is read through it at the base too, so what it held is noted", t.out);
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails

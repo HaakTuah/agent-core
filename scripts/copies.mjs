@@ -33,7 +33,7 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
-import { ruleFiles, toolFiles } from "./rule-files.mjs";
+import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { projectAt } from "./core-path.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
@@ -74,7 +74,13 @@ if (!inProject(config.baseline) || leadsOut(ROOT, path.join(ROOT, config.baselin
 const BASELINE = config.baseline;
 const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
 let fromSecurity = null;
-const security = () => { if (!fromSecurity) try { fromSecurity = ruleFiles(undefined, undefined, { tools: true }); } catch (e) { fail(e.message); } return fromSecurity; };
+// The project's rule files, as `read` and `list` find them (rule-files.mjs): those SECURITY.md lists, each a pathspec as
+// it is written there, and an agent tool's, each a literal path, so that a name of a glob's form names itself alone.
+const withTools = (read, list) => {
+  const rules = ruleFiles(read, list), named = new Set(rules);
+  return rules.concat(toolFiles(read, list).filter(f => !named.has(f)).map(f => `:(literal)${f}`));
+};
+const security = () => { if (!fromSecurity) try { fromSecurity = withTools(); } catch (e) { fail(e.message); } return fromSecurity; };
 const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity ? security() : []);
 const TOOLS = process.argv.includes("--tools"), WRITE = TOOLS || process.argv.includes("--write");
 if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check. Mend: list the code in "code" and the prose in "prose", as git pathspecs, or set "proseFromSecurity" to true');
@@ -233,18 +239,17 @@ function toolsOnly(show, list, specs) {
   let rules;
   try { rules = show ? ruleFiles(show, list) : ruleFiles(); } catch { return new Set(); }
   const before = new Set(specs(PROSE_SPECS.concat(rules)));
-  return new Set(specs(show ? toolFiles(show, list) : toolFiles()).filter(f => !before.has(f)));
+  return new Set(specs((show ? toolFiles(show, list) : toolFiles()).map(f => `:(literal)${f}`)).filter(f => !before.has(f)));
 }
 const TOOL_ONLY = toolsOnly(null, null, ls);
 // What a commit held of the copies in those files: each prose window that stood there with one of its places in such a
 // file, by its hash, and in how many places. Read only where a copy or the baseline asks it.
 function toolCopiesAt(commit) {
-  const show = f => { try { return git(["show", `${commit}:${f}`]); } catch { return null; } };
-  const list = dir => lsAt(commit, [dir]), there = specs => lsAt(commit, specs);
+  const show = readAt(commit), list = dir => lsAt(commit, [dir]), there = specs => lsAt(commit, specs);
   const tools = toolsOnly(show, list, there);
   if (!tools.size) return new Map();
   let rules;
-  try { rules = ruleFiles(show, list, { tools: true }); } catch { return new Map(); }
+  try { rules = withTools(show, list); } catch { return new Map(); }
   const { dup } = find(there(PROSE_SPECS.concat(rules)), proseUnits, WORDS, " ", 0, f => show(f) ?? "");
   return new Map([...dup].filter(([, at]) => at.some(p => tools.has(p.file))).map(([h, at]) => [h, at.length]));
 }
@@ -253,6 +258,9 @@ const stood = (h, n) => !!process.env.COPIES_BASE && TOOL_ONLY.size > 0 && ((atB
 const runs = [find(ls(CODE_SPECS), codeUnits, LINES, "\n", MIN_CHARS), find(ls(proseSpecs), proseUnits, WORDS, " ", 0)];
 const found = runs.flatMap(r => r.copies);
 const places = new Map(runs.flatMap(r => [...r.dup].map(([h, list]) => [h, list.length])));
+// (the copies that stand in an agent tool's file, and their windows)
+const inTools = c => c.files.some(f => TOOL_ONLY.has(f));
+const toolWindows = new Set(found.filter(inTools).flatMap(c => c.windows));
 if (process.argv.includes("--first")) {
   if (fs.existsSync(BASELINE)) fail(`${BASELINE} exists, and --first writes only a project's first baseline. Mend: run the check without --first, or --write to lower the baseline`);
   fs.writeFileSync(BASELINE, JSON.stringify({ windows: Object.fromEntries([...places].sort()) }, null, 2) + "\n");
@@ -301,16 +309,16 @@ if (from) {
     };
     // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
     let wasRules = [];
-    if (held.some(h => h.config.proseFromSecurity === true)) try { wasRules = ruleFiles(f => { try { return git(["show", `${from}:${f}`]); } catch { return null; } }); } catch { /* the base read none */ }
+    if (held.some(h => h.config.proseFromSecurity === true)) try { wasRules = withTools(readAt(from), dir => lsAt(from, [dir])); } catch { /* the base read none */ }
     const less = [...new Set(held.flatMap(h => lost("code", specs(h, "code"), CODE_SPECS).concat(lost("prose", specs(h, "prose").concat(h.config.proseFromSecurity === true ? wasRules : []), proseSpecs))))];
     if (less.length) fail(`${who} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
   }
   let there = true;
   try { git(["cat-file", "-e", `${from}:${BASELINE}`]); } catch { there = false; } // no baseline on that branch yet
   const old = there ? counted(JSON.parse(git(["show", `${from}:${BASELINE}`])).windows, `${from}:${BASELINE}`) || null : null;
-  // (save a window of a copy in an agent tool's file that the base held in as many places: listing what stood is what
-  // --tools does, and the base is the list until it is written; #405)
-  const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !stood(h, n)) : [];
+  // (save a window of a copy that stands in an agent tool's file and that the base held there in as many places:
+  // listing what stood is what --tools does, and the base is the list until it is written; #405)
+  const raised = old ? Object.entries(base.windows).filter(([h, n]) => (!(h in old) || n > old[h]) && !(toolWindows.has(h) && stood(h, n))) : [];
   if (raised.length) { console.error(`FAIL: ${logged(BASELINE)} adds or raises ${raised.length} windows against ${from}, and the baseline only shrinks. Mend: take it back as ${from} holds it (git checkout ${from} -- ${BASELINE}), point the new copy to one place, and run --write`); process.exit(1); }
 }
 // Near-copies (tasks/code-shape.md, "Near-copies are reported"; #246): the runs of code that match once names and
@@ -336,7 +344,6 @@ if (!WRITE) {
   if (near.length > 10) console.log(`  and ${near.length - 10} more`);
 }
 // (--tools: every window of a copy in an agent tool's file listed, in as many places as it stands in now)
-const inTools = c => c.files.some(f => TOOL_ONLY.has(f));
 if (TOOLS) for (const c of found.filter(inTools)) for (const h of c.windows) base.windows[h] = Math.max(base.windows[h] ?? 0, places.get(h));
 const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 // (a copy in an agent tool's file that the baseline does not list yet: noted where the base held it, or where there is
@@ -344,7 +351,7 @@ const over = h => !(h in base.windows) || places.get(h) > base.windows[h];
 const before = c => inTools(c) && (!process.env.COPIES_BASE || c.windows.filter(over).every(h => stood(h, places.get(h))));
 const fresh = found.filter(c => c.windows.some(over) && !before(c)), unlisted = found.filter(c => c.windows.some(over) && before(c));
 const shrunk = Object.keys(base.windows).filter(h => !places.has(h) || places.get(h) < base.windows[h]);
-for (const c of unlisted) console.log(`note ${logged(`an old copy in an agent tool's file, not yet in the baseline: ${c.places.join(" and ")} (it starts "${c.starts}")`)}: ${process.env.COPIES_BASE ? "the pull request's base held it" : "with no base to read against"}, so it fails nothing; list it with ${SELF} ${configPath} --tools, and commit ${logged(BASELINE)}`);
+for (const c of unlisted) console.log(`note ${logged(`an old copy in an agent tool's file, not yet in the baseline: ${c.places.join(" and ")} (it starts "${c.starts}")`)}: ${process.env.COPIES_BASE ? "the pull request's base held it" : "with no base to read against"}, so it fails nothing; list it with ${SELF} ${logged(configPath)} --tools, and commit ${logged(BASELINE)}`);
 for (const c of fresh) console.error(`FAIL: ${logged(`a new copy: ${c.places.join(' and ')} (it starts "${c.starts}")`)}. Mend: keep it in the one place it belongs and point there from the others`);
 if (WRITE) {
   base.windows = Object.fromEntries(Object.entries(base.windows).filter(([h]) => places.has(h)).map(([h, n]) => [h, Math.min(n, places.get(h))]));
@@ -352,7 +359,7 @@ if (WRITE) {
   console.log(`${logged(BASELINE)}: ${Object.keys(base.windows).length} windows kept, ${shrunk.length} lowered or dropped${TOOLS ? `, the copies in an agent tool's files listed` : ""}`);
   if (fresh.length) process.exit(1);
 } else {
-  if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${configPath} --write and commit the baseline it lowers`);
+  if (shrunk.length) console.error(`FAIL: ${logged(BASELINE)} lists ${shrunk.length} windows that are gone or in fewer places now. Mend: run ${SELF} ${logged(configPath)} --write and commit the baseline it lowers`);
   if (fresh.length || shrunk.length) process.exit(1);
   console.log(`ok   no new copies (${found.length - unlisted.length} old ones, listed in ${logged(BASELINE)}, to be removed${unlisted.length ? `; ${unlisted.length} in an agent tool's files, noted above` : ""})`);
 }

@@ -85,6 +85,28 @@ try {
   ok(!/agent tool's file|own\.md/.test(`${prose.stdout}${prose.stderr}`), "a config that reads no rule files reads no agent tool's file either", `${prose.stdout}${prose.stderr}`);
   fs.rmSync(path.join(dir, "checks/prose.json"));
 
+  // (against the base, the config is held to every file the base's read, an agent tool's among them)
+  const cfgWas = fs.readFileSync(path.join(dir, "checks/copies.json"), "utf8");
+  put("checks/copies.json", `${JSON.stringify({ baseline: "checks/copies-baseline.json", prose: ["AGENTS.md", "SECURITY.md", "docs/a.md"], proseFromSecurity: false })}\n`);
+  r = check({ COPIES_BASE: written });
+  put("checks/copies.json", cfgWas);
+  ok(r.status === 1 && mended(r.out) && /reads 1 files fewer than [0-9a-f]{40}'s config read: \.kiro\/steering\/own\.md \(prose\)/.test(r.out), "a config that stops reading an agent tool's file the base's read fails, saying its mend", r.out);
+
+  // (hostile files in a tool's folder, each read as text and failing nothing: one empty, one of bytes that are no
+  // text, one line of two million characters, markup; and a base that is no commit, or reads as an option to git)
+  put(".agents/rules/empty.md", "");
+  fs.writeFileSync(path.join(dir, ".agents/rules/bytes.md"), Buffer.from([0, 255, 1, 254, 0, 10, 0]));
+  put(".agents/rules/long.md", `${"x".repeat(2_000_000)}\n`);
+  put(".agents/rules/markup.md", "<script>alert(1)</script> <img src=x onerror=alert(1)> ::error::markup\n");
+  g("add", "-A");
+  r = check({ COPIES_BASE: written });
+  ok(r.status === 0 && !/::error::/.test(r.out), "an agent tool's file that is empty, of bytes, of one very long line or of markup is read as text and fails nothing", r.out);
+  for (const bad of ["no-such-branch", "--output=x"]) {
+    r = check({ COPIES_BASE: bad });
+    ok(r.status === 1 && mended(r.out) && /^FAIL: COPIES_BASE .* is not a commit here\. Mend: fetch it/m.test(r.out) && !fs.existsSync(path.join(dir, "x")), `a base that is no commit (${bad}) fails, saying to fetch it, and is never read as an option`, r.out);
+  }
+  g("rm", "-q", "-f", ".agents/rules/empty.md", ".agents/rules/bytes.md", ".agents/rules/long.md", ".agents/rules/markup.md");
+
   // (a file in a tool's folder whose link leads out of the project is not read)
   if (process.platform !== "win32") {
     const away = fs.mkdtempSync(path.join(os.tmpdir(), "copies-tools-away-"));
@@ -102,6 +124,14 @@ try {
     r = check({ COPIES_BASE: written });
     ok(r.status === 1 && /^FAIL: a new copy: .*x%0A::error::y\.md/m.test(r.out) && !/^::error::/m.test(r.out), "a file in a tool's folder whose name holds a line break is named on one line, escaped", r.out);
     g("rm", "-q", "-f", odd);
+    // (a tool's file that is a link inside the project is read through it, at the base as in the work tree)
+    fs.symlinkSync("../../docs/a.md", path.join(dir, ".kiro/steering/link.md"));
+    const linked = commit("a steering file that is a link to docs/a.md");
+    r = check({ COPIES_BASE: linked });
+    ok(r.status === 0 && /not yet in the baseline: .*link\.md.*the pull request's base held it/.test(r.out), "a tool's file that is a link inside the project is read through it at the base too, so what it held is noted", r.out);
+    check({}, "--tools");
+    r = check({ COPIES_BASE: linked });
+    ok(r.status === 0 && !/not yet in the baseline/.test(r.out), "and --tools lists it, which the base allows", r.out);
   }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);
