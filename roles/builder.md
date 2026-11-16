@@ -7,9 +7,9 @@ no role.
 
 **Read by task, twice** (core archive 233; #304). By default the builder reads, at a task's start, what
 `scripts/reading.mjs builder --issue <its issue>` prints; before its PR is marked ready it runs that with `--changed`,
-reads each file it adds, checks the work against it and lists it on the description's line `Read for it:`. It does
-not mean it opens no other file. Reason: a module the change turned out to call for went unread until a review found it. Held, in
-part, by the description check, which fails a line that leaves out a file the changed paths call for.
+reads each file it adds, checks the work against it and lists it on the description's line `Read for it:`. It does not
+mean it opens no other file. Reason: a module the change turned out to call for went unread until a review found it.
+Held, in part, by the description check, which fails a line that leaves out a file the changed paths call for.
 
 **Hands over, gets back:**
 - the orchestrator: word when its PR is ready and when it merges; back, its line and brief.

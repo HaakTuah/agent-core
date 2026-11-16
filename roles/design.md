@@ -1,7 +1,7 @@
 # The design session
 
 Read at its start by the role `design`: the design session, which `modules/inbox.md`, "The owner's words are kept
-once", says who is and what it alone does.
+once", says who it is and what it alone does.
 
 **Reads at its start:** `roles/builder.md` and what that names, since it builds what it designs.
 

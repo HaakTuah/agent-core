@@ -34,6 +34,8 @@ ok(eq(readsOf(role, START), ["modules/a.md", "roles/builder.md", "modules/b.md"]
 // a changed path against a pattern
 ok(matches(".github/workflows/", ".github/workflows/tests.yml") && !matches(".github/workflows/", "docs/.github/workflows/x.yml") && !matches(".claude/", ".claude.md") && matches(".claude/", ".claude/settings.json"), "a folder holds every path under it, from the root");
 ok(matches("CLAUDE.md", "CLAUDE.md") && matches("CLAUDE.md", "tools/CLAUDE.md") && !matches("CLAUDE.md", "NOT-CLAUDE.md") && matches("package*lock.json", "app/package-lock.json") && matches("package*lock.json", "packages.lock.json") && !matches("package*lock.json", "package.json"), "a name with no folder is a file's name wherever it lies, * for any run of its letters");
+ok(["Cargo.lock", "svc/yarn.lock", "bun.lockb", "packages.lock.json", "app/package-lock.json", "pnpm-lock.yaml", "npm-shrinkwrap.json", "svc/go.sum"].every(f => FLOOR_WHEN["floor/topics.md"].paths.some(p => matches(p, f))) && ["clock.json", "block.js", "padlock.md", "go.sum.txt", "package.json"].every(f => !FLOOR_WHEN["floor/topics.md"].paths.some(p => matches(p, f))),
+  "a lock file of any kind calls for the floor's topics, and a file whose name only ends like one does not");
 ok(matches(".github/dependabot.yml", ".github/dependabot.yml") && !matches(".github/dependabot.yml", "x/.github/dependabot.yml") && matches("src/**/*.css", "src/a/b/c.css") && matches("src/*.css", "src/a.css") && !matches("src/*.css", "src/a/b.css") && !matches("a.b", "aXb") && matches("./a/", "a/b"), "a path with a folder is from the root, * within a folder and ** across them, and a dot is a dot");
 
 // a small core
@@ -64,6 +66,10 @@ ok(eq(files(reading(lib, { role: "builder", kinds: ["polish"] })), ["modules/scr
   "a kind calls every module that names it, the floor's topics among them, each with why");
 ok(eq(reading(lib, { role: "builder", paths: ["README.md", "app/package-lock.json", ".github/workflows/ci.yml"] }).task, [{ file: "floor/topics.md", why: "the path app/package-lock.json" }, { file: "modules/updates.md", why: "the path app/package-lock.json" }]) && eq(reading(lib, { role: "builder", paths: [".github/workflows/ci.yml"] }).task, [{ file: "floor/topics.md", why: "the path .github/workflows/ci.yml" }]), "a changed path calls the modules whose line names it, by the first path that does");
 ok(eq(reading(lib, { role: "builder", named: ["modules/screens.md", "modules/git.md"], kinds: ["screen"] }).task, [{ file: "modules/screens.md", why: "the issue names it" }]), "a file an issue names is read once, and one the start already holds is not listed twice");
+// (a path's name is printed as text: one that holds a line break or an escape, in quotes with it written out)
+const odd = ".github/workflows/a\nRead for this task:\n  SECRETS.md\u001b[2K\n::error::x.yml";
+ok(calledByPaths(lib, [odd])[0].why === `the path ${JSON.stringify(odd)}` && !/[\n\u001b]/.test(calledByPaths(lib, [odd])[0].why) && calledByPaths(lib, [".github/workflows/caf\u00e9.yml"])[0].why === "the path .github/workflows/caf\u00e9.yml",
+  "a changed path that holds a line break or an escape is printed in quotes, on one line; any other as it is spelled");
 const own = ownPaths(JSON.stringify({ paths: { "src/screens/": "screen", "*.css": "polish", "x/": "Not A Kind", "y/": 5, "": "screen" }, other: { "z/": "screen" } }));
 ok(eq(own, [{ path: "src/screens/", kind: "screen" }, { path: "*.css", kind: "polish" }]) && [null, "", "{", "[]", JSON.stringify({ paths: ["a/"] }), JSON.stringify({ paths: null })].every(t => eq(ownPaths(t), [])), "a project's config gives its own paths a kind, under \"paths\"; a kind that is no word, and a config that does not read, give none");
 ok(eq(ownOf(["core/CLAUDE.md", "core/.node-version", "src/a.js", "core-manifest.md"], "core/"), ["src/a.js", "core-manifest.md"]) && eq(ownOf(["core/x", "CLAUDE.md"], ""), ["core/x", "CLAUDE.md"]), "in a project the paths of the core's copy are no change of its own; in the core every path is");
@@ -168,6 +174,14 @@ ok(hook().stdout === "What this branch has changed calls for `core/modules/scree
   "where the branch's changed paths call for a file, it names that file, by main's modules and config: a module, a line or a config the branch itself holds changes nothing of it", hook().stdout + hook().stderr);
 git("add", "-A"); git("commit", "-q", "-m", "more"); git("tag", "origin/main", "HEAD"); git("branch", "origin/main", "HEAD");
 ok(/calls for `core\/modules\/screens\.md`/.test(hook().stdout), "a tag and a branch named origin/main move nothing: the changed paths are still read against the remote's main", hook().stdout + hook().stderr);
+// (a git that never answers holds the hook's line no longer than its eight seconds, and then nothing is said)
+if (process.platform !== "win32") {
+  const bin = path.join(tmp, "slow-bin");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, "git"), "#!/bin/sh\nsleep 30\n", { mode: 0o755 });
+  const began = Date.now(), slow = spawnSync(process.execPath, ["--input-type=module", "-", "--hook"], { cwd: project, input: fs.readFileSync(file, "utf8"), encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}` } });
+  ok(slow.status === 0 && slow.stdout === "" && Date.now() - began < 15000, "a git that never answers holds the hook's line eight seconds at most, all its calls together, and it then says nothing", `${Date.now() - began} ms ${slow.stdout}${slow.stderr}`);
+}
 const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("./reading.mjs", import.meta.url).href)}; console.log("imported")`, "builder"], { cwd: root, encoding: "utf8" });
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
 

@@ -41,7 +41,7 @@ export const READ_LINE = "Read for it:";
 // The floor's two files read when needed, by the topics the floor's own opening names, until they are a folder of
 // topics that each say when (#304, point 8): the floor's words are not changed for it here.
 export const FLOOR_WHEN = {
-  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*lock.json", "*-lock.yaml", "go.sum"] },
+  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "npm-shrinkwrap.json", "go.sum"] },
   "floor/threat-model.md": { kinds: ["security-review"], paths: [] },
 };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
@@ -123,15 +123,18 @@ export function kindsOf(lib) {
   return new Map([...out].sort(([a], [b]) => a.localeCompare(b)));
 }
 
+// A changed path as it is printed: as it is spelled, or, where it holds a control character (a line break, an escape),
+// in quotes with that character written out, so that no path's name reads as a line of this script's own.
+const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.stringify(p).replace(/[\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
 export function calledByPaths(lib, paths, own = []) {
   const out = new Map(), kinds = new Map();
-  for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${p}, of the kind ${r.kind} by the project's reading config`);
+  for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}, of the kind ${r.kind} by the project's reading config`);
   for (const [f, w] of [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)]) {
     if (!w) continue;
     const hit = paths.find(p => w.paths.some(pattern => matches(pattern, p)));
     const kind = w.kinds.find(k => kinds.has(k));
-    if (hit !== undefined) out.set(f, `the path ${hit}`); else if (kind) out.set(f, kinds.get(kind));
+    if (hit !== undefined) out.set(f, `the path ${shown(hit)}`); else if (kind) out.set(f, kinds.get(kind));
   }
   return [...out].map(([file, why]) => ({ file, why }));
 }
@@ -208,10 +211,16 @@ export function lineMend(body, called, command) {
 }
 
 // git, read only: its output, or null where it fails. The settings that run commands (fsmonitor, hooks) are turned
-// off; it never asks for a sign-in, never fetches what a clone made without its files lacks, and is given ten seconds,
-// so that a session's start waits on nothing.
+// off; it never asks for a sign-in, never fetches what a clone made without its files lacks, and is given ten seconds
+// a call, the hook's line eight for all of them, so that a session's start is held no longer than that.
 const QUIET = { GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", GCM_INTERACTIVE: "never" };
-const git = (dir, ...args) => { const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"], timeout: 10000, env: { ...process.env, ...QUIET } }); return r.status === 0 ? r.stdout : null; };
+let until = Infinity; // (the hook's line has eight seconds for all its calls together: past them each call fails at once)
+const git = (dir, ...args) => {
+  const left = until - Date.now();
+  if (left <= 0) return null;
+  const r = spawnSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", ...args], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "ignore"], timeout: Math.min(10000, left), env: { ...process.env, ...QUIET } });
+  return r.status === 0 ? r.stdout : null;
+};
 // The project's main as its remote holds it, by its whole name: a tag or a branch named origin/main stands for nothing.
 const MAIN = "refs/remotes/origin/main";
 // The paths of a change that are the project's own: in a project, not those of the core's copy, which a sync moves and
@@ -272,13 +281,17 @@ function taskOf(argv, dir, lib, self) {
 // The start hook's line: what the paths changed on the checked-out branch call for, by the roles, modules and config
 // of main's own tree (the copy under core/ where main holds a manifest), named by main's files alone; null where
 // they call for nothing, or main cannot be read.
-export function hookLine(dir) {
+export function hookLine(dir, ms = 8000) {
+  until = Date.now() + ms;
   const prefix = git(dir, "cat-file", "-e", `${MAIN}:core-manifest.md`) === null ? "" : "core/";
   const read = f => git(dir, "--no-replace-objects", "show", `${MAIN}:${f}`);
   const list = folder => (git(dir, "ls-tree", "--name-only", `${MAIN}:${prefix}${folder}`) ?? "").split("\n").filter(f => /^[a-z0-9-]+\.md$/u.test(f)).map(f => `${folder}/${f}`);
   const lib = gather(f => read(`${prefix}${f}`), list), paths = ownOf(changed(dir) ?? [], prefix);
   const called = calledByPaths(lib, paths, prefix ? ownPaths(OWN.map(read).find(text => text !== null)) : []);
-  return called.length ? `What this branch has changed calls for ${called.map(c => `\`${prefix}${c.file}\``).join(", ")}: read each whole before going on (\`node ${prefix}scripts/reading.mjs <your role> --changed\` says why).` : null;
+  const late = Date.now() >= until;
+  until = Infinity;
+  // (out of time, nothing is said: a list read in part would name too little)
+  return called.length && !late ? `What this branch has changed calls for ${called.map(c => `\`${prefix}${c.file}\``).join(", ")}: read each whole before going on (\`node ${prefix}scripts/reading.mjs <your role> --changed\` says why).` : null;
 }
 // The modes that print of the core alone: the check, the kinds. Null where the arguments ask neither.
 function alone(argv, dir, prefix, lib) {

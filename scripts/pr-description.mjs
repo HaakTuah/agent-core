@@ -64,6 +64,18 @@ export function waitsMend(body) {
   return `${w ? `its line "${WAITS} ${w.said}" is in none of the forms` : `the description has no line "${WAITS}"`}. Mend: end it with one, above its closing lines, of these: "${WAITS} nothing", "${WAITS} a review", "${WAITS} checks", "${WAITS} #<the item it waits on>", or "${WAITS} the owner: <the question, in one sentence>?", with the label needs-owner on the pull request; edit it whenever what it waits on changes`;
 }
 
+// What the paths a pull request changes call for, [{ file, why }], in the checkout at `dir`, the merge commit against
+// its first parent, the base: each file by its path from the root (under core/ in a project). The kinds a project
+// gives its own paths are read as the base holds them, so that a pull request does not set that list for itself; the
+// modules' own lines are the copy's, which core.yml holds to the core's. Null where the change cannot be read.
+export function calledFor(dir) {
+  const git = (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
+  const prefix = coreAt(dir), diff = prefix === null ? null : git("diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD");
+  if (diff === null) return null;
+  const own = prefix ? ownPaths(OWN.map(f => git("show", `HEAD^1:${f}`)).find(text => text !== null)) : [];
+  return calledByPaths(library(dir, prefix), ownOf(diff.split("\0").filter(Boolean), prefix), own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
+}
+
 export const PARTS = ["What the owner can try", "Readings taken"];
 
 // The parts an argument asks for: its own, separated by |, in place of the two; led by a +, added to the two (so a
@@ -105,15 +117,10 @@ if (started(import.meta.url)) {
     if (then?.includes("export const WAITS_SINCE")) { const mend = waitsMend(process.env.PR_BODY); if (mend) mends.push(mend); }
     else console.log(`ok   the line "${WAITS}" is not asked here: ${why}`);
     if (created >= READS_SINCE && then?.includes("export const READS_SINCE")) {
-      const prefix = coreAt(process.cwd()), diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
-      const paths = prefix === null || diff.status !== 0 ? null : ownOf(diff.stdout.split("\0").filter(Boolean), prefix);
-      if (paths === null) console.log("ok   the line that lists what the changed paths call for is not asked here: the change could not be read against its base");
+      const called = calledFor(process.cwd());
+      if (called === null) console.log("ok   the line that lists what the changed paths call for is not asked here: the change could not be read against its base");
       else {
-        // (the kinds of the project's own paths as the base holds them: a pull request does not set what it is read by)
-        const atBase = f => { const r = spawnSync("git", ["show", `HEAD^1:${f}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? r.stdout : null; };
-        const own = prefix ? ownPaths(OWN.map(atBase).find(text => text !== null)) : [];
-        const called = calledByPaths(library(process.cwd(), prefix), paths, own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
-        const mend = lineMend(process.env.PR_BODY, called, `node ${prefix}scripts/reading.mjs builder --changed --line`);
+        const mend = lineMend(process.env.PR_BODY, called, `node ${coreAt(process.cwd())}scripts/reading.mjs builder --changed --line`);
         if (mend) mends.push(mend);
         else console.log(`ok   the description lists what its changed paths call for (${called.length} file${called.length === 1 ? "" : "s"})`);
       }

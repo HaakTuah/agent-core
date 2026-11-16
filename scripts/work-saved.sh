@@ -24,8 +24,9 @@ fi
 # without Node, or before main holds the script, nothing is said.
 if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
   reading=scripts/reading.mjs
-  g cat-file -e refs/remotes/origin/main:core-manifest.md 2>/dev/null && reading=core/scripts/reading.mjs
-  r=$(g --no-replace-objects show "refs/remotes/origin/main:$reading" 2>/dev/null) && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
+  # (neither read fetches what a clone made without its files lacks, nor asks for a sign-in)
+  GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g cat-file -e refs/remotes/origin/main:core-manifest.md 2>/dev/null && reading=core/scripts/reading.mjs
+  r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show "refs/remotes/origin/main:$reading" 2>/dev/null) && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
 fi
 issues=()
 dirty=$(g status --porcelain 2>/dev/null)
