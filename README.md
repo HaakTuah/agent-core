@@ -24,8 +24,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   `review-guidelines.md` and, read in a team's project, `teams.md`); `tools/` each agent tool's part, read when that
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
   tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
-  `github-calls.md`, `hosts.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`, `cleaning.md`; for a project
-  people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
+  `github-calls.md`, `hosts.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`, `cleaning.md`; for a change
+  its users will notice, `done-when.md`; for a project people use through a screen, `screens.md`; and, for games only,
+  `game-design.md`). A manifest takes or leaves out a
   module by its file's name, which stands once across the three folders. Until the second release after 16 November 2026
   a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
@@ -146,7 +147,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      and `reading-size.mjs`, the pointer check and the reading-size check,
      the second with marks of its own (the *size marks*), whose total counts the project's own files alone (the core's
      copy is held to the core's own cap), and `workflows.mjs`, which needs no config and fails a workflow that names
-     `pull_request_target` (floor rule 2).
+     `pull_request_target` (floor rule 2) or gives a key twice in one mapping, which GitHub refuses.
    - **The shape check,** in the same job: `shape.mjs`, with a config of the project's own (the *shape check*: its
      systems, its marks and its suites' time marks) and a baseline of what stood before it, which only shrinks
      (`tasks/code-shape.md`, which says too how the check holds a project before its config is written). From its

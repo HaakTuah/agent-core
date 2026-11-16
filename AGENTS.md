@@ -32,7 +32,7 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `roles/shared/teams.md`, `roles/orchestrator.md`, `tasks/updates.md`,
-`tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md` and `tasks/cleaning.md`.
+`tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md` and `tasks/done-when.md`.
 
 Not taken, each for its reason:
 
@@ -228,7 +228,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   went wrong or would without it (an incident, a review's finding, the owner's reason), and its holder, or that it has
   none yet; "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists
   each rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
-  review's finding seen twice moves its rule up to a check where one can hold it (#254). A line that only points
+  review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only points
   elsewhere or says what is protected, binding no one, is marked "describes" there and is not listed. It does not mean
   that a rule with no holder fails anything or goes by itself, nor that a review is a holder. Reason: the audit of 13
   November found 43 of 122 rules held by nothing but a session reading them, and nothing listed them. Held by

@@ -248,11 +248,6 @@
       "depth": 2,
       "branches": 24
     },
-    "function: scripts/state-report.mjs#readCounts": {
-      "lines": 18,
-      "depth": 2,
-      "branches": 16
-    },
     "function: scripts/sync.mjs#sync": {
       "lines": 85,
       "depth": 3,
