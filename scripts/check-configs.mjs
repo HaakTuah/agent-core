@@ -272,7 +272,8 @@ function unaccounted(run, script, runs) {
 }
 // Whether a line is one command that runs no script, and nothing more.
 const lone = line => {
-  if (/[|;&<>`]|\$\(/u.test(line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/gu, ""))) return false; // (outside quotes)
+  // (an operator outside quotes; a command's output, $(…) or `…`, anywhere, since double quotes run it too)
+  if (/`|\$\(/u.test(line) || /[|;&<>]/u.test(line.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/gu, ""))) return false;
   const [words = [], more] = commands(line);
   return !more && NO_RUNNER.has(path.posix.basename(words[pastWrappers(words)]?.text ?? "").toLowerCase());
 };
