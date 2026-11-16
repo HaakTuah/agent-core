@@ -10,7 +10,8 @@
       "scripts/licence-scan-test.mjs",
       "scripts/licence-fetch-test.mjs",
       "scripts/agent-tools.mjs",
-      "scripts/agent-tools-test.mjs"
+      "scripts/agent-tools-test.mjs",
+      "scripts/hostile-packages-test.mjs"
     ]
   },
   "agentTools": [
