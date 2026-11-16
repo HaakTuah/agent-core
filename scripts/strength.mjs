@@ -33,6 +33,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { CODE, OTHER } from "./code-shape.mjs";
+import { logged, parseBounded } from "./guards.mjs";
+import { pathIn } from "./reading.mjs";
 import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
@@ -49,9 +51,9 @@ export const unlinked = file => { try { return notLinked(file); } catch (e) { co
 
 // The project's rules: its manifest, else (the core) its AGENTS.md; and where the core's scripts lie from its root.
 export function rulesHere(root = ".") {
-  for (const [file, home] of [["core-manifest.md", "core/"], ["AGENTS.md", ""]]) {
+  for (const [file, home] of [["core-manifest.md", null], ["AGENTS.md", ""]]) {
     const text = tolerant(() => fs.readFileSync(path.join(root, file), "utf8"));
-    if (text !== null) return { text, home };
+    if (text !== null) return { text, home: home ?? pathIn(text) };
   }
   return { text: "", home: "core/" };
 }
@@ -121,7 +123,7 @@ const aMutant = m => m && typeof m.status === "string" && typeof m.mutatorName =
 // mutatorName, replacement }. It throws a Refused where the report is not in the form.
 export function faultsOf(text, wanted, root = ".") {
   let r;
-  try { r = JSON.parse(text); } catch { refuse("the mutation tool's report could not be read as JSON", "have the tool write its report in the mutation-testing-elements schema (Stryker's \"json\" reporter writes it) to the path {report} stands for"); }
+  try { r = parseBounded(text); } catch { refuse("the mutation tool's report could not be read as JSON", "have the tool write its report in the mutation-testing-elements schema (Stryker's \"json\" reporter writes it) to the path {report} stands for"); }
   if (!r || typeof r.files !== "object" || r.files === null) refuse("the mutation tool's report has no \"files\"", "have the tool write the mutation-testing-elements schema, whose \"files\" holds each file's \"source\" and \"mutants\"");
   const out = [];
   for (const [name, f] of Object.entries(r.files)) {
@@ -282,7 +284,7 @@ export function joinedUnsaid(now, was, touched = true, texts = () => null, found
 function baselineFrom(text, at) {
   if (text === null || text === undefined) return null;
   const b = parseBaseline(text, at, `write it again from the audit's whole run (node core/scripts/strength.mjs --whole), or take it back as the base holds it`);
-  return { ...b, whole: tolerant(() => JSON.parse(text).whole) ?? null };
+  return { ...b, whole: tolerant(() => parseBounded(text).whole) ?? null };
 }
 
 // The tool run, as the row says, on the lines given: the report's text. It throws a Refused where the tool fails or
@@ -358,7 +360,7 @@ function onPullRequest(p, base) {
   const ids = baseline ? needed(faults, baseline, was, recordsWhole(baseline, was, touched)) : [];
   const kinds = new Set(ids.map(kindOf)), still = ids.length ? measured(p, watched(ids, read, changed), baseline).filter(f => kinds.has(kindOf(f.id))) : [];
   const { lines, fails } = verdict({ faults, still, baseline, was, at: p.at, deleted, touched, texts: read });
-  for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(l);
+  for (const l of lines) (l.startsWith("FAIL") ? console.error : console.log)(logged(l));
   summary(lines);
   return fails ? 1 : 0;
 }
@@ -449,5 +451,5 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${e.message}`); process.exitCode = 1; }
+  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
 }

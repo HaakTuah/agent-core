@@ -197,7 +197,78 @@ How they are kept, and where each item lives: `archive/instructions.md`.
      larger feature is filed, pointed to from "Issues are the way in" in `roles/shared/inbox.md`, and
      `scripts/done-when.mjs` in the description check.
 
-241. **15 November 2026** (every project with a product a person uses, and the core by its batches; in chats with a
+
+241. **15 November 2026** (every project in more than one repository, and a library shared by several projects; in a
+     chat with a session the owner works with, not the design session, as that session recorded it on issue #285,
+     labelled `by:chat`, saying the owner agreed to it). Of a part one of the owner's projects may one day split off,
+     the owner agreed to keeping it in the project's repository to begin with, "abiding by the new rules strictly, so
+     it is easy to sort out", and of afterwards said:
+
+     > It just has to be more flexible where the core folder is at? Because importing to both […] seems like needless
+     > duplication and will cause drift in versions?
+
+     The session set out six points, which the owner agreed to, and gave the yes for the change to the floor: the
+     manifest says where the core's copy is, and every script, check and rule reads it there; a repository may take the
+     core through a dependency that carries it, at the path the library brings it to, pinning no copy of its own, one
+     sync, in the library; before a split, a part meant to be shared is kept as a declared system in the project's
+     repository, under the rules of #246, until a second consumer exists; three conditions, since a session that cannot
+     find its rules would work with no floor at all: the core's files are in the checkout when a session starts (a
+     submodule the tool checks out, or files committed), never ones an install creates, a check at a session's start
+     stops it where the floor cannot be read at the path the manifest names, and it does nothing else until that is
+     mended, and it is proven tool by tool with a staged case, a repository keeping until then its own copy of the
+     floor, with a check that its version is the library's; each repository keeps its queue, its issues, its audits and
+     its state report; and a project in one repository changes in nothing. To the orchestrator, passed on word for word
+     to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind `tasks/repositories.md`, the manifest's `Core:` line in its two forms and its line `Floor copy:`
+     (`scripts/core-path.mjs`), what `core.yml` and the work-saved hook read of them, the staged cases `carried` and
+     `no-floor`, and "the copy of the core where its `Core:` line says" and "the floor's own copy" in floor rule 3.
+
+
+242. **15 November 2026** (games; in chats with a session the owner works with, not the design session, as that session
+     recorded it on issue #311, labelled `by:chat`, under "What it is", saying the owner agreed to it; and as the owner
+     then told the orchestrator, who passed it on word for word to the builder of this rule). At the owner's own asking
+     the session checked the core's game rules against the field's practice and set out eight additions, with what holds
+     each: every game says on one page what it is for (what the player does from minute to minute, what winning is, two
+     or three kinds of experience it aims at, in the owner's words), a feature's entry says which it serves, and a slot
+     names the page; the first stage is the loop alone, nothing else built until it can be played from start to finish;
+     teaching has an order, one new thing at a time, first where a mistake costs nothing, then under pressure, then
+     combined, in play, not in text, and the time from opening the game to the first real choice measured against a
+     target on the page; standing measures from the simulations for every game (the win rate by seat or starting place,
+     how often the leader at a third of the game goes on to win, the spread of a game's length, the time a player spends
+     knocked out or with no real choice, the share of turns with only one sensible move), each reported whenever the
+     rules change against a target that is a first guess; a loss explains itself, the player seeing after a round what
+     beat them; chance before the choice where it can, a lever answering it where it comes after; what must be
+     remembered decided once for each game, shown to every player where remembering is not meant as part of the skill,
+     and where it is, the computer players remembering no better than a person at their setting could; and sound with
+     jobs (confirming an action, warning, marking a change of state), one voice for each job, the music never covering
+     them, how it sounds staying the owner's taste. What holds each, as the session set it out: the design check reading
+     a feature against the page, for the first; the queue's order, for the second; a timed script, for the third; the
+     simulation's report, for the standing measures; the critique of item 230, for the loss and for sound; the design
+     check, for chance; and the test that already compares what the computer players are shown, for memory. Staying out:
+     tricks that hold a player (daily rewards, streaks, timers that punish leaving), difficulty that shifts in secret,
+     helping whoever is behind by breaking the rules for them, any theory used as a checklist, and a verdict on fun from
+     a model, which stays the owner's own play. The owner agreed to every addition that passes the owner's own test for
+     a rule (#303), and so to all eight; the test, in the owner's words:
+
+     > So the criteria is rules the agents can actually execute on, and which aids the output, makes it better or more
+     > robust.
+
+     To the orchestrator, passed on word for word to the builder of this rule:
+
+     > My yes is given for every queued change, the floor and the review guidelines included, as its issue describes
+     > it: quote this in those pull requests.
+
+     Behind "Every game says what it is for, on one page", "The first stage is the loop alone", "Teaching has an order",
+     "A loss explains itself", "Standing measures from the simulations, for every game", "Chance comes before the choice
+     where it can", "What must be remembered is decided once for each game" and "Sound has jobs" in
+     `tasks/game-design.md`, the slot *game page*, the check `first-choice` of `scripts/screens.mjs`, and the sync note
+     "16 November 2026, what a game is for".
+
+243. **15 November 2026** (every project with a product a person uses, and the core by its batches; in chats with a
      session the owner works with, not the design session, as that session recorded it on issue #322, labelled
      `by:chat`, under "What it is", saying the owner agreed to it). The owner's notes named the importance of a first
      version and of milestones, and asked whether planning, scoping and a change of course should be looked into; the

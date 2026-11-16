@@ -1,11 +1,16 @@
 # The copy of the core ("How a project takes the core" in README.md, points 1 and 5), for every project that takes it:
-# fails a change whose core/ is not this repository, whole and unchanged, at the commit its core-manifest.md pins (a
-# folder, compared as scripts/copy-tree.mjs compares: core archive 201), whose pin, or the pin of a call to one of its
+# fails a change whose copy (core/, or the path its core-manifest.md's "Core:" line names: tasks/repositories.md) is not
+# this repository, whole and unchanged, at the commit its core-manifest.md pins (a folder, compared as scripts/copy-tree.mjs compares: core archive 201), whose pin, or the pin of a call to one of its
 # workflows, is not a commit of this repository's main (so what a project takes passed the core's reviews; floor rule 8;
 # the call to this workflow itself: scripts/pure-sync.mjs), or whose calls to the core's workflows are pinned to a
 # commit where the called workflow differs from the one at that pin, or whose manifest does not fill the *owner's
 # account* with one GitHub login, or whose default branch is not main, or whose manifest lists a difference
-# ("Differences") from the floor or the review guidelines.
+# ("Differences") from the floor or the review guidelines. Where a library of the project's carries the core (that line's
+# second form), it reads the pin from the library's own manifest, its files committed here or its submodule's commit
+# fetched with no token from an https address, holds the copy there to that pin, and fails a library it cannot read; and, while an agent tool has not passed the staged
+# cases carried and no-floor (the core's reports/staged-cases.json and scripts/staged-tools.json on its main, read as
+# data; a tool that never ran them has not passed), it fails a repository without its own copy of the floor ("Floor
+# copy:"), and a copy that differs from the floor at the pin.
 # A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
 # pinned to a full commit SHA. Reads only, with no secret: it fetches this public repository at the pin it reads, which
 # must be a full commit SHA before it is used, and runs nothing from either repository. Its own shell is tested in the
@@ -65,20 +70,67 @@ jobs:
             echo "FAIL core-manifest.md lists a difference that names the floor or the review guidelines, which no project differs from (below). Mend: take each such line out of its differences; a project differs from a module's rule alone."
             printf '%s\n' "$bad" | sed 's/^/> /'; exit 1
           fi
-      - name: The core pin
+      - name: The core pin, and where the copy stands
         id: pin
         run: |
           set -euo pipefail
-          core=${CORE//./\\.} # (in a pattern, a dot of the address is a dot)
-          pin=$(sed -n "s|^Core: $core at \([0-9a-f]\{40\}\), copied whole under core/.*|\1|p" core-manifest.md)
-          if [ "$(printf '%s' "$pin" | grep -c .)" -ne 1 ]; then
-            echo "FAIL core-manifest.md has no one \"Core: $CORE at <full commit SHA>, copied whole under core/\" line. Mend: write that one line, the commit of the core's main that core/ holds, as the sync writes it."; exit 1
+          # (the manifest's one "Core:" line, in either form: a copy of the project's own at a path, or the core a
+          # library of the project's carries; the core's scripts/core-path.mjs reads it alike, and says why each part)
+          seg='[A-Za-z0-9_][A-Za-z0-9._-]*'
+          forms="\"Core: $CORE at <full commit SHA>, copied whole under <path>/\" or \"Core: $CORE, carried by <library>/ under <path>/\""
+          lines=$(grep -c '^Core: ' core-manifest.md || true) line=$(grep -m 1 '^Core: ' core-manifest.md || true)
+          pin="" at="" library="" lib="" src=. copy=""
+          if [ "$lines" = 1 ] && [[ "$line" =~ ^Core:\ "$CORE"\ at\ ([0-9a-f]{40}),\ copied\ whole\ under\ (($seg/)+)(\ |$) ]]; then
+            pin=${BASH_REMATCH[1]} at=${BASH_REMATCH[2]}
+          elif [ "$lines" = 1 ] && [[ "$line" =~ ^Core:\ "$CORE",\ carried\ by\ (($seg/)+)\ under\ (($seg/)+)(\ |$) ]]; then
+            library=${BASH_REMATCH[1]} at=${BASH_REMATCH[3]}
+          else
+            echo "FAIL core-manifest.md has no one $forms line. Mend: write that one line, as the sync writes it: the commit of the core's main the copy holds, and its path (core/ as a rule)."; exit 1
+          fi
+          case "/$at" in */.git/*|*/node_modules/*) echo "FAIL core-manifest.md names the core under $at, where no checkout holds the files. Mend: name a folder of the repository's own files (core/ as a rule)."; exit 1 ;; esac
+          if [ -n "$library" ]; then
+            # (a carried core: tasks/repositories.md. Its files are in the checkout, the library's folder committed or a
+            # submodule; never ones an install writes)
+            [[ "$at" == "$library"?* ]] || { echo "FAIL core-manifest.md: the core is carried by $library, and $at is no folder inside it. Mend: name the folder of the library that holds the core, as the library's own manifest names it."; exit 1; }
+            lib=${library%/} kind=$(git ls-tree HEAD -- "$lib" | cut -d ' ' -f 1-2)
+            if [ "$kind" = "160000 commit" ]; then
+              # (the library's commit this one pins, fetched with no token from the https address .gitmodules gives it,
+              # and read as a committed library is: its manifest's pin, and its copy and the floor's own copy against
+              # the core at that pin, below)
+              src=.lib-at-pin rev=$(git ls-tree HEAD -- "$lib" | cut -d ' ' -f 3 | cut -f 1)
+              name=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk -v p="$lib" '$2 == p { sub(/^submodule\./, "", $1); sub(/\.path$/, "", $1); print $1; exit }' || true)
+              url=""; [ -z "$name" ] || url=$(git config -f .gitmodules --get "submodule.$name.url" 2>/dev/null || true)
+              if [[ ! "$url" =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9._/-]+$ ]] || ! git init -q "$src" || ! git -C "$src" fetch -q --depth 1 --no-tags "$url" "$rev"; then
+                echo "FAIL the library $lib, a submodule that carries the core, could not be fetched at the commit pinned here, $rev, from an https address .gitmodules names, so the core it carries cannot be checked. Mend: give the submodule an https address this check can fetch with no token, or commit the library's files in this repository."; exit 1
+              fi
+            elif [ "$kind" = "040000 tree" ]; then
+              src=. rev=HEAD
+            else
+              echo "FAIL the library $lib, which core-manifest.md says carries the core, is no folder or submodule of this commit. Mend: commit the library's files there, or add it as a submodule (git submodule add <its https address> $lib), so they are in the checkout when a session starts."; exit 1
+            fi
+            [ "$src" = . ] && inlib=$library || inlib=""
+            own=$(git -C "$src" show "$rev:${inlib}core-manifest.md" 2>/dev/null || true)
+            lines=$(printf '%s\n' "$own" | grep -c '^Core: ' || true) line=$(printf '%s\n' "$own" | grep -m 1 '^Core: ' || true)
+            if [ "$lines" = 1 ] && [[ "$line" =~ ^Core:\ "$CORE"\ at\ ([0-9a-f]{40}),\ copied\ whole\ under\ (($seg/)+)(\ |$) ]]; then
+              pin=${BASH_REMATCH[1]}
+              [ "$library${BASH_REMATCH[2]}" = "$at" ] || { echo "FAIL core-manifest.md names the carried core under $at, and the library's manifest under $library${BASH_REMATCH[2]}. Mend: name $library${BASH_REMATCH[2]} in the \"Core:\" line."; exit 1; }
+              copy="$rev:$inlib${BASH_REMATCH[2]%/}"
+            else
+              echo "FAIL ${library}core-manifest.md has no one \"Core: $CORE at <full commit SHA>, copied whole under <path>/\" line, so the core the library carries has no pin. Mend: carry the core from a library that copies it, with its manifest committed beside it."; exit 1
+            fi
           fi
           # whose word counts (floor rule 4) is never left to a guess: the slot is filled, one GitHub login
           if [ "$(grep -cE "^\| \*owner's account\* \| \`[A-Za-z0-9-]+\` \|$" core-manifest.md)" -ne 1 ]; then
             echo "FAIL core-manifest.md has no one \"| *owner's account* | \`<GitHub login>\` |\" row. Mend: write that one row among its slots, with the GitHub login of the project's owner."; exit 1
           fi
-          echo "sha=$pin" >> "$GITHUB_OUTPUT"
+          # (the floor's own copy a repository keeps while its core is carried and a tool has not passed: below)
+          fl=$(grep -m 1 '^Floor copy: ' core-manifest.md || true) floor=""
+          if [ -n "$fl" ]; then
+            [[ "$fl" =~ ^Floor\ copy:\ (($seg/)+)(\ |$) ]] || { echo "FAIL core-manifest.md has a \"Floor copy:\" line that names no folder. Mend: write it \"Floor copy: <folder>/\", the folder that holds the copy."; exit 1; }
+            floor=${BASH_REMATCH[1]}
+          fi
+          [ -n "$copy" ] || copy="HEAD:${at%/}" # (where the copy is read: a repository's git folder, and a commit's folder)
+          { echo "sha=$pin"; echo "at=$at"; echo "library=$library"; echo "floor=$floor"; echo "src=$src"; echo "copy=$copy"; } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.CORE }}
@@ -86,14 +138,22 @@ jobs:
           path: .core-at-pin
           fetch-depth: 0 # (the workflow pins are older commits of it)
           persist-credentials: false
-      - name: core/ is the core at its pin, the pin is on the core's main, and each call to a core workflow is pinned where that workflow is the same
+      - name: The copy is the core at its pin, the pin is on the core's main, and each call to a core workflow is pinned where that workflow is the same
+        if: steps.pin.outputs.sha != ''
         env:
           PIN: ${{ steps.pin.outputs.sha }}
+          AT: ${{ steps.pin.outputs.at }}
+          LIBRARY: ${{ steps.pin.outputs.library }}
+          SRC: ${{ steps.pin.outputs.src }}
+          COPY: ${{ steps.pin.outputs.copy }}
         run: |
           set -euo pipefail
           bad=0 core=${CORE//./\\.} # (in a pattern, a dot of the address is a dot)
+          # (how the copy is mended: written again by the sync, or, carried, taken again as the library holds it)
+          again="write it whole at the pin again, from a clone of the core (node <the clone>/scripts/sync.mjs $PIN); a change to the core is made in the core's own repository."
+          [ -z "$LIBRARY" ] || again="take the library's files under $LIBRARY again as its own repository holds them, whose sync writes its copy; a change to the core is made in the core's own repository."
           # (what the core keeps to itself is no part of a copy: its own .gitattributes says which folder)
-          # (core/ a folder, and entry by entry as the core's scripts/copy-tree.mjs compares, which says why; each path
+          # (the copy a folder, and entry by entry as the core's scripts/copy-tree.mjs compares, which says why; each path
           # quoted as git quotes it, so none prints raw or passes for two entries)
           entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
           # (the pin's tree without its top-level reports entry, built as scripts/copy-tree.mjs builds it, so that no
@@ -104,17 +164,17 @@ jobs:
             # any other failure is)
             tree=$(git -C .core-at-pin ls-tree -z "$PIN" | { grep -z -v -x -e $'[^\t]*\treports' || [ $? -eq 1 ]; } | git -C .core-at-pin mktree -z)
           fi
-          want=$(entries .core-at-pin "$tree") id=$(git rev-parse -q --verify HEAD:core || true)
-          if [ -n "$id" ] && [ "$(git ls-tree HEAD -- core)" = "040000 tree $id"$'\t'"core" ]; then have=$(entries . HEAD:core)
-          else echo "FAIL core/ is no folder of this commit (a submodule, a file, a link or nothing). Mend: write it as a folder of files at the pin, from a clone of the core: node <the clone>/scripts/sync.mjs $PIN."; have=""; bad=1; fi
+          rev=${COPY%%:*} dir=${COPY#*:} want=$(entries .core-at-pin "$tree") id=$(git -C "$SRC" rev-parse -q --verify "$COPY" || true)
+          if [ -n "$id" ] && [ "$(git -C "$SRC" ls-tree "$rev" -- "$dir")" = "040000 tree $id"$'\t'"$dir" ]; then have=$(entries "$SRC" "$COPY")
+          else echo "FAIL $AT is no folder of this commit (a submodule, a file, a link or nothing). Mend: $again"; have=""; bad=1; fi
           if [ "$want" != "$have" ]; then
-            echo "FAIL core/ differs from the core at its pin, by git's object ids (below; < the core's, > core/'s). Mend: write it whole at the pin again, from a clone of the core (node <the clone>/scripts/sync.mjs $PIN); a change to the core is made in the core's own repository."
+            echo "FAIL $AT differs from the core at its pin, by git's object ids (below; < the core's, > $AT's). Mend: $again"
             diff <(printf '%s\n' "$want") <(printf '%s\n' "$have") | grep '^[<>]' | head -n 20 || true
             bad=1
           fi
           if ! git -C .core-at-pin fetch -q --no-tags origin refs/heads/main \
             || ! git -C .core-at-pin merge-base --is-ancestor "$PIN" FETCH_HEAD; then
-            echo "FAIL the pin $PIN is not a commit of the core's main. Mend: sync to a commit of the core's main (node core/scripts/sync.mjs), which moves the pin and core/ together."; bad=1
+            echo "FAIL the pin $PIN is not a commit of the core's main. Mend: sync to a commit of the core's main (node ${AT}scripts/sync.mjs), which moves the pin and the copy together."; bad=1
           fi
           # (every mention outside a comment, in whatever form the YAML writes the call)
           calls=$(sed 's/#.*//' .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null \
@@ -131,4 +191,52 @@ jobs:
               echo "FAIL $name at $sha differs from the core's at its pin. Mend: pin the call to $PIN, as the sync pull request does."; bad=1
             fi
           done <<< "$calls"
+          exit "$bad"
+      - name: A carried core, and the floor's own copy kept until every agent tool has passed the staged cases carried and no-floor
+        if: steps.pin.outputs.library != '' || steps.pin.outputs.floor != ''
+        env:
+          PIN: ${{ steps.pin.outputs.sha }}
+          AT: ${{ steps.pin.outputs.at }}
+          FLOOR: ${{ steps.pin.outputs.floor }}
+        run: |
+          set -euo pipefail
+          # (tasks/repositories.md, "Proven tool by tool". The core's main's record of the staged cases and its list of
+          # the agent tools they run in, read as data: each tool named there, and its last verdict of each of the two; a
+          # tool that has never run them has not passed)
+          record='{"runs":[]}' tools='{"tools":[]}'
+          if git -C .core-at-pin fetch -q --no-tags origin refs/heads/main; then
+            record=$(git -C .core-at-pin show FETCH_HEAD:reports/staged-cases.json 2>/dev/null || echo '{"runs":[]}')
+            tools=$(git -C .core-at-pin show FETCH_HEAD:scripts/staged-tools.json 2>/dev/null || echo '{"tools":[]}')
+          fi
+          # (read by the runner's own node, with no file of either repository's: the code is this step's own)
+          open=$(RECORD="$record" TOOLS="$tools" node -e '
+            const read = (text, key) => { try { return JSON.parse(text)[key] ?? []; } catch { return []; } };
+            const norm = t => String(t ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+            const runs = read(process.env.RECORD, "runs"), tools = read(process.env.TOOLS, "tools"), open = [];
+            for (const t of tools) for (const c of ["carried", "no-floor"]) {
+              const last = runs.filter(x => norm(x.tool ?? tools[0]) === norm(t) && x.cases?.[c]).map(x => x.cases[c]).at(-1);
+              if (last?.verdict !== "pass" || last.wrong) open.push(`${t} (${c})`); // (a verdict found wrong proves nothing)
+            }
+            console.log(tools.length ? open.join(", ") : "every tool (their list could not be read)");')
+          if [ -z "$FLOOR" ]; then
+            if [ -n "$open" ]; then
+              echo "FAIL the core here is carried by a library, and not every agent tool has passed the staged cases that prove a session finds its rules there: $open. Mend: keep a copy of the core's floor/ in a folder of this repository's own, committed, and name it on a line \"Floor copy: <folder>/\" under the \"Core:\" line of core-manifest.md."; exit 1
+            fi
+            exit 0
+          fi
+          bad=0 dir=${FLOOR%/}
+          id=$(git rev-parse -q --verify "HEAD:$dir" || true)
+          if [ -z "$id" ] || [ "$(git ls-tree HEAD -- "$dir")" != "040000 tree $id"$'\t'"$dir" ]; then
+            echo "FAIL $FLOOR, the floor's own copy core-manifest.md names, is no folder of this commit. Mend: commit a copy of the core's floor/ there, from the core the library carries."; exit 1
+          fi
+          # (and a session reads it at every start: AGENTS.md names it, as every entry file pulls in what AGENTS.md names)
+          if ! grep -q -F "${FLOOR}security.md" AGENTS.md 2>/dev/null; then
+            echo "FAIL AGENTS.md does not name ${FLOOR}security.md, the floor's own copy, among the files read at every start. Mend: add the line @${FLOOR}security.md beside the other files a builder reads at the start of every task, and the same to each entry file that pulls them in."; bad=1
+          fi
+          entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
+          if [ "$(entries .core-at-pin "$PIN:floor")" != "$(entries . "HEAD:$dir")" ]; then
+            echo "FAIL $FLOOR differs from the floor of the core at its pin, $PIN, which the library carries (< the core's, > the copy's). Mend: copy the floor/ under $AT over it, whole, in this pull request."
+            diff <(entries .core-at-pin "$PIN:floor") <(entries . "HEAD:$dir") | grep '^[<>]' | head -n 20 || true
+            bad=1
+          fi
           exit "$bad"

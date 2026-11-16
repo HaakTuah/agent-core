@@ -21,6 +21,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { CORE } from "./core-address.mjs";
+import { corePath } from "./core-path.mjs";
+import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
@@ -53,9 +55,32 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 export function project(root) {
   const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
-  // (a path the project's own files name is read only inside the project: one that leads out of it reads as missing)
-  const inside = f => { const to = path.resolve(root, f), rel = path.relative(path.resolve(root), to); return rel && !rel.startsWith("..") && !path.isAbsolute(rel) ? to : null; };
-  const read = f => { const to = inside(f); if (!to) return null; try { return fs.readFileSync(to, "utf8").replace(/\r\n/g, "\n"); } catch { return null; } };
+  // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on it
+  // followed, ends inside the project (#362, #423): a path or link that leads out, a device, a pipe or a folder reads as
+  // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
+  // report; a link to a file of its own reads as that file, as the project's tools read it, and only to one git lists
+  // as the project's: never git's own folder nor a file it ignores, a person's or a machine's own)
+  const home = fs.realpathSync(root), unread = [], known = new Set(listed);
+  const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
+  const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
+    const to = path.resolve(home, f);
+    if (!within(to)) return null;
+    try {
+      const real = fs.realpathSync(to), stat = fs.statSync(real);
+      return within(real) && known.has(path.relative(home, real).split(path.sep).join("/")) && stat.isFile() ? { real, size: stat.size } : null;
+    } catch { return null; }
+  };
+  const read = f => {
+    const at = file(f);
+    if (!at) return null;
+    if (at.size > READ_MOST) { if (!unread.includes(f)) unread.push(f); return null; }
+    try { return fs.readFileSync(at.real, "utf8").replace(/\r\n/g, "\n"); } catch { return null; }
+  };
+  // (whether another script may be given the path to read as this reader would: nothing there, or what it reads)
+  const safe = f => {
+    try { if (!fs.lstatSync(path.resolve(home, f), { throwIfNoEntry: false })) return true; } catch { return false; }
+    return (file(f)?.size ?? Infinity) <= READ_MOST;
+  };
   const manifest = read("core-manifest.md") ?? "";
   const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
@@ -63,8 +88,10 @@ export function project(root) {
     try { yaml = parseYaml(read(f)); } catch { /* (a workflow this reader cannot read: a check that needs it says so) */ }
     return [f.slice(".github/workflows/".length), { text: read(f), yaml }];
   }));
-  return { root, files: listed, read, manifest, differences, workflows };
+  return { root, files: listed, read, safe, unread, manifest, differences, workflows };
 }
+// The most a file the steps read may hold: past any rule file, config, workflow, audit or baseline a project writes.
+export const READ_MOST = 64 << 20;
 
 // A workflow the core's reader cannot read (workflow-run.mjs reads the forms the core's own workflows use): a check that
 // would read it throws, naming it, so the step is reported as not read, never as done or as missing.
@@ -166,7 +193,7 @@ function testsStand(p) {
   let config;
   try { config = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)); } catch { return false; }
   if (!config.tests.length) return false;
-  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+  return execFileSync("git", ["ls-files", "-z", "--", ...config.tests], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(corePath(p.root) || "core/"));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
@@ -206,7 +233,7 @@ function keysOnce(p) {
 function testsTracked(p) {
   let specs;
   try { specs = parseConfig(p.read(shapeAt(p.manifest)) ?? "", shapeAt(p.manifest)).tests; } catch { specs = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")).tests; }
-  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith("core/"));
+  return specs.length > 0 && execFileSync("git", ["ls-files", "-z", "--", ...specs], { cwd: p.root, encoding: "utf8" }).split("\0").some(f => f && !f.startsWith(corePath(p.root) || "core/"));
 }
 
 // Whether a workflow that runs on pull requests has a step that runs the selection, with SELECT_BASE set on the step,
@@ -268,7 +295,7 @@ function nugetPathsHold(p) {
   const filtered = Object.entries(p.workflows).filter(([, w]) => Array.isArray(w.yaml?.on?.pull_request?.paths) && Object.values(w.yaml?.jobs ?? {})
     .some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/.github/workflows/nuget.yml@`.toLowerCase())));
   if (!filtered.length) return null;
-  const own = p.files.filter(f => !f.startsWith("core/")), byContent = projectFilesByContent(p.root, own);
+  const at = corePath(p.root) || "core/", own = p.files.filter(f => !f.startsWith(at)), byContent = projectFilesByContent(p.root, own);
   const read = [...new Set([...byContent, ...importsOf(own, f => readBuildFile(p.root, f), byContent).brought.keys()])];
   const wrong = filtered.map(([f, w]) => [f, read.filter(r => !pathsLetThrough(w.yaml.on.pull_request.paths, [r]))]).filter(([, missed]) => missed.length);
   // (each as a pattern that matches only itself, its glob characters taken as themselves, and quoted as YAML quotes it;
@@ -351,7 +378,7 @@ const dated = f => /\.(md|txt)$/u.test(f) && (/(^|\/)\d{4}-\d{2}-\d{2}[^/]*$/u.t
 function namers(p) {
   let rules = [];
   try { rules = ruleFiles(p.read, dir => p.files.filter(f => f.startsWith(`${dir}/`)), { tools: true }); } catch { /* (no list of rule files yet: the files of text alone) */ }
-  return p.files.filter(f => !f.startsWith("core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
+  return p.files.filter(f => !f.startsWith(corePath(p.root) || "core/") && (rules.includes(f) || /^\.[^/]/u.test(f) || (/\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f) && !dated(f))));
 }
 // Of those, the files that name each old path: Map(old path -> [file]).
 function namedStill(p, map) {
@@ -418,7 +445,7 @@ export const STEPS = [
     // (the core's licences.yml runs exact-versions.mjs itself; a project that runs the licence script from a workflow of
     // its own runs it beside it)
     check: p => {
-      if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith("core/") && !f.split("/").includes("node_modules"))) return null;
+      if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
       const own = runsOwn(p, "licences.mjs");
       return own.length && !own.some(([, w]) => script("exact-versions.mjs").test(runs(w)))
@@ -479,6 +506,11 @@ export const STEPS = [
       const marks = marksOf(p.manifest);
       const script = path.join(p.root, "core", "scripts", "reading-size.mjs");
       if (!fs.existsSync(script) || p.read(marks) === null) throw new Unread(`no copy of the reading-size check, or no ${marks}, to read`);
+      // (the check reads each file its marks name: one the steps' reader would not read is never handed to it; #423)
+      let named = {};
+      try { named = JSON.parse(p.read(marks))?.read ?? {}; } catch { /* (its own run says what of the marks it cannot read) */ }
+      const unsafe = Object.keys(named && typeof named === "object" ? named : {}).filter(f => !p.safe(f));
+      if (unsafe.length) throw new Unread(`${marks} names ${unsafe.map(f => `\`${shown(f)}\``).join(", ")}, which is no regular file of the project's own of at most ${READ_MOST} bytes`);
       const r = spawnSync(process.execPath, [script, marks], { cwd: p.root, encoding: "utf8", env: { ...process.env, SIZES_BASE: "" } });
       // (a run that never reached its end, where its notes and its verdict are given, read nothing: reported as not
       // read, never as done. It ends passing with its "ok" line, or failing with its verdicts alone, every line of its
@@ -552,6 +584,13 @@ export const STEPS = [
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
   { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
   { lead: "16 November 2026, how done will be judged", cost: COST.line, unread: "whether a project's users notice its changes is a reading of what it builds; where they do, a manifest whose \"Modules:\" is a list takes `done-when.md`, and the idea form's heading comes as `core/scripts/fresh.mjs` lists it" },
+  { lead: "16 November 2026, a project in several repositories", cost: COST.line,
+    check: p => {
+      const { taken, notTaken } = modulesOf(p.manifest);
+      return taken === "all" || taken?.has("repositories.md") || notTaken.has("repositories.md") ? null
+        : 'In one small pull request, add `repositories.md` to the "Modules:" line of `core-manifest.md` where the project is, or may become, more than one repository, or else add it to the line "Not taken:" under it as "`repositories.md` (one repository, which no library carries the core into)".';
+    } },
+  { lead: "16 November 2026, what a game is for", cost: COST.read, unread: "whether a project is a game, and whether its *game page* says what the game is for, is a reading of what it builds; the page is written in the game's next pull request that adds a feature (`core/tasks/game-design.md`, \"Every game says what it is for, on one page\"), not at the sync, and the design check reads the feature against it there" },
   { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
 ];
 
@@ -578,14 +617,16 @@ export function notDone(root, steps = STEPS) {
     try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read the entry in \`core/${NOTES}\` against it.`; }
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
   }
+  out.unread = p.unread;
   return out;
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are.
 export function report(missed) {
-  if (!missed.length) return "Every step a check reads is done (`core/scripts/steps.mjs`).";
+  const unread = missed.unread?.length ? `\n\nLeft unread, each past ${READ_MOST} bytes, which no file a step reads reaches: ${missed.unread.map(f => `\`${shown(f)}\``).join(", ")}. A step that reads one may have read it as missing: make it smaller, or take it out of git if it is no file of the project's.` : "";
+  if (!missed.length) return `Every step a check reads is done (\`core/scripts/steps.mjs\`).${unread}`;
   return [`Steps not done (\`core/scripts/steps.mjs\`; core/${NOTES}): each a task the project's agents take, in a pull request of its own, none waiting on another${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
-    ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n");
+    ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n") + unread;
 }
 
 if (started(import.meta.url)) {

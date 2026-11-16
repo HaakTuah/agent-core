@@ -72,7 +72,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      reports each gap as blocking, and no preference. It does not mean it judges the lines' choice, which the
      stand-in ruled on. Reason: a reading against the lines finds what the builder missed, one of taste what the
      reviewer prefers. Held by no check: the design check's brief carries it.
-   - **It asks whether the approach was known** (core archive 241; #322). By default, of a pull request that does the
+   - **It asks whether the approach was known** (core archive 243; #322). By default, of a pull request that does the
      *hard work*, the design check asks whether its approach was known before it was built, or found by a trial queued
      before it (`tasks/planning.md`, "Finding out is a task of its own"), and where neither, reports so as a finding
      that does not block, naming what a trial would have measured. Nothing changes it. It does not mean a trial is asked for after the

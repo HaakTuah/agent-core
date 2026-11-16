@@ -15,7 +15,7 @@ import { NOTES } from "./releases.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { pathsLetThrough } from "./workflow-run.mjs";
-import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
+import { COST, MOVED_GLOB, NEW_GLOBS, READ_MOST, STEPS, configs, leads, moved, notDone, plain, project, report, runsOwn } from "./steps.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -265,6 +265,56 @@ fs.writeFileSync(path.join(plainProject, "checks/copies.json"), JSON.stringify({
 found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter kit writes it today)") && project(plainProject).read("../a-game/AGENTS.md") === null,
   "a path that leads out of the project reads as missing, never as another folder's file", found.join("\n"));
+
+// ---- what the steps read is a regular file of the project's own, of a size a rule file or config keeps to (#362, #423):
+// a link (in or out), a folder link that leads out, an endless device and a file past the size read as missing, and the
+// last is named in the report ----
+{
+  const dir = path.join(tmp, "links"), outside = path.join(tmp, "outside");
+  fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+  fs.mkdirSync(outside, { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# own\n");
+  fs.writeFileSync(path.join(outside, "secret.md"), "outside\n");
+  fs.writeFileSync(path.join(dir, "docs/big.md"), "x".repeat(READ_MOST + 1));
+  const linked = [];
+  // (and git's own folder and a file it ignores, a person's own, read neither by a link nor by name)
+  fs.writeFileSync(path.join(dir, ".gitignore"), ".env\n");
+  fs.writeFileSync(path.join(dir, ".env"), "# a person's own\n");
+  for (const [at, to, type] of [["in.md", "AGENTS.md", "file"], ["gitcfg.md", ".git/config", "file"], ["env.md", ".env", "file"], ["out.md", path.join(outside, "secret.md"), "file"], ["far", outside, "dir"], ...(process.platform === "win32" ? [] : [["zero.md", "/dev/zero", "file"]])]) {
+    try { fs.symlinkSync(to, path.join(dir, at), type); linked.push(at); } catch { /* (a system that makes no link here: that case is not run) */ }
+  }
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const p = project(dir);
+  // (each part named, so that a system where one differs says which; a path through a file is no folder anywhere, and
+  // Windows says there is nothing there, where others say it is no folder: neither is handed on)
+  const parts = {
+    own: p.read("AGENTS.md") === "# own\n",
+    "links out or to a device": linked.filter(at => at !== "in.md").every(at => p.read(at === "far" ? "far/secret.md" : at) === null),
+    "a folder and a file past the size": p.read("docs") === null && p.read("docs/big.md") === null,
+    "a link to a file of its own": !linked.includes("in.md") || p.read("in.md") === "# own\n",
+    "git's own and an ignored file, by name": p.read(".env") === null && p.read(".git/config") === null,
+    "safe: its own, nothing there, not the big file": p.safe("AGENTS.md") && p.safe("nothing-here.md") && !p.safe("docs/big.md"),
+    "safe: a path through a file never throws": typeof p.safe("AGENTS.md/x") === "boolean" && (process.platform === "win32" || !p.safe("AGENTS.md/x")),
+    "safe: no link out or to a device": linked.filter(at => at !== "in.md" && at !== "far").every(at => !p.safe(at)),
+  };
+  const reads = Object.values(parts).every(Boolean);
+  const said = report(Object.assign([], { unread: p.unread }));
+  ok(reads && p.unread.join() === "docs/big.md" && said.includes(`Left unread, each past ${READ_MOST} bytes`) && said.includes("`docs/big.md`"),
+    `the steps read a regular file of the project's own and nothing else: a link to one reads as it, a link out or to a device (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, `${said}\n${Object.entries(parts).filter(([, v]) => !v).map(([k]) => `not so: ${k}`).join("\n")}`);
+  // (the size marks' step never hands the reading-size check a file the reader would not read: a tracked link to an
+  // endless device among the files its marks name is reported as not read, at once)
+  if (process.platform !== "win32") {
+    const kitDir = dirs["an-npm-project"], agents = path.join(kitDir, "AGENTS.md"), was = fs.readFileSync(agents);
+    fs.rmSync(agents);
+    fs.symlinkSync("/dev/zero", agents);
+    const step = STEPS.filter(x => x.lead === "14 November 2026, the size marks' total counts the project's own files");
+    const at = Date.now(), said2 = notDone(kitDir, step);
+    fs.rmSync(agents);
+    fs.writeFileSync(agents, was);
+    ok(said2.length === 1 && /names `AGENTS\.md`, which is no regular file of the project's own/.test(said2[0].mend) && Date.now() - at < 30000, "the size marks' step hands the reading-size check no file the reader would not read, and says which", said2[0]?.mend);
+  }
+}
 
 // ---- a NuGet project set up at its root, its project file nested; a difference declared: neither is a difference ----
 const rootNuget = kit("a-root-nuget-project", { nuget: ".", private: true });

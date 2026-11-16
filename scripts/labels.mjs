@@ -22,6 +22,7 @@
 //   node core/scripts/labels.mjs [--make] [--owner login] [--since 2026-11-16T00:00:00Z]
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { seen } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { ownerOf } from "./releases.mjs";
 import { VERDICT, byAgent, verdict } from "./stand-in-record.mjs";
@@ -47,7 +48,8 @@ const OPENER = new RegExp(`^(?:${LIST.openers.map(esc).join("|")})(?:, on #\\d+)
 // stand-in's verdict line that stand-in-record.mjs reads, or a call to a reviewer's app ("@codex review",
 // "@codex security review").
 export const opens = body => { const line = first(body).trim(); return OPENER.test(line) || /^@[\w-]+ (?:security )?review\b/.test(line) || (!line.startsWith(">") && VERDICT.test(line)); };
-export const found = body => lines(body).some(l => l.startsWith(LIST.headings.found) || l.startsWith(`**${LIST.headings.found}`));
+// Whether an agent's issue says "Found while:", as its reader sees it: never in an HTML comment or a fenced block of code.
+export const found = body => lines(seen(body)).some(l => l.startsWith(LIST.headings.found) || l.startsWith(`**${LIST.headings.found}`));
 // The headings of a text: a Markdown heading, or a line wholly in bold.
 const heading = l => {
   const hashes = l.length - l.replace(/^#+/, "").length;

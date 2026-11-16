@@ -27,8 +27,10 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { twice } from "./yaml-keys.mjs";
+import { projectAt } from "./core-path.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -92,25 +94,25 @@ export function repeated(files, before) {
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
-  process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+  process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
   const show = file => { try { return git(["show", `${base}:${file}`]); } catch { return null; } };
   const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
   let failed = links.size;
   const texts = [];
-  for (const file of links) console.log(`FAIL ${file}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
+  for (const file of links) console.log(`FAIL ${logged(file)}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
   for (const file of files) {
     if (links.has(file)) continue;
     const text = fs.readFileSync(file, "utf8"), found = lines(text);
     texts.push({ file, text });
-    if (!readable(text)) { failed++; console.log(`FAIL ${file}: not UTF-8 text, so it cannot be searched. Mend: save it as UTF-8`); }
+    if (!readable(text)) { failed++; console.log(`FAIL ${logged(file)}: not UTF-8 text, so it cannot be searched. Mend: save it as UTF-8`); }
     failed += found.length;
-    for (const line of found.slice(0, 5)) console.log(`FAIL ${file}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
-    if (found.length > 5) console.log(`FAIL ${file}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
+    for (const line of found.slice(0, 5)) console.log(`FAIL ${logged(file)}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
+    if (found.length > 5) console.log(`FAIL ${logged(file)}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
   const keys = repeated(texts, core ? () => null : base ? show : null);
-  for (const line of [...keys.notes, ...keys.fails]) console.log(line);
+  for (const line of [...keys.notes, ...keys.fails]) console.log(logged(line));
   failed += keys.fails.length;
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);

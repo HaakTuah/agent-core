@@ -31,9 +31,9 @@ which its entry file pulls in.
 Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
-`tasks/github-calls.md`, `tasks/hosts.md`, `roles/shared/teams.md`, `roles/orchestrator.md`, `tasks/updates.md`,
-`tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md` and
-`tasks/planning.md`.
+`tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
+`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`
+and `tasks/planning.md`.
 
 Not taken, each for its reason:
 

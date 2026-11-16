@@ -1,6 +1,6 @@
 # Planning
 
-Read when a queue is planned (core archive 241; #322): the kind `planning`, a task that adds lines to the *progress
+Read when a queue is planned (core archive 243; #322): the kind `planning`, a task that adds lines to the *progress
 file*, changes their order or names a milestone, as the orchestrator and the design session do.
 
 - **Milestones, named in order.** By default whoever writes the *progress file* (the orchestrator or the design session)

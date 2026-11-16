@@ -40,8 +40,9 @@ concurrency:
 jobs:
   # (on Windows, where a suite that starts many processes runs several times slower, the suites are split in four jobs
   # that run side by side, each under a time mark of its own: the core's checks from plain git and the sync on whole
-  # scratch projects, the starter kit with the check of the core's copy, the licence, NuGet and agent-tools checks, and
-  # the rest, each step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
+  # scratch projects, with the hostile tests of the core's inputs, the starter kit with the check of the core's copy,
+  # the licence, NuGet and agent-tools checks, with the hostile tests of build files and packages, and the rest, each
+  # step's condition naming the part it runs in, all on Linux, where one job runs them all; the parts
   # are sized by the steps' times on Windows, where one runner takes half as long again as another: the first two so
   # that each ends within its mark on the slow one too, the other two as they stood, which on the slow one may pass
   # their marks (#425), beside the upgrade job, which takes longer; #387, #411, #424)
@@ -132,6 +133,9 @@ jobs:
       - name: The dose a codebase's state sets
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/dose-test.mjs ')) }}
         run: node scripts/dose-test.mjs
+      - name: What the checks do with what a project's files shape before they use it
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/guards-test.mjs ')) }}
+        run: node scripts/guards-test.mjs
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/select-test.mjs ')) }}
         run: node scripts/select-test.mjs
@@ -186,12 +190,44 @@ jobs:
       - name: The core-moved check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-moved-test.mjs ')) }}
         run: node scripts/core-moved-test.mjs
+      - name: Where the core's copy stands, as the manifest names it
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-path-test.mjs ')) }}
+        run: node scripts/core-path-test.mjs
       - name: Where the owner's inbox is, issues or the folder
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/inbox-test.mjs ')) }}
         run: node scripts/inbox-test.mjs
       - name: The labels and openers, and their check
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/labels-test.mjs ')) }}
         run: node scripts/labels-test.mjs
+      - name: The hostile tests of an input, a pull request's description
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-text-test.mjs ')) }}
+        run: node scripts/hostile-pr-text-test.mjs
+      - name: The hostile tests of an input, comments and reviews on a pull request
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-comments-test.mjs ')) }}
+        run: node scripts/hostile-pr-comments-test.mjs
+      - name: The hostile tests of an input, what a pull request changes
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-pr-changes-test.mjs ')) }}
+        run: node scripts/hostile-pr-changes-test.mjs
+      - name: The hostile tests of an input, issues, their comments and labels
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-issues-test.mjs ')) }}
+        run: node scripts/hostile-issues-test.mjs
+      - name: The hostile tests of an input, what GitHub's API answers
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-github-test.mjs ')) }}
+        run: node scripts/hostile-github-test.mjs
+      - name: The hostile tests of an input, a project's configs of the core's checks, its manifest and SECURITY.md
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-configs-test.mjs ')) }}
+        run: node scripts/hostile-configs-test.mjs
+      - name: The hostile tests of an input, a project's build, package and workflow files
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-build-files-test.mjs ')) }}
+        run: node scripts/hostile-build-files-test.mjs
+      - name: The hostile tests of an input, what a package brings
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/hostile-packages-test.mjs ')) }}
+        run: node scripts/hostile-packages-test.mjs
+      # (on every pull request, whatever the selection: a hostile test added with no step, which the selection would run
+      # alone, is what it finds)
+      - name: The core's own inputs, each named with its hostile tests (SECURITY.md, rule 5)
+        if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') }}
+        run: node scripts/own-inputs-test.mjs
       - name: The core's releases, what a project follows, and cutting one
         if: ${{ !cancelled() && (matrix.part == 'all' || matrix.part == 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/releases-test.mjs ')) }}
         run: node scripts/releases-test.mjs

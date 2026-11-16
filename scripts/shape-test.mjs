@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { fileOf, groupOf, LONG, MARKS, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "./shape.mjs";
+import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "./shape.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -406,5 +406,9 @@ ok(r.status === 1 && mended(r.out) && /took 10\d s/.test(r.out), "a time taken s
 ok([["--suite", "unnamed", "--", "x"], ["--suite", "quick"], ["--suite", "quick", "--since", "soon"], ["--suite", "quick", "--", "no-such-command-here"]].every(a => { const x = run(["checks/shape.json", ...a]); return x.status === 1 && mended(x.out); }),
   "a suite with no mark, no command, no start or a command that cannot be started is refused, with its mend");
 
+// (a config or baseline is read only inside the project, however its path is written)
+const outside = file => { try { notLinked(file); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
+ok(["../shape.json", "checks/../../shape.json", "/etc/shape.json", "C:/shape.json", "\\shape.json"].every(f => mended(outside(f)) && /lies outside the project/u.test(outside(f))) && outside("checks/shape.json") === "" && outside("./checks/shape.json") === "",
+  "a config or baseline named outside the project is refused, with its mend; one inside it is read");
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

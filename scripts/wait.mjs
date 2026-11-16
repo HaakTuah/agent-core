@@ -8,6 +8,7 @@
 //   node core/scripts/wait.mjs [<config>] --repo <owner>/<name> [--count <n>]
 //       the last n merged pull requests (30 where none is given), through gh. Reads only; gh and Node's own modules.
 import fs from "node:fs";
+import { aCommit, aRepository } from "./guards.mjs";
 import { ghApi } from "./labels.mjs";
 import { notLinked, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
@@ -30,6 +31,7 @@ export const median = xs => { const s = [...xs].sort((a, b) => a - b), k = s.len
 // The median wait of the last `count` merged pull requests of `repo`, read through `gh`: { median, read, mark }, mark
 // the config's, or undefined where it gives none.
 export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
+  if (!aRepository(repo)) throw new Refused(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository. Mend: name it as <owner>/<name>`);
   // (newest updated first: a pull request is updated when it merges, so once a page's last update is older than the
   // count-th newest merge read, no later page holds a newer one)
   const merged = [], kth = () => merged.map(p => p.merged_at).sort().reverse()[count - 1];
@@ -38,7 +40,8 @@ export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
     merged.push(...rows.filter(p => p.merged_at));
     if (rows.length < 100 || (merged.length >= count && String(rows.at(-1).updated_at) < kth())) break;
   }
-  const times = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count)
+  // (a head that is no commit's whole name, as GitHub gives one, is not read: it would name another route than the commit's)
+  const times = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count).filter(p => aCommit(p.head?.sha))
     .map(p => waited(JSON.parse(gh(`repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`) || "{}").check_runs ?? [])).filter(t => t !== null);
   return { median: median(times), read: times.length, mark };
 }
@@ -55,7 +58,7 @@ function main(argv) {
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const opt = k => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
   const repo = opt("--repo"), count = Number(opt("--count") ?? COUNT);
-  if (!/^[\w.-]+\/[\w.-]+$/u.test(repo ?? "") || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", "run node core/scripts/wait.mjs [<config>] --repo <owner>/<name> [--count <n>]");
+  if (!aRepository(repo) || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", "run node core/scripts/wait.mjs [<config>] --repo <owner>/<name> [--count <n>]");
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f)), at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : "");
   let mark;
   try { mark = fs.existsSync(notLinked(at)) ? parseConfig(fs.readFileSync(at, "utf8"), at).wait : undefined; } catch { mark = undefined; }

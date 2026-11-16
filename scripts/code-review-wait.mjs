@@ -14,9 +14,10 @@
 // scripts/clean-merges.mjs proved, only through merges whose tree is the one git makes of their parents (#323), the
 // status naming the one where that stops it. None is needed where every changed file
 // is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
-// CLAUDE.local.md too, the copy under core/, .github/, .claude/, .agents/ and .agent/, and those the project's
+// CLAUDE.local.md too, the copy under core/ or the path the default branch's manifest names, .github/, .claude/, .agents/
+// and .agent/, and those the project's
 // SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
-// a sync's shape: the copy under core/, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
+// a sync's shape: the copy at that path, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
 // sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's). Given
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
 // files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
@@ -35,8 +36,9 @@
 //           [<its commits, the same> <its files, the same> [<the merges clean-merges.mjs proved>]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
 //         the link the status carries.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
+import { copyOf } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { RUNNING, UNREAD, WRITERS, codexState, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
@@ -48,15 +50,15 @@ const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry
 
 // { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name);
 // merges: the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran (#323)
-export function judge(pull, comments, commits, files, rules = [], bound = true, merges = undefined) {
+export function judge(pull, comments, commits, files, rules = [], bound = true, merges = undefined, copy = null) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const read = codexState(flat(comments));
-  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges);
+  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy);
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
-function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges) {
+function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy) {
   const short = sha.slice(0, 7);
   // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
   // commit must not stand for this one
@@ -67,7 +69,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
     return { sha, done: false, why: `Codex's code review of ${short} is still running. Mend: wait for it` };
   }
-  if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules))) return { sha, done: true, why: "no code review is running" };
+  if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   const seen = new Set(posted);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string") seen.add(review.commit_sha);
   // (a review stands for the head where only updates from main follow it, as security-review.mjs reads them)
@@ -83,17 +85,26 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
 
 // whether a pull request needs a code review: not where it holds docs alone, or has a sync's shape (the manifest's pin
 // moved alone among them)
-const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under core\/.*)$/u;
+const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under \S+\/.*)$/u; // (at the path the manifest names: core-path.mjs)
 const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
-function needs(pull, files, rules) {
+// A rule file: by the pattern, by the project's own list, or a file of the core's copy where the default branch's
+// manifest names it (`copy`, given apart from the list, which names files alone).
+const isRule = (name, rules, copy) => RULES.test(name) || rules.includes(name) || (copy !== null && name.startsWith(copy));
+// The copy's path: as the default branch's manifest names it; else as the base's line the pull request moves names
+// it; else core/ (core-path.mjs).
+const copyIn = (files, copy) => copy
+  ?? /^-Core: \S+ at [0-9a-f]{40}, copied whole under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)(?= |$)/mu.exec(files.find((file) => file.filename === "core-manifest.md")?.patch ?? "")?.[1] ?? "core/";
+function needs(pull, files, rules, copy) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename]).filter((name) => name !== undefined);
   if (names.length === 0 || names.some((name) => typeof name !== "string")) return names.length > 0;
   // (in the core's own repository every file is protected, its SECURITY.md says, and every pull request gets its code
   // review: AGENTS.md, "How changes are made here")
   if (String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
-  const rule = (name) => RULES.test(name) || rules.includes(name);
+  const rule = (name) => isRule(name, rules, copy);
   if (names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
-  const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith("core/") && (file.previous_filename ?? "core/").startsWith("core/"))
+  // (the copy at the path the manifest's line names, which a sync's patch shows beside the pin it moves: core-path.mjs)
+  const at = copyIn(files, copy);
+  const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith(at) && (file.previous_filename ?? at).startsWith(at))
     || (/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.filename) && pinsAlone(file)));
   return !(sync && files.some((file) => file.filename === "core-manifest.md"));
 }
@@ -103,10 +114,16 @@ if (started(import.meta.url)) {
     console.error("usage: node scripts/code-review-wait.mjs <the pull request, as JSON> <its comments, as JSON> [<its commits, as JSON> <its files, as JSON> [<the merges clean-merges.mjs proved, as JSON>]]");
     process.exit(2);
   }
-  const read = (file) => JSON.parse(readFileSync(file, "utf8"));
+  // (a file that is not JSON, or is gone, fails with its mend, never with a stack: the workflow writes each from gh api)
+  const read = (file) => {
+    try { return JSON.parse(readFileSync(file, "utf8")); }
+    catch (e) { console.error(`FAIL: scripts/code-review-wait.mjs could not read ${file} as JSON (${e.code ?? e.name}). Mend: write it again from the GitHub API, as the security-review workflow does, and run the check again`); process.exit(1); }
+  };
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
-  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false", mergesFile ? read(mergesFile) : undefined);
+  // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
+  const copy = existsSync("core-manifest.md") ? copyOf(".") : null;
+  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false", mergesFile ? read(mergesFile) : undefined, copy);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

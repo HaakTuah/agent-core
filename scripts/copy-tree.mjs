@@ -29,11 +29,12 @@ export function entries(tree, gitDir) {
   return git(["-c", "core.quotePath=true", "ls-tree", "-r", "--full-tree", tree], gitDir).split("\n").filter(Boolean).map((e) => e.replace(/^100755 blob /, "100644 blob ")).join("\n");
 }
 
-/** Whether `core` in the commit `rev`, in the repository whose git folder is `gitDir`, is a folder: a tree entry, never
- *  a submodule's pointer (whose id may name a tree all the same) nor a file or a link. */
-export function coreIsFolder(rev, gitDir) {
+/** Whether the copy's folder `at` (the manifest's path without its last "/": core-path.mjs) in the commit `rev`, in the
+ *  repository whose git folder is `gitDir`, is a folder: a tree entry, never a submodule's pointer (whose id may name a
+ *  tree all the same) nor a file or a link. */
+export function coreIsFolder(rev, gitDir, at = "core") {
   try {
-    return git(["ls-tree", rev, "--", "core"], gitDir) === `040000 tree ${git(["rev-parse", "--verify", "-q", `${rev}:core`], gitDir).trim()}\tcore\n`;
+    return git(["ls-tree", rev, "--", at], gitDir) === `040000 tree ${git(["rev-parse", "--verify", "-q", `${rev}:${at}`], gitDir).trim()}\t${at}\n`;
   } catch {
     return false;
   }

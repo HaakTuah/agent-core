@@ -24,9 +24,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   `review-guidelines.md` and, read in a team's project, `teams.md`); `tools/` each agent tool's part, read when that
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
   tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
-  `github-calls.md`, `hosts.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`, `cleaning.md`; for a queue
-  planned, `planning.md`; for a change its users will notice, `done-when.md`; for a project people use through a screen, `screens.md`; and, for games only,
-  `game-design.md`). A manifest takes or leaves out a
+  `github-calls.md`, `hosts.md`, `repositories.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`,
+  `cleaning.md`; for a queue planned, `planning.md`; for a change its users will notice, `done-when.md`; for a project
+  people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
   module by its file's name, which stands once across the three folders. Until the second release after 16 November 2026
   a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
@@ -52,7 +52,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 ## How a project takes the core
 
-1. **An exact copy under `core/`,** pinned to one commit of this repository and never edited by hand: everything but
+1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
+   project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
    `reports/`, the dated reports of this repository's own changes, which stay here alone (`.gitattributes`; core archive
    165). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
@@ -320,6 +321,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    The pointer check fails a difference whose rule the core has since renamed or removed, so it is read again at that
    sync. And each is filed with the core as an idea ("Reporting to the core"): a rule a project had to differ from may
    not be general enough.
+8. **A project in several repositories** takes the core once (`tasks/repositories.md`): a repository's manifest names
+   where its copy stands (`core/` as a rule, and so a project in one repository changes in nothing), and a repository
+   that depends on a library of the project's that holds a copy takes the core with it, at the path the library brings
+   it to, pinning no copy of its own; one sync, in the library. `scripts/core-path.mjs` reads the line, and prints, with
+   `--hooks`, the commands of Claude Code's hooks for a path other than `core/`. Each repository keeps its own queue,
+   issues, audits and state report.
 
 ## Slots
 
@@ -362,6 +369,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 | *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`tasks/screens.md`, point 9); left out, the module's own |
 | *desktop platforms* | the desktop platforms a program of the project's is made for (`tasks/screens.md`, point 15); left out, none |
 | *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`tasks/screens.md`, "What holds it"); left out, `checks/screens.json` where it stands, and otherwise every check off |
+| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"): one for each game, or one with a section for each; left out, `docs/game.md` |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
 
 ## The manifest's format
@@ -370,7 +378,10 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 # Core manifest
 
 Core: HaakTuah/agent-core at <full commit SHA>, copied whole under core/ (never edited here).
+<or, where a library carries the core (tasks/repositories.md): Core: HaakTuah/agent-core, carried by <library>/ under <library>/core/ (never edited here).>
+<and, while that library's core is not yet proven for every agent tool: Floor copy: <folder>/>
 Paths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/; any other is ours.
+<where the "Core:" line names another path, "under core/" above names that path>
 Floor: whole. Modules: <all, or the list of those taken>.
 Not taken: <where it is a list: each module left out as `name.md` (its reason), one line>.
 

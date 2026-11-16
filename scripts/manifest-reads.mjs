@@ -18,9 +18,11 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { logged, unrooted } from "./guards.mjs";
 import { readSection } from "./own-modules.mjs";
 import { MODULES } from "./reading.mjs";
 import { started } from "./started.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 
 const plain = s => s.toLowerCase().replace(/[‘’]/gu, "'").replace(/\s+/gu, " ").trim();
 // (a phrase in italics may run over one line break, as a module's text wraps it: "*where the numbers\n  go*"; the
@@ -123,9 +125,10 @@ const readDir = dir => Object.fromEntries(fs.readdirSync(dir).filter(f => f.ends
 function main() {
   const core = process.argv.includes("--core");
   const here = path.dirname(fileURLToPath(import.meta.url));
+  let root = path.resolve(here, core ? ".." : "../..");
   try {
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-    const home = core ? root : path.join(root, "core");
+    root = projectAt(here).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const home = core ? root : path.join(root, copyOf(root));
     // (the modules, by name, from each folder that holds them; the floor's own files, its topics among them)
     const where = Object.fromEntries(MODULES.flatMap(d => Object.keys(readDir(path.join(home, d))).map(n => [n, d])));
     const moduleTexts = Object.assign({}, ...MODULES.map(d => readDir(path.join(home, d))));
@@ -133,7 +136,7 @@ function main() {
     const texts = { readme: fs.readFileSync(path.join(home, "README.md"), "utf8"), moduleTexts, floorTexts, where };
     if (core) {
       const found = coreGaps({ agents: fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"), ...texts });
-      for (const f of found) console.error(`FAIL: ${f}`);
+      for (const f of found) console.error(`FAIL: ${logged(f)}`);
       if (found.length) return 1;
       console.log("each slot that the core's modules and floor use is filled in its AGENTS.md, or has a default");
       return 0;
@@ -141,12 +144,14 @@ function main() {
     const found = notes({ manifest: fs.readFileSync(path.join(root, "core-manifest.md"), "utf8"), ...texts });
     // (a manifest's text is data: a control character, a lone carriage return too, would start a line of its own in the
     // log, and a line led by "::" is a command to the runner)
-    for (const f of found) console.log(`note ${f.replace(/[\u0000-\u001f\u007f]/gu, " ")}`);
+    for (const f of found) console.log(`note ${logged(f)}`);
     console.log(found.length ? `note ${found.length} lines of the manifest to add; nothing fails over them (AGENTS.md of the core, "Nothing locks a project")` : "ok   the manifest takes or leaves out each module, and fills each slot they use");
   } catch (e) {
     // (a project that cannot be read this way is told so, never failed over it)
-    if (core) { console.error(`FAIL: the core's AGENTS.md, README.md, its modules or floor/ could not be read (${String(e.message).replace(/[\u0000-\u001f\u007f]/gu, " ")}). Mend: run it from a clone of the core, where they stand`); return 1; }
-    console.log(`note the manifest could not be read against the modules and the slots (${e.message})`);
+    // (the error is Node's, which names the file by its place on this machine: it is named from the project's root)
+    const said = logged(unrooted(e.message, root));
+    if (core) { console.error(`FAIL: the core's AGENTS.md, README.md, its modules or floor/ could not be read (${said}). Mend: run it from a clone of the core, where they stand`); return 1; }
+    console.log(`note the manifest could not be read against the modules and the slots (${said})`);
   }
   return 0;
 }

@@ -30,6 +30,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
+import { seen } from "./guards.mjs";
 import { FINDING, codexState, codexs } from "./security-review.mjs";
 import { started } from "./started.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
@@ -63,14 +64,14 @@ export function postedKind(body) {
 // The one count that the lines of a posted review matching `count` (its number) or `none` (zero) declare, or null where
 // none declares it or they disagree.
 function declared(body, count, none) {
-  const seen = new Set();
-  for (const raw of lines(body)) {
+  const said = new Set();
+  for (const raw of lines(seen(body))) { // (as the reader sees it: no line in an HTML comment or a fenced block of code)
     const line = raw.replaceAll("**", "").trim();
     const n = count.exec(line);
-    if (n) seen.add(Number(n[1]));
-    else if (none.test(line)) seen.add(0);
+    if (n) said.add(Number(n[1]));
+    else if (none.test(line)) said.add(0);
   }
-  return seen.size === 1 ? [...seen][0] : null;
+  return said.size === 1 ? [...said][0] : null;
 }
 
 // The blocking points, and the other points, a posted review declares, each a number or null (not read).
@@ -170,7 +171,7 @@ export function tally(pulls) {
 export const secondFound = pulls => pulls.filter(p => p.reviews.codexSecurity.blocked === "no" && p.reviews.postedSecurity.blocked === "yes").map(p => p.number);
 
 // The pull request a bug names as the one that brought it in ("Brought in by: #N" on a line of its own), or null.
-export const broughtBy = body => { const all = [...lines(body).join("\n").matchAll(/^Brought in by: #(\d{1,9})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
+export const broughtBy = body => { const all = [...lines(seen(body)).join("\n").matchAll(/^Brought in by: #(\d{1,9})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
 
 // The bugs, given as { number, at, login, body } with the owner's comments on any issue as { issue, at, login, body }:
 // how many the owner's account filed, which of them are tied to a merged pull request (the newest "Brought in by" of the
