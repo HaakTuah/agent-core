@@ -60,52 +60,22 @@ const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
  */
 const HTML_SPACE = /[\t\n\f\r ]/u; // (HTML's whitespace, ASCII only: a no-break space is part of a name or value)
 function attributesOf(text, at) {
-  const tag = { attributes: [], state: "before", name: "", value: "", quote: "" };
-  for (let k = at; k < text.length; k++) if (attributeStep(tag, text[k], HTML_SPACE.test(text[k]))) return { attributes: tag.attributes, end: k };
-  return { attributes: tag.attributes, end: -1 };
+  const attributes = [];
+  let state = "before", name = "", value = "", quote = "";
+  const done = () => { if (name) attributes.push([name, value]); name = value = ""; };
+  for (let k = at; k < text.length; k++) {
+    const ch = text[k], space = HTML_SPACE.test(ch);
+    if (state === "quoted") { if (ch === quote) { state = "before"; done(); } else value += ch; continue; }
+    if (state === "unquoted") { if (space || ch === ">") { done(); state = "before"; if (ch === ">") return { attributes, end: k }; } else value += ch; continue; }
+    if (ch === ">") { done(); return { attributes, end: k }; }
+    if (state === "value") { if (ch === '"' || ch === "'") { quote = ch; state = "quoted"; } else if (!space) { value = ch; state = "unquoted"; } continue; }
+    if (state === "name") { if (ch === "=") state = "value"; else if (space) state = "after"; else if (ch === "/") { done(); state = "before"; } else name += ch; continue; }
+    if (state === "after") { if (ch === "=") { state = "value"; continue; } if (space) continue; done(); state = "before"; }
+    if (space || ch === "/") continue;
+    name = ch; state = "name"; // ("before": a name starts, "=" itself among what may start one)
+  }
+  return { attributes, end: -1 };
 }
-
-// (the attribute read so far, where it has a name, is one of the tag's)
-const attributeDone = (tag) => { if (tag.name) tag.attributes.push([tag.name, tag.value]); tag.name = tag.value = ""; };
-
-/** One character `ch` of a tag (attributesOf, above), read in the tag's state: whether it is the ">" that ends it. */
-function attributeStep(tag, ch, space) {
-  if (tag.state === "quoted" || tag.state === "unquoted") return VALUE_STEP[tag.state](tag, ch, space);
-  if (ch === ">") { attributeDone(tag); return true; }
-  NAME_STEP[tag.state](tag, ch, space);
-  return false;
-}
-
-// Each state within a value, on one character: whether it is the ">" that ends the tag.
-const VALUE_STEP = {
-  quoted(tag, ch) {
-    if (ch === tag.quote) { tag.state = "before"; attributeDone(tag); } else tag.value += ch;
-    return false;
-  },
-  unquoted(tag, ch, space) {
-    if (!space && ch !== ">") { tag.value += ch; return false; }
-    attributeDone(tag);
-    tag.state = "before";
-    return ch === ">";
-  },
-};
-
-// Each other state, on one character that is no ">".
-const NAME_STEP = {
-  value(tag, ch, space) { if (ch === '"' || ch === "'") { tag.quote = ch; tag.state = "quoted"; } else if (!space) { tag.value = ch; tag.state = "unquoted"; } },
-  name(tag, ch, space) { if (ch === "=") tag.state = "value"; else if (space) tag.state = "after"; else if (ch === "/") { attributeDone(tag); tag.state = "before"; } else tag.name += ch; },
-  after(tag, ch, space) {
-    if (ch === "=") { tag.state = "value"; return; }
-    if (space) return;
-    attributeDone(tag);
-    tag.state = "before";
-    NAME_STEP.before(tag, ch, space);
-  },
-  before(tag, ch, space) {
-    if (space || ch === "/") return;
-    tag.name = ch; tag.state = "name"; // ("before": a name starts, "=" itself among what may start one)
-  },
-};
 
 /**
  * The parts of a page or component that run, read so as to fail closed rather than to match HTML's parser case by case:
@@ -120,50 +90,37 @@ const NAME_STEP = {
 function executable(text, f) {
   const lower = text.toLowerCase(), parts = [];
   if (/\.astro$/iu.test(f)) { const front = /^\s*---\r?\n([\s\S]*?)(?:\r?\n---|$)/u.exec(text); if (front) parts.push(front[1]); }
-  scriptParts(text, lower, parts);
-  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
-  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
-  if (!/\.html?$/iu.test(f)) braceParts(text, parts);
-  return parts.join("\n");
-}
-
-const nameEnds = (lower, k, length) => !/[^\t\n\f\r />]/u.test(lower[k + length] ?? ">"); // (a tag's name ends there)
-
-/** Every script element's tag and, where it runs, body (executable, above), pushed onto `parts`; `lower` is `text` in
- *  lower case. */
-function scriptParts(text, lower, parts) {
+  const ends = (k, length) => !/[^\t\n\f\r />]/u.test(lower[k + length] ?? ">"); // (a tag's name ends there)
   const closes = [];
-  for (let k = lower.indexOf("</script"); k >= 0; k = lower.indexOf("</script", k + 8)) if (nameEnds(lower, k, 8)) closes.push(k);
+  for (let k = lower.indexOf("</script"); k >= 0; k = lower.indexOf("</script", k + 8)) if (ends(k, 8)) closes.push(k);
   for (let k = lower.indexOf("<script"), covered = 0, c = 0; k >= 0; k = lower.indexOf("<script", k + 7)) {
-    if (k < covered || !nameEnds(lower, k, 7)) continue; // (one inside a body or tag already read is part of it)
+    if (k < covered || !ends(k, 7)) continue; // (one inside a body or tag already read is part of it)
     const tag = attributesOf(text, k + 7);
     if (tag.end < 0) { parts.push(text.slice(k + 7)); break; }
     parts.push(text.slice(k + 7, tag.end)); // (its tag too: one that is only text may span a script that runs)
     while (c < closes.length && closes[c] <= tag.end) c++;
-    covered = scriptBody(text, tag, c < closes.length ? closes[c] : text.length, parts);
+    let stop = c < closes.length ? closes[c] : text.length;
+    // (a script that runs is read, to the file's end where it holds "<!--", and covers what it read; one of data covers
+    // only its own tag, since it may be only text, in a comment or a value, before a script that runs)
+    const type = tag.attributes.find(([n]) => n.toLowerCase() === "type")?.[1] ?? "";
+    if (/json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, ""))) covered = tag.end + 1;
+    else {
+      if (text.slice(tag.end + 1, stop).includes("<!--")) stop = text.length;
+      parts.push(text.slice(tag.end + 1, stop));
+      covered = stop;
+    }
   }
-}
-
-/** A script's body, from the end of its `tag` to `stop`, the first "</script" after it (scriptParts, above), pushed
- *  onto `parts` where it runs: where what it covers ends. */
-function scriptBody(text, tag, stop, parts) {
-  // (a script that runs is read, to the file's end where it holds "<!--", and covers what it read; one of data covers
-  // only its own tag, since it may be only text, in a comment or a value, before a script that runs)
-  const type = tag.attributes.find(([n]) => n.toLowerCase() === "type")?.[1] ?? "";
-  if (/json|template|importmap|speculationrules|^text\/(html|plain|markdown)$/iu.test(type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/gu, ""))) return tag.end + 1;
-  if (text.slice(tag.end + 1, stop).includes("<!--")) stop = text.length;
-  parts.push(text.slice(tag.end + 1, stop));
-  return stop;
-}
-
-/** Every expression in braces (executable, above), each brace read to its match, pushed onto `parts`. */
-function braceParts(text, parts) {
-  let depth = 0, start = 0;
-  for (let k = 0; k < text.length; k++) {
-    if (text[k] === "{" && depth++ === 0) start = k;
-    else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
+  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
+  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
+  if (!/\.html?$/iu.test(f)) {
+    let depth = 0, start = 0;
+    for (let k = 0; k < text.length; k++) {
+      if (text[k] === "{" && depth++ === 0) start = k;
+      else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
+    }
+    if (depth > 0) parts.push(text.slice(start));
   }
-  if (depth > 0) parts.push(text.slice(start));
+  return parts.join("\n");
 }
 
 /** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
