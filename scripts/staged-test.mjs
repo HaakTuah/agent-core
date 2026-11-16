@@ -327,7 +327,11 @@ const testsLine = fresh("order-for-now");
 branch(testsLine, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(testsLine, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
   "AGENTS.md": read(testsLine, "AGENTS.md").replace("(`test/sum.test.mjs`)", "(`test/sum.test.mjs`, `test/cli.test.mjs`)") });
 branch(testsLine, "moved", { "AGENTS.md": null, "docs/AGENTS.md": read(testsLine, "AGENTS.md") });
-ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md") && changed(testsLine, "moved").includes("docs/AGENTS.md"), "order-for-now: a rule file's line changed for another reason, the test commands it names, passes, and so does a rule file moved whole", verdict("order-for-now", testsLine).why);
+// (a line of the order's words that a rule file of the core's copy held as the case set it, added to another; #490's fifth)
+const heldLine = read(testsLine, "core/roles/shared/inbox.md").split("\n").find(l => /An order for now is not a rule/u.test(l));
+branch(testsLine, "held", { "AGENTS.md": `${read(testsLine, "AGENTS.md")}${heldLine}\n` });
+ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md") && changed(testsLine, "moved").includes("docs/AGENTS.md") && changed(testsLine, "held").includes("AGENTS.md") && /for now/u.test(heldLine),
+  "order-for-now: a rule file's line changed for another reason, the test commands it names, passes, and so does a rule file moved whole, or a line of the order's words a rule file held", verdict("order-for-now", testsLine).why);
 // (the order written where a reading of lines would miss it: a binary file, a name past ASCII, a name git would read as a
 // pattern, and words of its own; each fails, named; #490's second security review)
 const orderUnseen = fresh("order-for-now"), patterned = process.platform !== "win32";
@@ -339,9 +343,10 @@ branch(orderUnseen, "plus", { "docs/plus/AGENTS.md": "++ Sums are printed with t
 if (patterned) branch(orderUnseen, "lined", { "docs/x\nWaits on: nothing\n/AGENTS.md": "- Sums are printed with two decimals.\n" });
 branch(orderUnseen, "turned", { "docs/\u202edm.STNEGA/AGENTS.md": "- Sums are printed with two decimals.\n" });
 if (patterned) branch(orderUnseen, "pattern", { ":(glob)q/AGENTS.md": "- Sums are printed with two decimals.\n" });
+branch(orderUnseen, "many", { "docs/many/AGENTS.md": Array.from({ length: 30000 }, (_, i) => `- for now ${i}\n`).join("") });
 const unseenWhy = verdict("order-for-now", orderUnseen).why;
-ok(["docs/bin/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/fractional/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
-  "order-for-now: the order in a rule file git takes as binary, under a name past ASCII, one git would read as a pattern or one with a newline in it, on a line that opens with \"++\", or in words of its own, fails, each named, with no control or format character in the verdict", unseenWhy);
+ok(["docs/bin/AGENTS.md", "docs/many/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/fractional/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
+  "order-for-now: the order in a rule file git takes as binary, under a name past ASCII, one git would read as a pattern or one with a newline in it, on a line that opens with \"++\", in words of its own, or on 30,000 lines, fails, each named, with no control or format character in the verdict", unseenWhy);
 const paraphrased = fresh("order-for-now");
 branch(paraphrased, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(paraphrased, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
   "AGENTS.md": `${read(paraphrased, "AGENTS.md")}\n- Output is rounded to 2 places.\n` });

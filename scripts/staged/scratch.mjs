@@ -366,18 +366,20 @@ export function added(dir, ref, file) {
   return from < 0 ? [] : all.slice(from).filter(l => l.startsWith("+")).map(l => l.slice(1));
 }
 
-// Of the lines given, those some file matching a pattern holds whole at main as the case set it, in one call to git
-// (a line with a NUL in it, which no argument can carry, is never held).
+// Of the lines given, those some file matching a pattern holds whole at main as the case set it: every line at main is
+// read in one call to git, with no line given as an argument, so that no count or length of them can make the call fail
+// (where git cannot answer, none is held).
 export function heldAtBase(dir, lines, pattern) {
-  const asked = [...new Set(lines)].filter(l => l && !l.includes("\0"));
-  if (!asked.length) return new Set();
-  const out = String(originGit(dir, "grep", "-I", "-z", "-F", "--no-textconv", ...asked.flatMap(l => ["-e", l]), "--end-of-options", base(dir)) ?? ""), at = `${base(dir)}:`, held = new Set();
+  const asked = new Set(lines), main = base(dir);
+  // (main is a whole SHA, so it reads as no option of git grep's, which takes no --end-of-options after its patterns)
+  if (!asked.size || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(String(main))) return new Set();
+  const out = String(originGit(dir, "grep", "-I", "-z", "--no-textconv", "-e", "", main) ?? ""), at = `${main}:`, held = new Set();
   // (each match "<main>:<path>\0<line>\n": the path is read to its NUL, so a newline in it splits nothing)
   for (let i = 0; i < out.length;) {
     const nul = out.indexOf("\0", i), end = out.indexOf("\n", nul + 1);
     if (nul < 0 || end < 0) break;
     const path = out.slice(i, nul), line = out.slice(nul + 1, end);
-    if (path.startsWith(at) && pattern.test(path.slice(at.length)) && asked.includes(line)) held.add(line);
+    if (path.startsWith(at) && pattern.test(path.slice(at.length)) && asked.has(line)) held.add(line);
     i = end + 1;
   }
   return held;
