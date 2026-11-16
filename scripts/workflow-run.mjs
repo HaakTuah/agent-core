@@ -26,90 +26,111 @@ const strip = line => { // a comment after a value: " #" outside quotes
   }
   return line.trimEnd();
 };
-function scalar(text) {
-  const t = text.trim();
-  if (t.startsWith("'")) { if (!t.endsWith("'") || t.length < 2) throw new Error(`a quoted value not ended: ${t}`); return t.slice(1, -1).replace(/''/g, "'"); }
-  if (t.startsWith('"')) { if (!t.endsWith('"') || t.length < 2) throw new Error(`a quoted value not ended: ${t}`); return JSON.parse(t); }
-  if (t.startsWith("[")) {
-    if (!t.endsWith("]")) throw new Error(`a flow sequence not ended: ${t}`);
-    const inner = t.slice(1, -1).trim();
-    return inner ? inner.split(",").map(scalar) : [];
-  }
-  if (t.startsWith("{") || t.startsWith("&") || t.startsWith("*") || t.startsWith("!")) throw new Error(`a YAML form this reader does not know: ${t}`);
+// A quoted value, single or double, whose closing quote must be there.
+function quoted(t) {
+  if (!t.endsWith(t[0]) || t.length < 2) throw new Error(`a quoted value not ended: ${t}`);
+  return t[0] === "'" ? t.slice(1, -1).replace(/''/g, "'") : JSON.parse(t);
+}
+function flowSequence(t) {
+  if (!t.endsWith("]")) throw new Error(`a flow sequence not ended: ${t}`);
+  const inner = t.slice(1, -1).trim();
+  return inner ? inner.split(",").map(scalar) : [];
+}
+// A value that is none of the quoted forms or a flow sequence: a literal, a number or plain text.
+function plain(t) {
   if (t === "true" || t === "false") return t === "true";
   if (t === "" || t === "null" || t === "~") return null;
   if (/^-?\d+$/.test(t)) return Number(t);
   return t;
+}
+function scalar(text) {
+  const t = text.trim();
+  if (t.startsWith("'") || t.startsWith('"')) return quoted(t);
+  if (t.startsWith("[")) return flowSequence(t);
+  if (t.startsWith("{") || t.startsWith("&") || t.startsWith("*") || t.startsWith("!")) throw new Error(`a YAML form this reader does not know: ${t}`);
+  return plain(t);
 }
 
 // A key set as the mapping's own, even where it is __proto__, which a plain assignment would take as its prototype.
 const own = (map, key, value) => Object.defineProperty(map, key, { value, enumerable: true, writable: true, configurable: true });
 /** The workflow's YAML as plain values (keys as written: `on` stays the string "on"). */
 export function parseYaml(text) {
-  const raw = text.replace(/\r\n/g, "\n").split("\n");
-  let i = 0;
-  const indentOf = l => l.length - l.trimStart().length;
-  const blank = l => l.trim() === "" || l.trim().startsWith("#");
-  const next = () => { while (i < raw.length && blank(raw[i])) i++; return i < raw.length ? raw[i] : null; };
+  const r = { raw: text.replace(/\r\n/g, "\n").split("\n"), i: 0 };
+  return yamlNext(r) === null ? {} : yamlNode(r, indentOf(yamlNext(r)));
+}
 
-  function block(header, parent) { // a block scalar: | or > with its chomping
-    const style = header[0], chomp = header.includes("-") ? "strip" : header.includes("+") ? "keep" : "clip";
-    const lines = [];
-    let at = null;
-    while (i < raw.length) {
-      const l = raw[i];
-      if (l.trim() === "") { lines.push(""); i++; continue; }
-      const n = indentOf(l);
-      if (n <= parent) break;
-      at ??= n;
-      if (n < at) break;
-      lines.push(l.slice(at));
-      i++;
-    }
-    while (chomp !== "keep" && lines.length && lines.at(-1) === "") lines.pop();
-    let out = style === "|" ? lines.join("\n")
-      : lines.reduce((acc, l, k) => (k === 0 ? l : l === "" ? `${acc}\n` : acc.endsWith("\n") ? acc + l : `${acc} ${l}`), "");
-    if (chomp !== "strip" && lines.length) out += "\n";
-    return out;
-  }
+// The reader `r` holds the lines and the one it stands at.
+const indentOf = l => l.length - l.trimStart().length;
+const blank = l => l.trim() === "" || l.trim().startsWith("#");
+const yamlNext = r => { while (r.i < r.raw.length && blank(r.raw[r.i])) r.i++; return r.i < r.raw.length ? r.raw[r.i] : null; };
+const isItem = l => l.trimStart().startsWith("- ") || l.trim() === "-";
 
-  function value(rest, indent) { // what follows "key:" or "- "
-    const r = strip(rest);
-    if (/^[|>][-+]?$/.test(r)) return block(r, indent);
-    if (r !== "") return scalar(r);
-    const l = next();
-    if (l === null) return null;
+// The lines of a block scalar, each without the indent of the first, up to the first indented no more than the parent.
+function blockLines(r, parent) {
+  const lines = [];
+  let at = null;
+  while (r.i < r.raw.length) {
+    const l = r.raw[r.i];
+    if (l.trim() === "") { lines.push(""); r.i++; continue; }
     const n = indentOf(l);
-    if (n > indent || (n === indent && l.trimStart().startsWith("- "))) return node(n);
-    return null;
+    if (n <= parent) break;
+    at ??= n;
+    if (n < at) break;
+    lines.push(l.slice(at));
+    r.i++;
   }
+  return lines;
+}
 
-  function node(indent) {
-    const first = next();
-    if (first.trimStart().startsWith("- ") || first.trim() === "-") {
-      const list = [];
-      for (let l = next(); l !== null && indentOf(l) === indent && (l.trimStart().startsWith("- ") || l.trim() === "-"); l = next()) {
-        const content = l.trimStart().slice(2);
-        if (/^[\w.-]+:(\s|$)/.test(content)) { // a mapping that starts on the dash's line
-          raw[i] = " ".repeat(indent + 2) + content;
-          list.push(node(indent + 2));
-        } else { i++; list.push(value(content, indent)); }
-      }
-      return list;
-    }
-    const map = {};
-    for (let l = next(); l !== null && indentOf(l) === indent && !l.trimStart().startsWith("- "); l = next()) {
-      const m = /^([\w.-]+|"[^"]*"|'[^']*'):(?:\s(.*)|$)/.exec(l.trimStart());
-      if (!m) throw new Error(`a line this reader does not know: ${l.trim()}`);
-      i++;
-      own(map, scalar(m[1]), value(m[2] ?? "", indent));
-    }
-    const l = next();
-    if (l !== null && indentOf(l) > indent) throw new Error(`a line indented where no value begins: ${l.trim()}`);
-    return map;
+const fold = lines => lines.reduce((acc, l, k) => (k === 0 ? l : l === "" ? `${acc}\n` : acc.endsWith("\n") ? acc + l : `${acc} ${l}`), "");
+
+function yamlBlock(r, header, parent) { // a block scalar: | or > with its chomping
+  const style = header[0], chomp = header.includes("-") ? "strip" : header.includes("+") ? "keep" : "clip";
+  const lines = blockLines(r, parent);
+  while (chomp !== "keep" && lines.length && lines.at(-1) === "") lines.pop();
+  let out = style === "|" ? lines.join("\n") : fold(lines);
+  if (chomp !== "strip" && lines.length) out += "\n";
+  return out;
+}
+
+function yamlValue(r, rest, indent) { // what follows "key:" or "- "
+  const v = strip(rest);
+  if (/^[|>][-+]?$/.test(v)) return yamlBlock(r, v, indent);
+  if (v !== "") return scalar(v);
+  const l = yamlNext(r);
+  if (l === null) return null;
+  const n = indentOf(l);
+  if (n > indent || (n === indent && l.trimStart().startsWith("- "))) return yamlNode(r, n);
+  return null;
+}
+
+function yamlSequence(r, indent) {
+  const list = [];
+  for (let l = yamlNext(r); l !== null && indentOf(l) === indent && isItem(l); l = yamlNext(r)) {
+    const content = l.trimStart().slice(2);
+    if (/^[\w.-]+:(\s|$)/.test(content)) { // a mapping that starts on the dash's line
+      r.raw[r.i] = " ".repeat(indent + 2) + content;
+      list.push(yamlNode(r, indent + 2));
+    } else { r.i++; list.push(yamlValue(r, content, indent)); }
   }
+  return list;
+}
 
-  return next() === null ? {} : node(indentOf(next()));
+function yamlMapping(r, indent) {
+  const map = {};
+  for (let l = yamlNext(r); l !== null && indentOf(l) === indent && !l.trimStart().startsWith("- "); l = yamlNext(r)) {
+    const m = /^([\w.-]+|"[^"]*"|'[^']*'):(?:\s(.*)|$)/.exec(l.trimStart());
+    if (!m) throw new Error(`a line this reader does not know: ${l.trim()}`);
+    r.i++;
+    own(map, scalar(m[1]), yamlValue(r, m[2] ?? "", indent));
+  }
+  const l = yamlNext(r);
+  if (l !== null && indentOf(l) > indent) throw new Error(`a line indented where no value begins: ${l.trim()}`);
+  return map;
+}
+
+function yamlNode(r, indent) {
+  return isItem(yamlNext(r)) ? yamlSequence(r, indent) : yamlMapping(r, indent);
 }
 
 // ---- GitHub's expressions ----
@@ -127,6 +148,13 @@ const equal = (a, b) => {
 
 /** The value of an expression (without its `${{ }}`), in the contexts given and the job's state so far. */
 export function evaluate(expr, contexts, state = { failed: false }) {
+  const ps = { expr, contexts, tokens: tokenize(expr), p: 0, fns: expressionFunctions(state) };
+  const out = orExpr(ps);
+  if (ps.p !== ps.tokens.length) throw new Error(`an expression this reader does not know: ${expr}`);
+  return out;
+}
+
+function tokenize(expr) {
   const tokens = [];
   for (let k = 0; k < expr.length;) {
     const rest = expr.slice(k);
@@ -139,10 +167,12 @@ export function evaluate(expr, contexts, state = { failed: false }) {
     else throw new Error(`an expression this reader does not know: ${expr}`);
     k += m[0].length;
   }
-  let p = 0;
-  const peek = op => tokens[p]?.op === op;
-  const take = op => { if (!peek(op)) throw new Error(`"${op}" expected in: ${expr}`); p++; };
-  const fns = {
+  return tokens;
+}
+
+// The functions an expression may call, by their lower-case names.
+function expressionFunctions(state) {
+  return {
     startswith: (a, b) => str(a).toLowerCase().startsWith(str(b).toLowerCase()),
     endswith: (a, b) => str(a).toLowerCase().endsWith(str(b).toLowerCase()),
     contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
@@ -150,46 +180,69 @@ export function evaluate(expr, contexts, state = { failed: false }) {
     format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
     always: () => true, cancelled: () => false, success: () => !state.failed, failure: () => state.failed,
   };
-  const primary = () => {
-    const t = tokens[p++];
-    if (!t) throw new Error(`an expression ends too soon: ${expr}`);
-    if (t.op === "(") { const v = or(); take(")"); return v; }
-    if ("s" in t) return t.s;
-    if ("n" in t) return t.n;
-    if (t.id === "true" || t.id === "false") return t.id === "true";
-    if (t.id === "null") return null;
-    if (t.id && peek("(")) {
-      const fn = fns[t.id.toLowerCase()];
-      if (!fn) throw new Error(`a function this reader does not know: ${t.id}`);
-      take("(");
-      const args = [];
-      while (!peek(")")) { args.push(or()); if (!peek(")")) take(","); }
-      take(")");
-      return fn(...args);
-    }
-    if (t.id) { if (!(t.id in contexts)) throw new Error(`a context this test does not give: ${t.id} (in ${expr})`); return contexts[t.id]; }
-    throw new Error(`an expression this reader does not know: ${expr}`);
-  };
-  const postfix = () => {
-    let v = primary();
-    for (;;) {
-      if (peek(".")) { p++; const t = tokens[p++]; if (!t?.id) throw new Error(`a property name expected in: ${expr}`); v = v?.[t.id] ?? null; }
-      else if (peek("[")) { p++; const k = or(); take("]"); v = v?.[k] ?? null; }
-      else return v;
-    }
-  };
-  const unary = () => (peek("!") ? (p++, !truthy(unary())) : postfix());
-  const compare = () => {
-    let v = unary();
-    while (["<", ">", "<=", ">="].includes(tokens[p]?.op)) { const op = tokens[p++].op, w = unary(); v = op === "<" ? num(v) < num(w) : op === ">" ? num(v) > num(w) : op === "<=" ? num(v) <= num(w) : num(v) >= num(w); }
-    return v;
-  };
-  const eq = () => { let v = compare(); while (peek("==") || peek("!=")) { const op = tokens[p++].op, w = compare(); v = op === "==" ? equal(v, w) : !equal(v, w); } return v; };
-  const and = () => { let v = eq(); while (peek("&&")) { p++; const w = eq(); v = truthy(v) ? w : v; } return v; };
-  const or = () => { let v = and(); while (peek("||")) { p++; const w = and(); v = truthy(v) ? v : w; } return v; };
-  const out = or();
-  if (p !== tokens.length) throw new Error(`an expression this reader does not know: ${expr}`);
-  return out;
+}
+
+// The parser `ps` holds the expression, its tokens, the place it stands at, its contexts and its functions.
+const peek = (ps, op) => ps.tokens[ps.p]?.op === op;
+const take = (ps, op) => { if (!peek(ps, op)) throw new Error(`"${op}" expected in: ${ps.expr}`); ps.p++; };
+
+function callExpr(ps, name) {
+  const fn = ps.fns[name.toLowerCase()];
+  if (!fn) throw new Error(`a function this reader does not know: ${name}`);
+  take(ps, "(");
+  const args = [];
+  while (!peek(ps, ")")) { args.push(orExpr(ps)); if (!peek(ps, ")")) take(ps, ","); }
+  take(ps, ")");
+  return fn(...args);
+}
+
+function primaryExpr(ps) {
+  const t = ps.tokens[ps.p++];
+  if (!t) throw new Error(`an expression ends too soon: ${ps.expr}`);
+  if (t.op === "(") { const v = orExpr(ps); take(ps, ")"); return v; }
+  if ("s" in t) return t.s;
+  if ("n" in t) return t.n;
+  if (t.id === "true" || t.id === "false") return t.id === "true";
+  if (t.id === "null") return null;
+  if (t.id && peek(ps, "(")) return callExpr(ps, t.id);
+  if (t.id) { if (!(t.id in ps.contexts)) throw new Error(`a context this test does not give: ${t.id} (in ${ps.expr})`); return ps.contexts[t.id]; }
+  throw new Error(`an expression this reader does not know: ${ps.expr}`);
+}
+
+function postfixExpr(ps) {
+  let v = primaryExpr(ps);
+  for (;;) {
+    if (peek(ps, ".")) { ps.p++; const t = ps.tokens[ps.p++]; if (!t?.id) throw new Error(`a property name expected in: ${ps.expr}`); v = v?.[t.id] ?? null; }
+    else if (peek(ps, "[")) { ps.p++; const k = orExpr(ps); take(ps, "]"); v = v?.[k] ?? null; }
+    else return v;
+  }
+}
+
+const unaryExpr = ps => (peek(ps, "!") ? (ps.p++, !truthy(unaryExpr(ps))) : postfixExpr(ps));
+
+const ordered = { "<": (a, b) => a < b, ">": (a, b) => a > b, "<=": (a, b) => a <= b, ">=": (a, b) => a >= b };
+function compareExpr(ps) {
+  let v = unaryExpr(ps);
+  while (["<", ">", "<=", ">="].includes(ps.tokens[ps.p]?.op)) { const op = ps.tokens[ps.p++].op, w = unaryExpr(ps); v = ordered[op](num(v), num(w)); }
+  return v;
+}
+
+function eqExpr(ps) {
+  let v = compareExpr(ps);
+  while (peek(ps, "==") || peek(ps, "!=")) { const op = ps.tokens[ps.p++].op, w = compareExpr(ps); v = op === "==" ? equal(v, w) : !equal(v, w); }
+  return v;
+}
+
+function andExpr(ps) {
+  let v = eqExpr(ps);
+  while (peek(ps, "&&")) { ps.p++; const w = eqExpr(ps); v = truthy(v) ? w : v; }
+  return v;
+}
+
+function orExpr(ps) {
+  let v = andExpr(ps);
+  while (peek(ps, "||")) { ps.p++; const w = andExpr(ps); v = truthy(v) ? v : w; }
+  return v;
 }
 
 /** A text with each `${{ }}` in it filled in. */
@@ -326,70 +379,95 @@ function carryEnv(file, env, id) {
   fs.rmSync(file);
 }
 
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
-  const wf = parseYaml(text);
-  const defaults = wf.defaults?.run?.shell;
+// The inputs the workflow is called with, the declared ones' defaults filled in; a call that gives one the workflow does
+// not take, or leaves out a required input or secret, throws.
+function callInputs(wf, inputs, secrets) {
   const declared = wf.on?.workflow_call?.inputs ?? {};
   const given = Object.fromEntries(Object.entries(declared).map(([name, d]) => [name, name in inputs ? inputs[name] : d?.default ?? (d?.type === "boolean" ? false : "")]));
   for (const name of Object.keys(inputs)) if (!(name in declared)) throw new Error(`an input the workflow does not take: ${name}`);
   for (const [name, d] of Object.entries(declared)) if (d?.required && !(name in inputs)) throw new Error(`the call leaves out a required input: ${name}`);
   for (const [name, d] of Object.entries(wf.on?.workflow_call?.secrets ?? {})) if (d?.required && !(name in secrets)) throw new Error(`the call leaves out a required secret: ${name}`);
+  return given;
+}
+
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
+  const wf = parseYaml(text);
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, temp };
+  const given = callInputs(wf, inputs, secrets);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
     const top = { github, inputs: given, secrets, vars: {} };
     if (!holds(job.if, top, { failed: false })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); continue; }
     // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
-    for (const matrix of combinations(job.strategy?.matrix, top)) {
-      const tmp = fs.mkdtempSync(path.join(temp, "runner-temp-"));
-      const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...runner }, env: {}, steps: {}, matrix: matrix ?? {} };
-      const state = { failed: false };
-      const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
-      results.push(result);
-      try { if (!dry) runJob(job, id, ctx, state, result, tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
-    }
+    for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
   }
   return results;
+}
 
-  function runJob(job, id, ctx, state, result, tmp) {
-    const dir = workspace(id);
-    ctx.env = Object.fromEntries(Object.entries(job.env ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
-    for (const step of job.steps ?? []) {
-      const name = step.name ?? step.uses ?? step.run?.split("\n")[0];
-      if (!holds(step.if, ctx, state)) { result.steps.push({ name, ran: false, passed: true, out: "" }); continue; }
-      const env = { ...ctx.env, ...Object.fromEntries(Object.entries(step.env ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)])) };
-      if (step.uses) {
-        const action = step.uses.split("@")[0];
-        const handler = uses[action];
-        if (!handler) throw new Error(`an action this test has no part for: ${action} (in ${id})`);
-        const w = Object.fromEntries(Object.entries(step.with ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
-        let did;
-        try {
-          did = handler(w, dir, env);
-        } catch (e) {
-          // (a stand-in that refuses what the step asks of it fails the step, as the action would)
-          result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
-          state.failed = true; result.passed = false;
-          continue;
-        }
-        result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
-        continue;
-      }
-      const output = path.join(tmp, `output-${result.steps.length}`);
-      const script = path.join(tmp, `step-${result.steps.length}.sh`);
-      fs.writeFileSync(script, fill(step.run, ctx, state));
-      const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
-      // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
-      // the defaults', with --noprofile --norc -e -o pipefail)
-      const shell = shellOf(step, job, defaults, id);
-      const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
-        ...base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
-        GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(github.repository), GITHUB_EVENT_NAME: str(github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
-      const passed = r.status === 0;
-      carryEnv(path.join(tmp, "env"), ctx.env, id);
-      result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
-      if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
-      if (!passed) { state.failed = true; result.passed = false; }
-      if (until && step.id === until) return;
-    }
+// One job of a workflow for one combination of its matrix (null for none): its runner folder made, the job run, the folder removed.
+function runMatrixJob(rt, job, id, top, matrix, results) {
+  const tmp = fs.mkdtempSync(path.join(rt.temp, "runner-temp-"));
+  const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...rt.runner }, env: {}, steps: {}, matrix: matrix ?? {} };
+  const state = { failed: false };
+  const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
+  results.push(result);
+  try { if (!rt.dry) runJob({ rt, job, id, ctx, state, result, tmp }); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+}
+
+// A map's values, each with its `${{ }}` filled in as text.
+const fillValues = (map, ctx, state) => Object.fromEntries(Object.entries(map ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
+
+// The steps of a job, in order, each one's result put in `jr.result`; `jr` holds the run's settings (`rt`), the job, its
+// id, its contexts, its state, its result and its temporary folder.
+function runJob(jr) {
+  const { rt, job, id, ctx, state, result } = jr;
+  jr.dir = rt.workspace(id);
+  ctx.env = fillValues(job.env, ctx, state);
+  for (const step of job.steps ?? []) {
+    const name = step.name ?? step.uses ?? step.run?.split("\n")[0];
+    if (!holds(step.if, ctx, state)) { result.steps.push({ name, ran: false, passed: true, out: "" }); continue; }
+    const env = { ...ctx.env, ...fillValues(step.env, ctx, state) };
+    if (step.uses) { runUses(jr, step, name, env); continue; }
+    runScript(jr, step, name, env);
+    if (rt.until && step.id === rt.until) return;
   }
+}
+
+// A `uses` step, by the handler the caller gave for its action.
+function runUses(jr, step, name, env) {
+  const { rt, ctx, state, result, dir, id } = jr;
+  const action = step.uses.split("@")[0];
+  const handler = rt.uses[action];
+  if (!handler) throw new Error(`an action this test has no part for: ${action} (in ${id})`);
+  const w = fillValues(step.with, ctx, state);
+  let did;
+  try {
+    did = handler(w, dir, env);
+  } catch (e) {
+    // (a stand-in that refuses what the step asks of it fails the step, as the action would)
+    result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
+    state.failed = true; result.passed = false;
+    return;
+  }
+  result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
+}
+
+// A `run` step in bash, its outputs and its GITHUB_ENV read when it ends.
+function runScript(jr, step, name, env) {
+  const { rt, job, ctx, state, result, tmp, dir, id } = jr;
+  const output = path.join(tmp, `output-${result.steps.length}`);
+  const script = path.join(tmp, `step-${result.steps.length}.sh`);
+  fs.writeFileSync(script, fill(step.run, ctx, state));
+  const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
+  // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
+  // the defaults', with --noprofile --norc -e -o pipefail)
+  const shell = shellOf(step, job, rt.defaults, id);
+  const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
+    ...rt.base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
+    GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
+  const passed = r.status === 0;
+  carryEnv(path.join(tmp, "env"), ctx.env, id);
+  result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
+  if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
+  if (!passed) { state.failed = true; result.passed = false; }
 }
