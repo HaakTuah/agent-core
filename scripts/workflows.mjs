@@ -89,7 +89,7 @@ export function repeated(files, before) {
 }
 
 if (started(import.meta.url)) {
-  const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
   process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);

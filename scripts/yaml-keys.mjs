@@ -34,15 +34,23 @@ export function keyName(raw) {
   return raw.trim();
 }
 
-// "key: value" at the start of a line's text, as { key, value }, or null where it holds no key.
-const KEY = /^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|(?:[^\s#'"{}[\],&*!|>%@`?:-]|[?:-]\S).*?)[ \t]*:(?:[ \t]+(.*))?$/u;
+// "key: value" at the start of a line's text, as { key, value }, or null where it holds no key: a quoted key, or a plain
+// one up to the first colon a blank or the line's end follows (found by one search, so that no line, however long,
+// makes the reading slow).
+const QUOTED = /^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*')[ \t]*:(?:[ \t]|$)/u, PLAIN = /^(?:[^\s#'"{}[\],&*!|>%@`?:-]|[?:-]\S)/u;
 export function keyAt(text) {
-  const m = KEY.exec(text);
-  return m ? { key: keyName(m[1]), value: (m[2] ?? "").trim() } : null;
+  const quoted = QUOTED.exec(text);
+  if (quoted) return { key: keyName(quoted[1]), value: text.slice(quoted[0].length).trim() };
+  const colon = PLAIN.test(text) ? /:(?:[ \t]|$)/u.exec(text) : null;
+  return colon ? { key: text.slice(0, colon.index).trimEnd(), value: text.slice(colon.index + 1).trim() } : null;
 }
 
 // Whether a value holds nothing but an anchor or a tag, so that what it names stands on the lines below it.
 const opens = value => /^(?:[&!]\S*(?:[ \t]+|$))*$/u.test(value);
+
+// How deep a flow value is read: past it the rest of the value is not, so that no nesting, however deep, makes the
+// reader throw (GitHub's own refuses one far less deep).
+const DEEPEST = 500;
 
 // The keys given twice in each flow mapping of a flow value (`{` or `[`, and all it holds), each as { key, at, first }:
 // the key as YAML reads it and the offsets in the text of the second and the first.
@@ -64,9 +72,11 @@ export function flowTwice(text) {
     while (i < text.length && !/[,[\]{}]/u.test(text[i]) && !(text[i] === ":" && /^(?:[\s,[\]{}]|)$/u.test(text[i + 1] ?? ""))) i++;
     return text.slice(start, i).trim();
   };
+  let depth = 0;
   const node = () => { blank(); return "{[".includes(text[i]) ? collection() : `"'`.includes(text[i]) ? quoted() : plain(); };
   function collection() {
     const close = text[i] === "{" ? "}" : "]", keys = new Map();
+    if (++depth > DEEPEST) { i = text.length; return; } // the rest of a value nested past the mark is not read
     i++;
     while (i < text.length && text[i] !== close) {
       const start = (blank(), i), key = node();
@@ -78,6 +88,7 @@ export function flowTwice(text) {
       else if (text[i] === ",") i++;
     }
     i++;
+    depth--;
   }
   node();
   return found;
@@ -102,14 +113,19 @@ export function twice(text) {
   let past = Infinity, flow = null; // past: the lines indented further than this belong to the value above; flow: a flow value being read
   const end = () => {
     if (!flow) return;
-    const at = offset => flow.line + flow.text.slice(0, offset).split("\n").length - 1;
+    const breaks = [...flow.text.matchAll(/\n/gu)].map(m => m.index); // where each line of the value ends, read once
+    const at = offset => { // the line an offset stands on: the value's first, and one more for each break before it
+      let low = 0, high = breaks.length;
+      while (low < high) { const mid = (low + high) >> 1; if (breaks[mid] < offset) low = mid + 1; else high = mid; }
+      return flow.line + low;
+    };
     for (const f of flowTwice(flow.text)) found.push({ line: at(f.at), key: f.key, first: at(f.first) });
     flow = null;
   };
   const value = (v, col, line) => { if (opens(v)) return; past = col; if ("{[".includes(v[0])) flow = { text: v, line }; };
   rows.forEach((row, n) => {
     const text = uncommented(row), col = /^[ \t]*/u.exec(row)[0].length;
-    if (!text.trim()) return;
+    if (!text.trim()) { if (flow) flow.text += "\n"; return; } // (a blank line or a comment in a flow value keeps its lines counted)
     if (col > past) { if (flow) flow.text += `\n${text.trim()}`; return; }
     end();
     past = Infinity;
