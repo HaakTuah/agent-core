@@ -40,6 +40,8 @@ for (const [what, text] of [
   ["a path where an install writes", copied("node_modules/core/")],
   ["a carried path outside its library", carried("lib/", "other/core/")],
   ["a carried path that is the library itself", carried("lib/", "lib/")],
+  ["a path that climbs out after a plain segment", copied("core/../evil/")],
+  ["a carried library that climbs out after a plain segment", carried("lib/../x/", "lib/../x/core/")],
 ]) {
   const got = readCore(text);
   ok(got.wrong && mended(`FAIL: ${got.wrong}`) && !got.path, `${what}: read as wrong, saying the mend`, JSON.stringify(got));
@@ -50,6 +52,20 @@ ok(floorCopyIn(carried()) === "floor-copy/" && floorCopyIn(copied()) === null &&
 // the reading script's own reading of the path, held to this one's
 for (const text of [copied(), copied("vendor/the-core/"), carried(), carried("libs/shared/", "libs/shared/core/")]) ok(pathIn(text) === readCore(text).path, `the reading script reads the path ${readCore(text).path} alike`);
 ok(pathIn("# Core manifest\n") === "core/", "where the line names none, the reading script takes the usual path");
+// the sed of the workflows' first step and of the work-saved hook, run on the same lines: each reads the path readCore
+// reads, and nothing where readCore reads it as wrong, so no check runs a script from a folder core.yml never compared
+{
+  const wf = fs.readFileSync(fileURLToPath(new URL("../.github/workflows/copies.yml", import.meta.url)), "utf8");
+  const hook = fs.readFileSync(fileURLToPath(new URL("./work-saved.sh", import.meta.url)), "utf8");
+  const seds = [["the workflows", /sed -n -E ('[^']+')/u.exec(wf)[1], out => out.split(" ")[0]], ["the hook", /sed -n -E ('s#\^Core: [^']+')/u.exec(hook)[1], out => out]];
+  for (const text of [copied(), copied("vendor/the-core/"), carried(), copied("core/../evil/"), carried("lib/../x/", "lib/../x/core/"), copied("core/..x/"), `${copied().trimEnd()} trailing words\n`]) {
+    const want = readCore(text).path ?? "";
+    for (const [who, sed, take] of seds) {
+      const r = spawnSync("bash", ["-c", `printf '%s\\n' "$1" | sed -n -E ${sed} | head -n 1`, "-", text], { encoding: "utf8" });
+      ok(take(r.stdout.trim()) === want, `${who} read ${JSON.stringify(text.split("\n")[2])} as readCore does: ${want || "nothing"}`, r.stdout + r.stderr);
+    }
+  }
+}
 
 // the carried core, from its library's manifest
 const files = { "lib/core-manifest.md": copied() };
@@ -75,6 +91,16 @@ ok(out.status === 0 && out.stdout.trim() === "lib/core/", "from a project's root
 out = run("# Core manifest\n");
 ok(out.status === 1 && mended(out.stderr), "and fails, saying the mend, where the line is wrong", out.stderr);
 ok(corePath(tmp) === "core/" && corePath(path.join(tmp, "nowhere")) === "", "a manifest whose line is wrong reads as the usual path; no manifest, the core's own root");
+// the sync writes the copy where the path leads: a folder on the way that is a link, which could lead out of the
+// project, stops it before it fetches or writes anything
+if (process.platform !== "win32") {
+  const linked = path.join(tmp, "linked"), outside = path.join(tmp, "outside");
+  fs.mkdirSync(linked); fs.mkdirSync(outside);
+  fs.symlinkSync(outside, path.join(linked, "vendor"));
+  fs.writeFileSync(path.join(linked, "core-manifest.md"), copied("vendor/the-core/"));
+  const r = spawnSync(process.execPath, [fileURLToPath(new URL("./sync.mjs", import.meta.url))], { cwd: linked, encoding: "utf8" });
+  ok(r.status === 1 && /vendor, on the way to the copy's path vendor\/the-core\/, is a link/.test(r.stderr) && mended(r.stderr) && fs.readdirSync(outside).length === 0, "the sync refuses a path through a link, saying the mend, and writes nothing", r.stderr);
+} else console.log("note a link cannot be made here (Windows), so the sync's refusal of one is not tried");
 
 // Claude Code's hooks for a core at another path: for core/ the helper's and the stop's are the starter kit's own, and
 // where a submodule carries the core, the start reads the work-saved hook from the library's commit main pins, never

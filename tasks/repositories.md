@@ -23,9 +23,8 @@ workflows move to that pin with the library, as `core.yml` says where one differ
 do nothing there, saying so. It does not mean a library carries a core it does not copy itself, nor that a repository
 edits what the library brings. Reason: a project that splits a shared part into a repository of its own would hold the
 core twice, sync it twice and could hold two versions; where several projects share the part, once more for each.
-Held by `core.yml`, which reads the pin from the library's own manifest where the library's files are committed and
-holds the copy there to it, and by the tests of `scripts/sync.mjs` and `scripts/core-moved.mjs`; where a submodule
-carries it, by the library's own `core.yml` at the commit the repository pins.
+Held by `core.yml`, which reads the pin from the library's own manifest, at the commit the repository holds, and holds
+the copy there to it, and by the tests of `scripts/sync.mjs` and `scripts/core-moved.mjs`.
 
 **Before a split, one repository** (core archive 240; #285). By default a part of a project meant to be shared with
 other projects stays in the project's own repository, as a system its shape check names (`tasks/code-shape.md`, "Each
@@ -39,12 +38,12 @@ from growing unlisted; the split's timing, by nothing yet.
 
 **The core's files are in the checkout when a session starts** (core archive 240; #285). By default they are, as the
 copy committed at the manifest's path. Where a library carries the core, the session that sets the repository up
-brings the library in as its folder committed in the repository, or as a submodule the agent tool checks out, never as
-files an install writes (a package manager's folder, a build's output). It does not
-mean a repository commits the library's files where a submodule its tool checks out serves. Reason: a session that
+brings the library in as its folder committed in the repository, or as a submodule the agent tool checks out, at an
+`https` address the checks can fetch with no token, never as files an install writes (a package manager's folder, a
+build's output). It does not mean a repository commits the library's files where such a submodule serves. Reason: a session that
 cannot find its rules would work with no floor at all, and an install runs after the session has started, when it
-runs. Held by `core.yml`, which fails a library that is neither a folder nor a submodule of the commit, and a path
-in a folder named node_modules or .git.
+runs. Held by `core.yml`, which fails a library that is neither a folder nor a submodule of the commit, a submodule
+it cannot fetch at that commit, and a path in a folder named node_modules or .git.
 
 **A session that cannot read its floor does nothing else** (core archive 240; #285). By default a session reads the
 floor at the path its manifest names. Where `<path>floor/security.md` is not in the checkout at a session's start, the

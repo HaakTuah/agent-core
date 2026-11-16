@@ -23,7 +23,9 @@ export const MANIFEST = "core-manifest.md", DEFAULT = "core/";
 // nor node_modules, where an install writes and no checkout holds the files)
 const SEGMENT = "[A-Za-z0-9_][A-Za-z0-9._-]*";
 const PATH = `(?:${SEGMENT}/)+`;
-const COPIED = `copied whole under (${PATH})`, CARRIED = `carried by (${PATH}) under (${PATH})`;
+// (each path ends where the line has a space or ends, so a segment that is no plain name, as "..", fails the line
+// rather than leaving a shorter path read; core.yml, the workflows' first step and the hooks read it so too)
+const COPIED = `copied whole under (${PATH})(?= |$)`, CARRIED = `carried by (${PATH}) under (${PATH})(?= |$)`;
 const FORMS = `"Core: ${CORE} at <full commit SHA>, copied whole under <path>/" or "Core: ${CORE}, carried by <library>/ under <path>/"`;
 const plain = p => !p.split("/").some(s => s === ".git" || s === "node_modules" || /^\.+$/u.test(s));
 
@@ -55,7 +57,7 @@ export function corePath(root = ".") {
  *  core a library carries keeps until every agent tool has passed the staged cases carried and no-floor; null where it
  *  names none. Given the manifest's text, or with `root` read from there. */
 export function floorCopyIn(text) {
-  return new RegExp(`^Floor copy: (${PATH})`, "mu").exec(String(text ?? ""))?.[1] ?? null;
+  return new RegExp(`^Floor copy: (${PATH})(?= |$)`, "mu").exec(String(text ?? ""))?.[1] ?? null;
 }
 export function floorCopy(root = ".") {
   try { return floorCopyIn(fs.readFileSync(path.join(root, MANIFEST), "utf8")); } catch { return null; }

@@ -65,7 +65,7 @@ let n = 0;
 // usual ones.
 // `under` is the folder the copy is written to, and `floor` one a copy of the core's floor/ is written to besides; `then`
 // changes the project before its commit.
-function check(files = {}, { branch = "main", at = B, without = null, under = "core", floor = null, then = null } = {}) {
+function check(files = {}, { branch = "main", at = B, without = null, under = "core", floor = null, then = null, base = env } = {}) {
   const dir = path.join(tmp, `project-${++n}`);
   fs.mkdirSync(path.join(dir, under), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
@@ -78,7 +78,7 @@ function check(files = {}, { branch = "main", at = B, without = null, under = "c
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "a project");
   const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: branch, private: false }, pull_request: { base: { sha: "" } } } };
-  const [job] = runWorkflow(workflow, { github, base: env, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
+  const [job] = runWorkflow(workflow, { github, base, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 const passes = (what, ...args) => { const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
@@ -116,6 +116,7 @@ const LIBRARY = { "lib/core-manifest.md": MANIFEST(), "AGENTS.md": "# A project\
 passes("a copy at the path the manifest names", { "core-manifest.md": AT("vendor/the-core/") }, { under: "vendor/the-core" });
 fails("a copy elsewhere than the path the manifest names", "vendor/the-core/ is no folder of this commit", { "core-manifest.md": AT("vendor/the-core/") });
 fails("a path where an install writes", "where no checkout holds the files", { "core-manifest.md": AT("node_modules/the-core/") }, { under: "node_modules/the-core" });
+fails("a path with a segment that climbs out, after a plain one", "has no one \"Core:", { "core-manifest.md": AT("core/../evil/") }, { under: "core" });
 fails("a path that climbs out of the repository", "has no one \"Core:", { "core-manifest.md": AT("../core/") });
 passes("a core a library carries, its files committed, with the floor's own copy", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY }, { under: "lib/core", floor: "floor-copy" });
 fails("without the floor's own copy, while no tool has passed the staged cases carried and no-floor", "not every agent tool has passed", { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
@@ -127,9 +128,25 @@ fails("a carried core whose copy differs from the core at the library's pin", "l
 fails("a library that is not in this commit", "the library lib, which core-manifest.md says carries the core, is no folder or submodule", { "core-manifest.md": CARRIED("lib/", "lib/core/") }, { floor: "floor-copy" });
 fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one", { "core-manifest.md": CARRIED("lib/", "lib/core/"), "lib/core-manifest.md": "# Core manifest\n" }, { under: "lib/core", floor: "floor-copy" });
 {
-  // (a submodule: the library's commit pinned here, its files in no checkout of this check's)
-  const r = check({ "core-manifest.md": CARRIED("lib/", "lib/core/"), "AGENTS.md": LIBRARY["AGENTS.md"] }, { floor: "floor-copy", then: dir => { fs.mkdirSync(path.join(dir, "lib")); git(dir, "update-index", "--add", "--cacheinfo", `160000,${B},lib`); } });
-  ok(r.passed && r.out.includes("carried by the submodule lib"), "a core a submodule carries, with the floor's own copy: passes, saying the library's own check holds its copy", r.out);
+  // (a submodule: the library's commit pinned here, fetched by the check from the https address .gitmodules gives it,
+  // here a library of the test's own reached through a rewrite, and held to the core at the library's pin)
+  const libRepo = path.join(tmp, "the-library"), address = "https://example.invalid/the-library";
+  fs.mkdirSync(path.join(libRepo, "core"), { recursive: true });
+  git(libRepo, "init", "-q", "-b", "main");
+  execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: libRepo, input: execFileSync("git", ["archive", B], { cwd: theCore, env, maxBuffer: 1 << 28 }) });
+  write(libRepo, "core-manifest.md", MANIFEST());
+  git(libRepo, "add", "-A"); git(libRepo, "commit", "-q", "-m", "the library");
+  git(libRepo, "config", "uploadpack.allowAnySHA1InWant", "true");
+  const good = git(libRepo, "rev-parse", "HEAD");
+  write(libRepo, "core/README.md", "edited\n"); git(libRepo, "commit", "-q", "-am", "an edited copy");
+  const edited = git(libRepo, "rev-parse", "HEAD");
+  const n = Number(env.GIT_CONFIG_COUNT), reach = { ...env, GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(libRepo)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: address };
+  const sub = (sha, url = address) => ({ base: reach, floor: "floor-copy", then: dir => { fs.mkdirSync(path.join(dir, "lib")); write(dir, ".gitmodules", `[submodule "lib"]\n\tpath = lib\n\turl = ${url}\n`); git(dir, "update-index", "--add", "--cacheinfo", `160000,${sha},lib`); } });
+  const files = { "core-manifest.md": CARRIED("lib/", "lib/core/"), "AGENTS.md": LIBRARY["AGENTS.md"] };
+  passes("a core a submodule carries, its commit fetched with no token and its copy the core at the library's pin, with the floor's own copy", files, sub(good));
+  fails("a submodule whose commit holds a copy that differs from the core", "lib/core/ differs from the core at its pin", files, sub(edited));
+  fails("a submodule with no https address", "could not be fetched at the commit pinned here", files, sub(good, slash(libRepo)));
+  fails("a floor's copy beside a submodule, that differs from the floor at the library's pin", "floor-copy/ differs from the floor", { ...files, "floor-copy/security.md": "edited\n" }, sub(good));
 }
 {
   // (the staged cases' record on the core's main: a tool counts as passed by its own runs alone)

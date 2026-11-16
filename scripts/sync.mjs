@@ -43,6 +43,13 @@ const REPORTS = kits => [["steps.mjs"], ["fresh.mjs", "--older", kits], ["inbox.
 function ownCopy(text) {
   const line = readCore(text);
   if (line.wrong) fail(line.wrong);
+  // (the copy is written where the path leads, so no folder on the way is a link, which could lead out of the project)
+  const parts = line.path?.split("/").filter(Boolean) ?? [];
+  for (let i = 1; i <= parts.length; i++) {
+    let st = null;
+    try { st = fs.lstatSync(parts.slice(0, i).join("/")); } catch { break; } // (not there yet: nothing further is either)
+    if (st.isSymbolicLink()) fail(`${parts.slice(0, i).join("/")}, on the way to the copy's path ${line.path}, is a link, which could lead out of the project. Mend: make it a folder of the project's own, or name another path in the "Core:" line`);
+  }
   if (line.form === "copied") return line;
   console.log(`the core here is the one the library at ${line.library} carries, at that library's pin: it is synced in the library's own repository, and reaches this one when this repository takes the library at a newer version (tasks/repositories.md). Nothing to sync here.`);
   return null;

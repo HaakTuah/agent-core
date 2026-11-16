@@ -104,7 +104,7 @@ export function gather(read, list) {
 // The path of the core a manifest's text names, "core/" where its "Core:" line names none: core-path.mjs reads the line
 // whole, and this its path alone, since the start hook runs this file from git with no file beside it to import
 // (core-path-test.mjs holds the two to each other).
-export const pathIn = manifest => /^Core: \S+(?: at [0-9a-f]{40}, copied whole|, carried by \S+) under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)/mu.exec(String(manifest ?? ""))?.[1] ?? "core/";
+export const pathIn = manifest => /^Core: \S+(?: at [0-9a-f]{40}, copied whole|, carried by (?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+) under ((?:[A-Za-z0-9_][A-Za-z0-9._-]*\/)+)(?= |$)/mu.exec(String(manifest ?? ""))?.[1] ?? "core/";
 // Where the core lies under `dir`: the manifest's path in a project (core/ as a rule), "" in the core's own repository,
 // null where neither holds its roles and floor.
 export function coreAt(dir) {

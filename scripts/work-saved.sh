@@ -19,12 +19,12 @@ g rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 at=""
 if [ "$mode" = start ]; then
   manifest=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g --no-replace-objects show refs/remotes/origin/main:core-manifest.md 2>/dev/null || true)
-  at=$(printf '%s\n' "$manifest" | sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by [^ ]+) under ([A-Za-z0-9_][A-Za-z0-9._/-]*/).*#\2#p' | head -n 1)
+  at=$(printf '%s\n' "$manifest" | sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by ([A-Za-z0-9_][A-Za-z0-9._-]*/)+) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\3#p' | head -n 1)
   [ -z "$at" ] && [ -n "$manifest" ] && at=core/ # (a manifest whose line reads in neither form: the usual path)
   if [ -n "$at" ] && [ ! -f "${at}floor/security.md" ]; then
     echo "STOP: the floor cannot be read at ${at}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the core's files into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."
   fi
-  copy=$(printf '%s\n' "$manifest" | sed -n -E 's#^Floor copy: ([A-Za-z0-9_][A-Za-z0-9._/-]*/).*#\1#p' | head -n 1)
+  copy=$(printf '%s\n' "$manifest" | sed -n -E 's#^Floor copy: (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\1#p' | head -n 1)
   if [ -n "$copy" ] && [ -d "${at}floor" ] && ! diff -r -q "${at}floor" "$copy" >/dev/null 2>&1; then
     echo "The floor's own copy under $copy differs from the floor under ${at}floor/, the core's that the library carries. Mend: copy ${at}floor/ over it, whole, in a pull request of its own."
   fi
