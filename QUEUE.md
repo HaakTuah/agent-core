@@ -35,7 +35,6 @@ wanted").
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
 | #426 | builder | |
-| #357 | builder | |
 | #394 | builder | |
 | #404 | builder | #403, or built with it |
 | #405 | builder | |

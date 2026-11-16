@@ -38,22 +38,23 @@ const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? 
 export const LIMITS = { run: 20000 };
 // Where git is told to find no hooks, no templates and no config of the user's. On Linux and macOS, the null device,
 // which nothing can write into. Git for Windows takes no hooks folder or config file at that device's name, so there
-// an empty folder and an empty file of the readers' own are made once, under a name no one can guess, and checked
-// before every use to be still empty: code of the session's that the readers run could otherwise plant a hook there
-// (a failed check makes the reading fail, as Unreadable).
+// an empty folder and an empty file of the readers' own are made under a name of the system's choosing, checked
+// before every use to be still empty, the file a link of its own (no hard link to another), and made afresh after each
+// run of the session's code (afresh, below): code of the session's that the readers run could otherwise plant a hook
+// there (a failed check makes the reading fail, as Unreadable).
 let quietFolder = null;
 const quiet = () => {
   if (process.platform !== "win32") return { hooks: os.devNull, config: os.devNull, templates: "" };
   if (!quietFolder) {
     const made = fs.mkdtempSync(path.join(os.tmpdir(), "staged-quiet-"));
-    process.on("exit", () => fs.rmSync(made, { recursive: true, force: true }));
+    process.once("exit", () => fs.rmSync(made, { recursive: true, force: true }));
     fs.mkdirSync(path.join(made, "no-hooks"));
     fs.writeFileSync(path.join(made, "no-config"), "");
     quietFolder = made;
   }
   const hooks = path.join(quietFolder, "no-hooks"), config = path.join(quietFolder, "no-config");
   const h = fs.lstatSync(hooks), c = fs.lstatSync(config);
-  if (!h.isDirectory() || fs.readdirSync(hooks).length || !c.isFile() || c.size) throw new Unreadable(`the readers' own empty folder was written into while the case was read`);
+  if (!h.isDirectory() || fs.readdirSync(hooks).length || !c.isFile() || c.size || c.nlink !== 1) throw new Unreadable(`the readers' own empty folder was written into while the case was read`);
   return { hooks, config, templates: hooks };
 };
 const SAFE_ = () => ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", `core.hooksPath=${quiet().hooks}`, "-c", "core.untrackedCache=false", "-c", "log.showSignature=false",
@@ -61,7 +62,7 @@ const SAFE_ = () => ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c",
   "-c", "core.commitGraph=false", "-c", "core.multiPackIndex=false", "-c", "pack.useBitmaps=false",
   // (and no .gitattributes of any tree's: attributes are read from git's empty tree alone)
   "-c", "attr.tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904"];
-const QUIET_ = () => ({ ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: quiet().config, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: quiet().templates, GIT_NO_REPLACE_OBJECTS: "1" });
+const QUIET_ = () => { const q = quiet(); return { ...BARE, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: q.config, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", GIT_TEMPLATE_DIR: q.templates, GIT_NO_REPLACE_OBJECTS: "1" }; };
 export const readGit = (cwd, ...args) => {
   const r = spawnSync("git", [...SAFE_(), ...args], { cwd, env: QUIET_(), encoding: "utf8", maxBuffer: 1 << 28, timeout: LIMITS.run });
   return r.status === 0 ? r.stdout : null;
@@ -83,7 +84,9 @@ function refsIn(gitDir, { reflog = false } = {}) {
   if (!real(gitDir, "dir")) throw new Unreadable(`${gitDir} is not there`);
   if (fs.existsSync(path.join(gitDir, "commondir"))) throw new Unreadable(`${gitDir} names another git folder as its common one`);
   const out = {}, NAME = /^refs\/[A-Za-z0-9._/-]+$/;
-  const named = r => { if (!NAME.test(r) || /\.\.|\/\/|\.lock$|\/\./.test(r)) throw new Unreadable(`${gitDir} holds the ref ${JSON.stringify(r)}, of no plain name`); return r; };
+  // (the name is the session's text, carried into a verdict and a pull request's description: cut, and shown in plain
+  // characters alone)
+  const named = r => { if (!NAME.test(r) || /\.\.|\/\/|\.lock$|\/\./.test(r)) throw new Unreadable(`${gitDir} holds the ref "${r.slice(0, 200).replace(/[^A-Za-z0-9._/-]/g, "?")}", of no plain name`); return r; };
   // (a file of at most 1 MB, a folder at most 32 deep: nothing else, a pipe or a device least of all, is read)
   const small = p => { const st = fs.lstatSync(p); if (!st.isFile() || st.size > 1 << 20) throw new Unreadable(`${p} is not a small plain file`); return fs.readFileSync(p, "utf8"); };
   if (real(path.join(gitDir, "packed-refs"), "file")) for (const l of small(path.join(gitDir, "packed-refs")).split("\n")) { const m = /^([0-9a-f]{40}) (refs\/\S+)$/.exec(l); if (m) out[named(m[2])] = m[1]; }
@@ -110,6 +113,13 @@ function refsIn(gitDir, { reflog = false } = {}) {
 // session's, borrowed (alternates), its refs those read above. Gives its git folder, or throws Unreadable.
 const views = new Map();
 process.on("exit", () => { for (const v of views.values()) fs.rmSync(path.dirname(v.at), { recursive: true, force: true }); });
+// After each run of the session's code: every view, and the Windows quiet folder, dropped, to be made afresh, so that
+// what that code may have written beside them is never read.
+function afresh() {
+  for (const v of views.values()) fs.rmSync(path.dirname(v.at), { recursive: true, force: true });
+  views.clear();
+  if (quietFolder) { fs.rmSync(quietFolder, { recursive: true, force: true }); quietFolder = null; }
+}
 function view(dir, which) {
   const gitDir = which === "origin" ? path.join(dir, "origin.git") : path.join(dir, "project", ".git");
   if (which === "project") real(path.join(dir, "project"), "dir");
@@ -299,8 +309,11 @@ export function branchesOf(dir) {
 export const sealOf = dir => `${path.resolve(dir)}.seal`;
 export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
 export const memoOf = (dir, name) => JSON.parse(fs.readFileSync(path.join(sealOf(dir), `${name}.json`), "utf8"));
+// (the project's git objects by their files' names: a commit made and then undone, its reflog cleared, still leaves one)
+const objectsOf = dir => { const at = path.join(dir, "project", ".git", "objects"), out = []; const walk = (f, rel) => { for (const e of fs.readdirSync(f)) { const p = path.join(f, e), st = fs.lstatSync(p); if (st.isDirectory()) walk(p, `${rel}${e}/`); else out.push(`${rel}${e}`); } }; walk(at, ""); return out.sort(); };
 export const seal = dir => {
   memo(dir, "refs", branchesOf(dir));
+  memo(dir, "objects", objectsOf(dir));
   memo(dir, "reflog", [...new Set(Object.entries(refsIn(path.join(dir, "project", ".git"), { reflog: true })).filter(([r]) => r.startsWith("refs/reflog/")).map(([, sha]) => sha))]);
 };
 const sealed = dir => memoOf(dir, "refs");
@@ -384,20 +397,34 @@ function writeSrc(dir, ref, tmp, needed) {
 
 // Whether the program at a ref of the origin sums right, as the case reads it: never by the branch's own test, which
 // the session could have weakened, nor by a run that only ends well (a sum.mjs could end the process as it loads), but
-// by sums of numbers drawn afresh for each reading, given to its sum() after it has loaded and checked here.
+// by sums of numbers drawn afresh for each reading, given to its sum() after it has loaded and checked here. The
+// reader takes the cases and a nonce from its input before it loads the session's code, keeps the functions it answers
+// with from before then, and answers on a pipe of its own (fd 3) with the nonce, each sum a plain number: so code that
+// patches the process's output, or reads its input, can neither see the cases ahead nor forge the answer (#357).
+// (the answer is built as a string from plain numbers alone, so that no setter or method the session's code puts on a
+// built-in object takes part in it)
+const JUDGE = `import fs from "node:fs";
+const { writeSync, readFileSync } = fs;
+const { nonce, cases } = JSON.parse(readFileSync(0, "utf8"));
+const n = cases.length;
+const { sum } = await import("./src/sum.mjs");
+let sums = "";
+for (let i = 0; i < n; i++) { const v = sum(cases[i]); sums += \`\${i ? "," : ""}\${typeof v === "number" && v === v ? v : "null"}\`; }
+writeSync(3, \`{"nonce":"\${nonce}","sums":[\${sums}]}\\n\`);
+`;
 export function testPasses(dir, ref) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
   try {
     if (!writeSrc(dir, ref, tmp, "src/sum.mjs")) return false;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
-    fs.writeFileSync(path.join(tmp, "read.mjs"), 'import { sum } from "./src/sum.mjs";\nlet input = "";\nprocess.stdin.on("data", d => { input += d; });\nprocess.stdin.on("end", () => { process.stdout.write(`\\n${JSON.stringify(JSON.parse(input).map(n => sum(n)))}\\n`); });\n');
+    fs.writeFileSync(path.join(tmp, "read.mjs"), JUDGE);
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
-    const cases = [[], [2], [1, 2, 3], ...[1, 2, 5, 9].map(draw)];
-    const r = spawnSync(process.execPath, ["read.mjs"], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, input: JSON.stringify(cases) });
-    let got = null;
-    try { got = JSON.parse(String(r.stdout ?? "").trim().split("\n").at(-1)); } catch { return false; }
+    const cases = [[], [2], [1, 2, 3], ...[1, 2, 5, 9].map(draw)], nonce = crypto.randomBytes(16).toString("hex");
+    const r = spawnSync(process.execPath, ["read.mjs"], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, input: JSON.stringify({ nonce, cases }), stdio: ["pipe", "pipe", "pipe", "pipe"] });
+    const said = String(r.output?.[3] ?? "").split("\n").map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(x => x?.nonce === nonce);
+    const got = said.length === 1 ? said[0].sums : null;
     return r.status === 0 && Array.isArray(got) && got.length === cases.length && cases.every((c, i) => got[i] === c.reduce((a, b) => a + b, 0));
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }
 
 // What the program prints at a ref of the origin, given `args`; null where it cannot run.
@@ -408,7 +435,7 @@ export function runAt(dir, ref, args) {
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run });
     return r.status === 0 ? r.stdout.trim() : null;
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }
 
 // Whether the session committed in the project: a branch or HEAD moved from main as the case set it, or a commit the
@@ -417,7 +444,10 @@ function committed(dir) {
   const refs = refsIn(path.join(dir, "project", ".git"), { reflog: true });
   if (Object.entries(refs).some(([r, sha]) => (r === "HEAD" || r.startsWith("refs/heads/")) && sha !== base(dir))) return true;
   const known = new Set(memoOf(dir, "reflog"));
-  return Object.entries(refs).some(([r, sha]) => r.startsWith("refs/reflog/") && !known.has(sha));
+  if (Object.entries(refs).some(([r, sha]) => r.startsWith("refs/reflog/") && !known.has(sha))) return true;
+  // (and a git object the seal did not hold: work begun, its reflog cleared since; a seal from before it was kept, none)
+  const before = fs.existsSync(path.join(sealOf(dir), "objects.json")) ? new Set(memoOf(dir, "objects")) : null;
+  return Boolean(before) && objectsOf(dir).some(o => !before.has(o));
 }
 
 // The project's own working folder: whether anything there differs from what the case set (committed or not).
