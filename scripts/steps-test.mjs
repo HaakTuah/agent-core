@@ -286,11 +286,22 @@ ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter k
   }
   execFileSync("git", ["add", "-A"], { cwd: dir });
   const p = project(dir);
-  const reads = p.read("AGENTS.md") === "# own\n" && linked.filter(at => at !== "in.md").every(at => p.read(at === "far" ? "far/secret.md" : at) === null) && p.read("docs") === null && p.read("docs/big.md") === null
-    && (!linked.includes("in.md") || p.read("in.md") === "# own\n") && p.read(".env") === null && p.read(".git/config") === null && p.safe("AGENTS.md") && !p.safe("AGENTS.md/x") && p.safe("nothing-here.md") && !p.safe("docs/big.md") && linked.filter(at => at !== "in.md" && at !== "far").every(at => !p.safe(at));
+  // (each part named, so that a system where one differs says which; a path through a file is no folder anywhere, and
+  // Windows says there is nothing there, where others say it is no folder: neither is handed on)
+  const parts = {
+    own: p.read("AGENTS.md") === "# own\n",
+    "links out or to a device": linked.filter(at => at !== "in.md").every(at => p.read(at === "far" ? "far/secret.md" : at) === null),
+    "a folder and a file past the size": p.read("docs") === null && p.read("docs/big.md") === null,
+    "a link to a file of its own": !linked.includes("in.md") || p.read("in.md") === "# own\n",
+    "git's own and an ignored file, by name": p.read(".env") === null && p.read(".git/config") === null,
+    "safe: its own, nothing there, not the big file": p.safe("AGENTS.md") && p.safe("nothing-here.md") && !p.safe("docs/big.md"),
+    "safe: a path through a file never throws": typeof p.safe("AGENTS.md/x") === "boolean" && (process.platform === "win32" || !p.safe("AGENTS.md/x")),
+    "safe: no link out or to a device": linked.filter(at => at !== "in.md" && at !== "far").every(at => !p.safe(at)),
+  };
+  const reads = Object.values(parts).every(Boolean);
   const said = report(Object.assign([], { unread: p.unread }));
   ok(reads && p.unread.join() === "docs/big.md" && said.includes(`Left unread, each past ${READ_MOST} bytes`) && said.includes("`docs/big.md`"),
-    `the steps read a regular file of the project's own and nothing else: a link to one reads as it, a link out or to a device (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, said);
+    `the steps read a regular file of the project's own and nothing else: a link to one reads as it, a link out or to a device (${linked.join(", ") || "none made here"}), a folder and a file past the size read as missing, the last named in the report`, `${said}\n${Object.entries(parts).filter(([, v]) => !v).map(([k]) => `not so: ${k}`).join("\n")}`);
   // (the size marks' step never hands the reading-size check a file the reader would not read: a tracked link to an
   // endless device among the files its marks name is reported as not read, at once)
   if (process.platform !== "win32") {
