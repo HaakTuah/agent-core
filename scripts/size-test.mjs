@@ -56,7 +56,7 @@ ok(/cannot be told/.test(raised("no cap here", two(27, 20), yes)) && /cannot be 
 // what it counts
 const template = name => fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8");
 const imported = [...`${template("AGENTS.md.tmpl")}\n${template("CLAUDE.md.tmpl")}`.matchAll(/^@core\/(\S+)$/gmu)].map(m => m[1]);
-const named = /`core\/(modules\/other-builders\.md)`/u.exec(template("AGENTS.md.tmpl"))?.[1];
+const named = /`core\/(tools\/other-builders\.md)`/u.exec(template("AGENTS.md.tmpl"))?.[1];
 const expected = [...imported, named].sort(), builder = counted("builder", root);
 ok(named && eq([...builder].sort(), expected) && !builder.includes("floor/topics.md") && !builder.includes("tasks/reviews.md"),
   "for the builder it counts what the starter kit's templates have a builder read at its start (the floor's security.md, its role's file, the modules read then, each tool's own part), and no file read only when a task calls for it", `${builder} against ${expected}`);
@@ -86,7 +86,7 @@ const over = put("over.mjs", caps({ ...kb, builder: kb.builder - 2 }));
 ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set it to /.test(run("--raise", over, one).out) && mended(run("--raise", over, one).out), "a raise of more than one step fails, saying the cap to set", run("--raise", over, one).out);
 // (a copy of the core whose script's real caps are not the ones its readable block says, run as itself; and one a
 // role's start has outgrown)
-for (const part of ["scripts", "roles", "modules", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
+for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
 const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);

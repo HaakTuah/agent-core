@@ -100,8 +100,8 @@ else {
   const g = (...a) => execFileSync(realGit, a, { cwd: core, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } }).trim();
   const release = (file, text, tag) => { fs.mkdirSync(path.dirname(path.join(core, file)), { recursive: true }); fs.writeFileSync(path.join(core, file), text); g("add", "-A"); g("commit", "-q", "-m", tag); g("tag", tag); return g("rev-parse", "HEAD"); };
   g("init", "-q", "-b", "main");
-  const r1 = release("modules/a.md", "a", "release-1");
-  release("modules/b.md", "b", "release-2");
+  const r1 = release("tasks/a.md", "a", "release-1");
+  release("tasks/b.md", "b", "release-2");
   const takes = list => `\nFloor: whole. Modules: ${list}.\nNot taken: \`b.md\` (no use here).\n`;
   r = program(r1, "", line(12, BOT, TITLE), [], "| *follows* | `releases` |", core, takes("`a.md`"));
   ok(r.status === 0 && r.out.includes("release-2, is at") && r.out.includes("changes nothing the project takes: close") && /gh issue close 12 .*changes nothing this project takes/.test(r.calls), "a release that changes nothing the project takes closes the issue, saying why", r.out);

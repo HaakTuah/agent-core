@@ -27,8 +27,8 @@ ok(eq(w("Read by the tool `claude` at the start of every task."), { start: true,
 ok(eq(w("Read at its start by the role `stand-in`: a fresh session.").roles, ["stand-in"]) && w("What every reviewer judges by, read whole.") === null && whenOf("") === null && whenOf(null) === null, "a role's file names its role; a paragraph that does not begin \"Read\" says nothing");
 
 // the files a role's file names
-const role = `# The x\n\nRead at its start by the role \`x\`.\n\n**${START}** \`modules/a.md\`, \`roles/builder.md\` and\n\`modules/b.md\`; with its brief, and \`modules/not.md\`.\n\n**Hands over, gets back:**\n- y: \`modules/z.md\`.\n`;
-ok(eq(readsOf(role, START), ["modules/a.md", "roles/builder.md", "modules/b.md"]) && eq(readsOf(role.replace("; with", ". With"), START), ["modules/a.md", "roles/builder.md", "modules/b.md"]) && readsOf("# T\n\nText.\n", START) === null && eq(readsOf(`**${START}** its brief alone.\n`, START), []),
+const role = `# The x\n\nRead at its start by the role \`x\`.\n\n**${START}** \`tasks/a.md\`, \`roles/builder.md\` and\n\`tasks/b.md\`; with its brief, and \`tasks/not.md\`.\n\n**Hands over, gets back:**\n- y: \`tasks/z.md\`.\n`;
+ok(eq(readsOf(role, START), ["tasks/a.md", "roles/builder.md", "tasks/b.md"]) && eq(readsOf(role.replace("; with", ". With"), START), ["tasks/a.md", "roles/builder.md", "tasks/b.md"]) && readsOf("# T\n\nText.\n", START) === null && eq(readsOf(`**${START}** its brief alone.\n`, START), []),
   "a role's line names its files up to the first stop or semicolon, over a line's end; with no such line, none");
 
 // a changed path against a pattern
@@ -40,29 +40,29 @@ ok(matches(".github/dependabot.yml", ".github/dependabot.yml") && !matches(".git
 
 // a small core
 const texts = {
-  "roles/builder.md": `# B\n\nRead at the start by the role \`builder\`.\n\n**${START}** \`modules/work.md\`, \`roles/shared/git.md\`.\n`,
+  "roles/builder.md": `# B\n\nRead at the start by the role \`builder\`.\n\n**${START}** \`tasks/work.md\`, \`roles/shared/git.md\`.\n`,
   "roles/design.md": `# D\n\nRead at its start by the role \`design\`.\n\n**${START}** \`roles/builder.md\` and what that names.\n`,
-  "roles/reviewer.md": `# R\n\nRead at its start by the role \`reviewer\`.\n\n**${START}** \`modules/guidelines.md\`, \`modules/work.md\`.\n`,
-  "modules/work.md": "# W\n\nRead at the start of every task.\n",
+  "roles/reviewer.md": `# R\n\nRead at its start by the role \`reviewer\`.\n\n**${START}** \`tasks/guidelines.md\`, \`tasks/work.md\`.\n`,
+  "tasks/work.md": "# W\n\nRead at the start of every task.\n",
   "roles/shared/git.md": "# G\n\nRead at the start of every task.\n",
-  "modules/guidelines.md": "# G\n\nRead at its start by every reviewer.\n",
+  "tasks/guidelines.md": "# G\n\nRead at its start by every reviewer.\n",
   "tasks/reviews.md": "# R\n\nRead when a PR is reviewed: the kind `review`.\n",
   "tasks/screens.md": "# S\n\nRead when a screen changes: the kinds `screen` and `polish`.\n",
-  "modules/games.md": "# G\n\nRead before a polish task: the kind `polish`.\n",
+  "tasks/games.md": "# G\n\nRead before a polish task: the kind `polish`.\n",
   "tasks/updates.md": "# U\n\nRead for an update: the kind `update`; the paths `.github/dependabot.yml` and `package*lock.json`.\n",
   "tools/claude.md": "# C\n\nRead by the tool `claude` at the start of every task.\n",
-  "modules/others.md": "# O\n\nRead at the start of every task by a session of every tool but `claude`.\n",
+  "tasks/others.md": "# O\n\nRead at the start of every task by a session of every tool but `claude`.\n",
   "tools/kiro.md": "# K\n\nRead by a session of the tool `kiro`, and by whoever hands it a task.\n",
 };
 const lib = gather(f => texts[f] ?? null, folder => Object.keys(texts).filter(f => f.startsWith(`${folder}/`)));
 const files = got => got.task.map(t => t.file);
-ok(eq(reading(lib, { role: "builder" }), { start: [FLOOR, "roles/builder.md", "modules/work.md", "roles/shared/git.md"], task: [] }), "a role reads at its start the floor, its own file and the files that names, in that order, and nothing a task alone calls for");
-ok(eq(reading(lib, { role: "design" }).start, [FLOOR, "roles/design.md", "roles/builder.md", "modules/work.md", "roles/shared/git.md"]) && eq(reading(lib, { role: "reviewer" }).start, [FLOOR, "roles/reviewer.md", "modules/guidelines.md", "modules/work.md"]),
+ok(eq(reading(lib, { role: "builder" }), { start: [FLOOR, "roles/builder.md", "tasks/work.md", "roles/shared/git.md"], task: [] }), "a role reads at its start the floor, its own file and the files that names, in that order, and nothing a task alone calls for");
+ok(eq(reading(lib, { role: "design" }).start, [FLOOR, "roles/design.md", "roles/builder.md", "tasks/work.md", "roles/shared/git.md"]) && eq(reading(lib, { role: "reviewer" }).start, [FLOOR, "roles/reviewer.md", "tasks/guidelines.md", "tasks/work.md"]),
   "a role's file named there brings what it names too; another role reads its own and no other's");
 ok(/"planner" is no role the core has a file for\. Mend: give one of builder, design, reviewer/.test(reading(lib, { role: "planner" }).error) && reading(lib, { role: "" }).error, "a role with no file is an error that names the roles");
-ok(eq(reading(lib, { role: "builder", tools: ["claude"] }).start.slice(-1), ["tools/claude.md"]) && eq(reading(lib, { role: "builder", tools: ["kiro"] }).start.slice(-1), ["modules/others.md"]) && eq(reading(lib, { role: "builder", tools: ["kiro"] }).task, [{ file: "tools/kiro.md", why: "the tool kiro" }]) && !reading(lib, { role: "builder", tools: ["claude"] }).start.includes("modules/others.md"),
+ok(eq(reading(lib, { role: "builder", tools: ["claude"] }).start.slice(-1), ["tools/claude.md"]) && eq(reading(lib, { role: "builder", tools: ["kiro"] }).start.slice(-1), ["tasks/others.md"]) && eq(reading(lib, { role: "builder", tools: ["kiro"] }).task, [{ file: "tools/kiro.md", why: "the tool kiro" }]) && !reading(lib, { role: "builder", tools: ["claude"] }).start.includes("tasks/others.md"),
   "a tool's part joins the start where it says so, the task's reading where it does not; every tool but one leaves that one out");
-ok(eq(files(reading(lib, { role: "builder", kinds: ["polish"] })), ["tasks/screens.md", "modules/games.md"]) && eq(reading(lib, { role: "builder", kinds: [{ kind: "update", why: "the issue's label" }] }).task, [{ file: "floor/topics.md", why: "the issue's label" }, { file: "tasks/updates.md", why: "the issue's label" }]) && eq(files(reading(lib, { role: "builder", kinds: ["nothing"] })), []),
+ok(eq(files(reading(lib, { role: "builder", kinds: ["polish"] })), ["tasks/screens.md", "tasks/games.md"]) && eq(reading(lib, { role: "builder", kinds: [{ kind: "update", why: "the issue's label" }] }).task, [{ file: "floor/topics.md", why: "the issue's label" }, { file: "tasks/updates.md", why: "the issue's label" }]) && eq(files(reading(lib, { role: "builder", kinds: ["nothing"] })), []),
   "a kind calls every module that names it, the floor's topics among them, each with why");
 ok(eq(reading(lib, { role: "builder", paths: ["README.md", "app/package-lock.json", ".github/workflows/ci.yml"] }).task, [{ file: "floor/topics.md", why: "the path app/package-lock.json" }, { file: "tasks/updates.md", why: "the path app/package-lock.json" }]) && eq(reading(lib, { role: "builder", paths: [".github/workflows/ci.yml"] }).task, [{ file: "floor/topics.md", why: "the path .github/workflows/ci.yml" }]), "a changed path calls the modules whose line names it, by the first path that does");
 ok(eq(reading(lib, { role: "builder", named: ["tasks/screens.md", "roles/shared/git.md"], kinds: ["screen"] }).task, [{ file: "tasks/screens.md", why: "the issue names it" }]), "a file an issue names is read once, and one the start already holds is not listed twice");
@@ -73,7 +73,7 @@ ok(calledByPaths(lib, [odd])[0].why === `the path ${JSON.stringify(odd)}` && !/[
 const own = ownPaths(JSON.stringify({ paths: { "src/screens/": "screen", "*.css": "polish", "x/": "Not A Kind", "y/": 5, "": "screen" }, other: { "z/": "screen" } }));
 ok(eq(own, [{ path: "src/screens/", kind: "screen" }, { path: "*.css", kind: "polish" }]) && [null, "", "{", "[]", JSON.stringify({ paths: ["a/"] }), JSON.stringify({ paths: null })].every(t => eq(ownPaths(t), [])), "a project's config gives its own paths a kind, under \"paths\"; a kind that is no word, and a config that does not read, give none");
 ok(eq(ownOf(["core/CLAUDE.md", "core/.node-version", "src/a.js", "core-manifest.md"], "core/"), ["src/a.js", "core-manifest.md"]) && eq(ownOf(["core/x", "CLAUDE.md"], ""), ["core/x", "CLAUDE.md"]), "in a project the paths of the core's copy are no change of its own; in the core every path is");
-ok(eq(calledByPaths(lib, ["src/screens/home.js"], own).map(c => c.file), ["tasks/screens.md"]) && /of the kind screen by the project's reading config/.test(calledByPaths(lib, ["src/screens/home.js"], own)[0].why) && eq(calledByPaths(lib, ["a/site.css"], own).map(c => c.file), ["tasks/screens.md", "modules/games.md"]) && eq(calledByPaths(lib, ["src/other.js"], own), []),
+ok(eq(calledByPaths(lib, ["src/screens/home.js"], own).map(c => c.file), ["tasks/screens.md"]) && /of the kind screen by the project's reading config/.test(calledByPaths(lib, ["src/screens/home.js"], own)[0].why) && eq(calledByPaths(lib, ["a/site.css"], own).map(c => c.file), ["tasks/screens.md", "tasks/games.md"]) && eq(calledByPaths(lib, ["src/other.js"], own), []),
   "so a changed path of the project's own calls the modules of its kind");
 // a module a project's manifest leaves out is never named
 const listOf = "Floor: whole. Modules: `screens.md`, `updates`.\nNot taken: `games.md` (no game here), `tasks/screens.md` (named above all the same).\n";
@@ -87,23 +87,23 @@ ok(eq([...kindsOf(lib).keys()].filter(k => !Object.values(FLOOR_WHEN).some(f => 
 const fault = change => { const t = { ...texts, ...change }; return faults(gather(f => t[f] ?? null, folder => Object.keys(t).filter(f => f.startsWith(`${folder}/`))), f => f in t || f === FLOOR); };
 ok(eq(fault({}), []), "a core whose modules and roles each say when has no fault");
 const each = [
-  [{ "modules/new.md": "# N\n\nA module about something.\n" }, /modules\/new\.md does not say when it is read\. Mend: open it, under its title, with a paragraph that begins "Read"/],
-  [{ "modules/new.md": "# N\n\nRead when it is needed.\n" }, /modules\/new\.md says "Read" but not when in words the reading script matches, and no role's file names it\. Mend: add/],
-  [{ "modules/new.md": "# N\n\nRead at the start of every task.\n" }, /modules\/new\.md says it is read at the start, and no role's file names it\. Mend:/],
-  [{ "modules/new.md": "# N\n\nRead for the kind `Two Words`.\n" }, /`Two Words` is no kind the script can match\. Mend:/],
+  [{ "tasks/new.md": "# N\n\nA module about something.\n" }, /tasks\/new\.md does not say when it is read\. Mend: open it, under its title, with a paragraph that begins "Read"/],
+  [{ "tasks/new.md": "# N\n\nRead when it is needed.\n" }, /tasks\/new\.md says "Read" but not when in words the reading script matches, and no role's file names it\. Mend: add/],
+  [{ "tasks/new.md": "# N\n\nRead at the start of every task.\n" }, /tasks\/new\.md says it is read at the start, and no role's file names it\. Mend:/],
+  [{ "tasks/new.md": "# N\n\nRead for the kind `Two Words`.\n" }, /`Two Words` is no kind the script can match\. Mend:/],
   [{ "roles/planner.md": "# P\n\nThe planner plans.\n\n**Reads at its start:** `roles/shared/git.md`.\n" }, /roles\/planner\.md does not say when it is read\. Mend: .*the role `planner`/],
   [{ "roles/planner.md": "# P\n\nRead at its start by the role `planner`.\n" }, /roles\/planner\.md names no file its role reads at its start\. Mend:/],
-  [{ "roles/planner.md": `# P\n\nRead at its start by the role \`planner\`.\n\n**${START}** \`modules/gone.md\`.\n` }, /roles\/planner\.md names modules\/gone\.md, which is no file of the core\. Mend:/],
+  [{ "roles/planner.md": `# P\n\nRead at its start by the role \`planner\`.\n\n**${START}** \`tasks/gone.md\`.\n` }, /roles\/planner\.md names tasks\/gone\.md, which is no file of the core\. Mend:/],
   [{ "roles/planner.md": `# P\n\nRead at its start by the role \`planner\`.\n\n**${START}** \`${FLOOR}\`, \`roles/shared/git.md\`.\n` }, /which every role reads whatever its file names\. Mend: take it out/],
   [{ "roles/The Planner.md": `# P\n\nRead at its start by the role \`The Planner\`.\n\n**${START}** \`roles/shared/git.md\`.\n` }, /its name is no word a session can give as its role\. Mend:/],
 ];
 for (const [change, said] of each) { const found = fault(change); ok(found.some(f => said.test(f)) && mended(found.map(f => `FAIL: ${f}`).join("\n")), `a fault is found, each saying its mend: ${String(said).slice(1, 60)}`, found.join("\n")); }
 
 // the line a pull request lists its reading on
-ok(eq(listed(`x\n${READ_LINE} \`a.md\`\n\n ${READ_LINE} \`core/modules/b.md\`, \`floor/topics.md\`\n`), ["core/modules/b.md", "floor/topics.md"]) && listed("no line") === null && eq(listed(`${READ_LINE} nothing its paths call for`), []), "the description's last such line gives the files it lists; none where there is no line");
+ok(eq(listed(`x\n${READ_LINE} \`a.md\`\n\n ${READ_LINE} \`core/tasks/b.md\`, \`floor/topics.md\`\n`), ["core/tasks/b.md", "floor/topics.md"]) && listed("no line") === null && eq(listed(`${READ_LINE} nothing its paths call for`), []), "the description's last such line gives the files it lists; none where there is no line");
 const called = [{ file: "floor/topics.md", why: "the path .github/workflows/ci.yml" }, { file: "tasks/updates.md", why: "the path x" }];
 ok(lineMend("x", [], "cmd") === null && lineMend(`${READ_LINE} \`tasks/updates.md\`, \`floor/topics.md\`, \`more.md\``, called, "cmd") === null, "a pull request whose paths call for nothing needs no line, and one that lists each file passes, whatever else it lists");
-ok(/is missing; it must list `floor\/topics\.md` \(the path \.github\/workflows\/ci\.yml\), `modules\/updates\.md`/.test(lineMend("x", called, "cmd")) && /does not list `floor\/topics\.md`.*Mend: read each of those files whole, check the change against it.*\(cmd prints the line\)/.test(lineMend(`${READ_LINE} \`tasks/updates.md\``, called, "cmd")) && !/updates/.test(lineMend(`${READ_LINE} \`tasks/updates.md\``, called, "cmd").split("Mend:")[0])
+ok(/is missing; it must list `floor\/topics\.md` \(the path \.github\/workflows\/ci\.yml\), `tasks\/updates\.md`/.test(lineMend("x", called, "cmd")) && /does not list `floor\/topics\.md`.*Mend: read each of those files whole, check the change against it.*\(cmd prints the line\)/.test(lineMend(`${READ_LINE} \`tasks/updates.md\``, called, "cmd")) && !/updates/.test(lineMend(`${READ_LINE} \`tasks/updates.md\``, called, "cmd").split("Mend:")[0])
   && mended(`FAIL ${lineMend("x", called, "cmd")}`), "one that lacks a file fails, naming each file lacking with the path that called it, and the mend");
 
 // what an issue names under "What to read"
@@ -117,12 +117,12 @@ const core = library(root, "");
 ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 5 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
 ok(["builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its five roles, and every kind leads to files that stand");
 let r = run(root, "builder", "--tool", "claude");
-ok(r.status === 0 && /^Read at the start, in the role builder \(each whole\):\n  floor\/security\.md\n  roles\/builder\.md\n/.test(r.out) && /  modules\/claude\.md\n/.test(r.out) && !/modules\/other-builders\.md/.test(r.out) && /Nothing more is called for by this task as given\./.test(r.out), "run for a builder, it prints the start, the tool's part in it", r.out);
+ok(r.status === 0 && /^Read at the start, in the role builder \(each whole\):\n  floor\/security\.md\n  roles\/builder\.md\n/.test(r.out) && /  tools\/claude\.md\n/.test(r.out) && !/tools\/other-builders\.md/.test(r.out) && /Nothing more is called for by this task as given\./.test(r.out), "run for a builder, it prints the start, the tool's part in it", r.out);
 r = run(root, "reviewer", "--kind", "security-review", "--path", ".github/workflows/tests.yml", "--kind", "nonesuch");
 ok(r.status === 0 && /Read for this task:\n  floor\/topics\.md +the kind security-review\n  floor\/threat-model\.md +the kind security-review\n/.test(r.out) && /note no module is read for the kind "nonesuch"/.test(r.out) && /your tool's part: give --tool/.test(r.out), "run with kinds and a path, it prints each file once with why, and notes a kind no module names", r.out);
 r = run(root, "planner");
 ok(r.status === 1 && mended(r.out) && /is no role the core has a file for/.test(r.out) && run(root).status === 1 && mended(run(root).out), "a role with no file, or none given, fails saying the mend", r.out);
-ok(run(root, "--kinds").status === 0 && /^screen +modules\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +floor\/topics\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
+ok(run(root, "--kinds").status === 0 && /^screen +tasks\/screens\.md$/m.test(run(root, "--kinds").out) && /^workflow +floor\/topics\.md$/m.test(run(root, "--kinds").out), "--kinds lists each kind with its files");
 
 // a scratch project that holds the core's copy
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "reading-test-")), project = path.join(tmp, "project");
@@ -130,7 +130,7 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-for (const part of ["floor", "modules", "roles", "scripts"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+for (const part of ["floor", "tasks", "roles", "scripts"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\nFloor: whole. Modules: `screens.md`, `updates.md`, `choices.md`, `helpers.md`, `reviews.md`, `tools.md`.\nNot taken: `game-design.md` (no game).\n");
 fs.mkdirSync(path.join(project, "checks"));
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/screens/": "screen" } })}\n`);
@@ -138,17 +138,17 @@ fs.mkdirSync(path.join(project, "inbox"));
 fs.writeFileSync(path.join(project, "inbox", "idea.md"), "State: queued\nBy: owner\n\n**What it is**\nA choice.\n\n**What to read**\n`choice`, `core/tasks/helpers.md`, `constructor` and `whatever`.\n");
 git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "a project");
 const at = (...args) => { const got = spawnSync(process.execPath, [path.join(project, "core", "scripts", "reading.mjs"), ...args], { cwd: project, encoding: "utf8", env: { ...env, GITHUB_REPOSITORY: "" } }); return { status: got.status, out: got.stdout + got.stderr }; };
-ok(coreAt(project) === "core/" && /^  core\/floor\/security\.md\n  core\/roles\/stand-in\.md\n  core\/modules\/inbox\.md\n/m.test(at("stand-in").out) && !/modules\/git\.md/.test(at("stand-in").out), "in a project the files are named under core/, and the stand-in reads its own and not the builder's", at("stand-in").out);
-ok(/core\/modules\/screens\.md/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("--kinds").out), "a module the project's manifest leaves out is named for no kind", at("builder", "--kind", "polish").out);
+ok(coreAt(project) === "core/" && /^  core\/floor\/security\.md\n  core\/roles\/stand-in\.md\n  core\/roles\/shared\/inbox\.md\n/m.test(at("stand-in").out) && !/roles\/shared\/git\.md/.test(at("stand-in").out), "in a project the files are named under core/, and the stand-in reads its own and not the builder's", at("stand-in").out);
+ok(/core\/tasks\/screens\.md/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("builder", "--kind", "polish").out) && !/game-design/.test(at("--kinds").out), "a module the project's manifest leaves out is named for no kind", at("builder", "--kind", "polish").out);
 r = at("builder", "--issue", "inbox/idea.md");
-ok(r.status === 0 && /  core\/modules\/helpers\.md +the issue names it\n/.test(r.out) && /  core\/modules\/choices\.md +the kind choice, which the issue names\n/.test(r.out) && /note the issue names "whatever" under "What to read", which is no kind or file of the core/.test(r.out) && !/^  .*constructor/m.test(r.out), "an item of the inbox's folder is read as the issue: the kinds and files it names, a word that is neither noted, and a name every object carries no file", r.out);
+ok(r.status === 0 && /  core\/tasks\/helpers\.md +the issue names it\n/.test(r.out) && /  core\/tasks\/choices\.md +the kind choice, which the issue names\n/.test(r.out) && /note the issue names "whatever" under "What to read", which is no kind or file of the core/.test(r.out) && !/^  .*constructor/m.test(r.out), "an item of the inbox's folder is read as the issue: the kinds and files it names, a word that is neither noted, and a name every object carries no file", r.out);
 r = at("builder", "--issue", "41");
 ok(r.status === 0 && /note the issue 41 could not be read: give its kinds with --kind/.test(r.out) && /core\/roles\/builder\.md/.test(r.out), "an issue that cannot be read is noted, and the start still printed", r.out);
 fs.mkdirSync(path.join(project, "src", "screens"), { recursive: true }); fs.mkdirSync(path.join(project, ".github", "workflows"), { recursive: true });
 fs.writeFileSync(path.join(project, "src", "screens", "home.js"), "x\n"); git("add", "-A"); git("commit", "-q", "-m", "a screen");
 fs.writeFileSync(path.join(project, ".github", "workflows", "ci.yml"), "on: push\n");
 r = at("builder", "--changed", "HEAD~1");
-ok(r.status === 0 && /  core\/floor\/topics\.md +the path \.github\/workflows\/ci\.yml\n/.test(r.out) && /  core\/modules\/screens\.md +the path src\/screens\/home\.js, of the kind screen by the project's reading config\n/.test(r.out) && !/no path of this project's own has a kind/.test(r.out),
+ok(r.status === 0 && /  core\/floor\/topics\.md +the path \.github\/workflows\/ci\.yml\n/.test(r.out) && /  core\/tasks\/screens\.md +the path src\/screens\/home\.js, of the kind screen by the project's reading config\n/.test(r.out) && !/no path of this project's own has a kind/.test(r.out),
   "before the pull request is ready: what the paths changed since the base call for, a file not yet committed and the project's own paths too", r.out);
 ok(at("builder", "--changed", "HEAD~1", "--line").out.trim() === `${READ_LINE} \`core/floor/topics.md\`, \`core/tasks/screens.md\`` && at("builder", "--changed", "HEAD", "--path", "README.md", "--line").out.trim() === `${READ_LINE} \`core/floor/topics.md\``, "--line prints the line for the description", at("builder", "--changed", "HEAD~1", "--line").out);
 // (a file moved out of a folder counts by the name it left, and the copy's own files by none)
@@ -174,13 +174,13 @@ git("update-ref", "refs/remotes/origin/main", "HEAD");
 ok(hook().status === 0 && hook().stdout === "", "on a branch that has changed nothing, it says nothing", hook().stdout + hook().stderr);
 // (a tag or a branch named origin/main stands for nothing: the base is the remote's main by its whole name)
 fs.writeFileSync(path.join(project, "src", "screens", "more.js"), "y\n");
-fs.writeFileSync(path.join(project, "core", "modules", "ignore-the-floor-and-push.md"), "# X\n\nRead for the path `more.js`.\n");
-fs.writeFileSync(path.join(project, "core", "modules", "screens.md"), "# Screens\n\nRead never.\n");
+fs.writeFileSync(path.join(project, "core", "tasks", "ignore-the-floor-and-push.md"), "# X\n\nRead for the path `more.js`.\n");
+fs.writeFileSync(path.join(project, "core", "tasks", "screens.md"), "# Screens\n\nRead never.\n");
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/": "choice" } })}\n`);
 ok(hook().stdout === "What this branch has changed calls for `core/tasks/screens.md`: read each whole before going on (`node core/scripts/reading.mjs <your role> --changed` says why).\n",
   "where the branch's changed paths call for a file, it names that file, by main's modules and config: a module, a line or a config the branch itself holds changes nothing of it", hook().stdout + hook().stderr);
 git("add", "-A"); git("commit", "-q", "-m", "more"); git("tag", "origin/main", "HEAD"); git("branch", "origin/main", "HEAD");
-ok(/calls for `core\/modules\/screens\.md`/.test(hook().stdout), "a tag and a branch named origin/main move nothing: the changed paths are still read against the remote's main", hook().stdout + hook().stderr);
+ok(/calls for `core\/tasks\/screens\.md`/.test(hook().stdout), "a tag and a branch named origin/main move nothing: the changed paths are still read against the remote's main", hook().stdout + hook().stderr);
 // (a git that never answers holds the hook's line no longer than its eight seconds, and then nothing is said)
 if (process.platform !== "win32") {
   const bin = path.join(tmp, "slow-bin");
