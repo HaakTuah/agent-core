@@ -11,7 +11,8 @@
     "tools": { "domain": "tools", "paths": ["scripts/"] }
   },
   "suites": {
-    "suites": { "linux": 300 },
+    "suites-kit-core-licences": { "linux": 240 },
+    "suites-projects-rest": { "linux": 240 },
     "suites-projects": { "win32": 600 },
     "suites-kit": { "win32": 600 },
     "suites-core": { "win32": 450 },
