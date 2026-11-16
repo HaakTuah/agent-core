@@ -473,7 +473,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       // (a fetch whose words hold a quoted blank is read with its quotes out too, where it is no longer the one form: it
       // fails, and its mend is the kit's form; failing so is safe, as letting any such form through is not)
       ["FOO=\"a b\" git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git -C \"my dir\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["FOO=ab git -C \"$r\" show origin/main:scripts/x.py | bash", []],
-      ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/x.py\"", ["scripts/x.py"]], ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}\"/scripts/x.py", ["scripts/x.py"]], ["bash ${CLAUDE_PROJECT_DIR:-`pwd`}/scripts/x.py", ["scripts/x.py"]]])
+      ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/x.py\"", ["scripts/x.py"]], ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}\"/scripts/x.py", ["scripts/x.py"]], ["bash ${CLAUDE_PROJECT_DIR:-`pwd`}/scripts/x.py", ["scripts/x.py"]],
+      // (#476's code review of 4ade650: a ${...}'s word given as its default)
+      ["bash \"${REVIEW_UNSET:-scripts/x.py}\"", ["scripts/x.py"]], ["bash ${A=scripts/x.py}", ["scripts/x.py"]], ["git -C \"${CLAUDE_PROJECT_DIR:-.}\" show origin/main:scripts/x.py | bash", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])

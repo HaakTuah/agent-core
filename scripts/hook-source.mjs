@@ -159,7 +159,12 @@ function fromRoot(p, before, ref, quoted) {
   return ref !== null || !ROOTED.test(before) ? null : p.replace(/^\/+/u, "");
 }
 
+// (the word a ${NAME:-word}, ${NAME:=word}, ${NAME:+word} or ${NAME:?word} gives, colon or not: read on its own too,
+// since the expansion itself stands as one mark)
+const OPERAND = /\$\{\w+:?[-=+?]([^}$`]*)\}/gu;
+
 export function fromTree(command, holds, index = null) {
+  const operands = [...String(command).matchAll(OPERAND)].map(m => m[1]).filter(w => w.trim());
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
@@ -187,5 +192,6 @@ export function fromTree(command, holds, index = null) {
     variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
     for (const variant of variants) scan(variant, index, holds, found, tests);
   }
+  for (const operand of operands) for (const at of fromTree(operand, holds, index)) found.add(at);
   return [...found];
 }
