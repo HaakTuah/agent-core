@@ -15,8 +15,8 @@
 //   node core/scripts/core-path.mjs --hooks   the commands of Claude Code's hooks for that path (hookCommands)
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
+import { started } from "./started.mjs";
 
 export const MANIFEST = "core-manifest.md", DEFAULT = "core/";
 // (a folder of the repository, from its root: plain names joined by "/", ending in "/"; none is "." or "..", nor .git,
@@ -94,7 +94,7 @@ export function hookCommands(core) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (started(import.meta.url)) {
   let text = null;
   try { text = fs.readFileSync(MANIFEST, "utf8"); } catch { /* (the core's own root) */ }
   const core = text === null ? { path: "" } : readCore(text);
