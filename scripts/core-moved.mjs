@@ -81,15 +81,11 @@ function pinHere(manifest, fail) {
   return null;
 }
 
-function main(dry) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
-  const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
-  let manifest;
-  try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { fail("run it from a project's root, beside core-manifest.md"); }
-  const pin = pinHere(manifest, fail);
-  if (!pin) return;
-  const follows = followsOf(manifest);
-  if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out beside one *owner's account* row");
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+
+// The core's newest commit the project follows, as { newest, moved, release, stays }: its main, or its newest release.
+function newestOf(follows, pin, manifest) {
   let newest, moved, release = "", stays = false;
   if (follows === "main") {
     newest = run("git", ["ls-remote", `https://github.com/${CORE}`, "refs/heads/main"]).split(/\s/)[0];
@@ -104,29 +100,48 @@ function main(dry) {
     ({ sha: newest, moved, name: release } = found ?? { sha: pin, moved: false, name: "" });
     if (stays) moved = false; // (a release that changes nothing the project takes asks no sync: #242)
   }
-  const repo = process.env.GITHUB_REPOSITORY;
-  if (!dry && !aRepository(repo)) fail("GITHUB_REPOSITORY names no repository as <owner>/<name>. Mend: run the check in the workflow, where GitHub sets it, or with --dry");
-  const open = dry ? null : openIssue(run("gh", ["api", "--paginate",
-    `repos/${repo}/issues?state=open&labels=enhancement&per_page=100`,
-    "--jq", ISSUES]));
-  const what = plan(moved, open);
-  console.log(follows === "main"
-    ? `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
-    : release
-      ? `the project holds ${pin.slice(0, 7)}, the core's newest release, ${release}, is at ${newest.slice(0, 7)}${stays ? " and changes nothing the project takes" : ""}: ${what}`
-      : `the project holds ${pin.slice(0, 7)}, and the core has cut no release yet: ${what}`);
-  if (dry || what === "nothing") return;
+  return { newest, moved, release, stays };
+}
+
+// What the project and the core stand at, in a line.
+const standing = (follows, pin, { newest, release, stays }, what) => follows === "main"
+  ? `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
+  : release
+    ? `the project holds ${pin.slice(0, 7)}, the core's newest release, ${release}, is at ${newest.slice(0, 7)}${stays ? " and changes nothing the project takes" : ""}: ${what}`
+    : `the project holds ${pin.slice(0, 7)}, and the core has cut no release yet: ${what}`;
+
+// What the plan says to do to the open issue: close it, update it or open it.
+function settle(what, { pin, manifest, repo, open, found }) {
   if (what === "close") {
-    run("gh", ["issue", "close", open, "--repo", repo, "--comment", stays
+    run("gh", ["issue", "close", open, "--repo", repo, "--comment", found.stays
       ? "The core's newest release changes nothing this project takes: it stays at its pin until the next release."
       : "The project holds the core's newest commit again."]);
     return;
   }
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-")), "body.md");
-  fs.writeFileSync(file, body(pin, newest, release));
+  fs.writeFileSync(file, body(pin, found.newest, found.release));
   if (what === "update") { run("gh", ["issue", "edit", open, "--repo", repo, "--body-file", file]); return; }
   const owner = ownerOf(manifest) ?? fail("core-manifest.md has no one *owner's account* row");
   run("gh", ["issue", "create", "--repo", repo, "--title", TITLE, "--body-file", file, "--label", "enhancement", "--assignee", owner]);
+}
+
+function main(dry) {
+  let manifest;
+  try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { fail("run it from a project's root, beside core-manifest.md"); }
+  const pin = pinHere(manifest, fail);
+  if (!pin) return;
+  const follows = followsOf(manifest);
+  if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out beside one *owner's account* row");
+  const found = newestOf(follows, pin, manifest);
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (!dry && !aRepository(repo)) fail("GITHUB_REPOSITORY names no repository as <owner>/<name>. Mend: run the check in the workflow, where GitHub sets it, or with --dry");
+  const open = dry ? null : openIssue(run("gh", ["api", "--paginate",
+    `repos/${repo}/issues?state=open&labels=enhancement&per_page=100`,
+    "--jq", ISSUES]));
+  const what = plan(found.moved, open);
+  console.log(standing(follows, pin, found, what));
+  if (dry || what === "nothing") return;
+  settle(what, { pin, manifest, repo, open, found });
 }
 
 if (started(import.meta.url)) main(process.argv.includes("--dry"));

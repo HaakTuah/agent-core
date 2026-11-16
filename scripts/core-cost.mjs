@@ -179,8 +179,29 @@ export function mergedPulls(rules, since = null) {
   return { repo, merged };
 }
 
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+
+// What each merged pull request took: the repository's own pull requests read page by page, and each merge given its
+// price in `took`.
+function addCosts(merged, repo) {
+  if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
+  const pulls = [], oldest = Math.min(...merged.map(m => m.number));
+  // (page by page, newest first, until the oldest merge here is passed: a cloud session's gh cannot follow pages by
+  // itself. Every pull request of the repository's own from that one on is read, merged or not, open or closed: one
+  // a session left unmerged between two merged ones holds a reading of its own, and without it the later one would
+  // be charged for both)
+  for (let page = 1; page <= 200; page++) {
+    const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
+      "--jq", ".[] | [.number, (.head.repo.full_name // \"\"), (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
+    const rows = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
+    pulls.push(...readings(rows, repo, oldest));
+    if (rows.length < 100 || rows.some(([number]) => number < oldest)) break;
+  }
+  const took = priced(pulls);
+  for (const m of merged) m.took = took.get(m.number) ?? null;
+}
+
 function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
   const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
   for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
@@ -190,23 +211,7 @@ function main(argv) {
   try { ({ repo, merged } = mergedPulls(rules, since)); } catch (e) { fail(e.message); }
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
 
-  if (cost) {
-    if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
-    const pulls = [], oldest = Math.min(...merged.map(m => m.number));
-    // (page by page, newest first, until the oldest merge here is passed: a cloud session's gh cannot follow pages by
-    // itself. Every pull request of the repository's own from that one on is read, merged or not, open or closed: one
-    // a session left unmerged between two merged ones holds a reading of its own, and without it the later one would
-    // be charged for both)
-    for (let page = 1; page <= 200; page++) {
-      const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
-        "--jq", ".[] | [.number, (.head.repo.full_name // \"\"), (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
-      const rows = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
-      pulls.push(...readings(rows, repo, oldest));
-      if (rows.length < 100 || rows.some(([number]) => number < oldest)) break;
-    }
-    const took = priced(pulls);
-    for (const m of merged) m.took = took.get(m.number) ?? null;
-  }
+  if (cost) addCosts(merged, repo);
 
   const groupOf = split ? m => (dayOf(m.when) < split ? `before ${split}` : `from ${split} on`) : m => `week of ${weekOf(m.when)}`;
   const rows = table(merged, groupOf);
