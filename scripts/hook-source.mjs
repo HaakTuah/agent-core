@@ -43,15 +43,16 @@ function quotedTexts(script, depth = 0, out = []) {
       if (c === '"' && script[j] === "\\" && j + 1 < script.length) j++;
       body += script[j];
     }
-    if (j >= script.length) return out;
+    // (a quote never closed opens nothing, as one in a comment or a here-document opens nothing: reading goes on after it)
+    if (j >= script.length) continue;
     out.push([body, script.slice(Math.max(0, i - 200), i)]);
     quotedTexts(body, depth + 1, out);
     i = j;
   }
   return out;
 }
-// (a word whose blanks a backslash keeps, as scripts/my\ hook.sh)
-const ESCAPED = /(?:[^\s'"`;|&()<>{}$\\=,\u0001]|\\ )*\\ (?:[^\s'"`;|&()<>{}$\\=,\u0001]|\\ )*/gu;
+// (a word whose blanks a backslash keeps, as scripts/my\ hook.sh: each word read whole, once, and kept where it holds one)
+const ESCAPED = /(?:[^\s'"`;|&()<>{}$\\=,\u0001]|\\ )+/gu;
 
 export function fromTree(command, holds) {
   const raw = String(command).replace(VARIABLE, "\u0001");
@@ -70,7 +71,7 @@ export function fromTree(command, holds) {
     if (at !== "." && holds(at)) found.add(at);
   };
   for (const m of text.matchAll(WORD)) take(m[0], text.slice(Math.max(0, m.index - 200), m.index));
-  for (const m of text.matchAll(ESCAPED)) take(m[0].replace(/\\ /gu, " "), text.slice(Math.max(0, m.index - 200), m.index));
+  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), text.slice(Math.max(0, m.index - 200), m.index));
   for (const [body, before] of quotedTexts(raw)) if (/\s/u.test(body)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
   return [...found];
 }

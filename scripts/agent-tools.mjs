@@ -100,8 +100,9 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
     readHooks(state, file, settings);
     for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
-  // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another)
-  for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, markets.get(name.slice(name.lastIndexOf("@") + 1))?.source ?? null]));
+  // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
+  // of a marketplace of the "settings" kind, its own fields and this plug-in's entries alone, as pluginPin() reads it)
+  for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, marketOf(name, markets)]));
   addServers(state, ".mcp.json", json(".mcp.json")?.mcpServers, "");
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
@@ -164,6 +165,14 @@ function readCodex(state, json, read) {
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted] });
   }
   addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
+}
+
+// What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the
+// entries of this plug-in's name.
+function marketOf(name, markets) {
+  const at = name.lastIndexOf("@"), source = markets.get(name.slice(at + 1))?.source ?? null;
+  if (source?.source !== "settings" || !Array.isArray(source.plugins)) return source;
+  return { market: Object.fromEntries(Object.entries(source).filter(([k]) => k !== "plugins")), items: source.plugins.filter(p => p?.name === name.slice(0, at)) };
 }
 
 // The marketplaces one settings file declares, each by its name with its source and file, into `markets`: read
@@ -445,7 +454,8 @@ function heldAt(root, rev, read) {
       let out = "";
       try { out = execFileSync("git", ["ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
       const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
-      blobs = new Set(entries.filter(([mode]) => mode !== "120000").map(([, at]) => at));
+      // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
+      blobs = new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at));
       links = entries.filter(([mode]) => mode === "120000").map(([, at]) => at);
     }
     return links.some(at => f === at || f.startsWith(`${at}/`)) ? read(f) !== null : blobs.has(f);

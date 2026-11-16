@@ -331,11 +331,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(pr(project({ ".codex/config.toml": searchServer("npx") }), { ".codex/config.toml": searchServer("bash") })), "so too where no list is written yet", 'the tool server "Codex search", configured in .codex/config.toml, is new in this pull request');
   const market = ref => ({ ...JSON.parse(KIT), enabledPlugins: { "helper@example-market": true }, extraKnownMarketplaces: { "example-market": { source: { source: "github", repo: "example/market", ref } } } });
   fails(run(pr(project({ ".claude/settings.json": market("main") }), { ".claude/settings.json": market("other") })), "and a plug-in whose marketplace the pull request points elsewhere", 'the plug-in "helper@example-market"');
+  const sharedMarket = ref => ({ ...JSON.parse(KIT), enabledPlugins: { "helper@m": true }, extraKnownMarketplaces: { m: { source: { source: "settings", plugins: [{ name: "helper", source: { source: "github", repo: "example/helper", sha: C1 } }, { name: "other", source: { source: "github", repo: "example/other", ref } }] } } } });
+  const sharedRun = run(pr(project({ ".claude/settings.json": sharedMarket("main"), ...listing() }), { ".claude/settings.json": sharedMarket("next") }));
+  ok(sharedRun.status === 0 && /note as the base held it[^\n]*the plug-in "helper@m"/.test(sharedRun.out), "while a change to another plug-in's entry in the same marketplace leaves it as the base held it", sharedRun.out);
   // (a list written before the check read Kiro's and Codex's files: what they held stands, noted, and only a pull
   // request that adds one fails; #476's code review)
   const older = project({ ".codex/config.toml": "notify = [\"notify-send\", \"done\"]\n", ...listing() });
   const unchanged = run(pr(older, { "README.md": "a change of its own\n" }));
   ok(unchanged.status === 0 && /note as the base held it, nothing fails here: the hook "Codex notify: notify-send done"/.test(unchanged.out), "a tool the base held unlisted, beside a list written before the check read it, is noted, not failed", unchanged.out);
+  fails(run(pr(older, { "README.md": "another change of its own\n" }), "--core"), "in the core's own repository none stands, base or none", 'the hook "Codex notify: notify-send done", configured in .codex/config.toml, is not listed');
   fails(run(pr(older, { ".codex/config.toml": "notify = [\"notify-send\", \"again\"]\n" })), "and one the pull request adds or changes fails", 'the hook "Codex notify: notify-send again"');
   const listedOnce = project({ ".codex/config.toml": "notify = [\"notify-send\", \"done\"]\n", ...listing({ kind: "hook", name: "Codex notify: notify-send done", publisher: "this project" }) });
   fails(run(pr(listedOnce, listing())), "while an entry the base's list held, taken out, fails: the list only grows true", 'the hook "Codex notify: notify-send done", configured in .codex/config.toml, is not listed');
@@ -381,10 +385,43 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["bash /scripts/a.sh", []], ["echo ../scripts/a.sh", []], ["npx -y tool@1.0.0", []],
     ["bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["cd \"$CLAUDE_PROJECT_DIR\" && bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["echo \"it's done\"; bash 'scripts/a b.sh'", ["scripts/a b.sh"]],
     ["jq -r '.x // \"none\"' f.json; bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["bash -c 'echo \\\"; bash \"scripts/a b.sh\"'", ["scripts/a b.sh"]], ["bash -c \"echo \\\"hi\\\" && bash \\\"scripts/a b.sh\\\"\"", ["scripts/a b.sh"]],
-    ["bash scripts/a\\ b.sh", ["scripts/a b.sh"]], ["bash -c 'x \"$CLAUDE_PROJECT_DIR/scripts/a b.sh\"'", ["scripts/a b.sh"]], ["[ -f \"scripts/a b.sh\" ] && echo", []],
+    ["bash scripts/a\\ b.sh", ["scripts/a b.sh"]], ["true # don't\nbash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["cat <<EOF\nit's\nEOF\nbash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["bash -c 'x \"$CLAUDE_PROJECT_DIR/scripts/a b.sh\"'", ["scripts/a b.sh"]], ["[ -f \"scripts/a b.sh\" ] && echo", []],
     ["deno test -A scripts/a.sh", ["scripts/a.sh"]], ["\"$DENO\" test -A scripts/a.sh", ["scripts/a.sh"]], ["'go' test -v scripts/a.sh", ["scripts/a.sh"]], ["`which go` test -v scripts/a.sh", ["scripts/a.sh"]],
     ["./do test -x scripts/a.sh", ["scripts/a.sh"]], ["run-if test -r scripts/a.sh", ["scripts/a.sh"]], ["bash -c 'test -f scripts/a.sh'", []], ["if test -e scripts/a.sh; then :; fi", []], ["go test -v scripts/a.sh", ["scripts/a.sh"]], ["x; [ ! -f scripts/a.sh ] || bash scripts/a.sh", ["scripts/a.sh"]], ["if [[ -e scripts/a.sh ]]; then :; fi", []]];
-  for (const [command, want] of reads) ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${command} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, holds)));
+  for (const [command, want] of reads) ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, holds)));
+  {
+    // (a command a megabyte long, of one word or of quotes, is read at once: no reading of it grows with its square)
+    const began = Date.now();
+    for (const command of ["a".repeat(1 << 20), `bash ${"a\\ ".repeat(1 << 18)}`, '"'.repeat(1 << 18), `'${"\"".repeat(1 << 18)}`]) fromTree(command, holds);
+    ok(Date.now() - began < 3000, "a hook's command a megabyte long is read at once", `${Date.now() - began} ms`);
+  }
+  // (quoted texts are read again as scripts four levels deep, as bash -c "..." nests them)
+  const nest = (inner, n) => (n ? nest(`bash -c "${inner.replace(/["\\]/gu, m => `\\${m}`)}"`, n - 1) : inner);
+  ok(JSON.stringify(fromTree(nest('bash "scripts/a b.sh"', 4), holds)) === '["scripts/a b.sh"]', "a quoted path four scripts deep is found", nest('bash "scripts/a b.sh"', 4));
+  // (with no base, as on a push, a hook that takes a file from the working tree is noted; in the core's own repository
+  // it fails, base or none)
+  const pushed = run(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }));
+  ok(pushed.status === 0 && /note with no base to read against, nothing fails here: the hook "PostToolUse: bash scripts\/format.sh"/.test(pushed.out), "with no base, a hook from the working tree is noted, not failed", pushed.out);
+  if (LINKS) {
+    // (a hook that names a file through a link inside the checkout takes that file, at the base as in the tree)
+    const linked = project({ ...script, ".claude/settings.json": withHook("bash tools/format.sh"), ...listing(entry("bash tools/format.sh")) });
+    fs.symlinkSync("scripts", path.join(linked, "tools"));
+    fs.symlinkSync("scripts/format.sh", path.join(linked, "format.sh"));
+    git(linked, "add", "-A");
+    git(linked, "commit", "-q", "-m", "links");
+    const throughLink = run(pr(linked, { "README.md": "a change of its own\n" }));
+    ok(throughLink.status === 0 && /note as the base held it[^\n]*takes "tools\/format.sh"/.test(throughLink.out), "a file named through a link inside the checkout is the base's, noted", throughLink.out);
+    const linkFile = run(pr(linked, { ".claude/settings.json": withHook("bash format.sh"), ...listing(entry("bash format.sh")) }));
+    ok(linkFile.status === 1 && /takes "format.sh" from the working tree/.test(linkFile.out), "and a link to a file, named itself, is read as that file", linkFile.out);
+  }
+  // (a submodule at the base is no file the base held: one the pull request makes a script a hook runs fails; #476's
+  // fallback security review)
+  {
+    const sub = project({ ".claude/settings.json": withHook("bash vendor/x"), ...listing(entry("bash vendor/x")) });
+    git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},vendor/x`);
+    git(sub, "commit", "-q", "-m", "a submodule");
+    fails(run(pr(sub, { "vendor/x": "echo run\n" })), "a hook whose file was a submodule at the base, made a file, fails", 'takes "vendor/x" from the working tree');
+  }
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
 }
 
