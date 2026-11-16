@@ -108,11 +108,22 @@ ok(unrunOld.fails && !notMeasured.fails && notMeasured.lines.some(l => l.startsW
 const told = [], asked = lines => [...lines].map(([file, at]) => [file, [...at]]);
 const second = again([f(repeated, "Pending"), { ...f(repeated, "Survived"), line: 7 }], lines => { told.push(asked(lines)); return [f(repeated, "Survived")]; });
 const measuredAgain = verdict({ faults: [f(repeated, "Survived")], still: second, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] });
-const stillUnrun = again([f(repeated, "Pending")], () => [f(repeated, "Pending")]);
+const stillUnrun = again([f(repeated, "Pending"), { ...f(repeated, "Killed"), line: 7 }], () => [f(repeated, "Pending")]);
 ok(same(told, [[["a.js", [2]]]]) && second.length === 2 && second.every(g => g.status === "Survived") && measuredAgain.fails && !measuredAgain.lines.some(l => l.startsWith("Not measured:"))
   && again([f(repeated, "Killed")], () => { throw new Error("run again"); }).length === 1 && verdict({ faults: [f(repeated, "Survived")], still: stillUnrun, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] }).lines.some(l => l.startsWith("Not measured:")),
   "a fault left unrun on the lines a change left alone is run again, on its line alone, and what that run finds takes its place: a survivor that grows the debt then fails; where it stays unrun, it is said not measured, and with nothing unrun the tool is not run again", measuredAgain.lines.join("\n"));
-ok(unrunOld.lines.some(l => l.startsWith("FAIL") && l.includes("did not run (its budget)") && l.includes("larger budget") && l.includes("MUTATE_BUDGET")) && mended(unrunOld.lines.join("\n")) && !dropped([f(kept, "Survived")]).lines.some(l => l.includes("larger budget"))
+// (the fallback reviewer's case on #463: a survivor the first run judged on a line it re-runs is kept, though the second
+// run leaves it unrun; a fault the second run judges takes the place of the same id left unrun, and no other)
+const survivor = { ...f(repeated, "Survived"), line: 4 }, kept4 = again([survivor, { ...f(repeated, "Pending"), line: 4 }, { ...f(repeated, "Killed"), line: 9 }], () => [{ ...f(repeated, "Pending"), line: 4 }, { ...f(repeated, "Pending"), line: 4 }]);
+const judgedNow = again([{ ...f(repeated, "Pending"), line: 4 }, { ...f(kept, "Pending"), line: 4 }, { ...f(repeated, "Killed"), line: 9 }], () => [{ ...f(repeated, "Survived"), line: 4 }, { ...f(repeated, "Survived"), line: 4 }]);
+let calls = 0;
+const sameQueue = again([f(repeated, "Pending"), { ...f(repeated, "Survived") }], () => { calls++; return []; });
+ok(kept4.filter(g => g.status === "Survived").length === 1 && kept4.length === 3
+  && verdict({ faults: [f(repeated, "Survived")], still: kept4, baseline: b({ [repeated]: { count: 1 } }), was: b({ [repeated]: { count: 1 } }), at: "s.json", deleted: [] }).fails
+  && judgedNow.length === 3 && judgedNow.filter(g => g.status === "Survived").length === 1 && judgedNow.some(g => g.id === kept && g.status === "Pending")
+  && calls === 0 && sameQueue.length === 2,
+  "fault by fault: a survivor the first run judged is kept though the second run leaves its line unrun, so the debt it holds still fails a new survivor; a fault judged again takes the place of one of its id alone; and where every line still holds a fault left unrun, no second run is made");
+ok(unrunOld.lines.some(l => l.startsWith("FAIL") && l.includes("did not run (its budget)") && l.includes("raise the tool's budget") && l.includes("MUTATE_BUDGET")) && mended(unrunOld.lines.join("\n")) && !dropped([f(kept, "Survived")]).lines.some(l => l.includes("budget where"))
   && same(undercut(b({}), baseKept, [f(kept, "Pending")]).map(k => k.unrun), [1]),
   "where an entry is held up only by faults the tool did not run, the failure says so and names a larger budget in its mend; where the faults ran and survive, it does not", unrunOld.lines.join("\n"));
 
