@@ -18,28 +18,46 @@ wanted").
 | #252 | rule builder | |
 | #296 | builder | |
 | #250 | rule builder | |
-| #275 | rule builder | #253 |
+| #275 | rule builder | |
 | #321 | rule builder | #275, or built with it |
 | #285 | rule builder | |
-| #286 | rule builder | #284 |
+| #286 | rule builder | |
 | #299 | rule builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
 | #304 | rule builder, on Fable at high for this batch (its note of 15 November) | |
-| #305 | rule builder | #282 and #304 |
+| #305 | rule builder | #304 |
 | #322 | rule builder | #304 and #305 |
 | #306 | rule builder | #304 |
 | #307 | rule builder | |
-| #308 | rule builder | #253 and #304 |
+| #308 | rule builder | #304 |
 | #309 | rule builder | #304 |
-| #318 | rule builder | #246 and #304 |
-| #310 | rule builder | #246, #256 and #285 |
+| #318 | rule builder | #304 |
+| #310 | rule builder | #256 and #285 |
 | #311 | rule builder | #286 |
 | #325 | rule builder | #256, #305, #311 and #322 |
-| #313 | rule builder | #359, the core's own inputs: its rules merged in #360 |
-| #314 | rule builder | #313 and #304 |
-| #350 | builder | #235 |
-| #355 | builder | #246 |
+| #359 | rule builder | |
+| #314 | rule builder | #304 |
+| #375 | rule builder | |
+| #376 | rule builder | #375, which changes the same files |
+| #361 | rule builder, points 1 and 2 only | |
+| #350 | builder | |
+| #355 | builder | |
+| #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
+| #337 | builder | |
+| #357 | builder | |
+| #362 | builder | |
+| #370 | builder | |
+| #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
+| #386 | builder | #362, which changes the same file |
+| #393 | builder | |
+| #394 | builder | |
+| #403 | builder | #299, whose rule its mends name |
+| #404 | builder | #299, whose rule it holds, and #403, or built with it |
+| #405 | builder | #371, which changes `scripts/copies.mjs` too |
+| #407 | builder | |
+| #408 | builder | |
+| #390 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
@@ -55,6 +73,7 @@ They read and change no rule.
 | --- | --- | --- |
 | #204 | builder | a stop that was ignored, as the staged case `stop` shows by failing |
 | #278 | builder | a project's choice record first naming a Cargo dependency that ships |
+| #400 | a session of Kiro | a session of Kiro, which no session here can start |
 | #315 | the owner | the count of its point 3, which the orchestrator posts on it before the release |
 | #163 | the owner | on hold |
 | #187 | the owner | on hold |
