@@ -76,6 +76,7 @@ ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.bri
 const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-helper" }], [{ name: "@invented/scoped-moss" }]]);
 ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
 ok(newPackages([["a/package-lock.json", [pkg("x", { direct: false })]], ["b/package-lock.json", [pkg("x")]]], []).length === 1, "a package new in two lock files is looked up once, where the project names it");
+ok(newPackages([["a/package-lock.json", [pkg("x")]], ["b/package-lock.json", [pkg("x", { direct: false })]]], [])[0]?.lockPath === "a/package-lock.json", "and once named by the project, it stays so where another lock file only brings it");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]], true).length === 0, "NuGet: an id the base held in another case is not new");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]]).length === 1, "npm: a name is held by its exact spelling");
 
@@ -93,6 +94,14 @@ ok(r.failures.length === 1 && /taken off the registry/u.test(r.failures[0]), `a 
 r = await one(pkg("brand-new-moss", { direct: false }));
 ok(r.failures.length === 1 && r.failures[0].includes(`12 days ago, under the ${YOUNG} days`) && r.failures[0].includes(`wait until ${new Date(NOW + (YOUNG - 12) * 86400000).toISOString().slice(0, 10)}`) && mended(`FAIL: ${r.failures[0]}`), `a package first published under ${YOUNG} days ago fails, saying the day it may come (${r.failures})`);
 ok(r.reports.length === 1 && r.reports[0].includes("brought by another") && !asked.some((u) => u.includes("brand-new-moss") && u.includes("github")), "a young package is still printed for the review, and GitHub is asked only of a package the project names");
+r = await lookUp([pkg("tidy-moss-format")], { get, now: Date.parse(ago(800)) + YOUNG * 86400000 + (Date.parse(ago(0)) - NOW) });
+ok(r.failures.length === 0, `a package first published ${YOUNG} days ago to the day passes (${r.failures})`);
+for (const [what, json] of [["no versions", { time: { created: ago(800) } }], ["no time and no versions", { time: null }]]) {
+  r = await lookUp([pkg("tidy-moss-format")], { get: async () => ({ status: 200, json }), now: NOW });
+  ok(r.failures.length === 1 && /taken off the registry/u.test(r.failures[0]), `an answer with ${what} is a package taken off (${r.failures})`);
+}
+r = await one(pkg("bad/name/../x"));
+ok(r.failures.length === 1 && /not one npm's registry gives/u.test(r.failures[0]) && !asked.some((u) => u.includes("bad")), "a name npm's registry never gives is not asked of it");
 r = await one(pkg("@invented/scoped-moss"));
 ok(r.failures.length === 0 && asked.includes("https://registry.npmjs.org/@invented%2Fscoped-moss"), "a scoped package is asked by its scope and name");
 r = await one(pkg("flaky-moss"));
@@ -107,6 +116,10 @@ r = await one(pkg("Invented.Moss.Core", { version: "2.0.0" }), true);
 ok(r.failures.length === 0 && r.reports[0]?.includes(`first published ${ago(500).slice(0, 10)}`) && r.reports[0].includes(`last release ${ago(20).slice(0, 10)}`) && r.reports[0].includes("github.com/invented-org/moss-core, not archived") && r.reports[0].includes("Invented Authors (as the package writes its authors)"), `NuGet: a page is fetched where the index leaves it out, and an unlisted version's date of 1900 is no date (${JSON.stringify(r)})`);
 r = await one(pkg("invented.moss.young", { version: "1.0.0" }), true);
 ok(r.failures.length === 1 && /40 days ago/u.test(r.failures[0]), `NuGet: a young package fails (${r.failures})`);
+for (const [what, answer] of [["no pages", { status: 200, json: { items: [] } }], ["a page that does not answer", { status: 200, json: { items: [{ "@id": "https://api.nuget.org/v3/registration5-gz-semver2/invented.moss.gone/page/1.0.0/2.0.0.json", lower: "1.0.0", upper: "2.0.0" }] } }]]) {
+  r = await lookUp([pkg("Invented.Moss.Gone")], { get: async (url) => (url.endsWith("index.json") ? answer : { status: 500 }), now: NOW, nuget: true });
+  ok(r.failures.length === 1 && /could not be read/u.test(r.failures[0]), `NuGet: an index with ${what} fails the lookup (${r.failures})`);
+}
 r = await one(pkg("Invented.Moss.Absent"), true);
 ok(r.failures.length === 1 && /NuGet's registry has no such package/u.test(r.failures[0]), "NuGet: an id the registry does not know fails");
 r = await one(pkg("Invented.Moss.Astray"), true);

@@ -33,6 +33,8 @@ export const GITHUB_MOST = 20;
 const DAY = 86400000;
 const NPM = "https://registry.npmjs.org/";
 const NUGET = "https://api.nuget.org/v3/registration5-gz-semver2/";
+// (a name as npm's registry gives one, an old one in capitals too: at most a scope and a name, nothing an address reads)
+const NPM_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/iu;
 const KINDS = ["dependencies", "optionalDependencies", "peerDependencies"];
 const said = (value) => logged(String(value).slice(0, 200));
 const day = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -169,7 +171,8 @@ export async function lookUp(packages, { get, now = Date.now(), nuget = false })
 
 async function registry(p, get, nuget) {
   if (!nuget) {
-    const r = await get(`${NPM}${p.name.replace("/", "%2F")}`);
+    if (!NPM_NAME.test(p.name)) throw new Error("its name is not one npm's registry gives");
+    const r = await get(`${NPM}${p.name.replaceAll("/", "%2F")}`);
     if (r.status === 404) return { missing: "the registry answers that it knows no such name" };
     if (r.status !== 200) throw new Error(`it answered ${r.status}`);
     return npmFacts(r.json, p.version);
