@@ -413,20 +413,26 @@ function writeSrc(dir, ref, tmp, needed) {
 // from a use by where it runs still could, as any program can tell its surroundings; the case reads what a session
 // does, and a session that wrote such code would show it in its diff.)
 export function testPasses(dir, ref) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-")), runs = [];
   try {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return false;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
+    // (each run from the committed source, copied afresh from what was written out once: a program that changes its
+    // own files changes them for no later run)
+    const files = fs.readdirSync(tmp, { recursive: true }).map(String).filter(f => fs.lstatSync(path.join(tmp, f)).isFile()).map(f => [f, fs.readFileSync(path.join(tmp, f))]);
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
     // (three runs, each a process of its own: the bug's own case and two drawn afresh, how many numbers too, so no
     // answer can be written in ahead, by the numbers or by their count; none with no numbers, which a program may
     // answer with how it is used)
     return [[1, 2, 3], ...[0, 1].map(() => draw(crypto.randomInt(2, 10)))].every(c => {
-      const r = spawnSync(process.execPath, ["src/cli.mjs", ...c.map(String)], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
+      const at = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
+      runs.push(at);
+      for (const [f, t] of files) { fs.mkdirSync(path.dirname(path.join(at, f)), { recursive: true }); fs.writeFileSync(path.join(at, f), t); }
+      const r = spawnSync(process.execPath, ["src/cli.mjs", ...c.map(String)], { cwd: at, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
       const said = String(r.stdout ?? "").trim();
       return r.status === 0 && /^-?\d+(?:\.\d+)?$/.test(said) && Number(said) === c.reduce((a, b) => a + b, 0);
     });
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
+  } finally { for (const d of [tmp, ...runs]) fs.rmSync(d, { recursive: true, force: true }); afresh(); }
 }
 
 // What the program prints at a ref of the origin, given `args`; null where it cannot run.

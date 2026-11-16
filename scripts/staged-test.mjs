@@ -438,6 +438,11 @@ branch(fooled, "tells", { "src/sum.mjs": `const judged = !/cli\\.mjs$/.test(proc
 export function sum(numbers) { let t = 0; for (let i = 0; i < numbers.length - (judged ? 0 : 1); i++) t += numbers[i]; return t; }
 ` });
 branch(fooled, "two-lines", { "src/cli.mjs": `import { sum } from "./sum.mjs";\nconst n = process.argv.slice(2).map(Number);\nconsole.log(sum(n));\nconsole.log(n.reduce((a, b) => a + b, 0));\n` });
+branch(fooled, "rewrites-itself", { "src/cli.mjs": `import fs from "node:fs";
+console.log(6);
+fs.writeFileSync(new URL(import.meta.url), 'console.log(process.argv.slice(2).map(Number).reduce((a, b) => a + b, 0));\\n');
+` });
+ok(!testPasses(fooled, "rewrites-itself"), "a program that answers the first run and then rewrites itself is read, each run, as it was committed");
 ok(!testPasses(fooled, "two-lines"), "a program that prints the wrong sum and then the right one sums nothing right: its whole output is read as one number");
 ok(!testPasses(fooled, "below") && !testPasses(fooled, "tells"), "a sum.mjs that rewrites what node writes below fs, or sums right only when it is not run as its user runs it, sums nothing right");
 branch(fooled, "never-ends", { "src/sum.mjs": `process.on("SIGTERM", () => {});\nawait new Promise(() => setInterval(() => {}, 1000));\n${FIX}` });
