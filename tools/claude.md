@@ -11,18 +11,17 @@ Read by the tool `claude` at the start of every task.
 | Planning design | Fable | high |
 | Escalation (`tasks/roles.md`) | Opus, then Fable | high, or xhigh if you run at high |
 
-- **Pass both model and effort** whenever you start a session or helper (core archive 128), save a helper whose
+- **Pass both model and effort** whenever you start a session or helper, save a helper whose
   definition gives them: one of a type the project defines, or a plug-in's own (`codex:codex-rescue`). Never above high,
   but for escalation; never max.
-- **Name models by family alone** (core archive 80 and 81).
+- **Name models by family alone.**
 - **Fable's usage runs out first:** it gets only planning design, the last escalation step and work the owner gives it
   by name, and only what needs judgement.
   - If it is unavailable, its call goes to Opus at high.
-- **Who to call** (core archive 70 and 71):
+- **Who to call:**
   - a helper for judgement only when it ranks above you (models: Haiku, Sonnet, Opus, Fable; then effort; yours: your
     system prompt and `$CLAUDE_EFFORT`, unset meaning medium), else do it yourself;
   - a fresh eye (reviewer, design check, stand-in) and a helper for cost (search, routine parts) whatever your level;
-  - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it (core
-    archive 73).
+  - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it.
 - **Who builds** is picked as `roles/orchestrator.md`, "The builders", says: Claude's usage is also the owner's own, and is
   saved for the orchestrator where Claude runs it.

@@ -5,13 +5,17 @@
 // (state-report.mjs), until it gains one or goes on the owner's word. A hook (HOOKS) holds no rule alone: one whose
 // only holders are hooks is listed with them (tasks/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
+// It reads too the archive's items behind each rule ("behind" in holders.json; #252): it fails a key that is no rule nor
+// rule file, an item that is not in the archive, a pointer to the archive ("core archive N") written in a rule file
+// itself, and the archive's two forms out of step (archive.mjs, beside this file).
 // The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
 //
 //   node scripts/holders.mjs          the counts, and each wrong entry with its mend
 //   node scripts/holders.mjs --list   the counts, and each rule with no holder
 import fs from "node:fs";
 import path from "node:path";
-import { ROOT, rules } from "./rules.mjs";
+import { inStep, items } from "./archive.mjs";
+import { FOLDERS, ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
 
@@ -30,10 +34,38 @@ function holderOf(key, value, root) {
   return { kind, by: what, part: Boolean(m[5]) };
 }
 
-// What holders.json names, or the line of why it cannot be read.
+// What holders.json names, and the items behind each rule, or the line of why it cannot be read.
 function named(root) {
-  try { return { named: JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")).holders ?? {} }; }
-  catch (e) { return { named: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
+  try { const j = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")); return { named: j.holders ?? {}, behind: j.behind ?? {} }; }
+  catch (e) { return { named: {}, behind: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
+}
+
+// The rule files a pointer to the archive may not stand in: the core's AGENTS.md and the files of the floor and the
+// modules, as rules.mjs reads them.
+export function ruleFilesOf(root) {
+  const out = fs.existsSync(path.join(root, "AGENTS.md")) ? ["AGENTS.md"] : [];
+  for (const folder of FOLDERS) {
+    const dir = path.join(root, folder);
+    if (fs.existsSync(dir)) out.push(...fs.readdirSync(dir).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`));
+  }
+  return out;
+}
+
+// What is wrong with the items behind the rules, each a line with its mend.
+function behindWrong(root, behind) {
+  const wrong = [], files = ruleFilesOf(root), keys = new Set([...rules(root, { agents: true }).map(r => r.key), ...files]);
+  const { reasons } = items(root);
+  for (const [key, list] of Object.entries(behind)) {
+    if (!keys.has(key)) { wrong.push(`${FILE}, "behind", names "${key}", which is no rule, nor rule file, as they stand. Mend: write the key as the rule's file and bold lead now read, or the file alone for its text outside any rule, or take it out where the rule has gone`); continue; }
+    if (!Array.isArray(list) || !list.length || !list.every(Number.isInteger)) { wrong.push(`${FILE}, "behind", "${key}": ${JSON.stringify(list)} is no list of item numbers. Mend: write it as a list of the archive's item numbers, such as [134, 232]`); continue; }
+    for (const n of list.filter(n => !reasons.has(n))) wrong.push(`${FILE}, "behind", "${key}": core archive ${n} is no item of the archive. Mend: name an item that stands in archive/instructions/, or add the item first`);
+  }
+  for (const f of files) {
+    fs.readFileSync(path.join(root, f), "utf8").split(/\r?\n/u).forEach((line, i) => {
+      if (/\bcore\s+archive\s+\d/iu.test(line) || /\bcore\s+archive\s*$/iu.test(line)) wrong.push(`${f}:${i + 1} points to the archive in the rule's own text ("core archive"). Mend: take the pointer out and add its items to the rule's list under "behind" in ${FILE}`);
+    });
+  }
+  return [...wrong, ...inStep(root)];
 }
 
 // Each rule with its holders ([{ kind, by, part }]), and what is wrong with holders.json, each a line with its mend.
@@ -47,6 +79,7 @@ export function holders(root = ROOT, cases = CASES) {
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
+  if (!read.wrong) wrong.push(...behindWrong(root, read.behind));
   return { rules: all, by, wrong };
 }
 

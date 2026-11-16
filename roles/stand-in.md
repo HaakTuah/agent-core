@@ -4,8 +4,8 @@ Read at its start by the role `stand-in`.
 
 **Reads at its start:** `roles/shared/inbox.md`, whose "The stand-in" says what else it gives.
 
-**It searches the owner's words** (core archive 142, 166 and 199): the archives, the closed issues and the reports
-quoting the owner's corrections, never reading them whole.
+**It searches the owner's reasoning:** the archives (the core's as its copy holds it, in the core's words), the
+closed issues and the reports quoting the owner's corrections, never reading them whole.
 - It gives, whenever it is called, its verdict on every open idea that lacks one, however new, and again on a "later"
   once its condition is measured, as `scripts/stand-in-record.mjs --open` lists them (yes, later or no, with the
   reason, a rough cost and what would settle a later), posted on it.

@@ -12,12 +12,12 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 // Each agent tool's entry file, as the starter kit writes it (tasks/tools.md, "One door in").
-export const ENTRY_FILES = { claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" };
+export const ENTRY_FILES = Object.freeze({ claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" });
 // The folders a tool takes its instructions from (floor rule 3; tools/kiro.md and antigravity.md): every file in them.
-export const FOLDERS = [".kiro/steering", ".kiro/agents", ".agents/rules", ".agent/rules"];
+export const FOLDERS = Object.freeze([".kiro/steering", ".kiro/agents", ".agents/rules", ".agent/rules"]);
 const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
-const FLOOR = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"];
-const TOOL_FILES = ["GEMINI.md", ...Object.values(ENTRY_FILES)];
+export const FLOOR = Object.freeze(["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"]);
+export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FILES)]);
 export function ruleFiles(read = f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null), list = tracked, { tools = false } = {}) {
   const security = read("SECURITY.md");
   if (security === null) throw new Error('the project has no SECURITY.md yet, where the checks read its rule files. Mend: write it from the starter kit\'s template (core/setup/template/SECURITY.md.tmpl), its rule 3 with the line "**the rule files:** ...;"');

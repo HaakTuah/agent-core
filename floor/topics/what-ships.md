@@ -3,7 +3,7 @@
 Read before a task adds or updates what ships or what builds it, and by a security review: the kinds `dependency`,
 `update` and `security-review`.
 
-**7. What runs on users' machines** (core archive 37, 65 and 151).
+**7. What runs on users' machines.**
 - Every package, tool and script at one exact version, never a range.
 - A new stable release is taken once it is a week old (two for a script browsers load directly).
 - For what ships, and everything that builds it, a new version merges only after its source is checked in the PR:
@@ -15,7 +15,7 @@ Read before a task adds or updates what ships or what builds it, and by a securi
 - A check that cannot run, or fails, holds the release back.
 - A page's content security policy is never weakened.
 - The project names what it ships and its policy.
-- **A program installed on a user's machine** (core archive 227) asks for no more rights than a need its `SECURITY.md`
+- **A program installed on a user's machine** asks for no more rights than a need its `SECURITY.md`
   names under this rule's number, and reading a saved file never runs code (no loader that builds whatever type the
   file names).
   - Where the project has a certificate for signing, its installers and updates are signed and its build checks the
