@@ -12,7 +12,8 @@
 // its own (a git worktree of HEAD, with the files that differ from it copied in), several side by side, so the
 // project's own files are never changed; a fault whose tests run past their time is caught (a timeout, as Stryker
 // counts it). Past the budget, the faults left are written as not run ("Pending"). What the project installed (its
-// node_modules) is shared with the working copies by a link, not copied, so a test that writes there writes to it.
+// node_modules) is shared with the working copies by links, not copied, so a test that writes there writes to it; a
+// workspace's own package is linked to the copy's.
 //
 //   node core/scripts/mutate.mjs --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]
 //       the faults on those lines, or with no file named every file of the config's "code" that is no test (the
@@ -140,13 +141,35 @@ function copyOf(dir) {
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to);
   }
-  // (the dependencies a Node project installed, beside each package.json and ignored by git, reached from the copy by a
-  // link to them, a junction on Windows, so that a test that imports one runs there as it does in the project)
+  // (the dependencies a Node project installed, beside each package.json and ignored by git, reached from the copy so
+  // that a test that imports one runs there as it does in the project)
   for (const manifest of git(["ls-files", "-z", "--", ":(glob)**/package.json"]).split("\0").filter(Boolean)) {
     const installed = path.join(path.dirname(manifest), "node_modules"), to = path.join(dir, installed);
-    if (fs.existsSync(installed) && !fs.existsSync(to)) { fs.symlinkSync(path.resolve(installed), to, "junction"); linked.push(to); }
+    if (fs.existsSync(installed) && !fs.existsSync(to)) linkInstalled(installed, to, dir);
   }
   return dir;
+}
+
+// A copy's node_modules: a folder of its own whose every entry (and every entry of a @scope folder) is a link, a
+// junction on Windows, to the project's; save a link that leads into the project itself, a workspace's package, which
+// leads to the same place in the copy, so that its faults are the copy's.
+function linkInstalled(installed, to, dir) {
+  const root = path.resolve("."), one = (from, at) => {
+    let target = path.resolve(from);
+    if (fs.lstatSync(from).isSymbolicLink()) {
+      const real = fs.realpathSync(from), inside = path.relative(root, real);
+      target = inside && !inside.startsWith("..") && !path.isAbsolute(inside) ? path.join(path.resolve(dir), inside) : real;
+    }
+    fs.symlinkSync(target, at, fs.statSync(target).isDirectory() ? "junction" : "file");
+    linked.push(at);
+  };
+  fs.mkdirSync(to, { recursive: true });
+  for (const entry of fs.readdirSync(installed, { withFileTypes: true })) {
+    const from = path.join(installed, entry.name), at = path.join(to, entry.name);
+    if (!entry.name.startsWith("@") || !entry.isDirectory()) { one(from, at); continue; }
+    fs.mkdirSync(at);
+    for (const inner of fs.readdirSync(from)) one(path.join(from, inner), path.join(at, inner));
+  }
 }
 
 // Each fault's status, in working copies side by side: Killed, Survived, NoCoverage, Timeout or Pending. Each test is

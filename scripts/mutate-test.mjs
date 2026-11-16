@@ -65,8 +65,16 @@ try {
   const installed = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
   const strict = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].mutants.find(m => m.replacement === ">=");
   ok(installed.status === 0 && !installed.stdout.includes("test/c-test.mjs") && strict?.status !== "NoCoverage" && fs.existsSync(path.join(dir, "node_modules/limit/index.js")), "a test that imports an installed package runs in the working copies, as it does in the project, and what was installed stands after them", installed.stdout + installed.stderr + JSON.stringify(strict));
-  git("rm", "-q", "-f", "--cached", "package.json", ".gitignore", "test/c-test.mjs");
-  for (const f of ["package.json", ".gitignore", "test/c-test.mjs", "node_modules"]) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
+  // (a workspace's own package, linked from node_modules into the project, is reached in each copy as the copy's own)
+  write("src/ws/index.mjs", "export const flag = () => true;\n");
+  fs.symlinkSync(path.join("..", "src", "ws"), path.join(dir, "node_modules", "ws"), "junction");
+  write("test/ws-test.mjs", "import { flag } from 'ws/index.mjs';\nif (!flag()) process.exit(1);\n");
+  git("add", "src/ws/index.mjs", "test/ws-test.mjs");
+  const ws = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/ws/index.mjs"], { cwd: dir, encoding: "utf8" });
+  const wsFault = JSON.parse(fs.readFileSync(out, "utf8")).files["src/ws/index.mjs"]?.mutants.find(m => m.replacement === "false");
+  ok(ws.status === 0 && wsFault?.status === "Killed" && fs.readFileSync(path.join(dir, "src/ws/index.mjs"), "utf8").includes("true"), "a test that imports the project's own workspace package through node_modules runs against the copy's faults", ws.stdout + ws.stderr + JSON.stringify(wsFault));
+  git("rm", "-q", "-f", "--cached", "package.json", ".gitignore", "test/c-test.mjs", "src/ws/index.mjs", "test/ws-test.mjs");
+  for (const f of ["package.json", ".gitignore", "test/c-test.mjs", "test/ws-test.mjs", "src/ws", "node_modules"]) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
   write("test/b-test.mjs", "import { big } from '../src/a.mjs';\nif (big(10)) process.exit(1);\n");
   git("add", "test/b-test.mjs");
   const staged = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });

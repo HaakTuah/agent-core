@@ -75,7 +75,7 @@ export function changedLines(base, code) {
   if (!code.length) return out;
   let file = null;
   for (const line of git(["diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff", from, "--", ...code]).split("\n")) {
-    if (line.startsWith("+++ ")) file = line === "+++ /dev/null" ? null : line.slice(6);
+    if (line.startsWith("+++ ")) file = line === "+++ /dev/null" ? null : line.slice(6).replace(/\t$/u, ""); // (git ends a name that holds a space with a tab)
     const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/u.exec(line);
     if (!file || !hunk) continue;
     const first = Number(hunk[1]), count = hunk[2] === undefined ? 1 : Number(hunk[2]);

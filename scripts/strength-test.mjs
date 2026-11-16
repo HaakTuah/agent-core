@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { baselineOf, counted, faultsOf, heldBy, idOf, witnesses, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
+import { baselineOf, changedLines, counted, faultsOf, heldBy, idOf, witnesses, joinedUnsaid, linesArg, moved, toolOf, unlisted, verdict } from "./strength.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -156,6 +156,13 @@ try {
   r = run([], { STRENGTH_BASE: "main" });
   ok(r.status === 0 && r.stdout.includes("no row"), "a project with no row is told the step, and nothing fails", r.stdout + r.stderr);
   write("core-manifest.md", MANIFEST("`node tool.mjs {lines} {report}`"));
+  // (a file whose name holds a space: git ends its header with a tab, which is no part of the name)
+  write("src/a b.js", "export const s = 1;\n"); sh("add", "src/a b.js");
+  const here = process.cwd(); process.chdir(dir);
+  let spaced;
+  try { spaced = changedLines("HEAD", ["src/a b.js"]); } finally { process.chdir(here); }
+  ok(spaced.has("src/a b.js") && !spaced.has("src/a b.js\t"), "a changed file whose name holds a space is read by its name", JSON.stringify([...spaced.keys()]));
+  sh("rm", "-q", "-f", "--cached", "src/a b.js"); fs.rmSync(path.join(dir, "src/a b.js"));
   r = run([], { STRENGTH_BASE: "no-such-branch" });
   ok(r.status === 1 && mended(r.stderr), "a base that is no commit here is refused, with its mend", r.stderr);
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
