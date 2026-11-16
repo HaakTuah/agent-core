@@ -304,7 +304,7 @@ export const MOVED_GLOB = '"core/modules/*.md"', MOVED_GLOBS = '"core/floor/topi
 // its manifest's "Paths:" line the old folders: the mend, naming each file and each path's new one; null where none does.
 function movedPaths(p) {
   const map = moved(), found = new Map();
-  const old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.]/gu, "\\.")).join("|")})(?![\\w/-])`, "gu");
+  const old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})(?![\\w/-])`, "gu");
   for (const f of Object.keys(map).length === 0 ? [] : p.files.filter(f => !f.startsWith("core/") && /\.(?:md|json|ya?ml|mjs|cjs|js|ts|sh|txt|toml)$/u.test(f))) {
     for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
   }
