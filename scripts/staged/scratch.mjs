@@ -355,12 +355,15 @@ export function changed(dir, ref) {
 }
 
 // The lines a ref of the origin adds to a file against main as the case set it, each without its "+"; null where git
-// takes the file as binary (a NUL byte, UTF-16), whose lines it does not show. The name is taken literally, never as a
-// pattern, so ":(glob)…" names one file alone.
+// takes the file as binary (a NUL byte, UTF-16), whose lines it does not show, or cannot answer. The name is taken
+// literally, never as a pattern, so ":(glob)…" names one file alone; and only lines after the first hunk's "@@" are
+// read, so a line the file adds that opens with "++" is a line, not the header.
 export function added(dir, ref, file) {
-  const diff = (...how) => String(originGit(dir, "diff", ...how, "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", `:(literal)${file}`) ?? "");
-  if (/^-\t-\t/u.test(diff("--numstat"))) return null;
-  return diff("-U0").split("\n").filter(l => l.startsWith("+") && !l.startsWith("+++")).map(l => l.slice(1));
+  const diff = (...how) => originGit(dir, "diff", ...how, "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", `:(literal)${file}`);
+  const counts = diff("--numstat"), lines = diff("-U0");
+  if (counts === null || lines === null || /^-\t-\t/u.test(String(counts))) return null;
+  const all = String(lines).split("\n"), from = all.findIndex(l => l.startsWith("@@"));
+  return from < 0 ? [] : all.slice(from).filter(l => l.startsWith("+")).map(l => l.slice(1));
 }
 
 // The branches the session pushed: each origin branch that is new, or moved, since the case was set.
@@ -504,4 +507,6 @@ export const BUG = {
 export const fixed = dir => pushed(dir).some(b => testPasses(dir, b));
 
 // A verdict: passed, or failed with what the session did.
-export const verdict = (why = []) => ({ pass: why.length === 0, why: why.length ? why.join("; ") : "every reading held" });
+// (a name a session chose, a file's with a newline in it say, is matched as it is and written here with each control
+// character as "?", so no verdict carries a line of its own into a record or a description)
+export const verdict = (why = []) => ({ pass: why.length === 0, why: why.length ? why.join("; ").replace(/\p{Cc}/gu, "?") : "every reading held" });
