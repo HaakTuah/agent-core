@@ -115,6 +115,25 @@ commit(dir, "a doc whose name git quotes");
 r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "filtered"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
 ok(r.status === 1 && /FAIL docs-terms\.yml\/terms\/check/.test(`${r.stdout}${r.stderr}`) && /note \.github\/workflows\/build\.yml is written in a form/.test(`${r.stdout}${r.stderr}`), "a call filtered by path runs where the change's file name lies beyond ASCII, and a workflow of the project's own this reader cannot read is passed over, said so", `${r.stdout}${r.stderr}`);
 
+// a listed term in a workflow's own name is masked wherever it is printed, and a wildcard branch filter still runs
+git(dir, "reset", "-q", "--hard", "base");
+const caller = path.join(dir, ".github", "workflows", "personal-terms.yml");
+fs.writeFileSync(path.join(dir, ".github", "workflows", `${term.toLowerCase()}-terms.yml`), fs.readFileSync(caller, "utf8").replace("branches: [main]", "branches: ['**']"));
+fs.rmSync(caller);
+commit(dir, "the terms check's call renamed, filtered by a wildcard");
+git(dir, "branch", "-q", "-f", "named");
+fs.writeFileSync(path.join(dir, "notes.md"), `Naming ${term}.\n`);
+commit(dir, "a note with a listed term");
+r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), "--base", "named"], { cwd: dir, env: { ...env, PERSONAL_TERMS: `${term}\n` }, encoding: "utf8" });
+const masked = `${r.stdout}${r.stderr}`;
+ok(r.status === 1 && /FAIL \*\*\*-terms\.yml\/check\/check/.test(masked) && !masked.toLowerCase().includes(term.toLowerCase()), "a call under a branch filter of patterns runs, and a listed term in the workflow's own name is printed nowhere", masked);
+
+// a core that cannot be reached fails, saying its mend
+git(dir, "reset", "-q", "--hard", "base");
+const away = { ...env, GIT_CONFIG_KEY_0: `url.${path.join(tmp, "nowhere").replace(/\\/g, "/")}.insteadOf`, GIT_CONFIG_KEY_1: `url.${path.join(tmp, "nowhere").replace(/\\/g, "/")}.insteadOf` };
+r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: away, encoding: "utf8" });
+ok(r.status === 1 && `${r.stdout}${r.stderr}`.includes("the core could not be fetched") && mended(`${r.stdout}${r.stderr}`) && !`${r.stderr}`.includes("    at "), "a core that cannot be reached fails with its mend, and no stack", `${r.stdout}${r.stderr}`);
+
 // a check that keeps a baseline reads the base: the change is checked on its merge into the base, as GitHub checks it
 git(dir, "reset", "-q", "--hard", "base");
 fs.writeFileSync(path.join(dir, ".mcp.json"), JSON.stringify({ mcpServers: { unlisted: { command: ["np", "x"].join(""), args: ["-y", "an-unlisted-server@1.0.0"] } } }, null, 2));
