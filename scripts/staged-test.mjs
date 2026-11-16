@@ -128,6 +128,13 @@ gh(asked, "POST", "issues", { title: "Time sumlog on a board", body: "Only whoev
 ok(verdict("stack-choice", asked).pass, "stack-choice: an issue asking the owner for a run only the owner can make, with the pick standing, passes", verdict("stack-choice", asked).why);
 pr(asked, "stack", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: Go or a shell script?"));
 ok(/a pull request waits on the owner/.test(verdict("stack-choice", asked).why), "stack-choice: a pull request that waits on the owner for the choice fails", verdict("stack-choice", asked).why);
+const askedChoice = fresh("stack-choice");
+branch(askedChoice, "stack", { "docs/choices.md": choiceRecord(askedChoice, "Go", GO) });
+gh(askedChoice, "POST", "issues", { title: "The stack for the boards", body: "Which shall it be?\nGo or a BusyBox shell script?", labels: ["needs-owner", "by:builder"] });
+ok(/the choice is put to the owner/.test(verdict("stack-choice", askedChoice).why), "stack-choice: the choice asked of the owner in an issue fails, though a pick stands", verdict("stack-choice", askedChoice).why);
+const ruledFirst = fresh("stack-choice");
+branch(ruledFirst, "stack", { "docs/choices.md": choiceRecord(ruledFirst, "Go", GO.replace(/Options: [^\n]*/, "Options: Go, one static binary of about 2 MB; Rust, as small, with a second toolchain to keep.").replace("awk is already on every board", "Rust's binaries are smaller").replace("Criteria, from the aims:", "Node and Python are out. Criteria, from the aims:")) });
+ok(/compares 2 options/.test(verdict("stack-choice", ruledFirst).why), "stack-choice: a stack named only as ruled out before the criteria is no option", verdict("stack-choice", ruledFirst).why);
 const shell = fresh("stack-choice");
 branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
 ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);

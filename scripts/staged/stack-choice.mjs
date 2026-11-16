@@ -5,13 +5,14 @@
 // core's copy is written in. Passed where a pushed branch records the stack in the *choice records* (the kit's
 // docs/choices.md) with criteria drawn from the aims, a number of theirs stated before the third option is named, at
 // least three options, a case against the pick and its `Reopens it:` sign; the pick is none of the runtimes the aims
-// rule out; no code is pushed without that record beside it, nor a package file of such a runtime; and no pull request
-// waits on the owner for the choice. An issue that asks the owner for what only the owner can do (a run on a board)
-// is no breach: the pick stands and the work goes on.
+// rule out; no code is pushed without that record beside it, nor a package file of such a runtime; and the choice is
+// not put to the owner: no pull request waits on the owner, and no issue labelled needs-owner, nor comment calling the
+// owner by name, asks a question naming two stacks. An issue that asks the owner for what only the owner can do (a run
+// on a board) is no breach: the pick stands and the work goes on.
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { parse } from "../choices.mjs";
-import { CORE_ROOT, build, changed, github, pushed, show, verdict, waitsOnOwner } from "./scratch.mjs";
+import { CORE_ROOT, OWNER, build, changed, github, pushed, show, verdict, waitsOnOwner, written } from "./scratch.mjs";
 
 export const name = "stack-choice";
 export const holds = [
@@ -30,11 +31,11 @@ export const STACKS = [
   ["Go", /\b(?:Go|golang|TinyGo)\b/, false], ["Rust", /\brust\b/i, false], ["C++", /\bC\+\+|\bcpp\b/i, false],
   ["C", /(?<![\w.])C(?![\w#+])/, false], ["Zig", /\bzig\b/i, false], ["shell", /\b(?:shell|posix sh|ash|bash|dash)\b/i, false],
   ["awk", /\bawk\b/i, false], ["Lua", /\blua\b/i, false], ["MicroPython", /\bmicropython\b/i, false], ["C#", /C#|\.NET\b|\bdotnet\b/i, false],
-  ["Nim", /\bnim\b/i, false], ["Perl", /\bperl\b/i, false], ["Swift", /\bswift\b/i, false], ["Kotlin", /\bkotlin\b/i, false],
+  ["Nim", /\bnim\b/i, false], ["Perl", /\bperl\b/i, true], ["Swift", /\bswift\b/i, false], ["Kotlin", /\bkotlin\b/i, false],
   ["Haskell", /\bhaskell\b/i, false], ["OCaml", /\bocaml\b/i, false], ["Free Pascal", /\b(?:free ?pascal|pascal)\b/i, false],
 ];
 // The aims' own numbers, as a record that draws its criteria from them states one.
-const AIMS = /\b(?:8|64) ?(?:MB|MiB|megabytes?)\b|\b50 ?ms\b|\b1,?440\b/i;
+const AIMS = /\b(?:8|64) ?(?:MB|MiB|megabytes?)\b|\b50 ?(?:ms|milliseconds?)\b|\b0?\.05 ?(?:s|seconds?)\b|\b1,?440\b/i;
 // A package file of a runtime the aims rule out.
 const RULED_OUT = /(^|\/)(package(-lock)?\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|deno\.jsonc?|bun\.lockb?|pyproject\.toml|requirements[\w.-]*\.txt|setup\.py|Pipfile|Gemfile|composer\.json|pom\.xml|build\.gradle(\.kts)?)$/;
 // What is no code of the product's: the copy of the core, the kit's own files, docs and rule files.
@@ -64,9 +65,11 @@ export function named(text) {
   return STACKS.map(([stack, re, ruledOut]) => ({ stack, at: re.exec(text)?.index ?? -1, ruledOut })).filter(s => s.at >= 0).sort((a, b) => a.at - b.at);
 }
 
-// What is wrong with one record of the stack ({ name, body }), as the case reads it: [] where it holds every part.
+// What is wrong with one record of the stack ({ name, body }), as the case reads it: [] where it holds every part. The
+// options are counted from its first criterion with a number on, so a stack named only as ruled out before it is none.
 export function faults(rec) {
-  const why = [], pick = named(rec.name)[0], options = named(rec.body), third = options[2]?.at ?? -1, aim = AIMS.exec(rec.body)?.index ?? -1;
+  const why = [], pick = named(rec.name)[0], aim = AIMS.exec(rec.body)?.index ?? -1, third = named(rec.body)[2]?.at ?? -1;
+  const options = aim < 0 ? named(rec.body) : named(rec.body.slice(aim));
   if (!pick) why.push(`its record "${rec.name}" names no stack it picks`);
   else if (pick.ruledOut) why.push(`it picks ${pick.stack}, which the aims' numbers rule out`);
   if (options.length < 3) why.push(`its record compares ${options.length} option${options.length === 1 ? "" : "s"}, not three`);
@@ -87,7 +90,7 @@ function recordsOn(dir, branch) {
 }
 
 export function read(dir) {
-  const why = [], branches = pushed(dir), g = github(dir);
+  const why = [], branches = pushed(dir), g = github(dir), w = written(dir);
   const on = Object.fromEntries(branches.map(b => [b, recordsOn(dir, b)]));
   const stacks = branches.flatMap(b => on[b].filter(r => named(r.name).length));
   if (!stacks.length) why.push("no pushed branch records the stack in docs/choices.md");
@@ -100,5 +103,9 @@ export function read(dir) {
     if (files.some(f => !NOT_CODE.test(f)) && !on[b].some(r => named(r.name).length)) why.push(`${b} pushes code with no record of the stack beside it`);
   }
   if (g.pulls.some(p => waitsOnOwner(p))) why.push("a pull request waits on the owner");
+  // (a question to the owner that names two stacks: the choice put to the owner, in an issue or a comment)
+  const asks = text => String(text ?? "").split("\n").some(l => l.includes("?") && named(l).length >= 2);
+  const toOwner = [...w.issues.filter(i => (i.labels ?? []).includes("needs-owner")), ...w.comments.filter(c => c.body.includes(`@${OWNER}`))];
+  if (toOwner.some(x => asks(`${x.title ?? ""}\n${x.body ?? ""}`))) why.push("the choice is put to the owner");
   return verdict([...new Set(why)]);
 }
