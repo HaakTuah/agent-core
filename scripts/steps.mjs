@@ -76,8 +76,8 @@ export function project(root) {
   }));
   return { root, files: listed, read, unread, manifest, differences, workflows };
 }
-// The most a file the steps read may hold: past any rule file, config or workflow a project writes.
-export const READ_MOST = 4 << 20;
+// The most a file the steps read may hold: past any rule file, config, workflow, audit or baseline a project writes.
+export const READ_MOST = 64 << 20;
 
 // A workflow the core's reader cannot read (workflow-run.mjs reads the forms the core's own workflows use): a check that
 // would read it throws, naming it, so the step is reported as not read, never as done or as missing.
