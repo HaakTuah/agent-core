@@ -6,10 +6,10 @@ Read by the tool `claude` at the start of every task.
 | --- | --- | --- |
 | Builder | Opus for the main lane, design readings and the *hard work*; Sonnet for routine lanes (polish, docs, splits, tests) | high |
 | Search helper | Haiku | low |
-| Parallel helper (`modules/helpers.md`) | Sonnet; Opus where it needs design judgement | medium; high for the hard work |
+| Parallel helper (`tasks/helpers.md`) | Sonnet; Opus where it needs design judgement | medium; high for the hard work |
 | Orchestrator (the owner starts it), fallback reviewer, design check, leanness check, stand-in, a choice's challenger | Opus | high |
 | Planning design | Fable | high |
-| Escalation (`modules/roles.md`) | Opus, then Fable | high, or xhigh if you run at high |
+| Escalation (`tasks/roles.md`) | Opus, then Fable | high, or xhigh if you run at high |
 
 - **Pass both model and effort** whenever you start a session or helper (core archive 128), save a helper whose
   definition gives them: one of a type the project defines, or a plug-in's own (`codex:codex-rescue`). Never above high,
@@ -24,5 +24,5 @@ Read by the tool `claude` at the start of every task.
   - a fresh eye (reviewer, design check, stand-in) and a helper for cost (search, routine parts) whatever your level;
   - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it (core
     archive 73).
-- **Who builds** is picked as `modules/roles.md`, "The builders", says: Claude's usage is also the owner's own, and is
+- **Who builds** is picked as `tasks/roles.md`, "The builders", says: Claude's usage is also the owner's own, and is
   saved for the orchestrator where Claude runs it.

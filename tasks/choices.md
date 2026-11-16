@@ -63,11 +63,11 @@ sign written in a measure.
   It does not mean a session makes that choice, or that the rest of the work waits on it. Reason: the owner asked
   what would reopen a choice, and wants better options suggested.
 - **When a feature may leave the stack.** By default a feature is built in what the project already uses. The trigger
-  is a measured miss: where a feature has a need in numbers (speed, memory, size; `modules/how-to-work.md`) and a trial
+  is a measured miss: where a feature has a need in numbers (speed, memory, size; `roles/shared/how-to-work.md`) and a trial
   shows the stack cannot meet it, its builder opens a choice record. It does not mean that another language being
   faster in general is a reason by itself. The record:
   - shows first where the time or the memory goes, since most slowness is in the algorithm;
-  - takes a part, never the whole: the other language goes behind a declared boundary (`modules/code-shape.md`), as
+  - takes a part, never the whole: the other language goes behind a declared boundary (`tasks/code-shape.md`), as
     any system does, and the rest of the code keeps its language;
   - counts the whole cost: the second toolchain, the build step, tests and checks in two languages, and how well
     agents write it;

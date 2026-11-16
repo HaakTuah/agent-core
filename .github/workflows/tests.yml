@@ -12,9 +12,9 @@
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
 # The suites together, each of their three parts on Windows, and the upgrade test, are each held to a time mark (the
-# "suites" of .github/shape.json, by scripts/shape.mjs; modules/code-shape.md, "The tests have a time mark").
+# "suites" of .github/shape.json, by scripts/shape.mjs; tasks/code-shape.md, "The tests have a time mark").
 # After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
-# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; modules/code-shape.md, "How
+# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
 # strong the tests are"), in working copies of its own, with no secret.
 name: tests
 

@@ -20,10 +20,10 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
 - a broken rule of the project, the core or the floor;
 - a size mark raised without its reason in the PR (one on what every session reads: below);
 - an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
-  and a fresh session's word there that it found no other way (`modules/code-shape.md`, "Never worse");
+  and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
 - a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
-  with a reason that holds (core archive 36; `modules/code-shape.md`, #253);
-- against the pillars of `modules/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
+  with a reason that holds (core archive 36; `tasks/code-shape.md`, #253);
+- against the pillars of `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
   pointed to.
 
 A finding, not blocking:
@@ -53,9 +53,9 @@ A finding, not blocking:
 
 **A brief written in a pull request** (a template of the starter kit that hands work, or a brief a module, script or
 workflow holds; core archive 229): blocking where it misses one of the four things "A brief is written as a rule is"
-in `modules/helpers.md` names, or gives its reader a title or stakes that are not real.
+in `tasks/helpers.md` names, or gives its reader a title or stakes that are not real.
 
-**A screen changed** (`modules/screens.md`; core archive 230):
+**A screen changed** (`tasks/screens.md`; core archive 230):
 - Blocking: a pull request that changes a screen with no critique on it (point 18), or with no pictures of point 17
   where its session could take them; where it could not, the pull request says why and the issue filed for the tool.
 - A finding: no three lines of the builder's (point 16), and a difference between them and the critique's answers to

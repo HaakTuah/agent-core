@@ -1,4 +1,4 @@
-// What a session reads, by its role and its task (modules/roles.md, "A file for each role"; modules/tools.md, "One
+// What a session reads, by its role and its task (tasks/roles.md, "A file for each role"; tasks/tools.md, "One
 // script says what to read"; core archive 234; #304). Given a role and a task (its issue, its kinds, or the paths
 // changed so far), it prints the files to read: at the start the floor (floor/security.md, whole, whatever the role),
 // the role's own file under roles/ and the files that file names on its line "Reads at its start:" (a role's file
@@ -39,12 +39,13 @@ export const FLOOR = "floor/security.md";
 export const START = "Reads at its start:";
 // The line of a pull request's description that lists what its changed paths called for (pr-description.mjs asks it).
 export const READ_LINE = "Read for it:";
-// The floor's two files read when needed, by the topics the floor's own opening names, until they are a folder of
-// topics that each say when (#304, point 8): the floor's words are not changed for it here.
-export const FLOOR_WHEN = {
-  "floor/topics.md": { kinds: ["workflow", "input", "dependency", "alert", "licence", "account", "update", "security-review"], paths: [".github/workflows/", ".github/dependabot.yml", "*.lock", "*.lockb", "*.lock.json", "*-lock.json", "*-lock.yaml", "*-shrinkwrap.json", "go.sum"] },
-  "floor/threat-model.md": { kinds: ["security-review"], paths: [] },
-};
+// The folders of the units a task calls for or a role's file names, each file saying when it is read: who (a role's
+// shared files, a tool's part) or when (a kind of task, a topic of the floor).
+export const UNITS = ["roles/shared", "tasks", "tools", "floor/topics"];
+// Of those, the folders of the modules: the units a project takes or leaves out by name, each name standing once.
+export const MODULES = ["roles/shared", "tasks", "tools"];
+// The floor's threat model, read with a security review, whose words are not changed to say so.
+export const FLOOR_WHEN = { "floor/threat-model.md": { kinds: ["security-review"], paths: [] } };
 const WORD = /^[a-z][a-z0-9-]{0,39}$/u;
 const ticks = text => [...String(text).matchAll(/`([^`\n]+)`/gu)].map(m => m[1]);
 const LIST = "((?:`[^`\\n]+`(?:,? (?:and |or )?)?)+)";
@@ -93,7 +94,7 @@ export function matches(pattern, file) {
 export function gather(read, list) {
   const roles = {}, modules = {};
   for (const f of list("roles")) { const text = read(f); roles[f] = { name: path.posix.basename(f, ".md"), when: whenOf(text), start: readsOf(text, START) }; }
-  for (const f of list("modules")) modules[f] = whenOf(read(f));
+  for (const f of UNITS.flatMap(list)) modules[f] = whenOf(read(f));
   return { roles, modules };
 }
 

@@ -2,7 +2,7 @@
 
 Read when a system is designed, added or named, when code is ported or rewritten (core archive 226), and when a pull
 request deletes a test or weakens one (#253): the kinds `system`, `port` and `test`. How what already stands is brought
-to it: `modules/cleaning.md`.
+to it: `tasks/cleaning.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
 its systems, and the marks below, in the config of its *shape check* (`core/scripts/shape.mjs`), which runs on every
@@ -17,9 +17,9 @@ one declared entrance.
   baseline), where the base branch held the breach already; or there was no other way, where the baseline gives the
   entry's reason under "grown", the pull request gives it too, and a fresh session says there that it found no other
   way. A mark rises the same way. It does not mean that code which stands is rewritten on demand: the baseline is a
-  debt, worked down by tasks (`modules/cleaning.md`), and no project is asked to rewrite. Reason: the rules are there
+  debt, worked down by tasks (`tasks/cleaning.md`), and no project is asked to rewrite. Reason: the rules are there
   for a reason, and one earns from them only where they cannot slip. Held by the shape check, which reads the baseline
-  against the pull request's base, and by the reviews for the reason given (`modules/review-guidelines.md`).
+  against the pull request's base, and by the reviews for the reason given (`roles/shared/review-guidelines.md`).
 - **Each project names its systems, under the same domains.** By default every file of code lies in a system the
   config names, each with its paths, the systems it uses, its entrance and its domain. The domains: the rules; saved
   data; the display; input; the network; storage; code bound to a platform; wrappers of third-party packages; tools;
@@ -89,7 +89,7 @@ one declared entrance.
   the project's baseline stands, a fault that survives on a changed line and the baseline does not list fails, and the
   session writes a test that catches it; only where the fault changes nothing the program does, it lists it with that
   reason, as "Never worse" says of any entry. The baseline lists what survives a whole run, which is the audit's,
-  outside the suite and in a pull request that changes no code or test (`modules/cleaning.md`): a debt worked down at
+  outside the suite and in a pull request that changes no code or test (`tasks/cleaning.md`): a debt worked down at
   the dose. It does not mean that a pull request runs the whole codebase, that a score is the aim, or that the tests
   that stand are rewritten on demand; a listed fault whose line the change rewrote stays listed, and any other fault on
   a changed line is the change's own. Reason: the projects lean on their suites as the proof that a
@@ -101,7 +101,7 @@ one declared entrance.
   case skipped): its builder says so under "Readings taken", with why, and the reviewer checks that the reason holds.
   It does not mean that a test which proves nothing must stay. Reason: a measure on changed lines cannot see a test
   weakened elsewhere, and a test made to pass is the cheapest way to green. No check holds it yet, since none can
-  tell a weakened assertion without guessing: the reviews read it (`modules/review-guidelines.md`), the strength check
+  tell a weakened assertion without guessing: the reviews read it (`roles/shared/review-guidelines.md`), the strength check
   names each test file a pull request deletes, and `core/scripts/holders.mjs` lists it until something holds it.
 - **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
   of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the

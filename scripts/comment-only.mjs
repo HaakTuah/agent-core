@@ -24,7 +24,7 @@
 // files outside what it reads, it refuses those that run by themselves or decide what does (RUNS_TOO below) and lists
 // the rest: it exits 0 where there are none, 1 where it refuses, and 2 where others changed, which the session's
 // "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
-// (modules/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git and Node's own
+// (tasks/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git and Node's own
 // modules only; it changes nothing.
 import { execFileSync } from "node:child_process";
 import { started } from "./started.mjs";

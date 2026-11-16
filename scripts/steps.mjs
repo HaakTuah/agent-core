@@ -178,7 +178,7 @@ function strengthRuns(p) {
 }
 
 // Whether the project names its mutation tool, or none with its reason, and where it names one, a workflow runs the
-// strength check (core/modules/code-shape.md, "How strong the tests are is measured on the lines a pull request
+// strength check (core/tasks/code-shape.md, "How strong the tests are is measured on the lines a pull request
 // changes").
 function strengthNamed(p) {
   const tool = toolOf(p.manifest);
@@ -289,11 +289,11 @@ export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
       const wrong = [];
-      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/modules/other-builders.md` at the start of every task");
+      if (!/core\/modules\/other-builders\.md/.test(p.read("AGENTS.md") ?? "")) wrong.push("`AGENTS.md` tells a session of another tool to read `core/tools/other-builders.md` at the start of every task");
       if (/^\|\s*\*Codex's checks\*\s*\|/m.test(p.manifest)) wrong.push("the manifest's row *Codex's checks* is renamed *other builders' checks*");
       return wrong.length ? `${wrong.join("; ")}.` : null;
     },
-    partly: "that no builder is given `core/modules/codex.md`, and the names in the size marks, are read by the review" },
+    partly: "that no builder is given `core/tools/codex.md`, and the names in the size marks, are read by the review" },
   { lead: "12 November 2026, who reviews", cost: COST.read, unread: "whether a project's reviewers differ from the core's is its own choice, which no file states" },
   { lead: "12 November 2026, the core has moved", cost: COST.workflow, unread: "whether the project's orchestrator wakes every day is no file's to say" },
   { lead: "12 November 2026, fetches on Windows and by .NET", cost: COST.check, held: "the licence check", partly: "the idea filed with the core is no file of the project's" },
@@ -413,7 +413,7 @@ export const STEPS = [
         throw new Unread(`no ${file}, or no ${marksAt} with its "each" and "read", to read`);
       const mark = marks.read?.[file], bytes = Buffer.byteLength(text);
       if ((Number.isInteger(mark) && mark < marks.each) || bytes < marks.each / 4) return null;
-      return `Trim \`${file}\` once, in a pull request of its own: each finished entry leaves it (its pull request and issue keep it), each entry says only what is next and points to its pull requests for what was done, and each line of a queued issue holds its issue, who builds it and what it waits on, nothing more (\`core/modules/inbox.md\`, "The *progress file* holds order only"). Then give it a mark of its own under "read" in \`${marksAt}\`: a number of bytes the project chooses, below "each" (${marks.each}) and at least its size after the trim.`;
+      return `Trim \`${file}\` once, in a pull request of its own: each finished entry leaves it (its pull request and issue keep it), each entry says only what is next and points to its pull requests for what was done, and each line of a queued issue holds its issue, who builds it and what it waits on, nothing more (\`core/roles/shared/inbox.md\`, "The *progress file* holds order only"). Then give it a mark of its own under "read" in \`${marksAt}\`: a number of bytes the project chooses, below "each" (${marks.each}) and at least its size after the trim.`;
     } },
   { lead: "15 November 2026, the owner's inbox where issues cannot be reached", cost: COST.read, unread: "whether issues can be read and written here is GitHub's answer, not a file's: `core/scripts/inbox.mjs` asks it, and each sync runs it from the next one on" },
   { lead: "15 November 2026, labels and openers", cost: COST.read, unread: "whether the labels stand and the issues and comments carry them is GitHub's answer, not a file's: `core/scripts/labels.mjs` asks it and says each mend, and each sync runs it from the next one on; the issue forms' \"Found while:\" line is a difference `core/scripts/fresh.mjs` lists" },
@@ -442,7 +442,7 @@ export const STEPS = [
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
-  { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/modules/screens.md`, point 1), and the critique asks for it there" },
+  { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/tasks/screens.md`, point 1), and the critique asks for it there" },
   { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
     partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
   { lead: "16 November 2026, a file for each role, and the script that says what to read", cost: COST.line,

@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false # the cut below takes its token from GH_TOKEN, nothing from the checkout
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The release, cut where every check on main's newest commit has passed
         env:
           GH_TOKEN: ${{ github.token }}

@@ -28,7 +28,7 @@ Read before a task changes a rule, a feature or how the computer players play, a
   - Every rule a player needs is in *where rules are taught*, added or changed in the same change as the rule.
   - When a rule acts on a player, the game shows it where and when that player could know it.
   - Whatever the game shows, a last-known position or an old report among it, and every mistake a player makes in
-    testing, are held to `modules/screens.md`, point 13 (core archive 112 and 114); a player may still lie.
+    testing, are held to `tasks/screens.md`, point 13 (core archive 112 and 114); a player may still lie.
 - **Strong computer players** (core archive 82, 83 and 90). The *computer players* play as competently as they can,
   within the limits their game sets them, never weaker on purpose (a game is made easier or harder by its setup
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule.
@@ -61,7 +61,7 @@ Read before a task changes a rule, a feature or how the computer players play, a
   depend on which the game settles first: they share, or a seeded draw decides.
 - **Everything new belongs** (core archive 105). Every new feature feels balanced, cohesive and purposeful, and fits the
   rest of the game: it reads and changes quantities other systems use, never keeping its own beside them (core archive
-  114), each through what the system that owns it offers (`modules/code-shape.md`, where the *computer players* are a
+  114), each through what the system that owns it offers (`tasks/code-shape.md`, where the *computer players* are a
   system of their own, of the domain `computer-players`).
 - **Every stage is a game** (core archive 204). A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
@@ -70,7 +70,7 @@ Read before a task changes a rule, a feature or how the computer players play, a
   - A lever is built with the counterweight that answers it, never with a stand-in for it, one moved in the order of
     work if need be.
   - It speaks of what the game offers its players, not of how its code is rebuilt: a named bridge that a stage of a
-    large refactor leaves, with the task that removes it queued, is none (`modules/cleaning.md`).
+    large refactor leaves, with the task that removes it queued, is none (`tasks/cleaning.md`).
 - **Numbers are first guesses until play tunes them** (core archive 86 and 108). A number a change sets that neither
   reality nor its causes fix (a time, a cost, a chance) is a first guess, listed in the change and tuned by measured
   play, never just picked.
@@ -104,4 +104,4 @@ Read before a task changes a rule, a feature or how the computer players play, a
 - **Readable by every player** (core archive 112, 204 and 205). *What they are shown* tells the *computer players* what
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
-  thing) are `modules/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
+  thing) are `tasks/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.

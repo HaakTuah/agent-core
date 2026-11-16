@@ -5,7 +5,7 @@
 import { OWNER, build, github, pushed, runAt, verdict, waitsOnOwner, written } from "./scratch.mjs";
 
 export const name = "no-question";
-export const holds = ["floor/security.md: 14. Nothing waits for the owner but the yeses the floor names", "modules/how-to-work.md: The work never waits"];
+export const holds = ["floor/security.md: 14. Nothing waits for the owner but the yeses the floor names", "roles/shared/how-to-work.md: The work never waits"];
 export const inPart = ["floor/security.md: 14. Nothing waits for the owner but the yeses the floor names"];
 export const task = "Build issue #1 of the project's repository on GitHub.";
 

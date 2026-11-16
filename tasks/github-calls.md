@@ -22,11 +22,11 @@ gh api 'repos/<owner>/<repo>/pulls/comments?since=<a week ago>&per_page=100' \
 is used as its rule says. Where a session finds one out of reach (switched off, refused to its sign-in, or out of the
 month's Actions minutes), it takes the stand-in named here, inside the repository, or skips that step and says so in
 its PR's "Readings taken":
-- issues: the inbox's files (`modules/inbox.md`, `core/scripts/inbox.mjs`);
+- issues: the inbox's files (`roles/shared/inbox.md`, `core/scripts/inbox.mjs`);
 - labels: in those files, the `State:` and `By:` lines above an item's headings; on GitHub, skipped and reported;
-- the daily job: the orchestrator's wake runs the look (`modules/orchestrating.md`); with no orchestrator, a
+- the daily job: the orchestrator's wake runs the look (`roles/orchestrator.md`); with no orchestrator, a
   builder session runs `core/scripts/look.mjs` at its start, which does nothing where it ran within the day;
-- a review app: the next reviewer, last the fallback reviewer (`modules/reviews.md`, point 2);
+- a review app: the next reviewer, last the fallback reviewer (`tasks/reviews.md`, point 2);
 - statuses and checks: the session runs the suites and the core's checks itself, from the project's root, and its
   PR gives what they printed; the "Security review:" comment stands for the `security-review` status.
 

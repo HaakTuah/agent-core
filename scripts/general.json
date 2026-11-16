@@ -1,8 +1,8 @@
 {
   "paths": ["floor", "modules", "roles"],
-  "exempt": ["modules/game-design.md"],
+  "exempt": ["tasks/game-design.md"],
   "words": [
-    { "pattern": "\\bgames?\\b", "say": "the project; what holds only for games goes in modules/game-design.md" },
+    { "pattern": "\\bgames?\\b", "say": "the project; what holds only for games goes in tasks/game-design.md" },
     { "pattern": "\\bplayers?\\b", "say": "its users" },
     { "pattern": "\\bplay(s|ed|ing)?\\b", "say": "what it does, or its behaviour" },
     { "pattern": "live (site|build)", "say": "what its users get, or its newest build: a project may release by tag" },

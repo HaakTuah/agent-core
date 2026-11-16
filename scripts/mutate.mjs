@@ -1,4 +1,4 @@
-// The core's own mutation tool (modules/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
+// The core's own mutation tool (tasks/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
 // AGENTS.md names, and one any project whose code is JavaScript run by Node, and whose tests are files run by
 // `node <file>`, may name too. It puts faults into the code on purpose, one at a time: an equality or comparison
 // turned (=== to !==, < to <=), and or or swapped, true and false swapped, a ! dropped, + and - swapped; and for each

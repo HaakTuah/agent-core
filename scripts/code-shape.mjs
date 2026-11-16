@@ -1,7 +1,7 @@
 // The measures of how a codebase is put together (#245): the audit's numbers kept as a script, so the next audit is a
 // run and not a study. It reads the JavaScript and TypeScript files git holds and prints a summary; with --json it
 // writes every number. It measures and fails nothing: what is held of it, and how, is the shape check's (shape.mjs,
-// beside this file, which reads with this file's reader; modules/code-shape.md). Node's own modules and git only.
+// beside this file, which reads with this file's reader; tasks/code-shape.md). Node's own modules and git only.
 //
 // What it gives, of the files it reads:
 //   - imports: how many, how many cross a folder, those of code that lead to no file, and the pairs of folders that

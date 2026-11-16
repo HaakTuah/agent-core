@@ -1,4 +1,4 @@
-# The versions check ("The newest stable version, unless there is a reason" in modules/updates.md): each version a
+# The versions check ("The newest stable version, unless there is a reason" in tasks/updates.md): each version a
 # config names is compared with its registry's (npm's or PyPI's) newest stable release old enough to take
 # (scripts/versions.mjs), and each one behind gets an enhancement issue for the owner, unless one it opened is still
 # open. A project calls it (workflow_call) from a monthly schedule of its own, with its config, pinned to a full commit

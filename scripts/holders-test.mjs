@@ -56,7 +56,7 @@ ok(!good.wrong.length && c.check === 1 && c.case === 1 && c.audit === 1 && c.par
   "each rule is counted by its holders, a staged case's own among them; one held only in part counts as in part; one with none is listed", JSON.stringify({ ...c, wrong: good.wrong }));
 const hooked = counts(holders(project({ "modules/x.md: 1. A rule of a paragraph": "check: scripts/work-saved.sh, in part", "modules/x.md: A rule inside it": ["check: scripts/helper-call.mjs", "describes"], "modules/x.md: Numbered": ["check: scripts/work-saved.sh", "check: scripts/a-check.mjs, in part"] }, { "scripts/work-saved.sh": "", "scripts/helper-call.mjs": "" }), []));
 ok(JSON.stringify(hooked.hooked) === JSON.stringify(["modules/x.md: 1. A rule of a paragraph", "modules/x.md: A rule inside it"]) && hooked.none.includes("modules/x.md: A rule inside it") && hooked.check === 0 && hooked.part === 1,
-  "a rule whose only holders are hooks is listed as held by none, and one a check holds beside a hook is counted by the check (modules/tools.md)", JSON.stringify(hooked));
+  "a rule whose only holders are hooks is listed as held by none, and one a check holds beside a hook is counted by the check (tasks/tools.md)", JSON.stringify(hooked));
 const bad = holders(project({ "modules/x.md: Gone": "check: scripts/a-check.mjs", "modules/x.md: Numbered": "check: scripts/missing.mjs", "modules/x.md: A last item": "case: a-case", "modules/x.md: The second numbered": "reviews" }), []);
 ok(bad.wrong.length === 4 && bad.wrong.every(w => /Mend: /.test(w)), "a key that names no rule, a check not there, a staged case named here and a holder in no form each fail, saying the mend", bad.wrong.join("\n"));
 ok(holders(project("{ not json"), []).wrong.length === 1, "holders.json that cannot be read fails");

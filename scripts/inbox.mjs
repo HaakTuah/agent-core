@@ -1,4 +1,4 @@
-// Where the owner's inbox is (modules/inbox.md, "Issues are the way in"; core archive 216): the project's issues, where
+// Where the owner's inbox is (roles/shared/inbox.md, "Issues are the way in"; core archive 216): the project's issues, where
 // they can be read and written here, else the folder inbox/ in the repository, the same flow run from files. Asked of
 // GitHub's API through gh, for the repository origin's address names: issues switched on, and the account gh is signed
 // in as may write them (triage or more), or, for an app's token such as GitHub's job's, GitHub takes a write of them

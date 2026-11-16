@@ -11,7 +11,7 @@ and 57).
 - **A question from the owner is a question:** answer it; act on it when the owner says so (core archive 25).
 - **Match effort to the task** (core archive 25): the cheapest approach that does it well; docs, small fixes and
   config in one pass.
-- **A choice that one pull request cannot reverse gets a record:** `modules/choices.md`, read before one is made or
+- **A choice that one pull request cannot reverse gets a record:** `tasks/choices.md`, read before one is made or
   advised.
 - **A need is stated in numbers where there is one:** whoever writes a task for a feature whose users will feel its
   speed, size or memory writes that need as a number. It does not mean a number made up where users feel none.
@@ -26,7 +26,7 @@ and 57).
   rules 4, 11, 13). Reason: work stood still for an answer no rule needed.
 - **Edit in place.**
 - **Don't loop:** if one approach fails twice, write down what you tried and take another, or take its brief (the
-  problem, what was tried, the files and lines) to escalation (`modules/roles.md`), or mark the task blocked with it and
+  problem, what was tried, the files and lines) to escalation (`tasks/roles.md`), or mark the task blocked with it and
   go on to the next that does not depend on it.
 - **One fact, one place** (core archive 3, 57 and 58): in code, data, tests, docs and rule files. Point to where a thing
   lives, never copy it. When a better home appears, it moves there in one PR, its pointers updated.

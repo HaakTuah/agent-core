@@ -87,7 +87,7 @@ ok(r.status === 1 && r.out.includes("list of phrases a rule may not use is empty
 r = words({}, { "floor/a.md": "# The floor\n\nNothing here.\n" }, true, { ...config, phrases: { paths: ["rules"], list: config.phrases.list } });
 ok(r.status === 1 && r.out.includes("not there: rules") && mended(r.out), "a file or folder of the list that is not there fails", r.out);
 
-// a brief is written as a rule is (modules/helpers.md; #282): the list reads the starter kit's templates too, and holds
+// a brief is written as a rule is (tasks/helpers.md; #282): the list reads the starter kit's templates too, and holds
 // a title and a stake that are not real
 const kit = { ...config, phrases: { ...config.phrases, paths: [...config.phrases.paths, "setup/template"] } };
 r = words({}, { "setup/template/AGENTS.md.tmpl": `# {{project}}\n\n${RULE}`, "setup/template/workflows/a.yml.tmpl": "# should consider\n" }, true, kit);

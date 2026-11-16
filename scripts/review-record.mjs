@@ -4,7 +4,7 @@
 // and the issues labelled `bug`, and counts for each kind of pull request, in five reviews, which got the review, in how
 // many it blocked, and how many blocking points it raised:
 //   Codex's code review      its own account (`chatgpt-codex-connector[bot]`, a Bot): a top-level inline comment with a
-//                            P-badge and no security marker is a find; P0 and P1 block (modules/review-guidelines.md),
+//                            P-badge and no security marker is a find; P0 and P1 block (roles/shared/review-guidelines.md),
 //                            P2 and P3 count as other points; it ran where its summary (scripts/security-review.mjs
 //                            `codexState`) says completed, or a receipt or a find of it is there
 //   Codex's security review  the same, for the finds that open with its security marker

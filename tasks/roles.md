@@ -4,8 +4,8 @@ Read at its start by the orchestrator, and when a task needs one (who takes a ro
 change): the kind `role`.
 
 **The roles, by what they do** (core archive 232): the orchestrator starts builder sessions and hands out lines
-(`modules/orchestrating.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
-(`modules/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`modules/reviews.md`);
+(`roles/orchestrator.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
+(`roles/shared/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`tasks/reviews.md`);
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
 against the design and the owner's words; escalation takes what has beaten a builder twice. Any agent tool the owner
 has may take any of them.
@@ -36,7 +36,7 @@ where that tool is not at hand, to the next it names:
 - Where a project's manifest has a table under "Tools", each row it holds replaces the default's for that role; a row
   it lacks keeps the default's.
 - A tool is not at hand where it is not installed or set up for the project, its usage window is spent, or it gives no
-  sign as `modules/reviews.md`, point 2, says. Whoever hands out the role (the orchestrator, or the session that needs
+  sign as `tasks/reviews.md`, point 2, says. Whoever hands out the role (the orchestrator, or the session that needs
   the review) takes the next.
 - It does not mean that any tool is refused a role: a preference orders and never refuses, and a project with one tool
   runs every role with it. Nor does it mean that a session judges what it wrote (below).
@@ -59,12 +59,12 @@ nothing yet: builder and reviewer post under one login (#187).
 
 - The orchestrator picks. A tool is reached by the first way there is (core archive 122, 154, 158, 162, 163, 169): the
   tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
-  project names, as the tool's part says (`modules/tools.md`).
+  project names, as the tool's part says (`tasks/tools.md`).
 - Each takes every task or part whose brief can say all it needs, each in its own working tree and PR, whose first line
   names its builder; what no brief carries (a design reading, the owner's past words) goes to a builder that reads them
   itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
 - It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
-  over (`modules/orchestrating.md`, "The pace is the owner's").
+  over (`roles/orchestrator.md`, "The pace is the owner's").
 - Reason: the orchestrator is what keeps the work going, so its provider is saved the longest, and the strongest model
   is kept for the work that takes judgement.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.

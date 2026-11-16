@@ -2,7 +2,7 @@
 
 Read by a builder that takes a cleaning task, by the session that takes an audit's task and by its reader, and by the
 orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` and `audit`. What the code is held to:
-`modules/code-shape.md`.
+`tasks/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -16,7 +16,7 @@ orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` an
 
   The numbers are first guesses, which use tunes. The one condition that changes the state: the project's owner names
   it in one line of the manifest, its *dose*, and is not asked to. The trigger is the scheduled look
-  (`modules/orchestrating.md`): it keeps one issue for the cleaning the state makes due and one for each audit that
+  (`roles/orchestrator.md`): it keeps one issue for the cleaning the state makes due and one for each audit that
   is due, each a task an agent takes alone, and the orchestrator hands out lanes by the share. The share is shown: the
   cleaning issue says what the lane got, of the changes of the last 30 days those that lowered the baseline, against
   its target. In debt the baseline is smaller at each audit than at the last; where an audit comes due by its days
@@ -41,14 +41,14 @@ orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` an
     side by side, with the task that removes it already in the queue. "No stopgaps", a rule of design for what a
     product offers its users, does not forbid a bridge;
   - **a package that binds the code to one platform, swapped for one that does not,** is ordinary cleaning where the
-    tests prove behaviour kept: no choice that is hard to undo (`modules/choices.md`), and nothing changes in what
+    tests prove behaviour kept: no choice that is hard to undo (`tasks/choices.md`), and nothing changes in what
     the product is sold or shipped for.
 
-  A part that is rewritten instead states what it keeps (`modules/code-shape.md`). It does not mean that the numbers
+  A part that is rewritten instead states what it keeps (`tasks/code-shape.md`). It does not mean that the numbers
   are the aim: a baseline can empty while the code stays one piece, so the audit's reader judges what no number
   shows. Reason: the owner wants a codebase that cleans itself, by rules that are there for a reason and pay off in
   the long run. Held by the reviews ("a split goes in its own PR, behaviour proven unchanged",
-  `modules/how-to-work.md`), by the shape check, which fails a mended entry left in the baseline, and by the audit.
+  `roles/shared/how-to-work.md`), by the shape check, which fails a mended entry left in the baseline, and by the audit.
 - **The audit's reader has a fixed brief and fixed questions.** By default an audit is a run of the measures
   (`core/scripts/code-shape.mjs`) read by a fresh session that built none of what it reads. The session that takes
   the audit's task starts that reader, writes its answers as a report in the *audits*, named by its day, beside the
@@ -72,7 +72,7 @@ orchestrator when it hands out lanes (core archive 226): the kinds `cleaning` an
     audit's task runs it on the whole codebase, outside the suite and on a machine where the project's tests may run
     (floor rule 18), with `core/scripts/strength.mjs --whole`, which writes the tests' strength baseline in the same
     pull request, one that changes no code or test; the reader reads its number beside the last one's
-    (`modules/code-shape.md`, #253); the tests' other measures come with #275.
+    (`tasks/code-shape.md`, #253); the tests' other measures come with #275.
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
   again: what it left unanswered is answered at the next. Reason: what was measured was fixed and what was judged had

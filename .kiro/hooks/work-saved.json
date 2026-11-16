@@ -3,7 +3,7 @@
   "hooks": [
     {
       "name": "work-saved-start",
-      "description": "At a session's start: work left unpushed, and the owner's stop switch (the core's modules/work-flow.md); runs the copy merged into main.",
+      "description": "At a session's start: work left unpushed, and the owner's stop switch (the core's roles/shared/work-flow.md); runs the copy merged into main.",
       "trigger": "SessionStart",
       "action": {
         "type": "command",
@@ -13,7 +13,7 @@
     },
     {
       "name": "work-saved",
-      "description": "Work not committed or pushed keeps the agent going once (the core's modules/git.md, \"Push after every commit\"); runs the copy merged into main.",
+      "description": "Work not committed or pushed keeps the agent going once (the core's roles/shared/git.md, \"Push after every commit\"); runs the copy merged into main.",
       "trigger": "Stop",
       "action": {
         "type": "command",

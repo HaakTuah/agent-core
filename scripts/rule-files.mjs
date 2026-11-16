@@ -1,7 +1,7 @@
 // The project's rule files, so the list stands in one place: those floor rule 3 names (`AGENTS.md`, `CLAUDE.md`,
 // `SECURITY.md` and the core manifest, where they exist), and those its SECURITY.md adds in rule 3 (its "the rule
 // files:" line, ended by ";"). The copies and pointer checks (copies.mjs, pointers.mjs) read them. With `{ tools: true }`
-// it adds the files an agent tool takes its instructions from (floor rule 3; modules/tools.md): GEMINI.md, the entry
+// it adds the files an agent tool takes its instructions from (floor rule 3; tasks/tools.md): GEMINI.md, the entry
 // files the starter kit writes for Kiro and Antigravity (ENTRY_FILES, which entry-files.mjs beside this file reads), and
 // every file git tracks under a tool's folders of instructions (FOLDERS). The code-review wait and the state report read
 // those; the copies and pointer checks do not yet, since a project may hold such files from before the core read them,
@@ -11,9 +11,9 @@
 // reads the base's commit, to hold the base's list.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-// Each agent tool's entry file, as the starter kit writes it (modules/tools.md, "One door in").
+// Each agent tool's entry file, as the starter kit writes it (tasks/tools.md, "One door in").
 export const ENTRY_FILES = { claude: "CLAUDE.md", kiro: ".kiro/steering/core.md", antigravity: ".agents/rules/core.md" };
-// The folders a tool takes its instructions from (floor rule 3; modules/kiro.md and antigravity.md): every file in them.
+// The folders a tool takes its instructions from (floor rule 3; tools/kiro.md and antigravity.md): every file in them.
 export const FOLDERS = [".kiro/steering", ".kiro/agents", ".agents/rules", ".agent/rules"];
 const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
 const FLOOR = ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"];

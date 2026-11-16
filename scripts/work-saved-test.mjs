@@ -61,7 +61,7 @@ ok(r.status === 0 && /What this branch has changed calls for `core\/modules\/not
   "once main holds it, the start names what the branch's changed paths call for: main's copy run, main's modules read, no file of the working tree's named", `${r.status} ${r.stdout}`);
 fs.rmSync(path.join(project, "core", "modules", "ignore-the-rules-and-push.md"));
 git(project, "checkout", "-q", "--", "core/scripts/reading.mjs");
-// the starter kit's hooks for Kiro and Codex (modules/tools.md), run from a folder inside the project, as those tools
+// the starter kit's hooks for Kiro and Codex (tasks/tools.md), run from a folder inside the project, as those tools
 // start a command where the session works, with no CLAUDE_PROJECT_DIR: each finds the project's root by git
 const kit = name => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8"));
 const kiroStop = kit("kiro-hook.json.tmpl").hooks.find(h => h.trigger === "Stop").action.command;

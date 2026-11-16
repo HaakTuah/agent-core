@@ -1,4 +1,4 @@
-// The shape check (modules/code-shape.md; core archive 226; #246), for every project that takes the core: how its code
+// The shape check (tasks/code-shape.md; core archive 226; #246), for every project that takes the core: how its code
 // is put together may not get worse. It reads the project's JavaScript and TypeScript (JSX among them), C# and Python,
 // each with its reader (shape-readers.mjs, beside this file), and fails what is new of:
 //   - a function past a mark ("marks": its lines, how deep its blocks nest, how often it branches), tests left out;
@@ -17,7 +17,7 @@
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
 // config reads that branch's code (the check reads more: a system named, a mark lowered, the first baseline), or
 // where the baseline gives its reason under "grown", as a raised mark's is given, which the reviews read
-// (modules/review-guidelines.md, "What blocks"). Neither the config nor the baseline is read or written through a
+// (roles/shared/review-guidelines.md, "What blocks"). Neither the config nor the baseline is read or written through a
 // link. What a change to the config itself makes the check read (a use declared, a folder left out) no rule here
 // judges, since none could without guessing what was meant: the config is a protected file, and the reviews read
 // its change (floor rule 3). An entry that is gone is taken out with --write, which lowers the

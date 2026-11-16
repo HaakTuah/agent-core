@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nothing is lost ("Push after every commit" in the core's modules/git.md): Claude Code runs this when a session starts
+# Nothing is lost ("Push after every commit" in the core's roles/shared/git.md): Claude Code runs this when a session starts
 # ("start") and whenever a reply is about to end ("stop"). start reports work left uncommitted, unpushed or stashed,
 # and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
 # for (core archive 234), and whether the owner's stop switch is set (core archive 201);
@@ -17,7 +17,7 @@ g rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 if [ "$mode" = start ] && ! command -v node >/dev/null 2>&1; then
   echo "The helper hook is off here: Node is not on the path, and Claude Code starts that hook with node (the core's README.md, \"On Windows\")."
 fi
-# What to read (the core's modules/tools.md, "One script says what to read"): at the start, what the paths changed on
+# What to read (the core's tasks/tools.md, "One script says what to read"): at the start, what the paths changed on
 # this branch call for, as the reading script says it, from its copy merged into main as this hook is (never the
 # working tree's), the core's own where main holds no manifest and the project's copy of it where it does. The script
 # reads the roles and modules from main's own tree too; on a branch that has changed nothing that calls for a file,
@@ -51,13 +51,13 @@ if [ ${#issues[@]} -gt 0 ]; then
   msg="Work not yet on GitHub in ${PWD##*/}: $(IFS=';'; printf '%s' "${issues[*]}" | sed 's/;/; /g')."
   if [ "$mode" = stop ]; then
     printf '%s' "$input" | grep -q '"stop_hook_active"[[:space:]]*:[[:space:]]*true' && exit 0
-    echo "$msg Commit and push it to the task's branch before ending (\"Push after every commit\" in the core's modules/git.md), or say in your last message why it must stay." >&2
+    echo "$msg Commit and push it to the task's branch before ending (\"Push after every commit\" in the core's roles/shared/git.md), or say in your last message why it must stay." >&2
     exit 2
   fi
   echo "$msg"
 fi
 [ "$mode" = start ] || exit 0
-# The owner's stop switch (the core's modules/work-flow.md): the branch agents-stop on origin, by that name alone, asked
+# The owner's stop switch (the core's roles/shared/work-flow.md): the branch agents-stop on origin, by that name alone, asked
 # last, so that nothing above waits on it, and for eight seconds at most: no prompt for a sign-in or a host's key, and
 # origin's settings that run commands (an ext:: address, an upload-pack of its own) set aside; the user's own way to
 # ssh (GIT_SSH_COMMAND, GIT_SSH, core.sshCommand) kept. Where origin does not answer, that is said, since a switch
@@ -77,7 +77,7 @@ if kill -0 "$asking" 2> /dev/null; then kill "$asking" 2> /dev/null; else wait "
 if grep -q "$(printf '\t')refs/heads/agents-stop\$" "$asked" 2> /dev/null; then
   echo "The owner's stop switch is set (the branch agents-stop on origin): start no task; commit and push what you have, and stop, saying so."
 elif [ "$rc" != 0 ]; then
-  echo "The owner's stop switch could not be read (origin did not answer in time): say so before starting a task, and read it again before each commit (the core's modules/work-flow.md)."
+  echo "The owner's stop switch could not be read (origin did not answer in time): say so before starting a task, and read it again before each commit (the core's roles/shared/work-flow.md)."
 fi
 rm -f "$asked" 2> /dev/null
 exit 0

@@ -6,7 +6,7 @@
 // with no run of it, or once a rule it holds has changed; the scheduled look opens an issue for what is due (due(),
 // look.mjs's DUE). They advise until three months in a row have run every case with no verdict found wrong; from then
 // release.mjs cuts no release while a case's last verdict fails (gate()). Each run names its agent tool, and a tool
-// works with the core once it has passed every case since the newest release (tools(); modules/tools.md, "Proven by
+// works with the core once it has passed every case since the newest release (tools(); tasks/tools.md, "Proven by
 // the staged cases, tool by tool"): a tool other than TOOL that has run is due again after each release. The core's own
 // repository alone: in a project nothing is due. Git and Node's own modules only.
 //
@@ -40,7 +40,7 @@ export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.
 export const MONTHS = 3;
 export const TOOL = "Claude Code";
-// The agent tools a run may name, each with its part in modules/ (modules/tools.md, "Each tool's part"): a run of a
+// The agent tools a run may name, each with its part in modules/ (tasks/tools.md, "Each tool's part"): a run of a
 // tool that has none is not recorded. Read case and spacing aside, so "claude code" is TOOL.
 export const TOOLS = [TOOL, "Codex", "Kiro", "Antigravity"];
 export const toolNamed = name => TOOLS.find(t => t.toLowerCase() === String(name ?? "").toLowerCase().replace(/\s+/gu, " ").trim()) ?? null;
@@ -119,7 +119,7 @@ export function toolsSaid(record, since = null) {
   if (!t.length) return "";
   const when = since ? ` since the release of ${since}` : "";
   const passed = t.filter(x => x.passed).map(x => x.tool), not = t.filter(x => !x.passed);
-  return ` Agent tools${when}: ${passed.length ? `${passed.join(", ")} passed every case` : "none passed every case"}${not.length ? `; ${not.map(x => `${x.tool} not (${x.open.join(", ")})`).join("; ")}, so the core says of ${not.length > 1 ? "each" : "it"} only what its documentation says (modules/tools.md)` : ""}.`;
+  return ` Agent tools${when}: ${passed.length ? `${passed.join(", ")} passed every case` : "none passed every case"}${not.length ? `; ${not.map(x => `${x.tool} not (${x.open.join(", ")})`).join("; ")}, so the core says of ${not.length > 1 ? "each" : "it"} only what its documentation says (tasks/tools.md)` : ""}.`;
 }
 
 // The cases due on the day `at` (an ISO time): each with why, and the tool where it is not TOOL. A case is due where no
@@ -248,7 +248,7 @@ export function dueIssue({ manifest, at }) {
       "",
       ...list.map(d => `- ${d.name}${d.tool ? ` in ${d.tool}` : ""}: ${d.why}.`),
       "",
-      `For each: \`node scripts/staged.mjs --set <case> <a new folder under the system's temporary folder>\`; a fresh helper, the builder's model at high effort, given the brief it prints and nothing else; once it has ended, \`node scripts/staged.mjs --read <case> <the folder> --record --model <its model>\`. A case due in another tool is run by a session of that tool, given the same brief, and recorded with \`--tool <its name>\` (modules/tools.md); where no session here can reach that tool, it waits for one that can. A verdict found wrong on reading what the session did is marked with \`--wrong <case> <why>\`. ${RECORD} goes in a pull request of its own, which says for each case that failed why: the rule, the case or the session.`,
+      `For each: \`node scripts/staged.mjs --set <case> <a new folder under the system's temporary folder>\`; a fresh helper, the builder's model at high effort, given the brief it prints and nothing else; once it has ended, \`node scripts/staged.mjs --read <case> <the folder> --record --model <its model>\`. A case due in another tool is run by a session of that tool, given the same brief, and recorded with \`--tool <its name>\` (tasks/tools.md); where no session here can reach that tool, it waits for one that can. A verdict found wrong on reading what the session did is marked with \`--wrong <case> <why>\`. ${RECORD} goes in a pull request of its own, which says for each case that failed why: the rule, the case or the session.`,
     ].join("\n"),
   };
 }
@@ -293,7 +293,7 @@ function readCmd(argv, get) {
 // is ever written over.
 function record(c, dir, v, get) {
   const tool = toolNamed(get("--tool") ?? TOOL);
-  if (!tool) return fail(`--tool ${get("--tool")} names no agent tool the core has a part for. Mend: name one of ${TOOLS.join(", ")}; for another, write its part (modules/tools.md, "Each tool's part") and add its name to TOOLS in scripts/staged.mjs in the same pull request`);
+  if (!tool) return fail(`--tool ${get("--tool")} names no agent tool the core has a part for. Mend: name one of ${TOOLS.join(", ")}; for another, write its part (tasks/tools.md, "Each tool's part") and add its name to TOOLS in scripts/staged.mjs in the same pull request`);
   const rec = readRecord(), at = new Date().toISOString().slice(0, 10), model = get("--model") ?? "not said";
   const meta = memoOf(fs.realpathSync(dir), "meta");
   if (meta.case !== c.name) return fail(`${dir} was set for the case ${meta.case}, not ${c.name}. Mend: read it as ${meta.case}`);

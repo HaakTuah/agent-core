@@ -1,8 +1,8 @@
-# The description check ("Each PR has the headings" in modules/git.md), for every project that takes the core: it fails
+# The description check ("Each PR has the headings" in roles/shared/git.md), for every project that takes the core: it fails
 # a pull request whose description lacks a heading for one of its parts, "What the owner can try" and "Readings taken",
 # or the parts the project names, and one opened since the copy on its base gained the line whose description does not
-# end saying what it waits on ("Nothing waits silently" in the core's modules/git.md), or does not list what its changed
-# paths called for ("One script says what to read" in the core's modules/tools.md; the change is read from git alone,
+# end saying what it waits on ("Nothing waits silently" in the core's roles/shared/git.md), or does not list what its changed
+# paths called for ("One script says what to read" in the core's tasks/tools.md; the change is read from git alone,
 # the merge commit against its first parent, the base). A draft is not asked (it claims a
 # lane and says little), nor Dependabot's own PRs (floor rule 17). A project calls it (workflow_call) from a workflow of its own of the same name, on pull_request
 # with the types opened, edited, reopened, synchronize and ready_for_review, so that a description put right is checked
@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 2 # the merge commit and its parents: the paths the pull request changes are read against the base
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: core/.node-version # the one exact Node ("Node" in the core's modules/updates.md)
+          node-version-file: core/.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The description has its parts
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

@@ -1,4 +1,4 @@
-// The scheduled look (modules/orchestrating.md, "The scheduled look"; core archive 218): what has stopped, what is due
+// The scheduled look (roles/orchestrator.md, "The scheduled look"; core archive 218): what has stopped, what is due
 // and what is overdue, kept in issues by itself, so that starting an orchestrator is all an owner does and an owner who
 // never asks is shown it all the same. Run once a day from a project's root by the project's daily job (the core's
 // look.yml, and core-moved.yml for a project that still calls it), on an orchestrator's wake where that job does not
@@ -16,7 +16,7 @@
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
 //     closes this one: a session closes it once it has found why.
-//   - What the dose makes due (dose.mjs; modules/cleaning.md): cleaning, while the codebase is not in standard, and an
+//   - What the dose makes due (dose.mjs; tasks/cleaning.md): cleaning, while the codebase is not in standard, and an
 //     audit by a reader, which the look labels needs-owner in place of queued where the project is in debt and its
 //     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the

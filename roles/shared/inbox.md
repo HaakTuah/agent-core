@@ -50,7 +50,7 @@ Read at the start of every task.
   - A verdict the stand-in is sure of decides one (core archive 168): a yes is queued, behind what stands there, and
     marked `stand-in-yes` until the owner confirms or corrects it; a no closes it; each says why. Any other waits for
     the owner.
-  - The versions workflow's update (`modules/updates.md`) is built without a verdict.
+  - The versions workflow's update (`tasks/updates.md`) is built without a verdict.
 - **Bugs don't wait.** One in the task at hand is fixed in it; one outside it is filed, and any lane whose files it
   touches may fix it. Its fix's commit says "Fixes #n", so it closes when the fix reaches `main`, never by hand.
 - **The core itself** (`core/`, a copy of its repository, changed there alone): a fault, idea or question about it is

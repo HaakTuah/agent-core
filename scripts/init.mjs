@@ -82,8 +82,8 @@ export const FILES = [
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
 // The files every session reads at its start, as the AGENTS.md template imports them: the reading-size check's marks,
 // and of the core's own (those under core/) what the core's cap counts (size.mjs).
-export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/modules/how-to-work.md",
-  "core/modules/inbox.md", "core/modules/work-flow.md", "core/modules/git.md", "core/modules/claude.md", "core/modules/other-builders.md"];
+export const READ = ["AGENTS.md", "CLAUDE.md", "docs/PROGRESS.md", "core-manifest.md", "core/floor/security.md", "core/roles/builder.md", "core/roles/shared/how-to-work.md",
+  "core/roles/shared/inbox.md", "core/roles/shared/work-flow.md", "core/roles/shared/git.md", "core/tools/claude.md", "core/tools/other-builders.md"];
 const KB = 1024;
 
 // A project's name as it may stand in a rule file's heading: letters, digits and blanks, and the few marks a name
@@ -152,7 +152,7 @@ export function fill(text, words) {
   return out;
 }
 
-// A game's own rows of its manifest: the slots modules/game-design.md uses, each left for the project to fill (#329).
+// A game's own rows of its manifest: the slots tasks/game-design.md uses, each left for the project to fill (#329).
 export const GAME_ROWS = [
   ["computer players", "what the game calls its computer players, and where their logic lives"],
   ["measured players", "the computer players the measurement plays, and where they live"],
@@ -258,10 +258,10 @@ function init(argv) {
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);
-  console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/modules/code-shape.md)`);
+  console.log(`  checks/shape.json: "systems", each system the project has, by its name, with its paths, what it uses and its entrance, once it has any; "tests", its test files (core/tasks/code-shape.md)`);
   console.log("  checks/licences.json: \"ships\" and \"scan\", once something reaches its users; \"lockfiles\" and \"ignoreScriptsIn\", each npm lock file and .npmrc that did not stand yet");
   console.log("  where it has versions Dependabot cannot see, its versions check: the core's README, point 5");
-  console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/modules/inbox.md)");
+  console.log("  its labels, once its repository is on GitHub: node core/scripts/labels.mjs --make, which makes those of core/scripts/labels.json (core/roles/shared/inbox.md)");
   if (o.nuget !== undefined) console.log("  its NuGet packages: lock files turned on (RestorePackagesWithLockFile in its project files or Directory.Build.props) and committed, and each packages.lock.json named in checks/licences.json under \"nuget\", as one whose packages ship or one of tools that only run");
   if (o.private) console.log("  no call to the core's CodeQL and licence workflows was written (--private): a workflow of the project's own runs the licence check, as the core's README, point 5, \"A private repository\", says");
   console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);

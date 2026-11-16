@@ -2,7 +2,7 @@
 
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
 run is due: the kind `tool`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
-which role: `modules/roles.md`, "Tools are preferences".
+which role: `tasks/roles.md`, "Tools are preferences".
 
 **One door in: `AGENTS.md`** (core archive 232; #249). By default every rule a session must know is reachable from the
 project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task. A
@@ -17,7 +17,7 @@ pulls in less than `AGENTS.md` names.
 
 **One script says what to read** (core archive 234; #304). By default a session of any agent tool finds what it reads
 by one command, which the project's `AGENTS.md` names: `scripts/reading.mjs`, given a role and a task (its issue, its
-kinds, or the paths changed so far), prints the role's start (`modules/roles.md`, "A file for each role") and the
+kinds, or the paths changed so far), prints the role's start (`tasks/roles.md`, "A file for each role") and the
 modules the task calls for, each module saying in its opening line when it is read, in words the script matches: a
 kind of task, a path, a tool. It does not mean a tool needs a way of its own to find them (where it has a hook at a
 session's start, the work-saved hook there calls the script and names what the branch's changed paths call for;
@@ -39,8 +39,8 @@ same rules.
 
 **A change of tool loses nothing** (core archive 232). The state of a task is in the repository and never only in a
 session: its branch, pushed after every commit, its pull request's description with the note where to pick up, its
-line in the *progress file* and what it waits on (`modules/git.md`). Where a builder's tool stops (its usage spent,
-say), a fresh builder of any tool picks up from the branch (`modules/orchestrating.md`, "A stalled lane"). It does not
+line in the *progress file* and what it waits on (`roles/shared/git.md`). Where a builder's tool stops (its usage spent,
+say), a fresh builder of any tool picks up from the branch (`roles/orchestrator.md`, "A stalled lane"). It does not
 mean that the tool that stopped hands over by itself. Reason: when one provider's usage ran out, everything held only
 in its sessions stopped with them. Held, in part, by `scripts/stalled.mjs`, which the look and the orchestrator run.
 
@@ -55,9 +55,9 @@ documentation says what it reads, not whether its model keeps the rules, and the
 
 **Each tool's part** (core archive 232): how it is handed a task, how it is asked for a review, what it cannot do that a
 rule needs, and its own folders, which floor rule 3 protects by name; the model it runs at is the project's "Pace", or
-`modules/claude.md` for Claude. A tool with no review app on the host is asked for a review by a fresh session of it
-given the review's brief (`modules/reviews.md`, point 7) and told to change nothing; its answer is posted on the PR in a
-comment that opens "Code review:" or "Security review:". The parts: `modules/claude.md`, `modules/codex.md`,
-`modules/copilot.md`, `modules/kiro.md` and `modules/antigravity.md`. A project whose tool has none names in its
+`tools/claude.md` for Claude. A tool with no review app on the host is asked for a review by a fresh session of it
+given the review's brief (`tasks/reviews.md`, point 7) and told to change nothing; its answer is posted on the PR in a
+comment that opens "Code review:" or "Security review:". The parts: `tools/claude.md`, `tools/codex.md`,
+`tools/copilot.md`, `tools/kiro.md` and `tools/antigravity.md`. A project whose tool has none names in its
 manifest's "Tools" table how it is reached, and files the part with the core (`README.md`, "Reporting to the core").
 Reason: a project with only that tool otherwise had no word on how to reach it. Held by nothing yet.

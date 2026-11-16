@@ -1,6 +1,6 @@
 # Git and GitHub
 
-Read at the start of every task. The calls from a cloud session: `modules/github-calls.md`.
+Read at the start of every task. The calls from a cloud session: `tasks/github-calls.md`.
 
 - **Work from `main`:** each task on a branch of its own with a PR into `main` (core archive 5 and 113; floor rule 12).
 - **Each PR has the headings** "What the owner can try" (with whether the README is current) and "Readings taken" (core
@@ -13,4 +13,4 @@ Read at the start of every task. The calls from a cloud session: `modules/github
 - **Push after every commit,** even before the PR opens (a draft if not ready) (core archive 6 and 15).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
     PR.
-- **Updates, Dependabot and CodeQL:** `modules/updates.md`.
+- **Updates, Dependabot and CodeQL:** `tasks/updates.md`.

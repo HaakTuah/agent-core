@@ -1,4 +1,4 @@
-// The records of the choices that are hard to undo (modules/choices.md; core archive 222 and 231): where a project
+// The records of the choices that are hard to undo (tasks/choices.md; core archive 222 and 231): where a project
 // keeps them, what they hold, whether the pass over them, twice a year, is due, and whether a sign written in a measure
 // has tripped. Where they are: the *choice records*, a row of the manifest's slots or, in the core, a slot of its
 // AGENTS.md; left out, the starter kit's file, KIT. A record is a heading "## Choice: " and what was chosen, its sign
@@ -122,7 +122,7 @@ export function look({ manifest, at, root = "." }) {
   const found = parse(got.text), why = due(found, at);
   if (!why) return { title: TITLE, body: null };
   const unsigned = found.records.filter(r => !r.sign).length, unknown = found.records.filter(r => r.unknown.length).length;
-  return { title: TITLE, body: `The pass over the choices that are hard to undo is due (\`${home}modules/choices.md\`, "What reopens a choice"): \`${got.file}\` holds ${found.records.length} records, and ${why}; the pass falls ${DAYS} days after the last.${unsigned ? ` ${unsigned} of them name no sign on a line "Reopens it:".` : ""}${unknown ? ` ${unknown} of them hold, on their line "Trips when:", what names no measure the look reads.` : ""} A fresh reader goes through each record as that rule says, files an issue for the owner, labelled needs-owner, for each choice whose sign has tripped or for which a plainly better option exists now, save one the issue \"${TRIPPED}\" already names, and writes the day of its pass on that line, in a pull request of its own. \`node ${home}scripts/choices.mjs\` lists the records.` };
+  return { title: TITLE, body: `The pass over the choices that are hard to undo is due (\`${home}tasks/choices.md\`, "What reopens a choice"): \`${got.file}\` holds ${found.records.length} records, and ${why}; the pass falls ${DAYS} days after the last.${unsigned ? ` ${unsigned} of them name no sign on a line "Reopens it:".` : ""}${unknown ? ` ${unknown} of them hold, on their line "Trips when:", what names no measure the look reads.` : ""} A fresh reader goes through each record as that rule says, files an issue for the owner, labelled needs-owner, for each choice whose sign has tripped or for which a plainly better option exists now, save one the issue \"${TRIPPED}\" already names, and writes the day of its pass on that line, in a pull request of its own. \`node ${home}scripts/choices.mjs\` lists the records.` };
 }
 
 // Each condition of the records that holds today, with the number read: [{ name, measure, op, limit, value }].
@@ -150,7 +150,7 @@ export function trippedBody(file, held, found, home) {
   // (a few lines each, and three of a record's unknown conditions, the rest counted, so the body stays under 30 000
   // characters, far under GitHub's limit of 65 536, however many a file of MOST bytes holds)
   const some = (list, line) => [...list.slice(0, LISTED).map(line), ...(list.length > LISTED ? [`- and ${list.length - LISTED} more: \`node ${home}scripts/choices.mjs\` lists them`] : [])];
-  const rule = `\`${home}modules/choices.md\`, "What reopens a choice"`;
+  const rule = `\`${home}tasks/choices.md\`, "What reopens a choice"`;
   return [...(held.length ? [`A choice's sign, written in a measure the shape check keeps, holds today in \`${file}\` (${rule}):`,
     ...some(held, c => `- ${shown(c.name)}: \`${c.measure} ${c.op} ${c.limit}\`, and it reads ${figure(c.value)} ${MEASURES[c.measure][0]}.`), ""] : []),
   ...(unknown.length ? [`A line "Trips when:" in \`${file}\` names what is no measure the look reads, so that sign is not read (${rule}; the measures: ${Object.keys(MEASURES).join(", ")}):`,
@@ -189,7 +189,7 @@ function recordLine(rec, r) {
 // What the script prints: each record, and whether the pass is due.
 export function report(got, at, r = "the measures were not read") {
   if (got.unread) return `The choice records could not be read: ${got.unread}.`;
-  if (got.text === null) return `No choice records at \`${got.file}\` yet: a project records there each choice that is hard to undo (modules/choices.md).`;
+  if (got.text === null) return `No choice records at \`${got.file}\` yet: a project records there each choice that is hard to undo (tasks/choices.md).`;
   const found = parse(got.text), why = due(found, at);
   return [`\`${got.file}\`: ${found.records.length} records${found.read ? `, read whole on ${found.read}` : ""}${found.open ? `, ${found.open} lines still marked FILL IN` : ""}.`,
     ...found.records.flatMap(rec => recordLine(rec, r)),

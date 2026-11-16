@@ -1,4 +1,4 @@
-// The pointer check ("One fact, one place" in modules/how-to-work.md), for every project that takes the core: every
+// The pointer check ("One fact, one place" in roles/shared/how-to-work.md), for every project that takes the core: every
 // pointer in the project's rule files (rule-files.mjs, beside this file) to a file, a section or a numbered point must
 // lead to one that exists, or it fails, saying which. A pointer is read from the forms below; a form it cannot read is
 // listed, never guessed. Node's own modules only. It checks the project it lies in (core/scripts/ there), whatever the

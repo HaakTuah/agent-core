@@ -3,7 +3,7 @@
 // audit. holders.json, beside this file, names the checks and the audit by each rule's file and lead (rules.mjs); each
 // staged case names the rules it holds in its own file. A rule with none is listed, in the core's monthly state report
 // (state-report.mjs), until it gains one or goes on the owner's word. A hook (HOOKS) holds no rule alone: one whose
-// only holders are hooks is listed with them (modules/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
+// only holders are hooks is listed with them (tasks/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
 // The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
 //

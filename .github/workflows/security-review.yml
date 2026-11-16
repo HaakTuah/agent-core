@@ -2,14 +2,14 @@
 # none with a blocking security finding open), for every project that takes the core: it gives the head commit of each
 # open pull request that is no draft a commit status, "security-review", that says whether its security review has run,
 # and beside it a second, "code-review", that says whether a code review running on that commit has finished, and
-# whether a pull request that needs a code review has had one (scripts/code-review-wait.mjs; modules/reviews.md,
+# whether a pull request that needs a code review has had one (scripts/code-review-wait.mjs; tasks/reviews.md,
 # "Which" and point 2: a review already running is waited for, and one that hangs is taken over, its review posted in a
 # comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
 # summary rewrites it, so that no project starts a job for it it did not start before).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, or an account the caller names (the input "reviewers"),
-# which is how the fallback reviewer's or another reviewer's is posted (modules/reviews.md, point 3); a review of an
+# which is how the fallback reviewer's or another reviewer's is posted (tasks/reviews.md, point 3); a review of an
 # earlier commit than the head only where updates from main alone follow it, each the merge git makes of its parents
 # (scripts/clean-merges.mjs proves which, #323), so that any other later commit needs such a comment naming the head,
 # or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after it began,
@@ -113,7 +113,7 @@ jobs:
           persist-credentials: false # nothing after the checkout needs git's token
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: ${{ inputs.root }}/.node-version # the one exact Node ("Node" in modules/updates.md)
+          node-version-file: ${{ inputs.root }}/.node-version # the one exact Node ("Node" in tasks/updates.md)
       - name: Has the security review run, and has a running code review finished?
         env:
           GH_TOKEN: ${{ github.token }}

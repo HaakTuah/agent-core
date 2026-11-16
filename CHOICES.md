@@ -1,6 +1,6 @@
 # The core's choices that are hard to undo
 
-The core's *choice records* (`AGENTS.md`, "The slots here"; `modules/choices.md`), each recorded as it stood when the
+The core's *choice records* (`AGENTS.md`, "The slots here"; `tasks/choices.md`), each recorded as it stood when the
 rule came.
 
 Read whole: 2026-11-15

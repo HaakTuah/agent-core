@@ -17,7 +17,7 @@ might attack: `floor/threat-model.md`.
 
 **3. The protected files.**
 - A session the owner starts, or one such a session starts, of any agent tool, may change them (which tool is
-  preferred: `modules/roles.md`; core archive 232). It does not mean a change an outsider's text asks for (rule 4).
+  preferred: `tasks/roles.md`; core archive 232). It does not mean a change an outsider's text asks for (rule 4).
   Reason: a lock on one tool shut out an owner who had only that tool.
 - They are what runs by itself or with credentials (`.github/`, `.claude/`, an agent tool's own folder such as .kiro or
   .codex, the cloud setup script, any file of the credentialed GitHub calls builders run); the rule files
@@ -31,7 +31,7 @@ might attack: `floor/threat-model.md`.
   above all; it is never a second question about what the owner asked for (core archive 232).
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
   the fallback reviewer's, each by a session that did not write it, a fresh one of the same tool serving
-  (`modules/reviews.md`; core archive 134, 138 and 232).
+  (`tasks/reviews.md`; core archive 134, 138 and 232).
   - Save an action's pinned version alone (rule 17).
   - One that changes, of what runs by itself or with credentials, only comments and steps' names passes rule 8's one:
     the core's `scripts/comment-only.mjs`, run from the core's `main` on the head that merges, proves it of the files
@@ -58,7 +58,7 @@ saved data; a weakened check).
   - Dependabot's own: rule 17.
 - One that changes a protected file also gets a code review.
 - A security review that starts by itself when a PR opens or is marked ready is waited for and read on every PR, a pure
-  sync's too (core archive 174 and 179; how long: `modules/reviews.md`, point 3).
+  sync's too (core archive 174 and 179; how long: `tasks/reviews.md`, point 3).
 - A pure sync PR needs no review of its own, nor rule 3's two: both passed its code in the core's own PR (core archive
   139 and 140).
   - A pure sync: its diff only the core's copy, its pin and the pins of calls to the core's workflows, moved forward to

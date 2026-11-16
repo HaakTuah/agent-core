@@ -18,9 +18,9 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
    colour, shape, motion and background, what the product uses and what it never uses. The owner sees it once, in that
    pull request, as two or three small sample screens, and chooses. The work does not wait: the builder takes the
    sample it reads as likeliest and lists that reading under "Readings taken" as unsure, since taste is the owner's and
-   the stand-in stays unsure of it (`modules/inbox.md`), and the owner's choice is built like any correction. The
+   the stand-in stays unsure of it (`roles/shared/inbox.md`), and the owner's choice is built like any correction. The
    direction is then kept as the system's values (point 2) and as one reference screen that every later screen is
-   compared with, and recorded as a choice (`modules/choices.md`). It does not mean that the core names a theme, a font
+   compared with, and recorded as a choice (`tasks/choices.md`). It does not mean that the core names a theme, a font
    or a palette, nor that samples are made again for each screen. Reason: where nothing says what the product is, a
    first version is whatever its tool reaches for. Held by the critique's question on the direction; that it is
    written, by discipline alone.
@@ -71,7 +71,7 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     that runs off at a phone's width is the commonest mistake a builder could see for itself. Held by the rendered
     check's sweep of widths.
 11. **Familiar first.** A control works as its users know it from the platform and from other products. A departure is
-    a choice, recorded with its reason (`modules/choices.md`). It does not mean nothing new: a departure with its reason
+    a choice, recorded with its reason (`tasks/choices.md`). It does not mean nothing new: a departure with its reason
     stands. Reason: users bring habits, and a control that breaks one is read as broken. Held by the critique ("Does
     anything look pressable that is not?") and the record.
 12. **Words.** One name for each thing, everywhere (core archive 112, 204 and 205). A button says what it does. An
@@ -115,7 +115,7 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
 ## What the review does
 
 18. **A critique by fixed questions,** on every pull request that changes a screen, by a fresh session that wrote none
-    of it, at the design check's model and effort (`modules/claude.md`), given the pictures of point 17, the walk by
+    of it, at the design check's model and effort (`tools/claude.md`), given the pictures of point 17, the walk by
     the Tab key and the list of words where those checks are on, and the *direction*, and nothing from the builder: not
     its three lines, its description or its account of what it mended.
     - Is it plain within three seconds what this screen is for?
@@ -133,7 +133,7 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
 
     It posts its answers on the pull request. Its answers to the first two are then set beside the builder's three
     lines (point 16), and a difference is a finding; an answer that shows a point above broken is one too, judged as
-    `modules/review-guidelines.md` says ("A screen changed"). It does not mean the critic judges by its own taste: it
+    `roles/shared/review-guidelines.md` says ("A screen changed"). It does not mean the critic judges by its own taste: it
     judges by the direction. Reason: a reviewer told what the builder meant sees what was meant, not what is there.
     Held by the review guidelines' line, which blocks a screen's pull request that has no critique.
 
@@ -155,7 +155,7 @@ that runs it, which the module leaves to the project: that pull request lists wh
 and from then on the check runs on every pull request that changes a screen, over only the screens it changes, at two
 or three of the *screen sizes*. Each reports first,
 and binds only where the *screen checks* say so and a session can mend what it finds ("Nothing locks a project" in the
-core's `AGENTS.md`). Each keeps a baseline that may not get worse, in the shape check's form (`modules/code-shape.md`,
+core's `AGENTS.md`). Each keeps a baseline that may not get worse, in the shape check's form (`tasks/code-shape.md`,
 "Never worse"): the project's tool writes what it found, and `core/scripts/screens.mjs` holds that against the baseline
 and says the mend of each new finding. A reader is given pictures only for what a machine cannot judge. A finding the
 critique makes on a second pull request of the project's becomes a check: the session that meets it the second time
@@ -164,7 +164,7 @@ core ships a tool, nor that a project with every check off is held up: point 17 
 the limits have published numbers, so a check can hold them, and a run costs, so it covers only what a pull request
 changes. Held by `core/scripts/screens.mjs` and its test.
 
-The polish lane (`modules/work-flow.md`) stays as it is, and takes its finds from the critique's questions too.
+The polish lane (`roles/shared/work-flow.md`) stays as it is, and takes its finds from the critique's questions too.
 
 **What stays out:** a named font, palette or theme; a longer list of banned looks than point 4's examples, since a
 default is only wrong when nobody chose it; the strictest accessibility level everywhere, since the standard level is

@@ -1,4 +1,4 @@
-// The description check ("Each PR has the headings" in modules/git.md), for every project that takes the core, on every
+// The description check ("Each PR has the headings" in roles/shared/git.md), for every project that takes the core, on every
 // PR that is not a draft: it fails a description without a heading for each part the project names, by default "What
 // the owner can try" and "Readings taken". A part is there when a line of the description is a heading (one to six #)
 // that starts with its words, whatever the case, with no letter or digit right after them and whatever marks before
@@ -8,14 +8,14 @@
 // the project's report is a file of its own, with where that file is, so the check never guesses whether something
 // was. It holds that the parts are there, not that they are true or whole: that stays with the reviews. Dependabot's
 // own PRs are not asked (the workflow leaves them out by their author).
-// It asks too the line that says what it waits on ("Nothing waits silently" in modules/git.md; core archive 218), in one
+// It asks too the line that says what it waits on ("Nothing waits silently" in roles/shared/git.md; core archive 218), in one
 // of the forms waitsOn reads, as the scheduled look reads it (look.mjs, beside this file), of a pull request opened
 // (PR_CREATED) on or after WAITS_SINCE where the copy on its base (BASE_SHA) already held it then: the newest commit
 // from before then that changed this file there, as GitHub's API gives them through gh (GH_TOKEN, GITHUB_REPOSITORY),
 // holds the line. Where any of it cannot be read, or the base's copy has not gained it (a sync's
 // own pull request), nothing is asked, so a pull request that stood before the line came is never turned red by it.
 // It asks in the same way, of a pull request opened since the copy on its base held READS_SINCE, the line that lists
-// what its changed paths called for ("One script says what to read" in modules/tools.md; core archive 234; #304): each
+// what its changed paths called for ("One script says what to read" in tasks/tools.md; core archive 234; #304): each
 // file the reading script (reading.mjs, beside this file) gives for the paths the pull request changes, read from git
 // as the merge commit against its first parent, the base, stands in backticks on the description's line "Read for
 // it:". A renamed file counts by both its names, and the paths of the core's copy, in a project, by neither: a sync

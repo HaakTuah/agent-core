@@ -176,7 +176,7 @@ if (p.status === 0) {
   // (the core runs the same check on itself, with its own config and baseline (#339): it passes as the core stands, a
   // copy added fails, and its mend names the path a session types there, with no "core/" before it)
   const coreRun = run(core, "scripts/copies.mjs", ".github/copies.json");
-  const how = path.join(core, "modules/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
+  const how = path.join(core, "roles/shared/how-to-work.md"), howWas = fs.readFileSync(how, "utf8");
   fs.appendFileSync(how, `\n${fs.readFileSync(path.join(core, "floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
   const ownCopy = run(core, "scripts/copies.mjs", ".github/copies.json");
   fs.writeFileSync(how, howWas);

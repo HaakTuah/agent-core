@@ -1,4 +1,4 @@
-// The state report (modules/orchestrating.md, "The scheduled look"; core archive 218): once a month the scheduled look
+// The state report (roles/orchestrator.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
 // (floor rule 14): each measure that keeps a baseline against the last report, in the core the rules of the floor and
 // the modules by what holds them, those with none listed (holders.mjs, beside this file), and what the look keeps open

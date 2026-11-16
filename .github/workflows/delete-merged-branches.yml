@@ -4,7 +4,7 @@
 # contents: write and pull-requests: read.
 # Deletes only branches whose every commit is already in main, that no open pull request uses, and whose newest
 # commit is more than a day old (unless their pull request was merged). main, pr-media, gh-pages and agents-stop (the
-# owner's stop switch, modules/work-flow.md) are never touched.
+# owner's stop switch, roles/shared/work-flow.md) are never touched.
 # Branch names reach the shell only through git and gh, quoted.
 name: Delete merged branches
 
