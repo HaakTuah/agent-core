@@ -150,17 +150,22 @@ function copyOf(dir) {
   return dir;
 }
 
-// A copy's node_modules: a folder of its own whose every entry (and every entry of a @scope folder) is a link, a
-// junction on Windows, to the project's; save a link that leads into the project itself, a workspace's package, which
-// leads to the same place in the copy, so that its faults are the copy's.
+// A copy's node_modules: a folder of its own whose every entry (and every entry of a @scope folder) reaches the
+// project's: a folder by a link, a junction on Windows, and a file by a copy, which needs no right to make. A link that
+// leads into the project's own files, a workspace's package, leads to the same place in the copy, so that its faults
+// are the copy's; one that leads into a node_modules (pnpm's store) or outside, to where it led; a dangling one is left
+// out.
 function linkInstalled(installed, to, dir) {
-  const root = path.resolve("."), one = (from, at) => {
+  const root = fs.realpathSync("."), one = (from, at) => {
     let target = path.resolve(from);
     if (fs.lstatSync(from).isSymbolicLink()) {
-      const real = fs.realpathSync(from), inside = path.relative(root, real);
-      target = inside && !inside.startsWith("..") && !path.isAbsolute(inside) ? path.join(path.resolve(dir), inside) : real;
+      try { target = fs.realpathSync(from); } catch { return; }
+      const inside = path.relative(root, target);
+      const own = inside && !inside.startsWith("..") && !path.isAbsolute(inside) && !inside.split(path.sep).includes("node_modules");
+      if (own) target = path.join(path.resolve(dir), inside);
     }
-    fs.symlinkSync(target, at, fs.statSync(target).isDirectory() ? "junction" : "file");
+    if (!fs.statSync(path.resolve(from)).isDirectory()) { fs.copyFileSync(from, at); return; }
+    fs.symlinkSync(target, at, "junction");
     linked.push(at);
   };
   fs.mkdirSync(to, { recursive: true });

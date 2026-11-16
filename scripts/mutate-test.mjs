@@ -60,6 +60,8 @@ try {
   ok(named.status === 0 && same([...lines], [2]), "the lines named alone take faults", named.stdout + named.stderr);
   // (a package the project installed, ignored by git, is reached from the working copies)
   write("package.json", "{}\n"); write(".gitignore", "node_modules/\n"); write("node_modules/limit/index.js", "module.exports = 20;\n");
+  write("node_modules/.package-lock.json", "{}\n"); // (a file of node_modules is copied, needing no right to make a link)
+  if (process.platform !== "win32") fs.symlinkSync(path.join(dir, "gone"), path.join(dir, "node_modules", "dangling")); // (left out)
   write("test/c-test.mjs", "import limit from 'limit';\nimport { big } from '../src/a.mjs';\nif (!big(limit)) process.exit(1);\n");
   git("add", "package.json", ".gitignore", "test/c-test.mjs");
   const installed = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/a.mjs:1-1"], { cwd: dir, encoding: "utf8" });
