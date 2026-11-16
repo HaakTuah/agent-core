@@ -227,6 +227,7 @@ function outside(ctx, from, spec, aliased) {
   if (bound) { if (from.domain !== "platform") add(ctx, "platform", `${from.file} -> ${bound}`, bound); return; }
   if (BUILTIN.has(spec)) return;
   const known = !aliased && !isRelative(spec) && !ctx.packages.has(name) && ctx.declared.has(name);
+  if (!known) ctx.unsure.add(from.file); // (it leads to a file the readers do not read, or nowhere they can tell)
   if (known && ctx.ships.has(name)) ctx.usedBy.set(name, [...(ctx.usedBy.get(name) ?? []), from]);
   else if (!known && (toCode(spec) || !isRelative(spec))) ctx.read.nowhere++;
 }
@@ -275,11 +276,26 @@ function foreign(ctx, from, imp, r) {
   const bound = l.names.find(n => ctx.config.platform.includes(n));
   if (bound) { if (from.domain !== "platform") add(ctx, "platform", `${from.file} -> ${bound}`, bound); return; }
   if (l.known && l.known !== "builtin" && ctx.ships.has(l.known)) ctx.usedBy.set(l.known, [...(ctx.usedBy.get(l.known) ?? []), from]);
-  else if (!l.known) ctx.read.nowhere++;
+  else if (!l.known) { ctx.read.nowhere++; ctx.unsure.add(from.file); }
+}
+
+// An import whose target only running the code tells: in JavaScript, by its tokens (a string or a regular expression
+// is never code), a dynamic import or require of anything but one plain string, or a glob of files (import.meta.glob,
+// require.context); in Python, outside a comment, an import by a name built at run time.
+const PY_COMPUTED = /\b(?:import_module|__import__)\s*\(\s*(?!["'][^"']*["']\s*[,)])/u;
+const after = (toks, k, ...vs) => vs.every((v, j) => toks[k + 1 + j]?.v === v && toks[k + 1 + j].t !== "str");
+const plainString = (toks, k) => toks[k]?.t === "str" && toks[k].v !== "`" && [")", ","].includes(toks[k + 1]?.v);
+function computed(r, text) {
+  if (r.lang === "python") return PY_COMPUTED.test(text.split("\n").filter(l => !/^\s*#/u.test(l)).join("\n"));
+  if (r.lang !== "javascript") return false;
+  const t = r.toks;
+  return t.some((tok, k) => tok.t === "id" && t[k - 1]?.v !== "." && (((tok.v === "import" || tok.v === "require") && after(t, k, "(") && !plainString(t, k + 2))
+    || (tok.v === "import" && after(t, k, ".", "meta", ".", "glob")) || (tok.v === "require" && after(t, k, ".", "context"))));
 }
 
 function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
+  if (computed(r, ctx.texts[file] ?? "")) ctx.unsure.add(file);
   if (!system) ctx.unnamed.push(file);
   ctx.readers.set(file, r.reader);
   if (!r.functions) { ctx.read.jsx++; add(ctx, "lost", file, file); }
@@ -319,14 +335,15 @@ function wrappedOnce(ctx) {
 // Map of each breach's id to { kind, group, n }, n its numbers where it has any; `read`, the counts of what it read;
 // `unnamed`, the files of code in no system; `readers`, the reader of each file (shape-readers.mjs); and `reach`, each
 // file's imports of the project's own files, dynamic ones and those of types among them, and `scripts`, the files that
-// share the global space, which import nothing (select.mjs). `tests` is the
+// share the global space, which import nothing, and `unsure`, the files with an import whose target the readers cannot
+// follow (select.mjs). `tests` is the
 // set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
   const readings = code.map(file => [file, reading(file, texts[file])]);
   const idx = index(readings, texts), js = manifests(texts);
-  const ctx = { config, tests, files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
+  const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
     entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map() };
   for (const [file, r] of readings) oneFile(ctx, file, r);
   sharedSpace(ctx);
@@ -335,7 +352,7 @@ export function survey(texts, config, tests = new Set()) {
   read.unnamed = ctx.unnamed.length;
   read.tests = tests.size;
   read.screens = new Set([...ctx.entries.keys()].filter(id => id.startsWith("screen: ")).map(fileOf)).size;
-  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()) };
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure };
 }
 
 // ---- the baseline ----

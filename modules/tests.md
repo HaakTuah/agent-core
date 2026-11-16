@@ -21,9 +21,11 @@ and a test taken out: `modules/code-shape.md`. What every check here reads is th
   (a simulation's fingerprint, a replay, a save's round trip), which are never selected out. The one condition that
   changes it: where a changed file's reach cannot be told (a file of no code the readers follow, data, a file gone),
   where no base is told and where the config cannot be read, the whole suite runs. The whole suite runs where it ran
-  before: on the default branch, on a schedule, before a release, so no job is added. The trigger is a fault the whole
-  suite finds that the selection left out: its finder mends the map at once, as a bug (a name under "select.whole" for
-  a test that reaches every file, or the import the readers missed). It does not mean that a test is taken out, nor
+  before: on the default branch, on a schedule, before a release, so no job is added. A test that reaches an import the
+  readers cannot follow (a path built at run time, a file they do not read) runs on any change; one that reaches files
+  by a path it builds, by listing a folder or through a running program, its builder names under "select.whole". The
+  trigger is a fault the whole suite finds that the selection left out: its finder mends the map at once, as a bug (a
+  name under "select.whole", or the import the readers missed). It does not mean that a test is taken out, nor
   that a project whose suite proves to be needed whole runs less: where the record's numbers show it, its session
   names every test under "select.whole", citing them in that pull request, and nothing is asked of its owner. Reason: the suites ran whole on every pull request, one that changed a line of the queue
   too, and set the pace of every pull request. Held by `core/scripts/steps.mjs`, which reports a project whose job of

@@ -59,20 +59,24 @@ export function matcher(specs) {
 
 // A file of JavaScript or TypeScript without its comments, as far as a line tells them: a line that opens with one, and
 // one that ends a line after a space. What is left over names more, never less.
-const uncommented = text => text.split("\n").filter(l => !/^\s*(\/\/|\/?\*)/u.test(l)).map(l => l.replace(/\s\/\/\s.*$/u, "")).join("\n");
+// (a line that only a comment opens: "//", "/*", or a block's "* " and "#" in Python; a comment after code is kept, which
+// names more, never less)
+const uncommented = (text, py) => text.split("\n").filter(l => !(py ? /^\s*#/u : /^\s*(\/\/|\/\*|\*(\s|\/|$))/u).test(l)).join("\n");
 
-// Each file's links to the others: its imports; from JavaScript or TypeScript, each file of code (no test) whose name
-// it holds outside a comment; and from a file of Python, the __init__.py of each folder above it, which Python runs
-// whenever it imports the file.
-const initsAbove = (file, texts) => file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/__init__.py`).filter(f => f !== file && f in texts);
+// Each file's links to the others: its imports; from JavaScript, TypeScript or Python, each file whose name (in Python
+// its dotted name too) it holds outside a comment; and from a file of Python, the __init__.py and conftest.py of its
+// folder and each folder above, which Python and pytest run with no import.
+const above = (name, file, texts) => ["", ...file.split("/").slice(0, -1).map((_, k, dirs) => `${dirs.slice(0, k + 1).join("/")}/`)].map(d => `${d}${name}`).filter(f => f !== file && f in texts);
+// A file of Python by its dotted name too ("pkg.rules"; a package's own for __init__.py and __main__.py).
+const dotted = f => f.replace(/\.py$/u, "").replace(/\/(__init__|__main__)$/u, "").split("/").join(".");
 export function links(texts, tests, reach) {
-  const code = Object.keys(texts).filter(f => !tests.has(f));
-  const named = code.map(f => [f, new RegExp(`(^|[^\\w-])${escaped(path.posix.basename(f))}(?![\\w-])`, "u")]);
+  const named = Object.keys(texts).map(f => [f, new RegExp(`(^|[^\\w-])${escaped(path.posix.basename(f))}(?![\\w-])${f.endsWith(".py") && dotted(f).includes(".") ? `|(^|[^\\w.])${escaped(dotted(f))}(?![\\w])` : ""}`, "u")]);
   const out = new Map();
   for (const [file, text] of Object.entries(texts)) {
-    const to = new Set(reach.get(file) ?? []);
-    if (CODE.includes(path.posix.extname(file))) { const plain = uncommented(text); for (const [f, re] of named) if (f !== file && re.test(plain)) to.add(f); }
-    if (file.endsWith(".py")) for (const init of initsAbove(file, texts)) to.add(init);
+    const to = new Set(reach.get(file) ?? []), py = file.endsWith(".py");
+    if (py || CODE.includes(path.posix.extname(file))) { const plain = uncommented(text, py); for (const [f, re] of named) if (f !== file && re.test(plain)) to.add(f); }
+    // (Python runs a package's __init__.py on each import under it, and pytest a folder's conftest.py with no import)
+    if (py) for (const run of [...above("__init__.py", file, texts), ...above("conftest.py", file, texts)]) to.add(run);
     out.set(file, to);
   }
   return out;
@@ -92,10 +96,13 @@ export function reached(tests, linked) {
 // What a pull request runs: { all, why, tests }, `why` the reason for the whole suite, or for each test selected.
 // `changed` the paths it changes (gone ones among them), `texts` and `tests` the project as the shape check reads it,
 // `reach` its imports, `failed` the tests that failed last time, `config` the shape check's.
-export function selection({ changed, texts, tests, reach, scripts = new Set(), failed = [], config }) {
+export function selection({ changed, texts, tests, reach, scripts = new Set(), unsure = new Set(), failed = [], config }) {
   const proof = matcher(config.select.proof), m = { whole: matcher(config.select.whole), none: matcher(config.select.none), isTest: matcher(config.tests) };
   const by = new Map(), add = (t, why) => { if (tests.has(t) && !by.has(t)) by.set(t, why); };
-  const ctx = { texts, tests, scripts, add, reaches: reached(tests, links(texts, tests, reach)), ...m };
+  const reaches = reached(tests, links(texts, tests, reach));
+  // (a test that reaches an import the readers cannot follow may reach any file: it runs as one that reaches every file)
+  const blind = new Set([...reaches].filter(([, files]) => [...files].some(f => unsure.has(f))).map(([t]) => t));
+  const ctx = { texts, tests, scripts, add, reaches, ...m, whole: t => m.whole(t) || blind.has(t) };
   for (const t of tests) if (proof(t)) add(t, "never selected out: the project's proof that behaviour was kept");
   for (const t of failed) add(t, "failed last time");
   for (const f of changed) {
@@ -113,13 +120,13 @@ function oneChange(f, { texts, tests, scripts, add, reaches, whole, none, isTest
   // links nothing: a change to either may reach every test)
   if (!(f in texts) || !isCode(f)) return `${f} is no code the readers follow, or is gone, so what reaches it cannot be told`;
   // (C# reaches a type by its full name with no using directive, and a script of the global space by no import at all)
-  if (f.endsWith(".cs") || scripts.has(f)) return `${f} is C#, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
+  if (f.endsWith(".cs") || f.endsWith(".d.ts") || scripts.has(f)) return `${f} is C#, a declaration of types, or a script of the global space, whose users no import names, so what reaches it cannot be told`;
   for (const [t, files] of reaches) if (files.has(f)) add(t, `reaches ${f}`);
   if (!isTest(f)) for (const t of tests) if (whole(t)) add(t, `reaches every file (${f})`); // (a test's own file is no file of the project's a whole run tests)
   return null;
 }
 
-const pick = ({ reach, scripts }) => ({ reach, scripts });
+const pick = ({ reach, scripts, unsure }) => ({ reach, scripts, unsure });
 
 // The paths a pull request changes against its base, renames as a path gone and a path added.
 const changedSince = base => git(["diff", "-z", "--name-only", "--no-renames", base, "HEAD"]).split("\0").filter(Boolean);

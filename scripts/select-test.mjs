@@ -50,13 +50,14 @@ const tests = new Set(Object.keys(texts).filter(f => f.startsWith("test/") && f 
 const reach = survey(texts, config, tests).reach, linked = links(texts, tests, reach), reaches = reached(tests, linked);
 ok(reaches.get("test/view.test.js").has("src/rules.js") && reaches.get("test/run.test.js").has("src/tool.js") && reaches.get("test/lazy.test.js").has("src/rules.js"),
   "a test reaches what its imports reach, file to file, a file a script starts by its name and a dynamic import's", JSON.stringify([...reaches].map(([t, f]) => [t, [...f]])));
-ok(!linked.get("src/tool.js").has("src/view.js") && !reaches.get("test/run.test.js").has("src/rules.js") && !reaches.get("test/rules.test.js").has("src/view.js"),
-  "a name in a comment, before or after the code, links nothing, and an import points one way", JSON.stringify([...linked].map(([t, f]) => [t, [...f]])));
+ok(!linked.get("src/tool.js").has("src/view.js") && reaches.get("test/run.test.js").has("src/rules.js") && !reaches.get("test/rules.test.js").has("src/view.js"),
+  "a name in a line that only a comment opens links nothing, one after the code links (more, never less), and an import points one way", JSON.stringify([...linked].map(([t, f]) => [t, [...f]])));
+ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, new Set(), new Map()).get("a.js").has("b.js"), "a generator's line that opens with * is code, not a comment");
 
 // ---- what a pull request runs ----
 const pick = (changed, failed = []) => selection({ changed, texts, tests, reach, failed, config });
 let s = pick(["src/rules.js"]);
-ok(!s.all && same(s.tests, ["test/kit.test.js", "test/lazy.test.js", "test/replay.test.js", "test/rules.test.js", "test/view.test.js"]) && s.why.get("test/view.test.js") === "reaches src/rules.js" && /never selected out/.test(s.why.get("test/replay.test.js")) && /every file/.test(s.why.get("test/kit.test.js")),
+ok(!s.all && same(s.tests, ["test/kit.test.js", "test/lazy.test.js", "test/replay.test.js", "test/rules.test.js", "test/run.test.js", "test/view.test.js"]) && s.why.get("test/view.test.js") === "reaches src/rules.js" && /never selected out/.test(s.why.get("test/replay.test.js")) && /every file/.test(s.why.get("test/kit.test.js")),
   "a changed file runs each test that reaches it, the proof, never selected out, and a test that reaches every file; the others not", JSON.stringify([...s.why]));
 s = pick(["src/tool.js"]);
 ok(same(s.tests, ["test/kit.test.js", "test/replay.test.js", "test/run.test.js"]), "a script started by its name runs the test whose code starts it", JSON.stringify(s.tests));
@@ -79,6 +80,20 @@ for (const f of ["src/Rules.cs", "web/app.js"]) {
   s = selection({ changed: [f], texts: cs, tests: csTests, reach: csFound.reach, scripts: csFound.scripts, config: csConfig });
   ok(s.all && s.why.includes(f), `${f === "web/app.js" ? "a script of the global space, which no import names," : "C#, whose types a test reaches by their full names with no using,"} runs the whole suite`, JSON.stringify(s));
 }
+// (what only running the code tells: a test that reaches such an import runs as one that reaches every file)
+const blindTexts = { "src/a.js": "export const a = 1;\n", "src/plugins.js": "export const load = n => import(`./p/${n}.js`);\n", "src/view.vue.js": "import App from './App.vue';\n", "src/b.js": "export const b = 2;\n",
+  "test/a.test.js": "import '../src/a.js';\n", "test/plugins.test.js": "import '../src/plugins.js';\n", "test/vue.test.js": "import '../src/view.vue.js';\n", "test/b.test.js": "import '../src/b.js';\n", "src/env.d.ts": "declare const X: number;\n" };
+const blindConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "test"], tests: ["test/"] })), blindTests = new Set(Object.keys(blindTexts).filter(f => f.startsWith("test/"))), blindFound = survey(blindTexts, blindConfig, blindTests);
+s = selection({ changed: ["src/b.js"], texts: blindTexts, tests: blindTests, reach: blindFound.reach, unsure: blindFound.unsure, config: blindConfig });
+ok(same(s.tests, ["test/b.test.js", "test/plugins.test.js", "test/vue.test.js"]) && blindFound.unsure.has("src/plugins.js") && blindFound.unsure.has("src/view.vue.js") && !blindFound.unsure.has("src/a.js"),
+  "a test that reaches a computed import, or an import of a file the readers do not read, runs on any change", JSON.stringify({ s, unsure: [...blindFound.unsure] }));
+s = selection({ changed: ["src/env.d.ts"], texts: blindTexts, tests: blindTests, reach: blindFound.reach, config: blindConfig });
+ok(s.all && /env\.d\.ts/.test(s.why), "a declaration of types, which no import may name, runs the whole suite", JSON.stringify(s));
+const pyMore = { "pkg/__init__.py": "", "pkg/db.py": "def connect():\n    return 1\n", "pkg/plugins.py": "def p():\n    return 2\n", "tests/conftest.py": "from pkg.db import connect\n", "tests/test_x.py": "def test_x(db):\n    assert db\n", "tests/test_load.py": "import importlib\nm = importlib.import_module('pkg.plugins')\n", "tests/fixtures/child.py": "import pkg.db\n", "tests/test_child.py": "import subprocess, sys\nsubprocess.run([sys.executable, 'tests/fixtures/child.py'])\n" };
+const pyMoreConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["pkg", "tests"], tests: ["tests/"] })), pyMoreTests = new Set(Object.keys(pyMore).filter(f => f.startsWith("tests/"))), pyMoreFound = survey(pyMore, pyMoreConfig, pyMoreTests);
+const pick2 = f => selection({ changed: [f], texts: pyMore, tests: pyMoreTests, reach: pyMoreFound.reach, unsure: pyMoreFound.unsure, config: pyMoreConfig }).tests;
+ok(pick2("pkg/db.py").includes("tests/test_x.py") && pick2("pkg/db.py").includes("tests/test_child.py") && pick2("pkg/plugins.py").includes("tests/test_load.py"),
+  "Python: a folder's conftest.py, a fixture run by its path among the tests, and a module named by its dotted name in a string reach the tests that use them", JSON.stringify({ db: pick2("pkg/db.py"), plugins: pick2("pkg/plugins.py") }));
 s = selection({ changed: ["package.json"], texts: { ...texts, "package.json": "{\"dependencies\":{\"x\":\"1.0.0\"}}" }, tests, reach, config });
 ok(s.all && /package\.json/.test(s.why), "a package's manifest, read beside the code, runs the whole suite: it links to no file, and may reach every test", JSON.stringify(s));
 for (const [changed, what] of [[["package.json"], "a file of no code the readers follow"], [["src/gone.js"], "a file of code that is gone"], [["src/rules.js", "config/app.json"], "data beside code"]]) {
