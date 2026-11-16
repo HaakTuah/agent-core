@@ -1,7 +1,7 @@
 # Updates: Dependabot, CodeQL and Node
 
-Read when a task takes an update: the kind `update`; the paths `.github/dependabot.yml`, `.node-version`,
-`package-lock.json` and `packages.lock.json`. Its safety rules: floor rules 7, 15 and 17.
+Read when a task takes an update: the kind `update`; the paths `.github/dependabot.yml`, `.node-version` and
+`package*lock.json`. Its safety rules: floor rules 7, 15 and 17.
 
 **The newest stable version, unless there is a reason** (core archive 65).
 - Updates are upkeep: they wait for no queue entry.

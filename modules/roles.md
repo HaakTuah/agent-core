@@ -10,6 +10,17 @@ the fallback reviewer takes a review no other gives; the design check, the stand
 against the design and the owner's words; escalation takes what has beaten a builder twice. Any agent tool the owner
 has may take any of them.
 
+**A file for each role** (core archive 233; #304). By default what a role reads at its start is the floor's
+`security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
+session's) and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
+puts one that a single role needs in that role's file, and one that several roles share in one shared file their files
+name, so that no rule stands in two files; a role's file says in a line each what the role hands each neighbouring role
+and gets back, and nothing of how the neighbour works. It does not mean a module read by task belongs to a role (a
+builder that mends a bug and one that builds a feature have one role and read different modules), nor that a session
+with no file here (a helper, planning design, escalation) reads more than its brief names. Reason: every role read
+every other role's rules at each start. Held by `scripts/size.mjs`, a cap for each role's start, and
+`scripts/reading.mjs --check`, which fails a role's file that names no start; where a rule stands, by nothing yet.
+
 **Tools are preferences** (core archive 232; #249). By default each role goes to the tool this table prefers, and,
 where that tool is not at hand, to the next it names:
 

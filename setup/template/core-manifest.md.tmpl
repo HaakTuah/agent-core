@@ -1,7 +1,7 @@
 # Core manifest
 
 Core: {{core}} at {{pin}}, copied whole under core/ (never edited here).
-Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.
+Paths: in the core's files, one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/; any other is ours.
 Floor: whole. Modules: {{modules}}.{{declined}}
 
 ## Names
@@ -35,6 +35,13 @@ The core's default (`core/modules/roles.md`, "Tools are preferences"), save each
 
 ## Pace
 None set: no session slows work to save usage (`core/modules/orchestrating.md`, "The pace is the owner's").
+
+## Reading
+The kind of task a path of ours belongs to, which `core/scripts/reading.mjs` reads: a path (a folder ends in `/`) and a
+kind, each in backticks, a row each (`node core/scripts/reading.mjs --kinds` lists the kinds). None yet.
+
+| Path | Kind |
+| --- | --- |
 
 ## Differences
 None.

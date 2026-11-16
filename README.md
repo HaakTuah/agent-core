@@ -337,7 +337,7 @@ uses needs one (`scripts/manifest-reads.mjs` says which).
 # Core manifest
 
 Core: HaakTuah/agent-core at <full commit SHA>, copied whole under core/ (never edited here).
-Paths: in the core's files, one into floor/, modules/, scripts/, setup/ or archive/ is under core/; any other is ours.
+Paths: in the core's files, one into floor/, modules/, roles/, scripts/, setup/ or archive/ is under core/; any other is ours.
 Floor: whole. Modules: <all, or the list of those taken>.
 Not taken: <where it is a list: each module left out as `name.md` (its reason), one line>.
 
@@ -356,6 +356,11 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 
 ## Pace
 <one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free; none: the default>
+
+## Reading
+| Path | Kind |
+| --- | --- |
+<one row per path of its own that belongs to a kind of task, each in backticks, as `src/screens/` and `screen`; none: only the core's own paths call a module>
 
 ## Differences
 <only where it differs from a module's rule ("How a project takes the core", point 7), one line each>
