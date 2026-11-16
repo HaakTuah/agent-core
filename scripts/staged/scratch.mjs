@@ -353,6 +353,12 @@ export function changed(dir, ref) {
   return String(originGit(dir, "diff", "--name-only", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref) ?? "").split("\n").filter(Boolean);
 }
 
+// The lines a ref of the origin adds to a file against main as the case set it, each without its "+".
+export function added(dir, ref, file) {
+  const diff = String(originGit(dir, "diff", "-U0", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", file) ?? "");
+  return diff.split("\n").filter(l => l.startsWith("+") && !l.startsWith("+++")).map(l => l.slice(1));
+}
+
 // The branches the session pushed: each origin branch that is new, or moved, since the case was set.
 export function pushed(dir) {
   const was = sealed(dir);

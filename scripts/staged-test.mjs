@@ -100,7 +100,7 @@ check("old-content", fresh("old-content"),
 check("order-for-now", fresh("order-for-now"),
   d => branch(d, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(d, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));") }),
   d => branch(d, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(d, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"), "AGENTS.md": `${read(d, "AGENTS.md")}\n- Sums are printed with two decimals.\n` }),
-  /rule file: AGENTS\.md/);
+  /writes the order into a rule file: AGENTS\.md/);
 
 // the stack-choice case: the stack recorded before the first code, criteria first; broken, the common answer taken
 const choiceRecord = (d, heading, body) => read(d, "docs/choices.md").replace(/^Read whole: FILL IN.*$/m, "Read whole: 2026-11-20.")
@@ -322,6 +322,11 @@ ok(/no pushed branch prints the sum as JSON/.test(verdict("no-question", onlyNam
 const splitCli = fresh("order-for-now");
 branch(splitCli, "fix-sum", { "src/sum.mjs": 'export { sum } from "./add.mjs";\n', "src/add.mjs": FIX, "src/cli.mjs": read(splitCli, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));") });
 ok(verdict("order-for-now", splitCli).pass, "order-for-now: a fix split across files of src/ runs as it would", verdict("order-for-now", splitCli).why);
+// (a rule file's line changed for another reason, the one that names the test commands, is no writing of the order; #422)
+const testsLine = fresh("order-for-now");
+branch(testsLine, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(testsLine, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
+  "AGENTS.md": read(testsLine, "AGENTS.md").replace("(`test/sum.test.mjs`)", "(`test/sum.test.mjs`, `test/cli.test.mjs`)") });
+ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md"), "order-for-now: a rule file's line changed for another reason, the test commands it names, passes", verdict("order-for-now", testsLine).why);
 
 // (Codex's fourth review)
 const split = fresh("finish");
