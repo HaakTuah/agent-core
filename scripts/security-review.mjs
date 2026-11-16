@@ -180,7 +180,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (verdict.done && more.pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha))) {
     const codexDone = review !== null && typeof review === "object" && review.status === "completed";
     if ((codexDone ? 1 : 0) + posted.length < 2) {
-      const why = `floor rule 3 asks two. Mend: the fallback reviewer posts the second, or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
+      const why = `floor rule 3 asks two. Mend: the fallback reviewer reviews, posts the second, or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
       // a pull request whose head does not hold this check as the default branch does stood before it came: reported
       verdict = bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
     } else verdict = { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
