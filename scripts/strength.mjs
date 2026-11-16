@@ -193,13 +193,21 @@ export function unlisted(faults, listedMap, open = new Map(), held = new Map()) 
 }
 
 // Of the entries a pull request that records a new whole run lists anew or above the base, those whose line stands
-// nowhere in its file as it is (`texts`): no run could have found them, so the whole run's exception holds them not.
+// nowhere in its file as it is (`texts`), or whose count passes what the file can hold (room()): no run could have
+// found them, so the whole run's exception holds them not.
 function invented(now, was, texts) {
   return [...now.listed].filter(([id, n]) => {
     const parts = partsOf(id), text = parts && texts(parts.file);
     if ((n.count ?? 0) <= (was.listed.get(id)?.count ?? 0) || (now.grown[id] ?? "").trim()) return false;
-    return !parts || !text || !text.split(/\r?\n/u).some(l => collapse(l, 100) === parts.line);
+    return !parts || !text || (n.count ?? 0) > room(parts, text);
   }).map(([id]) => id);
+}
+
+// How many faults of an entry's kind its file can hold: for each line of the entry's text, as often as the replaced
+// text stands in it, at least once; none where no such line stands.
+function room(parts, text) {
+  const original = (/^\[(.*) -> .*\]$/u.exec(parts.what)?.[1] ?? "").replace(/…$/u, "");
+  return text.split(/\r?\n/u).filter(l => collapse(l, 100) === parts.line).reduce((n, l) => n + Math.max(1, original ? l.split(original).length - 1 : 1), 0);
 }
 
 // The entries that joined the baseline since the base with no reason under "grown": [id]. None counts where the base
