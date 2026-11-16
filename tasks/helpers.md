@@ -23,7 +23,8 @@ template of the starter kit for the sessions that read it.
   wrong with it"); the task, with the files it may change; what done looks like, which is what it returns, in what form,
   and where it stops; and the reason.
 - Where the task is the owner's word, that goes word for word (floor rule 4), the four things around it.
-- It gives no title ("an expert") and no stakes that are not real.
+- It gives no title ("an expert"), no stakes that are not real, and no number of the state report as a target
+  (`tasks/cleaning.md`, "No process number is a builder's goal").
 - It does not mean a brief repeats what its reader reads anyway (`AGENTS.md` and what that names), nor that a template
   that hands no work (a manifest, a threat model) takes the four parts.
 - Reason: a session's whole view of its task comes from its brief; in tests a title or a stake changed no score, and

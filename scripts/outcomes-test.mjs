@@ -71,6 +71,7 @@ ok(t("cost") === "20 answers, 2,000 output tokens (of 2 priced)" && t("uncorrect
 ok(t("idle") === "98% of 24 open hours (of the 1 newest merged)", "the open hours in a gap of over an hour with no event", t("idle"));
 ok(t("rework") === "3 (± 3) in 1 pull requests: a review finding 1, a failed check 1, neither (measuring again, or the builder's own) 1; and 1 bringing the branch up to date", "commits after ready, by cause, and the base's apart", t("rework"));
 const rows = measure(data, "2026-10");
+ok(lines({ rows, grown: null }).join("\n").includes(`for every ten, over the last ${MONTHS} months, still under ${LEAST}.`), "a count still under thirty when the months run out says so");
 ok(rows.find(r => r.key === "misread").months === MONTHS && rows.every(r => r.months >= 1 && r.months <= MONTHS) && LEAST === 30,
   "where a count is under thirty the months before are added, up to the most");
 const big = { ...data, merged: Array.from({ length: 40 }, (_, i) => pull(100 + i, "2026-10-10T00:00:00Z", { mends: i < 31 })) };

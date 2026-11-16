@@ -92,5 +92,5 @@ code is held to: `tasks/code-shape.md`.
 - **No process number is a builder's goal** (core archive 241; #302). By default the state report's numbers are read
   by the owner and the audits; whoever writes a brief, a rule or an entry sets none of them as a target, and only a
   property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
-  not read them. Reason: a number made a goal stops measuring what it stood for. Held by the review guidelines ("A
-  brief written in a pull request").
+  not read them. Reason: a number made a goal stops measuring what it stood for. Held by no check: none reads a target
+  set in prose without guessing; the brief's rule (`tasks/helpers.md`) and the reviews carry it.

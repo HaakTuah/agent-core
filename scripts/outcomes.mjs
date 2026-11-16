@@ -147,7 +147,7 @@ export function growth(r, root = ".") {
 // it, `first`: the first reading's texts by key, or null, `previous`: the last report's text, or null.
 export function lines({ rows, grown, share = null, first = null, previous = null }) {
   const was = label => { const m = previous ? new RegExp(`^- ${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}: ([^\n]*?)\\.(?: At the |$)`, "mu").exec(previous) : null; return m ? ` At the last report: ${m[1]}.` : ""; };
-  const line = r => `- ${r.label}: ${r.text}${r.months > 1 ? `, over the last ${r.months} months` : ""}.${first?.[r.key] ? ` At the first reading: ${first[r.key]}.` : ""}${was(r.label)}`;
+  const line = r => `- ${r.label}: ${r.text}${r.months > 1 ? `, over the last ${r.months} months${r.small ? `, still under ${LEAST}` : ""}` : ""}.${first?.[r.key] ? ` At the first reading: ${first[r.key]}.` : ""}${was(r.label)}`;
   const out = [`The five outcomes the owner named, each led by its direct measure or said to have none yet, then what stands for it; last what the work cost. A count stands with the range chance alone gives it (±), and where it is under ${LEAST} the months before are added. None is a target (\`scripts/outcomes.mjs\`; #302).`];
   for (const [key, name] of OUTCOMES) {
     const mine = rows.filter(r => r.outcome === key);
@@ -170,7 +170,7 @@ export function measure(data, month) {
   return MEASURES.map(m => {
     let months = 1, got = m.of(data, windowOf(month));
     while (got.n < LEAST && months < MONTHS) got = m.of(data, windowOf(month, ++months));
-    return { key: m.key, outcome: m.outcome, direct: m.direct, label: m.label, text: got.text, months };
+    return { key: m.key, outcome: m.outcome, direct: m.direct, label: m.label, text: got.text, months, small: got.n < LEAST };
   });
 }
 
@@ -178,7 +178,7 @@ export function measure(data, month) {
 // The words a measure's value is written in, all that outcomesFrom lets through beside numbers and marks.
 const WORDS = new Set(("of merged for every ten none h days answers output tokens priced not corrected open hours the newest in pull requests a "
   + "review finding failed check neither measuring again or builder's own and bringing branch up to date kb files them over lines depth branches "
-  + "months last it read all core's share").split(" "));
+  + "months last still under it read all core's share").split(" "));
 const NAMES = new Set([...MEASURES.map(m => m.label), "the code's size", "functions over each mark"]);
 const VALUE = /^[\p{L}\d ±%().,;:'-]{1,300}$/u;
 
