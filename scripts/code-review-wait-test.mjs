@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
-import { UNREAD } from "./security-review.mjs";
+import { UNREAD, status } from "./security-review.mjs";
 import { CONTEXT, judge } from "./code-review-wait.mjs";
 
 let failed = 0;
@@ -72,6 +72,7 @@ ok(is(stopped, false, "merge eeeeeee unproved. Mend: another reviews") && is(pro
   && mended(`Waiting: ${stopped.why}`) && `Waiting: ${stopped.why}`.length <= 140, "one of an earlier commit with a merge not proved after it waits, naming that merge and the mend, within GitHub's 140 characters (a list that is no list proves none)");
 // (each mend names what the posted review carries: its kind and whole SHA, and its two lines of counts; #403)
 ok(is(stopped, false, "Mend: another reviews, posts Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.") && is(proved([], []), false, "Mend: ask one, or another reviews, posts Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M."), "each mend names the posted review's form and its two lines of counts");
+ok([stopped, proved([], [])].every((v) => [true, false].every((a) => status(v, a, undefined, CONTEXT).description === `${a ? "Advisory" : "Waiting"}: ${v.why}`)), "each mend stands whole in its status, advisory or not, within GitHub's 140 characters");
 ok(is(proved([], []), false, "no code review yet. Mend: ask one") && is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates"), "with no review behind the merge it waits as before, and given no list of the merges proved (an older workflow) the parents alone are read, as before");
 const mixed = [commit(OLD, "8".repeat(40)), commit(F, OLD), commit(HEAD, F, MAIN)];
 const branch = [commit(OLD, "8".repeat(40)), commit(F, "6".repeat(40)), commit(HEAD, OLD, F)];
@@ -127,7 +128,7 @@ try {
     return JSON.parse(execFileSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), ...more], { encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
   };
   const advisory = run(pull, [[summary(running)]]);
-  ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.context === "code-review" && advisory.status.description.startsWith("Advisory: would wait, Codex's code review"), "run with no word on it, it is advisory and names its status");
+  ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.context === "code-review" && advisory.status.description.startsWith("Advisory: Codex's code review"), "run with no word on it, it is advisory and names its status");
   const strict = run(pull, [[summary(running)]], { ADVISORY: "false", RUN_URL: "https://github.com/o/r/actions/runs/9" });
   ok(strict.status.state === "pending" && mended(strict.status.description) && strict.status.description.length < 140 && strict.status.target_url.endsWith("/runs/9") && run(pull, [[summary(running), said(`Code review: of ${HEAD}`)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review finishes or another's is posted");
   const counts = { ...pull, commits: 2, changed_files: 1 };

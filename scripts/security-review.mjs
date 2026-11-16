@@ -330,8 +330,9 @@ function judgeWith({ sha, list, posted, forHead, stand, bind, review, pull, revi
 // status's name, this check's unless scripts/code-review-wait.mjs gives its own)
 export function status(verdict, advisory, url, context = CONTEXT) {
   const state = verdict.done || advisory ? "success" : "pending";
-  // (where Codex's summary cannot be read, the status says so too, where the owner sees it; GitHub takes 140 characters)
-  const description = `${advisory ? "Advisory: " : ""}${verdict.done ? "" : advisory ? "would wait, " : "Waiting: "}${verdict.why}${verdict.warning ? "; summary unreadable" : ""}`.slice(0, 140);
+  // (where Codex's summary cannot be read, the status says so too, where the owner sees it; GitHub takes 140 characters,
+  // and a prefix of about the same length either way leaves each mend room whole, advisory or not: #403)
+  const description = `${advisory ? "Advisory: " : verdict.done ? "" : "Waiting: "}${verdict.why}${verdict.warning ? "; summary unreadable" : ""}`.slice(0, 140);
   return { state, description, context, ...(typeof url === "string" && /^https:\/\/[\w./-]{1,200}$/u.test(url) ? { target_url: url } : {}) };
 }
 

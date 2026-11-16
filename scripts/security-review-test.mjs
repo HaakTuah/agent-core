@@ -153,11 +153,11 @@ ok(is(judge(bump, [summary(running)], [], its), false, "no security review") && 
 const wait = judge(pull, []);
 const pass = judge(pull, [summary(done)]);
 ok(status(wait, false).state === "pending" && status(wait, false).description === "Waiting: no security review has run yet. Mend: your security reviewer reviews; with Codex's app, the fallback reviewer after 5 min" && status(pass, false).state === "success" && status(pass, false).description.startsWith("Codex's security review has run"), "when it is not advisory, a pull request with no review waits and one with a review passes");
-ok(status(wait, true).state === "success" && status(wait, true).description.startsWith("Advisory: would wait, no security review has run yet. Mend: your security reviewer ") && status(pass, true).state === "success" && status(pass, true).description.startsWith("Advisory: Codex's"), "while advisory it always passes, and says what it would have done");
+ok(status(wait, true).state === "success" && status(wait, true).description.startsWith("Advisory: no security review has run yet. Mend: your security reviewer ") && status(pass, true).state === "success" && status(pass, true).description.startsWith("Advisory: Codex's"), "while advisory it always passes, and says what it would have done");
 ok([wait, pass, judge(pull, [said("Security review: x")]), judge(pull, [summary(open)]), judge(pull, [summary(open), said("Security review: x")])].every((v) => [true, false].every((a) => status(v, a).context === CONTEXT && status(v, a).description.length <= 140)), "every status has the one name and a description GitHub takes");
 ok(status(pass, true, "https://github.com/o/r/actions/runs/1").target_url === "https://github.com/o/r/actions/runs/1" && !("target_url" in status(pass, true)) && !("target_url" in status(pass, true, "javascript:alert(1)")) && !("target_url" in status(pass, true, "https://x/?a=b c")), "it links to its run, and to nothing that is no plain https address");
 const unread = judge(pull, [real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]), longest = { sha: HEAD, done: true, why: "x".repeat(200), warning: UNREAD };
-ok(status(unread, true).description === "Advisory: would wait, no security review has run yet. Mend: wait 5 min; then the fallback reviewer reviews, posts one; summary unreadable" && status(unread, true).state === "success" && status(longest, true).description.length === 140, "where Codex's summary cannot be read, the status says so too, as the owner sees it, and no description runs past GitHub's 140 characters");
+ok(status(unread, true).description === "Advisory: no security review has run yet. Mend: wait 5 min; then the fallback reviewer reviews, posts one; summary unreadable" && status(unread, true).state === "success" && status(longest, true).description.length === 140, "where Codex's summary cannot be read, the status says so too, as the owner sees it, and no description runs past GitHub's 140 characters");
 
 // What runs by itself changed: floor rule 3's two security reviews, save pins moved alone or comments alone proven.
 const PIN1 = "1".repeat(40), PIN2 = "2".repeat(40);
@@ -245,7 +245,7 @@ const byApp = [saw(pushed, [summary(onOld)]), notGit[0], judge(pull, [summary(op
   across(twice, [idle, said(`Security review: on ${OLD}`)], [HEAD]), judge(pull, [idle]), judge(pull, [summary(running)]), two([summary(done)], [stepChange])];
 const byOwn = [notGit[2], saw(pushed, [said(`Security review: on ${OLD}`)]), judge(pull, [])];
 const names = (v, actor) => v?.done === false && mended(status(v, false).description) && status(v, false).description === `Waiting: ${v.why}`
-  && new RegExp(`Mend: (?:[^;,]+[;,] (?:then )?)?${actor} reviews[,;] `, "u").test(status(v, false).description) && new RegExp(`${actor} `, "u").test(status(v, true).description) && !/\bask\b/u.test(v.why);
+  && new RegExp(`Mend: (?:[^;,]+[;,] (?:then )?)?${actor} reviews[,;] `, "u").test(status(v, false).description) && new RegExp(`${actor} `, "u").test(status(v, true).description) && status(v, true).description === `Advisory: ${v.why}` && !/\bask\b/u.test(v.why);
 ok(byApp.every((v) => names(v, "(?:the )?fallback(?: reviewer)?")) && unread.why === "no security review has run yet. Mend: wait 5 min; then the fallback reviewer reviews, posts one"
   && judge(pull, [summary(running)]).why === "no security review has run yet. Mend: wait 30 min for Codex's; then the fallback reviewer reviews, posts one", `where Codex's app reviews, each status that waits for a review posted names the fallback reviewer: ${byApp.map((v) => status(v, false).description).join(" | ")}`);
 ok(byOwn.every((v) => names(v, "your (?:security )?reviewer") && !/Mend: (?:the )?fallback/u.test(v.why)), `elsewhere it names the project's own security reviewer first: ${byOwn.map((v) => status(v, false).description).join(" | ")}`);
@@ -273,7 +273,7 @@ try {
     return JSON.parse(execFileSync(process.execPath, [script, ...files], { encoding: "utf8", env: { ...process.env, ADVISORY: "", RUN_URL: "", ...env } }));
   };
   const advisory = run(pull, [[summary(running)]]);
-  ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.description.startsWith("Advisory: would wait"), "run with no word on it, it is advisory");
+  ok(advisory.sha === HEAD && advisory.status.state === "success" && advisory.status.description.startsWith("Advisory: no security review"), "run with no word on it, it is advisory");
   const strict = run(pull, [[summary(running)]], { ADVISORY: "false", RUN_URL: "https://github.com/o/r/actions/runs/7" });
   ok(strict.status.state === "pending" && strict.status.target_url.endsWith("/runs/7") && run(pull, [[summary(done)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review has run");
   ok(run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T11:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "pending" && run(pull, [[summary(open), said("Security review: checked", "OWNER", "2026-11-12T13:00:00Z")]], { ADVISORY: "false" }, [[finding("2026-11-12T12:00:00Z")]]).status.state === "success", "given the review comments too, it weighs a finding against a posted review");
