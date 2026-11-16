@@ -93,5 +93,7 @@ sign written in a measure.
 
 Held by: the starter kit, whose *choice records* ask for a new project's stack before its first code; the scheduled
 look, which keeps the pass's issue and that of a sign written in a measure while it holds (`core/scripts/choices.mjs`,
-its test running both on a project made for it, and on the core's own records); a staged case (#256), in which the
-common answer is the wrong one for a project's stated aims; and, for the rest, the reviews alone.
+its test running both on a project made for it, and on the core's own records); the staged case `stack-choice`
+(`core/scripts/staged/stack-choice.mjs`), in which the common answer is the wrong one for a new project's stated aims,
+read in part: the record's criteria with a number of the aims' before its third option, three options, a case against,
+the pick and its sign; and, for the rest, the reviews alone.

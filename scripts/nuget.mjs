@@ -92,6 +92,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, r
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
+import { oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
@@ -403,7 +404,7 @@ const DECLARATION = new RegExp(`^<\\?xml${XB}+version${XB}*=${XB}*(?:"1\\.[0-9]+
 const ATTRIBUTES = /^(?:[ \t\r\n]+[A-Za-z_][A-Za-z0-9_.-]*(?::[A-Za-z_][A-Za-z0-9_.-]*)?[ \t\r\n]*=[ \t\r\n]*(?:"[^"<\u0000\u0001]*"|'[^'<\u0000\u0001]*'))*[ \t\r\n]*$/u;
 const AMPERSAND = /&(?!(?:amp|lt|gt|quot|apos|#[0-9]{1,7}|#x[0-9A-Fa-f]{1,6});)/u;
 // (what a lock file, a manifest or a file's name holds is shown on one line: none of it starts a line of its own)
-const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?");
+const shown = oneLine;
 
 /** The config's "nuget", checked: { ships, tools, accepted, sources }. A key or a shape it does not know would check less. */
 export function nugetConfig(config) {
@@ -472,7 +473,7 @@ export function sdkPacks(env = process.env, root = null) {
 export function lockPackages(text, lockPath) {
   const failures = [], split = [], packages = new Map();
   let lock;
-  try { lock = JSON.parse(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
+  try { lock = parseBounded(unmarked(text)); } catch { return { packages: [], failures: [`${lockPath} is not JSON. Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split }; }
   if (![1, 2].includes(lock?.version) || !lock.dependencies || typeof lock.dependencies !== "object" || Array.isArray(lock.dependencies)) {
     return { packages: [], failures: [`${lockPath} is no lock file this check knows (NuGet's version 1 or 2, with "dependencies"). Mend: restore again to write the lock file anew (dotnet restore --force-evaluate), and commit it`], split };
   }
@@ -497,6 +498,19 @@ export function lockPackages(text, lockPath) {
   return { packages: [...packages.values()], failures: failures.map(shown), split: split.map(shown) };
 }
 
+/** Of the openings `next` holds, each with where it stands next in `text` (-2 where it is not yet looked for, -1 for
+ *  none left), the one nearest from `at`, as [where, opening], or undefined: each looked for again only once the reading
+ *  has passed it, so the text is read once however many of them it holds. */
+function nearest(text, at, next) {
+  let found;
+  for (const [open, i] of next) {
+    const now = i !== -1 && i < at ? text.indexOf(open, at) : i;
+    next.set(open, now);
+    if (now >= 0 && (!found || now < found[0])) found = [now, open];
+  }
+  return found;
+}
+
 /**
  * The licence a package's manifest (its .nuspec, as text) names: { expression } for an SPDX expression, { other }
  * (a word for what it has instead: "a licence file", "an address", "nothing") where a machine cannot read one.
@@ -516,8 +530,8 @@ export function manifestLicence(text) {
   // no manifest can hold is left where each stood: a comment holds no "--", and an instruction is named, never "xml")
   let plain = "", at = 0;
   const ends = { "<!--": "-->", "<![CDATA[": "]]>", "<?": "?>" };
-  for (;;) {
-    const found = Object.keys(ends).map((open) => [text.indexOf(open, at), open]).filter(([i]) => i >= 0).sort((a, b) => a[0] - b[0])[0];
+  for (const next = new Map(Object.keys(ends).map((open) => [open, -2]));;) {
+    const found = nearest(text, at, next);
     if (!found) { plain += text.slice(at); break; }
     const end = text.indexOf(ends[found[1]], found[0] + found[1].length);
     if (end < 0) return malformed;
@@ -768,7 +782,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     let manifest = {};
     const text = textOf(f);
     if (text === null) continue;
-    try { manifest = JSON.parse(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
+    try { manifest = parseBounded(unmarked(text)); } catch { if (fetched) (!base || textAt(root, base, f) === text ? reports : failures).push(`${f} is not JSON`); }
     if (!fetched) {
       for (const [id, entry] of Object.entries(manifest?.tools ?? {})) if (typeof entry?.version === "string") toolsRead.add(key(id, entry.version));
       continue;
@@ -791,7 +805,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
   if (config.audit) {
     const bytes = readProject(root, config.audit);
     if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`);
-    try { entries = JSON.parse(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+    try { entries = parseBounded(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)

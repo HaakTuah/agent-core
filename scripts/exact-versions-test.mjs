@@ -113,11 +113,11 @@ expect("a package list that is missing fails", check("package-lock.json", reader
 expect("a name that is also a key of every object is not found by mistake", project({ "": { dependencies: { constructor: "1.0.0" } } }, { "": {} }), ['"constructor": "1.0.0" is not in']);
 
 // Run as a project runs it: from its root, with the licence check's config, on files on disk.
-function run(spec) {
+function run(spec, lockfile = "tools/package-lock.json") {
   const dir = mkdtempSync(join(tmpdir(), "exact-versions-"));
   try {
     mkdirSync(join(dir, "tools"));
-    writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: ["tools/package-lock.json"] }));
+    writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: [lockfile] }));
     writeFileSync(join(dir, "tools", "package.json"), JSON.stringify({ devDependencies: { a: spec } }));
     writeFileSync(join(dir, "tools", "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" } } }));
     try { execFileSync(process.execPath, [fileURLToPath(new URL("./exact-versions.mjs", import.meta.url)), "licences.json"], { cwd: dir, stdio: "pipe" }); return 0; } catch (e) { return mended(String(e.stderr)) ? e.status : "a failure without its mend"; }
@@ -125,6 +125,12 @@ function run(spec) {
 }
 if (run("1.2.3") !== 0) { failed++; console.error("FAIL run from a project's root: an exact version does not pass"); }
 if (run("^1.2.3") !== 1) { failed++; console.error("FAIL run from a project's root: a range does not fail, saying its mend"); }
+if (run("1.2.3", "../tools/package-lock.json") !== 1 || run("1.2.3", join(tmpdir(), "package-lock.json")) !== 1) { failed++; console.error("FAIL a lock file named outside the project is not refused, saying its mend"); }
+
+// A package list or lock file nested past the bound is refused, saying its mend, never read by recursion.
+const deep = (inner) => `${"{\"a\":".repeat(20000)}${inner}${"}".repeat(20000)}`;
+expect("overrides nested past the bound are refused", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": `{"overrides":${deep('"1.2.3"')}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
+expect("a lock file nested past the bound is refused", check("package-lock.json", reader({ "package-lock.json": `{"lockfileVersion":3,"packages":{"":${deep("{}")}}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
 
 console.log(failed ? `${failed} FAILED` : "ok   the exact-versions check tells every case apart");
 process.exit(failed ? 1 : 0);

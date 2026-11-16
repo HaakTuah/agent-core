@@ -32,6 +32,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
+import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
 import { commandLines, commands, fetched, otherFetch } from "./licence-commands.mjs";
 import { copyOf } from "./core-path.mjs";
 
@@ -122,6 +123,23 @@ function executable(text, f) {
   return parts.join("\n");
 }
 
+/** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
+ *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
+function trackedText(root, f, fail) {
+  const at = join(root, f);
+  if (!leadsOut(root, at)) return readFileSync(at, "utf8");
+  fail(`${f} is a link that leads out of the project, so what it holds cannot be read. Mend: put the file itself there, in place of the link`);
+  return "";
+}
+
+/** The command lines a JSON file `f` holds (licence-commands.mjs); none where it nests past the bound, which fails
+ *  unless an entry audits it by hand. */
+function linesIn(json, f, byHand, fail) {
+  if (!tooDeep(json)) return commandLines(json);
+  if (!byHand(f)) fail(`${f}: it nests deeper than ${DEEPEST} objects and lists, so its commands cannot be read. Mend: nest it less deep, or name it in the "files" of the entry that audits it`);
+  return [];
+}
+
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
 export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const failures = [];
@@ -176,7 +194,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) {
     if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
-    const text = binary.has(f) ? "" : readFileSync(join(root, f), "utf8");
+    const text = binary.has(f) ? "" : trackedText(root, f, fail);
     // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
     // scan cannot read; with none, as shell)
     const bare = !binary.has(f) && !/.\.\w+$/u.test(posix.basename(f)); // (".envrc" and the like have none either)
@@ -204,7 +222,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
         else fetches(text.split(/\r?\n/u).map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
       }
       if (json !== undefined) {
-        for (const line of commandLines(json)) fetches(String(line), f, line.literal === true);
+        for (const line of linesIn(json, f, byHand, fail)) fetches(String(line), f, line.literal === true);
         const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
         if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
           fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile with npm, by its install given --package-lock-only, and name it in the config's "lockfiles"`);

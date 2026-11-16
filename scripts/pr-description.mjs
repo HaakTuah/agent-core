@@ -22,6 +22,11 @@
 // moves them, and the core's own pull request held them to their reading. A pull request whose paths call for nothing
 // needs no line, and where the change cannot be read (a checkout without the base) nothing is asked. The kinds a
 // project gives its own paths (its reading config) are read as the base holds them.
+// It asks in the same way, of a pull request opened since the copy on its base held DONE_SINCE, how done will be judged
+// (tasks/done-when.md; #305): a feature's issue it adds to the *progress file* has the heading "Done when", lines the
+// description holds are in the form, and one that closes a feature's issue says what it ran and saw for each line, as
+// done-when.mjs, beside this file, reads them, at most a dozen items read through gh; one it cannot read is asked
+// nothing.
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -29,6 +34,7 @@
 //   PR_BODY="$(...)" node core/scripts/pr-description.mjs "+Part three"     the two, and that one as well
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -39,6 +45,11 @@ const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", 
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
+// The day from which how done will be judged is asked (tasks/done-when.md; #305), as the two lines above are.
+export const DONE_SINCE = "2026-11-17T00:00:00Z";
+// Whether it is asked of a pull request opened at `created` (as GitHub gives it), `then` the copy on its base when it
+// opened, or null where that could not be read: only where both are on or after the day it came.
+export const doneAsked = (created, then) => String(created) >= DONE_SINCE && Boolean(then?.includes("export const DONE_SINCE"));
 
 // What a description says it waits on: its last line that starts with "Waits on:", as { said, kind }, kind null where
 // the line is in none of the forms; null where there is no such line.
@@ -127,6 +138,14 @@ if (started(import.meta.url)) {
         else console.log(`ok   the description lists what its changed paths call for (${called.length} file${called.length === 1 ? "" : "s"})`);
       }
     } else console.log(`ok   the line that lists what the changed paths call for is not asked here: ${why}`);
+    const at = coreAt(process.cwd()) ?? "", queue = doneAsked(created, then) ? queueAt(process.cwd(), at) : null;
+    if (queue && !takesIt(queue.manifest, at)) console.log("ok   how done will be judged is not asked here: the manifest leaves done-when.md out");
+    else if (queue) {
+      const owner = ownerAt(queue.manifest, at, repo), done = doneMends({ body: process.env.PR_BODY, queue, read: item => readItem(repo, item, ".", owner), at });
+      for (const note of done.notes) console.log(`ok   ${note}`);
+      if (done.mends.length) mends.push(...done.mends);
+      else console.log("ok   how done will be judged: the entries this pull request queues or closes are in the form, and proved");
+    } else console.log(`ok   how done will be judged is not asked here: ${doneAsked(created, then) ? "the change could not be read against its base" : why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);

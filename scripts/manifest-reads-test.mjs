@@ -89,7 +89,7 @@ try {
   ok(r.status === 0 && !/[\r]/.test(r.stdout) && !/^::/m.test(r.stdout) && /^note /m.test(r.stdout), "a control character in the manifest's text never starts a line of the log, so no workflow command is made of it", JSON.stringify(r.stdout.slice(0, 300)));
   fs.rmSync(path.join(root, "core-manifest.md"));
   r = spawnSync(process.execPath, ["core/scripts/manifest-reads.mjs"], { cwd: root, encoding: "utf8" });
-  ok(r.status === 0 && /^note the manifest could not be read/m.test(r.stdout), "no manifest at all is a note, never a failure", r.stdout + r.stderr);
+  ok(r.status === 0 && /^note the manifest could not be read/m.test(r.stdout) && !r.stdout.includes(root) && !r.stdout.includes(fs.realpathSync(root)), "no manifest at all is a note, never a failure, naming the file from the project's root, never by its place on this machine", r.stdout + r.stderr);
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }

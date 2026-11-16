@@ -23,6 +23,7 @@ import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tool
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
+import { progressOf } from "./done-when.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
@@ -94,7 +95,6 @@ const input = (p, name, key = "config") => {
 const PROJECT_FILES = /\.(cs|fs|vb)proj$/;
 // The paths the manifest's slots name for the progress file and the size marks, else the starter kit's.
 const slot = (manifest, name, kit) => new RegExp(`^\\|\\s*\\*${name}\\*\\s*\\|\\s*\`([^\`]+)\``, "m").exec(manifest)?.[1] ?? kit;
-const progressOf = manifest => slot(manifest, "progress file", "docs/PROGRESS.md");
 const marksOf = manifest => slot(manifest, "size marks", "checks/sizes.json");
 
 // What a workflow of the project's runs: the `run:` values of its jobs' steps, a line continued by "\" joined to the
@@ -553,6 +553,7 @@ export const STEPS = [
   { lead: "16 November 2026, the rules in folders that say who reads them or when", cost: COST.line, check: movedPaths,
     partly: "a path the project builds from parts, or names in a file of no text, is no match a check finds" },
   { lead: "16 November 2026, no workflow gives a key twice", cost: COST.workflow, check: keysOnce },
+  { lead: "16 November 2026, how done will be judged", cost: COST.line, unread: "whether a project's users notice its changes is a reading of what it builds; where they do, a manifest whose \"Modules:\" is a list takes `done-when.md`, and the idea form's heading comes as `core/scripts/fresh.mjs` lists it" },
   { lead: "16 November 2026, a project in several repositories", cost: COST.line,
     check: p => {
       const { taken, notTaken } = modulesOf(p.manifest);

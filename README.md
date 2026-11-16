@@ -25,8 +25,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
   tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
   `github-calls.md`, `hosts.md`, `repositories.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`,
-  `cleaning.md`; for a project
-  people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
+  `cleaning.md`; for a change its users will notice, `done-when.md`; for a project people use through a screen,
+  `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
   module by its file's name, which stands once across the three folders. Until the second release after 16 November 2026
   a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the

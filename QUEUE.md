@@ -13,22 +13,18 @@ wanted").
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #254 | rule builder | |
-| #256 | rule builder | |
 | #252 | rule builder | |
-| #296 | builder | |
 | #302 | rule builder | |
 | #303 | rule builder | #302 |
-| #305 | rule builder | |
 | #322 | rule builder | #305 |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
 | #309 | rule builder | |
 | #318 | rule builder | |
-| #310 | rule builder | #256 and #285 |
+| #310 | rule builder | #285 |
 | #311 | rule builder | #286 |
-| #325 | rule builder | #256, #305, #311 and #322 |
+| #325 | rule builder | #305, #311 and #322 |
 | #359 | rule builder | |
 | #314 | rule builder | |
 | #375 | rule builder | |
@@ -40,8 +36,6 @@ wanted").
 | #337 | builder | |
 | #357 | builder | |
 | #362 | builder | |
-| #370 | builder | |
-| #371 | builder | #370, which changes the same part of `scripts/copies.mjs` |
 | #386 | builder | #362, which changes the same file |
 | #394 | builder | |
 | #403 | builder | #299, whose rule its mends name |

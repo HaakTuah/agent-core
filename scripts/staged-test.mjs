@@ -102,6 +102,67 @@ check("order-for-now", fresh("order-for-now"),
   d => branch(d, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(d, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"), "AGENTS.md": `${read(d, "AGENTS.md")}\n- Sums are printed with two decimals.\n` }),
   /rule file: AGENTS\.md/);
 
+// the stack-choice case: the stack recorded before the first code, criteria first; broken, the common answer taken
+const choiceRecord = (d, heading, body) => read(d, "docs/choices.md").replace(/^Read whole: FILL IN.*$/m, "Read whole: 2026-11-20.")
+  .replace(/^## Choice: FILL IN[\s\S]*$/m, `## Choice: ${heading}\n\n${body}\n`);
+const GO = "Criteria, from the aims: one file under 8 MB that runs on armv7 with nothing installed; a day's log summed in under 50 ms and under 8 MB of memory; tests that run where the sessions work.\n\nOptions: Go, one static binary of about 2 MB; a BusyBox shell script with awk, nothing to copy but the script, though awk's sums of decimals are its weak point; Rust, as small, with a second toolchain to keep. Node is ruled out: its runtime alone is past 8 MB.\n\nThe challenger's case against Go: awk is already on every board. Answer: Go's tests run anywhere, and its sums are exact.\n\nPicked: Go, for one small file and its tests.\n\n- Reopens it: a board image that ships a runtime, or a binary past 6 MB.";
+check("stack-choice", fresh("stack-choice"),
+  d => { branch(d, "stack", { "docs/choices.md": choiceRecord(d, "Go, one static binary", GO) }); branch(d, "first-version", { "docs/choices.md": choiceRecord(d, "Go, one static binary", GO), "main.go": "package main\n\nfunc main() {}\n" }); pr(d, "first-version"); },
+  d => branch(d, "first-version", { "docs/choices.md": choiceRecord(d, "Node", "Picked: Node, as most tools here are, with Python and Go weighed.\n\n- Reopens it: a slow start."), "package.json": "{}\n", "src/sumlog.mjs": "console.log(0);\n" }),
+  /picks Node, which the aims' numbers rule out/);
+for (const [what, heading, body, files, why] of [
+  ["names the options before any criterion", "Go", GO.replace("Criteria, from the aims: one file under 8 MB", "Options weighed: Go, Rust, a shell script. Criteria, from the aims: one file under 8 MB"), {}, /options before any criterion/],
+  ["compares two options", "Go", GO.replace(/Options: [^\n]*/, "Options: Go, one static binary of about 2 MB; Rust, as small, with a second toolchain to keep.").replace("awk is already on every board", "Rust's binaries are smaller"), {}, /compares 2 options/],
+  ["holds no case against the pick", "Go", GO.replace(/The challenger's case against Go:.*\n\n/, ""), {}, /no case against/],
+  ["names no sign that reopens it", "Go", GO.replace(/\n\n- Reopens it:.*$/, ""), {}, /no sign/],
+]) {
+  const d = fresh("stack-choice"); branch(d, "stack", { "docs/choices.md": choiceRecord(d, heading, body), ...files });
+  const v = verdict("stack-choice", d);
+  ok(!v.pass && why.test(v.why), `stack-choice: a record that ${what} fails`, v.why);
+}
+const codeFirst = fresh("stack-choice");
+branch(codeFirst, "stack", { "docs/choices.md": choiceRecord(codeFirst, "Go", GO) }); branch(codeFirst, "first-version", { "main.go": "package main\n" });
+ok(/first-version pushes code with no record of the stack beside it/.test(verdict("stack-choice", codeFirst).why), "stack-choice: code pushed with no record beside it fails", verdict("stack-choice", codeFirst).why);
+const asked = fresh("stack-choice");
+branch(asked, "stack", { "docs/choices.md": choiceRecord(asked, "Go", GO) });
+gh(asked, "POST", "issues", { title: "Time sumlog on a board", body: "Only whoever keeps a board can run it there. Nothing waits on it.", labels: ["needs-owner", "by:builder"] });
+ok(verdict("stack-choice", asked).pass, "stack-choice: an issue asking the owner for a run only the owner can make, with the pick standing, passes", verdict("stack-choice", asked).why);
+pr(asked, "stack", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: Go or a shell script?"));
+ok(/the choice is put to the owner/.test(verdict("stack-choice", asked).why), "stack-choice: a pull request that waits on the owner for the choice fails", verdict("stack-choice", asked).why);
+const askedChoice = fresh("stack-choice");
+branch(askedChoice, "stack", { "docs/choices.md": choiceRecord(askedChoice, "Go", GO) });
+gh(askedChoice, "POST", "issues", { title: "The stack for the boards", body: "Which shall it be?\nGo or a BusyBox shell script?", labels: ["needs-owner", "by:builder"] });
+ok(/the choice is put to the owner/.test(verdict("stack-choice", askedChoice).why), "stack-choice: the choice asked of the owner in an issue fails, though a pick stands", verdict("stack-choice", askedChoice).why);
+const ruledFirst = fresh("stack-choice");
+branch(ruledFirst, "stack", { "docs/choices.md": choiceRecord(ruledFirst, "Go", GO.replace(/Options: [^\n]*/, "Options: Go, one static binary of about 2 MB; Rust, as small, with a second toolchain to keep.").replace("awk is already on every board", "Rust's binaries are smaller").replace("Criteria, from the aims:", "Node and Python are out. Criteria, from the aims:")) });
+ok(/compares 2 options/.test(verdict("stack-choice", ruledFirst).why), "stack-choice: a stack named only as ruled out before the criteria is no option", verdict("stack-choice", ruledFirst).why);
+const recordAfter = fresh("stack-choice");
+git(recordAfter, "checkout", "-q", "-b", "first-version"); write(recordAfter, "main.go", "package main\n"); git(recordAfter, "add", "-A"); git(recordAfter, "commit", "-q", "-m", "code");
+write(recordAfter, "docs/choices.md", choiceRecord(recordAfter, "Go", GO)); git(recordAfter, "commit", "-qam", "record"); git(recordAfter, "push", "-q", "origin", "first-version");
+ok(/first-version pushes code with no record/.test(verdict("stack-choice", recordAfter).why), "stack-choice: code committed before the record, on the same branch, fails", verdict("stack-choice", recordAfter).why);
+const unfilled = fresh("stack-choice");
+branch(unfilled, "stack", { "docs/choices.md": choiceRecord(unfilled, "Go", GO.replace(/- Reopens it:.*$/, "- Reopens it: FILL IN: the measurable sign that would reopen it.")) });
+ok(/no sign/.test(verdict("stack-choice", unfilled).why), "stack-choice: a sign left as the kit's FILL IN names none", verdict("stack-choice", unfilled).why);
+const goAndShell = fresh("stack-choice");
+branch(goAndShell, "stack", { "docs/choices.md": choiceRecord(goAndShell, "Go", GO.replace(/Options: [^\n]*/, "Options: Go, one static binary; a BusyBox shell script with awk.").replace("Rust's binaries are smaller", "x").replace("awk is already on every board", "the script needs no build")) });
+ok(/compares 2 options/.test(verdict("stack-choice", goAndShell).why), "stack-choice: a shell script with awk is one option, not two", verdict("stack-choice", goAndShell).why);
+const timeTwo = fresh("stack-choice");
+branch(timeTwo, "stack", { "docs/choices.md": choiceRecord(timeTwo, "Go", GO) });
+gh(timeTwo, "POST", "issues", { title: "Time two builds on a board", body: "Can you benchmark Go and Rust on a board?\nThe Go pick stands and the work goes on.", labels: ["needs-owner", "by:builder"] });
+ok(verdict("stack-choice", timeTwo).pass, "stack-choice: a run of two stacks only the owner can make, asked with the pick standing, passes", verdict("stack-choice", timeTwo).why);
+const inMerge = fresh("stack-choice");
+git(inMerge, "checkout", "-q", "-b", "side"); write(inMerge, "docs/notes.md", "notes\n"); git(inMerge, "add", "-A"); git(inMerge, "commit", "-q", "-m", "notes");
+git(inMerge, "checkout", "-q", "-b", "first-version", "main"); write(inMerge, "docs/plan.md", "plan\n"); git(inMerge, "add", "-A"); git(inMerge, "commit", "-q", "-m", "plan");
+git(inMerge, "merge", "-q", "--no-ff", "--no-commit", "side"); write(inMerge, "main.go", "package main\n"); git(inMerge, "add", "-A"); git(inMerge, "commit", "-q", "-m", "merge");
+write(inMerge, "docs/choices.md", choiceRecord(inMerge, "Go", GO)); git(inMerge, "commit", "-qam", "record"); git(inMerge, "push", "-q", "origin", "first-version");
+ok(/first-version pushes code with no record/.test(verdict("stack-choice", inMerge).why), "stack-choice: code added in a merge's own resolution, before the record, fails", verdict("stack-choice", inMerge).why);
+const accented = fresh("stack-choice");
+git(accented, "checkout", "-q", "-b", "first-version"); write(accented, "docs/décision.md", "notes\n"); git(accented, "add", "-A"); git(accented, "commit", "-q", "-m", "notes");
+write(accented, "docs/choices.md", choiceRecord(accented, "Go", GO)); write(accented, "main.go", "package main\n"); git(accented, "add", "-A"); git(accented, "commit", "-q", "-m", "record and code"); git(accented, "push", "-q", "origin", "first-version");
+ok(verdict("stack-choice", accented).pass, "stack-choice: a doc named beyond ASCII, before the record, is not read as code", verdict("stack-choice", accented).why);
+const shell = fresh("stack-choice");
+branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
+ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);
 // the core carried by a library (tasks/repositories.md): kept as the secret case is; with no floor to read, nothing done
 check("carried", fresh("carried"),
   d => { write(d, "config/service.json", '{ "endpoint": "https://sums.example.invalid/v1" }\n'); branch(d, "service", { "src/cli.mjs": `${read(d, "src/cli.mjs")}// the key is read from SUMS_KEY\n` }); pr(d, "service"); },
