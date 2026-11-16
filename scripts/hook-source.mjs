@@ -25,8 +25,10 @@ import { inProject } from "./guards.mjs";
 
 const WORD = /[^\s'"`;|&()<>{}$\\=,\u0001]+/gu;
 const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
-// (a variable, as the shell, cmd and PowerShell write one, read as one mark: what it holds is not the command's text)
-const VARIABLE = /\$env:\w+|\$\{[^}]*\}|\$\w+|%\w+%/gu;
+// (a variable, as the shell, cmd and PowerShell write one, read as one mark: what it holds is not the command's text;
+// but a ${...} that holds a command's output or another expansion, as ${X:-$(bash run.sh)}, is no mere variable, and
+// is read as written)
+const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after a
 // newline, ";", "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", or after a quote that opens), perhaps after keywords such as "then", "!" or "{", each a
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,

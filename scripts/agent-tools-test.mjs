@@ -464,7 +464,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["git -C `git rev-parse --show-toplevel` show origin/main:scripts/x.py | bash", []], ["git --git-dir=\"$(pwd)/.git\" show origin/main:scripts/x.py | python3 -", []],
       ["/usr/bin/git show origin/main:scripts/x.py | bash", []], ["git.exe show origin/main:scripts/x.py | bash", []], ["git -c core.pager=cat show origin/main:scripts/x.py | bash", []],
       ["shopt -s expand_aliases\nif true; then alias test=bash; fi\ntest -x scripts/x.py", ["scripts/x.py"]], ["shopt -s expand_aliases\n{ alias test=bash; }\ntest -x scripts/x.py", ["scripts/x.py"]],
-      ["shopt -s expand_aliases\nbuiltin alias test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["java -cp git -cp show -cp origin/main:scripts/x.py Main", ["scripts/x.py"]]])
+      ["shopt -s expand_aliases\nbuiltin alias test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["java -cp git -cp show -cp origin/main:scripts/x.py Main", ["scripts/x.py"]],
+      // (#476's code review of 64d440f: a command's output inside a ${...})
+      [": \"${REVIEW_UNSET:-$(bash scripts/x.py)}\"", ["scripts/x.py"]], [": ${A:-`bash scripts/x.py`}", ["scripts/x.py"]]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
