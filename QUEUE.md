@@ -12,6 +12,11 @@ it merges last.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #486, points 2 to 4 (the choice record) | rule builder, hard work with a challenger; it reopens `CHOICES.md`'s first choice | |
+| #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
+| #375 | rule builder | |
+| #376 | rule builder | #375, which changes the same files |
+| #488, points 3 to 5 and 7 | builder | #488's points 1 and 2 |
+| #481 | rule builder; it changes `AGENTS.md` and the README's table of slots | |
 | #303 | rule builder | |
 | #306 | rule builder | |
 | #307 | rule builder | |
@@ -26,14 +31,13 @@ it merges last.
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
-| #375 | rule builder | |
-| #376 | rule builder | #375, which changes the same files |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, whose work-down takes in `scripts/look.mjs` |
+| #477 | builder | |
 | #350 | builder | |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
@@ -46,8 +50,6 @@ it merges last.
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | #486's record |
-| #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
-| #488, points 3 to 5 and 7 | builder | #488's points 1 and 2 |
 | #460, point 1 (a staged case for floor rule 9) | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder | #405, which changes `scripts/copies.mjs` too |
@@ -57,8 +59,6 @@ it merges last.
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, which changes the same files |
-| #477 | builder | |
-| #481 | rule builder; it changes `AGENTS.md` and the README's table of slots | |
 | #412 | builder | #481, of which it is one case |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
