@@ -23,7 +23,8 @@ import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tool
 import { CORE } from "./core-address.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
-import { parseConfig, where as shapeAt } from "./shape.mjs";
+import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
@@ -191,14 +192,20 @@ function strengthNamed(p) {
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
-// that config names. Null where both stand; else the mend.
+// that config names, which names every reader of the check's ("reads"; shape-readers.mjs), so that it lists what each
+// finds. Null where all of it stands; else the mend.
 function shapeWritten(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
   const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
   let config;
   try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
-  return p.read(config.baseline) === null ? `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` : null;
+  const baseline = p.read(config.baseline);
+  if (baseline === null) return `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.`;
+  let reads = [];
+  try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader: its mend writes it again) */ }
+  const missing = Object.keys(READERS).filter(r => !reads.includes(r)).map(r => READERS[r]);
+  return missing.length ? `The shape check's baseline \`${config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
 }
 
 // The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
