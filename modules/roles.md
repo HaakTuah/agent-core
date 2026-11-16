@@ -2,14 +2,14 @@
 
 Read when a task needs one: who takes a role, who builds a line, who reviews a change.
 
-**The roles, by what they do** (core archive 231): the orchestrator starts builder sessions and hands out lines
+**The roles, by what they do** (core archive 232): the orchestrator starts builder sessions and hands out lines
 (`modules/orchestrating.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
 (`modules/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`modules/reviews.md`);
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
 against the design and the owner's words; escalation takes what has beaten a builder twice. Any agent tool the owner
 has may take any of them.
 
-**Tools are preferences** (core archive 231; #249). By default each role goes to the tool this table prefers, and,
+**Tools are preferences** (core archive 232; #249). By default each role goes to the tool this table prefers, and,
 where that tool is not at hand, to the next it names:
 
 | Role | Preferred | When it is not at hand |
@@ -32,12 +32,12 @@ where that tool is not at hand, to the next it names:
   with another tool alone could fill none.
 - Held by nothing yet: which tool took a role leaves no mark a check reads.
 
-**No session reviews its own work** (core archive 231): the session that reviews a change is never the session that
+**No session reviews its own work** (core archive 232): the session that reviews a change is never the session that
 wrote it. A fresh session of the same tool serves; a different tool is a preference, the table's. It does not mean a
 second tool is needed. Reason: a reviewer that wrote the change reads its own intent instead of the diff. Held by
 nothing yet: builder and reviewer post under one login (#187).
 
-**The builders** (core archive 231): a builder is picked for a line in this order:
+**The builders** (core archive 232): a builder is picked for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
    the cheapest tool that can do it;
 2. not the orchestrator's provider, while another has allowance left;

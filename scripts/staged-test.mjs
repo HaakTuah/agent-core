@@ -111,7 +111,6 @@ const takeSteps = (d, leave = null) => {
     manifest: { "core-manifest.md": manifest },
     gemini: { "docs/trial/GEMINI.md": null },
     look: { ".github/workflows/look.yml": look, ".github/workflows/core-moved.yml": null },
-    suites: { ".github/workflows/tests.yml": read(d, ".github/workflows/tests.yml").replace(", 'core/**'", "") },
     choices: { "docs/choices.md": fs.readFileSync(path.join(s.core, "setup", "template", "choices.md.tmpl"), "utf8").replace("Read whole: FILL IN: the day the first record is written, as 2026-11-15; each pass twice a year writes its own day.", "Read whole: 2026-11-20.").replace(/## Choice: FILL IN.*/, "## Choice: Node").replace(/- Reopens it: FILL IN.*/, "- Reopens it: a user with no Node.") },
     private: { ".github/workflows/security-review.yml": `${read(d, ".github/workflows/security-review.yml").trimEnd()}\n    with:\n      private: true\n` },
   };
@@ -119,7 +118,7 @@ const takeSteps = (d, leave = null) => {
   if (leave !== "labels") for (const l of LABELS) gh(d, "POST", "labels", l);
   if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
 };
-check("steps", fresh("steps"), d => takeSteps(d), d => takeSteps(d, "suites"), /not done: 12 November 2026, a sync and the project's own suites/);
+check("steps", fresh("steps"), d => takeSteps(d), d => takeSteps(d, "gemini"), /not done: 13 November 2026, every file a tool takes its instructions from/);
 const noLabels = fresh("steps"); takeSteps(noLabels, "labels");
 ok(/labels and openers/.test(verdict("steps", noLabels).why), "steps: labels left unmade are read from GitHub's answer", verdict("steps", noLabels).why);
 const noScanning = fresh("steps"); takeSteps(noScanning, "scanning");

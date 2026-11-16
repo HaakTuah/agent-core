@@ -23,7 +23,8 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
 - **The scheduled look** (core archive 218): once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
   and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
   the steps of a release not done, the labels and openers to mend, a run of its own missed, the cleaning and each
-  audit the codebase's state makes due (`modules/cleaning.md`), and in the core alone the staged cases due
+  audit the codebase's state makes due (`modules/cleaning.md`), the pass over the choices that are hard to undo and a
+  sign of theirs written in a measure that holds (`modules/choices.md`), and in the core alone the staged cases due
   (`core/scripts/staged.mjs`); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the
   project's daily job (`look.yml`, as the starter kit writes it) and the orchestrator's wake; where issues cannot be
   reached, its files go to the inbox (`--inbox`).
@@ -52,7 +53,7 @@ Read by the orchestrator (`modules/roles.md`) when it starts.
   told to stop; not one that waits only on the owner's yes.
   - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of
     another tool, or waits, marked in the *progress file*, tried once a day, named to the owner once.
-- **The pace is the owner's** (core archive 231; #249). By default no session slows or stops work to save usage by its
+- **The pace is the owner's** (core archive 232; #249). By default no session slows or stops work to save usage by its
   own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
   "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
   line, how much of a usage window is left free for the owner's own use.

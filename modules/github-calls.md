@@ -18,7 +18,7 @@ gh api 'repos/<owner>/<repo>/pulls/comments?since=<a week ago>&per_page=100' \
   # those not on a line: issues/comments, the same way)
 ```
 
-**What stands in when a part of GitHub cannot be reached** (core archive 231; #249). By default each part a rule needs
+**What stands in when a part of GitHub cannot be reached** (core archive 232; #249). By default each part a rule needs
 is used as its rule says. Where a session finds one out of reach (switched off, refused to its sign-in, or out of the
 month's Actions minutes), it takes the stand-in named here, inside the repository, or skips that step and says so in
 its PR's "Readings taken":

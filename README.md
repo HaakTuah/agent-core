@@ -171,7 +171,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
      `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167).
+     pin moved (`modules/how-to-work.md`, "The smallest setup that tests the rule"; core archive 167). A path filter
+     sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
+     that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
+     not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -410,7 +413,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   a task, and how it is asked for a review) and the project tells the core ("Reporting to the core"), so that the tool
   gains a part here (`modules/tools.md`). Nothing more is asked of the owner: the sessions hand over by the first way
   they find, and with none the tool at hand takes the role (`modules/roles.md`, "The builders"; core archive 169 and
-  231). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
+  232). A tool that pushes its own branch gets a sign-in that cannot change a workflow (as `setup/server.md`, point 5),
   or the repository's workflows wait for an approval before they run.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`modules/work-flow.md`). It stops only that repository's agents.

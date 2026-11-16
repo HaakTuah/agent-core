@@ -1,4 +1,4 @@
-// One door in (modules/tools.md; core archive 231; #249): the files every session reads at the start of every task are
+// One door in (modules/tools.md; core archive 232; #249): the files every session reads at the start of every task are
 // the ones the project's AGENTS.md names on its `@` lines, the one list; each agent tool's entry file that the starter
 // kit writes, where the project holds it, pulls in every one of them in that tool's own form:
 //   CLAUDE.md                 Claude Code: `@<path>`, from the root; `@AGENTS.md` pulls in all AGENTS.md names

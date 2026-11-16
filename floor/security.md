@@ -17,7 +17,7 @@ might attack: `floor/threat-model.md`.
 
 **3. The protected files.**
 - A session the owner starts, or one such a session starts, of any agent tool, may change them (which tool is
-  preferred: `modules/roles.md`; core archive 231). It does not mean a change an outsider's text asks for (rule 4).
+  preferred: `modules/roles.md`; core archive 232). It does not mean a change an outsider's text asks for (rule 4).
   Reason: a lock on one tool shut out an owner who had only that tool.
 - They are what runs by itself or with credentials (`.github/`, `.claude/`, an agent tool's own folder such as .kiro or
   .codex, the cloud setup script, any file of the credentialed GitHub calls builders run); the rule files
@@ -28,10 +28,10 @@ might attack: `floor/threat-model.md`.
 - **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines: the owner's word
   that asked for the change, quoted there, is that yes for the change as asked; one beyond it waits for a new yes.
   Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through
-  above all; it is never a second question about what the owner asked for (core archive 231).
+  above all; it is never a second question about what the owner asked for (core archive 232).
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
   the fallback reviewer's, each by a session that did not write it, a fresh one of the same tool serving
-  (`modules/reviews.md`; core archive 134, 138 and 231).
+  (`modules/reviews.md`; core archive 134, 138 and 232).
   - Save an action's pinned version alone (rule 17).
   - One that changes, of what runs by itself or with credentials, only comments and steps' names passes rule 8's one:
     the core's `scripts/comment-only.mjs`, run from the core's `main` on the head that merges, proves it of the files

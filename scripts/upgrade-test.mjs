@@ -38,7 +38,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
 import { STAGES } from "./steps-stage.mjs";
-import { STEPS, leads } from "./steps.mjs";
+import { STEPS, callers, leads, project as read } from "./steps.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "./workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
@@ -201,8 +201,12 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     if (trigger === null) continue;
     if (trigger.branches && !trigger.branches.includes("main")) continue;
     if (event === "pull_request" && trigger.types && !trigger.types.includes("synchronize") && !trigger.types.includes("opened")) continue;
-    // (a `paths:` filter, as GitHub reads it against what the pull request changes from its base)
-    if (event === "pull_request" && trigger.paths && !pathsLetThrough(trigger.paths, git(p.dir, "diff", "--name-only", `${baseSha}...${sha}`).split("\n").filter(Boolean))) continue;
+    // (a path filter, as GitHub reads it against what the pull request changes from its base)
+    if (event === "pull_request" && (trigger.paths || trigger["paths-ignore"])) {
+      const changed = git(p.dir, "diff", "--name-only", `${baseSha}...${sha}`).split("\n").filter(Boolean);
+      if (trigger.paths && !pathsLetThrough(trigger.paths, changed)) continue;
+      if (trigger["paths-ignore"] && changed.every(f => pathsLetThrough(trigger["paths-ignore"], [f]))) continue;
+    }
     // (a workflow of the project's own that calls none of the core's, run as GitHub would where asked: its steps run the
     // project's copy of the core's scripts)
     if (ownToo && Object.values(wf.jobs ?? {}).every(job => !String(job?.uses ?? "").toLowerCase().startsWith(`${CORE.toLowerCase()}/`))) {
@@ -260,6 +264,12 @@ function upgrade(p, from, ownChanges, expect) {
     onSync = checks(p, "pull_request", syncHead, { baseSha: main0, title: `Sync the core to ${carrying}` });
   }
   ok(!failures(onSync), `${p.name}: every check passes on the sync's pull request (${started(onSync).length} jobs${p.named ? ", once mended" : ""})`, failures(onSync));
+  // a sync that moves the pins of calls to the core's workflows starts none of the project's own suites, filtered as
+  // the step asks, where a filter of the copy and the manifest alone would have started them (#379)
+  const synced = git(p.dir, "diff", "--name-only", `${main0}...${syncHead}`).split("\n").filter(Boolean);
+  const moved = synced.filter(f => f.startsWith(".github/workflows/"));
+  ok(!jobRan(onSync, "suites.yml") && (!moved.length || !synced.every(f => pathsLetThrough(["core/**", "core-manifest.md"], [f]))),
+    `${p.name}: the sync, which moves ${moved.length} call${moved.length === 1 ? "" : "s"}' pins, starts none of its own suites, which a filter of the copy and the manifest alone would have started`, started(onSync).join("\n"));
   const pure = node(p.dir, path.join(theCore, "scripts", "pure-sync.mjs"));
   ok(pure.status === 0 && pure.out.includes(`sha=${syncHead}`), `${p.name}: the sync is pure, as pure-sync.mjs reads it from the release it moves to, whatever modes git here records`, pure.out);
 
@@ -317,6 +327,10 @@ function upgrade(p, from, ownChanges, expect) {
 
   // every step a release asks reads done; each step the commit under test adds, taken out, is reported and mended
   git(p.dir, "checkout", "-q", "main");
+  // (its own suite goes first: it lists the files that hold only calls to the core's workflows as they stood, and a
+  // stage below writes another such file)
+  git(p.dir, "rm", "-q", ".github/workflows/suites.yml");
+  git(p.dir, "commit", "-q", "-m", "its own suite elsewhere");
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
   const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
@@ -453,6 +467,11 @@ function seed(p, eol) {
   write(p.dir, "src/tall.js", `export function tall(a) {${eol}${`  a += 1;${eol}`.repeat(70)}  return a;${eol}}${eol}`);
   const manifest = path.join(p.dir, "core-manifest.md");
   fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^(Floor: whole\. Modules: .*?)`copilot\.md`, /m, "$1"));
+  // its own suite, filtered as "12 November 2026, a sync and the project's own suites" asks: the copy, the manifest and
+  // each file that holds only calls to the core's workflows, by its exact path, left out
+  git(p.dir, "add", "-A");
+  write(p.dir, ".github/workflows/suites.yml", ["name: suites", "", "on:", "  pull_request:", "    paths-ignore:", "      - 'core/**'", "      - 'core-manifest.md'",
+    ...callers(read(p.dir)).map(f => `      - '${f}'`), "", "permissions:", "  contents: read", "", "jobs:", "  test:", "    runs-on: ubuntu-latest", "    steps:", "      - run: echo its own suite", ""].join(eol));
   const copied = fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/).find(l => /^- Nothing secret goes in the repository/.test(l)) ?? "";
   fs.appendFileSync(path.join(p.dir, "SECURITY.md"), `${eol}${copied}${eol}`);
   const baseline = path.join(p.dir, "checks/copies-baseline.json");

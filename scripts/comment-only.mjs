@@ -37,7 +37,7 @@ const UNREAD = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff\ufffe
 const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scalar's header, with its comment if any
 // what else runs by itself or decides what does, refused outright: Claude Code's servers; another agent tool's own
 // folder (Kiro's, Codex's, Antigravity's, Gemini's, Cursor's and the like: their hooks, settings and rules; core
-// archive 231); an editor's, a container's or a shell's setup and git's hooks; npm's, pnpm's, yarn's and .NET's
+// archive 232); an editor's, a container's or a shell's setup and git's hooks; npm's, pnpm's, yarn's and .NET's
 // packages, tools, configs, hooks and builds (MSBuild runs a project's targets, and reads by itself a project's .user
 // file and a folder's Directory.Build.rsp) and the Node or SDK they pick; a task runner's file; the copy of the core;
 // git's own attributes and submodules; a container's build; and a name with "~" and a digit, which Windows can read as
