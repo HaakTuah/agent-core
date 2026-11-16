@@ -616,6 +616,16 @@ ok(notRead("copies", { "a.yml": { env: { A: "x" }, jobs: { j: { steps: [{ uses: 
 ok(['node "$CORE"/scripts/copies.mj? c.json', "node $CORE/scripts/copie[s].mjs c.json", "node $CORE/scripts/copies.* c.json", "node $C/copies.mjs/ c.json", "node ${{ github.action_path }}/copies.mjs/ c.json", "node core/scripts/copies.mj? c.json"]
   .every(run => notRead("copies", { "a.yml": stepped(run) })) && copiesOf({ "a.yml": stepped("node --test tests/*.mjs\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
   "a glob or a \"/\" after the script's name leaves the run not read; a glob in a folder that is no scripts folder is no run of it");
+// (the review of f1663f5: a glob in the script's own name matched against the script's; what a step is given counted
+// through the shared lists, never flattened again)
+ok(["node copies.mj? c.json", "node ./copies.* c.json", "node * c.json", "node $D/copies.mj? c.json"].every(run => notRead("copies", { "a.yml": stepped(run, { "working-directory": "core/scripts" }) }))
+  && ["node --test **/*.test.mjs", 'node --test "**/*.test.mjs"', "node --test test/**/*.mjs", "node --test scripts/*.test.mjs"].every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"),
+  "a glob that can match the script's name, in its folder, is not read; one that cannot is no run of it");
+const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
+const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
+const givenStarted = Date.now();
+ok(copiesOf({ "a.yml": { jobs: { j: { env: bigEnv, steps: Array.from({ length: 200 }, () => ({ uses: "./.github/actions/a" })) } } } }, oneRun) === "checks/copies.json" && Date.now() - givenStarted < 5000,
+  "a large env: given to many calls of an action is read once", `${Date.now() - givenStarted} ms`);
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

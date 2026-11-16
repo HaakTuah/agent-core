@@ -336,7 +336,7 @@ function runAt(words, i, dir, script) {
   const word = words[i];
   if (!word) return [];
   const name = path.posix.basename(script).toLowerCase(), at = located(word, dir.dynamic ? "." : dir.at);
-  if (at.dynamic || at.windows || /[{*?[]|\$'/u.test(word.text.replace(ROOT, ""))) return unplaced(word, dir, name);
+  if (at.dynamic || at.windows || /[{*?[]|\$'/u.test(word.text.replace(ROOT, ""))) return unplaced(word, dir, name, script);
   if (path.posix.basename(plainPath(word.text)).toLowerCase() !== name) return []; // (another script)
   if (dir.moved) return [{ unread: `runs ${word.text} after a command that changes its folder`, unsure: true }];
   if (dir.dynamic) return [{ unread: `runs ${word.text} in a folder named only when the workflow runs`, unsure: true }];
@@ -344,16 +344,39 @@ function runAt(words, i, dir, script) {
   // that ignores case may run the copy by it)
   return at.at === script ? [configAfter(words, i, dir, script)] : [{ unread: `runs ${word.text}, a file of the name of ${script} that the reader cannot tell from it`, unsure: true }];
 }
+// Whether a glob (*, ?, [...], {a,b}) can match a name, case left aside, read in one pass.
+function globMatches(glob, name) {
+  let re = "";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*" && glob[i + 1] === "*") { re += ".*"; i++; } // (** crosses folders)
+    else if (c === "*") re += "[^/]*";
+    else if (c === "?") re += "[^/]";
+    else if (c === "[") { const e = glob.indexOf("]", i + 2); if (e < 0) re += "\\["; else { re += `[${glob.slice(i + 1, e).replace(/^!/u, "^").replace(/[\\\]]/gu, "\\$&")}]`; i = e; } }
+    else if (c === "{") { const e = glob.indexOf("}", i); if (e < 0) re += "\\{"; else { re += `(?:${glob.slice(i + 1, e).split(",").map(a => a.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|")})`; i = e; } }
+    else re += c.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  }
+  try { return new RegExp(`^${re}$`, "iu").test(name); } catch { return true; } // (a glob it cannot read may match)
+}
 // A run whose script is named only when the workflow runs (a variable, an expression of GitHub's, braces, a glob,
 // $'…', a "\\"): no run of this script where its folder plainly is no folder scripts (node --test tests/*.mjs) or its
 // own name plainly is another's (node ${{ github.action_path }}/index.js); else, where it looks like one of the
 // core's (a .mjs file, a folder scripts or core, an expression), not read; one given by a variable alone (node --test
 // $RUN) is counted where the step names the path it holds (unaccounted).
-function unplaced(word, dir, name) {
+function unplaced(word, dir, name, script) {
   const plain = x => !/[$`{}\\'"*?[]/u.test(x), text = word.text.replace(ROOT, "").replace(/\/+$/u, "");
   const cut = text.lastIndexOf("/"), folder = cut < 0 ? null : text.slice(0, cut), own = text.slice(cut + 1);
   if (!dir.moved && !dir.dynamic && folder !== null && plain(folder) && !/(?:^|\/)scripts$/iu.test(path.posix.join(dir.at, folder))) return [];
   if (plain(own) && own.toLowerCase() !== name) return [];
+  // (an own name, and a folder, that are globs or braces and hold no variable are matched against the script's: one that
+  // cannot match it, *.test.mjs or test/**, is no run of it, one that can, copies.mj? or *, is not read)
+  const literal = x => !/[$`'"\\]/u.test(x);
+  if (literal(own)) {
+    if (!globMatches(own, name)) return [];
+    const where = folder === null ? dir.at : path.posix.join(dir.at, folder);
+    if (!dir.moved && !dir.dynamic && literal(where) && !globMatches(where, path.posix.dirname(script ?? `scripts/${name}`))) return [];
+    return [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }];
+  }
   return /\.mjs\b|scripts|\bcore\b|\$\{?CORE|\$\{\{/iu.test(text) ? [{ unread: `runs ${word.text}, a script named only when the workflow runs`, unsure: true }] : [];
 }
 
@@ -380,10 +403,20 @@ const STEPS_OF = new WeakMap(); // (each project's steps read once, however many
 // there is counted as named (unaccounted). Each mapping is read once, its text values (at any depth, a mapping or a
 // list held as text only by its values) counted by name once, however many steps and checks ask.
 const GIVEN = new WeakMap();
+const WRAP = Symbol("given"); // (a list of what a step is given, made here; a matrix's list is none)
+const wrap = (...items) => Object.assign(items, { [WRAP]: true });
+const WRAPPED = new WeakMap(); // (each wrapper's count by name, its parts counted once each)
 function givenNamings(objects, name) {
   let n = 0;
   for (const o of objects) {
     if (!o || typeof o !== "object") continue;
+    if (o[WRAP]) {
+      if (!WRAPPED.has(o)) WRAPPED.set(o, new Map());
+      const counts = WRAPPED.get(o);
+      if (!counts.has(name)) counts.set(name, givenNamings(o, name));
+      n += counts.get(name);
+      continue;
+    }
     if (!GIVEN.has(o)) { const lines = leaves(o); GIVEN.set(o, { lines, whole: lines.whole, counts: new Map() }); }
     const memo = GIVEN.get(o);
     // (a mapping too deep or too large to read whole counts as naming the script, so the step is not read)
@@ -438,15 +471,15 @@ function steps(p) {
   const walk = (where, from, list, dirOf, envs = [], chain = []) => {
     for (const step of Array.isArray(list) ? list : []) {
       if (out.length >= STEP_MOST) return tooMany(where, from);
-      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), given: [step?.env, envs] });
-      if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from, [step?.env, step?.with, envs], chain);
+      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step), given: wrap(step?.env, envs) });
+      if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from, wrap(step?.env, step?.with, envs), chain);
     }
   };
   for (const [f, w] of Object.entries(p.workflows)) {
     const where = `.github/workflows/${f}`;
     if (!w.yaml) continue;
     for (const job of Object.values(w.yaml.jobs ?? {})) {
-      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]), [job?.env, w.yaml.env, job?.strategy]);
+      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]), wrap(job?.env, w.yaml.env, job?.strategy));
       // (a call to a workflow of the project's own: what it passes is read as the callee's steps would be given it)
       if (typeof job?.uses === "string" && job.uses.startsWith("./")) out.push({ where, from: where, run: "", dir: { at: "." }, given: [job.with, job.strategy] });
     }
