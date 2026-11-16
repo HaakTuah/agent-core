@@ -30,14 +30,18 @@ const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
 // is read as written)
 const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after a
-// newline, ";", "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", or after a quote that opens), perhaps after keywords such as "then", "!" or "{", each a
+// newline, ";", "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", after a quote that opens,
+// or where a shell's -c script starts, its quotes read), perhaps after keywords such as "then", "!" or "{", each a
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
-const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["']|(?:^|[\s/])(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
 // (a command that defines "test", "[" or "[[" as a function, in either of bash's forms, or as an alias among any of
 // alias's operands, quoted or not: no file test of it is one)
 const DEFINED = /(?:^|[\s;&|(])(?:test|\[\[?)[ \t]*\([ \t]*\)|\bfunction[ \t\n]+(?:test|\[\[?)(?=[\s({]|$)/u;
-const redefined = raw => DEFINED.test(raw) || raw.split(/[;&|\n]/u).some(c => /^\s*(?:(?:then|do|else|elif|if|while|until|builtin|command|!|\{|\()\s*)*alias\b/u.test(c) && /[\s"'](?:test|\[\[?)=/u.test(c));
+// (whether a command, read command by command, defines an alias whose name `name` matches)
+const ALIASES = /^\s*(?:(?:then|do|else|elif|if|while|until|builtin|command|!|\{|\()\s*)*alias\b/u;
+const aliases = (raw, name) => raw.split(/[;&|\n]/u).some(c => ALIASES.test(c) && name.test(c));
+const redefined = raw => DEFINED.test(raw) || aliases(raw, /[\s"'](?:test|\[\[?)=/u);
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), or a ${...} with a default, perhaps closed by a quote)
 const ROOTED = /[\u0001)`}]\\?["']?$/u;
@@ -95,6 +99,9 @@ const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 const ARG = `(?:"(?:[^"\`$\\\\\\u0001]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>\\u0001])+`;
 const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\w+=${ARG}?[ \\t]+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:[ \\t]+(?:-[Cc][ \\t]+${ARG}|--[\\w-]+(?:=${ARG})?))*[ \\t]+(?:show|cat-file[ \\t]+-p)[ \\t]+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
 const fetched = before => FETCHED.test(before);
+// (a command that defines git as a function or an alias: no fetch of its is one)
+const GIT_DEFINED = /(?:^|[\s;&|(])git[ \t]*\([ \t]*\)|\bfunction[ \t\n]+git(?=[\s({]|$)/u;
+const gitDefined = raw => GIT_DEFINED.test(raw) || aliases(raw, /[\s"']git=/u);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
@@ -137,20 +144,20 @@ function quotedAt(s, i, q) {
 }
 
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
-function scan(text, index, holds, found, tests) {
+function scan(text, index, holds, found, tests, fetches) {
   for (let i = 0; i < text.length; i++) {
     if (i > 0 && NAME.test(text[i - 1]) && text[i - 1] !== "/") continue;
     let node = index;
     for (let j = i; j < text.length && (node = node.get(text[j])); j++) { // (by UTF-16 unit, as pathsIndex keys them)
       if (!node.has("") || (j + 1 < text.length && /[\w./-]/u.test(text[j + 1]))) continue;
       const at = text.slice(i, j + 1);
-      if (found.has(at)) continue;
-      const before = text.slice(Math.max(0, i - 200), i);
-      // (a root's "/" or a "./" before a tested path is the test's: "[ -f "$r/x" ]", "test -e ./x")
-      if (STARTS.test(before) && !fetched(before) && !(tests && TESTED.test(before.replace(/(?:\.\/|\/+)$/u, ""))) && holds(at)) found.add(at);
+      if (!found.has(at) && takenAt(text.slice(Math.max(0, i - 200), i), tests, fetches) && holds(at)) found.add(at);
     }
   }
 }
+// Whether a path that `before` stands before is taken from the working tree: it starts where a path may, is not
+// fetched from main, and is not only tested for (a root's "/" or a "./" before a tested path is the test's).
+const takenAt = (before, tests, fetches) => STARTS.test(before) && !(fetches && fetched(before)) && !(tests && TESTED.test(before.replace(/(?:\.\/|\/+)$/u, "")));
 
 // A word's path relative to the project's root: a path after a variable, a command's output or a backtick's is read
 // from the root, which is what such a thing holds in a hook; another path that starts at "/" is none of the project's.
@@ -170,16 +177,23 @@ export function fromTree(command, holds, index = null) {
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  const found = new Set(), tests = !redefined(raw);
+  const found = new Set(), tests = !redefined(raw), fetches = !gitDefined(raw);
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    if ((ref !== null && MAIN.test(ref) && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || fetched(before)))) return;
+    if ((ref !== null && MAIN.test(ref) && fetches && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || (fetches && fetched(before))))) return;
     const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
     if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);
     if (at !== "." && holds(at)) found.add(at);
   };
-  for (const m of text.matchAll(WORD)) take(m[0], text.slice(Math.max(0, m.index - 200), m.index));
+  // (each word as written, and as the shell unquotes it, so a path through a link inside the checkout, which no list of
+  // the project's files holds, is found however it is quoted)
+  for (let level = text, n = 0; n < 4; n++) {
+    for (const m of level.matchAll(WORD)) take(m[0], level.slice(Math.max(0, m.index - 200), m.index));
+    const next = dequote(level);
+    if (next === level) break;
+    level = next;
+  }
   for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), text.slice(Math.max(0, m.index - 200), m.index));
   for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
   if (index) {
@@ -192,7 +206,7 @@ export function fromTree(command, holds, index = null) {
     // (a closed backtick span holding a blank is the shell's command output, kept as one mark, not PowerShell's escape)
     const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
     variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
-    for (const variant of variants) scan(variant, index, holds, found, tests);
+    for (const variant of variants) scan(variant, index, holds, found, tests, fetches);
   }
   for (const operand of operands) for (const at of fromTree(operand, holds, index)) found.add(at);
   return [...found];

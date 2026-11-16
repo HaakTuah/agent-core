@@ -430,6 +430,22 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const linkFile = run(pr(linked, { ".claude/settings.json": withHook("bash format.sh"), ...listing(entry("bash format.sh")) }));
     ok(linkFile.status === 1 && /takes "format.sh" from the working tree/.test(linkFile.out), "and a link to a file, named itself, is read as that file", linkFile.out);
   }
+  if (LINKS) {
+    // (a path through a link to a folder inside the checkout, however quoted; #476's code review of a72dc88)
+    const viaLink = project({ ...script, ...listing() });
+    fs.symlinkSync("scripts", path.join(viaLink, "tools"));
+    git(viaLink, "add", "-A");
+    git(viaLink, "commit", "-q", "-m", "a link");
+    const quotedLink = "bash to\"ols/format.sh\"";
+    fails(run(pr(viaLink, { ".claude/settings.json": withHook(quotedLink), ...listing(entry(quotedLink)) })), "a path through a link to a folder, quoted in the middle, is found", 'takes "tools/format.sh"');
+  }
+  {
+    // (a tool's file the base held unreadable, unchanged, is noted where a list stands; #476's code review of a72dc88)
+    const broken = project({ ".codex/config.toml": "notify = [\n", ...listing() });
+    const unchanged = run(pr(broken, { "README.md": "a change of its own\n" }));
+    ok(unchanged.status === 0 && /note as the base held it, nothing fails here: \.codex\/config\.toml cannot be read as TOML/.test(unchanged.out), "an unreadable config.toml the base held is noted, not failed", unchanged.out);
+    fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "notify = [\n" })), "and one the pull request writes fails", ".codex/config.toml cannot be read as TOML");
+  }
   // (a submodule at the base is no file the base held: one the pull request makes a script a hook runs fails; #476's
   // fallback security review)
   {
@@ -477,7 +493,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       // (#476's code review of 4ade650: a ${...}'s word given as its default)
       ["bash \"${REVIEW_UNSET:-scripts/x.py}\"", ["scripts/x.py"]], ["bash ${A=scripts/x.py}", ["scripts/x.py"]], ["git -C \"${CLAUDE_PROJECT_DIR:-.}\" show origin/main:scripts/x.py | bash", []],
       // (#476's fallback security review of a72dc88: a fetch is one line; a pattern's replacement is read)
-      ["show() { python3 \"${1#*:}\"; }\ngit\nshow origin/main:scripts/x.py", ["scripts/x.py"]], ["bash ${PWD/*/scripts/x.py}", ["scripts/x.py"]], [`git -C ${"$a".repeat(24)} show origin/main:scripts/x.py | bash`, []]])
+      ["show() { python3 \"${1#*:}\"; }\ngit\nshow origin/main:scripts/x.py", ["scripts/x.py"]], ["bash ${PWD/*/scripts/x.py}", ["scripts/x.py"]], [`git -C ${"$a".repeat(24)} show origin/main:scripts/x.py | bash`, []],
+      // (#476's code review of a72dc88: a hook that redefines git fetches nothing)
+      ["git() { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]], ["function git { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["shopt -s expand_aliases; alias git=bash\ngit show origin/main:scripts/x.py", ["scripts/x.py"]]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])

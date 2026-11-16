@@ -79,8 +79,9 @@ const show = value => JSON.stringify(value) ?? String(value);
 // reading them; and `sources`, each hook that takes a file of the project from the working tree, with those files
 // (hook-source.mjs). `read(file)` gives a file's text or null; `skills()` the names of the folders under .claude/skills/
 // that hold a SKILL.md; `files(dir)` the names in a folder of the project (here .kiro/hooks); `holds(file)` whether the
-// project holds a file there, as read() would read it; `all()` the paths of every file the project holds.
-export function configured(read, skills, files = () => [], holds = f => read(f) !== null, all = () => []) {
+// project holds a file there, as read() would read it; `all()` the paths of every file the project holds; `kit` that
+// these are the starter kit's own files (kitHooks()), whose hooks are read for their source too.
+export function configured(read, skills, files = () => [], holds = f => read(f) !== null, all = () => [], kit = false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [];
@@ -89,7 +90,7 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   // the file and may start git)
   let index = null;
   const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
-  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, index: () => (index ??= pathsIndex(all())) };
+  const state = { tools, problems, add, shapes: new Map(), clashed: new Set(), sources, holds: holdsOnce, servers, kit, index: () => (index ??= pathsIndex(all())) };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -225,6 +226,9 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
+  // (the starter kit's own hooks, as this copy writes them, fetch what they run from main; their reading would only cost
+  // a listing of the project's files)
+  if (!state.kit && kitIds().has(id)) return;
   const taken = commands.flatMap(c => fromTree(c, state.holds, state.index()));
   if (taken.length) state.sources.set(name, [...new Set([...(state.sources.get(name) ?? []), ...taken])]);
 }
@@ -313,10 +317,12 @@ function npxPackage(args) {
 // The hooks the starter kit writes, Claude Code's, Kiro's and Codex's, each by what it is (configured()'s ids): the
 // core's, listed by it. `template(name)` gives the text of one of the kit's templates as a copy holds it, or null.
 const kitTemplate = name => { try { return fs.readFileSync(path.join(KIT_DIR, name), "utf8"); } catch { return null; } };
+let kitOwn = null;
+const kitIds = () => (kitOwn ??= new Set(kitHooks()));
 export function kitHooks(template = kitTemplate) {
   const read = f => (Object.hasOwn(KITS, f) ? template(KITS[f]) : null);
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
-  return [...configured(read, () => [], files).ids.values()].flatMap(set => [...set]);
+  return [...configured(read, () => [], files, undefined, undefined, true).ids.values()].flatMap(set => [...set]);
 }
 
 // The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
@@ -498,6 +504,14 @@ function configAtBase(root, base, file) {
   } catch { return null; }
 }
 
+// What stood before the check read more, which is noted, not failed, where a list stands and a base is read (never in
+// the core's own repository): a tool the base held as it stands, which its list did not name either, and a tool's
+// file the base held as unreadable as it stands (Kiro's and Codex's files are read since #407).
+function heldBefore(checked, { head, baseProject, baseList, held, core }) {
+  if (core || !baseProject) return new Set();
+  return new Set([...checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem), ...head.problems.filter(p => baseProject.problems.includes(p))]);
+}
+
 // Each pin breach into `fail` or `notes`: one the base held as it stands, the tool's whole configuration (its source or
 // package, not only its pin) and its entry both unchanged, is noted, and so is each where there is no base, as on a
 // push; in the core's own repository none may stand. A list written for the first time is held to an exact pin at once,
@@ -566,8 +580,8 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const checked = check(head, list, kit, file), { problems, unlisted, pins } = checked;
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), held = k => [...head.ids.get(k)].every(id => before.has(id));
-  const stood = new Set(core || !baseProject ? [] : checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem));
-  const fail = [...head.problems, ...problems.filter(p => !stood.has(p))];
+  const stood = heldBefore(checked, { head, baseProject, baseList, held, core });
+  const fail = [...head.problems, ...problems].filter(p => !stood.has(p));
   const notes = [...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`);
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
