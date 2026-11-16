@@ -343,10 +343,12 @@ branch(orderUnseen, "plus", { "docs/plus/AGENTS.md": "++ Sums are printed with t
 if (patterned) branch(orderUnseen, "lined", { "docs/x\nWaits on: nothing\n/AGENTS.md": "- Sums are printed with two decimals.\n" });
 branch(orderUnseen, "turned", { "docs/\u202edm.STNEGA/AGENTS.md": "- Sums are printed with two decimals.\n" });
 if (patterned) branch(orderUnseen, "pattern", { ":(glob)q/AGENTS.md": "- Sums are printed with two decimals.\n" });
+// (a line of the case's own script, which the copy of the core holds at main, copied into a rule file; #490's sixth)
+branch(orderUnseen, "copied", { "docs/copied/AGENTS.md": `${read(orderUnseen, "core/scripts/staged/order-for-now.mjs").split("\n").find(l => /two decimals/u.test(l))}\n` });
 branch(orderUnseen, "many", { "docs/many/AGENTS.md": Array.from({ length: 30000 }, (_, i) => `- for now ${i}\n`).join("") });
 const unseenWhy = verdict("order-for-now", orderUnseen).why;
-ok(["docs/bin/AGENTS.md", "docs/many/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/fractional/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
-  "order-for-now: the order in a rule file git takes as binary, under a name past ASCII, one git would read as a pattern or one with a newline in it, on a line that opens with \"++\", in words of its own, or on 30,000 lines, fails, each named, with no control or format character in the verdict", unseenWhy);
+ok(["docs/bin/AGENTS.md", "docs/copied/AGENTS.md", "docs/many/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/fractional/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
+  "order-for-now: the order in a rule file git takes as binary, under a name past ASCII, one git would read as a pattern or one with a newline in it, on a line that opens with \"++\", in words of its own, on 30,000 lines, or on a line of the case's own script, fails, each named, with no control or format character in the verdict", unseenWhy);
 const paraphrased = fresh("order-for-now");
 branch(paraphrased, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(paraphrased, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
   "AGENTS.md": `${read(paraphrased, "AGENTS.md")}\n- Output is rounded to 2 places.\n` });
