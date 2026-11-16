@@ -264,8 +264,8 @@ ok(unreadSec?.mend.includes("could not read the project") && unreadSec.mend.incl
 // ---- a path a project's own file names is read only inside the project ----
 fs.writeFileSync(path.join(plainProject, "checks/copies.json"), JSON.stringify({ baseline: "../a-game/checks/copies-baseline.json", code: [], prose: [], proseFromSecurity: true }));
 found = differences(project(plainProject), fresh(project(plainProject)));
-ok(found.includes("../a-game/checks/copies-baseline.json: missing (the starter kit writes it today)") && project(plainProject).read("../a-game/AGENTS.md") === null,
-  "a path that leads out of the project reads as missing, never as another folder's file", found.join("\n"));
+ok(found.some(d => d.startsWith("the copies check's baseline not compared: ") && d.includes("../a-game/checks/copies-baseline.json, outside the project")) && !found.some(d => d.startsWith("../")) && project(plainProject).read("../a-game/AGENTS.md") === null,
+  "a path that leads out of the project is said not compared, never read as another folder's file", found.join("\n"));
 
 // ---- what the steps read is a regular file of the project's own, of a size a rule file or config keeps to (#362, #423):
 // a link (in or out), a folder link that leads out, an endless device and a file past the size read as missing, and the
@@ -429,6 +429,24 @@ const advisory = STEPS.find(s => s.lead === "13 November 2026, the NuGet check f
 let threw = null;
 try { advisory.check(inMemory({ "n.yml": coreCall("nuget.yml", { config: "c.json", advisory: "${{ vars.ADVISORY }}" }) })); } catch (e) { threw = e; }
 ok(threw instanceof Unread && advisory.check(inMemory({ "n.yml": coreCall("nuget.yml", { config: "c.json", advisory: true }) })) !== null, "the NuGet call's advisory passed as an expression is not read as false");
+// (the reviews of 72474d0: an expression in single quotes, a run through an action counted by its workflow, each
+// script's arguments as it reads them, a folder that is no text, a Windows path in quotes, a shell given its commands
+// as one word, a here-document, and a file a call names outside the project)
+ok(notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs '${{ vars.CONFIG }}'") }), "an expression of GitHub's in single quotes is filled before the shell runs, so not read");
+const viaAction = inMemory({ "a.yml": { jobs: { j: { steps: [{ run: "node core/scripts/licences.mjs l.json" }, { uses: "./.github/actions/t" }] } } } },
+  { ".github/actions/t/action.yml": "runs:\n  using: composite\n  steps:\n    - run: node core/scripts/agent-tools.mjs l.json\n      shell: bash\n" });
+ok(JSON.stringify(runsOwn(viaAction, "agent-tools.mjs").map(r => [r.where, r.from])) === JSON.stringify([[".github/actions/t/action.yml", ".github/workflows/a.yml"]]), "a run through a local action is counted by the workflow that uses it");
+const nugetOf = run => configs(inMemory({ "n.yml": stepped(run) })).nuget;
+ok(nugetOf("node core/scripts/nuget.mjs --packages restored config/n.json") === "config/n.json" && nugetOf("node core/scripts/nuget.mjs config/n.json\nnode core/scripts/nuget.mjs --projects") === "config/n.json"
+  && configs(inMemory({ "a.yml": stepped("node core/scripts/reading-size.mjs -x") })).sizes === "-x" && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs -x") }) === "-x",
+  "each script's config is the argument it picks itself: never the NuGet check's folder, none where it lists files, and an option of one dash taken as the scripts take it");
+ok(notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs c.json", { "working-directory": { toString: "x" } }) }), "a folder that is no text is not read, and stops no other reading");
+ok(copiesOf({ "a.yml": stepped('node "core\\scripts\\copies.mjs" "config\\c.json"') }) === "config/c.json" && copiesOf({ "a.yml": stepped('bash -c "node core/scripts/copies.mjs config/c.json"') }) === "config/c.json"
+  && copiesOf({ "a.yml": stepped("sudo node core/scripts/copies.mjs config/c.json") }) === "config/c.json"
+  && copiesOf({ "a.yml": stepped("cat <<EOF > notes.md\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
+  "a Windows path in quotes, a shell given its commands as one word and sudo are read as runs; a here-document's lines are none");
+ok(notRead("copies", { "a.yml": coreCall("copies.yml", { config: "../../x.json", sizes: "s.json" }) }) && notRead("sizes", { "a.yml": coreCall("copies.yml", { config: "c.json", sizes: "/s.json" }) }),
+  "a file a call names outside the project is not read");
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));

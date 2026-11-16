@@ -40,10 +40,17 @@ export function given(p, name, key) {
 // The files the calls pass as `key`, an input the workflow requires: a call that passes none, or no text, is not read.
 const passed = (p, name, key = "config") => given(p, name, key).map(({ where, value }) => {
   if (typeof value !== "string" || !value.trim()) throw new Unread(`${where} calls the core's ${name} with no ${key} that names a file`);
-  return { where, value: tidy(value) };
+  return { where, value: inside(value, `${where}'s call to the core's ${name}`) };
 });
 // A path as the project's root reads it: "./" and a slash at its end left out, and any "." or ".." in it taken.
 const tidy = f => path.posix.normalize(f.replace(/\/+$/u, "")).replace(/^\.\//u, "");
+// A file a call or a config names, as a path from the root: one that leads out of the project, or starts at the
+// machine's root, is no file of the project's, and not read.
+const inside = (f, what) => {
+  const at = tidy(f);
+  if (at === ".." || at.startsWith("../") || at.startsWith("/")) throw new Unread(`${what} names ${f}, outside the project`);
+  return at;
+};
 
 // The copy's folder, from the manifest (core-path.mjs), "core/" where it names none.
 const copyOf = p => { try { return (p.root && corePath(p.root)) || "core/"; } catch { return "core/"; } };
@@ -65,9 +72,10 @@ function uncommented(line) {
 // The commands of a step's `run:`, each a list of its words as { text, dynamic }, quotes taken off, as a shell reads
 // them: a line continued by "\" joined to the next, a comment left out, commands parted by a line's end, ; & | ( or ).
 // A word is dynamic where a variable, a command's output or an expression of GitHub's in it is filled only when the
-// workflow runs. A "\" between two letters of a path is read as "/", a folder's parting on Windows.
+// workflow runs. A "\" between two letters of a path is read as "/", a folder's parting on Windows. A here-document's
+// lines are data the command reads, never commands.
 export function commands(run) {
-  const text = run.split(/\r?\n/u).map(uncommented).join("\n").replace(/\\\n/gu, " ");
+  const text = withoutHereDocuments(run.split(/\r?\n/u).map(uncommented)).join("\n").replace(/\\\n/gu, " ");
   const out = [];
   let words = [], word = null;
   const add = (s, dynamic = false) => { word ??= { text: "", dynamic: false }; word.text += s; word.dynamic ||= dynamic; };
@@ -82,13 +90,24 @@ export function commands(run) {
   for (const ws of out) for (const w of ws) w.dynamic ||= /%\w+%/u.test(w.text);
   return out;
 }
+// The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone).
+function withoutHereDocuments(lines) {
+  const out = [];
+  for (let n = 0; n < lines.length; n++) {
+    out.push(lines[n]);
+    const end = /<<-?[ \t]*(['"]?)([\w.-]+)\1/u.exec(lines[n])?.[2];
+    if (end) while (n + 1 < lines.length && lines[n + 1].trim() !== end) n++;
+  }
+  return out;
+}
 // One part of a word, at `i`: given to `add` as what it spells, and whether it is filled only when the workflow runs;
 // it returns where the part ends.
 const expressionEnd = (text, i) => { const e = text.indexOf("}}", i); return e < 0 ? text.length : e + 2; };
 function part(text, i, add) {
   const c = text[i];
   if (text.startsWith("${{", i)) { const j = expressionEnd(text, i); add(text.slice(i, j), true); return j - 1; }
-  if (c === "'") { const e = text.indexOf("'", i + 1), j = e < 0 ? text.length : e; add(text.slice(i + 1, j)); return j; }
+  // (GitHub fills its expressions before the shell runs, single quotes or not)
+  if (c === "'") { const e = text.indexOf("'", i + 1), j = e < 0 ? text.length : e; add(text.slice(i + 1, j), text.slice(i + 1, j).includes("${{")); return j; }
   if (c === '"') return doubleQuoted(text, i, add);
   if (c === "\\") { const next = text[i + 1] ?? ""; add(/[\w.-]/u.test(next) && /[\w.-]/u.test(text[i - 1] ?? "") ? `/${next}` : next); return i + 1; }
   add(c, c === "$" || c === "`");
@@ -109,33 +128,45 @@ const ROOT = /^(?:\$GITHUB_WORKSPACE|\$\{GITHUB_WORKSPACE\}|\$\{\{\s*github\.wor
 // A word as a path from the project's root, run in the folder `dir` (from the root): { at } where it is known, at null
 // where it leads out of the project; { dynamic } where it is named only when the workflow runs.
 function located(word, dir) {
-  const rooted = ROOT.test(word.text), rest = word.text.replace(ROOT, "");
+  const text = slashed(word), rooted = ROOT.test(text), rest = text.replace(ROOT, "");
   if (word.dynamic && /\$|`|%\w+%/u.test(rest)) return { dynamic: true };
   if (!rooted && rest.startsWith("/")) return { at: null };
   const at = path.posix.normalize(rooted ? rest : path.posix.join(dir, rest));
   return { at: at === ".." || at.startsWith("../") ? null : at.replace(/^\.\//u, "") };
 }
+// (a "\" left in a word, quoted or not, read as "/": a path spelled for Windows)
+const slashed = word => word.text.replace(/\\/gu, "/");
 const NODE = /(?:^|\/)node(?:\.exe)?$/iu;
-const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup"]);
+const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup", "sudo"]);
+// A shell given its commands as one word (`bash -c "…"`), whose commands are read as the step's own.
+const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu, INLINE = /^(?:-c|-command)$/iu;
 // Node's options that take the next word as their value, so that it is no script.
 const VALUED = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--title", "--input-type"]);
 const CHDIR = /^(?:cd|pushd|popd|chdir|set-location|sl)$/iu;
 
 // The word a command runs with node, by its index ({ at }), past what goes before node (a variable set, env, exec)
-// and node's own options; { moves } where the command changes the folder; {} where it runs nothing with node.
+// and node's own options; { moves } where the command changes the folder; { inner }, the commands a shell is given as
+// one word; {} where it runs nothing with node.
 function nodeRuns(words) {
   let i = 0;
   while (i < words.length && (/^\w+=/u.test(words[i].text) || WRAPPERS.has(words[i].text))) i++;
   if (i < words.length && CHDIR.test(words[i].text)) return { moves: true };
+  if (i + 2 < words.length && SHELL.test(words[i].text) && INLINE.test(words[i + 1].text)) return { inner: words[i + 2].text };
   if (i >= words.length || !NODE.test(words[i].text)) return {};
   for (i++; i < words.length && words[i].text.startsWith("-"); i++) if (VALUED.has(words[i].text)) i++;
   return { at: i };
 }
-// The config a run passes the script at word `i`: the first word after it that is no option, as { config }, a path
-// from the root; or { unread } with why it cannot be known.
+// How each script picks its config from its arguments, as it reads them: the first that does not start with "--"; of
+// the reading-size and exact-versions checks, the first whatever it is; of the NuGet check, never the value of its
+// "--packages", and none where it is run "--projects", which lists files and reads no config.
+const PICKS = { "reading-size.mjs": { first: true }, "exact-versions.mjs": { first: true }, "nuget.mjs": { valued: ["--packages"], none: ["--projects"] } };
+// The config a run passes the script at word `i`, as that script picks it (PICKS), as { config }, a path from the
+// root; { unread } with why it cannot be known; null where the run reads no config.
 function configAfter(words, i, dir, script) {
-  let arg = i + 1;
-  while (arg < words.length && words[arg].text.startsWith("-")) arg++;
+  const pick = PICKS[path.posix.basename(script)] ?? {}, args = words.slice(i + 1);
+  if (args.some(a => pick.none?.includes(a.text))) return null;
+  const k = pick.first ? 0 : args.findIndex((a, n) => !a.text.startsWith("--") && !(n > 0 && pick.valued?.includes(args[n - 1].text)));
+  const arg = k < 0 ? words.length : i + 1 + k;
   if (arg >= words.length) return { unread: `runs ${script} with no config` };
   const config = located(words[arg], dir.at);
   if (config.dynamic) return { unread: `passes ${script} its config as ${words[arg].text}, which names it only when the workflow runs` };
@@ -147,35 +178,42 @@ function runsIn(run, dir, script) {
   const found = [], name = path.posix.basename(script);
   let moved = false;
   for (const words of commands(run)) {
-    const { moves, at: i } = nodeRuns(words);
+    const { moves, inner, at: i } = nodeRuns(words);
     moved ||= !!moves;
+    if (inner !== undefined) found.push(...runsIn(inner, moved ? { dynamic: true } : dir, script));
     const word = words[i ?? words.length];
-    if (!word || !word.text.endsWith(`scripts/${name}`)) continue;
+    if (!word || !slashed(word).endsWith(`scripts/${name}`)) continue;
     // (after a cd, or in a folder named only when it runs, which copy it runs cannot be known)
     const at = dir.dynamic || moved ? { dynamic: true } : located(word, dir.at);
     if (moved) found.push({ unread: `runs ${word.text} after a command that changes its folder` });
     else if (at.dynamic) found.push({ unread: `runs ${word.text} in a folder or by a path named only when the workflow runs` });
-    else if (at.at === script) found.push(configAfter(words, i, dir, script));
+    else if (at.at === script) { const config = configAfter(words, i, dir, script); if (config) found.push(config); }
   }
   return found;
 }
 
 // A step's folder, from the root: its own `working-directory`, else its job's or its workflow's default.
+// (one that is no text, or names itself only when the workflow runs, cannot be known)
 const folder = (...dirs) => {
   const d = dirs.find(v => v !== undefined && v !== null);
   if (d === undefined) return { at: "." };
-  const text = String(d);
+  if (typeof d !== "string") return { dynamic: true };
+  const text = d;
   if (/\$/u.test(text)) return { dynamic: true };
   const at = path.posix.normalize(text.replace(ROOT, "").replace(/\\/gu, "/"));
   return at === ".." || at.startsWith("../") || at.startsWith("/") ? { dynamic: true } : { at };
 };
 
 // Each step the project runs from its workflows, and from the local actions (`uses: ./…`) they use, as
-// { where, run, dir }: the file it stands in, its `run:` and its folder (an action's steps run from the root, save
-// where one names its own); an action the reader cannot read as { where, unreadable }, its text.
+// { where, from, run, dir }: the file it stands in, the workflow that runs it, its `run:` and its folder (an action's
+// steps run from the root, save where one names its own); an action the reader cannot read as { where, from,
+// unreadable }, its text. (An action two workflows use is read once, as the first's.)
+const STEPS_OF = new WeakMap(); // (each project's steps read once, however many checks ask)
 function steps(p) {
+  if (STEPS_OF.has(p)) return STEPS_OF.get(p);
   const out = [], seen = new Set();
-  const action = uses => {
+  STEPS_OF.set(p, out);
+  const action = (uses, from) => {
     const at = tidy(uses);
     if (seen.has(at)) return;
     seen.add(at);
@@ -184,38 +222,39 @@ function steps(p) {
       if (text === null) continue;
       let yaml = null;
       try { yaml = parseYaml(text); } catch { /* (below) */ }
-      if (!yaml) { out.push({ where: f, unreadable: text }); return; }
-      walk(f, yaml.runs?.steps ?? [], step => folder(step["working-directory"]));
+      if (!yaml) { out.push({ where: f, from, unreadable: text }); return; }
+      walk(f, from, yaml.runs?.steps ?? [], step => folder(step["working-directory"]));
       return;
     }
   };
-  const walk = (where, list, dirOf) => {
+  const walk = (where, from, list, dirOf) => {
     for (const step of Array.isArray(list) ? list : []) {
-      if (typeof step?.run === "string") out.push({ where, run: step.run, dir: dirOf(step) });
-      if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses);
+      if (typeof step?.run === "string") out.push({ where, from, run: step.run, dir: dirOf(step) });
+      if (typeof step?.uses === "string" && step.uses.startsWith("./")) action(step.uses, from);
     }
   };
   for (const [f, w] of Object.entries(p.workflows)) {
     const where = `.github/workflows/${f}`;
     if (!w.yaml) continue;
     for (const job of Object.values(w.yaml.jobs ?? {})) {
-      walk(where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]));
+      walk(where, where, job?.steps, step => folder(step["working-directory"], job?.defaults?.run?.["working-directory"], w.yaml.defaults?.run?.["working-directory"]));
     }
   }
   return out;
 }
 
-// The project's own runs of a script of its copy (`name`, "copies.mjs"), each as { where, config } or { where, unread }.
+// The project's own runs of a script of its copy (`name`, "copies.mjs"), each as { where, from, config } or { where,
+// from, unread }: the file the step stands in and the workflow that runs it.
 export function runsOwn(p, name) {
   readable(p, text => text.includes(name));
   const script = `${copyOf(p)}scripts/${name}`;
   return steps(p).flatMap(s => {
-    if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, unread: `the core's reader cannot read ${s.where}, in a form it does not know` }] : [];
-    return runsIn(s.run, s.dir, script).map(r => ({ where: s.where, ...r }));
+    if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know` }] : [];
+    return runsIn(s.run, s.dir, script).map(r => ({ where: s.where, from: s.from, ...r }));
   });
 }
-// The files of the project's own that run the script, once each.
-export const runFiles = (p, name) => [...new Set(runsOwn(p, name).map(r => r.where))];
+// The workflows of the project's own that run the script, themselves or through an action they use, once each.
+export const runFiles = (p, name) => [...new Set(runsOwn(p, name).map(r => r.from))];
 const fromRuns = (p, name) => runsOwn(p, name).map(r => {
   if (r.unread) throw new Unread(`${r.where} ${r.unread}`);
   return { where: r.where, value: r.config };
@@ -259,7 +298,7 @@ export function key(p, file, name, rooted = false) {
   if (text === null) return null;
   let value;
   try { value = JSON.parse(text)?.[name]; } catch { throw new Unread(`${file} is no JSON, so the ${name} it names cannot be read`); }
-  return typeof value === "string" && value ? tidy(rooted ? value.replace(/^\//u, "") : value) : null;
+  return typeof value === "string" && value ? inside(rooted ? value.replace(/^\//u, "") : value, `the ${name} of ${file}`) : null;
 }
 
 // The licence check's config: what the calls to the core's licences.yml pass, and the project's own runs of the
