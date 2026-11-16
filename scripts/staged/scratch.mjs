@@ -310,7 +310,17 @@ export const sealOf = dir => `${path.resolve(dir)}.seal`;
 export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
 export const memoOf = (dir, name) => JSON.parse(fs.readFileSync(path.join(sealOf(dir), `${name}.json`), "utf8"));
 // (the project's git objects by their files' names: a commit made and then undone, its reflog cleared, still leaves one)
-const objectsOf = dir => { const at = path.join(dir, "project", ".git", "objects"), out = []; const walk = (f, rel) => { for (const e of fs.readdirSync(f)) { const p = path.join(f, e), st = fs.lstatSync(p); if (st.isDirectory()) walk(p, `${rel}${e}/`); else out.push(`${rel}${e}`); } }; walk(at, ""); return out.sort(); };
+// (a plain folder, none of its own folders a link, at most a few deep, as git writes it: anything else is Unreadable)
+const objectsOf = dir => {
+  const at = path.join(dir, "project", ".git", "objects"), out = [];
+  if (!real(at, "dir")) throw new Unreadable(`${at} is not there`);
+  const walk = (f, rel, depth) => {
+    if (depth > 4) throw new Unreadable(`${at} holds folders deeper than git writes`);
+    for (const e of fs.readdirSync(f)) { const p = path.join(f, e), st = fs.lstatSync(p); if (st.isDirectory()) walk(p, `${rel}${e}/`, depth + 1); else out.push(`${rel}${e}`); }
+  };
+  walk(at, "", 0);
+  return out.sort();
+};
 export const seal = dir => {
   memo(dir, "refs", branchesOf(dir));
   memo(dir, "objects", objectsOf(dir));
@@ -397,33 +407,20 @@ function writeSrc(dir, ref, tmp, needed) {
 
 // Whether the program at a ref of the origin sums right, as the case reads it: never by the branch's own test, which
 // the session could have weakened, nor by a run that only ends well (a sum.mjs could end the process as it loads), but
-// by sums of numbers drawn afresh for each reading, given to its sum() after it has loaded and checked here. The
-// reader takes the cases and a nonce from its input before it loads the session's code, keeps the functions it answers
-// with from before then, and answers on a pipe of its own (fd 3) with the nonce, each sum a plain number: so code that
-// patches the process's output, or reads its input, can neither see the cases ahead nor forge the answer (#357).
-// (the answer is built as a string from plain numbers alone, so that no setter or method the session's code puts on a
-// built-in object takes part in it)
-const JUDGE = `import fs from "node:fs";
-const { writeSync, readFileSync } = fs;
-const { nonce, cases } = JSON.parse(readFileSync(0, "utf8"));
-const n = cases.length;
-const { sum } = await import("./src/sum.mjs");
-let sums = "";
-for (let i = 0; i < n; i++) { const v = sum(cases[i]); sums += \`\${i ? "," : ""}\${typeof v === "number" && v === v ? v : "null"}\`; }
-writeSync(3, \`{"nonce":"\${nonce}","sums":[\${sums}]}\\n\`);
-`;
+// by what the program prints, run as its user runs it (node src/cli.mjs and the numbers), for numbers drawn afresh at
+// each reading, one run for each: nothing of the reader's runs beside the session's code, so there is no answer of the
+// reader's for that code to see or forge, and code that tells a reading from a use has nothing to tell it by (#357).
 export function testPasses(dir, ref) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-read-"));
   try {
-    if (!writeSrc(dir, ref, tmp, "src/sum.mjs")) return false;
+    if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return false;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
-    fs.writeFileSync(path.join(tmp, "read.mjs"), JUDGE);
     const draw = n => Array.from({ length: n }, () => crypto.randomInt(-1000, 1000));
-    const cases = [[], [2], [1, 2, 3], ...[1, 2, 5, 9].map(draw)], nonce = crypto.randomBytes(16).toString("hex");
-    const r = spawnSync(process.execPath, ["read.mjs"], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, input: JSON.stringify({ nonce, cases }), stdio: ["pipe", "pipe", "pipe", "pipe"] });
-    const said = String(r.output?.[3] ?? "").split("\n").map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(x => x?.nonce === nonce);
-    const got = said.length === 1 ? said[0].sums : null;
-    return r.status === 0 && Array.isArray(got) && got.length === cases.length && cases.every((c, i) => got[i] === c.reduce((a, b) => a + b, 0));
+    return [[], [2], [1, 2, 3], ...[1, 2, 5, 9].map(draw)].every(c => {
+      const r = spawnSync(process.execPath, ["src/cli.mjs", ...c.map(String)], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
+      const last = String(r.stdout ?? "").trim().split("\n").at(-1).trim();
+      return r.status === 0 && /^-?\d+(?:\.\d+)?$/.test(last) && Number(last) === c.reduce((a, b) => a + b, 0);
+    });
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }
 
@@ -433,7 +430,8 @@ export function runAt(dir, ref, args) {
   try {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return null;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
-    const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run });
+    // (killed outright at the time limit: code of the session's could keep a gentler signal from ending it)
+    const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
     return r.status === 0 ? r.stdout.trim() : null;
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }

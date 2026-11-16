@@ -97,11 +97,15 @@ const ABOUT = "The staged cases' runs (scripts/staged.mjs; AGENTS.md, \"Staged c
 // (each carries the entry it was read from under ENTRY, so that --wrong marks that one and no other found by value)
 const ENTRY = Symbol("the record's own entry");
 export function latest(record) {
-  // (a recorded time counts only as an ISO time on its run's own day: a hand-written one far ahead cannot outrank)
-  const out = {}, when = e => (typeof e.recorded === "string" && /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(e.recorded) && e.recorded.startsWith(String(e.at)) ? e.recorded : String(e.at));
+  // (a recorded time counts only as a whole ISO time on its run's own day: a hand-written one far ahead, or out of the
+  // clock, cannot outrank; the day is always the run's, whatever an entry says of its own)
+  const TIME = /^\d{4}-\d\d-\d\dT(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?Z$/;
+  const out = {}, when = e => (typeof e.recorded === "string" && TIME.test(e.recorded) && e.recorded.startsWith(String(e.at)) ? e.recorded : String(e.at));
+  // (of two at the same time, one that fails or was marked wrong is kept: a copy alike cannot stand in for it)
+  const worse = e => e.verdict !== "pass" || Boolean(e.wrong);
   for (const run of record.runs) for (const [name, entry] of Object.entries(run.cases ?? {})) {
-    const e = { at: run.at, ...entry, [ENTRY]: entry };
-    if (!out[name] || when(e) >= when(out[name])) out[name] = e;
+    const e = { ...entry, at: run.at, [ENTRY]: entry }, was = out[name];
+    if (!was || when(e) > when(was) || (when(e) === when(was) && (worse(e) || !worse(was)))) out[name] = e;
   }
   return out;
 }
