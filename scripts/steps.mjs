@@ -298,8 +298,10 @@ export function moved(core = HERE) {
   }
   return out;
 }
-// Where a project's own files still name an old path of the core's, and its manifest's "Paths:" line the old folders:
-// the mend, naming each file and each path's new one; null where none does.
+// The folder of the modules as a config's pattern named it, and the patterns that name the folders the rules stand in now.
+export const MOVED_GLOB = '"core/modules/*.md"', MOVED_GLOBS = '"core/floor/topics/*.md", "core/roles/*.md", "core/roles/shared/*.md", "core/tasks/*.md", "core/tools/*.md"';
+// Where a project's own files still name an old path of the core's, a config of its own the old folder's pattern, and
+// its manifest's "Paths:" line the old folders: the mend, naming each file and each path's new one; null where none does.
 function movedPaths(p) {
   const map = moved(), found = new Map();
   const old = new RegExp(`core/(${Object.keys(map).map(f => f.replace(/[.]/gu, "\\.")).join("|")})(?![\\w/-])`, "gu");
@@ -307,6 +309,8 @@ function movedPaths(p) {
     for (const m of (p.read(f) ?? "").matchAll(old)) found.set(m[1], [...new Set([...(found.get(m[1]) ?? []), f])]);
   }
   const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""} (in ${files.map(f => `\`${f}\``).join(", ")})`);
+  const globs = Object.keys(map).length === 0 ? [] : p.files.filter(f => !f.startsWith("core/") && f.endsWith(".json") && (p.read(f) ?? "").includes(MOVED_GLOB));
+  if (globs.length) wrong.push(`the pattern ${MOVED_GLOB} is now the patterns ${MOVED_GLOBS} (in ${globs.map(f => `\`${f}\``).join(", ")})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
   return wrong.length ? `In one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
 }

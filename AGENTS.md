@@ -9,9 +9,10 @@ The shared core of the owner's agent-built projects: a floor every project takes
 ## The core this repository takes
 
 The floor whole, and every module but those "Not taken" below gives its reason for (core archive 209 and 213).
-`scripts/own-modules.mjs` fails a module of `modules/` this section neither names nor gives one. A builder reads these
-whole at the start of every task (Claude Code imports them); what else a task calls for, and what another role reads,
-`node scripts/reading.mjs <role> --issue <its line's issue>` prints (`tasks/tools.md`, "One script says what to read"):
+`scripts/own-modules.mjs` fails a module of `roles/shared/`, `tasks/` or `tools/` this section neither names nor gives
+one. A builder reads these whole at the start of every task (Claude Code imports them); what else a task calls for, and
+what another role reads, `node scripts/reading.mjs <role> --issue <its line's issue>` prints (`tasks/tools.md`, "One
+script says what to read"):
 
 @floor/security.md
 @roles/builder.md
@@ -27,10 +28,11 @@ the core in "Sessions", since this repository is the core and holds no copy.
 Read at the start of every task too: by Claude, `tools/claude.md` (`CLAUDE.md` imports it); by a session of any
 other tool, `tools/other-builders.md` and its tool's part (`tasks/tools.md`), which its entry file pulls in.
 
-Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`, `floor/threat-model.md`,
-`tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`, `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`,
-`tools/kiro.md`, `tools/antigravity.md`, `tasks/github-calls.md`, `roles/orchestrator.md`,
-`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md` and `tasks/cleaning.md`.
+Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
+`floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
+`tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
+`tasks/github-calls.md`, `roles/orchestrator.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md` and
+`tasks/cleaning.md`.
 
 Not taken, each for its reason:
 

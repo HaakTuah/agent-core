@@ -17,13 +17,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   a rule, could the owner be harmed or something be lost for good? Then it is floor. Its three files:
   `security.md`, whose opening says what it and the folder `topics/` hold and when each is read, and `threat-model.md`, the
   shared threat model.
-- **The modules** (`modules/`): everything else the projects share, one file per thing a reader looks up, each saying in
-  its opening line when it is read, in words a script matches: a kind of task, a path, a tool (a tool's part: when that
-  tool is asked). A builder reads at the start of every task `how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, and
-  its tool's own (`claude.md`, or `other-builders.md`). When a task calls for it: `roles.md`, `helpers.md`,
-  `reviews.md`, `review-guidelines.md`, `tools.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`,
-  `orchestrating.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md` and `cleaning.md`; for a
-  project people use through a screen, `screens.md`; and, for games only, `game-design.md`.
+- **The modules** (`roles/shared/`, `tasks/`, `tools/`): everything else the projects share, one file per thing a reader
+  looks up, in a folder whose name says who reads it or when, each saying in its opening line when it is read, in words
+  a script matches: a kind of task, a path, a tool. `roles/shared/` holds what more than one role reads at its start
+  (`how-to-work.md`, `inbox.md`, `work-flow.md`, `git.md`, `review-guidelines.md`); `tools/` each agent tool's part,
+  read when that tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and
+  `other-builders.md` for every tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`,
+  `reviews.md`, `tools.md`, `github-calls.md`, `updates.md`, `choices.md`, `code-shape.md`, `cleaning.md`; for a
+  project people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves
+  out a module by its file's name, which stands once across the three folders. Until the second release after 16
+  November 2026 a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
   stand-in, the design session), read at that role's start with the shared files it names: `tasks/roles.md`, "A file
   for each role".
@@ -105,7 +108,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
    itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
-   step of the copies workflow, reads the list against `core/modules/` on every pull request: a module the list
+   step of the copies workflow, reads the list against the core's modules on every pull request: a module the list
    neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
    with the line to add, and never fail.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file a builder reads at the start of every task, each
