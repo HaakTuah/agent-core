@@ -313,8 +313,23 @@ try {
   ok(notDone(tmp, step).length === 0, "and a NuGet lookup first there counts");
   writeFileSync(join(tmp, ".github/actions/packages/action.yml"), "name: [unclosed\n");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /cannot be read as YAML/u.test(missed[0].mend), `a local action that cannot be read is named, not taken as running nothing (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /cannot be read whole/u.test(missed[0].mend), `a local action that cannot be read is named, not taken as running nothing (${missed.map((m) => m.mend)})`);
+  // Ten actions, each calling the next ten times, would be ten billion steps: a bound on all a workflow's actions read.
+  for (let i = 0; i < 10; i++) {
+    mkdirSync(join(tmp, `.github/actions/a${i}`), { recursive: true });
+    writeFileSync(join(tmp, `.github/actions/a${i}/action.yml`), `name: a${i}\nruns:\n  using: composite\n  steps:\n${i === 9 ? "    - run: node core/scripts/exact-versions.mjs c.json\n      shell: bash\n" : `    - uses: ./.github/actions/a${i + 1}\n`.repeat(10)}`);
+  }
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: ./.github/actions/a0\n");
+  const began = Date.now();
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /past 5000 steps/u.test(missed[0].mend) && Date.now() - began < 20000, `actions that call each other without end are read to a bound, and named (${missed.map((m) => m.mend.slice(0, 200))})`);
   rmSync(join(tmp, ".github/actions"), { recursive: true, force: true });
+  // One config's name in two folders is two configs: a lookup in one folder does not stand for the other's check.
+  const dirs = (...pairs) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${pairs.map(([d, l]) => `      - run: ${l}\n        working-directory: ${d}\n`).join("")}`);
+  dirs(["frontend", "node ../core/scripts/exact-versions.mjs licences.json"], ["backend", "node ../core/scripts/exact-versions.mjs licences.json"], ["frontend", "node ../core/scripts/lookup.mjs licences.json"]);
+  ok(notDone(tmp, step).length === 1, "a lookup run in one folder does not stand for a check of the same name in another");
+  dirs(["frontend", "node ../core/scripts/exact-versions.mjs licences.json"], ["backend", "node ../core/scripts/exact-versions.mjs licences.json"], ["frontend", "node ../core/scripts/lookup.mjs licences.json"], ["backend", "node ../core/scripts/lookup.mjs licences.json"]);
+  ok(notDone(tmp, step).length === 0, "and with a lookup in each, the step is done");
   nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json # waits & sees");
   ok(notDone(tmp, step).length === 0, "an ampersand in a comment does not send the lookup to the background");
 } finally { rmSync(tmp, { recursive: true, force: true }); }

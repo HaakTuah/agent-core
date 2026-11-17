@@ -389,15 +389,18 @@ function movedPaths(p) {
 
 // A job's steps with each local composite action (`uses: ./…`) read in its place, its own steps in order, so a check or
 // a lookup run from one is seen where it runs: an inner step takes its caller's `if:`, continue-on-error and env where
-// it gives none of its own. An action no deeper than 10, never within itself; one whose file cannot be read as YAML is
-// named in `unread`, and its step kept as it stands.
-function inlined(list, read, unread, chain = []) {
+// it gives none of its own, and runs from the folder it names, never its caller's default. An action no deeper than 10,
+// never within itself, and no more than INLINED_MOST steps read in a workflow, however the actions call each other; one
+// whose file cannot be read as YAML, or past that bound, is named in `unread`, and its step kept as it stands.
+const INLINED_MOST = 5000;
+function inlined(list, read, unread, budget, chain = []) {
   return list.flatMap(st => {
     const uses = typeof st?.uses === "string" && st.uses.startsWith("./") ? path.posix.normalize(st.uses.slice(2)).replace(/\/+$/u, "") : null;
     const steps = uses && !uses.startsWith("..") && !chain.includes(uses) && chain.length < 10 ? compositeSteps(uses, read, unread) : null;
     if (!steps) return [st];
-    const inner = steps.map(x => (x && typeof x === "object" ? { ...x, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(x.env ?? {}) } } : x));
-    return inlined(inner, read, unread, [...chain, uses]);
+    if ((budget.left -= steps.length) < 0) { unread.push(uses); return [st]; }
+    const inner = steps.map(x => (x && typeof x === "object" ? { ...x, composite: true, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(x.env ?? {}) } } : x));
+    return inlined(inner, read, unread, budget, [...chain, uses]);
   });
 }
 // The steps of the composite action at `at`, or null: none there, or not composite, or (named in `unread`) no YAML.
@@ -415,6 +418,11 @@ function stopsOn(st, job, w) {
   const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
   return shell === undefined ? !/windows/iu.test(JSON.stringify(job?.["runs-on"] ?? "")) : /^(?:bash|sh)$/u.test(String(shell).trim());
 }
+// The folder a step runs in, where it names one: its own, else (but in a composite action) its job's or workflow's default.
+function folderOf(st, job, w) {
+  const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
+  return typeof dir === "string" ? dir : undefined;
+}
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -422,7 +430,7 @@ function stepOf(st, job, w, started) {
   // (a lone "|" or "&" in the step's text, a pipe or the background, hides the command's failure from the step)
   const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
-  return { cmds, counts, uses: typeof st?.uses === "string" ? st.uses : null, env: st?.env && typeof st.env === "object" ? st.env : {} };
+  return { cmds, counts, dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env: st?.env && typeof st.env === "object" ? st.env : {} };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -436,18 +444,20 @@ function jobsOf(w, read = () => null) {
   const deep = (v) => /^(?:0|[2-9]|\d{2,})$/u.test(String(v ?? "").trim());
   const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
   if (!jobs) return [{ runs: commands(w.text ?? ""), steps: [], deep: false, unread: [] }];
-  const started = onPullRequests(w.yaml?.on);
+  const started = onPullRequests(w.yaml?.on), budget = { left: INLINED_MOST };
   return jobs.map(job => {
     const unread = [];
-    const steps = inlined(Array.isArray(job?.steps) ? job.steps : [], read, unread).map(st => stepOf(st, job, w, started));
+    const steps = inlined(Array.isArray(job?.steps) ? job.steps : [], read, unread, budget).map(st => stepOf(st, job, w, started));
     return { runs: steps.flatMap(st => st.cmds), steps, unread,
       deep: (job?.steps ?? []).some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
   });
 }
+// A config as a step names it, from the folder the step runs in, so that one name in two folders is two configs.
+const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAbsolute(cfg) ? path.posix.normalize(path.posix.join(dir, cfg)) : cfg);
 // Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
 // named by a variable is matched only where both steps give that variable the same value (or neither sets it).
 const lookupOf = (st, flag, copy, at) => {
-  if (!st.counts || !looksUp(st.cmds[0], flag, copy) || configOf(st.cmds[0], "lookup.mjs", copy) !== at.cfg) return false;
+  if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
@@ -678,14 +688,14 @@ export const STEPS = [
         // lock files of the config it is given)
         // (a config named only when the workflow runs, "$CONFIG", may name another file in each job: there the lookup is
         // looked for in the check's own job alone)
-        const configs = (...names) => jobs.flatMap(j => j.steps.flatMap(step => step.cmds.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [{ cfg: configOf(c, n, copy), job: j, step }] : [])))));
+        const configs = (...names) => jobs.flatMap(j => j.steps.flatMap(step => step.cmds.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [{ cfg: placed(configOf(c, n, copy), step.dir), job: j, step }] : [])))));
         const within = ({ cfg, job }) => (/[$%]/u.test(cfg ?? "") ? [job] : jobs);
         const looked = (flag, at) => within(at).some(j => j.steps.some(st => lookupOf(st, flag, copy, at)));
         return [
           configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
           configs("nuget.mjs", "nuget-fetch.mjs").some(at => !within(at).some(j => lookedUpFirst(j, copy, at))) ? `in ${at}, after only the checkout, \`setup-\` actions and the core's other scripts, so before anything that may run the pull request's build files (\`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`), which could change what the lookup reads, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
           jobs.some(j => !j.deep && j.steps.some(st => st.counts && looksUp(st.cmds[0], undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
-          ...[...new Set(jobs.flatMap(j => j.unread))].map(f => `in ${at}, the local action \`${shown(f)}\` cannot be read as YAML, so whether it runs a package check cannot be told: write it as YAML`),
+          ...[...new Set(jobs.flatMap(j => j.unread))].map(f => `in ${at}, the local action \`${shown(f)}\` cannot be read whole (no YAML, or past ${INLINED_MOST} steps in all its actions call), so whether it runs a package check cannot be told: write it as YAML, its actions calling fewer`),
         ].filter(Boolean);
       });
       return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (its step's one command, under bash or sh, with no \`if:\` or \`continue-on-error\` on the step or its job), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
