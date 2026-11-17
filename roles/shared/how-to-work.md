@@ -32,7 +32,7 @@ pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lea
 - **No description left untrue:** a change updates, in the same PR, every place that describes
   what it changes (the *descriptions*). Dated records stay as they were.
 - **Keep it lean:** every change removes what it replaces, in the same PR: no commented-out code, no
-  "old" copies, nothing left unused. Look for an existing helper before writing one.
+  "old" copies, nothing left unused. Look for an existing helper or package (`tasks/code-shape.md`) before writing one.
 - **Split by meaning, from the start:** each file holds one thing people look up on its own, as
   small as that thing is; new work goes into its own file. A file past about 20 KB probably holds two things.
   - A split goes in its own PR, behaviour proven unchanged; a file past the *size marks*' split mark is split before it

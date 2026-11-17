@@ -1,7 +1,8 @@
 # How code is put together
 
-Read when a system is designed, added or named, when code is ported or rewritten, and when a pull
-request deletes a test or weakens one (#253): the kinds `system`, `port` and `test`. How what already stands is brought
+Read when a system is designed, added or named, when code is ported or rewritten, when a pull
+request deletes a test or weakens one (#253), and before a session writes more than about 50 lines for one job (#486):
+the kinds `system`, `port` and `test`. How what already stands is brought
 to it: `tasks/cleaning.md`. What the tests cost, their time marks among it: `tasks/tests.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
@@ -61,6 +62,29 @@ one declared entrance.
   piece, so the checks read what depends on what and the audit's reader judges what no number shows. Reason: on 15
   November 2026 three codebases held 19, 54 and 79 functions with more than 30 branch points, the worst in the files
   changed most. Held by the shape check.
+- **A job a maintained package does is done by it** (#486). By default, in all code (the core's tooling, a project's
+  and its product's), a job that a maintained package does is done by that package and not by hand; first among such
+  jobs is one on a format or a language someone else defines and changes (YAML, a language's grammar, shell syntax, a
+  lock file, the host's workflow format, Markdown the project does not control), where a package follows the changes
+  and code written by hand must be kept in step for ever. Which package, and in what order (what the platform brings,
+  then a tool that only runs, then a library), floor rule 15 says ("A new one is taken in an order"); what the platform
+  brings comes first against code written by hand too, its test runner and its reader of arguments among it. A package
+  that fails the floor (rules 7, 10 and 15) is no package for this, nor is one nobody looks after: maintained means a
+  release within the last year and a repository that is not archived, a first guess; and few packages of its own count
+  for it. The trigger is a session about to write more than about 50 lines for one job: it first searches for a
+  maintained package that does the job, on the web and in the registry of the language at hand, and its pull request
+  names what it looked for on a line that opens `Looked for:`, as a choice's record does (`tasks/choices.md`). It
+  writes the job by hand only where one of four things holds, and its pull request says which in a line: the job is
+  small and stable, about 50 lines or fewer, a first guess; no package fits, the job being the project's own, as a
+  reader of its own rules or settings is; fitting a package takes more code than the job itself; or the package brings
+  too much, many packages of its own or far more than the job needs. It does not mean a product takes a package the
+  floor would refuse, that code which stands is rewritten for it (the core's own is listed in `CHOICES.md`, "What is
+  written by hand today", and `INVENTORY.md`, and replaced worst first, each by itself, at the dose), nor that a
+  project may not decide otherwise for what it ships: one that counts "no dependencies" among its features declares
+  that among its manifest's "Differences". Reason: for a session code is cheap to write, so it writes where a person
+  would reach for a package, and the cost comes later, as upkeep and as bugs in readers written by hand. No check
+  holds it yet, since none can tell one job from another without guessing: the reviews read it
+  (`roles/shared/review-guidelines.md`), and `core/scripts/holders.mjs` lists it until something holds it.
 - **A port or a rewrite states what it keeps.** By default a change that moves code proves behaviour unchanged. A port,
   or a part that is rewritten, states in its pull request what it keeps and what it is free to change. What it keeps
   is what the program owes: its rules, what it saves, what its users see. How the old code got there is not owed: the

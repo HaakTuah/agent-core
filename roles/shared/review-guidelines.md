@@ -33,7 +33,10 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
 - a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
   with a reason that holds (`tasks/code-shape.md`, #253);
 - against the pillars of `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
-  pointed to.
+  pointed to;
+- a job a package does written by hand, a reader of a format someone else defines above all, with no line naming its
+  exception or, past about 50 lines, `Looked for:` (`tasks/code-shape.md`, "A job a maintained package does is done
+  by it").
 
 A finding, not blocking:
 - anything the change leaves behind (unused code, files or settings, commented-out code, a description made untrue);
