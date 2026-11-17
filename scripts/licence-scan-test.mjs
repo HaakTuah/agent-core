@@ -284,6 +284,11 @@ for (const [what, change, why] of [
     put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}curl -fsSLo other.tgz https://mossgrip.example/other-1.0.0.tgz\necho "${SUM}  moss.tgz" | sha256sum -c -\n`);
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 1 && /holds 1 checksum and 1 check for 2 downloads/u.test(r.failures[0]), "one checksum for two downloads leaves one checked by none, and fails", JSON.stringify(r));
+    // (a file partly pinned at the base, two downloads and one check, that loses its one check: less pinned, failing)
+    put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}curl -fsSLo other.tgz https://mossgrip.example/other-1.0.0.tgz\necho "${SUM}  moss.tgz" | sha256sum -c -\n`); git("commit", "-q", "-m", "partly pinned");
+    put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}curl -fsSLo other.tgz https://mossgrip.example/other-1.0.0.tgz\n`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && /holds no checksum/u.test(r.failures[0]), "a file partly pinned at the base that loses a check fails: the base is compared download by download", JSON.stringify(r));
     put("scripts/get.sh", `#!/usr/bin/env bash\nSUM=${SUM}\n${GET}echo "$SUM  moss.tgz" | sha256sum -c -\n`); git("commit", "-q", "-m", "pinned, the sum in a variable");
     put("scripts/get.sh", `#!/usr/bin/env bash\nSUM=${SUM}\n${GET}`);
     r = licenceCheck(config, dir, "HEAD", config);
@@ -297,6 +302,13 @@ for (const [what, change, why] of [
     put(WF, job(["Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip", `if ((Get-FileHash moss.zip).Hash -ne "${SUM.toUpperCase()}") { exit 1 }`]));
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 0 && pins(r).length === 0, "a checksum as PowerShell writes it, in capitals, is one", JSON.stringify(r));
+    // (a PowerShell script and a package.json script, which the scan reads apart from code that runs, are read too)
+    put("scripts/get.ps1", "Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip\n");
+    put("package.json", JSON.stringify({ scripts: { tool: "curl -fsSLo moss.tgz https://mossgrip.example/moss-1.2.0.tgz" } }));
+    audit([{ name: "mosstool", licence: "MIT", ships: false, version: "1.2.0", files: ["scripts/get.sh", WF, "scripts/get.ps1", "package.json"] }]);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 2 && r.failures.some((m) => m.startsWith("scripts/get.ps1:") && /holds no checksum/u.test(m)) && r.failures.some((m) => m.startsWith("package.json:") && /holds no checksum/u.test(m)), "a download in a PowerShell script or a package.json script is held to its pin too", JSON.stringify(r));
+    git("rm", "-q", "-f", "scripts/get.ps1", "package.json");
     put("scripts/key.sh", "curl -fsS https://github.com/web-flow.gpg | gpg --import\n");
     put("site/data.sh", "curl -fsSLo words.txt https://mossgrip.example/words.txt\n");
     audit([{ name: "mosstool", licence: "MIT", ships: false, version: "1.2.0", files: ["scripts/get.sh", WF] },

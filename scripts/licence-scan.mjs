@@ -224,22 +224,25 @@ const NO_PROGRAM = new Set(["own", "data", "asset", "font", "github-service"]);
 const CHECKSUM = /(?<![0-9a-f])(?:[0-9a-f]{64}){1,2}(?![0-9a-f])|sha(?:256|384|512)-[A-Za-z0-9+/]{43,}={0,2}/iu;
 const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:\.exe)?\s+-hashfile|createHash)(?![\w-])/giu;
 
-/** What the code `code` of the file `f` (codeOf) lacks for the program it downloads by address to be pinned, or null:
- *  of the audit's `entries` covering `f` that audit what may be a program, each names its version, and the file holds
- *  the checksum it checks the download by. The scan and the sync's step (steps.mjs) read it alike. */
+/** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
+ *  null: of the audit's `entries` covering `f` that audit what may be a program, each names its version (`bare`, those
+ *  that do not), and for each download the file holds a checksum of its own and a check by a command of VERIFIER
+ *  (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
 export function pinFault(entries, auditPath, f, code) {
-  const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind));
-  if (!tools.length || !downloads(code).length) return null;
+  const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind)), count = downloads(code).length;
+  if (!tools.length || !count) return null;
   const bare = tools.filter((e) => typeof e.version !== "string" || !e.version.trim()).map((e) => e.name);
-  if (bare.length) return { what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}` };
-  // (each download its own: as many checksums, none counted twice, and as many checks by a command of VERIFIER, as
-  // downloads; which check a download meets is left to the review, since reading that needs a reader of the shell's
-  // data flow)
-  const sums = new Set([...code.matchAll(new RegExp(CHECKSUM.source, "giu"))].map((m) => m[0].toLowerCase())), count = downloads(code).length;
-  const checks = [...code.matchAll(VERIFIER)].length, have = Math.min(sums.size, checks);
-  if (have < count) return { what: !sums.size ? `${f} holds no checksum to check it by` : !checks ? `${f} holds a checksum and no command that checks a file by it` : `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} and ${checks} check${checks === 1 ? "" : "s"} for ${count} downloads, so one is checked by none`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
-  return null;
+  // (which check a download meets is left to the review, since reading that needs a reader of the shell's data flow)
+  const sums = new Set([...code.matchAll(new RegExp(CHECKSUM.source, "giu"))].map((m) => m[0].toLowerCase()));
+  const checks = [...code.matchAll(VERIFIER)].length, deficit = Math.max(0, count - Math.min(sums.size, checks));
+  if (bare.length) return { bare, deficit, what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}` };
+  if (!deficit) return null;
+  return { bare, deficit, what: !sums.size ? `${f} holds no checksum to check it by` : !checks ? `${f} holds a checksum and no command that checks a file by it` : `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} and ${checks} check${checks === 1 ? "" : "s"} for ${count} downloads, so one is checked by none`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
 }
+
+/** Whether the scan reads the file `f`, holding `text` and no binary, for the commands it runs, and so for its pins:
+ *  code that runs, a script in a language it cannot read, and JSON but the audit and a lock file. */
+export const pinRead = (f, text, auditPath) => { const as = readAs({ binary: new Set() }, f, text); return as.runs || as.other || (/\.json[c5]?$/u.test(f) && f !== auditPath && !LOCKFILE.test(f)); };
 
 // Whether every item of `now` stands in `was` as often or more: no download added, nor one made twice.
 function fewer(now, was) {
@@ -259,7 +262,9 @@ function pinned(c, f, text) {
   const atBase = (path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
   const was = c.base ? atBase(f) : null;
   if (c.base && was !== null && c.baseEntries === undefined) { try { const a = JSON.parse(atBase(c.auditPath) ?? "null"); c.baseEntries = Array.isArray(a?.entries) ? a.entries : []; } catch { c.baseEntries = []; } }
-  const held = !c.base || (was !== null && pinFault(c.baseEntries, c.auditPath, f, codeOf(f, was)) !== null && fewer(downloads(text), downloads(codeOf(f, was))));
+  // (held only where the base was unpinned as much or more: no download added, no entry newly bare, no check fewer)
+  const then = was === null ? null : pinFault(c.baseEntries, c.auditPath, f, codeOf(f, was));
+  const held = !c.base || (then !== null && fewer(downloads(text), downloads(codeOf(f, was))) && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n)));
   const said = `${f}: it downloads what may be a program (${downloads(text)[0].replace(/\s+/gu, " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
   if (held) c.reports.push(`${said}; it stood so ${c.base ? "at the pull request's base" : "with no base to read it against"}, so it passes: ${fault.mend}, as the sync's step asks`);
   else c.fail(`${said}. Mend: ${fault.mend}`);
@@ -273,14 +278,12 @@ function scanned(c, f) {
   if (runs) scanRunning(c, f, text);
   else if (/\.json[c5]?$/u.test(f) && f !== c.auditPath && !LOCKFILE.test(f)) scanJson(c, f, text);
   else if (other) scanOther(c, f);
+  // (a download's pin, in every file read for its commands that an entry audits by hand)
+  if (!c.binary.has(f) && byHand(c, f) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
 }
-
-/** Whether the scan reads the file `f`, holding `text` and no binary, as code that runs (readAs): the files whose
- *  downloads it holds to their pins. */
-export const runsAsCode = (f, text) => readAs({ binary: new Set() }, f, text).runs;
 
 /** How the scan reads the file `f` holding `text` (scanned, above): `other`, in a language it cannot read; `runs`, as
  *  shell, JavaScript or a page. */
@@ -312,7 +315,6 @@ function scanRunning(c, f, text) {
     }
   }
   fetches(c, src, f);
-  if (byHand(c, f)) pinned(c, f, src);
 }
 
 /** A script in a language the scan cannot read (scanned, above): the entries of what it uses cover it. */

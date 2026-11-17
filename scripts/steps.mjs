@@ -39,7 +39,7 @@ import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
-import { codeOf, covers, pinFault, runsAsCode } from "./licence-scan.mjs";
+import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -617,7 +617,7 @@ function pinAsks(p, config) {
   const skipped = f => f.startsWith(copy) || skip.some(s => s === f || (s.endsWith("/") && f.startsWith(s)));
   return p.files.filter(f => !skipped(f) && entries.some(e => covers(e, f))).flatMap(f => {
     const text = p.read(f);
-    const fault = text !== null && runsAsCode(f, text) ? pinFault(entries, config.audit, f, codeOf(f, text)) : null;
+    const fault = text !== null && pinRead(f, text, config.audit) ? pinFault(entries, config.audit, f, codeOf(f, text)) : null;
     return fault ? [`\`${shown(f)}\` downloads what may be a program, and ${shown(fault.what)}: ${fault.mend}`] : [];
   });
 }
