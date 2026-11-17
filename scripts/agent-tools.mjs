@@ -19,7 +19,9 @@
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
 // tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case fails,
-// as the tool may read it, save one the base held while what the tool reads through it stands.
+// as the tool may read it, save one the base held while what the tool reads through it stands. So does a variable a
+// tool's settings set (Claude Code's "env", Codex's shell environment policy) that changes how the programs a hook runs
+// start, save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
