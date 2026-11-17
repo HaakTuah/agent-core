@@ -17,8 +17,8 @@
 //     PowerShell's Invoke-WebRequest and the like): each of those passes
 //     only in a file an entry's "files" names, that entry its hand audit; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
-//     of GitHub's or the owner's own work), each such entry names its version and the file holds the checksum it
-//     checks the download by (floor rule 7), a file that stood unpinned at the pull request's base reported;
+//     of GitHub's or the owner's own work), each such entry names its version and the file holds a checksum for each
+//     download, to check it by (floor rule 7), a file that stood unpinned at the pull request's base reported;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
@@ -228,7 +228,10 @@ export function pinFault(entries, auditPath, f, code) {
   if (!tools.length || !downloads(code).length) return null;
   const bare = tools.filter((e) => typeof e.version !== "string" || !e.version.trim()).map((e) => e.name);
   if (bare.length) return { what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}` };
-  if (!CHECKSUM.test(code)) return { what: `${f} holds no checksum to check it by`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
+  // (each download its own: as many checksums as downloads, none counted twice; which check a download meets is
+  // left to the review, since reading that needs a reader of the shell's data flow)
+  const sums = new Set([...code.matchAll(new RegExp(CHECKSUM.source, "giu"))].map((m) => m[0].toLowerCase())), count = downloads(code).length;
+  if (sums.size < count) return { what: sums.size ? `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} for ${count} downloads, so one is checked by none` : `${f} holds no checksum to check it by`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
   return null;
 }
 
