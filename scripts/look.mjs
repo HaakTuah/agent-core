@@ -197,13 +197,17 @@ export const slug = title => `look-${title.toLowerCase().replace(/[^a-z0-9]+/g, 
 // none (#423).
 const stepsBody = missed => (missed.length || missed.unread?.length ? `${stepsReport(missed)}\n\nEach step is a task an agent takes alone, in a pull request of its own; one marked the owner's is labelled needs-owner and the rest go on.` : null);
 
-function main(args) {
+// The options the look is given, or null where one is no option of the look's, said as a failure.
+function optionsOf(args) {
   const known = ["--dry", "--now", "--inbox"];
   const odd = args.find(a => !known.includes(a));
-  if (odd) { console.error(`FAIL: ${odd} is no option of the look's (${known.join(", ")})`); return 1; }
-  const dry = args.includes("--dry"), now = args.includes("--now"), toInbox = args.includes("--inbox");
-  const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
-  if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository"); return 1; }
+  if (odd) { console.error(`FAIL: ${odd} is no option of the look's (${known.join(", ")})`); return null; }
+  return { dry: args.includes("--dry"), now: args.includes("--now"), toInbox: args.includes("--inbox") };
+}
+
+// Where the look runs, with its options: GitHub's job or a session's run, the time, the manifest (null in the core),
+// the repository and its owner, the scripts' folder, and `say`, which prints a line and adds it to the job's summary.
+function settingOf(options) {
   const job = process.env.GITHUB_ACTIONS === "true";
   const carrier = job ? "GitHub's daily job" : "a session's run";
   const at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -214,28 +218,19 @@ function main(args) {
   const owner = ownerOf(manifest ?? "") ?? repo?.split("/")[0] ?? "";
   const scripts = manifest === null ? "scripts" : `${pathIn(manifest)}scripts`;
   const say = line => { console.log(line); if (job && process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`); };
+  return { ...options, job, carrier, at, manifest, repo, owner, scripts, say };
+}
 
-  // whether issues can be read and written here, as inbox.mjs asks it: no answer, nothing is done
-  let reach;
-  if (!repo) reach = { yes: false, why: "its origin is not on github.com" };
-  else {
-    let got = null, refused = false;
-    try { got = JSON.parse(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
-    reach = got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
-  }
-  if (!reach) { say(`The scheduled look could not ask GitHub here (gh is not installed, answers for no account, or gave no answer): nothing was looked at. Run \`node ${scripts}/look.mjs\` where gh answers.`); return 0; }
+// Whether issues can be read and written in `repo`, as inbox.mjs asks it; null where GitHub gave no answer.
+function reachOf(repo) {
+  if (!repo) return { yes: false, why: "its origin is not on github.com" };
+  let got = null, refused = false;
+  try { got = JSON.parse(ghApi(`repos/${repo}`)); } catch (e) { refused = /\bHTTP 404\b/.test(String(e.message)); }
+  return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
+}
 
-  // the record, and whether a session's run is due
-  let kept = new Map();
-  if (reach.yes) {
-    try { kept = mine(pagesOf(`repos/${repo}/issues?state=all&labels=by%3Alook`), owner); } catch { say("The issues the scheduled look keeps could not be read: nothing was looked at."); return 0; }
-  }
-  const record = kept.get(RECORD) ?? null, last = lastRun(record?.body);
-  if (!job && !now && last && hoursBetween(last, at) < SOON) { say(`The scheduled look ran ${hoursBetween(last, at)} h ago (${last}): nothing more to do until ${SOON} h have passed.`); return 0; }
-
-  const findings = [];
-  const add = (title, what, unread = null) => findings.push({ title, what, unread });
-  // pull requests that stand idle
+// The idle pull requests, through `add`: each lane with its checks, or why the pull requests could not be read.
+function idleFinding(repo, add) {
   try {
     const api = (route, jq) => ghApi(route, "--jq", jq);
     const lanes = stalled(openPulls(repo, api), Date.now(), HOURS);
@@ -247,6 +242,15 @@ function main(args) {
   } catch {
     add(TITLES.idle, null, `the open pull requests could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`pull-requests: read\`, \`checks: read\` and \`statuses: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
   }
+}
+
+// What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
+// done (null where they were not read), for the state report.
+function findingsOf({ repo, manifest, owner, at }, reach, last) {
+  const findings = [];
+  const add = (title, what, unread = null) => findings.push({ title, what, unread });
+  // pull requests that stand idle
+  idleFinding(repo, add);
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {
@@ -262,8 +266,14 @@ function main(args) {
   if (last && hoursBetween(last, at) > MISSED) add(TITLES.missed, `The look before this one ran at ${last}, ${hoursBetween(last, at)} h before this run at ${at}: over ${MISSED} h. Find why and mend it, then close this issue: GitHub switches a scheduled workflow off after 60 days with no activity in the repository (\`gh workflow enable\` turns it back on, as an orchestrator's wake does), a run can fail, and an orchestrator that carries the look may not have woken.`);
   // what else is due, as each rule that sets it comes
   findings.push(...dueNow({ repo, manifest, at }));
+  return { findings, stepsLeft };
+}
 
-  // the state report, once a month
+// (open since its last reopening, where the look reopened it: a task that came back is not one that stood)
+const reopenedSince = (repo, i) => { try { return pagesOf(`repos/${repo}/issues/${i.number}/events`).filter(e => e.event === "reopened").map(e => e.created_at).sort().at(-1) ?? i.created_at; } catch { return i.created_at; } };
+
+// The state report, once a month: its title, its file in the inbox, and `monthly`, its body where it is due, else null.
+function monthlyOf({ repo, manifest, at, scripts }, reach, kept, stepsLeft) {
   const month = monthOf(at), reportTitle = `${REPORT}, ${month}`;
   let monthly = null;
   // (in the inbox, a month's report is written once: while no commit has held its file)
@@ -271,62 +281,69 @@ function main(args) {
   const written = !reach.yes && spawnSync("git", ["log", "--all", "--format=%H", "-1", "--", reportFile], { encoding: "utf8" }).stdout.trim() !== "";
   if (reach.yes ? !kept.has(reportTitle) : !written && !fs.existsSync(reportFile)) {
     const previous = [...kept.entries()].filter(([t]) => t.startsWith(`${REPORT}, `) && t < reportTitle).sort(([a], [b]) => a.localeCompare(b)).at(-1)?.[1] ?? null;
-    // (open since its last reopening, where the look reopened it: a task that came back is not one that stood)
-    const since = i => { try { return pagesOf(`repos/${repo}/issues/${i.number}/events`).filter(e => e.event === "reopened").map(e => e.created_at).sort().at(-1) ?? i.created_at; } catch { return i.created_at; } };
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
-      .map(([t, i]) => ({ number: i.number, title: t, since: since(i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
+      .map(([t, i]) => ({ number: i.number, title: t, since: reopenedSince(repo, i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
     monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last }), scripts });
   }
+  return { reportTitle, reportFile, monthly };
+}
 
-  // what is done with each
-  if (!reach.yes) {
-    say(`Issues cannot be read and written here (${reach.why}), so what the scheduled look would open goes to \`${FOLDER}/\`, one file each${toInbox ? "" : ": a session runs `node " + scripts + "/look.mjs --inbox` and commits them in a pull request of its own"}.`);
-    for (const f of findings) {
-      const file = path.join(FOLDER, slug(f.title));
-      if (f.unread) { say(`- ${f.title}: not read (${f.unread}).`); continue; }
-      if (f.what === null) {
-        if (fs.existsSync(file)) { say(`- ${f.title}: nothing stands; ${file} goes.`); if (toInbox && !dry) fs.rmSync(file); }
-        continue;
-      }
-      const content = inboxFile(f.title, f.what, carrier);
-      say(`- ${f.title}: ${file}${toInbox && !dry ? " written" : ""}.`);
-      if (toInbox && !dry) { fs.mkdirSync(FOLDER, { recursive: true }); fs.writeFileSync(file, content); } else if (!toInbox) say(content);
-    }
-    if (monthly) {
-      say(`- ${reportTitle}: ${reportFile}${toInbox && !dry ? " written" : ""}.`);
-      const content = inboxFile(reportTitle, monthly, carrier);
-      if (toInbox && !dry) { fs.mkdirSync(FOLDER, { recursive: true }); fs.writeFileSync(reportFile, content); } else if (!toInbox) say(content);
-    }
-    say("Its record is kept in an issue, so here no run is recorded and none is said missed: the session that runs it on its wake is the record.");
-    return 0;
+// A file of the inbox: written with --inbox (save with --dry), else printed.
+function putFile({ toInbox, dry, say }, file, content) {
+  if (toInbox && !dry) { fs.mkdirSync(FOLDER, { recursive: true }); fs.writeFileSync(file, content); } else if (!toInbox) say(content);
+}
+
+// One finding, where issues cannot be reached: not read, its file gone where nothing stands, or its file.
+function inboxFinding(ctx, f) {
+  const { toInbox, dry, carrier, say } = ctx;
+  const file = path.join(FOLDER, slug(f.title));
+  if (f.unread) { say(`- ${f.title}: not read (${f.unread}).`); return; }
+  if (f.what === null) {
+    if (fs.existsSync(file)) { say(`- ${f.title}: nothing stands; ${file} goes.`); if (toInbox && !dry) fs.rmSync(file); }
+    return;
   }
-  const close = (number, why) => {
-    write("POST", `repos/${repo}/issues/${number}/comments`, { body: `From the scheduled look: ${why}\n\n${SIGNED}` });
-    write("PATCH", `repos/${repo}/issues/${number}`, { state: "closed", state_reason: "completed" });
-  };
-  const did = [];
-  const act = (title, body, issue, unread, { closes = true, labels = LABELS, requeue = null } = {}) => {
-    const step = plan(body, issue, unread);
-    const shown = step === "close" && !closes ? "nothing" : step;
-    did.push(`${title}: ${unread ? `not read (${unread})` : shown}${issue ? ` (#${issue.number})` : ""}`);
-    if (dry || shown === "nothing") return;
-    try {
-      // (an owner GitHub will not let be assigned here leaves the issue unassigned, never unopened)
-      if (shown === "open") try { write("POST", `repos/${repo}/issues`, { title, body, labels, assignees: owner ? [owner] : [] }); } catch { write("POST", `repos/${repo}/issues`, { title, body, labels }); }
-      else if (shown === "update") write("PATCH", `repos/${repo}/issues/${issue.number}`, updating(issue, body, requeue));
-      else if (shown === "reopen") write("PATCH", `repos/${repo}/issues/${issue.number}`, reopening(issue, body, labels.includes(OWNERS)));
-      else if (shown === "close") close(issue.number, "nothing of this stands today, so this closes; it opens again if it comes back.");
-    } catch (e) { did.push(`  ${e.message}`); }
-  };
-  // (an older twin of an issue it keeps, left by two runs at once, is closed: never a second issue for the same thing)
-  for (const t of kept.twins ?? []) {
-    did.push(`a second issue of the same thing: closed (#${t.number})`);
-    if (!dry) try { close(t.number, "another issue of the look's holds this same thing, so this one closes."); } catch (e) { did.push(`  ${e.message}`); }
+  const content = inboxFile(f.title, f.what, carrier);
+  say(`- ${f.title}: ${file}${toInbox && !dry ? " written" : ""}.`);
+  putFile(ctx, file, content);
+}
+
+// Where issues cannot be read and written: what the look would open goes to the inbox's folder, one file each.
+function toFolder(ctx, reach, findings, { reportTitle, reportFile, monthly }) {
+  const { toInbox, dry, carrier, scripts, say } = ctx;
+  say(`Issues cannot be read and written here (${reach.why}), so what the scheduled look would open goes to \`${FOLDER}/\`, one file each${toInbox ? "" : ": a session runs `node " + scripts + "/look.mjs --inbox` and commits them in a pull request of its own"}.`);
+  for (const f of findings) inboxFinding(ctx, f);
+  if (monthly) {
+    say(`- ${reportTitle}: ${reportFile}${toInbox && !dry ? " written" : ""}.`);
+    const content = inboxFile(reportTitle, monthly, carrier);
+    putFile(ctx, reportFile, content);
   }
-  for (const f of findings) { act(f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner), requeue: f.requeue }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
-  if (monthly) act(reportTitle, text(monthly, carrier), null, null);
-  // the record, written last: a closed issue of its own
+  say("Its record is kept in an issue, so here no run is recorded and none is said missed: the session that runs it on its wake is the record.");
+}
+
+// Closes an issue the look keeps, with a comment that says why.
+function closeIssue(repo, number, why) {
+  write("POST", `repos/${repo}/issues/${number}/comments`, { body: `From the scheduled look: ${why}\n\n${SIGNED}` });
+  write("PATCH", `repos/${repo}/issues/${number}`, { state: "closed", state_reason: "completed" });
+}
+
+// What is done with one kind's issue (plan()), said in `did` and, save with --dry, written.
+function act({ repo, owner, dry }, did, title, body, issue, unread, { closes = true, labels = LABELS, requeue = null } = {}) {
+  const step = plan(body, issue, unread);
+  const shown = step === "close" && !closes ? "nothing" : step;
+  did.push(`${title}: ${unread ? `not read (${unread})` : shown}${issue ? ` (#${issue.number})` : ""}`);
+  if (dry || shown === "nothing") return;
+  try {
+    // (an owner GitHub will not let be assigned here leaves the issue unassigned, never unopened)
+    if (shown === "open") try { write("POST", `repos/${repo}/issues`, { title, body, labels, assignees: owner ? [owner] : [] }); } catch { write("POST", `repos/${repo}/issues`, { title, body, labels }); }
+    else if (shown === "update") write("PATCH", `repos/${repo}/issues/${issue.number}`, updating(issue, body, requeue));
+    else if (shown === "reopen") write("PATCH", `repos/${repo}/issues/${issue.number}`, reopening(issue, body, labels.includes(OWNERS)));
+    else if (shown === "close") closeIssue(repo, issue.number, "nothing of this stands today, so this closes; it opens again if it comes back.");
+  } catch (e) { did.push(`  ${e.message}`); }
+}
+
+// The record, written last: a closed issue of its own.
+function writeRecord({ repo, dry, carrier, at }, record, did) {
   const recordBody = `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n`;
   if (!dry) {
     try {
@@ -334,7 +351,51 @@ function main(args) {
       else { const made = write("POST", `repos/${repo}/issues`, { title: RECORD, body: recordBody, labels: ["by:look"] }); if (made.number) write("PATCH", `repos/${repo}/issues/${made.number}`, { state: "closed", state_reason: "completed" }); }
     } catch (e) { did.push(`the record: ${e.message}`); }
   }
+}
+
+// Where issues can be read and written: each kind's issue opened, updated, reopened or closed, the state report
+// opened, the record written, and what was done said.
+function keepIssues(ctx, kept, record, findings, { reportTitle, monthly }) {
+  const { repo, dry, carrier, at, say } = ctx;
+  const did = [];
+  // (an older twin of an issue it keeps, left by two runs at once, is closed: never a second issue for the same thing)
+  for (const t of kept.twins ?? []) {
+    did.push(`a second issue of the same thing: closed (#${t.number})`);
+    if (!dry) try { closeIssue(repo, t.number, "another issue of the look's holds this same thing, so this one closes."); } catch (e) { did.push(`  ${e.message}`); }
+  }
+  for (const f of findings) { act(ctx, did, f.title, f.what === null ? null : text(f.what, carrier), kept.get(f.title) ?? null, f.unread, { closes: f.title !== TITLES.missed, labels: labelsFor(f.owner), requeue: f.requeue }); did.push(...relabel({ repo, issue: kept.get(f.title), finding: f, dry })); }
+  if (monthly) act(ctx, did, reportTitle, text(monthly, carrier), null, null);
+  writeRecord(ctx, record, did);
   say(`The scheduled look in ${repo}, ${at}${dry ? " (dry: nothing written)" : ""}:\n${did.map(d => `- ${d}`).join("\n")}`);
+}
+
+function main(args) {
+  const options = optionsOf(args);
+  if (!options) return 1;
+  const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
+  if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository"); return 1; }
+  const ctx = settingOf(options);
+  const { job, now, at, repo, owner, scripts, say } = ctx;
+
+  // whether issues can be read and written here, as inbox.mjs asks it: no answer, nothing is done
+  const reach = reachOf(repo);
+  if (!reach) { say(`The scheduled look could not ask GitHub here (gh is not installed, answers for no account, or gave no answer): nothing was looked at. Run \`node ${scripts}/look.mjs\` where gh answers.`); return 0; }
+
+  // the record, and whether a session's run is due
+  let kept = new Map();
+  if (reach.yes) {
+    try { kept = mine(pagesOf(`repos/${repo}/issues?state=all&labels=by%3Alook`), owner); } catch { say("The issues the scheduled look keeps could not be read: nothing was looked at."); return 0; }
+  }
+  const record = kept.get(RECORD) ?? null, last = lastRun(record?.body);
+  if (!job && !now && last && hoursBetween(last, at) < SOON) { say(`The scheduled look ran ${hoursBetween(last, at)} h ago (${last}): nothing more to do until ${SOON} h have passed.`); return 0; }
+
+  const { findings, stepsLeft } = findingsOf(ctx, reach, last);
+  // the state report, once a month
+  const report = monthlyOf(ctx, reach, kept, stepsLeft);
+
+  // what is done with each
+  if (!reach.yes) { toFolder(ctx, reach, findings, report); return 0; }
+  keepIssues(ctx, kept, record, findings, report);
   return 0;
 }
 

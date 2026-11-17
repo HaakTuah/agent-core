@@ -35,6 +35,12 @@ export const OUTCOMES = [["asked", "The product does what was asked"], ["fast", 
   ["usable", "A new user can use it"], ["robust", "It does not break"], ["cost", "What the work cost (no outcome: the price of the five)"]];
 export const KINDS = ["misread", "looks wrong", "does not work", "rule missing"];
 export const LABEL = "correction";
+// The number a rule names (AGENTS.md of the core, "Every rule says what holds it"; #303): the count it is meant to
+// lower, `findings` (the review findings that name it), `check fires` (the pull requests its check failed) or
+// `correction: <kind>`, the one of the five outcomes it stands for, and "; rare harm" where it guards against rare and
+// severe harm; held in holders.json's "numbers" and on a description's line "Number:" (pr-description.mjs), both beside
+// this file, in this one form.
+export const NUMBER = new RegExp(`^(findings|check fires|correction: (?:${KINDS.join("|")})); outcome: (${OUTCOMES.slice(0, 5).map(([k]) => k).join("|")})(; rare harm)?$`, "u");
 export const LEAST = 30, MONTHS = 3, SAMPLE = 60, SPLIT = 20 * 1024, DAYS = 14, HOUR = 3600e3;
 export const FIRST = "reports/outcomes-first-reading.json";
 export const HEADING = "The outcomes";
@@ -75,14 +81,14 @@ const big = n => Math.round(n).toLocaleString("en-US");
 const within = (iso, w) => ms(iso) >= w.from && ms(iso) < w.to;
 
 // Each measure: its outcome, its label, and from the data and a window { from, to } (ms) its count and its value.
-// `direct` marks the outcome's direct measure.
+// `direct` marks the outcome's direct measure; `median`, one whose count is only how many cases it read.
 export const MEASURES = [
   { key: "misread", outcome: "asked", direct: true, label: "corrections that the task was misread, for every ten merged tasks", of: (d, w) => perTen(d, w, ["misread"]) },
   { key: "missing", outcome: "asked", label: "corrections that a rule was missing, for every ten merged tasks", of: (d, w) => perTen(d, w, ["rule missing"]) },
   { key: "queued", outcome: "asked", label: "from joining the queue to merged, the median", of: (d, w) => spanOf(d.queued.filter(q => within(q.done, w)).map(q => (ms(q.done) - ms(q.joined)) / HOUR)) },
   { key: "looks", outcome: "usable", label: "corrections that it looks or feels wrong, for every ten merged tasks", of: (d, w) => perTen(d, w, ["looks wrong"]) },
   { key: "failed", outcome: "robust", direct: true, label: "merges followed within two weeks by a fix or a revert", of: (d, w) => failed(d, w) },
-  { key: "live", outcome: "robust", direct: true, label: "from a bug's report to its fix live, the median", of: (d, w) => spanOf(d.bugs.filter(b => within(b.closed, w)).map(b => (ms(b.closed) - ms(b.at)) / HOUR)) },
+  { key: "live", outcome: "robust", direct: true, median: true, label: "from a bug's report to its fix live, the median", of: (d, w) => spanOf(d.bugs.filter(b => within(b.closed, w)).map(b => (ms(b.closed) - ms(b.at)) / HOUR)) },
   { key: "broke", outcome: "robust", label: "corrections that it does not work, for every ten merged tasks", of: (d, w) => perTen(d, w, ["does not work"]) },
   { key: "mending", outcome: "robust", label: "merged work that was unplanned mending", of: (d, w) => { const t = tasks(d, w), m = t.filter(p => p.mends).length; return { n: m, text: `${counted(m)} of ${t.length}, ${pct(m, t.length)}` }; } },
   { key: "corrected", outcome: "cost", label: "corrections of every kind, for every ten merged tasks", of: (d, w) => perTen(d, w, KINDS) },

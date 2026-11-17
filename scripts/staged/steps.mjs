@@ -84,6 +84,7 @@ export const UNPLANTED = {
   "16 November 2026, how done will be judged": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the rest is a reading of what the project builds",
   "16 November 2026, what a game is for": "it needs a game, whose next pull request adding a feature writes its page first, and this case's project is a private tool that is no game",
   "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
+  "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
 };
 
 export function set(dir, opts = {}) {

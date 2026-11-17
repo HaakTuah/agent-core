@@ -3,8 +3,9 @@
 // hand, two in a row, and a list whose parents are not git's; and, end to end, the core's security-review.yml run as
 // GitHub runs it (workflow-run.mjs) on a pull request whose head is such a merge, GitHub's API a stand-in that gives the
 // pull request and logs the statuses it is given: the review of the commit before a merge git makes stands for the
-// head, and one before a merge with a change of its own waits, both statuses naming that merge and the mend. Git, jq,
-// bash and Node's own modules.
+// head, and one before a merge with a change of its own waits, both statuses naming that merge and the mend; and a
+// member's review of the head counts where GitHub's answer on the member's rights gives the role write, and only there
+// (#412). Git, jq, bash and Node's own modules.
 //
 //   node scripts/clean-merges-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -116,12 +117,12 @@ const { env: runEnv, ghData, ghLog } = ghStandIn(env, tmp, origin);
 const state = { code_review: { commit_sha: SEEN, status: "completed" }, security_review: { commit_sha: SEEN, has_any_findings: false, has_unresolved_findings: false, status: "completed" } };
 const summary = { user: { login: "chatgpt-codex-connector[bot]", type: "Bot" }, author_association: "NONE", created_at: "2026-11-15T10:00:00Z", updated_at: "2026-11-15T10:00:00Z",
   body: `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify(state)} -->\n<details>the table</details>` };
-const check = (number, head) => {
+const check = (number, head, posted = [], rights = {}) => {
   const repoOf = { full_name: "someone/project" };
   // (the files name the check's scripts, so that the pull request is held by what they read: the workflow's "held")
   const files = ["scripts/security-review.mjs", "scripts/code-review-wait.mjs"].map((filename) => ({ filename, status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }));
   const pull = { number, state: "open", draft: false, changed_files: files.length, commits: 2, head: { sha: head, repo: repoOf }, base: { sha: BASE, repo: { ...repoOf, owner: { login: "someone" } } }, user: { login: "someone" } };
-  fs.writeFileSync(ghData, JSON.stringify({ [`pulls/${number}$`]: pull, [`issues/${number}/comments`]: [summary], [`pulls/${number}/comments`]: [], [`pulls/${number}/commits`]: listed(repo, SEEN, head), [`pulls/${number}/files`]: files }));
+  fs.writeFileSync(ghData, JSON.stringify({ [`pulls/${number}$`]: pull, [`issues/${number}/comments`]: [summary, ...posted], [`pulls/${number}/comments`]: [], [`pulls/${number}/commits`]: listed(repo, SEEN, head), [`pulls/${number}/files`]: files, ...rights }));
   fs.writeFileSync(ghLog, "");
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
     event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false } } };
@@ -140,6 +141,15 @@ const own = check(2, OWN);
 ok(own.passed && own.out.includes("Merges from main that are the ones git makes: 0.") && own.security.state === "pending" && own.code.state === "pending"
   && own.security.description.includes(`merge ${OWN.slice(0, 7)} unproved`) && own.code.description.includes(`merge ${OWN.slice(0, 7)} unproved`) && [own.security, own.code].every((s) => mended(s.description)),
   "  and one before a merge with a change of its own waits, both statuses naming that merge and the mend", own.out + JSON.stringify([own.security, own.code]));
+
+// a member's review of the head, which the job reads the member's rights for (#412)
+const member = { user: { login: "a-member", type: "User" }, author_association: "MEMBER", created_at: "2026-11-15T11:00:00Z", updated_at: "2026-11-15T11:00:00Z", body: `Security review: ${OWN}\nNo blocking finding.\nNo other finding.` };
+const rightOf = (role_name, permission) => ({ "collaborators/a-member/permission$": { permission, role_name, user: { login: "a-member", type: "User" } } });
+const writer = check(2, OWN, [member], rightOf("write", "write"));
+ok(writer.passed && writer.security.state === "success" && writer.security.description.includes("a security review is posted"), "the workflow: a member the host lets write counts with nothing named", writer.out + JSON.stringify(writer.security));
+const reader = check(2, OWN, [member], rightOf("triage", "read")), unread = check(2, OWN, [member]);
+ok(reader.passed && reader.security.state === "pending" && unread.passed && unread.security.state === "pending" && unread.out.includes("The host's rights of a-member could not be read"),
+  "  and one it lets only triage, or whose rights cannot be read, does not, the run saying the second", reader.out + unread.out + JSON.stringify([reader.security, unread.security]));
 
 console.log(`\n${count - failed} of ${count} passed`);
 process.exit(failed ? 1 : 0);
