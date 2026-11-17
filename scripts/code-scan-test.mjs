@@ -72,8 +72,10 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   const p = path.join(tmp, "host"); fs.mkdirSync(path.join(p, ".github", "workflows"), { recursive: true });
   fs.writeFileSync(path.join(p, ".github", "workflows", "codeql.yml"), "# uses: owner/core/.github/workflows/codeql.yml@x (a comment)\njobs: {}\n");
   const before = hostScans(p);
+  fs.writeFileSync(path.join(p, ".github", "workflows", "text.yml"), "jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: |\n          uses: owner/core/.github/workflows/codeql.yml@main\n");
+  const inText = hostScans(p);
   fs.writeFileSync(path.join(p, ".github", "workflows", "scan.yaml"), "jobs:\n  analyze:\n    uses: owner/core/.github/workflows/codeql.yml@0123456789abcdef0123456789abcdef01234567\n");
-  ok(!before && hostScans(p) && !hostScans(tmp), "the host scans a project where a workflow calls the core's codeql.yml, not where one only names it");
+  ok(!before && !inText && hostScans(p) && !hostScans(tmp), "the host scans a project where a job of a workflow calls the core's codeql.yml, not where a comment or a step's text only names it");
   const skipped = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: p });
   ok(/not fetched: a workflow calls the core's codeql\.yml/u.test(skipped) && !fs.existsSync(path.join(tmp, "not-fetched")), "where the host's CodeQL scans the project, nothing is fetched", skipped);
 }
@@ -175,12 +177,14 @@ def ok5(cur):
   ok(!all.lines.some(l => l.includes("could not read")), "the engine reads every sample", all.lines.join("\n"));
 
   // (before the pull request: a file whose name is a pattern to git, with a weakness that stands, and a link)
+  fs.writeFileSync(path.join(repo, "flow.js"), "const { exec } = require(\"child_process\");\nfunction route(app) {\n  app.get(\"/r\", (req, res) => {\n    const command = \"uptime\";\n    exec(command);\n  });\n}\n");
   fs.writeFileSync(path.join(repo, "[id].ts"), "export function h(req, res, db) {\n  db.query(\"SELECT \" + req.query.id);\n  return res;\n  // a note\n}\n");
   let linked = false;
   try { fs.symlinkSync("tasks.py", path.join(repo, "handler.py")); linked = true; } catch { /* (no links made here, as on Windows without the right) */ }
   git("add", "-A"); git("commit", "-q", "-m", "more");
   fs.writeFileSync(path.join(repo, "[id].ts"), fs.readFileSync(path.join(repo, "[id].ts"), "utf8").replace("// a note", "// a note, changed"));
   fs.writeFileSync(path.join(repo, "i.ts"), "export const a = 1;\nexport const b = 2;\n");
+  fs.writeFileSync(path.join(repo, "flow.js"), fs.readFileSync(path.join(repo, "flow.js"), "utf8").replace("\"uptime\"", "req.query.command"));
   if (linked) { fs.rmSync(path.join(repo, "handler.py")); fs.writeFileSync(path.join(repo, "handler.py"), "import os\ndef run(user_input):\n    os.system(user_input)\n"); }
   // a pull request: one line it adds is a weakness, one hidden behind a comment, one listed as a false alarm
   fs.appendFileSync(path.join(repo, "tasks.py"), "def added(name):\n    os.system(\"rm \" + name)  # nosemgrep\ndef listed(n):\n    os.popen(\"ls \" + n)\n");
@@ -192,19 +196,22 @@ def ok5(cur):
   const run = (args, body = "") => spawnSync(process.execPath, [SCRIPT, ...args, "--engine", dir], { cwd: repo, encoding: "utf8", env: { ...env, PR_BODY: body } });
   const failing = run(["--base", "HEAD~1"]);
   const out = failing.stdout + failing.stderr;
-  ok(failing.status === 1 && /FAIL: tasks\.py:\d+: a parameter reaches a shell command \(py-command\), on a line this change adds/u.test(out) && mended(out), "a weakness on a line the change adds fails, saying its mend", out);
+  ok(failing.status === 1 && /FAIL: tasks\.py:\d+: a parameter reaches a shell command \(py-command\), which this change brings/u.test(out) && mended(out), "a weakness the change brings fails, saying its mend", out);
   ok((out.match(/^FAIL: tasks\.py:/gmu) ?? []).length === 2, "a comment in the code silences no finding", out);
   ok(ODD.every(f => out.includes(`FAIL: ${f}:3:`)), "a file whose name git quotes, or that reads as an option, is scanned, its finding failing", out);
   ok(/reported, not failed: \[id\]\.ts:2:/u.test(out) && !out.includes("FAIL: [id].ts"), "a file whose name is a pattern to git is read by its name alone: a finding that stood in it is reported, not failed for another file's lines", out);
   ok(!linked || out.includes("FAIL: handler.py:3:"), "a link the change makes a file is scanned, its finding failing", out);
-  ok(/reported, not failed: tasks\.py:5: .* on a line that stood before this change/u.test(out) && !/^FAIL: (web|Handlers)/mu.test(out), "a weakness on a line that stood before is reported, and passes", out);
+  ok(out.includes("FAIL: flow.js:5:"), "input the change brings to a sink whose line it leaves as it was fails: the base held no such finding", out);
+  ok(/reported, not failed: tasks\.py:5: .* which stood before this change/u.test(out) && !/^FAIL: (web|Handlers)/mu.test(out), "a weakness on a line that stood before is reported, and passes", out);
   ok(!/link\.py/u.test(out), "a file that is a link is not read", out);
   const listedAll = [...out.matchAll(/^FAIL: (.+?:\d+): /gmu)].map(m => `Scan false alarm: \`${m[1]}\`, invented for the test`).join("\n");
   const explained = run(["--base", "HEAD~1"], listedAll);
   ok(explained.status === 0 && /passed: tasks\.py:\d+: .* listed in the description as a false alarm/u.test(explained.stdout), "a finding the description lists as a false alarm passes, said so", explained.stdout + explained.stderr);
   const host = path.join(repo, ".github", "workflows"); fs.mkdirSync(host, { recursive: true });
   fs.writeFileSync(path.join(host, "codeql.yml"), "jobs:\n  a:\n    uses: owner/core/.github/workflows/codeql.yml@main\n");
-  const hosted = run(["--base", "HEAD~1"]);
+  const added = run(["--base", "HEAD~1"]);
+  ok(added.status === 1 && !/not run/u.test(added.stdout), "a call to codeql.yml the change adds does not switch the scan off: the base's workflows are read", added.stdout);
+  const hosted = run([]);
   ok(hosted.status === 0 && /not run: a workflow calls the core's codeql\.yml/u.test(hosted.stdout), "where the host's CodeQL scans the project, the scan does not run, and says so", hosted.stdout);
   fs.rmSync(host, { recursive: true });
   const none = spawnSync(process.execPath, [SCRIPT, "--base", "HEAD~1", "--engine", path.join(tmp, "no-engine")], { cwd: repo, encoding: "utf8", env });

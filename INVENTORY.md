@@ -167,7 +167,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   its place. *Bugs:* 1. **Keep** for a public project.
 - `scripts/code-scan.mjs`, `scripts/code-scan.yml`: where no workflow calls `codeql.yml`, fetches Semgrep's engine by
   its wheel's digest at set-up and scans the code a pull request adds or alters with the core's own rules, failing a
-  finding on an added line. *Runs:* a cloud session's set-up and any session, and a step of `core.yml`'s one job.
+  finding its base did not hold. *Runs:* a cloud session's set-up and any session, and a step of `core.yml`'s one job.
   *Else:* argued in `CHOICES.md`, "Choice: a private project's code is scanned by Semgrep's engine, with the core's own
   rules" (#546): ast-grep, Opengrep and a score more weighed there; the rules are the core's since no maintained set
   carries a licence the floor allows. *Bugs:* 0. **Keep:** the engine is a maintained tool already; the rules and the

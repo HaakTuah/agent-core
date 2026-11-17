@@ -1,22 +1,25 @@
 // The scan of a private project's code (#546; CHOICES.md, "Choice: a private project's code is scanned by Semgrep's
 // engine, with the core's own rules"): where the host's CodeQL does not scan the project, which it does only where a
 // workflow calls the core's codeql.yml, Semgrep's engine reads the files a pull request changes with the core's own
-// rules (code-scan.yml beside this file) and fails a finding on a line the pull request adds, saying its mend; what it
-// finds on a line that stood before is reported and passes (the core's AGENTS.md, "Nothing locks a project"). A finding
-// the pull request's description lists on a line "Scan false alarm: `<path>:<line>`, <why>" passes, said so, for its
-// security review to confirm, as floor rule 9 says of CodeQL's false alarms. With no base, as on a push to main, it reads
-// every tracked file of the kinds it reads and reports what it finds.
+// rules (code-scan.yml beside this file) and fails a finding the pull request's base did not hold, saying its mend: the
+// base's own versions of those files are scanned too, so input the change brings to a sink whose line it leaves as it
+// was counts as the change's. A finding the base held is reported and passes (the core's AGENTS.md, "Nothing locks a
+// project"). Whether a workflow calls codeql.yml is read from the base's workflows, parsed, so a change cannot switch
+// the scan off. A finding the pull request's description lists on a line "Scan false alarm: `<path>:<line>`, <why>"
+// passes, said so, for its security review to confirm, as floor rule 9 says of CodeQL's false alarms. With no base, as
+// on a push to main, it reads every tracked file of the kinds it reads and reports what it finds.
 //   The engine is a tool that only runs, fetched at set-up and never while the check runs (#534, point 5): `--fetch`
 // takes `semgrep-core` and the libraries beside it from the wheel of Semgrep 1.185.0 on PyPI built for this system,
-// checked by the wheel's SHA-256 here, out of a folder outside the repository, and puts it there under the name
+// checked by the wheel's SHA-256 here, into a folder outside the repository, and puts it there under the name
 // `osemgrep` too, the name by which it runs as a whole command with no Python. Nothing of the wheel runs before its
 // digest is checked, and no install script runs at all. Where this system has no build (an Intel Mac, Windows on arm64)
 // or the fetch fails, it says so and exits 0; where the engine is not in its folder, the scan says that it did not run
 // and why, and decides nothing (#459). The engine runs with no variable but those a program needs to start and a home
-// and temporary folder of its own, so no token reaches it, and with its metrics off; a comment in the code that would silence a finding (`nosemgrep`) silences none, and the
-// files are named to it, so no ignore file of the project's leaves one out. It reads JavaScript and TypeScript,
-// C# and Python; a file that is a link, or leads out of the project, is not read, nor the core's copy, whose code the
-// host's CodeQL scans in the core's own public repository. Node's own modules, git, and the engine.
+// and temporary folder of its own, so no token reaches it, and with its metrics off; a comment in the code that would
+// silence a finding (`nosemgrep`) silences none, and the files are named to it, so no ignore file of the project's
+// leaves one out. It reads JavaScript and TypeScript, C# and Python; a file that is a link, or leads out of the
+// project, is not read, nor the core's copy, whose code the host's CodeQL scans in the core's own public repository.
+// Node's own modules, git, and the engine.
 //
 //   node core/scripts/code-scan.mjs --fetch [--engine <folder>]     at set-up: a cloud session's, a job's
 //   node core/scripts/code-scan.mjs [--base <commit>] [--description <file>] [--engine <folder>]
@@ -32,6 +35,7 @@ import { copyOf } from "./core-path.mjs";
 import { leadsOut, logged } from "./guards.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
+import { parseYaml } from "./workflow-run.mjs";
 import { zipEntries, zipRead } from "./zip.mjs";
 
 export const VERSION = "1.185.0";
@@ -94,8 +98,8 @@ export function place(files, dir, sys = process.platform) {
 }
 
 /** Fetches the engine into `dir` at set-up; always resolves, to the line it prints. */
-export async function fetchEngine(dir, { sys = system(), get = fetch, root = process.cwd() } = {}) {
-  if (hostScans(root)) return `semgrep ${VERSION}: not fetched: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project`;
+export async function fetchEngine(dir, { sys = system(), get = fetch, root = process.cwd(), base = null } = {}) {
+  if (hostScans(root, base)) return `semgrep ${VERSION}: not fetched: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project`;
   const wheel = WHEELS[sys];
   if (!wheel) return `NOT FETCHED: Semgrep ${VERSION}: no build of its engine for ${sys}; the code scan will say it did not run here`;
   if (ran(dir)) return `semgrep ${VERSION}: present in ${dir}`;
@@ -131,14 +135,22 @@ function ran(dir) {
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 }
 
-/** Whether a workflow of the project calls the core's codeql.yml, so that the host's CodeQL scans it. */
-export function hostScans(root) {
+/** Whether a workflow of the project calls the core's codeql.yml, so that the host's CodeQL scans it: read from `base`
+ *  where one is given, a commit the change cannot edit, else from the work tree; each workflow parsed, and only a
+ *  job's `uses:` counted, so no text elsewhere in a workflow counts as a call. */
+export function hostScans(root, base = null) {
+  const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 1 << 24, stdio: ["ignore", "pipe", "ignore"] });
   const dir = path.join(root, ".github", "workflows");
-  let names = [];
-  try { names = fs.readdirSync(dir).filter(n => /\.ya?ml$/u.test(n)); } catch { return false; }
-  return names.some(n => {
-    try { return /^\s*uses:\s*["']?[^\s"'#]*\/\.github\/workflows\/codeql\.yml@/mu.test(fs.readFileSync(path.join(dir, n), "utf8")); }
-    catch { return false; }
+  let texts;
+  try {
+    texts = base
+      ? git("ls-tree", "-z", "--name-only", `${base}:.github/workflows`).split("\0").filter(n => /\.ya?ml$/u.test(n)).map(n => git("show", `${base}:.github/workflows/${n}`))
+      : fs.readdirSync(dir).filter(n => /\.ya?ml$/u.test(n)).map(n => fs.readFileSync(path.join(dir, n), "utf8"));
+  } catch { return false; }
+  return texts.some(text => {
+    let jobs;
+    try { jobs = parseYaml(text)?.jobs; } catch { return false; }
+    return Object.values(jobs ?? {}).some(j => typeof j?.uses === "string" && /^[^@\s]*\/\.github\/workflows\/codeql\.yml@/u.test(j.uses));
   });
 }
 
@@ -187,32 +199,69 @@ export function runEngine(dir, root, files) {
         { cwd: root, encoding: "utf8", env: engineEnv(home), maxBuffer: 1 << 28, timeout: 600000 });
       let out;
       try { out = JSON.parse(r.stdout); } catch { return { failed: `the engine gave no answer it could read (exit ${r.status ?? r.signal ?? r.error?.code}): ${logged(String(r.stderr ?? "").trim().split("\n").pop() ?? "")}` }; }
-      for (const f of out.results ?? []) findings.push({ file: String(f.path).replace(/\\/gu, "/").replace(/^\.\//u, ""), line: f.start?.line, rule: String(f.check_id).split(".").pop(), message: f.extra?.message ?? "" });
+      for (const f of out.results ?? []) findings.push({ file: String(f.path).replace(/\\/gu, "/").replace(/^\.\//u, ""), line: f.start?.line, end: f.end?.line, rule: String(f.check_id).split(".").pop(), message: f.extra?.message ?? "" });
       for (const e of out.errors ?? []) errors.push(e.message ?? e.type ?? "an error");
     }
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
   return { findings, errors };
 }
 
+/** A finding's key: its file, its rule and the code it points at, its spaces made one, so that the same finding is
+ *  known at the base and at the head wherever its lines moved. */
+function keyOf(root, f, texts) {
+  if (!texts.has(f.file)) { try { texts.set(f.file, fs.readFileSync(path.join(root, f.file), "utf8").split(/\r?\n/u)); } catch { texts.set(f.file, []); } }
+  const code = texts.get(f.file).slice(f.line - 1, Math.max(f.line, f.end ?? f.line)).join(" ").replace(/\s+/gu, " ").trim();
+  return `${f.file}\0${f.rule}\0${code}`;
+}
+
+/** What stood at the base: of the files given that the base held, the engine's findings there, a count for each key;
+ *  null where the engine could not read them. Each is read from git's object, never from the work tree. */
+function stoodAt(dir, root, base, files) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-base-"));
+  try {
+    const held = files.filter(f => {
+      let bytes;
+      try { bytes = execFileSync("git", ["cat-file", "blob", `${base}:${f}`], { cwd: root, maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }); } catch { return false; }
+      fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true });
+      fs.writeFileSync(path.join(tmp, f), bytes);
+      return true;
+    });
+    const got = held.length ? runEngine(dir, tmp, held) : { findings: [] };
+    if (got.failed) return null;
+    const counts = new Map(), texts = new Map();
+    for (const f of got.findings) { const k = keyOf(tmp, f, texts); counts.set(k, (counts.get(k) ?? 0) + 1); }
+    return counts;
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+/** Each finding's verdict: a line to print, or a failure. With a base, a finding stood where the base held one of the
+ *  same key, those on lines the change does not add taking them first; any other is the change's own, and fails unless
+ *  the description lists it as a false alarm. */
+function verdicts(findings, { root, base, stood, added, explained }) {
+  const lines = [], fails = [], texts = new Map(), left = new Map(stood ?? []);
+  const isAdded = f => (added.get(f.file)?.has(f.line) ? 1 : 0);
+  for (const f of [...findings].sort((a, b) => isAdded(a) - isAdded(b))) {
+    const at = `${logged(f.file)}:${f.line}`, what = `${logged(f.message)} (${logged(f.rule)})`, key = keyOf(root, f, texts);
+    if (!base) { lines.push(`- reported: ${at}: ${what}, with no base to read a change against`); continue; }
+    if ((left.get(key) ?? 0) > 0) { left.set(key, left.get(key) - 1); lines.push(`- reported, not failed: ${at}: ${what}, which stood before this change`); continue; }
+    if (explained.has(`${f.file}:${f.line}`)) { lines.push(`- passed: ${at}: ${what}, listed in the description as a false alarm, for the security review to confirm`); continue; }
+    fails.push(`FAIL: ${at}: ${what}, which this change brings (the base held no such finding). ${MEND}change the code so that no input reaches it (a fixed command or its arguments as a list, SQL with parameters, a path checked to stay inside its folder, no eval, no BinaryFormatter or pickle on what comes in); or, where it is a false alarm, add to the pull request's description a line "Scan false alarm: \`${at}\`, <why>" for its security review to confirm (floor rule 9)`);
+  }
+  return { lines, fails };
+}
+
 /** The scan: { lines, failed }, each line to print. */
 export function scan(root, { base = null, description = "", dir = engineAt() } = {}) {
-  if (hostScans(root)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
+  if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
   if (!fs.existsSync(path.join(dir, `osemgrep${exe()}`))) {
     return { lines: [`code scan: did not run: Semgrep's engine is not in ${dir} (fetched at set-up by \`node <the core's copy>/scripts/code-scan.mjs --fetch\`, or no build of it for ${system()}); it decides nothing`], failed: false };
   }
   const files = targets(root, base);
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
-  const got = runEngine(dir, root, files);
-  if (got.failed) return { lines: [`code scan: did not run: ${got.failed}; it decides nothing`], failed: false };
-  const added = base ? addedLines(root, base, files) : new Map(), explained = falseAlarms(description);
-  const lines = [], fails = [];
-  for (const f of got.findings) {
-    const at = `${logged(f.file)}:${f.line}`, what = `${logged(f.message)} (${logged(f.rule)})`;
-    if (!base) lines.push(`- reported: ${at}: ${what}, with no base to read a change against`);
-    else if (!added.get(f.file)?.has(f.line)) lines.push(`- reported, not failed: ${at}: ${what}, on a line that stood before this change`);
-    else if (explained.has(`${f.file}:${f.line}`)) lines.push(`- passed: ${at}: ${what}, listed in the description as a false alarm, for the security review to confirm`);
-    else fails.push(`FAIL: ${at}: ${what}, on a line this change adds. ${MEND}change the code so that no input reaches it (a fixed command or its arguments as a list, SQL with parameters, a path checked to stay inside its folder, no eval, no BinaryFormatter or pickle on what comes in); or, where it is a false alarm, add to the pull request's description a line "Scan false alarm: \`${at}\`, <why>" for its security review to confirm (floor rule 9)`);
-  }
+  const got = runEngine(dir, root, files), stood = base && !got.failed ? stoodAt(dir, root, base, files) : null;
+  const failed = got.failed ?? (base && !stood ? "the engine could not read the base's files" : null);
+  if (failed) return { lines: [`code scan: did not run: ${failed}; it decides nothing`], failed: false };
+  const { lines, fails } = verdicts(got.findings, { root, base, stood, added: base ? addedLines(root, base, files) : new Map(), explained: falseAlarms(description) });
   for (const e of got.errors) lines.push(`- the engine could not read part of it: ${logged(e)}`);
   lines.unshift(`code scan: Semgrep ${VERSION}, the core's rules, ${files.length} file(s) ${base ? "the change adds or alters" : "tracked"}: ${got.findings.length} finding(s), ${fails.length} failing`);
   return { lines: [...lines, ...fails], failed: fails.length > 0 };
@@ -223,7 +272,7 @@ if (started(import.meta.url)) {
   const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
   const dir = engineAt(opt("--engine"));
   if (args.includes("--fetch")) {
-    console.log(await fetchEngine(dir));
+    console.log(await fetchEngine(dir, { base: opt("--base") || null }));
   } else {
     const file = opt("--description");
     const description = file ? fs.readFileSync(file, "utf8") : process.env.PR_BODY ?? "";
