@@ -227,11 +227,11 @@ try {
   const own = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json");
   let missed = notDone(tmp, step);
-  ok(missed.length === 1 && /runs `node core\/scripts\/lookup\.mjs` with the same config, for each/u.test(missed[0].mend) && !/`--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /for each config `core\/scripts\/exact-versions\.mjs` is given, add a step that runs `node core\/scripts\/lookup\.mjs` with the same config,/u.test(missed[0].mend) && !/`--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
   own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget-fetch.mjs c.json", "node core/scripts/lookup.mjs c.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /with the same config and `--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
-  own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json");
+  own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json", "node core/scripts/nuget.mjs c.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `with both, a checkout of one commit is still reported, since the lookup would read no base (${missed.map((m) => m.mend)})`);
   writeFileSync(join(tmp, ".github/workflows/own.yml"), `${readFileSync(join(tmp, ".github/workflows/own.yml"), "utf8").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n")}`);
@@ -241,11 +241,11 @@ try {
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `a fetch depth in another job than the lookup's does not count (${missed.map((m) => m.mend)})`);
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: |\n          node core/scripts/exact-versions.mjs c.json\n          # node core/scripts/lookup.mjs c.json\n");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup in a shell comment runs nothing, and does not count (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /add a step that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup in a shell comment runs nothing, and does not count (${missed.map((m) => m.mend)})`);
   const nugetJob = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   nugetJob("dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /after only the checkout, `setup-` actions and the core's lookup, exact-versions and licence scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /with nothing before it in its job but the checkout, `setup-` actions and the core's lookup, exact-versions, licence and agent-tools scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and before it, it does");
   nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/lookup.mjs c.json", "node core/scripts/nuget.mjs c.json");
@@ -279,6 +279,21 @@ try {
   }
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: ./tools/node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor a lookup run by a node of the project's");
+  for (const [what, extra] of [
+    ["LD_PRELOAD", "      - run: node core/scripts/licences.mjs c.json\n        env:\n          LD_PRELOAD: ./tools/hook.so\n"],
+    ["a bash function named node", "      - run: node core/scripts/licences.mjs c.json\n        env:\n          BASH_FUNC_node%%: \"() { ./build.sh; }\"\n"],
+    ["a variable its words do not name", "      - run: node core/scripts/licences.mjs c.json\n        env:\n          HOOK: ./build.sh\n"],
+    ["a script of the core's from another folder", "      - run: node core/scripts/licences.mjs c.json\n        working-directory: tools\n"],
+  ]) {
+    lic(extra);
+    ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with ${what} does not count`);
+  }
+  for (const [what, line, dir] of [["a lookup script the pull request holds", "node tools/core/scripts/lookup.mjs c.json --nuget"], ["a lookup run from another folder", "node core/scripts/lookup.mjs ../c.json --nuget", "tools"]]) {
+    writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: ${line}\n${dir ? `        working-directory: ${dir}\n` : ""}      - run: node core/scripts/nuget.mjs c.json\n`);
+    ok(notDone(tmp, step).length === 1, `${what} counts for none`);
+  }
+  nugetJob("npm run build", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
+  ok(notDone(tmp, step).length === 1, "an npm lookup after a step that runs the project's own files counts for none");
   lic("      - run: node core/scripts/licences.mjs c.json\n");
   ok(notDone(tmp, step).length === 0, "and after the licence script alone, it does");
   nugetJob("echo PATH=./tools >> \"$GITHUB_PATH\"", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
@@ -293,7 +308,7 @@ try {
   for (const [what, line] of [["named by an echo", "echo core/scripts/lookup.mjs c.json"], ["allowed to fail", "node core/scripts/lookup.mjs c.json || true"]]) {
     nugetJob("node core/scripts/exact-versions.mjs c.json", line);
     missed = notDone(tmp, step);
-    ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup ${what} does not count (${missed.map((m) => m.mend)})`);
+    ok(missed.length === 1 && /add a step that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup ${what} does not count (${missed.map((m) => m.mend)})`);
   }
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor one in a workflow no pull request starts");
@@ -320,7 +335,7 @@ try {
   ok(notDone(tmp, step).length === 0, "and one under bash on Windows counts");
   nugetJob("node core/scripts/exact-versions.mjs checks/frontend.json", "node core/scripts/exact-versions.mjs checks/backend.json", "node core/scripts/lookup.mjs checks/frontend.json");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /with the same config, for each config/u.test(missed[0].mend), `a lookup of one config does not stand for another config's check (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /for each config `core\/scripts\/exact-versions\.mjs` is given/u.test(missed[0].mend), `a lookup of one config does not stand for another config's check (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/exact-versions.mjs checks/frontend.json", "node core/scripts/exact-versions.mjs checks/backend.json", "node core/scripts/lookup.mjs checks/frontend.json", "node core/scripts/lookup.mjs checks/backend.json");
   ok(notDone(tmp, step).length === 0, "and with a lookup of each, the step is done");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  front:\n    runs-on: ubuntu-latest\n    env:\n      CONFIG: checks/frontend.json\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs \"$CONFIG\"\n      - run: node core/scripts/lookup.mjs \"$CONFIG\"\n  back:\n    runs-on: ubuntu-latest\n    env:\n      CONFIG: checks/backend.json\n    steps:\n      - run: node core/scripts/exact-versions.mjs \"$CONFIG\"\n");
@@ -336,7 +351,7 @@ try {
   const usesAction = () => writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: ./.github/actions/packages\n");
   action("node core/scripts/exact-versions.mjs c.json"); usesAction();
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs`/u.test(missed[0].mend), `a check run from a local action, with no lookup, is not done (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /add a step that runs `node core\/scripts\/lookup\.mjs`/u.test(missed[0].mend), `a check run from a local action, with no lookup, is not done (${missed.map((m) => m.mend)})`);
   action("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and with the lookup beside it there, it is");
   action("dotnet restore --locked-mode", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
@@ -388,8 +403,10 @@ try {
   const dirs = (...pairs) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${pairs.map(([d, l]) => `      - run: ${l}\n        working-directory: ${d}\n`).join("")}`);
   dirs(["frontend", "node ../core/scripts/exact-versions.mjs licences.json"], ["backend", "node ../core/scripts/exact-versions.mjs licences.json"], ["frontend", "node ../core/scripts/lookup.mjs licences.json"]);
   ok(notDone(tmp, step).length === 1, "a lookup run in one folder does not stand for a check of the same name in another");
-  dirs(["frontend", "node ../core/scripts/exact-versions.mjs licences.json"], ["backend", "node ../core/scripts/exact-versions.mjs licences.json"], ["frontend", "node ../core/scripts/lookup.mjs licences.json"], ["backend", "node ../core/scripts/lookup.mjs licences.json"]);
-  ok(notDone(tmp, step).length === 0, "and with a lookup in each, the step is done");
+  dirs(["frontend", "node ../core/scripts/exact-versions.mjs licences.json"], ["backend", "node ../core/scripts/exact-versions.mjs licences.json"], [".", "node core/scripts/lookup.mjs frontend/licences.json"], [".", "node core/scripts/lookup.mjs backend/licences.json"]);
+  ok(notDone(tmp, step).length === 1, "a lookup run from another folder than the root counts for none, though a check may run there");
+  dirs([".", "node core/scripts/lookup.mjs frontend/licences.json"], [".", "node core/scripts/lookup.mjs backend/licences.json"], ["frontend", "node ../core/scripts/exact-versions.mjs licences.json"], ["backend", "node ../core/scripts/exact-versions.mjs licences.json"]);
+  ok(notDone(tmp, step).length === 0, "and with a lookup of each folder's config from the root, before them, the step is done");
   nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json # waits & sees");
   ok(notDone(tmp, step).length === 0, "an ampersand in a comment does not send the lookup to the background");
 } finally { rmSync(tmp, { recursive: true, force: true }); }

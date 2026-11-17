@@ -272,8 +272,7 @@ export const STAGES = {
     // (a project that runs the exact-versions and NuGet checks from a workflow of its own, without either lookup; its
     // workflow runs no licence or agent-tools script, whose own steps a workflow running them beside these would answer)
     stage: dir => write(dir, ".github/workflows/packages-own.yml", "name: packages-own\n\non:\n  pull_request:\n\njobs:\n  packages:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/exact-versions.mjs checks/licences.json\n      - run: node core/scripts/nuget.mjs checks/licences.json --packages packages\n"),
-    mend: dir => write(dir, ".github/workflows/packages-own.yml", read(dir, ".github/workflows/packages-own.yml").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs checks/licences.json --nuget\n")
-      + "      - run: node core/scripts/lookup.mjs checks/licences.json\n"),
+    mend: dir => write(dir, ".github/workflows/packages-own.yml", read(dir, ".github/workflows/packages-own.yml").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs checks/licences.json --nuget\n      - run: node core/scripts/lookup.mjs checks/licences.json\n")),
   },
   "17 November 2026, the checks as one job": {
     // (the call to core.yml folds the description check and leaves the copies checks out, their own call taken out too;

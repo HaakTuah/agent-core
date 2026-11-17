@@ -470,14 +470,17 @@ function folderOf(st, job, w) {
   return typeof dir === "string" ? dir : undefined;
 }
 // Whether a step may run more than its words show: a command run inside another's words or an expansion bash may
-// evaluate (anything but a plain ${NAME}), a shell of the step's own, or an env that has bash or Node load a file first
-// or finds programs elsewhere (BASH_ENV, ENV, PATH, any NODE_*), the step's, its job's or its workflow's.
-const LOADS = /^(?:BASH_ENV|ENV|PATH|NODE_\w*)$/iu;
-const hides = (st, env, job, w) => /\$\(|`|<\(|>\(|\$\{(?![A-Za-z_]\w*\})/u.test(typeof st?.run === "string" ? st.run : "")
-  || !/^(?:bash|sh)?$/u.test(String(st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell ?? "").trim())
-  || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && Object.keys(e).some(k => LOADS.test(k)));
-// Whether a step's run writes what later steps run with ($GITHUB_ENV, $GITHUB_PATH).
-const exports = st => typeof st?.run === "string" && /GITHUB_(?:ENV|PATH)/u.test(st.run);
+// evaluate (anything but a plain ${NAME}), a shell of the step's own, or any variable in its env, its job's or its
+// workflow's, that its own words do not name, or that bash, Node or the system's loader reads (an allow-list: only
+// what the step's command is given by name, such as the config's path).
+const READ_BY_RUNNERS = /^(?:LD_|BASH|ENV$|PATH$|NODE_|SHELLOPTS$|PS4$|IFS$|CDPATH$|GLOBIGNORE$|TMPDIR$)/iu;
+const named = (text, key) => new RegExp(`\\$\\{?${key}\\b|%${key}%`, "u").test(text);
+const hides = (st, env, job, w) => {
+  const text = typeof st?.run === "string" ? st.run : "";
+  return /\$\(|`|<\(|>\(|\$\{(?![A-Za-z_]\w*\})/u.test(text)
+    || !/^(?:bash|sh)?$/u.test(String(st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell ?? "").trim())
+    || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && Object.keys(e).some(k => !/^[A-Za-z_]\w*$/u.test(k) || READ_BY_RUNNERS.test(k) || !named(text, k)));
+};
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -486,7 +489,7 @@ function stepOf(st, job, w, started) {
   const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
-  return { cmds, counts, hidden: hides(st, env, job, w), exports: exports(st), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, hidden: hides(st, env, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -504,8 +507,6 @@ function jobsOf(w, read = () => null) {
   return jobs.map(job => {
     const unread = [];
     const steps = inlined(Array.isArray(job?.steps) ? job.steps : [], read, unread, budget).map(st => stepOf(st, job, w, started));
-    // (a step after one that writes to $GITHUB_ENV or $GITHUB_PATH runs with what that one chose)
-    steps.reduce((seen, st) => { st.tainted = seen; return seen || st.exports; }, false);
     return { runs: steps.flatMap(st => st.cmds), steps, unread,
       deep: (job?.steps ?? []).some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
   });
@@ -514,29 +515,29 @@ function jobsOf(w, read = () => null) {
 const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAbsolute(cfg) ? path.posix.normalize(path.posix.join(dir, cfg)) : cfg);
 // Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
 // named by a variable is matched only where both steps give that variable the same value (or neither sets it), one
-// an action's input names, where its caller gave none, is matched by none, and a lookup that may run more than its
-// words show (hides), that runs a program named node other than the runner's own, or that runs after a step that writes
-// what later steps run with, counts for none.
-const lookupOf = (st, flag, copy, at) => {
-  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || st.hidden || st.tainted || !/^node(?:\.exe)?$/iu.test(st.cmds[0]?.[0]?.text ?? "")) return false;
+// an action's input names, where its caller gave none, is matched by none, and a lookup counts only where it is a step
+// that may stand before the lookup itself (beforeLookup: the runner's node running the copy's own script from the
+// project's root, nothing hidden), and every step before it in its job is one too, so nothing the pull request holds
+// has run before it.
+const lookupOf = (st, flag, copy, at, job) => {
+  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || !beforeLookup(st, copy)) return false;
+  const i = job.steps.indexOf(st);
+  if (i < 0 || !job.steps.slice(0, i).every(x => beforeLookup(x, copy))) return false;
   if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
-// Whether a step may stand before the NuGet lookup: checkout or a setup action, or a run, by `node`, of one of the
-// core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing run inside its words and no
-// NODE_OPTIONS. Anything else (dotnet under any spelling, a build script, make, a local action, a script of the core's
-// that restores or runs the project's tests) may run the pull request's build files, which could change what the
-// lookup reads: an allow-list, not a search for a build.
-const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs"];
+// Where a lookup stands, as the step's mend says it (beforeLookup).
+const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root with no env but what its own words name, so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
+// Whether a step may stand before a lookup: checkout or a setup action, or a run, by the runner's own `node`, from the
+// project's root, of one of the core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing
+// hidden (hides). Anything else (dotnet under any spelling, npm, a build script, make, a local action, a script of the
+// core's that restores or runs the project's tests) may run the pull request's own files, which could change what the
+// lookup reads or the lookup itself: an allow-list, not a search for a build.
+const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs"];
 const beforeLookup = (st, copy) => (st.uses ? /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
-  : !st.hidden && st.cmds.length > 0 && st.cmds.every(c => /(?:^|[\\/])node(?:\.exe)?$/iu.test(c[0]?.text ?? "") && c.length > 1
+  : !st.hidden && (st.dir === undefined || st.dir === ".") && st.cmds.length > 0 && st.cmds.every(c => c.length > 1
     && /^node(?:\.exe)?$/iu.test(c[0].text) && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
-// Whether a job runs the NuGet lookup of the check at `at`, counted, with every step before it one that may stand there.
-const lookedUpFirst = (job, copy, at) => {
-  const first = job.steps.findIndex(st => lookupOf(st, true, copy, at));
-  return first >= 0 && job.steps.slice(0, first).every(st => beforeLookup(st, copy));
-};
 // Whether a command names the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given
 // `flag`, with that flag (true) or without it (false).
 const running = (words, name, flag, copy = "core/") => words.some(w => new RegExp(`(?:^|/)${copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
@@ -748,16 +749,18 @@ export const STEPS = [
       // where it runs the NuGet check)
       const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
         const jobs = jobsOf(w, p.read), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
+        // (a workflow this reader cannot read as YAML, whose words name a package check, is said, never taken as done)
+        if (!w.yaml?.jobs && /(?:exact-versions|nuget|nuget-fetch)\.mjs/u.test(w.text ?? "")) return [`${at} cannot be read as YAML here, so where it runs its package checks and their lookups cannot be told: write it as plain YAML (quoted keys and values, no anchors)`];
         // (each config a check is given is matched by a lookup given the same config, since the lookup reads only the
         // lock files of the config it is given)
         // (a config named only when the workflow runs, "$CONFIG", may name another file in each job: there the lookup is
         // looked for in the check's own job alone)
         const configs = (...names) => jobs.flatMap(j => j.steps.flatMap(step => step.cmds.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [{ cfg: placed(configOf(c, n, copy), step.dir), job: j, step }] : [])))));
         const within = ({ cfg, job }) => (/[$%]/u.test(cfg ?? "") ? [job] : jobs);
-        const looked = (flag, at) => within(at).some(j => j.steps.some(st => lookupOf(st, flag, copy, at)));
+        const looked = (flag, at) => within(at).some(j => j.steps.some(st => lookupOf(st, flag, copy, at, j)));
         return [
-          configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
-          configs("nuget.mjs", "nuget-fetch.mjs").some(at => !within(at).some(j => lookedUpFirst(j, copy, at))) ? `in ${at}, after only the checkout, \`setup-\` actions and the core's lookup, exact-versions and licence scripts, run by \`node\` with nothing inside their words, so before anything that may run the pull request's build files (\`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`), which could change what the lookup reads, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
+          configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, for each config \`${copy}scripts/exact-versions.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config, ${FIRST(copy)}` : null,
+          configs("nuget.mjs", "nuget-fetch.mjs").some(at => !looked(true, at)) ? `in ${at}, for each config \`${copy}scripts/nuget.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, ${FIRST(copy)}` : null,
           jobs.some(j => !j.deep && j.steps.some(st => st.counts && looksUp(st.cmds[0], undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
           ...[...new Set(jobs.flatMap(j => j.unread))].map(f => `in ${at}, the local action \`${shown(f)}\` cannot be read whole (no YAML, or past ${INLINED_MOST} steps in all its actions call), so whether it runs a package check cannot be told: write it as YAML, its actions calling fewer`),
         ].filter(Boolean);
