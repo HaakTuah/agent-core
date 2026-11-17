@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { copiesConfig } from "./check-configs.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, callers, moved, project } from "./steps.mjs";
 
 const at = (dir, f) => path.join(dir, f);
@@ -23,6 +24,10 @@ const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses:
 // (a suite of the project's own whose path filter leaves the copy and the manifest out, as it was told, and not the
 // files that hold only calls to the core's workflows, whose pins a sync moves)
 const SUITE = "name: suites-staged\n\non:\n  pull_request:\n    paths-ignore:\n      - 'core/**'\n      - 'core-manifest.md'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo the suite\n";
+
+// (a rule file of an agent tool's, which the copies and pointer checks read since #405)
+const STAGED = ".agents/rules/staged.md";
+const copies = (dir, flag) => spawnSync(process.execPath, ["core/scripts/copies.mjs", copiesConfig(project(dir)), flag], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: "" } });
 
 // (a workflow of the project's own with a key twice in a step, which GitHub refuses)
 const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: read\n\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo a\n        if: github.event_name == 'push'\n        if: always()\n";
@@ -221,6 +226,40 @@ export const STAGES = {
       }
       const manifest = read(dir, "core-manifest.md"), want = /^Paths: .*$/m.exec(read(dir, "core/setup/template/core-manifest.md.tmpl"))[0];
       if (!/^Paths:.*\btasks\/.*\btools\//m.test(manifest)) write(dir, "core-manifest.md", manifest.replace(/^Paths: .*$/m, want));
+    },
+  },
+  "16 November 2026, the agent tools' files read for copies and pointers": {
+    asked: true,
+    // (a rule file of Antigravity's that repeats a line of AGENTS.md and points at a file that is not there; the mend,
+    // as the step words it, points it at one that is, then lists the copies with --tools, the starter kit's entry
+    // files' among them where the baseline was written before the check read them)
+    stage: dir => {
+      const line = read(dir, "AGENTS.md").split(/\r?\n/).filter(l => !/^[#@|]/.test(l) && !l.includes("](") && l.split(/\s+/).length >= 14).sort((a, b) => b.length - a.length)[0];
+      write(dir, STAGED, `# Staged\n\n${line}\n\nAs \`docs/staged-nowhere.md\` says.\n`);
+      spawnSync("git", ["add", STAGED], { cwd: dir });
+    },
+    after: dir => {
+      spawnSync("git", ["rm", "-q", "-f", "--cached", "--ignore-unmatch", STAGED], { cwd: dir });
+      fs.rmSync(at(dir, STAGED), { force: true });
+      copies(dir, "--write");
+    },
+    mend: dir => {
+      if (fs.existsSync(at(dir, STAGED))) {
+        write(dir, STAGED, read(dir, STAGED).replace("docs/staged-nowhere.md", "AGENTS.md"));
+        spawnSync("git", ["add", STAGED], { cwd: dir });
+      }
+      copies(dir, "--tools");
+    },
+  },
+  "16 November 2026, checks once a pull request is ready": {
+    // (the call to the copy check skips its job on a draft, its trigger left as it was; the mend, as the step words it,
+    // lists the trigger's types with ready_for_review)
+    stage: dir => write(dir, ".github/workflows/core.yml", read(dir, ".github/workflows/core.yml").replace(/, ready_for_review\]/, "]")
+      .replace(/^(jobs:\r?\n {2}[\w-]+:(\r?\n))(?! {4}if:)/m, (job, _, eol) => `${job}    if: \${{ !github.event.pull_request.draft }}${eol}`)),
+    mend: dir => {
+      const text = read(dir, ".github/workflows/core.yml");
+      write(dir, ".github/workflows/core.yml", /^ {4}types: \[/m.test(text) ? text.replace(/^( {4}types: \[[^\]\r\n]*)\]/m, "$1, ready_for_review]")
+        : text.replace(/^( {2}pull_request:(\r?\n))/m, (on, _, eol) => `${on}    types: [opened, reopened, synchronize, ready_for_review]${eol}`));
     },
   },
   "16 November 2026, a project in several repositories": {

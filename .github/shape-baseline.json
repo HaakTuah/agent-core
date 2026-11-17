@@ -63,11 +63,6 @@
       "depth": 0,
       "branches": 16
     },
-    "function: scripts/init.mjs#init": {
-      "lines": 59,
-      "depth": 2,
-      "branches": 19
-    },
     "function: scripts/labels.mjs#check": {
       "lines": 41,
       "depth": 0,
@@ -148,56 +143,6 @@
       "depth": 4,
       "branches": 81
     },
-    "function: scripts/nuget-fetch.mjs#fetchAll": {
-      "lines": 110,
-      "depth": 3,
-      "branches": 37
-    },
-    "function: scripts/nuget-fetch.mjs#one": {
-      "lines": 41,
-      "depth": 2,
-      "branches": 31
-    },
-    "function: scripts/nuget.mjs#check": {
-      "lines": 271,
-      "depth": 3,
-      "branches": 98
-    },
-    "function: scripts/nuget.mjs#imported": {
-      "lines": 64,
-      "depth": 4,
-      "branches": 43
-    },
-    "function: scripts/nuget.mjs#importsOf": {
-      "lines": 42,
-      "depth": 4,
-      "branches": 31
-    },
-    "function: scripts/nuget.mjs#judge": {
-      "lines": 47,
-      "depth": 3,
-      "branches": 32
-    },
-    "function: scripts/nuget.mjs#lockPackages": {
-      "lines": 27,
-      "depth": 3,
-      "branches": 22
-    },
-    "function: scripts/nuget.mjs#manifestLicence": {
-      "lines": 67,
-      "depth": 3,
-      "branches": 68
-    },
-    "function: scripts/nuget.mjs#plainText": {
-      "lines": 12,
-      "depth": 1,
-      "branches": 18
-    },
-    "function: scripts/nuget.mjs#projectRooted": {
-      "lines": 25,
-      "depth": 4,
-      "branches": 25
-    },
     "function: scripts/security-review.mjs#judge": {
       "lines": 45,
       "depth": 2,
@@ -212,11 +157,6 @@
       "lines": 35,
       "depth": 2,
       "branches": 24
-    },
-    "function: scripts/sync.mjs#sync": {
-      "lines": 85,
-      "depth": 3,
-      "branches": 35
     },
     "function: scripts/workflow-run.mjs#block": {
       "lines": 20,

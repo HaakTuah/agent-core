@@ -27,6 +27,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`) and the sync's steps
      (`scripts/steps.mjs`); hostile tests: `scripts/hostile-configs-test.mjs`.
+   - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
+     the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
+     `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); hostile tests: `scripts/copies-tools-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and
      agent-tools checks (`scripts/licences.mjs`, `scripts/exact-versions.mjs`, `scripts/nuget.mjs`,
      `scripts/workflows.mjs`, `scripts/agent-tools.mjs`); hostile tests: `scripts/hostile-build-files-test.mjs`.

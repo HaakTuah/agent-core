@@ -15,6 +15,7 @@
 //
 //   node core/scripts/steps.mjs          from a project's root: the steps not done, each with its mend; nothing else
 import { execFileSync, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,6 +25,7 @@ import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
+import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
@@ -31,7 +33,7 @@ import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
-import { Unread, call, calls, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
+import { Unread, call, calls, copiesConfig, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
@@ -141,6 +143,56 @@ function keysOnce(p) {
   return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
 }
 
+// Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
+// core, "Nothing locks a project": no old breach goes unlisted): each copy there in the copies check's baseline, which
+// `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
+// old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
+// holds and fails none; null where nothing is left to list.
+// Both checks read only the files git tracks, as the work tree holds them (a tracked link, what it leads to), and the
+// copies check its config and baseline besides: where none of those changed since the last reading in this process,
+// that reading's answer stands, so the two runs are made once for each state of the project (a sync reads it once; a
+// test, many times).
+const listedBefore = new Map();
+function toolFilesListed(p) {
+  const config = copiesConfig(p);
+  if (!p.safe(config)) throw new Unread(`the copies check's config \`${shown(config)}\` is no regular file of the project's own of at most ${READ_MOST} bytes`);
+  const git = args => execFileSync("git", args, { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28 });
+  let baseline = null;
+  try { baseline = JSON.parse(p.read(config) ?? "")?.baseline; } catch { /* (its own run says what of the config it cannot read) */ }
+  const index = git(["ls-files", "-s", "-z"]), state = crypto.createHash("sha256").update(index);
+  for (const f of [...git(["ls-files", "-m", "-z"]).split("\0").filter(Boolean), config, typeof baseline === "string" ? baseline : null]) if (f) state.update(`\0${f}\0${p.read(f) ?? ""}`);
+  // (what a tracked link leads to, a file git does not track among them, as the checks read it through the link: only
+  // where they would, a regular file of at most READ_MOST bytes inside the project; anything else, a device, a pipe, a
+  // folder or a file outside, is never opened, and counts as nothing)
+  for (const f of index.split("\0").filter(e => e.startsWith("120000 ")).map(e => e.slice(e.indexOf("\t") + 1))) {
+    const to = path.join(p.root, f);
+    let text = "";
+    try { if (!leadsOut(p.root, to)) { const stat = fs.statSync(to); if (stat.isFile() && stat.size <= READ_MOST) text = fs.readFileSync(to, "utf8"); } } catch { /* (a link to nothing) */ }
+    state.update(`\0${f}\0${text}`);
+  }
+  const key = `${p.root}\0${state.digest("hex")}`;
+  if (!listedBefore.has(key)) listedBefore.set(key, toolFilesRead(p, config));
+  return listedBefore.get(key);
+}
+function toolFilesRead(p, config) {
+  const run = (script, args, env) => {
+    const at = path.join(p.root, corePath(p.root) || "core/", "scripts", script);
+    if (!fs.existsSync(at)) throw new Unread(`no copy of ${script} to run`);
+    const r = spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, ...env } });
+    return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
+  };
+  // (a run that never reached its verdict read nothing: reported as not read, never as done)
+  const copies = run("copies.mjs", [config], { COPIES_BASE: "" });
+  if (copies.error || !(/^ok {3}no new copies/m.test(copies.out) || /^FAIL: (a new copy|.* lists \d+ windows that are gone)/m.test(copies.err))) throw new Unread(`the copies check did not run to its verdict on ${shown(config)}`);
+  const pointers = run("pointers.mjs", [], { POINTERS_BASE: "" });
+  if (pointers.error || !(/^ok {3}\d+ pointers/m.test(pointers.out) || /^FAIL: a broken pointer: /m.test(pointers.err))) throw new Unread("the pointer check did not run to its verdict");
+  const asks = [];
+  if (/^note an old copy in an agent tool's file, not yet in the baseline: /m.test(copies.out)) asks.push(`run \`node core/scripts/copies.mjs ${shown(config)} --tools\`, which lists in the copies check's baseline each copy an agent tool's files held before the check read them, and commit the baseline`);
+  const broken = [...pointers.out.matchAll(/^note a broken pointer in an agent tool's file: (.*?) \(with no base to read against/gm)].map(m => shown(m[1]));
+  if (broken.length) asks.push(`point each pointer in an agent tool's file that leads nowhere at the file, heading or numbered point that holds what it means, or take it out where that is gone: ${broken.join("; ")}`);
+  return asks.length ? `In a pull request of its own, ${asks.join("; and, in another, ")}. Until then what the pull request's base held there is noted, never failed.` : null;
+}
+
 // The project's tracked test files, as the shape check's config names them, else as the starter kit's does, so that a
 // config taken out leaves the tests counted; the copy of the core aside.
 function testsTracked(p) {
@@ -215,6 +267,22 @@ function nugetPathsHold(p) {
   // a name that holds a control character is named with "?" in its place, to be renamed)
   const asPattern = f => `'${f.replace(/[\\[\]*?!+]/g, c => `\\${c}`).replace(/'/g, "''")}'`.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029`]/gu, "?");
   return wrong.length ? `The \`paths:\` of a call to the NuGet check let through a change to every file a build of the project's reads, or the check starts on none of its changes: add each, by its exact path, to ${wrong.map(([f, missed]) => `\`.github/workflows/${f}\`: ${missed.map(asPattern).join(", ")}`).join("; ")} (a name shown with "?" holds a control character or a backtick: rename it).` : null;
+}
+
+// A call to one of the core's pull-request checks whose job is skipped on a draft runs on a pull request once it is
+// ready only where its trigger starts it when one is marked ready (#375): without that, the check a draft skipped never
+// runs on that head, and a ruleset counts the skip as passed. Each workflow where a call does so is named.
+function readyOnlyHolds(p) {
+  const checks = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget)\.yml@/i;
+  readable(p, text => checks.test(text));
+  // (the types a workflow's pull_request trigger lists, GitHub's own where it lists none or names the event alone, as
+  // `on: pull_request` or `on: [push, pull_request]`; null where it has no such trigger)
+  const types = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
+    : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
+  const wrong = Object.entries(p.workflows).filter(([, w]) => types(w.yaml?.on) !== null && !types(w.yaml.on).includes("ready_for_review")
+    && Object.values(w.yaml.jobs ?? {}).some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/`.toLowerCase()) && checks.test(job.uses)
+      && /\bpull_request\.draft\b/.test(String(job.if ?? ""))));
+  return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
 
 // Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
@@ -507,6 +575,9 @@ export const STEPS = [
   { lead: "16 November 2026, milestones named in order", cost: COST.line, unread: "which modules fit a project is a reading of what it builds, as of the modules a project takes; where the manifest's list neither takes `planning.md` nor leaves it out, `core/scripts/manifest-reads.mjs` reports it on every pull request, and the milestones themselves are the file's writer's next planning task" },
   { lead: "16 November 2026, corrections counted and the outcomes read", cost: COST.line,
     unread: "whether the repository holds a label is GitHub's, in no file: the labels check run at each sync reports the label `correction` missing, its mend `core/scripts/labels.mjs --make`; the cost line is held by the description check, and the bug form's line is a difference `core/scripts/fresh.mjs` lists" },
+  { lead: "16 November 2026, the agent tools' files read for copies and pointers", cost: COST.config, check: toolFilesListed },
+  { lead: "16 November 2026, checks once a pull request is ready", cost: COST.workflow, check: readyOnlyHolds,
+    partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the trigger and the condition a private project's calls lack" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
