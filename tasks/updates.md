@@ -14,9 +14,12 @@ them); the paths `.github/dependabot.yml` and `.node-version`. Its safety rules:
   or changes hands), written in the closed PR and an open issue.
 
 **Node** runs the core's scripts in every project.
-- CI and the cloud machines run the exact version in the core's `.node-version`: CI reads it, and a cloud setup runs
-  `scripts/node.sh`, which holds its checksums.
-- When a new Node becomes long-term support, both move to it, proven by the full suites.
+- CI runs the exact version in the core's `.node-version`, the pin; a cloud setup runs `scripts/node.sh`, which keeps
+  a machine's Node at or above the least long-term line in the core's `.node-least` and fetches the pin otherwise, by
+  the checksums it holds. The core's own suites run on both (#526).
+- When a new Node becomes long-term support, the pin moves to it, proven by the full suites; when the line in
+  `.node-least` leaves long-term support (Node 22 in April 2027), whoever takes the update moves it to the next
+  long-term line, proven by the suites on it.
 
 **CodeQL,** where the repository has it, checks every PR into `main`, every push to it and once a week; a finding is
 handled as floor rule 9 says.

@@ -12,7 +12,6 @@ it merges last.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #515, points 1 and 3 to 16 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
-| #526, path step 1 | rule builder | |
 | #527, step 2 | rule builder | #526 |
 | #528, step 3 | rule builder | #527, and #488's points 1, 3 and 4 |
 | #529, step 4 | builder | #528 |

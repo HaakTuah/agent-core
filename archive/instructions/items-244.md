@@ -76,3 +76,10 @@ The index, and how an item is written: `archive/instructions.md`.
      to the repository, read from its rights each run, rather than from a list of a team's owners kept beside them,
      which goes stale; a list named to the check stays for an account that is no owner. It stands behind who the
      `security-review` status counts.
+
+251. **17 November 2026**, #526, the first step of the path #519's judgment set out. The core's scripts promise to run
+     on the least long-term Node line as well as on the pin: a project's machine keeps its own Node where it is at or
+     above that line, or fetches the pin where it is below or has none, and the core's suites run on both, so that every
+     later step of the path stands on a Node a project's machine already holds while the checks keep one exact Node. It
+     stands behind "Node" in `tasks/updates.md`, `.node-least`, `scripts/node.sh` and the suites' matrix in
+     `.github/workflows/tests.yml`.
