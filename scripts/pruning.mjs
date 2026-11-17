@@ -18,7 +18,8 @@
 // in bold, and the merges on the first-parent line since) is "too early" and not judged; one that guards against rare
 // and severe harm, of the floor or with a number marked "; rare harm", is never listed for its check alone. Beside the list, under "in use", the citations of each rule in the span
 // (cited.mjs, beside this file), which say a rule is applied and never that it helps. It removes nothing: the owner
-// decides which go. The record is RECORD, written by --read and --record and committed in a pull request of its own.
+// decides which go. The record is RECORD, written by --read and --record into the pruning in progress (open()), which
+// --record ends, and committed in a pull request of its own.
 // The core's own repository alone. Git, gh and Node's own modules.
 //
 //   node scripts/pruning.mjs                               the list, from the record's newest pruning
@@ -27,10 +28,10 @@
 //                                                          system's temporary folder, from the core at HEAD with the
 //                                                          rules it holds taken out, and prints the brief
 //   node scripts/pruning.mjs --read <case> <dir>           once that session has ended: its verdict, written into
-//                                                          today's pruning
+//                                                          the pruning in progress
 //   node scripts/pruning.mjs --record --repo <owner/name> [--model <id>] [--owner <login>]
 //                                                          the counts of the span since the last pruning, read through
-//                                                          gh and written into today's pruning
+//                                                          gh and written into the pruning in progress, which ends it
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -44,9 +45,10 @@ export const EVERY = 2, EARLY = 20;
 // The outcomes' direct measures (outcomes.mjs; #302) that a count gives, whose counts a pruning records: a median's
 // measure gives only how many cases it read, not its value, so it is left out.
 export const DIRECT = MEASURES.filter(m => m.direct && !m.median);
-const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"). Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
+const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"), and \"recorded\" once its counts are written, which ends it. Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
 
-// The record: { prunings: [{ at, model, from, numbers, direct, corrections, fired, cited, without }] }, oldest first.
+// The record: { prunings: [{ at, model, from, numbers, direct, corrections, fired, cited, without, recorded }] }, oldest
+// first, `at` the day a pruning began; `recorded` once --record has written its counts, which ends it.
 export function readRecord(root = ROOT) {
   try { const r = JSON.parse(fs.readFileSync(path.join(root, RECORD), "utf8")); return Array.isArray(r.prunings) ? r : { prunings: [] }; } catch { return { prunings: [] }; }
 }
@@ -123,18 +125,20 @@ function standIn(key, n, p) {
 export const rare = (r, n) => r.file.startsWith("floor/") || / ?; rare harm$/u.test(String(n ?? ""));
 
 // The sign that no step that runs a check of the rule `r` (`checks`) failed on a pull request in the newest pruning's
-// span; null where one did, where a check is run by no step known, or for a rule that guards against rare harm.
-function silent(r, n, checks, steps, now) {
+// span; null where one did, or where a check is run by no step known.
+function silent(checks, steps, now) {
   const runs = checks.map(by => stepsOf(by, steps));
-  if (!now?.fired || rare(r, n) || !runs.length || runs.some(x => !x.length) || runs.flat().some(x => now.fired[x])) return null;
+  if (!now?.fired || !runs.length || runs.some(x => !x.length) || runs.flat().some(x => now.fired[x])) return null;
   return `its check never fired from ${now.from ?? "the start"} to ${now.at} (${[...new Set(runs.flat())].join("; ")})`;
 }
 
 // The signs that a rule may go, from the prunings `p` (oldest first, the newest last), its number `n` (or undefined),
 // its checks (scripts or workflows), the workflows' steps, and the staged cases that hold it.
+// A rule that guards against rare and severe harm is judged by its staged case alone (point 8): no count of its own,
+// which a quiet span leaves standing, lists it.
 function signsOf(r, { p, n, checks, steps, cases }) {
   const now = p.at(-1), passed = cases.filter(c => now.without?.[c.name]?.verdict === "pass").map(c => `its staged case ${c.name} passed without it`);
-  return [stood(r.key, n, p), standIn(r.key, n, p), silent(r, n, checks, steps, now), ...passed].filter(Boolean);
+  return [...(rare(r, n) ? [] : [stood(r.key, n, p), standIn(r.key, n, p), silent(checks, steps, now)]), ...passed].filter(Boolean);
 }
 
 // The list's closing lines: what was too early or could not be read, the citations "in use", and who decides.
@@ -201,10 +205,10 @@ export async function stepsAt(root = ROOT) {
 }
 const holdersAt = root => JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8"));
 
-// Today's pruning in the record, made where there is none.
-function today(record, model) {
-  const at = new Date().toISOString().slice(0, 10);
-  let p = record.prunings.find(x => x.at === at);
+// The pruning in progress: the newest whose counts are not yet recorded, made, dated today, where there is none; so a
+// pruning whose cases run past midnight stays one.
+export function open(record, model, at = new Date().toISOString().slice(0, 10)) {
+  let p = ordered(record).filter(x => !x.recorded).at(-1);
   if (!p) { p = { at, model: model ?? "not said" }; record.prunings.push(p); }
   if (model) p.model = model;
   return p;
@@ -224,11 +228,12 @@ async function findingsOf({ repo, from, to, owner, gh }) {
 }
 
 // The outcomes' direct measures and the corrections of each kind, from `from` to `to`, as outcomes-read.mjs reads
-// them within its budget: { direct: { key: count }, corrections: { kind: count } }; each null where it ran out.
+// them: { direct: { key: count }, corrections: { kind: count } }. Read whole, with no budget: the look's job has one
+// for its five minutes, and a reading it cuts short would count what it left unread as none; a pruning runs once in
+// two months, in a session.
 async function outcomesOf({ repo, from, to, owner, gh }) {
   const { read } = await import("./outcomes-read.mjs"), w = { from: Date.parse(from), to: Date.parse(to) };
-  let data;
-  try { data = read(repo, w.from, w.to, owner, gh); } catch (e) { if (e instanceof RangeError) return { direct: null, corrections: null }; throw e; }
+  const data = read(repo, w.from, w.to, owner, gh, { calls: Infinity, ms: Infinity });
   const corrections = Object.fromEntries(KINDS.map(k => [k, data.corrections.filter(c => c.kind === k && Date.parse(c.at) >= w.from && Date.parse(c.at) < w.to).length]));
   return { direct: Object.fromEntries(DIRECT.map(m => [m.key, m.of(data, w).n])), corrections };
 }
@@ -316,7 +321,7 @@ async function readCmd(argv, get) {
   if (meta.case !== got.c.name || Object.values(meta.rules ?? {}).some(f => f !== null)) return fail(`${got.dir} was not set for ${got.c.name} with its rules taken out. Mend: set it with \`node scripts/pruning.mjs --set ${got.c.name} <a new folder>\`, and run it again`);
   let v;
   try { v = got.c.read(fs.realpathSync(got.dir)); } catch (e) { if (!(e instanceof Unreadable)) throw e; v = { pass: false, why: `its repositories could not be read: ${e.message}` }; }
-  const record = readRecord(), p = today(record, get("--model"));
+  const record = readRecord(), p = open(record, get("--model"));
   (p.without ??= {})[got.c.name] = { verdict: v.pass ? "pass" : "fail", why: unplaced(v.why) };
   writeRecord(record);
   console.log(`${got.c.name}, without its rules: ${v.pass ? "pass" : "fail"}: ${v.why}\nrecorded in ${RECORD}`);
@@ -327,13 +332,13 @@ async function recordCmd(get) {
   const repo = get("--repo");
   if (!/^[\w-]+\/[\w.-]+$/u.test(repo ?? "")) return fail("--record needs --repo <owner/name>. Mend: name the core's repository, as GitHub spells it");
   const { ghApi } = await import("./labels.mjs");
-  const record = readRecord(), last = ordered(record).filter(x => x.at < new Date().toISOString().slice(0, 10)).at(-1);
+  const record = readRecord(), last = ordered(record).filter(x => x.recorded).at(-1);
   const to = new Date().toISOString().replace(/\.\d{3}Z$/u, "Z"), from = last ? `${last.at}T00:00:00Z` : new Date(Date.now() - EVERY * 31 * 864e5).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let c;
   const h = holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
   try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(ROOT, { agents: true }), numbers: h.numbers ?? {}, stepsOfRule }); }
   catch (e) { return fail(`GitHub did not answer for ${repo}: ${String(e.message).split("\n")[0]}. Mend: run it where gh answers for the owner's account, or try again once GitHub does`); }
-  Object.assign(today(record, get("--model")), { from, ...c });
+  Object.assign(open(record, get("--model")), { from, ...c, recorded: true });
   writeRecord(record);
   console.log(`the counts from ${from} recorded in ${RECORD}`);
 }

@@ -298,7 +298,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   shows firing, whose case passed without them, or whose number, a stand-in, moved at two prunings while its outcome's
   direct measures did not. A rule fewer than twenty merged pull requests have come under since it joined is "too
   early" and not judged, and one that guards against rare and severe harm, the floor's and any whose number says so, is
-  never listed for a check that did not fire: its staged case judges it. Nothing changes it. The owner decides which
+  judged by its staged case alone, never listed for a check that did not fire. Nothing changes it. The owner decides which
   go, a few at a time, the numbers read again before more go; the list gives each rule its step: a rule read at a
   role's start is at step 1, to move to a module read on need, and one read on need at step 2, to go where nothing
   changed after its move, kept in the archive with its reason and its last number, and free to return. It does not mean that a session removes or moves a

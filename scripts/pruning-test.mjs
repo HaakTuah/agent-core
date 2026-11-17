@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { checksOf, DIRECT, due, generation, list, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
+import { checksOf, DIRECT, due, generation, list, open, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
 import { rulesOf } from "./rules.mjs";
 
 let failed = 0, count = 0;
@@ -77,6 +77,18 @@ ok(out.includes(`- In use: 2 of 12 rules cited in the span; the most cited: ${st
 ok(list({ all: [still], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40 })[0].startsWith("- No pruning is recorded yet")
   && list({ all: [moved], named, numbers, record: rec(p[2]), cases, steps, starts: new Set(), joined: () => 40 })[1] === "- Nothing listed: no rule shows a sign that it may go.",
   "with no pruning recorded there is nothing to list, and with no sign nothing is listed");
+
+const floorStood = R("floor/security.md", "2. Stood"), rec2 = rec({ at: "2026-09-01", numbers: { [floorStood.key]: 0, [marked.key]: 0 } }, { at: "2026-11-01", numbers: { [floorStood.key]: 0, [marked.key]: 0 }, without: { "f-case": { verdict: "pass" } } });
+const guarded = list({ all: [floorStood, marked], named, numbers: { [floorStood.key]: "check fires; outcome: robust", [marked.key]: "check fires; outcome: robust; rare harm" }, record: rec2, cases: [{ name: "f-case", holds: [floorStood.key] }], steps, starts: new Set(), joined: () => 40 });
+ok(guarded.some(l => l.startsWith(`- ${floorStood.key}: its staged case f-case passed without it.`)) && !guarded.some(l => l.startsWith(`- ${marked.key}:`)),
+  "a rule that guards against rare harm is judged by its staged case alone: a count that stood lists it not, a case that passed without it does");
+
+// ---- the pruning in progress ----
+const r = rec({ at: "2026-09-01", recorded: true });
+const first = open(r, "claude-opus-5-5", "2026-11-01"), again = open(r, null, "2026-11-02");
+ok(first === again && first.at === "2026-11-01" && r.prunings.length === 2 && first.model === "claude-opus-5-5", "the cases read on the next day go into the pruning in progress, not a new one");
+first.recorded = true;
+ok(open(r, null, "2026-11-02").at === "2026-11-02" && r.prunings.length === 3, "once its counts are recorded the pruning ends, and the next read begins another");
 
 // ---- run, a failure says its mend ----
 const run = (...a) => spawnSync(process.execPath, [fileURLToPath(new URL("./pruning.mjs", import.meta.url)), ...a], { encoding: "utf8" });
