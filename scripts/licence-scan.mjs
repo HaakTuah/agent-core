@@ -15,7 +15,11 @@
 //     with what it pulls in. A fetch it cannot read fails, but npm pack's, which runs nothing it fetches, and another
 //     fetcher's (curl, wget, pip, pnpm, yarn, bun, playwright install, git clone, dotnet tool install, choco, winget,
 //     PowerShell's Invoke-WebRequest and the like): each of those passes
-//     only in a file an entry's "files" names, that entry its hand audit;
+//     only in a file an entry's "files" names, that entry its hand audit; and where such a file downloads by address
+//     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
+//     of GitHub's or the owner's own work), each such entry names its version and the file holds, for each download,
+//     a checksum of its own and a command that checks by one (sha256sum, shasum, Get-FileHash and the like) (floor
+//     rule 7), a file that stood unpinned at the pull request's base reported;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
@@ -33,7 +37,7 @@ import { readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
-import { commandLines, commands, fetched, otherFetch } from "./licence-commands.mjs";
+import { commandLines, commands, downloads, fetched, otherFetch } from "./licence-commands.mjs";
 import { copyOf } from "./core-path.mjs";
 
 const OWN = `${OWNER}/`;
@@ -141,8 +145,8 @@ function linesIn(json, f, byHand, fail) {
 }
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
-export function scan(settings, root, entries, auditPath, lockfiles = []) {
-  const failures = [];
+export function scan(settings, root, entries, auditPath, lockfiles = [], base = null, baseAudit = null) {
+  const failures = [], reports = [];
   const fail = (m) => { if (!failures.includes(m)) failures.push(m); };
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
   const tracked = git("ls-files", "-z").split("\0").filter(Boolean);
@@ -150,19 +154,19 @@ export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
   // (what the scan's parts share: scanned, below)
-  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail };
+  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit };
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) entryFaults(c, e);
   c.locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
   for (const f of files) scanned(c, f);
-  return { failures, scanned: files.length };
+  return { failures, reports, scanned: files.length };
 }
 
 const holds = (p, f) => typeof p === "string" && (p === "" || p === f || (p.endsWith("/") && f.startsWith(p)));
 const under = (f, paths) => (paths ?? []).some((p) => holds(p, f));
 const served = (c, f) => under(f, c.settings.served) && !under(f, c.settings.tools);
-const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));
+export const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));
 const covering = (c, f) => c.entries.filter((e) => covers(e, f));
 const byHand = (c, f) => covering(c, f).some((e) => e.kind !== "own");
 const badFiles = (e) => e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p));
@@ -212,6 +216,70 @@ function fetches(c, text, f, literal = false) {
   if (other) c.fail(`${f}: ${other.trim()} fetches what no entry's "files" says. Mend: name ${f} in the "files" of the entry that audits it`);
 }
 
+// What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.
+const NO_PROGRAM = new Set(["own", "data", "asset", "font", "github-service"]);
+// A checksum written out: SHA-256 or SHA-512 as hex, or an integrity value as npm writes one; and the commands that
+// check a file against one, an allow-list: sha256sum, sha512sum and shasum, PowerShell's Get-FileHash, certutil's
+// -hashfile and Node's createHash.
+const CHECKSUM = /(?<![0-9a-f])(?:[0-9a-f]{64}){1,2}(?![0-9a-f])|sha(?:256|384|512)-[A-Za-z0-9+/]{43,}={0,2}/iu;
+const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:\.exe)?\s+-hashfile|createHash)(?![\w-])/giu;
+
+/** What the code `code` of the file `f` (codeOf) lacks for the programs it downloads by address to be pinned, or
+ *  null: of the audit's `entries` covering `f` that audit what may be a program, each names its version (`bare`, those
+ *  that do not), and for each download the file holds a checksum of its own and a check by a command of VERIFIER
+ *  (`deficit`, the downloads short of one). The scan and the sync's step (steps.mjs) read it alike. */
+export function pinFault(entries, auditPath, f, code) {
+  const tools = entries.filter((e) => e && typeof e === "object" && covers(e, f) && !NO_PROGRAM.has(e.kind)), count = downloads(code).length;
+  if (!tools.length || !count) return null;
+  const bare = tools.filter((e) => typeof e.version !== "string" || !e.version.trim()).map((e) => e.name);
+  // (which check a download meets is left to the review, since reading that needs a reader of the shell's data flow)
+  const sums = new Set([...code.matchAll(new RegExp(CHECKSUM.source, "giu"))].map((m) => m[0].toLowerCase()));
+  const checks = [...code.matchAll(VERIFIER)].length, deficit = Math.max(0, count - Math.min(sums.size, checks));
+  if (bare.length) return { bare, deficit, what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}` };
+  if (!deficit) return null;
+  return { bare, deficit, what: !sums.size ? `${f} holds no checksum to check it by` : !checks ? `${f} holds a checksum and no command that checks a file by it` : `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} and ${checks} check${checks === 1 ? "" : "s"} for ${count} downloads, so one is checked by none`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
+}
+
+/** Whether the scan reads the file `f`, holding `text` and no binary, for the commands it runs, and so for its pins:
+ *  code that runs, a script in a language it cannot read, and JSON but the audit and a lock file. */
+export const pinRead = (f, text, auditPath) => { const as = readAs({ binary: new Set() }, f, text); return as.runs || as.other || (/\.json[c5]?$/u.test(f) && f !== auditPath && !LOCKFILE.test(f)); };
+
+// A download's pin, in every file read for its commands that an entry audits by hand.
+function pinnedIfRead(c, f, text) {
+  if (!c.binary.has(f) && byHand(c, f) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
+}
+
+/** A program the file `f` downloads by its address is pinned by version and checksum (floor rule 7, as the core pins
+ *  Node): where it is not, a pull request that adds the download, or that makes the file lose its pin, fails; a file the
+ *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
+ *  project"). Read from the scan's own readers of fetches: what a package manager fetches by name is not read here. */
+// A file of the base, as text, or null where the base held none.
+const atBase = (c, path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
+// The audit's entries as the base held them, at the path the base's own config named it (a pull request may move it),
+// read once for the scan.
+function baseEntries(c) {
+  if (c.baseEntries === undefined) { try { const a = JSON.parse(atBase(c, c.baseAudit ?? c.auditPath) ?? "null"); c.baseEntries = Array.isArray(a?.entries) ? a.entries : []; } catch { c.baseEntries = []; } }
+  return c.baseEntries;
+}
+// Whether the base held the file `f` unpinned as much or more than `fault` says of `text`, read by the base's own audit,
+// by counts alone, an allow-list of what may stand: no more downloads, no entry newly with no version, no check fewer.
+// (A download's own words are not compared: telling one command from the next on a line needs a reader of the shell,
+// and an unpinned download whose address changes is the same debt, reported, never a larger one.)
+function heldAtBase(c, f, text, fault) {
+  const was = atBase(c, f);
+  const then = was === null ? null : pinFault(baseEntries(c), c.auditPath, f, codeOf(f, was));
+  return then !== null && downloads(text).length <= downloads(codeOf(f, was)).length && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n));
+}
+
+function pinned(c, f, text) {
+  const fault = pinFault(c.entries, c.auditPath, f, text);
+  if (!fault) return;
+  const held = !c.base || heldAtBase(c, f, text, fault);
+  const said = `${f}: it downloads what may be a program (${downloads(text)[0].replace(/\s+/gu, " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
+  if (held) c.reports.push(`${said}; it stood so ${c.base ? "at the pull request's base" : "with no base to read it against"}, so it passes: ${fault.mend}, as the sync's step asks`);
+  else c.fail(`${said}. Mend: ${fault.mend}`);
+}
+
 /** The scan of one tracked file `f` (scan, above): by what it is, and for a licence notice it carries. */
 function scanned(c, f) {
   if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) c.fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
@@ -220,6 +288,7 @@ function scanned(c, f) {
   if (runs) scanRunning(c, f, text);
   else if (/\.json[c5]?$/u.test(f) && f !== c.auditPath && !LOCKFILE.test(f)) scanJson(c, f, text);
   else if (other) scanOther(c, f);
+  pinnedIfRead(c, f, text);
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
@@ -237,11 +306,16 @@ function readAs(c, f, text) {
 }
 
 /** A file that runs (scanned, above): the actions a workflow uses, and what its commands fetch. */
-function scanRunning(c, f, text) {
-  // (a line that is only a comment fetches nothing; a comment after code stays, since a # or // in a string is none)
+/** The code of a file that runs, as the scan reads it: a page's parts that run, and no line that is only a comment
+ *  (a comment after code stays, since a # or // in a string is none). */
+export function codeOf(f, text) {
   const comment = JS.test(f) || WEB.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
   // (lines end as Windows writes them too, or a comment there would be read as code)
-  const src = (WEB.test(f) ? executable(text, f) : text).split(/\r?\n/u).map((l) => l.replace(comment, "")).join("\n");
+  return (WEB.test(f) ? executable(text, f) : text).split(/\r?\n/u).map((l) => l.replace(comment, "")).join("\n");
+}
+
+function scanRunning(c, f, text) {
+  const src = codeOf(f, text);
   if (YAML.test(f)) {
     for (const m of src.matchAll(/(?:^|[\s{,])['"]?uses['"]?\s*:\s*['"]?([^\s'",}]+)/gu)) {
       const used = m[1];

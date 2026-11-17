@@ -21,7 +21,9 @@
 // all rights reserved, as floor rule 10 ends), and "notice", its notice; "notices", the third-party notices file that
 // ships, where the project keeps one (every entry that ships, but the owner's own, is named in it; without one, each
 // such entry has its "notice", for the notices the project builds, as floor rule 10 asks); "ignoreScriptsIn", the
-// .npmrc files that must keep packages' own install scripts off (floor rule 15); and "scan", which folders reach users,
+// .npmrc files that must keep packages' own install scripts off (floor rule 15) and set the week's wait, which npm
+// reads as min-release-age=7 (floor rule 7: one that stood without it is reported, one a pull request adds or takes it
+// out of fails); and "scan", which folders reach users,
 // for the scan that nothing used is left out of the audit (licence-scan.mjs, beside this file, which says what it
 // finds). Every .npmrc in the project may hold only settings that leave where npm fetches from alone, since a data or
 // font package is known by its registry address. "accepted" holds what is off its list and the owner wants anyway,
@@ -254,13 +256,37 @@ export function shippedPaths(packages, workspaces, manifest) {
  * all, is listed, and `registryName` only vouches for what npm really fetches.
  */
 export function registryOverrides(npmrc) {
-  const harmless = /^((fund|audit|update-notifier|engine-strict|save-exact|progress|loglevel)\s*=\s*[\w.-]*|ignore-scripts\s*=\s*true)$/u;
+  const harmless = /^((fund|audit|update-notifier|engine-strict|save-exact|progress|loglevel)\s*=\s*[\w.-]*|ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d{1,5})$/u;
   return npmrc.split(/\r?\n/u).map((l) => l.trim()).filter((l) => l && !/^[#;]/u.test(l) && !harmless.test(l));
 }
 
 /** Whether an `.npmrc` keeps packages' own install scripts off (floor rule 15): `ignore-scripts=true`, never undone. */
 export function scriptsOff(npmrc) {
   return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
+}
+
+/** The week's wait an `.npmrc` sets (floor rule 7: a new release is taken once it is WAIT days old): the days its last
+ *  `min-release-age` line gives, which npm reads from version 11.10 on, or null where it gives none. */
+export function releaseAge(npmrc) {
+  const days = npmrc.split(/\r?\n/u).map((l) => /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1]).filter(Boolean).at(-1);
+  return days === undefined ? null : Number(days);
+}
+export const WAIT = 7;
+
+/** Each file of "ignoreScriptsIn" that sets no wait of WAIT days or more, as { failures, reports }: one that held the
+ *  wait at `base`, or that `base` did not hold, fails, and one that stood without it is reported, as with no base at all
+ *  (AGENTS.md, "Nothing locks a project": the sync's step asks the line). */
+function waitFaults(root, base, files) {
+  const failures = [], reports = [];
+  for (const f of files) {
+    const text = existsSync(join(root, f)) ? ownText(root, f) : "";
+    if ((releaseAge(text) ?? 0) >= WAIT) continue;
+    const was = base ? textAt(root, base, f) : null;
+    const said = `${f} does not set min-release-age=${WAIT}, so npm may take a release under a week old where a session adds or updates a package (floor rule 7)`;
+    if (base && (was === null || (releaseAge(was) ?? 0) >= WAIT)) failures.push(`${said}. Mend: add the line min-release-age=${WAIT} to ${f}`);
+    else reports.push(`${said}; it stood so ${base ? "at the pull request's base" : "with no base to read it against"}, so it passes: add the line min-release-age=${WAIT} to ${f}, as the sync's step asks`);
+  }
+  return { failures, reports };
 }
 
 /** A file of the project's own at `f`, from its root `root`, as text: one reached through a link that leads out of the
@@ -451,15 +477,21 @@ export function check(config, root, base = null, baseConfig = null) {
   for (const p of packages) checkPackage(ctx, p);
   const entries = config.audit ? checkAudit(ctx) : [];
   unneededYeses(ctx);
-  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? []) : undefined;
+  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then)) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
+  const wait = waitFaults(root, base, config.ignoreScriptsIn ?? []);
+  failures.push(...wait.failures);
   const all = [...new Set(failures)]; // (a package a lockfile holds twice fails once)
-  return { failures: all, reports, summary: summaryOf(ctx, packages, entries, scanned, all.length) };
+  const summary = summaryOf(ctx, packages, entries, scanned, all.length);
+  return { failures: all, reports: [...reports, ...wait.reports, ...(scanned?.reports ?? [])], summary };
 }
+
+// (the audit's path a config names, or null)
+const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
 function shrinkwrapFaults(root, lockfiles) {

@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node scripts/look-test.mjs
-import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, text, updating } from "./look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, text, TITLES, updating } from "./look.mjs";
 import { parse, signKey, tripped, trippedBody } from "./choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "./state-report.mjs";
 import fs from "node:fs";
@@ -154,6 +154,12 @@ fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), JSON.stringify({
 ok(copies(dir, "| *copies check* | `core/scripts/copies.mjs` with `checks/copies.json` |")?.count === 2 && copies(dir, "") === null && copies(dir, "| *copies check* | `x/none.json` |") === null,
   "the copies baseline is read where the manifest names its config, and is none where it names none or nothing stands there");
 fs.rmSync(dir, { recursive: true, force: true });
+
+// the packages gone stale (held.mjs --issue, #488, point 8): its body kept, none closing the issue, a failure leaving it
+const stale = (status, stdout = "") => staleFinding(() => ({ status, stdout }));
+ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what === "Packages the project holds that have gone stale\n\n- a" && stale(0).what === null && stale(0).title === TITLES.stale
+  && stale(3).unread && stale(null).unread && plan(stale(3).what, { state: "open" }, stale(3).unread) === "nothing",
+  "the packages gone stale: listed where held.mjs finds some, closed where it finds none, left as they stand where it could not look");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
