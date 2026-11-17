@@ -38,6 +38,9 @@ import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
+import { releaseAge, WAIT } from "./licences.mjs";
+import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
+import { npmPackages, offRegistry } from "./lookup.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -584,6 +587,41 @@ const configOf = (words, name, copy) => {
 // Whether a command runs the lookup itself: node, then the copy's script.
 const looksUp = (words, flag, copy) => /(?:^|[\\/])node(?:\.exe)?$/iu.test(words[0]?.text ?? "") && words.length > 1 && running([words[1]], "lookup.mjs", undefined, copy) && running(words, "lookup.mjs", flag, copy);
 
+// What stood before the package checks read it, which they report and pass (#488, points 3 to 5), read as they read
+// it: an .npmrc of "ignoreScriptsIn" without the week's wait (licences.mjs), a lock entry not from npm's registry with an
+// integrity value (lookup.mjs), and a file that downloads what may be a program unpinned (licence-scan.mjs). A config,
+// audit or lock file those checks cannot read is their own failure, so nothing is said of it here.
+function packagesHeld(p) {
+  const config = jsonAt(p, licenceConfig(p));
+  if (!config) return null;
+  const all = [...waitAsks(p, config), ...offAsks(p, config), ...pinAsks(p, config)];
+  return all.length ? `Each stood before the package checks read it, which report it and pass; mend each in a pull request of its own: ${all.slice(0, 20).join("; ")}${all.length > 20 ? `; and ${all.length - 20} more, which the licence check and the lookup print` : ""}.` : null;
+}
+// (a file of the project's read as a JSON object, or null; a list's texts)
+const jsonAt = (p, f) => { try { const v = JSON.parse(p.read(f) ?? "null"); return v && typeof v === "object" && !Array.isArray(v) ? v : null; } catch { return null; } };
+const strings = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
+// An .npmrc of "ignoreScriptsIn" with no wait of WAIT days.
+const waitAsks = (p, config) => strings(config.ignoreScriptsIn).filter(f => (releaseAge(p.read(f) ?? "") ?? 0) < WAIT)
+  .map(f => `\`${shown(f)}\` sets no wait: add the line \`min-release-age=${WAIT}\` to it`);
+// A lock entry of "lockfiles" not from npm's registry with an integrity value.
+const offAsks = (p, config) => strings(config.lockfiles).flatMap(f => {
+  let held = [];
+  try { held = npmPackages(p.read(f) ?? "", f); } catch { /* (the lookup and the licence check fail on it themselves) */ }
+  return held.filter(offRegistry).map(q => `\`${shown(f)}\`: ${shown(q.name)}@${shown(q.version)}: ${offRegistry(q)}: take it from npm's registry at one exact version, by npm's own install in the lock file's folder with --save-exact and --ignore-scripts, so that npm writes its address and integrity value`);
+});
+// A file the scan reads that downloads what may be a program, unpinned by version or checksum.
+function pinAsks(p, config) {
+  if (!config.scan || typeof config.audit !== "string") return [];
+  const listed = jsonAt(p, config.audit)?.entries, entries = Array.isArray(listed) ? listed.filter(e => e && typeof e === "object") : [];
+  const copy = corePath(p.root) || "core/", skip = strings(config.scan.skip);
+  const skipped = f => f.startsWith(copy) || skip.some(s => s === f || (s.endsWith("/") && f.startsWith(s)));
+  return p.files.filter(f => !skipped(f) && entries.some(e => covers(e, f))).flatMap(f => {
+    const text = p.read(f);
+    const fault = text !== null && pinRead(f, text, config.audit) ? pinFault(entries, config.audit, f, codeOf(f, text)) : null;
+    return fault ? [`\`${shown(f)}\` downloads what may be a program, and ${shown(fault.what)}: ${fault.mend}`] : [];
+  });
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
@@ -819,6 +857,8 @@ export const STEPS = [
       if (found.records.every(r => !r.lacks.length)) return null;
       return `Run once the process of \`core/tasks/choices.md\`, "What the project would be built on today", in a pull request of its own: write in \`${file}\` a record headed \`## Choice: \` and what the project is built on, ending "judged again as if written today", argued on its lines \`Looked for:\`, \`The blind pick:\` and \`The judgment:\`, with the second judgment, what a move would take and gain here, apart; file one issue to the project's owner, labelled \`enhancement\`, saying what the pick would have been and, apart, what a move would cost and gain; and write that issue's number on the record's line \`The suggestion: #<its number>\`.`;
     } },
+  { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
+  { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

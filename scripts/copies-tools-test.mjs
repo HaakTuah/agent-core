@@ -23,7 +23,7 @@ try {
   const g = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["copies.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   put("AGENTS.md", `# A project\n\n${SAID}.\n`);
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/a.md`;\n");
   put("docs/a.md", `# Developing\n\n${OTHER}.\n`);

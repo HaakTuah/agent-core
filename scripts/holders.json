@@ -20,6 +20,8 @@
     "floor/topics/workflows.md: 2. The workflows": "check: scripts/workflows.mjs, in part",
     "floor/topics/what-ships.md: 7. What runs on users' machines": [
       "check: scripts/exact-versions.mjs, in part",
+      "check: scripts/lookup.mjs, in part",
+      "check: scripts/licences.mjs, in part",
       "check: .github/workflows/signatures.yml, in part",
       "check: scripts/versions.mjs, in part"
     ],
@@ -168,7 +170,7 @@
     "AGENTS.md: Queued means wanted: nothing queued waits for a second word": [211],
     "AGENTS.md: Rules are written for any project": [150, 201],
     "AGENTS.md: Staged cases hold what no check reads": [228],
-    "AGENTS.md: Rules are pruned by their numbers": [249],
+    "AGENTS.md: Rules are pruned by their numbers": [249, 254],
     "AGENTS.md: Proof is sized to what a thing costs others": [249],
     "AGENTS.md: The archive is pointed to from the list": [246],
     "AGENTS.md: The archive keeps the reasoning; the owner's words stay here": [246],

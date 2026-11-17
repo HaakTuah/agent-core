@@ -68,7 +68,7 @@ ok(fails(r) && r.ms < 5000, `${MEND} a config of 5 MB, in ${r.ms} ms`);
 // ---- reading-size.mjs: checks/sizes.json ----
 const sizes = text => { write("checks/sizes.json", text); return run("reading-size.mjs", "checks/sizes.json"); };
 const marks = more => JSON.stringify({ each: 20000, read: { "a.md": 20000 }, total: 20000, split: 50000, ...more });
-for (const [text, what] of [["[]", "a list"], ["5", "a number"], ['"x"', "a string"], [marks({ read: ["a.md"] }), "a read that is a list"], [marks({ skip: [3] }), "a skip of numbers"]])
+for (const [text, what] of [["null", "null"], ["[]", "a list"], ["5", "a number"], ['"x"', "a string"], [marks({ read: ["a.md"] }), "a read that is a list"], [marks({ skip: [3] }), "a skip of numbers"]])
   ok(fails(sizes(text)), `reading-size.mjs: refuses with its mend a config of the wrong type: ${what}`);
 ok(fails(sizes("")) && fails(run("reading-size.mjs", "checks/none.json")) && fails(run("reading-size.mjs")), "reading-size.mjs: refuses with its mend an empty config, one not there, and none named");
 for (const n of [-1, 0, 1.5, "1e309", '"20000"']) ok(fails(sizes(marks({ each: "@" }).replace('"@"', n))), `reading-size.mjs: refuses with its mend an "each" of ${n}, out of range`);
