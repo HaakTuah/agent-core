@@ -431,7 +431,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // program told to work there reads it, wherever the two stand; and a command that would ask too much is not read)
     ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], ["env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash a.sh", ["a.sh", "scripts/a.sh"]],
     ["env -Cscripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["bash a.sh -C scripts", ["a.sh", "scripts/a.sh"]], ["env -C scripts env -C in bash a.sh", ["a.sh", "scripts/a.sh", "scripts/in/a.sh"]],
-    ["bash scripts/a.sh", ["scripts/a.sh"]], [Array.from({ length: 3000 }, (_, i) => `${"w".repeat(40)}${i}`).join(" "), null]])
+    ["bash scripts/a.sh", ["scripts/a.sh"]],
+    // (#476's code review of 002e060: a path given to an option in the same word)
+    ["ruby -r./scripts/a.sh -e 0", ["scripts/a.sh"]], ["ruby -rscripts/a.sh -e 0", ["scripts/a.sh"]], ["gcc -vIscripts/in a.sh", ["a.sh", "scripts/in/a.sh"]], ["node --x-scripts/a.sh", []], [Array.from({ length: 300 }, (_, i) => `-${"w".repeat(100)}${i}`).join(" "), null]])
     ok(JSON.stringify(fromTree(command, holds, folder)) === JSON.stringify(want), `the command ${JSON.stringify(command).slice(0, 100)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds, folder)));
   // (a file at the root that cmd runs in the place of the first word)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])

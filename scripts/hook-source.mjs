@@ -9,10 +9,11 @@
 // none within another); and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an agent tool sets it.
 // A word that sets a variable (PATH=x and the like change which program runs), a path with a ".." (read by the file
 // system after the links before it) or one from the root ("/", which may lead into the checkout) makes it no plain
-// command. Of a plain command, each word, and each part of a word
-// between spaces (a quoted script given to sh -c) or `=`, `:`, `,` and `@`, that names a file the project holds,
-// at the root or in a folder another part names (a folder a program may be told to work in), through a link inside the
-// checkout too, as holds() reads it, is taken from the working tree, whatever program it is given to; and so is a file at the project's root that a Windows shell runs in the place of its first word. No other
+// command. Of a plain command, each word, and each part of a word between spaces (a quoted script given to sh -c) or
+// `=`, `:`, `,` and `@`, or after an option's letters (-r./x.rb), that names a file the project holds, at the root or
+// in a folder another part names (a folder a program may be told to work in), through a link inside the checkout too,
+// as holds() reads it, is taken from the working tree, whatever program it is given to; and so is a file at the
+// project's root that a Windows shell runs in the place of its first word. No other
 // command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
 // so nothing a reading here could get wrong grants a hook anything. Node's own modules only.
 //
@@ -90,14 +91,24 @@ function rootAt(command, i, quote) {
 // A word and its parts: whole, at its spaces, as a quoted script given to sh -c holds its words, and at each = : , @.
 const parts = word => new Set([word, ...word.split(/ +/u), ...word.split(/[=:,@]/u), ...word.split(/[ =:,@]+/u)]);
 
-// Each part of a word that names a file the project holds, at the root or in a folder a program may be told to work in:
-// each folder the project holds that a part names, or ends in (env -C scripts, make --directory=scripts, -Cscripts),
+// What a part may name: itself and, of an option (-x, +x), each tail from after its signs through its first letters,
+// where a program reads a path given to it in the same word (ruby -r./scripts/run.rb, env -Cscripts, gcc -Iinclude).
+function readings(part) {
+  const option = /^[-+]+(\w*)/u.exec(part);
+  if (!option) return [part];
+  const out = [part];
+  for (let i = option[0].length - option[1].length; i <= option[0].length && i < part.length; i++) out.push(part.slice(i));
+  return out;
+}
+
+// Each reading of a part that names a file the project holds, at the root or in a folder a program may be told to work
+// in: each folder the project holds that a reading names (env -C scripts, make --directory=scripts, -Cscripts),
 // wherever it stands in the command and from any such folder in turn, since which of a program's options moves it, and
 // to which word after or before, is the program's and not read here. Each path asked costs its length from BUDGET; a
 // command that would ask more is not read.
 const BUDGET = 1_000_000, OVER = new Error("over its budget");
 function named(list, holds, folder) {
-  const each = new Set(list.flatMap(word => [...parts(word)]).filter(Boolean));
+  const each = new Set(list.flatMap(word => [...parts(word)]).filter(Boolean).flatMap(readings));
   let spent = 0;
   const at = (dir, part) => {
     spent += 1 + part.length;
@@ -108,8 +119,8 @@ function named(list, holds, folder) {
   const folders = new Set(["."]), work = ["."];
   while (work.length) {
     const dir = work.pop();
-    for (const part of each) for (let i = 0; i < part.length; i++) {
-      const f = at(dir, part.slice(i));
+    for (const part of each) {
+      const f = at(dir, part);
       if (f !== "." && !folders.has(f) && folder(f)) { folders.add(f); work.push(f); }
     }
   }
