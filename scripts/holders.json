@@ -354,6 +354,9 @@
     "AGENTS.md: Rules are pruned by their numbers": "correction: misread; outcome: asked",
     "AGENTS.md: Proof is sized to what a thing costs others": "findings; outcome: robust",
     "roles/shared/teams.md: Who is an owner": "correction: misread; outcome: asked",
-    "tasks/reviews.md: What a posted review stands for": "check fires; outcome: robust; rare harm"
+    "tasks/reviews.md: What a posted review stands for": "check fires; outcome: robust; rare harm",
+    "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
+    "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
+    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
   }
 }

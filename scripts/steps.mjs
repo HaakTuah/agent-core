@@ -469,15 +469,16 @@ function folderOf(st, job, w) {
   const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
   return typeof dir === "string" ? dir : undefined;
 }
-// Whether a step may run more than its words show: a command run inside another's words or an expansion bash may
-// evaluate (anything but a plain ${NAME}), a shell of the step's own, or any variable in its env, its job's or its
+// Whether a step may run more than its words show: a command run inside another's words, a redirection, or an expansion
+// bash may evaluate (anything but a plain ${NAME}), a shell of the step's own, or any variable in its env, its job's or its
 // workflow's, that its own words do not name, or that bash, Node or the system's loader reads (an allow-list: only
 // what the step's command is given by name, such as the config's path).
 const READ_BY_RUNNERS = /^(?:LD_|BASH|ENV$|PATH$|NODE_|SHELLOPTS$|PS4$|IFS$|CDPATH$|GLOBIGNORE$|TMPDIR$)/iu;
 const named = (text, key) => new RegExp(`\\$\\{?${key}\\b|%${key}%`, "u").test(text);
 const hides = (st, env, job, w) => {
   const text = typeof st?.run === "string" ? st.run : "";
-  return /\$\(|`|<\(|>\(|\$\{(?![A-Za-z_]\w*\})/u.test(text)
+  // (a redirection, which may write a file, the lookup itself among them, before the program opens it, is refused too)
+  return /\$\(|`|[<>]|\$\{(?![A-Za-z_]\w*\})/u.test(text.split(/\r?\n/u).map(uncommented).join("\n"))
     || !/^(?:bash|sh)?$/u.test(String(st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell ?? "").trim())
     || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && Object.keys(e).some(k => !/^[A-Za-z_]\w*$/u.test(k) || READ_BY_RUNNERS.test(k) || !named(text, k)));
 };

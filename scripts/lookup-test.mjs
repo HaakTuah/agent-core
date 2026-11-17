@@ -288,7 +288,7 @@ try {
     lic(extra);
     ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with ${what} does not count`);
   }
-  for (const [what, line, dir] of [["a lookup script the pull request holds", "node tools/core/scripts/lookup.mjs c.json --nuget"], ["a lookup run from another folder", "node core/scripts/lookup.mjs ../c.json --nuget", "tools"]]) {
+  for (const [what, line, dir] of [["a lookup that writes over its own script", "node core/scripts/lookup.mjs c.json --nuget 3>core/scripts/lookup.mjs"], ["a lookup script the pull request holds", "node tools/core/scripts/lookup.mjs c.json --nuget"], ["a lookup run from another folder", "node core/scripts/lookup.mjs ../c.json --nuget", "tools"]]) {
     writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: ${line}\n${dir ? `        working-directory: ${dir}\n` : ""}      - run: node core/scripts/nuget.mjs c.json\n`);
     ok(notDone(tmp, step).length === 1, `${what} counts for none`);
   }
