@@ -62,11 +62,12 @@ const ranPlanted = () => (fs.existsSync(ranMark) ? fs.readFileSync(ranMark, "utf
 r = checkUntold();
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && ranPlanted() === "", "programs named bash and git at the change's root run in place of none the checks start, \".\" and an empty entry on the PATH too", `${ranPlanted()}\n${r.out}`);
 // (with no owner's account in the manifest, the check asks the host who holds the repository, starting git and gh in
-// the project's folder from its own environment, held so too)
+// the project's folder from its own environment, held so too: it says what it read from the host, and elsewhere than
+// Windows, where the stand-ins leave no mark, no planted program ran for it)
 fs.writeFileSync(path.join(dir, "core-manifest.md"), fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").replace(/^\| \*owner's account\*.*\n/mu, ""));
 commit(dir, "no owner's account");
 r = checkUntold();
-ok(!/owner's account\* \|/u.test(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) && ranPlanted() === "", "with no owner's account in the manifest, the host is asked by no program of the change's", `${ranPlanted()}\n${r.out}`);
+ok(!/owner's account\* \|/u.test(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) && /read from the host: /u.test(r.out) && ranPlanted() === "", "with no owner's account in the manifest, the host is asked by no program of the change's", `${ranPlanted()}\n${r.out}`);
 git(dir, "reset", "-q", "--hard", "HEAD~2");
 // (and bash is taken from the PATH as the system takes it: on POSIX, a file of that name the user may not run, in a
 // folder ahead on the PATH, is passed over for the one it may)
