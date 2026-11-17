@@ -452,7 +452,7 @@ function readyInPrivate(p) {
 // The checks as one job (#376), on a private project that took the entry of 16 November: with its calls as they were, a
 // pull request once ready starts each check's own job, and fresh.mjs lists the one call; with the starter kit's call in
 // their place it starts two jobs, the one job and personal-terms, its status still "core / core", and each check of the
-// calls it took out runs as a step of it, a new copy failing it with that check's own mend.
+// calls it took out runs as a step of it (that a failure of one fails the job, saying its mend, check-test.mjs holds).
 function oneJobInPrivate(p) {
   git(p.dir, "checkout", "-q", "main");
   const main0 = git(p.dir, "rev-parse", "HEAD"), fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
@@ -477,11 +477,6 @@ function oneJobInPrivate(p) {
   ok(after.length === 2 && after.includes("core.yml/core/core") && after.some(w => w.startsWith("personal-terms.yml/")) && !failures(results)
     && ["No new copies", "Nothing new in how the code is put together", "The description has its parts", ...(sdk ? ["Does the pull request change what NuGet reads?"] : [])].every(s => ran(results, "core.yml", s)),
     `${p.name}: and a pull request starts two jobs, the one job, whose status is still "core / core", and personal-terms; each check of the calls taken out runs as its step and passes`, `${after.join(", ")}\n${failures(results)}`);
-  const block = Array.from({ length: 40 }, (_, i) => `export function f${i}(a, b) { const c = a * ${i} + b; if (c > ${i}) { return c - a; } return c + b * ${i}; }`).join("\n");
-  const copied = change(main1, () => { fs.writeFileSync(path.join(p.dir, "src/App/one.js"), `${block}\n`); fs.writeFileSync(path.join(p.dir, "src/App/two.js"), `${block}\n`);
-    const cfg = path.join(p.dir, "checks/copies.json"); fs.writeFileSync(cfg, JSON.stringify({ ...JSON.parse(fs.readFileSync(cfg, "utf8")), code: ["src"] }, null, 2)); });
-  const failed = checks(p, "pull_request", copied, { baseSha: main1, only: "core.yml" });
-  ok(/No new copies/.test(failures(failed)) && /Mend: /.test(failures(failed)) && ran(failed, "core.yml", "The description has its parts"), `${p.name}: a new copy of code fails the one job with the copies check's own failure and its mend, the steps after it still run`, failures(failed));
   git(p.dir, "checkout", "-q", "main");
 }
 
