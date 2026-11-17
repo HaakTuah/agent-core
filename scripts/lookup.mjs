@@ -59,12 +59,19 @@ export function npmPackages(text, lockPath) {
   const names = (entry, kinds = KINDS) => kinds.flatMap((k) => (entry?.[k] && typeof entry[k] === "object" ? Object.keys(entry[k]) : []));
   const direct = new Set([...own].flatMap((p) => names(packages[p], [...KINDS, "devDependencies"]).map((n) => resolve(packages, p, n)).filter(Boolean)));
   const next = (at) => names(packages[at]).map((n) => resolve(packages, at, n)).filter(Boolean);
-  const reached = new Map([...direct].map((d) => [d, reach(d, next)]));
   const nameOf = (p) => entryName(packages[p], p);
+  // (what a package brings, and which of the project's own brings it, are read only where they are asked, for a package
+  // the pull request makes new, each by one walk of the graph: never a whole set kept for every package)
+  let back = null;
+  const before = (at) => {
+    if (!back) { back = new Map(); for (const from of Object.keys(packages)) for (const to of next(from)) { if (!back.has(to)) back.set(to, []); back.get(to).push(from); } }
+    return back.get(at) ?? [];
+  };
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
-    .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
-      by: direct.has(p) ? [] : [...reached].filter(([, set]) => set.has(p)).map(([d]) => nameOf(d)) }));
+    .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p),
+      get brings() { return reach(p, next).size; },
+      get by() { return direct.has(p) ? [] : [...reach(p, before)].filter((d) => direct.has(d)).map(nameOf); } }));
 }
 
 // Where an entry that npm's registry does not give comes from, in a few words for the report.

@@ -86,6 +86,17 @@ const nugetLock = JSON.stringify({ version: 1, dependencies: { "net8.0": {
 const nread = nugetPackages(nugetLock, "src/packages.lock.json");
 ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.brings === 1 && nread.find((p) => p.name === "Invented.Moss.Young")?.direct === false && nread.find((p) => p.name === "Invented.Moss.Young")?.by.join() === "Invented.Moss.Core", `NuGet: its packages read, a dependency matched in any case, the project's own left out (${JSON.stringify(nread)})`);
 
+// A long chain of packages each the project names, as a lock file a pull request leaves alone: read in a bounded time,
+// with no set kept for every package (it once ran out of memory), and what each brings read only where it is asked.
+{
+  const many = 4000, chain = { "": { dependencies: Object.fromEntries(Array.from({ length: many }, (_, i) => [`chain-moss-${i}`, "1.0.0"])) } };
+  for (let i = 0; i < many; i++) chain[`node_modules/chain-moss-${i}`] = { version: "1.0.0", resolved: tgz(`chain-moss-${i}`), ...(i + 1 < many ? { dependencies: { [`chain-moss-${i + 1}`]: "1.0.0" } } : {}) };
+  const began = Date.now(), long = npmPackages(JSON.stringify({ lockfileVersion: 3, packages: chain }), "package-lock.json");
+  const none = newPackages([["package-lock.json", long]], [long.map((p) => ({ name: p.name }))]);
+  ok(long.length === many && none.length === 0 && Date.now() - began < 5000, `a lock file of ${many} packages in a chain, left alone, is read in a bounded time (${Date.now() - began} ms)`);
+  ok(long[many - 2].brings === 1 && long[many - 2].by.length === 0 && long[0].brings === many - 1, "and what one brings is read where it is asked");
+}
+
 // ---- What is new
 const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-helper" }], [{ name: "@invented/scoped-moss" }]]);
 ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,dev-moss,from-git,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
