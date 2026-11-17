@@ -115,13 +115,13 @@ function testsStand(p) {
 // step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
 const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
 // Whether a workflow runs on every push to an open pull request: the event pull_request with no "types" that leaves out
-// its opening or a push, and no "paths" that could leave out the change a lookup reads (a lookup's own reading of it).
+// its opening or a push, and no "paths" or "branches" filter that could leave out the change a lookup reads.
 const everyPush = on => {
   if (!onPullRequests(on)) return false;
   const pr = on && typeof on === "object" && !Array.isArray(on) ? on.pull_request : null;
   if (!pr || typeof pr !== "object") return true;
   const types = pr.types === undefined ? null : [pr.types].flat();
-  return (!types || ["opened", "synchronize"].every(t => types.includes(t))) && pr.paths === undefined && pr["paths-ignore"] === undefined;
+  return (!types || ["opened", "synchronize"].every(t => types.includes(t))) && ["paths", "paths-ignore", "branches", "branches-ignore"].every(k => pr[k] === undefined);
 };
 const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
 const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
@@ -471,26 +471,37 @@ function actionAt(at, read) {
 // Whether a step's shell stops on a failure: bash or sh, the default off Windows.
 function stopsOn(st, job, w) {
   const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
-  return shell === undefined ? !/windows/iu.test(JSON.stringify(job?.["runs-on"] ?? "")) : /^(?:bash|sh)$/u.test(String(shell).trim());
+  return shell === undefined ? notWindows(job) : /^(?:bash|sh)$/u.test(String(shell).trim());
 }
+// Whether a job's runner is named outright and is no Windows one, whose default shell is pwsh (a runner a matrix or an
+// expression names may be one).
+const notWindows = job => [job?.["runs-on"] ?? ""].flat().every(r => typeof r === "string" && !/\$\{\{|windows/iu.test(r));
 // The folder a step runs in, where it names one: its own, else (but in a composite action) its job's or workflow's default.
 function folderOf(st, job, w) {
   const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
   return typeof dir === "string" ? dir : undefined;
 }
 // Whether a step may run more than its words show: a command run inside another's words, a redirection, or an expansion
-// bash may evaluate (anything but a plain ${NAME}), a shell of the step's own, or any variable in its env, its job's or its
-// workflow's, that its own words do not name, or that bash, Node or the system's loader reads (an allow-list: only
-// what the step's command is given by name, such as the config's path).
-const READ_BY_RUNNERS = /^(?:LD_|BASH|ENV$|PATH$|NODE_|SHELLOPTS$|PS4$|IFS$|CDPATH$|GLOBIGNORE$|TMPDIR$)/iu;
-const named = (text, key) => new RegExp(`\\$\\{?${key}\\b|%${key}%`, "u").test(text);
+// bash may evaluate (anything but a plain ${NAME}); a shell other than bash or sh (an unset one only where the runner is
+// no Windows one); or a variable in its env, its job's or its workflow's, but those its config word names (an
+// allow-list), and never one a runner, a shell, Node, OpenSSL or the loader reads, even named so.
+const READ_BY_RUNNERS = /^(?:LD_|BASH|ENV$|PATH$|NODE_|OPENSSL_|SSL_|SHELLOPTS$|PS4$|IFS$|CDPATH$|GLOBIGNORE$|TMPDIR$|INPUT_|ACTIONS_|RUNNER_|GITHUB_)/iu;
+const visible = (env, job, w) => [env, job?.env, w.yaml?.env].flatMap(e => (e && typeof e === "object" ? Object.keys(e) : []));
+const plainKey = k => /^[A-Za-z_]\w*$/u.test(k) && !READ_BY_RUNNERS.test(k);
 const hides = (st, env, job, w) => {
   const text = typeof st?.run === "string" ? st.run : "";
+  const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
+  const word = commands(text)[0]?.[2]?.text ?? "";
+  const given = new Set([...word.matchAll(/\$\{?([A-Za-z_]\w*)|%([A-Za-z_]\w*)%/gu)].map(m => m[1] ?? m[2]));
   // (a redirection, which may write a file, the lookup itself among them, before the program opens it, is refused too)
   return /\$\(|`|[<>]|\$\{(?![A-Za-z_]\w*\})/u.test(text.split(/\r?\n/u).map(uncommented).join("\n"))
-    || !/^(?:bash|sh)?$/u.test(String(st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell ?? "").trim())
-    || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && Object.keys(e).some(k => !/^[A-Za-z_]\w*$/u.test(k) || READ_BY_RUNNERS.test(k) || !named(text, k)));
+    || (shell === undefined ? !notWindows(job) : !/^(?:bash|sh)$/u.test(String(shell).trim()))
+    || visible(env, job, w).some(k => !plainKey(k) || !given.has(k));
 };
+// Whether an action's step may stand before a lookup as it is given: no env of its own and none a runner reads from its
+// job or workflow, and, for the checkout, no other repository, folder or commit than the pull request's.
+const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible({}, job, w).every(plainKey)
+  && (!/^actions\/checkout@/u.test(st.uses) || Object.keys(st.with ?? {}).every(k => ["fetch-depth", "persist-credentials"].includes(k)));
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -499,7 +510,7 @@ function stepOf(st, job, w, started) {
   const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
-  return { cmds, counts, hidden: hides(st, env, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, hidden: hides(st, env, job, w), plain: typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -538,14 +549,14 @@ const lookupOf = (st, flag, copy, at, job) => {
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
 // Where a lookup stands, as the step's mend says it (beforeLookup).
-const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root with no env but what its own words name, so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
+const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash, with no env but a variable its config is named by, so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
 // Whether a step may stand before a lookup: checkout or a setup action, or a run, by the runner's own `node`, from the
 // project's root, of one of the core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing
 // hidden (hides). Anything else (dotnet under any spelling, npm, a build script, make, a local action, a script of the
 // core's that restores or runs the project's tests) may run the pull request's own files, which could change what the
 // lookup reads or the lookup itself: an allow-list, not a search for a build.
 const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs"];
-const beforeLookup = (st, copy) => (st.uses ? /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
+const beforeLookup = (st, copy) => (st.uses ? st.plain && /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
   : !st.hidden && (st.dir === undefined || st.dir === ".") && st.cmds.length > 0 && st.cmds.every(c => c.length > 1
     && /^node(?:\.exe)?$/iu.test(c[0].text) && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
 // Whether a command names the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given

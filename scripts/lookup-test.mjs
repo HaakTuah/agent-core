@@ -315,6 +315,19 @@ try {
   }
   nugetJob("npm run build", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
   ok(notDone(tmp, step).length === 1, "an npm lookup after a step that runs the project's own files counts for none");
+  for (const [what, extra] of [
+    ["a setup action given an env of its own", "      - uses: actions/setup-node@v4\n        env:\n          LD_PRELOAD: ./evil.so\n"],
+    ["a checkout of another repository into the copy's folder", "      - uses: actions/checkout@v7\n        with:\n          repository: someone/else\n          path: core\n"],
+    ["OPENSSL_CONF, though the step's words name it", "      - run: node core/scripts/licences.mjs $OPENSSL_CONF\n        env:\n          OPENSSL_CONF: evil.cnf\n"],
+    ["a variable its words name, but not as its config", "      - run: node core/scripts/licences.mjs c.json $HOOK\n        env:\n          HOOK: ./build.sh\n"],
+  ]) {
+    lic(extra);
+    ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with ${what} does not count`);
+  }
+  for (const [what, runner] of [["a Windows runner, whose shell is pwsh", "windows-latest"], ["a runner a matrix names", "${{ matrix.os }}"]]) {
+    writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ${runner}\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/licences.mjs @(./evil.ps1)\n      - run: node core/scripts/lookup.mjs c.json --nuget\n        shell: bash\n      - run: node core/scripts/nuget.mjs c.json\n`);
+    ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with no shell named on ${what} does not count`);
+  }
   lic("      - run: node core/scripts/licences.mjs c.json\n");
   ok(notDone(tmp, step).length === 0, "and after the licence script alone, it does");
   nugetJob("echo PATH=./tools >> \"$GITHUB_PATH\"", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
@@ -333,7 +346,7 @@ try {
   }
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor one in a workflow no pull request starts");
-  for (const [what, on] of [["only once it closes", "  pull_request:\n    types: [closed]\n"], ["only where its paths change", "  pull_request:\n    paths: [docs/**]\n"]]) {
+  for (const [what, on] of [["only once it closes", "  pull_request:\n    types: [closed]\n"], ["only where its paths change", "  pull_request:\n    paths: [docs/**]\n"], ["only into some branches", "  pull_request:\n    branches: [nothing-here]\n"]]) {
     writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n${on}jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n`);
     ok(notDone(tmp, step).length === 1, `nor one in a workflow a pull request starts ${what}`);
   }
