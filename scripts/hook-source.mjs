@@ -212,11 +212,12 @@ function scanAll(written, raw, text, index, holds, found, tests, fetches) {
   const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
   variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
   for (const variant of variants) scan(variant, index, holds, found, tests, fetches);
-  // (and, for a name that holds a "$" or a "%", the command as written, its variables not marked, with its quoting read:
+  // (and, for a name that holds a "$" or a "%", the command as written, its variables not marked, with its quoting read
+  // level after level:
   // a "$" a quote or backslash keeps, as in 'scripts/$notify.sh', and a %name% a POSIX shell never reads, as in
   // scripts/%notify%.sh, are part of a name, which marking would have taken)
   const dollar = at => /[$%]/u.test(at);
-  for (const variant of [written, dequote(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
+  for (const variant of [written, ...dequotings(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
 }
 
 // Of a command in one of the kit's forms, the words after its script that name a file of the working tree; else null.
