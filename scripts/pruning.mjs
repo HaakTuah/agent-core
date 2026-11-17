@@ -6,7 +6,8 @@
 // core's AGENTS.md that:
 //   - names a number (holders.json, "numbers", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
 //   - stands in for an outcome (its number not one of the outcome's direct measures) and moved at two prunings in a row
-//     while those measures did not, each read as outcomes.mjs's MEASURES count it (fast, readable and usable have none);
+//     while those measures did not, each by the count outcomes.mjs's MEASURES give (DIRECT: a median left out; fast,
+//     readable and usable have none);
 //   - is held by a check that fired nowhere in the span: no step of a workflow that runs it failed on a pull request,
 //     read from GitHub's record of each failed run's jobs and their steps, and from the workflows' steps as the core's
 //     own reader of YAML gives them (workflow-run.mjs, beside this file); a check no step names is not judged so;
@@ -40,8 +41,9 @@ import { started } from "./started.mjs";
 
 export const RECORD = "reports/pruning.json";
 export const EVERY = 2, EARLY = 20;
-// The outcomes' direct measures (outcomes.mjs; #302), whose counts a pruning records.
-const DIRECT = MEASURES.filter(m => m.direct);
+// The outcomes' direct measures (outcomes.mjs; #302) that a count gives, whose counts a pruning records: a median's
+// measure gives only how many cases it read, not its value, so it is left out.
+export const DIRECT = MEASURES.filter(m => m.direct && !/, the median$/u.test(m.label));
 const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"). Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
 
 // The record: { prunings: [{ at, model, from, numbers, direct, corrections, fired, cited, without }] }, oldest first.
@@ -162,7 +164,7 @@ export function list({ all, named, numbers, record, cases, steps, starts, joined
     if (came === null) unread.push(r.key);
     else if (came < EARLY) early.push(`${r.key} (${came})`);
     else {
-      const step = starts.has(r.key) ? "1, read at a role's start: it moves first to a module read on need" : "2, read on need: it may go where nothing changed since it moved";
+      const step = starts.has(r.key) ? "1, read at a role's start: it moves first to a module read on need" : "2, read on need: it may go, one moved there only where nothing changed after its move";
       listed.push(`- ${r.key}: ${signs.join("; ")}. Its step of the pruning: ${step}. Its number: ${n ?? "none named"}; cited ${now.cited?.[r.key] ?? 0} times.`);
     }
   }

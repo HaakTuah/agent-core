@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { checksOf, due, generation, list, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
+import { checksOf, DIRECT, due, generation, list, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
 import { rulesOf } from "./rules.mjs";
 
 let failed = 0, count = 0;
@@ -61,11 +61,12 @@ const line = r => out.find(l => l.startsWith(`- ${r.key}:`)) ?? "";
 ok(out[0] === "- Read: the pruning of 2026-11-01, against 2026-09-01; 2 staged cases run with their rules taken out; counts from 2026-09-01T00:00:00Z (`scripts/pruning.mjs`).", "the list opens with what it read", out[0]);
 ok(/^- tasks\/a\.md: Still: its number did not move \(3, as at 2026-09-01\)\. Its step of the pruning: 1, read at a role's start: it moves first to a module read on need\. Its number: findings; outcome: robust; cited 4 times\.$/u.test(line(still)) && !line(moved),
   "a number that did not move is listed, read at a start it moves first, with its number and its citations; one that moved is not", line(still));
-ok(/its check never fired from 2026-09-01T00:00:00Z to 2026-11-01 \(\.github\/workflows\/own\.yml#C\)\. Its step of the pruning: 2, read on need: it may go/u.test(line(quiet)) && !line(loud) && !line(floor) && !line(marked),
+ok(/its check never fired from 2026-09-01T00:00:00Z to 2026-11-01 \(\.github\/workflows\/own\.yml#C\)\. Its step of the pruning: 2, read on need: it may go, one moved there only where nothing changed after its move/u.test(line(quiet)) && !line(loud) && !line(floor) && !line(marked),
   "a check whose steps failed nowhere is listed, though another step of its workflow failed; one whose step failed is not; one that guards against rare harm never for its check alone");
 ok(/^- AGENTS\.md: A process rule: its number did not move \(2, as at 2026-09-01\)\. Its step of the pruning: 1,/u.test(line(agents)), "a rule of the core's AGENTS.md is listed as any other", line(agents));
 ok(/its staged case c-case passed without it/u.test(line(passed)) && !line(still).includes("d-case"), "a case that passed without its rule lists it; one that failed does not");
 ok(/its number moved at two prunings while its outcome, asked, did not \(misread: 2\)/u.test(line(stand)) && !line(own), "a stand-in that moved twice while its outcome's direct measures stood is listed, beside them; a direct measure's own count is no stand-in");
+ok(JSON.stringify(DIRECT.map(m => m.key)) === JSON.stringify(["misread", "failed"]), "the direct measures a pruning compares are those a count gives, the median of a bug's time to live left out");
 const robust = list({ all: [stand], named, numbers: { [stand.key]: "findings; outcome: robust" }, record: rec(...p), cases, steps, starts: new Set(), joined: () => 40 });
 const usable = list({ all: [stand], named, numbers: { [stand.key]: "findings; outcome: usable" }, record: rec(...p), cases, steps, starts: new Set(), joined: () => 40 });
 ok(!robust.some(l => l.includes("its outcome")) && !usable.some(l => l.includes("its outcome")), "one whose outcome's direct measures moved is not listed, nor one whose outcome has none");
