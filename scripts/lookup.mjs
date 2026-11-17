@@ -191,7 +191,7 @@ export function sourceFaults(head, base) {
     const fault = offRegistry(p);
     if (!fault) continue;
     const at = `${said(lockPath)}: ${said(p.name)}@${said(p.version)} (at ${said(p.path)}): ${said(fault)}`;
-    const mend = `take it from npm's registry at one exact version (npm install ${said(p.name)}@<version> --save-exact --ignore-scripts in the lock file's folder; for one another package brings, a version of that package which takes it from the registry), so that npm writes its address and integrity value; never edit the lock file by hand`;
+    const mend = `take ${said(p.name)} from npm's registry at one exact version, by npm's own install in the lock file's folder with --save-exact and --ignore-scripts (for one another package brings, a version of that package which takes it from the registry), so that npm writes its address and integrity value; never edit the lock file by hand`;
     if (held.has(key(p))) reports.push(`${at}; the pull request's base held it so, so it passes: ${mend}, as the sync's step asks`);
     else failures.push(`${at} (floor rule 7). Mend: ${mend}`);
   }

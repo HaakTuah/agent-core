@@ -45,7 +45,7 @@ ok(/deep-old-moss@1\.1\.0: no release since .*, brought by kept-moss$/u.test(lin
 ok(/shut-moss@1\.1\.0: its repository, github\.com\/invented-org\/shut-moss, is archived$/u.test(line("shut-moss")), "one whose repository is archived is stale", r.stale);
 ok(/gone-moss@1\.1\.0: its registry no longer has it/u.test(line("gone-moss")), "one its registry no longer knows is stale", r.stale);
 ok(r.stale.length === 4 && !line("kept-moss") && !asked.some((u) => u.includes("from-git")), "one released this year, its repository not archived, is not, and one from elsewhere is not asked", r.stale);
-ok(r.unread.length === 1 && /flaky-moss@1\.1\.0: npm's registry could not be read \(it answered 503\)/u.test(r.unread[0]) && r.asked === 6, "a registry that does not answer leaves the package unread, never stale", r.unread);
+ok(r.unread.length === 1 && /flaky-moss@1\.1\.0: the registry of npm could not be read \(it answered 503\)/u.test(r.unread[0]) && r.asked === 6, "a registry that does not answer leaves the package unread, never stale", r.unread);
 const body = report(r);
 ok(body.startsWith("Packages the project holds that have gone stale") && body.includes("- package-lock.json: old-moss@1.1.0:") && /Left unread this time \(1\)/u.test(body) && body.includes("core/tasks/updates.md"), "the report lists each as a task, then what was left unread", body);
 ok(report({ stale: [], unread: [], asked: 3, notOnGitHub: 0 }) === null, "with nothing stale, there is no report");

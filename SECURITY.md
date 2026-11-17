@@ -37,8 +37,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `scripts/workflows.mjs`, `scripts/agent-tools.mjs`); hostile tests: `scripts/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
-     (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`) and
-     the lookup (`scripts/lookup.mjs`); Node itself is checked against its SHA-256 by `scripts/node.sh`; hostile
+     (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
+     lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`; hostile
      tests: `scripts/hostile-packages-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are

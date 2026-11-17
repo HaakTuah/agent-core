@@ -12,6 +12,9 @@ them); the paths `.github/dependabot.yml` and `.node-version`. Its safety rules:
 - A new major version is its own PR, with the *major version checks*.
 - One is held back only for a reason (it breaks something, runs worse, changes its licence, or its project is abandoned
   or changes hands), written in the closed PR and an open issue.
+- One gone stale (no release within the year, gone from its registry, or its repository archived), as the scheduled
+  look's issue "Packages gone stale" lists it each month (`core/scripts/held.mjs`), is a task: replaced, or kept with
+  its reason in an issue of its own.
 
 **Node** runs the core's scripts in every project.
 - CI and the cloud machines run the exact version in the core's `.node-version`: CI reads it, and a cloud setup runs

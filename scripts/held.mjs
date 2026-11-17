@@ -40,7 +40,7 @@ export function heldPackages(root, configs) {
     let head = [];
     try { ({ head } = packagesOf(config, root, null, nuget)); } catch (e) { unread.push(`${said(configPath)}: ${said(e.message)}`); continue; }
     for (const [lockPath, packages] of head) for (const p of packages) {
-      const key = `${nuget ? "nuget" : "npm"}\u0000${nuget ? p.name.toLowerCase() : p.name}@${p.version}`;
+      const key = `${nuget ? 1 : 0}\u0000${nuget ? p.name.toLowerCase() : p.name}@${p.version}`;
       const was = out.get(key);
       if (!was || (p.direct && !was.direct)) out.set(key, { ...p, lockPath, nuget, sources });
     }
@@ -58,7 +58,7 @@ export async function lookAgain(packages, { get, now = Date.now(), until = Date.
     if (clock() > until) { unread.push(`${at}: not asked, past the ${SECONDS} seconds a look takes`); return; }
     asked++;
     let facts;
-    try { facts = await registry(p, get, p.nuget, p.sources); } catch (e) { unread.push(`${at}: ${p.nuget ? "NuGet's" : "npm's"} registry could not be read (${said(e.message)})`); return; }
+    try { facts = await registry(p, get, p.nuget, p.sources); } catch (e) { unread.push(`${at}: ${p.nuget ? "NuGet's registry" : "the registry of npm"} could not be read (${said(e.message)})`); return; }
     if (facts.elsewhere) return;
     if (facts.missing) { stale.push(`${at}: its registry no longer has it (${said(facts.missing)})`); return; }
     if (now - facts.last > STALE * DAY) { stale.push(`${at}: no release since ${day(facts.last)}, over ${STALE} days ago${p.direct ? "" : `, brought by ${(p.by ?? []).map(said).join(", ") || "another"}`}`); return; }
