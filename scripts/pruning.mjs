@@ -241,14 +241,14 @@ async function outcomesOf({ repo, from, to, owner, gh }) {
 }
 
 // The steps that failed on a pull request from `from` to `to`, each "<workflow>#<step's name>": { step: count }, read
-// from the jobs of every attempt (filter=all) of each run that failed or was run again, so that a failure a re-run
-// passed still counts; only those of `known` (the core's own steps), so that no name a fork's own workflow gives its
+// from the jobs of every attempt (filter=all) of each run that did not succeed (a failure, or one cancelled after a step
+// failed, as a newer push cancels one) or was run again, so that no failure a later attempt or push hid is lost; only those of `known` (the core's own steps), so that no name a fork's own workflow gives its
 // steps reaches the record.
-function firedOf({ repo, from, to, gh, known }) {
+export function firedOf({ repo, from, to, gh, known }) {
   const out = {};
   for (let page = 1; page <= 50; page++) {
     const runs = JSON.parse(gh(`repos/${repo}/actions/runs?event=pull_request&created=${from.slice(0, 10)}..${to.slice(0, 10)}&per_page=100&page=${page}`) || "{}").workflow_runs ?? [];
-    for (const run of runs.filter(x => x.path && Number.isInteger(x.id) && (x.conclusion === "failure" || x.run_attempt > 1))) {
+    for (const run of runs.filter(x => x.path && Number.isInteger(x.id) && (!["success", "skipped"].includes(x.conclusion) || x.run_attempt > 1))) {
       const jobs = JSON.parse(gh(`repos/${repo}/actions/runs/${run.id}/jobs?filter=all&per_page=100`) || "{}").jobs ?? [];
       for (const id of jobs.flatMap(j => j.steps ?? []).filter(x => x.conclusion === "failure").map(x => `${run.path}#${x.name}`).filter(x => known.has(x))) out[id] = (out[id] ?? 0) + 1;
     }

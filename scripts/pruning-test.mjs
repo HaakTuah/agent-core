@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { checksOf, DIRECT, due, generation, list, open, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
+import { checksOf, DIRECT, due, firedOf, generation, list, open, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
 import { rulesOf } from "./rules.mjs";
 
 let failed = 0, count = 0;
@@ -85,6 +85,22 @@ const floorStood = R("floor/security.md", "2. Stood"), rec2 = rec({ at: "2026-09
 const guarded = list({ all: [floorStood, marked], named, numbers: { [floorStood.key]: "check fires; outcome: robust", [marked.key]: "check fires; outcome: robust; rare harm" }, record: rec2, cases: [{ name: "f-case", holds: [floorStood.key] }], steps, starts: new Set(), joined: () => 40 });
 ok(guarded.some(l => l.startsWith(`- ${floorStood.key}: its staged case f-case passed without it.`)) && !guarded.some(l => l.startsWith(`- ${marked.key}:`)),
   "a rule that guards against rare harm is judged by its staged case alone: a count that stood lists it not, a case that passed without it does");
+
+// ---- the failed steps, read from GitHub's runs and jobs (a mocked gh) ----
+const W = ".github/workflows/tests.yml", calls = [];
+const runs = [{ id: 1, path: W, conclusion: "success", run_attempt: 1 }, { id: 2, path: W, conclusion: "failure", run_attempt: 1 }, { id: 3, path: W, conclusion: "cancelled", run_attempt: 1 },
+  { id: 4, path: W, conclusion: "success", run_attempt: 2 }, { id: 5, path: ".github/workflows/fork.yml", conclusion: "failure", run_attempt: 1 }];
+const failedIn = { 2: "A and B", 3: "A and B", 4: "Its test", 5: "Anything a fork names" };
+const gh = route => {
+  calls.push(route);
+  if (route.includes("/actions/runs?")) return JSON.stringify({ workflow_runs: route.includes("page=1") ? runs : [] });
+  const id = Number(/runs\/(\d+)\/jobs/u.exec(route)[1]);
+  return JSON.stringify({ jobs: [{ steps: [{ name: failedIn[id], conclusion: "failure" }, { name: "C", conclusion: "success" }] }] });
+};
+const fired = firedOf({ repo: "o/r", from: "2026-09-01T00:00:00Z", to: "2026-11-01T00:00:00Z", gh, known: new Set([`${W}#A and B`, `${W}#Its test`]) });
+ok(JSON.stringify(fired) === JSON.stringify({ [`${W}#A and B`]: 2, [`${W}#Its test`]: 1 }) && !calls.some(c => c.includes("runs/1/jobs")) && calls.filter(c => c.includes("/jobs")).every(c => c.includes("filter=all"))
+  && !calls.find(c => c.includes("/actions/runs?")).includes("status="),
+  "a failed step counts from a failed run, one a newer push cancelled, and an earlier attempt a re-run passed, every attempt read; a run that succeeded at once is not read; no step a fork's workflow names is kept", JSON.stringify(fired));
 
 // ---- the pruning in progress ----
 const r = rec({ at: "2026-09-01", recorded: true });
