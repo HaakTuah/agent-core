@@ -72,7 +72,12 @@ The index, and how an item is written: `archive/instructions.md`.
      months and at each new generation of model, the owner deciding which go: the owner chose to start wide and cut
      back by what makes a difference, and an unneeded rule costs every session that reads it.
 
-250. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
+250. **16 November 2026**, #412, a case of #481. A posted security review counts from each person the host lets write
+     to the repository, read from its rights each run, rather than from a list of a team's owners kept beside them,
+     which goes stale; a list named to the check stays for an account that is no owner. It stands behind who the
+     `security-review` status counts.
+
+251. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
      fails a name it does not know and one first published under 90 days ago, a bad package has a procedure, and a
      new one is taken in an order: a model sometimes names a package that does not exist and someone registers the
      name, such a name is new and has no history, which a script can read, and the floor said what to do about a

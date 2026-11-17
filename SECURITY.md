@@ -21,10 +21,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `scripts/hostile-issues-test.mjs`.
-   - what GitHub's API answers, releases and tags, runs and checks, pull requests, and whose account holds a
-     repository (the workflow's event too): read by `scripts/core-moved.mjs`,
-     `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs` and
-     `scripts/clean-merges.mjs`; hostile tests: `scripts/hostile-github-test.mjs`.
+   - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
+     (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
+     `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
+     `scripts/clean-merges.mjs` and `scripts/security-review.mjs`; hostile tests: `scripts/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`) and the sync's steps

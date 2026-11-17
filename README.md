@@ -277,7 +277,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
      request or by a comment that opens "Security review:" from an account `tasks/reviews.md`, point 3, counts (the
-     repository owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex
+     repository owner's, a person's the host lets write, read from its rights, or one the project names in its call, the
+     input `reviewers`), the second alone where Codex
      marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
      never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running

@@ -766,6 +766,7 @@ export const STEPS = [
     partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
   { lead: "17 November 2026, the checks as one job", cost: COST.workflow, check: oneJobHolds,
     partly: "whether the repository is private, and whether a ruleset requires a check by a name the change takes away, are GitHub's settings, not files: `core/scripts/fresh.mjs`, which every sync runs, lists the one call a project's calls differ from, and a required check's name is the owner's to move" },
+  { lead: "17 November 2026, a team's owners read from the host", cost: COST.workflow, unread: "whether an account the call to `security-review.yml` names is one the host lets write is GitHub's answer, not a file's: `gh api repos/<owner>/<repo>/collaborators/<login>/permission`" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

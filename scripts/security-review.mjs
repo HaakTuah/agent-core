@@ -4,9 +4,11 @@
 // always from the default branch's copy, on what GitHub's own API gives of the pull request and its comments. It takes
 // two things as proof: the summary Codex's own app keeps on the pull request (its login and kind are GitHub's, which no
 // one else can post under), saying its security review is completed; or a comment that opens "Security review:" from
-// the repository's owner, or an account the project names (the workflow's input "reviewers"), with a say in the
-// repository by GitHub's own word (owner, member or collaborator), which is how another reviewer's, or the fallback
-// reviewer's, is posted (tasks/reviews.md, point 3; #99). Given the pull request's commits, a review stands for the
+// the repository's owner, an account the host lets write (a person's account whose role GitHub gives as write, maintain
+// or admin, read by the workflow from its rights each run: a team's owners, roles/shared/teams.md, #412), or an account
+// the project names (the workflow's input "reviewers"), with a say in the repository by GitHub's own word (owner, member
+// or collaborator), which is how another reviewer's, or the fallback reviewer's, is posted (tasks/reviews.md, point 3;
+// #99). Given the pull request's commits, a review stands for the
 // head only where it saw the head, or a commit that only updates from main follow (merges whose second parent is no
 // commit of the pull request's, as GitHub's "Update branch" makes): Codex's by the commit its summary names, a posted
 // one by a commit it names by its whole SHA; any other later commit needs a posted review, or the note that none is
@@ -63,7 +65,8 @@
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
-//         the link the status carries; REVIEWERS for the accounts named; PURE for the head pure-sync.mjs proved.
+//         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
+//         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved.
 import { readFileSync } from "node:fs";
 import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
@@ -141,13 +144,14 @@ function codex(comments) {
 export const UNREAD = "Codex's summary is on the pull request, but its state cannot be read: its form may have changed, and scripts/security-review.mjs must learn it";
 
 // { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name). more:
-// { reviewers, the accounts besides the repository's owner whose posted review counts; pure, whether pure-sync.mjs
+// { reviewers, the accounts besides the repository's owner whose posted review counts; rights, GitHub's answers on
+// accounts' rights to the repository, whose writers' posted reviews count too; pure, whether pure-sync.mjs
 // proved the head a pure sync; merges, the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran }
 export function judge(pull, comments, reviewComments, commits, files, bound = true, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const list = flat(comments);
-  const { all, unnamed } = postedBy(pull, list, bound, more.reviewers);
+  const { all, unnamed } = postedBy(pull, list, bound, more.reviewers, more.rights);
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
   const { running, posted, changed } = sinceBegun(all, read);
   const { chain, stand, forHead, cut } = forTheHead(pull, commits, sha, more.merges, posted);
@@ -158,14 +162,14 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   return warning ? { ...verdict, warning } : verdict;
 }
 // the posted reviews that count (all), and whether one by an account not named counts all the same (unnamed)
-function postedBy(pull, list, bound, reviewers) {
-  const whose = counted(pull, reviewers);
+function postedBy(pull, list, bound, reviewers, rights) {
+  const whose = counted(pull, reviewers, writersOf(rights));
   const writers = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   // (of a pull request whose head does not hold this check as the default branch does, which stood before it came, a
   // member's or collaborator's review counts as it did then, and the status says so: AGENTS.md, "Nothing locks a
   // project")
-  const all = bound ? writers.filter((comment) => whose(comment.user?.login)) : writers;
-  const unnamed = !bound && writers.some((comment) => !whose(comment.user?.login));
+  const all = bound ? writers.filter((comment) => whose(comment.user)) : writers;
+  const unnamed = !bound && writers.some((comment) => !whose(comment.user));
   return { all, unnamed };
 }
 // whether Codex's own review runs, the posted reviews that count while it does, and when its summary last changed
@@ -210,16 +214,25 @@ function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure }) {
   return { ...verdict, why: `${verdict.why}; floor rule 3's two are there` };
 }
 
-// whose posted review counts (#99): the repository's owner's, and the accounts the project names (the workflow's
-// input "reviewers"), each by its login in any case, as GitHub reads one; nobody else's, a member's or a
-// collaborator's neither. One login may post the builder's work and its review alike: that this tells no one apart
-// stays with the reviews (#187)
+// whose posted review counts (#99): the repository's owner's, the accounts the project names (the workflow's input
+// "reviewers"), and a person's account the host lets write (#412), each by its login in any case, as GitHub reads one;
+// nobody else's, a member's or a collaborator's who may only read or triage neither, nor an app's. One login may post
+// the builder's work and its review alike: that this tells no one apart stays with the reviews (#187)
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$/u;
 export const reviewersOf = (text) => (typeof text === "string" ? text.split(/[\s,]+/u) : []).filter((name) => LOGIN.test(name));
-function counted(pull, reviewers) {
+function counted(pull, reviewers, writers) {
   const names = new Set([pull.base?.repo?.owner?.login, ...(Array.isArray(reviewers) ? reviewers : [])].filter((name) => typeof name === "string" && LOGIN.test(name)).map((name) => name.toLowerCase()));
-  return (login) => typeof login === "string" && names.has(login.toLowerCase());
+  return (user) => typeof user?.login === "string" && (names.has(user.login.toLowerCase()) || (user.type === "User" && writers.has(user.login.toLowerCase())));
 }
+// the logins, in lower case, of the people the host lets write, from GitHub's answers on rights
+// (repos/<owner>/<repo>/collaborators/<login>/permission), read strictly: a person's account (of type User, no app's),
+// its role write, maintain or admin, and its permission the one GitHub gives that role (write, write, admin), and where
+// the answer says whether it may push, true; anything else, a custom role among them, is read as no right to write
+const ROLES = { write: "write", maintain: "write", admin: "admin" };
+const writes = (answer) => answer !== null && typeof answer === "object" && typeof answer.role_name === "string" && Object.hasOwn(ROLES, answer.role_name) && answer.permission === ROLES[answer.role_name]
+  && answer.user !== null && typeof answer.user === "object" && answer.user.type === "User" && typeof answer.user.login === "string" && LOGIN.test(answer.user.login) && !answer.user.login.endsWith("[bot]")
+  && (answer.user.permissions === undefined || answer.user.permissions?.push === true);
+export const writersOf = (rights) => new Set(flat(rights).filter(writes).map((answer) => answer.user.login.toLowerCase()));
 // the commits a comment names by their whole SHA, all forty characters (a shorter one can be made to match another)
 export const named = (body) => (typeof body === "string" ? body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? [] : []).map((at) => at.toLowerCase());
 // the commits a review of which stands for the head (#99): the head, and each reached from it by first parents through
@@ -386,7 +399,7 @@ if (started(import.meta.url)) {
   // (PURE: the head's whole SHA, where pure-sync.mjs, run by the workflow from the default branch's copy, proved it)
   const pull = read(pullFile);
   const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, process.env.BOUND !== "false",
-    { reviewers: reviewersOf(process.env.REVIEWERS), pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
+    { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined });
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }
