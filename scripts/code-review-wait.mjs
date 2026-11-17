@@ -70,6 +70,10 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
     return { sha, done: false, why: `Codex's code review of ${short} is still running. Mend: wait for it` };
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
+  return reviewRan(sha, posted, review, pull, commits, bound, merges);
+}
+// whether a code review has run on the head, or on a commit only updates from main follow: posted, or Codex's completed
+function reviewRan(sha, posted, review, pull, commits, bound, merges) {
   const seen = new Set(posted);
   if (review !== null && typeof review === "object" && review.status === "completed" && typeof review.commit_sha === "string") seen.add(review.commit_sha);
   // (a review stands for the head where only updates from main follow it, as security-review.mjs reads them)
