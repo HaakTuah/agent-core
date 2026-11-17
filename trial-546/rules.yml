@@ -1,0 +1,81 @@
+rules:
+- id: js-cmd
+  languages: [javascript, typescript]
+  severity: ERROR
+  message: a shell command built from input
+  mode: taint
+  pattern-sources: [{pattern: "$REQ.query"}, {pattern: "$REQ.body"}, {pattern: "$REQ.params"}]
+  pattern-sinks: [{pattern: "exec($CMD, ...)"}]
+- id: js-eval
+  languages: [javascript, typescript]
+  severity: ERROR
+  message: eval of input
+  mode: taint
+  pattern-sources: [{pattern: "$REQ.query"}, {pattern: "$REQ.body"}, {pattern: "$REQ.params"}]
+  pattern-sinks: [{pattern: "eval(...)"}]
+- id: js-sql
+  languages: [javascript, typescript]
+  severity: ERROR
+  message: SQL built from input
+  mode: taint
+  pattern-sources: [{pattern: "$REQ.query"}, {pattern: "$REQ.body"}, {pattern: "$REQ.params"}]
+  pattern-sinks: [{patterns: [{pattern: "$DB.query($Q, ...)"}, {focus-metavariable: $Q}]}]
+- id: js-path
+  languages: [javascript, typescript]
+  severity: ERROR
+  message: a path built from input
+  mode: taint
+  pattern-sources: [{pattern: "$REQ.query"}, {pattern: "$REQ.body"}, {pattern: "$REQ.params"}]
+  pattern-sinks: [{patterns: [{pattern-either: [{pattern: "fs.readFile($P, ...)"}, {pattern: "fs.readFileSync($P, ...)"}]}, {focus-metavariable: $P}]}]
+- id: cs-cmd
+  languages: [csharp]
+  severity: ERROR
+  message: a process started with a command built from a parameter
+  mode: taint
+  pattern-sources: [{patterns: [{pattern-inside: "$T $M(..., string $X, ...) { ... }"}, {pattern: "$X"}]}]
+  pattern-sinks: [{pattern: "Process.Start(...)"}]
+- id: cs-sql
+  languages: [csharp]
+  severity: ERROR
+  message: SQL built from a parameter
+  mode: taint
+  pattern-sources: [{patterns: [{pattern-inside: "$T $M(..., string $X, ...) { ... }"}, {pattern: "$X"}]}]
+  pattern-sinks: [{patterns: [{pattern: "new SqlCommand($Q, ...)"}, {focus-metavariable: $Q}]}]
+- id: cs-path
+  languages: [csharp]
+  severity: ERROR
+  message: a path built from a parameter
+  mode: taint
+  pattern-sources: [{patterns: [{pattern-inside: "$T $M(..., string $X, ...) { ... }"}, {pattern: "$X"}]}]
+  pattern-sinks: [{pattern: "File.ReadAllText(...)"}]
+- id: cs-deser
+  languages: [csharp]
+  severity: ERROR
+  message: BinaryFormatter deserializes untrusted data
+  pattern: new BinaryFormatter().Deserialize(...)
+- id: py-cmd
+  languages: [python]
+  severity: ERROR
+  message: a shell command built from a parameter
+  mode: taint
+  pattern-sources: [{patterns: [{pattern-inside: "def $F(..., $X, ...): ..."}, {pattern: "$X"}]}]
+  pattern-sinks: [{pattern: "os.system(...)"}, {patterns: [{pattern: "subprocess.run($C, ..., shell=True, ...)"}, {focus-metavariable: $C}]}]
+- id: py-sql
+  languages: [python]
+  severity: ERROR
+  message: SQL built from a parameter
+  mode: taint
+  pattern-sources: [{patterns: [{pattern-inside: "def $F(..., $X, ...): ..."}, {pattern: "$X"}]}]
+  pattern-sinks: [{patterns: [{pattern: "$C.execute($Q)"}, {focus-metavariable: $Q}]}]
+- id: py-eval
+  languages: [python]
+  severity: ERROR
+  message: eval of a parameter
+  mode: taint
+  pattern-sources: [{patterns: [{pattern-inside: "def $F(..., $X, ...): ..."}, {pattern: "$X"}]}]
+  pattern-sinks: [{pattern: "eval(...)"}]
+- id: py-deser
+  languages: [python]
+  severity: ERROR
+  message: pickle loads untrusted data
+  pattern: pickle.loads(...)
