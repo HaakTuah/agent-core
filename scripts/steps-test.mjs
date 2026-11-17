@@ -51,7 +51,8 @@ function kit(name, o) {
   for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
-  fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), "{\n  \"windows\": {}\n}\n");
+  // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
+  execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
   fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
   return dir;
 }
@@ -759,6 +760,50 @@ const coreRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const there = to => fs.existsSync(path.join(coreRoot, to)) && fs.statSync(path.join(coreRoot, to)).isDirectory() === to.endsWith("/");
 ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Object.values(moved.apart()).flat().every(a => there(a.to) && fs.readFileSync(path.join(coreRoot, a.to), "utf8").includes(`**${a.lead}**`)),
   "each file at a path the rules left names a file or a folder that stands, and a rule it says stands elsewhere stands there", JSON.stringify([moved(), moved.apart()]));
+
+// the agent tools' files step: where the copies or pointer check cannot run to its verdict, it is not read, never done
+{
+  const step = STEPS.find(s => s.lead === "16 November 2026, the agent tools' files read for copies and pointers"), d = dirs["an-npm-project"];
+  const unread = () => { try { step.check(project(d)); return ""; } catch (e) { return e instanceof Unread ? e.message : `${e}`; } };
+  const cfg = path.join(d, "checks/copies.json"), was = fs.readFileSync(cfg, "utf8");
+  fs.writeFileSync(cfg, "{ not json");
+  let said = unread();
+  fs.writeFileSync(cfg, was);
+  ok(/the copies check did not run to its verdict on checks\/copies\.json/.test(said), "where the copies check stops before its verdict, the step is not read", said);
+  for (const script of ["copies.mjs", "pointers.mjs"]) {
+    const at = path.join(d, "core/scripts", script);
+    fs.renameSync(at, `${at}.away`);
+    said = unread();
+    fs.renameSync(`${at}.away`, at);
+    ok(said === `no copy of ${script} to run`, `with no copy of ${script}, the step is not read`, said);
+  }
+  if (process.platform !== "win32") {
+    const outside = path.join(tmp, "copies-outside.json");
+    fs.writeFileSync(outside, was); fs.rmSync(cfg); fs.symlinkSync(outside, cfg);
+    said = unread();
+    fs.rmSync(cfg); fs.writeFileSync(cfg, was);
+    ok(/the copies check's config `checks\/copies\.json` is no regular file of the project's own/.test(said), "a copies config whose link leads out of the project is not handed to the check", said);
+  }
+  ok(step.check(project(d)) === null, "and with each put back, the starter kit's project has nothing to list", step.check(project(d)) ?? "");
+  if (process.platform !== "win32") {
+    // (a tracked link to a file git does not track: what the step says follows that file, read through the link)
+    fs.mkdirSync(path.join(d, "notes"), { recursive: true });
+    fs.writeFileSync(path.join(d, "notes/g.md"), "# G\n\nAs `docs/nowhere-g.md` says.\n");
+    fs.symlinkSync("../../notes/g.md", path.join(d, ".kiro/steering/g.md"));
+    execFileSync("git", ["add", ".kiro/steering/g.md"], { cwd: d });
+    const before = step.check(project(d)) ?? "";
+    fs.writeFileSync(path.join(d, "notes/g.md"), "# G\n\nAs `AGENTS.md` says.\n");
+    const after = step.check(project(d));
+    execFileSync("git", ["rm", "-q", "-f", ".kiro/steering/g.md"], { cwd: d }); fs.rmSync(path.join(d, "notes"), { recursive: true });
+    ok(before.includes(".kiro/steering/g.md:3") && after === null, "a broken pointer in a tool's file that links to a file git does not track is named, and once that file is mended, no longer", `${before}\n${after}`);
+    // (a tracked link to a device, or to a file outside the project, is never opened: the step reads on)
+    fs.symlinkSync("/dev/zero", path.join(d, "zero")); fs.symlinkSync(path.join(tmp, "copies-outside.json"), path.join(d, "outside.json"));
+    execFileSync("git", ["add", "zero", "outside.json"], { cwd: d });
+    const linked = step.check(project(d));
+    execFileSync("git", ["rm", "-q", "-f", "zero", "outside.json"], { cwd: d });
+    ok(linked === null, "a tracked link to a device or to a file outside the project is never opened, and the step reads on", `${linked}`);
+  }
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
 process.exitCode = failed ? 1 : 0;

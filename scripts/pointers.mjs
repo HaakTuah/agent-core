@@ -19,28 +19,50 @@
 // and its points; a floor rule and an archive item stand alone. One of those two that leads nowhere fails the core's
 // own run, and is listed in a project's, so that a sync never fails a project's check over a citation of its own
 // (AGENTS.md of the core, "Nothing locks a project").
+// The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`).
+// Nothing locks a project: with POINTERS_BASE set to the pull request's base (as the copies workflow sets it), a broken
+// pointer in one of those files that the base held, in the same file and the same words, is noted and fails nothing,
+// and one it did not hold fails; with no base, as on a push to main, each is noted. The sync's step lists the old ones
+// until they are gone (core/setup/sync-notes.md, 16 November 2026).
 //
 //   node core/scripts/pointers.mjs
 //
 // In the core's own repository, `node scripts/pointers.mjs --core` checks its floor, its roles' files, its modules and
 // the files that point from the paths they left the same way (its tests workflow runs it): there a path under `core/` is the core's own, read without that folder, and what only a
-// project has (`.claude/`, the cloud proxy's `ccr/` routes) is not looked for.
-import { execFileSync } from "node:child_process";
+// project has (`.claude/`, the cloud proxy's `ccr/` routes) is not looked for. Its agent tools' files are read too.
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { logged } from "./guards.mjs";
+import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
+// (`--tools-at <commit>`, which this script gives itself alone: it reads that commit's tree, as git holds it, and prints
+// the broken pointers in its agent tools' files, each by its file and its words, as one JSON list; #405)
+const AT = process.argv.includes("--tools-at") ? process.argv[process.argv.indexOf("--tools-at") + 1] : null;
+if (AT !== null && !/^[0-9a-f]{40}$/u.test(AT ?? "")) { console.error("FAIL: --tools-at takes a commit's full SHA, which this script gives itself. Mend: run it without --tools-at"); process.exit(1); }
+// (at a commit, a link inside its tree followed as the work tree follows it: rule-files.mjs, `readAt`)
+const atCommit = AT ? readAt(AT) : null;
+const text = f => (AT ? atCommit(f) ?? "" : fs.readFileSync(f, 'utf8'));
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
-const tracked = git(['ls-files', '-z', '--recurse-submodules']).split('\0').filter(Boolean);
+const tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean);
 const CORE = process.argv.includes("--core");
-let RULES;
-try { RULES = CORE ? tracked.filter(f => /^(floor|floor\/topics|modules|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : ruleFiles(); } catch (e) { console.error(`FAIL: ${e.message}`); process.exit(1); }
-for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: the rule file ${rf} is no tracked file. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
+const show = AT ? f => (tracked.includes(f) ? atCommit(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
+let RULES, TOOLS;
+try {
+  // (an agent tool's files that no other way names a rule file, tracked, as git lists them)
+  // (at a commit, the agent tools' files alone, where a broken pointer is all it gives; one with no list of rule files
+  // there read as naming none)
+  const listed = () => { try { return ruleFiles(show, under); } catch (e) { if (AT) return []; throw e; } };
+  const old = CORE ? tracked.filter(f => /^(floor|floor\/topics|modules|roles|roles\/shared|tasks|tools)\/[^/]+\.md$/.test(f)) : listed();
+  TOOLS = new Set(toolFiles(show, under).filter(f => tracked.includes(f) && !old.includes(f)));
+  RULES = AT ? [...TOOLS] : [...old, ...TOOLS];
+} catch (e) { console.error(`FAIL: ${logged(e.message)}`); process.exit(1); }
+for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: ${logged(`the rule file ${rf} is no tracked file`)}. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
 if (process.exitCode) process.exit(1);
 const files = new Set(tracked), dirs = new Set(tracked.flatMap(f => f.split('/').slice(0, -1).map((_, i, p) => p.slice(0, i + 1).join('/') + '/')));
 const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
@@ -56,7 +78,7 @@ const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items
 const parsed = new Map();
 function parse(file) {
   if (parsed.has(file)) return parsed.get(file);
-  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/), anchors = [], heads = []; // (a Windows checkout's line endings too)
+  const lines = text(file).split(/\r?\n/), anchors = [], heads = []; // (a Windows checkout's line endings too)
   lines.forEach((l, i) => {
     const h = /^(#+)\s+(.*)$/.exec(l);
     if (h) { heads.push({ level: h[1].length, i }); anchors.push({ title: plain(h[2]), level: h[1].length, from: i }); }
@@ -115,7 +137,7 @@ const GLUE = /^(\s*,\s*|,?\s+and\s+|,?\s+in\s+|\s+of\s+|\s*\(\s*|\s*,\s*in\s+)$/
 
 const broken = [], unread = [], notFound = [], quotes = [];
 // the Markdown files the rule files name, where a quote with no file named is looked for
-const named = new Set(RULES.flatMap(rf => [...fs.readFileSync(rf, 'utf8').matchAll(/`([\w./-]+\.md)`/g)]
+const named = new Set(RULES.flatMap(rf => [...text(rf).matchAll(/`([\w./-]+\.md)`/g)]
   .map(m => files.has(m[1]) ? m[1] : tracked.filter(t => t.endsWith('/' + m[1]))).flat()).concat(RULES));
 let count = 0;
 for (const rf of RULES) {
@@ -228,10 +250,29 @@ for (const rf of RULES) {
     }
   }
 }
-for (const u of new Set(unread)) console.log(`note ${u}`);
+// A broken pointer in an agent tool's file, as { file, words }: the file it stands in and what is wrong, its line aside,
+// so that one the base held is known though lines moved; null for any other.
+const inTool = x => { for (const f of TOOLS) { const m = x.startsWith(`${f}:`) && /^:\d+: ([\s\S]*)$/u.exec(x.slice(f.length)); if (m) return { file: f, words: m[1] }; } return null; };
+const key = t => `${t.file}\t${t.words}`;
+if (AT) { console.log(JSON.stringify([...new Set(broken)].map(inTool).filter(Boolean).map(key))); process.exit(0); }
+// (in a project, one the pull request's base held is noted, and every one where there is no base to read against)
+const old = [];
+if (!CORE && broken.some(inTool)) {
+  const from = process.env.POINTERS_BASE ?? "";
+  let held = null;
+  if (from) {
+    let sha;
+    try { sha = git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${from}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${from} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); }
+    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "--tools-at", sha], { encoding: "utf8", maxBuffer: 1 << 28 });
+    try { held = new Set(JSON.parse(r.stdout)); } catch { console.error(`FAIL: the pointers in the agent tools' files at ${logged(from)} could not be read. Mend: run node ${HOME}scripts/pointers.mjs where git can read every file of that commit`); process.exit(1); }
+  }
+  for (let k = broken.length - 1; k >= 0; k--) { const t = inTool(broken[k]); if (t && (!held || held.has(key(t)))) old.push(...broken.splice(k, 1)); }
+}
+for (const u of new Set(unread)) console.log(`note ${logged(u)}`);
 // (in a project, a floor rule or an archive item that is not there is listed apart, read but found nowhere)
-for (const u of new Set(notFound)) console.log(`note ${u} (read, and not found: listed, not failed, in a project)`);
-if (quotes.length) console.log(`note ${new Set(quotes).size} quotes are no section of any file the rule files name, so read as quotes: ${[...new Set(quotes)].map(q => `"${q}"`).join(', ')}`);
-for (const x of new Set(broken)) console.error(`FAIL: a broken pointer: ${x}${x.includes(". Mend: ") ? "" : ". Mend: point it at the file, heading or numbered point that holds what it means, or take it out where that is gone"}`);
+for (const u of new Set(notFound)) console.log(`note ${logged(u)} (read, and not found: listed, not failed, in a project)`);
+for (const x of new Set(old.reverse())) console.log(`note ${logged(`a broken pointer in an agent tool's file: ${x}`)} (${process.env.POINTERS_BASE ? "the pull request's base held it" : "with no base to read against"}, so it fails nothing: point it at what holds what it means, or take it out)`);
+if (quotes.length) console.log(logged(`note ${new Set(quotes).size} quotes are no section of any file the rule files name, so read as quotes: ${[...new Set(quotes)].map(q => `"${q}"`).join(', ')}`));
+for (const x of new Set(broken)) console.error(`FAIL: ${logged(`a broken pointer: ${x}`)}${x.includes(". Mend: ") ? "" : ". Mend: point it at the file, heading or numbered point that holds what it means, or take it out where that is gone"}`);
 if (broken.length) process.exit(1);
-console.log(`ok   ${count} pointers in the rule files lead somewhere (${unread.length} in forms it cannot read${notFound.length ? `, ${notFound.length} read and not found` : ""}, listed above)`);
+console.log(`ok   ${count} pointers in the rule files lead somewhere (${unread.length} in forms it cannot read${notFound.length ? `, ${notFound.length} read and not found` : ""}${old.length ? `, ${new Set(old).size} old in an agent tool's file` : ""}, listed above)`);

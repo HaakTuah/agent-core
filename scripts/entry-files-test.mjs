@@ -94,13 +94,14 @@ const own = f => (fs.existsSync(path.join(root, f)) ? fs.readFileSync(path.join(
 ok(lacking(own).length === 0 && ENTRY.every(e => own(e.file) !== null), "the core's own entry files stand and pull in every file its AGENTS.md names");
 
 // the rule files the copies and pointer checks read take in the entry files and every file of a tool's folders
-const rfRead = reader({ "SECURITY.md": "**the rule files:** `docs/t.md`;", "AGENTS.md": "", ".kiro/steering/core.md": "", "GEMINI.md": "" });
-const rfList = d => (d === ".kiro/steering" ? [".kiro/steering/core.md", ".kiro/steering/api.md"] : d === ".agents/rules" ? [".agents/rules/x.md"] : []);
+const rfRead = reader({ "SECURITY.md": "**the rule files:** `docs/t.md`;", "AGENTS.md": "", ".kiro/steering/core.md": "", ".kiro/steering/api.md": "", ".agents/rules/x.md": "", "GEMINI.md": "" });
+const rfList = d => (d === ".kiro/steering" ? [".kiro/steering/core.md", ".kiro/steering/api.md", ".kiro/steering/out.md"] : d === ".agents/rules" ? [".agents/rules/x.md"] : []);
 const rf = ruleFiles(rfRead, rfList, { tools: true });
 ok([".kiro/steering/core.md", ".kiro/steering/api.md", ".agents/rules/x.md", "GEMINI.md", "docs/t.md", "AGENTS.md"].every(f => rf.includes(f)) && new Set(rf).size === rf.length,
   "with the tools' files, the rule files are the entry files, GEMINI.md, every file git tracks in a tool's folders of instructions, and SECURITY.md's list, each once");
+ok(!rf.includes(".kiro/steering/out.md"), "and a file of a tool's folder that the reader cannot read, such as a link that leads out of the project, is none of them");
 ok(JSON.stringify(ruleFiles(rfRead, rfList).sort()) === JSON.stringify(["AGENTS.md", "SECURITY.md", "docs/t.md"]),
-  "without them, as the copies and pointer checks read, the list is what it was before the tools' files came (#405)");
+  "without them, the list is the floor's files and SECURITY.md's, as it was before the tools' files came");
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;
