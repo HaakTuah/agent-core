@@ -206,6 +206,14 @@ function optionsOf(args) {
   return { dry: args.includes("--dry"), now: args.includes("--now"), toInbox: args.includes("--inbox") };
 }
 
+// The manifest, read as the steps read it (own-files.mjs): { manifest }, null in the core itself; or { refused }, the
+// line to fail with, where one is there but no file of the project's own.
+function manifestHere() {
+  const manifest = ownFiles(".").read("core-manifest.md", true);
+  if (manifest !== null || !fs.lstatSync("core-manifest.md", { throwIfNoEntry: false })) return { manifest };
+  return { refused: `FAIL: core-manifest.md is no regular file of the project's own of at most ${READ_MOST} bytes (a link that leads out of the project, a device, a folder, or a file too large), so nothing was looked at. Mend: make it the project's own manifest, a file tracked in git, as the starter kit writes it` };
+}
+
 // Where the look runs, with its options: GitHub's job or a session's run, the time, the manifest (null in the core),
 // the repository and its owner, the scripts' folder, and `say`, which prints a line and adds it to the job's summary.
 function settingOf(options, manifest) {
@@ -373,13 +381,8 @@ function main(args) {
   if (!options) return 1;
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
   if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository"); return 1; }
-  // (the manifest read as the steps read it: own-files.mjs; none in the core itself, and one that is there but no file
-  // of the project's own is refused)
-  const manifest = ownFiles(".").read("core-manifest.md", true);
-  if (manifest === null && fs.lstatSync("core-manifest.md", { throwIfNoEntry: false })) {
-    console.error(`FAIL: core-manifest.md is no regular file of the project's own of at most ${READ_MOST} bytes (a link that leads out of the project, a device, a folder, or a file too large), so nothing was looked at. Mend: make it the project's own manifest, a file tracked in git, as the starter kit writes it`);
-    return 1;
-  }
+  const { manifest, refused } = manifestHere();
+  if (refused) { console.error(refused); return 1; }
   const ctx = settingOf(options, manifest);
   const { job, now, at, repo, owner, scripts, say } = ctx;
 
