@@ -115,6 +115,12 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/exact-versions.mjs`: fails a dependency of the project's own written as a range. *Runs:* any session and the
   runners. *Else:* npm's `save-exact`, dropped on fact: it writes exact versions and checks none already written.
   *Bugs:* 1. **Keep:** small and stable, a read of `package.json`.
+- `scripts/lookup.mjs`: asks its registry of each package a pull request brings in new, and fails a name the
+  registry does not know or one first published days ago, printing the rest for the review (#488, point 1, merged
+  later the same day). *Runs:* any session and the runners, with the registry reachable. *Else:* `npm view` and NuGet's
+  own API, which it already asks; deps.dev and Socket, dropped on fact: hosted services (#534, point 6); OpenSSF
+  Scorecard, dropped on fact: it scores a repository's practices, not whether a name is new, and wants a token.
+  *Bugs:* 0. **Keep:** nothing fits; the registries are asked through their own interfaces, and the rule is the core's.
 - `scripts/agent-tools.mjs`: fails a plug-in, tool server, skill or hook a project configures for its agents that its
   licence config does not list with a publisher and one exact version. *Runs:* any session and the runners. *Else:* none
   found that reads every tool's own settings. *Bugs:* 2. **Keep:** nothing fits; the list is the core's policy. Its TOML
