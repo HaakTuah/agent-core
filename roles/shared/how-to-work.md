@@ -5,8 +5,8 @@ Read at the start of every task.
 The aim: as much finished work of full quality as the week's usage allows, at the lowest cost now and later. Four
 pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lean** and **read little**.
 
-- **The work never waits** (floor rule 14). Where something is open, take the best reading, say it
-  under "Readings taken" in the *report* with what it rests on.
+- **The work never waits** (floor rule 14). Say each reading taken under "Readings taken" in the *report*
+  with what it rests on.
 - **A question from the owner is a question:** answer it; act on it when the owner says so.
 - **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and
   config in one pass.
