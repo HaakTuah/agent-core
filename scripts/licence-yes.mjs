@@ -22,18 +22,35 @@
  * a shape it does not know would check less without a word.
  */
 export function acceptedList(list = [], key, named, shape, { entries = false, same = (name) => name } = {}) {
-  const text = (v) => typeof v === "string" && v.trim() !== "";
-  const only = (a, keys) => Object.keys(a).every((k) => keys.includes(k));
-  const whole = (a) => a && typeof a === "object" && !Array.isArray(a) && text(a.yes) && (a.package !== undefined
-    ? only(a, ["package", "licence", "ships", "yes", "notice"]) && text(a.package) && named.test(a.package) && text(a.licence)
-      && typeof a.ships === "boolean" && (a.notice === undefined || typeof a.notice === "string")
-    : entries && only(a, ["entry", "version", "licence", "ships", "yes"]) && text(a.entry) && (a.version === undefined || text(a.version))
-      && text(a.licence) && typeof a.ships === "boolean");
+  const whole = (a) => wholeYes(a, named, entries);
   if (!Array.isArray(list) || !list.every(whole)) throw new Error(`the config's "${key}" is not in the form it reads. Mend: write it as a list of { "package": "${shape}", "licence": ..., "ships": true or false, "yes": ..., and "notice" where it ships }${entries ? ', or { "entry": an audit entry\'s name, its "version" where it has one, "licence": ..., "ships": ..., "yes": ... }' : ""}`);
   const names = list.map((a) => (a.package !== undefined ? `package ${same(a.package)}` : `entry ${a.entry}${a.version === undefined ? "" : `, version ${a.version}`}`));
   const again = names.filter((n, i) => names.indexOf(n) !== i);
   if (again.length) throw new Error(`the config's "${key}" names one twice: ${[...new Set(again)].join(", ")}. Mend: keep one yes for each`);
   return list;
+}
+
+const text = (v) => typeof v === "string" && v.trim() !== "";
+const only = (a, keys) => Object.keys(a).every((k) => keys.includes(k));
+
+/** Whether an item of an accepted list (acceptedList, above) is whole: a yes for a package named as `named` reads
+ *  one, or, where the list takes `entries`, for an audit entry. */
+function wholeYes(a, named, entries) {
+  return a && typeof a === "object" && !Array.isArray(a) && text(a.yes) && (a.package !== undefined
+    ? packageYes(a, named)
+    : entries && entryYes(a));
+}
+
+/** Whether a yes for a package (wholeYes, above) holds its fields, and only those. */
+function packageYes(a, named) {
+  return only(a, ["package", "licence", "ships", "yes", "notice"]) && text(a.package) && named.test(a.package) && text(a.licence)
+    && typeof a.ships === "boolean" && (a.notice === undefined || typeof a.notice === "string");
+}
+
+/** Whether a yes for an audit entry (wholeYes, above) holds its fields, and only those. */
+function entryYes(a) {
+  return only(a, ["entry", "version", "licence", "ships", "yes"]) && text(a.entry) && (a.version === undefined || text(a.version))
+    && text(a.licence) && typeof a.ships === "boolean";
 }
 
 /** Whether a licence is named so that a machine can read it: a whole SPDX expression, each licence in it one of `ids`

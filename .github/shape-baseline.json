@@ -93,16 +93,6 @@
       "depth": 2,
       "branches": 20
     },
-    "function: scripts/licence-installed.mjs#check": {
-      "lines": 56,
-      "depth": 2,
-      "branches": 22
-    },
-    "function: scripts/licence-installed.mjs#leftOut": {
-      "lines": 37,
-      "depth": 3,
-      "branches": 21
-    },
     "function: scripts/licence-scan.mjs#attributesOf": {
       "lines": 17,
       "depth": 3,
@@ -112,21 +102,6 @@
       "lines": 35,
       "depth": 2,
       "branches": 27
-    },
-    "function: scripts/licence-scan.mjs#scan": {
-      "lines": 96,
-      "depth": 4,
-      "branches": 82
-    },
-    "function: scripts/licence-yes.mjs#acceptedList": {
-      "lines": 14,
-      "depth": 0,
-      "branches": 24
-    },
-    "function: scripts/look.mjs#main": {
-      "lines": 140,
-      "depth": 4,
-      "branches": 81
     },
     "function: scripts/state-report.mjs#projects": {
       "lines": 35,

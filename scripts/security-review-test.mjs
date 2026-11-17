@@ -197,12 +197,27 @@ ok(before.done === true && before.why.startsWith("before this check came, so not
 
 ok(is(judge(counted(pull, [stepChange]), [summary(running), early, said("Security review: the fallback reviewer's", "OWNER", "2026-11-12T10:40:00Z")], [], undefined, [stepChange]), false, "second") && is(judge(counted(pull, [stepChange]), [summary(running), said("Security review: one", "OWNER", "2026-11-12T10:30:00Z"), said("Security review: two", "OWNER", "2026-11-12T10:40:00Z")], [], undefined, [stepChange]), true, "floor rule 3's two"), "for floor rule 3's two, a review posted before Codex's running one began does not count either");
 
-// Whose posted review counts (#99): the repository's owner's, and the accounts the project names; nobody else's.
+// Whose posted review counts (#99): the repository's owner's, the accounts the project names, and those the host lets
+// write (#412); nobody else's.
 const as = (login, assoc = "COLLABORATOR", body = "Security review: fine") => ({ ...said(body, assoc), user: { login, type: "User" } });
 ok(is(judge(pull, [as("SomeOne", "OWNER")]), true, "is posted") && is(judge(pull, [as("helper")]), false, "no security review") && is(judge(pull, [as("helper", "MEMBER")]), false, "no security review"), "the owner's account counts, in any case; a collaborator or a member it does not name does not");
 ok(is(judge(pull, [as("helper")], [], undefined, undefined, true, { reviewers: ["helper"] }), true, "is posted") && is(judge(pull, [as("Helper")], [], undefined, undefined, true, { reviewers: reviewersOf("other, helper") }), true, "is posted") && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, true, { reviewers: ["helper"] }), false, "no security review"), "an account the project names counts, a collaborator or member still, never one with no say in the repository");
 ok(JSON.stringify(reviewersOf(" a-b  c,d[bot]\n$(x) -e f_g ")) === JSON.stringify(["a-b", "c", "d[bot]"]) && reviewersOf(undefined).length === 0 && is(judge({ ...pull, base: { repo: { owner: { login: "$(x)" } } } }, [as("$(x)", "OWNER")]), false, "no security review"), "the names are read as logins and nothing else");
 ok(is(judge({ ...pull, base: undefined }, [said("Security review: x")]), false, "no security review"), "with no owner to be read, only a named account counts");
+// a person the host lets write counts with nothing named (#412): GitHub's answer on the account's rights, read strictly
+const right = (login, role_name = "write", more = {}) => ({ permission: role_name === "admin" ? "admin" : ["write", "maintain"].includes(role_name) ? "write" : "read", role_name, user: { login, type: "User", permissions: { admin: role_name === "admin", maintain: role_name !== "write", push: true, triage: true, pull: true } }, ...more });
+const byRights = (comments, rights, bound = true) => judge(pull, comments, [], undefined, undefined, bound, { rights });
+ok(["write", "maintain", "admin"].every((role) => is(byRights([as("helper", "MEMBER")], [right("Helper", role)]), true, "is posted")) && is(byRights([as("helper")], [right("helper")]), true, "is posted"),
+  "a member's or collaborator's review counts where the host gives the account the role write, maintain or admin, its login in any case");
+ok(["read", "triage", "custom-reviewer"].every((role) => is(byRights([as("helper")], [right("helper", role)]), false, "no security review"))
+  && is(byRights([as("helper")], [right("helper", "custom-reviewer", { permission: "write" })]), false, "no security review"),
+  "a right to read or triage, or a custom role even on write, makes no owner: such an account is named in reviewers");
+ok(is(byRights([as("helper", "NONE")], [right("helper")]), false, "no security review") && is(byRights([as("helper")], [right("other")]), false, "no security review")
+  && is(byRights([{ ...as("helper"), user: { login: "helper", type: "Bot" } }], [right("helper")]), false, "no security review")
+  && is(byRights([as("helper")], [{ ...right("helper"), user: { ...right("helper").user, type: "Bot" } }]), false, "no security review"),
+  "the rights count only for the comment's own login, a person's on both sides, and never where GitHub gives the comment no say in the repository");
+ok(is(byRights([as("SomeOne", "OWNER")], []), true, "is posted") && is(byRights([as("helper")], undefined), false, "no security review") && is(judge(pull, [as("helper")], [], undefined, undefined, true, { reviewers: ["helper"], rights: [right("helper", "read")] }), true, "is posted"),
+  "with no rights read the owner's and the named accounts count as before, and an account named counts whatever its rights (AGENTS.md, \"Nothing locks a project\")");
 const unnamedOld = judge(pull, [as("helper")], [], undefined, undefined, false);
 ok(unnamedOld.done === true && unnamedOld.why.endsWith("a review from an account not named counts, as before this check came") && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request"), "a pull request from before the check: a member's or collaborator's review counts as it did then, said in the status, and no one else's");
 
