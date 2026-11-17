@@ -2,18 +2,20 @@
 // state report (state-report.mjs, beside this file, says when one is due), and in a month whose session runs on a newer
 // generation of model than the last pruning's, the session that takes the report runs each staged case (staged.mjs)
 // set from the core with the rules the case holds taken out, records the counts the rules' numbers read for the span
-// since the last pruning, and adds the list this prints. The list names each rule of the floor and the modules that:
+// since the last pruning, and adds the list this prints. The list names each rule of the floor, the modules and the
+// core's AGENTS.md that:
 //   - names a number (holders.json, "numbers", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
-//   - stands in for an outcome (its number not the outcome's own count) and moved at two prunings in a row while the
-//     outcome did not, the outcomes read as `correction: <kind>` counts them (OUTCOME_OF; fast and readable have none);
-//   - is held by a check that fired nowhere in the span: no run of a workflow that names the check failed on a pull
-//     request, which is read from GitHub's record of runs, so that a check sharing a workflow with others counts as
-//     fired where any of them did (never a guess that it did not);
+//   - stands in for an outcome (its number not one of the outcome's direct measures) and moved at two prunings in a row
+//     while those measures did not, each read as outcomes.mjs's MEASURES count it (fast, readable and usable have none);
+//   - is held by a check that fired nowhere in the span: no step of a workflow that runs it failed on a pull request,
+//     read from GitHub's record of each failed run's jobs and their steps, and from the workflows' steps as the core's
+//     own reader of YAML gives them (workflow-run.mjs, beside this file); a check no step names is not judged so;
 //   - is held by a staged case that passed without it.
-// Each listed with its step: a rule read at a role's start moves first to a module read on need, and one read on need
-// may go. A rule fewer than EARLY merged pull requests came under since it joined (read from git: the first commit
-// that wrote its lead in bold, and the merges on the first-parent line since) is "too early" and not judged; one of the
-// floor is never listed for its check alone. Beside the list, under "in use", the citations of each rule in the span
+// Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
+// move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
+// fewer than EARLY merged pull requests came under since it joined (read from git: the first commit that wrote its lead
+// in bold, and the merges on the first-parent line since) is "too early" and not judged; one that guards against rare
+// and severe harm, of the floor or with a number marked "; rare harm", is never listed for its check alone. Beside the list, under "in use", the citations of each rule in the span
 // (cited.mjs, beside this file), which say a rule is applied and never that it helps. It removes nothing: the owner
 // decides which go. The record is RECORD, written by --read and --record and committed in a pull request of its own.
 // The core's own repository alone. Git, gh and Node's own modules.
@@ -32,18 +34,17 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { KINDS, NUMBER } from "./outcomes.mjs";
+import { KINDS, MEASURES, NUMBER } from "./outcomes.mjs";
 import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 
 export const RECORD = "reports/pruning.json";
 export const EVERY = 2, EARLY = 20;
-// The outcome each kind of correction counts, as outcomes.mjs reads them (#302): the one count of an outcome's own a
-// pruning records.
-export const OUTCOME_OF = { misread: "asked", "looks wrong": "usable", "does not work": "robust" };
-const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), each outcome's own count (\"outcomes\"), the runs of each workflow that failed on a pull request (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"). Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
+// The outcomes' direct measures (outcomes.mjs; #302), whose counts a pruning records.
+const DIRECT = MEASURES.filter(m => m.direct);
+const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"). Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
 
-// The record: { prunings: [{ at, model, from, numbers, outcomes, fired, cited, without }] }, oldest first.
+// The record: { prunings: [{ at, model, from, numbers, direct, corrections, fired, cited, without }] }, oldest first.
 export function readRecord(root = ROOT) {
   try { const r = JSON.parse(fs.readFileSync(path.join(root, RECORD), "utf8")); return Array.isArray(r.prunings) ? r : { prunings: [] }; } catch { return { prunings: [] }; }
 }
@@ -88,8 +89,9 @@ export function without(keys, all, read) {
   return { texts, missing };
 }
 
-// The workflows of `workflows` ({ path: text }) that run the check `by` (a holder's script or workflow).
-export const workflowsOf = (by, workflows) => (by.startsWith(".github/workflows/") ? [by] : Object.keys(workflows).filter(w => workflows[w].includes(by)));
+// The steps that run the check `by` (a holder's script, or a workflow, all of whose steps do), each "<workflow>#<its
+// name>", from `steps` ({ workflow: [{ name, run }] }).
+export const stepsOf = (by, steps) => Object.entries(steps).flatMap(([w, list]) => list.filter(st => (by.startsWith(".github/workflows/") ? w === by : String(st.run ?? "").includes(by))).map(st => `${w}#${st.name}`));
 
 // The checks a rule's holders name (holders.json's "holders"), each a script or workflow, or GitHub's setting.
 export const checksOf = (key, named) => [named[key] ?? []].flat().map(h => /^check: (.+?)(?:, in part)?$/u.exec(String(h))?.[1]).filter(Boolean);
@@ -104,28 +106,33 @@ function stood(key, n, p) {
 }
 
 // The sign that the number `n` of the rule `key`, a stand-in, moved at each of the last two prunings of `p` while the
-// outcome it stands for, by its own count, did not; null where it did not, or where the outcome has no count of its own.
+// direct measures of the outcome it stands for did not; null where they moved, or where the outcome has none. A number
+// that is a direct measure's own count (`correction: misread` for "asked") stands in for nothing.
 function standIn(key, n, p) {
-  const outcome = n ? NUMBER.exec(n)?.[2] : null, kind = Object.keys(OUTCOME_OF).find(k => OUTCOME_OF[k] === outcome);
-  if (!kind || n === `correction: ${kind}; outcome: ${outcome}` || p.length < 3) return null;
-  const last = p.slice(-3), v = last.map(x => numberAt(x, key)), o = last.map(x => (typeof x.outcomes?.[kind] === "number" ? x.outcomes[kind] : null));
-  if ([...v, ...o].includes(null) || v[0] === v[1] || v[1] === v[2] || o[0] !== o[1] || o[1] !== o[2]) return null;
-  return `its number moved at two prunings while its outcome, ${outcome}, did not (${kind}: ${o[2]})`;
+  const [, what, outcome] = (n && NUMBER.exec(n)) || [], direct = DIRECT.filter(m => m.outcome === outcome);
+  if (!direct.length || direct.some(m => what === `correction: ${m.key}`) || p.length < 3) return null;
+  const last = p.slice(-3), v = last.map(x => numberAt(x, key)), o = last.map(x => direct.map(m => x.direct?.[m.key]));
+  if (v.includes(null) || o.flat().some(x => typeof x !== "number") || v[0] === v[1] || v[1] === v[2] || `${o[0]}` !== `${o[1]}` || `${o[1]}` !== `${o[2]}`) return null;
+  return `its number moved at two prunings while its outcome, ${outcome}, did not (${direct.map((m, i) => `${m.key}: ${o[2][i]}`).join(", ")})`;
 }
 
-// The sign that every check of the rule `r` (`checks`) runs in a workflow that failed on no pull request in the newest
-// pruning's span; null where one did, where a check's workflow is not known, or for a rule of the floor.
-function silent(r, checks, workflows, now) {
-  const runs = checks.map(by => workflowsOf(by, workflows));
-  if (!now?.fired || r.file.startsWith("floor/") || !runs.length || runs.some(w => !w.length) || runs.flat().some(w => now.fired[w])) return null;
-  return `its check never fired from ${now.from ?? "the start"} to ${now.at} (${[...new Set(runs.flat())].join(", ")})`;
+// Whether the rule `r`, with its number `n`, guards against rare and severe harm: one of the floor, or one whose number
+// says so.
+export const rare = (r, n) => r.file.startsWith("floor/") || / ?; rare harm$/u.test(String(n ?? ""));
+
+// The sign that no step that runs a check of the rule `r` (`checks`) failed on a pull request in the newest pruning's
+// span; null where one did, where a check is run by no step known, or for a rule that guards against rare harm.
+function silent(r, n, checks, steps, now) {
+  const runs = checks.map(by => stepsOf(by, steps));
+  if (!now?.fired || rare(r, n) || !runs.length || runs.some(x => !x.length) || runs.flat().some(x => now.fired[x])) return null;
+  return `its check never fired from ${now.from ?? "the start"} to ${now.at} (${[...new Set(runs.flat())].join("; ")})`;
 }
 
 // The signs that a rule may go, from the prunings `p` (oldest first, the newest last), its number `n` (or undefined),
-// its checks (scripts or workflows), the workflows' texts, and the staged cases that hold it.
-function signsOf(r, { p, n, checks, workflows, cases }) {
+// its checks (scripts or workflows), the workflows' steps, and the staged cases that hold it.
+function signsOf(r, { p, n, checks, steps, cases }) {
   const now = p.at(-1), passed = cases.filter(c => now.without?.[c.name]?.verdict === "pass").map(c => `its staged case ${c.name} passed without it`);
-  return [stood(r.key, n, p), standIn(r.key, n, p), silent(r, checks, workflows, now), ...passed].filter(Boolean);
+  return [stood(r.key, n, p), standIn(r.key, n, p), silent(r, n, checks, steps, now), ...passed].filter(Boolean);
 }
 
 // The list's closing lines: what was too early or could not be read, the citations "in use", and who decides.
@@ -142,21 +149,21 @@ function closing({ all, numbers, now, early, unread }) {
 }
 
 // The list's lines. `all`: the rules (rules.mjs's); `named`: holders.json's "holders"; `numbers`: its "numbers";
-// `record`; `cases`: the staged cases ({ name, holds }); `workflows`: { path: text }; `starts`: the keys of the rules a
-// role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null.
-export function list({ all, named, numbers, record, cases, workflows, starts, joined }) {
+// `record`; `cases`: the staged cases ({ name, holds }); `steps`: the workflows' steps, { path: [{ name, run }] };
+// `starts`: the keys of the rules a role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null.
+export function list({ all, named, numbers, record, cases, steps, starts, joined }) {
   const p = ordered(record), now = p.at(-1);
   if (!now) return ["- No pruning is recorded yet: nothing to list (`node scripts/pruning.mjs --due`)."];
   const listed = [], early = [], unread = [];
   for (const r of all) {
-    const n = numbers[r.key], signs = signsOf(r, { p, n, checks: checksOf(r.key, named), workflows, cases: cases.filter(c => c.holds.includes(r.key)) });
+    const n = numbers[r.key], signs = signsOf(r, { p, n, checks: checksOf(r.key, named), steps, cases: cases.filter(c => c.holds.includes(r.key)) });
     const came = signs.length ? joined(r) : undefined;
     if (came === undefined) continue;
     if (came === null) unread.push(r.key);
     else if (came < EARLY) early.push(`${r.key} (${came})`);
     else {
-      const step = starts.has(r.key) ? "read at a role's start, so it moves first to a module read on need" : "read on need, so it may go where nothing changed since it moved";
-      listed.push(`- ${r.key}: ${signs.join("; ")}. Its step: ${step}. Its number: ${n ?? "none named"}; cited ${now.cited?.[r.key] ?? 0} times.`);
+      const step = starts.has(r.key) ? "1, read at a role's start: it moves first to a module read on need" : "2, read on need: it may go where nothing changed since it moved";
+      listed.push(`- ${r.key}: ${signs.join("; ")}. Its step of the pruning: ${step}. Its number: ${n ?? "none named"}; cited ${now.cited?.[r.key] ?? 0} times.`);
     }
   }
   return [
@@ -178,8 +185,18 @@ export function joinedIn(r, root = ROOT) {
   } catch { return null; }
 }
 
-// The workflows' texts at `root`.
-const workflowsAt = root => { const dir = path.join(root, ".github", "workflows"); return Object.fromEntries(fs.readdirSync(dir).filter(f => /\.ya?ml$/u.test(f)).map(f => [`.github/workflows/${f}`, fs.readFileSync(path.join(dir, f), "utf8")])); };
+// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's own reader of YAML, each mapping
+// written on one line as a list's item (a matrix's, which holds no step) set aside first, since it reads none; a
+// workflow it cannot read has none.
+export async function stepsAt(root = ROOT) {
+  const { parseYaml } = await import("./workflow-run.mjs"), dir = path.join(root, ".github", "workflows"), out = {};
+  for (const f of fs.readdirSync(dir).filter(x => /\.ya?ml$/u.test(x))) {
+    let yaml = {};
+    try { yaml = parseYaml(fs.readFileSync(path.join(dir, f), "utf8").replace(/^(\s*-[ \t]+)\{[^\n]*\}[ \t]*$/gmu, "$1(set aside)")); } catch { /* (none read) */ }
+    out[`.github/workflows/${f}`] = Object.values(yaml.jobs ?? {}).flatMap(j => (Array.isArray(j?.steps) ? j.steps : [])).filter(st => typeof st?.name === "string").map(st => ({ name: st.name, run: st.run ?? "" }));
+  }
+  return out;
+}
 const holdersAt = root => JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8"));
 
 // Today's pruning in the record, made where there is none.
@@ -204,22 +221,26 @@ async function findingsOf({ repo, from, to, owner, gh }) {
   return out;
 }
 
-// The corrections of each kind filed from `from` to `to` (outcomes.mjs).
-async function correctionsOf({ repo, from, to, owner, gh }) {
-  const { pagesOf } = await import("./labels.mjs"), { corrections, LABEL } = await import("./outcomes.mjs");
-  const issues = pagesOf(`repos/${repo}/issues?state=all&labels=${LABEL}&since=${from}`, gh).filter(i => !i.pull_request);
-  const notes = issues.flatMap(i => pagesOf(`repos/${repo}/issues/${i.number}/comments`, gh).map(c => ({ issue: i.number, at: c.created_at, login: c.user?.login, body: c.body ?? "" })));
-  const out = Object.fromEntries(KINDS.map(k => [k, 0]));
-  for (const c of corrections(issues, notes, owner).filter(x => x.at >= from && x.at < to && x.kind)) out[c.kind]++;
-  return out;
+// The outcomes' direct measures and the corrections of each kind, from `from` to `to`, as outcomes-read.mjs reads
+// them within its budget: { direct: { key: count }, corrections: { kind: count } }; each null where it ran out.
+async function outcomesOf({ repo, from, to, owner, gh }) {
+  const { read } = await import("./outcomes-read.mjs"), w = { from: Date.parse(from), to: Date.parse(to) };
+  let data;
+  try { data = read(repo, w.from, w.to, owner, gh); } catch (e) { if (e instanceof RangeError) return { direct: null, corrections: null }; throw e; }
+  const corrections = Object.fromEntries(KINDS.map(k => [k, data.corrections.filter(c => c.kind === k && Date.parse(c.at) >= w.from && Date.parse(c.at) < w.to).length]));
+  return { direct: Object.fromEntries(DIRECT.map(m => [m.key, m.of(data, w).n])), corrections };
 }
 
-// The runs that failed on a pull request from `from` to `to`, by workflow: { path: count }.
+// The steps that failed on a pull request from `from` to `to`, each "<workflow>#<step's name>": { step: count }, read
+// from each failed run's jobs.
 function firedOf({ repo, from, to, gh }) {
   const out = {};
   for (let page = 1; page <= 50; page++) {
     const runs = JSON.parse(gh(`repos/${repo}/actions/runs?event=pull_request&status=failure&created=${from.slice(0, 10)}..${to.slice(0, 10)}&per_page=100&page=${page}`) || "{}").workflow_runs ?? [];
-    for (const run of runs.filter(x => x.path)) out[run.path] = (out[run.path] ?? 0) + 1;
+    for (const run of runs.filter(x => x.path && Number.isInteger(x.id))) {
+      const jobs = JSON.parse(gh(`repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`) || "{}").jobs ?? [];
+      for (const st of jobs.flatMap(j => j.steps ?? []).filter(x => x.conclusion === "failure")) out[`${run.path}#${st.name}`] = (out[`${run.path}#${st.name}`] ?? 0) + 1;
+    }
     if (runs.length < 100) break;
   }
   return out;
@@ -235,21 +256,21 @@ async function citedOf({ repo, from, to, gh, all }) {
   return out;
 }
 
-// The counts of `repo` from `from` to `to` (ISO times), through `gh` (labels.mjs's ghApi form): { numbers, outcomes,
-// fired, cited }, each rule's number as `numbers` (holders.json's) names it: its findings, its check's fires, those of
-// the workflows `workflowsOfRule(key)` gives, or the corrections of a kind.
-export async function counts({ repo, from, to, owner, gh, all, numbers, workflowsOfRule }) {
+// The counts of `repo` from `from` to `to` (ISO times), through `gh` (labels.mjs's ghApi form): { numbers, direct,
+// corrections, fired, cited }, each rule's number as `numbers` (holders.json's) names it: its findings, its check's
+// fires (of the steps `stepsOfRule(key)` gives), or the corrections of a kind (null where they were not read).
+export async function counts({ repo, from, to, owner, gh, all, numbers, stepsOfRule }) {
   const span = { repo, from, to, owner, gh }, { ruleOf } = await import("./review-record.mjs");
-  const findings = await findingsOf(span), outcomes = await correctionsOf(span), fired = firedOf(span), cited = await citedOf({ ...span, all });
+  const findings = await findingsOf(span), { direct, corrections } = await outcomesOf(span), fired = firedOf(span), cited = await citedOf({ ...span, all });
   const of = {
     findings: key => findings.get(ruleOf(key)) ?? 0,
-    "check fires": key => workflowsOfRule(key).reduce((sum, w) => sum + (fired[w] ?? 0), 0),
+    "check fires": key => stepsOfRule(key).reduce((sum, x) => sum + (fired[x] ?? 0), 0),
   };
   const nums = Object.fromEntries(Object.entries(numbers).filter(([, n]) => NUMBER.test(n)).map(([key, n]) => {
     const what = NUMBER.exec(n)[1];
-    return [key, of[what] ? of[what](key) : outcomes[what.slice("correction: ".length)]];
+    return [key, of[what] ? of[what](key) : corrections?.[what.slice("correction: ".length)] ?? null];
   }));
-  return { numbers: nums, outcomes, fired, cited };
+  return { numbers: nums, direct, corrections, fired, cited };
 }
 
 const fail = msg => { console.error(`FAIL: ${msg}`); process.exitCode = 1; };
@@ -307,8 +328,8 @@ async function recordCmd(get) {
   const record = readRecord(), last = ordered(record).filter(x => x.at < new Date().toISOString().slice(0, 10)).at(-1);
   const to = new Date().toISOString().replace(/\.\d{3}Z$/u, "Z"), from = last ? `${last.at}T00:00:00Z` : new Date(Date.now() - EVERY * 31 * 864e5).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let c;
-  const h = holdersAt(ROOT), workflows = workflowsAt(ROOT), workflowsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => workflowsOf(by, workflows));
-  try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(), numbers: h.numbers ?? {}, workflowsOfRule }); }
+  const h = holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
+  try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(ROOT, { agents: true }), numbers: h.numbers ?? {}, stepsOfRule }); }
   catch (e) { return fail(`GitHub did not answer for ${repo}: ${String(e.message).split("\n")[0]}. Mend: run it where gh answers for the owner's account, or try again once GitHub does`); }
   Object.assign(today(record, get("--model")), { from, ...c });
   writeRecord(record);
@@ -323,8 +344,9 @@ async function main(argv) {
   if (argv.includes("--due")) { const d = due({ month: new Date().toISOString().slice(0, 7), record: readRecord(), model: get("--model") }); return console.log(`${d.due ? "due" : "not due"}: ${d.why}`); }
   const { startRules } = await import("./cited.mjs");
   const { CASES } = await import("./staged.mjs");
-  const all = rules(), h = holdersAt(ROOT), starts = new Set([...startRules(all).values()].flatMap(s => [...s]));
-  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, workflows: workflowsAt(ROOT), starts, joined: r => joinedIn(r) }).join("\n"));
+  // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
+  const all = rules(ROOT, { agents: true }), h = holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
+  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, joined: r => joinedIn(r) }).join("\n"));
 }
 
 if (started(import.meta.url)) await main(process.argv.slice(2));

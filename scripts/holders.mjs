@@ -76,7 +76,7 @@ function numbersWrong(root, numbers) {
   const keys = new Set(rules(root, { agents: true }).map(r => r.key)), wrong = [];
   for (const [key, n] of Object.entries(numbers)) {
     if (!keys.has(key)) wrong.push(`${FILE}, "numbers", names "${key}", which is no rule as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`);
-    else if (!NUMBER.test(String(n))) wrong.push(`${FILE}, "numbers", "${key}": "${n}" is in no form it reads. Mend: write "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for`);
+    else if (!NUMBER.test(String(n))) wrong.push(`${FILE}, "numbers", "${key}": "${n}" is in no form it reads. Mend: write "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm`);
   }
   return wrong;
 }

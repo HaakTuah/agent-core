@@ -225,7 +225,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   check does: an agent keeps the project within it, and the project is safer for it. It comes from a standing word of
   the owner's (`roles/shared/inbox.md`, "An order for now is not a rule"), with an item of the archive behind it, and
   goes into a module read only when a task needs it, with a check wherever a machine can hold it. Nothing changes it.
-  Whoever writes a rule puts it to this test in its pull request, and the design check blocks one that fails it. It
+  The design check of a pull request that adds or changes a rule blocks one that fails this test. It
   does not mean that what only the owner can act on (a duty to an authority, a promise to customers, whether a law
   reaches a product) is a rule: it is information for the owner, kept out of the rule files, binding no session. The
   core names no project outside its archive and reports. Reason: agents do what a rule file says, needed or not, at
@@ -261,7 +261,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   went wrong or would without it (an incident, a review's finding, the owner's reason), its holder, or that it has
   none yet, and its number (#303): a line "Number:" with the count the rule is meant to lower (`findings`, the review
   findings that name it; `check fires`; or `correction: <kind>`, #302) and the one of the five outcomes it stands for
-  (`; outcome: asked`, `fast`, `readable`, `usable` or `robust`), as `scripts/holders.json` keeps it under "numbers";
+  (`; outcome: asked`, `fast`, `readable`, `usable` or `robust`), then `; rare harm` where it guards against rare and
+  severe harm, as `scripts/holders.json` keeps it under "numbers";
   "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists each
   rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
   review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only points elsewhere or
@@ -292,21 +293,24 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   whose report a session of a newer generation of model takes than the last pruning's (`node scripts/pruning.mjs --due
   --model <its id>`), the session that takes the report runs each staged case with the rules it holds taken out
   (`scripts/pruning.mjs --set`, then `--read`), records the counts (`--record`) and adds as a note the list
-  `node scripts/pruning.mjs` prints, the record in a pull request of its own: the rules whose number did not move since
-  the last pruning, whose check never fired, whose case passed without them, or whose number, a stand-in, moved at two
-  prunings while its outcome did not. A rule fewer than twenty merged pull requests have come under since it joined is
-  "too early" and not judged, and one of the floor is never listed for a check that did not fire: its staged case
-  judges it. Nothing changes it. The owner decides which go, a few at a time, the numbers read again before more go; a rule read at a
-  role's start moves first to a module read on need and goes only where nothing changes after that, kept in the
-  archive with its reason and its last number, and may return. It does not mean that a session removes or moves a
+  `node scripts/pruning.mjs` prints, the record in a pull request of its own: the rules of the floor, the modules and
+  this file whose number did not move since the last pruning, whose check no failed step of a pull request's run
+  shows firing, whose case passed without them, or whose number, a stand-in, moved at two prunings while its outcome's
+  direct measures did not. A rule fewer than twenty merged pull requests have come under since it joined is "too
+  early" and not judged, and one that guards against rare and severe harm, the floor's and any whose number says so, is
+  never listed for a check that did not fire: its staged case judges it. Nothing changes it. The owner decides which
+  go, a few at a time, the numbers read again before more go; the list gives each rule its step: a rule read at a
+  role's start is at step 1, to move to a module read on need, and one read on need at step 2, to go where nothing
+  changed after its move, kept in the archive with its reason and its last number, and free to return. It does not mean that a session removes or moves a
   rule by its own choice, or that a listed rule goes. Reason: the core tested that a rule holds and never whether it
   is still needed, and an unneeded one costs every session that reads it. Held by `scripts/pruning.mjs`, which makes
   the list, and by the state report, which says when a pruning is due.
-- **Proof is sized to what a thing costs others** (#303). By default a number that shows a thing pays is asked, by
-  the design check of the pull request that adds or changes it, only of text a role reads at its start, a check that
-  can fail a pull request, a slow test and anything hard to remove; none of a fast test, a line of a module read on
-  need or an ordinary change. Nothing changes it. Whoever adds a measure has a script count it, never a hand, and takes none that costs
-  more than keeping the thing does. It does not mean a rule names no number: its line costs a line and is asked all
+- **Proof is sized to what a thing costs others** (#303). By default the design check of a pull request that adds a
+  thing asks for a number that shows it pays only where the thing is text a role reads at its start, a check that can
+  fail a pull request, a test that adds a tenth of its suite's time mark or more (`tasks/tests.md`), or a choice one
+  pull request cannot reverse (`tasks/choices.md`); of anything else, a quicker test or a line of a module read on need
+  among them, it asks none, and it holds a new measure to one a script counts, never a hand, that costs less than
+  keeping the thing does. Nothing changes it. It does not mean a rule names no number: its line costs a line and is asked all
   the same ("Every rule says what holds it"); what is sized is the work of proving. Reason: proof that costs more than
   what it guards against is the overhead it was meant to cut. Held by the review guidelines ("A rule file changed").
 - **A rule is written to one pattern.** Whoever writes or changes a rule of the floor, the modules or

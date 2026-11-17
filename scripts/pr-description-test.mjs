@@ -44,6 +44,8 @@ ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMe
 ok(numberMend("## What holds it\n\nNone\n") === null && numberMend("x") === null
   && numberMend("## What holds it\n- \"A rule\": held by its check.\n  Number: correction: misread; outcome: asked.\n## Readings taken\nNumber: x") === null,
   "the number is asked only where \"What holds it\" stands and holds more than None, and one line in its form is enough");
+ok(numberMend("## What holds it\n- Number: check fires; outcome: robust; rare harm.") === null && numberMend("## What holds it\n- Number: check fires; outcome: robust; rare") !== null,
+  "a number may say that its rule guards against rare and severe harm, in those words");
 ok([numberMend("## What holds it\n- \"A rule\": held by its check.\n## Readings taken\nNumber: findings; outcome: robust"), numberMend("### What holds it\n- Number: findings; outcome: cost")].every(m => /Mend: under it, .*"Number: <findings \| check fires \| correction: <kind>>; outcome: <asked/.test(m ?? ""))
   && /it reads "findings; outcome: cost"/.test(numberMend("### What holds it\n- Number: findings; outcome: cost")),
   "a rule with no number under the heading, one under another heading, or one in no form, is to mend, the mend giving the form");
