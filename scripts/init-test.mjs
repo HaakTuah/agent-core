@@ -291,10 +291,25 @@ if (p.status === 0) {
   const partly = baseRun();
   git(core, "reset", "-q", "--hard", "main");
   fs.rmSync(path.join(core, "notes.md"), { force: true });
+  // (a line in any script counts: a read file of a heading and lines in another alphabet, deleted, is not taken in by a
+  // file that holds the heading alone)
+  const branch = git(core, "rev-parse", "--abbrev-ref", "HEAD");
+  git(core, "checkout", "-q", "-b", "with-notes");
+  fs.writeFileSync(path.join(core, "roles/shared/notes.md"), "# Notes\n\nПервая строка\nВторая строка\nТретья строка\n");
+  git(core, "add", "roles/shared/notes.md");
+  git(core, "commit", "-q", "-m", "a read file in another alphabet");
+  git(core, "rm", "-q", "roles/shared/notes.md");
+  fs.writeFileSync(path.join(core, "elsewhere.md"), "# Notes\n");
+  git(core, "add", "elsewhere.md");
+  const alphabet = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "with-notes" }, encoding: "utf8" });
+  git(core, "checkout", "-q", "-f", branch);
+  git(core, "branch", "-q", "-D", "with-notes");
+  git(core, "reset", "-q", "--hard", "main");
+  fs.rmSync(path.join(core, "elsewhere.md"), { force: true });
   const tookIn = file => new RegExp(`reads 1 files fewer than main's config read: ${file} \\(prose, which took in most of the lines of roles/shared/how-to-work\\.md, deleted\\)\\. Mend: take the config back`, "u");
   ok(/^D\troles\/shared\/how-to-work\.md$/mu.test(status) && rewritten.status === 1 && tookIn("elsewhere\\.md").test(rewritten.out) && mended(rewritten.out)
-    && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0,
-    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them passes", `${status}${rewritten.out}${movedIn.out}${partly.out}`);
+    && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0 && alphabet.status === 0,
+    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them, or only the lines in one alphabet of a file in two, passes", `${status}${rewritten.out}${movedIn.out}${partly.out}${alphabet.stdout}${alphabet.stderr}`);
   // (a file of the core's copy that a sync moves out of what the project's config reads fails nothing: the core's own
   // pull request held the move)
   const coreFile = fs.readdirSync(path.join(p.dir, "core/tasks")).find(f => f.endsWith(".md"));

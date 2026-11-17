@@ -191,24 +191,31 @@ function renamed(commit) {
   }
   return { to, gone, grown };
 }
-// The lines of a text that hold a word, each once, trimmed: what a file "holds" of another's.
-const wordLines = text => new Set(String(text ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => /\w/u.test(l)));
+// The lines of a text that hold a letter or a number of any script, as proseUnits reads them, each once, trimmed: what
+// a file "holds" of another's.
+const wordLines = text => new Set(String(text ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => /[\p{L}\p{N}]/u.test(l)));
 // Where the text of a commit's files that git calls deleted went: to the file the tree adds or changes whose new
 // lines hold more than half of its own, so that one renamed and rewritten past half, which git reads as deleted and
 // added, or one moved into another file, is followed all the same (#434); null where none does, the file deleted with
 // its text. Only the lines a file gained count, so a copy that stood before is never taken for the text moved. No file
-// of the core's copy takes it in, as a sync moves those.
+// of the core's copy takes it in, as a sync moves those. The files are read only once a deleted file is looked up.
 function linesMoved(commit, grown) {
-  const index = new Map(), to = new Map(), show = readAt(commit);
-  for (const f of grown) {
-    if (CORE && f.startsWith(CORE)) continue;
-    let text = "";
-    try { text = git(["show", `:${f}`]); } catch { /* (no such file in the index: it holds none) */ }
-    const had = wordLines(show(f));
-    for (const l of wordLines(text)) if (!had.has(l)) (index.get(l) ?? index.set(l, []).get(l)).push(f);
-  }
+  const to = new Map(), show = readAt(commit);
+  let index = null;
+  const indexed = () => {
+    const map = new Map();
+    for (const f of grown) {
+      if (CORE && f.startsWith(CORE)) continue;
+      let text = "";
+      try { text = git(["show", `:${f}`]); } catch { /* (no such file in the index: it holds none) */ }
+      const had = wordLines(show(f));
+      for (const l of wordLines(text)) if (!had.has(l)) (map.get(l) ?? map.set(l, []).get(l)).push(f);
+    }
+    return map;
+  };
   return f => {
     if (!to.has(f)) {
+      index ??= indexed();
       const was = wordLines(show(f)), held = new Map();
       for (const l of was) for (const a of index.get(l) ?? []) held.set(a, (held.get(a) ?? 0) + 1);
       to.set(f, [...held].find(([, n]) => n * 2 > was.size)?.[0] ?? null);
