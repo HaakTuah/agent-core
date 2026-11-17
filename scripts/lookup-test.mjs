@@ -3,7 +3,7 @@
 // the registry gives, trimmed to what the lookup reads, and handed to it in place of the network (floor rule 8: no
 // live call, no real package). Run: node scripts/lookup-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "./lookup.mjs";
@@ -91,6 +91,8 @@ const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-he
 ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,dev-moss,from-git,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
 ok(newPackages([["a/package-lock.json", [pkg("x", { direct: false })]], ["b/package-lock.json", [pkg("x")]]], []).length === 1, "a package new in two lock files is looked up once, where the project names it");
 ok(newPackages([["a/package-lock.json", [pkg("x")]], ["b/package-lock.json", [pkg("x", { direct: false })]]], [])[0]?.lockPath === "a/package-lock.json", "and once named by the project, it stays so where another lock file only brings it");
+const both = newPackages([["a/package-lock.json", [pkg("twin-moss", { from: "a git address" })]], ["b/package-lock.json", [pkg("twin-moss")]]], []);
+ok(both.length === 2 && both.some((p) => !p.from), "a name from git does not stand in for the same name the registry gives, which is still looked up");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]], true).length === 0, "NuGet: an id the base held in another case is not new");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]]).length === 1, "npm: a name is held by its exact spelling");
 
@@ -186,9 +188,17 @@ try {
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a lock file the pull request newly names in the config makes no name held (${r.lines})`);
   writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
+  // A lock file the pull request makes a link to a file outside the project: refused, and nothing of the file printed.
+  const outside = mkdtempSync(join(tmpdir(), "lookup-outside-"));
+  writeFileSync(join(outside, "secret.txt"), "invented-secret-text-not-json");
+  rmSync(join(tmp, "package-lock.json"));
+  symlinkSync(join(outside, "secret.txt"), join(tmp, "package-lock.json"));
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-secret/u.test(r.lines.join("\n")), `a lock file that links out of the project is refused, unread (${r.lines})`);
+  rmSync(join(tmp, "package-lock.json")); rmSync(outside, { recursive: true, force: true });
   writeFileSync(join(tmp, "package-lock.json"), "{ not json");
   r = await run(config, { root: tmp, base, get, now: NOW });
-  ok(r.code === 1 && mended(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend (${r.lines})`);
+  ok(r.code === 1 && mended(r.lines.join("\n")) && !/not json/u.test(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend and quoting none of it (${r.lines})`);
   // The sync's step, on a workflow of the project's own: each lookup is asked for apart, so one does not hide the other.
   const step = STEPS.filter((x) => x.lead === "16 November 2026, a new package looked up");
   mkdirSync(join(tmp, ".github/workflows"), { recursive: true });

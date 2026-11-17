@@ -22,7 +22,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
-import { logged, parseBounded } from "./guards.mjs";
+import { leadsOut, logged, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { projectAt } from "./core-path.mjs";
@@ -44,9 +44,14 @@ const when = (text) => (typeof text === "string" && /^\d{4}-\d\d-\d\dT/u.test(te
 
 // ---- What a lock file holds
 
+// A lock file's text parsed, or an error that names the file and none of its text (a parser's message quotes it).
+function parsed(text, lockPath) {
+  try { return parseBounded(text); } catch { throw new Error(`${logged(lockPath)} cannot be read as JSON. Mend: write it anew with its package manager, never by hand`); }
+}
+
 /** The packages of an npm lock file's text that npm's registry gives: each { name, version, path, direct, brings }. */
 export function npmPackages(text, lockPath) {
-  const lock = parseBounded(text), packages = lock?.packages;
+  const lock = parsed(text, lockPath), packages = lock?.packages;
   if (!packages || typeof packages !== "object" || Array.isArray(packages)) throw new Error(`${lockPath} holds no "packages". Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);
   const own = new Set(Object.keys(packages).filter((p) => !lockInstalled(p)));
   // (what the project's own packages ask for, their development dependencies too, it names itself; what an installed
@@ -102,7 +107,7 @@ function reach(start, next) {
 export function nugetPackages(text, lockPath) {
   const { packages, failures } = lockPackages(text, lockPath);
   if (failures.length) throw new Error(failures[0]);
-  const lock = parseBounded(text.replace(/^﻿/u, "")), out = new Map();
+  const lock = parsed(text.replace(/^﻿/u, ""), lockPath), out = new Map();
   for (const entries of Object.values(lock.dependencies)) {
     const lower = new Map(Object.keys(entries).map((id) => [id.toLowerCase(), id]));
     const next = (id) => Object.keys(entries[id]?.dependencies ?? {}).map((d) => lower.get(d.toLowerCase())).filter(Boolean);
@@ -123,12 +128,15 @@ export function nugetPackages(text, lockPath) {
 /** The packages of `head` (lists of packages, one for each lock file) whose name no list of `base` holds, one for each
  *  name, its lock file named: npm's names as written, NuGet's in any case. */
 export function newPackages(head, base, nuget = false) {
-  const key = (name) => (nuget ? name.toLowerCase() : name);
-  const held = new Set(base.flat().map((p) => key(p.name))), out = new Map();
+  // (an entry from elsewhere than the registry is kept apart from one of the same name the registry gives, so that it
+  // never stands in for the one the lookup asks of)
+  const key = (p) => `${nuget ? p.name.toLowerCase() : p.name}${p.from ? "\u0000from" : ""}`;
+  const name = (p) => (nuget ? p.name.toLowerCase() : p.name);
+  const held = new Set(base.flat().map(name)), out = new Map();
   for (const [lockPath, packages] of head) for (const p of packages) {
-    if (held.has(key(p.name))) continue;
-    const was = out.get(key(p.name));
-    if (!was || (p.direct && !was.direct)) out.set(key(p.name), { ...p, lockPath });
+    if (held.has(name(p))) continue;
+    const was = out.get(key(p));
+    if (!was || (p.direct && !was.direct)) out.set(key(p), { ...p, lockPath });
   }
   return [...out.values()];
 }
@@ -276,7 +284,11 @@ async function pool(items, size, work) {
 export function packagesOf(config, root, base, nuget, baseConfig = null) {
   const named = (c) => { try { return nuget ? [...nugetConfig(c).ships, ...nugetConfig(c).tools] : Array.isArray(c?.lockfiles) ? c.lockfiles : []; } catch { return []; } };
   const read = nuget ? nugetPackages : npmPackages;
-  const head = named(config).map((f) => [f, read(readFileSync(posix.join(root, f), "utf8"), f)]);
+  const head = named(config).map((f) => {
+    // (a lock file the pull request makes a link out of the project is never read: floor rule 5)
+    if (leadsOut(root, posix.join(root, f))) throw new Error(`${logged(f)} leads out of the project, through a link. Mend: make it a file of the project's own, written by its package manager`);
+    return [f, read(readFileSync(posix.join(root, f), "utf8"), f)];
+  });
   const baseFiles = [...new Set(named(baseConfig).map((f) => posix.normalize(f)))];
   const baseLists = baseFiles.map((f) => { try { return read(textAt(root, base, f) ?? "", f); } catch { return []; } });
   return { head, base: baseLists };
