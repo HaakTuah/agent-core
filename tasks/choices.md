@@ -20,7 +20,16 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
     kept, three at the least, one of them the plain or the less common one, each with what would make it the wrong
     pick. It does not mean a number of candidates, nor a trial for each: the trial is the costly part, the list cheap.
     Reason: "at least three" was read as three, and the three were those the issue had named;
-  - **a measure where one is cheap:** a small trial on the project's hardest part, not an argument;
+  - **a drop says whether it rests on a fact** (#515): each line that drops a candidate says whether its reason is a
+    fact, what follows from a fixed constraint ("a binary for each system that no one reads"), or an assumption that
+    could be measured ("slower to write"); an assumption that drops a candidate the criteria would otherwise keep gets
+    a cheap measure, or is marked for the challenger, whose case takes it up. It does not mean a trial for every
+    candidate. Reason: in the first record argued this way a language was dropped on how fast it is written, which no
+    one measured;
+  - **the same trial for each option kept** (#515): each option kept goes through one trial on the project's hardest
+    part, not an argument; where a stand-in was measured in an option's place (one runtime for its kind, a start-up
+    time for a port), the record says so and what was not tried. Reason: two languages on that record's short list
+    were measured only by how fast they start;
   - **popularity only for what it buys,** named: documentation, upkeep, how well agents write it; "it is what most
     use" is no reason by itself;
   - **the blind pick** (#515): a fresh session given the problem and the criteria, never the record, its list or its
