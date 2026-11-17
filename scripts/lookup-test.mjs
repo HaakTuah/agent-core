@@ -230,6 +230,8 @@ try {
   ok(notDone(tmp, step).length === 1, "nor one in a step allowed to fail");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n        if: false\n");
   ok(notDone(tmp, step).length === 1, "nor one under a condition the reader cannot tell");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    continue-on-error: true\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor one in a job allowed to fail");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /no `ref:`/u.test(missed[0].mend), `and a checkout of another commit than the merge does not hold the base (${missed.map((m) => m.mend)})`);

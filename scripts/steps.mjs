@@ -401,7 +401,7 @@ function jobsOf(w) {
     const steps = Array.isArray(job?.steps) ? job.steps : [];
     const runOf = st => (typeof st?.run === "string" ? commands(st.run) : []);
     // (a step or job under an `if:`, whose condition the reader cannot tell, does not count)
-    const fails = st => typeof st?.run === "string" && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !/lookup\.mjs[^\n]*\|\|/u.test(st.run);
+    const fails = st => typeof st?.run === "string" && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"] && !/lookup\.mjs[^\n]*\|\|/u.test(st.run);
     return { runs: steps.flatMap(runOf), counted: started ? steps.flatMap(st => (fails(st) ? runOf(st) : [[]])) : [],
       deep: steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
   });
@@ -634,7 +634,7 @@ export const STEPS = [
           jobs.some(j => !j.deep && j.counted.some(c => looksUp(c, undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
         ].filter(Boolean);
       });
-      return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (no \`if:\` on it or its job, no \`continue-on-error\`, no \`||\` after it), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
+      return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (no \`if:\` or \`continue-on-error\` on it or its job, no \`||\` after it), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
     },
     partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
 ];
