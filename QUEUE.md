@@ -13,11 +13,23 @@ it merges last.
 | #486, points 6 to 8 and 11 | rule builder | |
 | #527, step 2 | rule builder | #526 |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue, as #534's line below does | |
-| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | #488's points 1 and 3 to 5 |
-| #528, step 3 | rule builder | #527, and #488's points 1 and 3 to 5 |
+| #534, point 13 | rule builder | |
+| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
+| #579 | builder | |
+| #580 | builder | |
+| #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
+| #582 | builder | |
+| #583 | builder | |
+| #584 | rule builder | |
+| #589 | builder | |
+| #590 | builder | #580 |
+| #591 | builder | #589 |
+| #585 | builder | |
+| #586 | builder | |
+| #528, step 3 | rule builder | #527 |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder | #529 |
-| #534, point 8 | rule builder | #530 |
+| #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
