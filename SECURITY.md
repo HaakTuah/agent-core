@@ -44,7 +44,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `scripts/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:": read by the code scan
      (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine with no variable that holds a token,
-     and silences no finding a comment in the code asks it to; its tests: `scripts/code-scan-test.mjs`.
+     and silences no finding a comment in the code asks it to; hostile tests: `scripts/code-scan-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node

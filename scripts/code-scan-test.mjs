@@ -57,6 +57,17 @@ ok(throws(() => engineFiles(zip([[`${BIN}README`, "x"]]), "linux")) && throws(()
 // what a description lists as false alarms, and whether the host scans a project
 ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false alarm: `b.py:3`, why\nscan false alarm: `c.cs:1`\nSee Scan false alarm: `d.js:4`")].join(" ") === "src/a.js:12 b.py:3",
   "a false alarm is a line of its own, opening \"Scan false alarm:\" with its place in backticks");
+// (hostile descriptions: nothing, the wrong type, markup, a path, a number out of range, too long; none lists a finding
+// it does not name exactly, and none takes long)
+{
+  const t0 = Date.now();
+  const long = `${"Scan false alarm: `".repeat(200000)}x`;
+  ok(falseAlarms(undefined).size === 0 && falseAlarms(null).size === 0 && falseAlarms(42).size === 0 && falseAlarms({ toString: () => "Scan false alarm: `a.py:1`" }).size === 1 && falseAlarms("").size === 0,
+    "a description that is nothing, or no text, lists no false alarm, and one is read as text");
+  ok([...falseAlarms("<b>Scan false alarm: `a.py:1`</b>\nScan false alarm: `<script>`\nScan false alarm: `a.py:1x`")].length === 0, "markup around or in the line lists nothing");
+  ok([...falseAlarms("Scan false alarm: `../../etc/passwd:1`\nScan false alarm: `a.py:99999999999999999999999`")].join(" ") === "../../etc/passwd:1 a.py:99999999999999999999999", "a path or a number out of range is listed only as written, matching no finding a file inside the project gives");
+  ok(falseAlarms(long).size === 0 && Date.now() - t0 < 2000, "a description far past any real one is read in time, and lists nothing");
+}
 {
   const p = path.join(tmp, "host"); fs.mkdirSync(path.join(p, ".github", "workflows"), { recursive: true });
   fs.writeFileSync(path.join(p, ".github", "workflows", "codeql.yml"), "# uses: owner/core/.github/workflows/codeql.yml@x (a comment)\njobs: {}\n");
@@ -163,6 +174,9 @@ def ok5(cur):
 
   // a pull request: one line it adds is a weakness, one hidden behind a comment, one listed as a false alarm
   fs.appendFileSync(path.join(repo, "tasks.py"), "def added(name):\n    os.system(\"rm \" + name)  # nosemgrep\ndef listed(n):\n    os.popen(\"ls \" + n)\n");
+  // (files named so that git would quote them in a diff's header, or so that they read as an option)
+  const ODD = ["ünï.py", "-x.py", ...(process.platform === "win32" ? [] : ['a "q" b.py'])]; // (Windows takes no quote in a name)
+  for (const odd of ODD) fs.writeFileSync(path.join(repo, odd), "import os\ndef go(arg):\n    os.system(\"ls \" + arg)\n");
   try { fs.symlinkSync("tasks.py", path.join(repo, "link.py")); } catch { /* (no links made here, as on Windows without the right) */ }
   git("add", "-A"); git("commit", "-q", "-m", "change");
   const run = (args, body = "") => spawnSync(process.execPath, [SCRIPT, ...args, "--engine", dir], { cwd: repo, encoding: "utf8", env: { ...env, PR_BODY: body } });
@@ -170,10 +184,11 @@ def ok5(cur):
   const out = failing.stdout + failing.stderr;
   ok(failing.status === 1 && /FAIL: tasks\.py:\d+: a parameter reaches a shell command \(py-command\), on a line this change adds/u.test(out) && mended(out), "a weakness on a line the change adds fails, saying its mend", out);
   ok((out.match(/^FAIL: tasks\.py:/gmu) ?? []).length === 2, "a comment in the code silences no finding", out);
+  ok(ODD.every(f => out.includes(`FAIL: ${f}:3:`)), "a file whose name git quotes, or that reads as an option, is scanned, its finding failing", out);
   ok(/reported, not failed: tasks\.py:5: .* on a line that stood before this change/u.test(out) && !/^FAIL: (web|Handlers)/mu.test(out), "a weakness on a line that stood before is reported, and passes", out);
   ok(!/link\.py/u.test(out), "a file that is a link is not read", out);
-  const at = /^FAIL: (tasks\.py:\d+): .*py-command/mu.exec(out)?.[1], at2 = [...out.matchAll(/^FAIL: (tasks\.py:\d+):/gmu)].map(m => m[1]).find(x => x !== at);
-  const explained = run(["--base", "HEAD~1"], `Scan false alarm: \`${at}\`, invented for the test\nScan false alarm: \`${at2}\`, invented too`);
+  const listedAll = [...out.matchAll(/^FAIL: (.+?:\d+): /gmu)].map(m => `Scan false alarm: \`${m[1]}\`, invented for the test`).join("\n");
+  const explained = run(["--base", "HEAD~1"], listedAll);
   ok(explained.status === 0 && /passed: tasks\.py:\d+: .* listed in the description as a false alarm/u.test(explained.stdout), "a finding the description lists as a false alarm passes, said so", explained.stdout + explained.stderr);
   const host = path.join(repo, ".github", "workflows"); fs.mkdirSync(host, { recursive: true });
   fs.writeFileSync(path.join(host, "codeql.yml"), "jobs:\n  a:\n    uses: owner/core/.github/workflows/codeql.yml@main\n");

@@ -150,17 +150,17 @@ export function targets(root, base) {
   return listed.filter(f => KINDS.test(f) && !f.startsWith(copy) && !leadsOut(root, path.join(root, f)) && fs.lstatSync(path.join(root, f), { throwIfNoEntry: false })?.isFile());
 }
 
-/** The lines the change adds to each file, from git's diff with no context: Map(file → Set(line)). */
+/** The lines the change adds to each file, from git's diff of that file alone with no context, so that no name git
+ *  would quote in a diff's header is read: Map(file → Set(line)). */
 export function addedLines(root, base, files) {
   const out = new Map();
-  if (!files.length) return out;
-  const diff = execFileSync("git", ["diff", "-U0", "--no-renames", "--no-color", base, "HEAD", "--", ...files], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
-  let file = null;
-  for (const line of diff.split("\n")) {
-    const to = /^\+\+\+ (?:b\/(.*)|\/dev\/null)$/u.exec(line);
-    if (to) { file = to[1] ?? null; if (file && !out.has(file)) out.set(file, new Set()); continue; }
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u.exec(line);
-    if (hunk && file) for (let n = Number(hunk[1]), i = 0; i < Number(hunk[2] ?? 1); i++) out.get(file).add(n + i);
+  for (const file of files) {
+    const diff = execFileSync("git", ["diff", "-U0", "--no-renames", "--no-color", "--no-ext-diff", base, "HEAD", "--", file], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+    const lines = new Set();
+    for (const hunk of diff.matchAll(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gmu)) {
+      for (let n = Number(hunk[1]), i = 0; i < Number(hunk[2] ?? 1); i++) lines.add(n + i);
+    }
+    out.set(file, lines);
   }
   return out;
 }
