@@ -245,7 +245,7 @@ function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
     if (at === null) return void state.sources.set(name, "is not in the starter kit's form");
-    if (state.linked(at)) return void state.sources.set(name, `fetches ${show(at)} from main, which the project holds as a link, so main gives the name of the file it leads to in place of a script`);
+    if (state.linked(at)) return void state.sources.set(name, `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`);
   }
 }
 
@@ -459,11 +459,16 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
   // (whether the project holds a path as a link: git's mode 120000 at a commit, a link in the working tree)
   // (or on main, as `linkedOnMain` says: the base, which a hook fetches from until the pull request merges)
-  const own = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
+  // (anything but a plain file: a link, a folder or a submodule, in the commit's listing; in the working tree, the
+  // commit it stands on too, where a submodule shows as an empty folder)
+  const own = at => notFile(listing(root, rev ?? "HEAD"), at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
   return { ...project, links };
 }
+
+// Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
+const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at);
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
 // a link inside the repository is followed (eight hops at most), its target put before what is left of the path, so a
@@ -593,7 +598,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
-  const head = readProject(root, null, base ? at => listing(root, base).linked.has(at) : undefined);
+  const head = readProject(root, null, base ? at => notFile(listing(root, base), at) : undefined);
   const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
   const kit = [...kitHooks(), ...(base ? kitHooks(atBase) : [])];
   let list = listed(config, file);

@@ -426,24 +426,37 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(windowsRun({ ".codex/config.toml": `[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "command"\ncommand = ${JSON.stringify(KIT_HOOK)}\ncommand_windows = ${JSON.stringify(evil)}\n` }, `Codex Stop: ${KIT_HOOK} (Windows: ${evil})`), "and so does one in config.toml whose command_windows is not", NOT_KIT);
   const only = { type: "command", command_windows: evil };
   fails(windowsRun({ ".codex/hooks.json": codexHook(only) }, `Codex Stop: ${JSON.stringify(only)}`), "and one with a Windows command alone", NOT_KIT);
+  // (#476's fallback security review of 490c9d9: a folder or a submodule's entry at the fetched path is no script either,
+  // since git prints what it holds, a name a line, for bash to run)
+  const NOT_FILE = 'fetches "scripts/format.sh" from main, which the project holds as no plain file';
+  fails(run(pr(project({ ...listing() }), { "scripts/format.sh/bash evil.sh": "", ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a folder fails", NOT_FILE);
+  const mainDir = project({ "scripts/format.sh/x": "", ...listing() });
+  fs.rmSync(path.join(mainDir, "scripts/format.sh"), { recursive: true });
+  fails(run(pr(mainDir, { "scripts/format.sh": "echo a file\n", ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "and one whose fetched path main holds as a folder", NOT_FILE);
+  const sub = project({ ...listing() });
+  git(sub, "checkout", "-q", "-B", "change");
+  change(sub, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) });
+  git(sub, "add", "-A"); git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},scripts/format.sh`);
+  git(sub, "commit", "-q", "-m", "a submodule's entry"); git(sub, "checkout", "-q", "main"); git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
+  fails(run(sub), "and one whose fetched path is a submodule's entry", NOT_FILE);
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {
     const linkFetch = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.symlinkSync("./tree.sh", path.join(linkFetch, "scripts/format.sh"));
-    fails(run(pr(linkFetch, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a link from main fails", 'fetches "scripts/format.sh" from main, which the project holds as a link');
+    fails(run(pr(linkFetch, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a link from main fails", 'fetches "scripts/format.sh" from main, which the project holds as no plain file');
     // (#476's code review of ac42a35: the starter kit's own hooks too, where what they fetch is a link)
     const kitLink = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.mkdirSync(path.join(kitLink, "core/scripts"), { recursive: true });
     fs.symlinkSync("../../scripts/tree.sh", path.join(kitLink, "core/scripts/work-saved.sh"));
-    fails(run(pr(kitLink, { "README.md": "a change of its own\n" }), "--core"), "a hook of the starter kit's own, unchanged, whose fetched file is a link, fails", 'fetches "core/scripts/work-saved.sh" from main, which the project holds as a link');
+    fails(run(pr(kitLink, { "README.md": "a change of its own\n" }), "--core"), "a hook of the starter kit's own, unchanged, whose fetched file is a link, fails", 'fetches "core/scripts/work-saved.sh" from main, which the project holds as no plain file');
     // (#476's code review of a76614d: and where main holds it as a link that the pull request makes a file, since the hook
     // fetches from main until the pull request merges)
     const mainLink = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.symlinkSync("./tree.sh", path.join(mainLink, "scripts/format.sh"));
     git(mainLink, "add", "-A"); git(mainLink, "commit", "-q", "-m", "a link on main");
     git(mainLink, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(mainLink, "scripts/format.sh"));
-    fails(run(pr(mainLink, { "scripts/format.sh": "echo a file\n", ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "and so does one whose fetched link the pull request makes a file, main holding the link until it merges", 'fetches "scripts/format.sh" from main, which the project holds as a link');
+    fails(run(pr(mainLink, { "scripts/format.sh": "echo a file\n", ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "and so does one whose fetched link the pull request makes a file, main holding the link until it merges", 'fetches "scripts/format.sh" from main, which the project holds as no plain file');
   }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes(NOT_KIT), "the sync note's step reads not done while a hook not in the kit's form stands unmarked");
