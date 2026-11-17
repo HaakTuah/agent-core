@@ -17,12 +17,14 @@
 // words>"), and its tool servers there ("Codex <name>"; toml.mjs reads it). A link inside the checkout is followed; one
 // that leads out of it is not, and fails, save one the base held as it stands. What a person or a machine configures
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
-// `.kiro/agents`, say), and where a plug-in's marketplace or a tool server's command points, are the review's.
+// `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
+// tool server's command points, are the review's. A tool's file in another case fails, as the tool may read it.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
-// `main`): a hook of any tool read here runs its copy on main only where each of its commands is the starter kit's
-// form (hook-source.mjs), which fetches its script from main; any other fails, since nothing shows it does not run the
-// working tree's copy, which the branch it runs on can change. One that stood before is listed in the baseline, its
+// `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
+// among them, is the starter kit's form (hook-source.mjs), which fetches its script from main, and the file it fetches
+// is no link; any other fails, since nothing shows it does not run the working tree's copy, which the branch it runs on
+// can change. One that stood before is listed in the baseline, its
 // entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked so fails, and so does
 // a mark taken out while its hook stands, or a mark on a hook in the kit's form.
 //
@@ -56,7 +58,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
-import { kitForm } from "./hook-source.mjs";
+import { fetchedBy } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 import { parseToml } from "./toml.mjs";
@@ -81,14 +83,14 @@ const show = value => JSON.stringify(value) ?? String(value);
 // file's text or null; `skills()` the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the
 // names in a folder of the project (here .kiro/hooks); `kit` that these are the starter kit's own files (kitHooks()),
 // whose hooks are read for their source too.
-export function configured(read, skills, files = () => [], kit = false) {
+export function configured(read, skills, files = () => [], kit = false, linked = () => false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Set(), servers = [], texts = new Map();
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, kit };
+  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, kit, linked };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -191,6 +193,17 @@ function declaredMarkets(settings, file, markets) {
   for (const [name, m] of Object.entries(declared)) markets.set(name, { source: m?.source, file });
 }
 
+// What one hook of these runs: { runs, whether it is a command hook; text, its name's command; commands, each command
+// it may run }, the command Codex runs on Windows in its place among them ("commandWindows", or "command_windows" in
+// TOML), whatever the hook's type, each held to the kit's form and named, so its entry in the list reads otherwise than
+// the kit's.
+const WINDOWS = ["commandWindows", "command_windows"];
+function commandsOf(hook) {
+  const runs = hook?.type === "command" && typeof hook.command === "string";
+  const windows = WINDOWS.filter(k => hook && typeof hook === "object" && Object.hasOwn(hook, k)).map(k => hook[k]);
+  if (!runs) return { runs, text: JSON.stringify(hook), commands: windows };
+  return { runs, text: `${hook.command}${windows.length ? ` (Windows: ${windows.map(String).join(", ")})` : ""}`, commands: [hook.command, ...windows] };
+}
 // The hooks one settings file configures, into configured()'s `state`: Claude Code's, or, with `tool`, another tool's
 // written the same way (Codex's).
 function readHooks(state, file, settings, tool = "") {
@@ -198,10 +211,7 @@ function readHooks(state, file, settings, tool = "") {
   for (const [event, groups] of Object.entries(all && typeof all === "object" && !Array.isArray(all) ? all : {})) {
     for (const group of Array.isArray(groups) ? groups : []) {
       const matcher = typeof group?.matcher === "string" && group.matcher ? group.matcher : "";
-      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) {
-        const runs = hook?.type === "command" && typeof hook.command === "string";
-        addHook(state, file, { tool, event, matcher, given: group?.matcher, hook, runs, text: runs ? hook.command : JSON.stringify(hook), commands: runs ? [hook.command] : [] });
-      }
+      for (const hook of Array.isArray(group?.hooks) ? group.hooks : []) addHook(state, file, { tool, event, matcher, given: group?.matcher, hook, ...commandsOf(hook) });
     }
   }
 }
@@ -230,10 +240,15 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   if (!state.kit && kitIds().has(id)) return;
   readSource(state, name, commands);
 }
-// Each hook with a command that is not the starter kit's form, into `state.sources`: nothing shows it runs its copy on
-// main (hook-source.mjs).
+// Each hook with a command that is not the starter kit's form, into `state.sources` with why: nothing shows it runs its
+// copy on main (hook-source.mjs); nor where the file the kit's form fetches the project holds as a link (`linked`), whose
+// target's name main gives in the script's place, a file the branch can change.
 function readSource(state, name, commands) {
-  if (!commands.every(kitForm)) state.sources.add(name);
+  for (const command of commands) {
+    const at = fetchedBy(command);
+    if (at === null) return void state.sources.set(name, "is not in the starter kit's form");
+    if (state.linked(at)) return void state.sources.set(name, `fetches ${show(at)} from main, which the project holds as a link, so main gives the name of the file it leads to in place of a script`);
+  }
 }
 
 // The pins of the plug-ins turned on and the tool servers, by their "kind name" keys, where their configuration gives
@@ -395,8 +410,8 @@ export function check(head, list, kit, file) {
 // check()'s `sources` and `marked`, and into `problems` each mark on a hook in the starter kit's form.
 function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
-  for (const k of head.sources ?? []) {
-    const said = `${describe(k)}, configured in ${head.tools.get(k)}, is not in the starter kit's form, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
+  for (const [k, why] of head.sources ?? []) {
+    const said = `${describe(k)}, configured in ${head.tools.get(k)}, ${why}, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
     if (list?.from?.has(k)) marked.push([k, said]);
     else sources.push([k, `${said}. Mend: ${HOW}, in this pull request`]);
   }
@@ -446,7 +461,37 @@ export function readProject(root, rev = null) {
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
-  return { ...configured(read, skills, names), links };
+  // (whether the project holds a path as a link: git's mode 120000 at a commit, a link in the working tree)
+  const linked = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
+  const project = configured(read, skills, names, false, linked);
+  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
+    const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
+    project.problems.push(problem);
+    project.texts.set(problem, `${at}\0`);
+  }
+  return { ...project, links };
+}
+
+// The tools' files this check reads, and their folders, as each tool names them.
+const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
+const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
+// Each path of `paths` that names a tool's file or folder in another case, or a hook file of Kiro's whose ".json" is,
+// as [the path, the name the check reads]: a file system that ignores case gives the tool the file this check passes by.
+function misnamed(paths) {
+  const out = [];
+  for (const at of paths) {
+    const low = at.toLowerCase();
+    const file = TOOL_FILES.find(f => f === low && f !== at);
+    const folder = TOOL_FOLDERS.find(d => low.startsWith(d) && !at.startsWith(d));
+    const want = file ?? (folder ? `${folder}${at.slice(folder.length)}` : at);
+    const fixed = path.posix.dirname(want) === ".kiro/hooks" ? want.replace(/\.json$/iu, ".json") : want;
+    if (fixed !== at) out.push([at, fixed]);
+  }
+  return out;
+}
+// The paths the working tree holds of the project's, tracked or not but never ignored, git asked once.
+function tracked(root) {
+  try { return execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }).split("\0").filter(Boolean); } catch { return []; }
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:

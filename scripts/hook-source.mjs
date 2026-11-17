@@ -4,17 +4,26 @@
 // running it, perhaps with plain words after it, which that script, main's, reads. Nothing else is read: no other
 // command shows where what it runs comes from, so none passes for it. Node's own modules only.
 //
-//   import { kitForm } from "./hook-source.mjs";
+//   import { fetchedBy, kitForm } from "./hook-source.mjs";
 //   kitForm(command) -> whether it is one of the kit's forms, whole
+//   fetchedBy(command) -> the path of the project it fetches from main, or null where it is in neither form
 
 // The starter kit's two forms of a hook's command, as setup/'s templates write them: its script fetched from main into
 // "$f" and run, perhaps with plain words after it, and nothing else, the second after one or more tests that a file is
 // there or is not; only the paths and those words change.
 const KIT_PATH = "[\\w.-]+(?:/[\\w.-]+)*", KIT_ARGS = "((?: [\\w.-]+)*)";
-const kitFetch = dir => `f=\\$\\(git -C "${dir}" --no-replace-objects show refs/remotes/origin/main:${KIT_PATH} 2>/dev/null\\)`;
+const kitFetch = dir => `f=\\$\\(git -C "${dir}" --no-replace-objects show refs/remotes/origin/main:(?<fetched>${KIT_PATH}) 2>/dev/null\\)`;
 const KIT_FORMS = [
   new RegExp(`^bash -c '${kitFetch("\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}")} \\|\\| (?:exit 0|\\{ echo "[^"'$\`\\\\]*"; exit 0; \\}); (?:bash -c "\\$f"${KIT_ARGS}|node --input-type=module -e "\\$f"())'$`, "u"),
   new RegExp(`^bash -c 'r=\\$\\(git rev-parse --show-toplevel 2>/dev/null\\) \\|\\| exit 0; (?:\\[ (?:! )?-f "\\$r/${KIT_PATH}" \\] \\|\\| exit 0; )+${kitFetch("\\$r")} \\|\\| exit 0; CLAUDE_PROJECT_DIR="\\$r" bash -c "\\$f"${KIT_ARGS}'$`, "u"),
 ];
 
-export const kitForm = command => KIT_FORMS.some(form => form.test(String(command)));
+// The path a command in one of the kit's forms fetches from main, or null where the command is in neither.
+export function fetchedBy(command) {
+  for (const form of KIT_FORMS) {
+    const found = form.exec(String(command));
+    if (found) return found.groups.fetched;
+  }
+  return null;
+}
+export const kitForm = command => fetchedBy(command) !== null;

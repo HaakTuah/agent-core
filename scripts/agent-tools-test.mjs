@@ -414,6 +414,27 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const notifyRun = words => run(pr(project({ ...listing() }), { "scripts/notify.sh": "", ".codex/config.toml": `notify = ${JSON.stringify(words)}\n`, ...listing({ kind: "hook", name: `Codex notify: ${words.join(" ")}`, publisher: "this project" }) }));
   passes(notifyRun(kitNotify), "Codex's notify given as the kit's form, bash, -c and its script, passes");
   fails(notifyRun(["git", "show", "refs/remotes/origin/main:scripts/notify.sh"]), "while a fetch of its own form fails", NOT_KIT);
+  // (#476's security review of a74309b: the command Codex runs on Windows in a hook's place is held to the kit's form too,
+  // and named, so its entry reads otherwise than the kit's)
+  const codexHook = hook => ({ hooks: { Stop: [{ hooks: [hook] }] } });
+  const evil = "powershell -File scripts/evil.ps1";
+  const windowsRun = (files, name) => run(pr(project({ ...listing() }), { "scripts/evil.ps1": "", ...files, ...listing({ kind: "hook", name, publisher: "this project" }) }));
+  fails(windowsRun({ ".codex/hooks.json": codexHook({ type: "command", command: KIT_HOOK, commandWindows: evil }) }, `Codex Stop: ${KIT_HOOK} (Windows: ${evil})`), "a Codex hook in the kit's form whose commandWindows is not fails", NOT_KIT, "(Windows: powershell");
+  fails(windowsRun({ ".codex/config.toml": `[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "command"\ncommand = ${JSON.stringify(KIT_HOOK)}\ncommand_windows = ${JSON.stringify(evil)}\n` }, `Codex Stop: ${KIT_HOOK} (Windows: ${evil})`), "and so does one in config.toml whose command_windows is not", NOT_KIT);
+  const only = { type: "command", command_windows: evil };
+  fails(windowsRun({ ".codex/hooks.json": codexHook(only) }, `Codex Stop: ${JSON.stringify(only)}`), "and one with a Windows command alone", NOT_KIT);
+  // (#476's security review of a74309b: a tool's file in another case is what a file system that ignores case gives the tool)
+  fails(run(pr(project({ ...listing() }), { ".Codex/hooks.json": codexHook({ type: "command", command: "bash scripts/evil.sh" }) })), "a tool's file in another case fails", ".Codex/hooks.json is .codex/hooks.json in another case", "Mend: rename it to .codex/hooks.json");
+  fails(run(pr(project({ ...listing() }), { ".Kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and so does a Kiro hook file in another case, its .json too", "Mend: rename it to .kiro/hooks/x.json");
+  const oddStood = run(pr(project({ ".Claude/settings.json": { hooks: {} }, ...listing() }), { "README.md": "a change of its own\n" }));
+  ok(oddStood.status === 0 && /\.Claude\/settings\.json is \.claude\/settings\.json in another case/.test(oddStood.out), "one the base held is noted, not failed", oddStood.out);
+  // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
+  // name main would give in the script's place)
+  if (LINKS) {
+    const linkFetch = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
+    fs.symlinkSync("./tree.sh", path.join(linkFetch, "scripts/format.sh"));
+    fails(run(pr(linkFetch, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a link from main fails", 'fetches "scripts/format.sh" from main, which the project holds as a link');
+  }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes(NOT_KIT), "the sync note's step reads not done while a hook not in the kit's form stands unmarked");
   ok(!notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), step).length, "and done once it is marked, listed in the baseline");
