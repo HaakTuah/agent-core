@@ -267,8 +267,8 @@ if (p.status === 0) {
   ok(renamedOut.status === 1 && /reads 1 files fewer than main's config read: elsewhere\.md \(prose\)\. Mend: take the config back/u.test(renamedOut.out) && mended(renamedOut.out) && deleted.status === 0 && !renamedOut.left && !deleted.left,
     "against the base, a file its config read and renamed out of every spec fails, by its new name, with its mend; one deleted passes; and the base's index is taken away after", `${renamedOut.out}${deleted.out}`);
   // (a file renamed out of every spec and rewritten past half, which git reads as deleted and added, or whose lines
-  // move into a file no spec reads, is followed to the file that took in most of its lines; one that took in less
-  // than half passes; #434)
+  // move into a file no spec reads, is followed to the file that took in most of its lines; one that took in half or
+  // less passes; #434)
   const howText = fs.readFileSync(path.join(core, "roles/shared/how-to-work.md"), "utf8");
   const fresh = Array.from({ length: howText.split("\n").length * 3 }, (_, i) => `A line of new text, the ${i}th.`).join("\n");
   git(core, "mv", "roles/shared/how-to-work.md", "elsewhere.md");
@@ -282,9 +282,11 @@ if (p.status === 0) {
   git(core, "add", "CHOICES.md");
   const movedIn = baseRun();
   git(core, "reset", "-q", "--hard", "main");
-  const lines = howText.split("\n").filter(l => /\w/u.test(l));
-  fs.writeFileSync(path.join(core, "notes.md"), `${lines.slice(0, Math.floor(lines.length / 3)).join("\n")}\n`);
-  git(core, "rm", "-q", "roles/shared/how-to-work.md");
+  // (exactly half of a file's lines, each holding a word and counted once, is not most of them)
+  const distinct = f => [...new Set(fs.readFileSync(path.join(core, f), "utf8").split("\n").map(l => l.trim()).filter(l => /\w/u.test(l)))];
+  const even = ["roles/shared/how-to-work.md", ...fs.readdirSync(path.join(core, "tasks")).map(f => `tasks/${f}`)].find(f => f.endsWith(".md") && distinct(f).length % 2 === 0);
+  fs.writeFileSync(path.join(core, "notes.md"), `${distinct(even).slice(0, distinct(even).length / 2).join("\n")}\n`);
+  git(core, "rm", "-q", even);
   git(core, "add", "notes.md");
   const partly = baseRun();
   git(core, "reset", "-q", "--hard", "main");
@@ -292,7 +294,7 @@ if (p.status === 0) {
   const tookIn = file => new RegExp(`reads 1 files fewer than main's config read: ${file} \\(prose, which took in most of the lines of roles/shared/how-to-work\\.md, deleted\\)\\. Mend: take the config back`, "u");
   ok(/^D\troles\/shared\/how-to-work\.md$/mu.test(status) && rewritten.status === 1 && tookIn("elsewhere\\.md").test(rewritten.out) && mended(rewritten.out)
     && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0,
-    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in less than half passes", `${status}${rewritten.out}${movedIn.out}${partly.out}`);
+    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them passes", `${status}${rewritten.out}${movedIn.out}${partly.out}`);
   // (a file of the core's copy that a sync moves out of what the project's config reads fails nothing: the core's own
   // pull request held the move)
   const coreFile = fs.readdirSync(path.join(p.dir, "core/tasks")).find(f => f.endsWith(".md"));

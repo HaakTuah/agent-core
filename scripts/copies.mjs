@@ -196,9 +196,9 @@ const wordLines = text => new Set(String(text ?? "").split(/\r\n|\r|\n/u).map(l 
 // Where the text of a commit's files that git calls deleted went: to the file the tree adds or changes whose new
 // lines hold more than half of its own, so that one renamed and rewritten past half, which git reads as deleted and
 // added, or one moved into another file, is followed all the same (#434); null where none does, the file deleted with
-// its text. Only the lines a file gained count, so a copy that stood before is never taken for the text moved. A file
-// of the core's copy is never followed.
-function linesMoved(commit, { gone, grown }) {
+// its text. Only the lines a file gained count, so a copy that stood before is never taken for the text moved. No file
+// of the core's copy takes it in, as a sync moves those.
+function linesMoved(commit, grown) {
   const index = new Map(), to = new Map(), show = readAt(commit);
   for (const f of grown) {
     if (CORE && f.startsWith(CORE)) continue;
@@ -208,7 +208,6 @@ function linesMoved(commit, { gone, grown }) {
     for (const l of wordLines(text)) if (!had.has(l)) (index.get(l) ?? index.set(l, []).get(l)).push(f);
   }
   return f => {
-    if (!gone.has(f) || (CORE && f.startsWith(CORE)) || !index.size) return null;
     if (!to.has(f)) {
       const was = wordLines(show(f)), held = new Map();
       for (const l of was) for (const a of index.get(l) ?? []) held.set(a, (held.get(a) ?? 0) + 1);
@@ -328,7 +327,7 @@ if (from) {
     if (!held.some(h => h.config.baseline === BASELINE)) fail(`${who} moves the baseline from ${held.map(h => h.config.baseline).join(" and ")} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
     // (each config the base called read on its own: one's ":!" leaves out only what that one read)
     const specs = (h, key) => Array.isArray(h.config[key]) ? h.config[key].filter(x => typeof x === "string" && x) : [];
-    const moves = renamed(from), movedTo = linesMoved(from, moves), was = new Map();
+    const moves = renamed(from), movedTo = linesMoved(from, moves.grown), was = new Map();
     const lost = (kind, before, now) => {
       const keep = new Set(ls(now)), at = lsAt(from, before);
       for (const f of at.filter(f => moves.gone.has(f))) { const to = movedTo(f); if (to) was.set(to, f); }
