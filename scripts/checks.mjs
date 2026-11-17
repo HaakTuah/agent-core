@@ -3,7 +3,7 @@
 // signatures.yml and nuget.yml, which run its parts one each. A session may also start it by hand in the folder it works
 // in, from the project's root: a tool, and no duty (no rule asks it before a push; #417). It runs, part by part:
 //
-// - copies: the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (what each holds, its
+// - copies: the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (what each holds, its
 //   own script says; the header of .github/workflows/copies.yml says them together);
 // - description: the description check (pr-description.mjs), given the pull request's description in PR_BODY or a file;
 // - signatures and nuget, the package checks: first a look at whether the change touches what it reads, then npm's
@@ -50,6 +50,7 @@ export const COPIES = [
   ["Each agent tool's entry file pulls in every file AGENTS.md names", "entry-files.mjs", null, "ENTRY_BASE"],
   ["The manifest takes or leaves out each module and fills each slot they use (reports, never fails)", "manifest-reads.mjs", null, null],
   ["Nothing new in how the code is put together", "shape.mjs", null, "SHAPE_BASE"],
+  ["Each choice record a change adds is argued in full", "choices.mjs", null, "CHOICES_BASE"],
 ];
 
 function fail(what, mend) { console.log(`FAIL ${what} ${MEND}${mend}`); process.exit(1); }

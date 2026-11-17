@@ -51,8 +51,8 @@ const run = (dir, args, extra = {}) => {
   const r = run(dir, ["copies", "--copies", "checks/copies.json", "--sizes", "checks/sizes.json", "--base", head]);
   const ran = [...r.out.matchAll(/^ran (\S+)/gm)].map(m => m[1]);
   ok(r.status === 1 && ran.join() === COPIES.map(([, s]) => s).join() && /^ran copies\.mjs \[checks\/copies\.json\] COPIES_BASE=[0-9a-f]{40}/m.test(r.out) && /^ran reading-size\.mjs \[checks\/sizes\.json\] SIZES_BASE=/m.test(r.out)
-    && /^ran shape\.mjs \[\] SHAPE_BASE=[0-9a-f]{40}/m.test(r.out) && /1 of 8 checks failed/.test(r.out) && mended(r.out),
-  "copies: each of its seven checks runs, in order, the one that fails not stopping the rest, each with its base and its file; it fails, and says each failure's mend", r.out);
+    && /^ran shape\.mjs \[\] SHAPE_BASE=[0-9a-f]{40}/m.test(r.out) && /^ran choices\.mjs \[\] CHOICES_BASE=[0-9a-f]{40}/m.test(r.out) && /1 of 9 checks failed/.test(r.out) && mended(r.out),
+  "copies: each of its eight checks runs, in order, the one that fails not stopping the rest, each with its base and its file; it fails, and says each failure's mend", r.out);
   const none = run(dir, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", ""]);
   ok(/^ran copies\.mjs \[c\.json\] COPIES_BASE=(,|$)/m.test(none.out), "with the base given empty, as on a push to main, each check is given none", none.out);
 }
