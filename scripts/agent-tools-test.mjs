@@ -517,8 +517,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   deep({ ".Claude/Skills/notes/skill.md": "# notes\n" }, { ".Claude/Skills/notes/skill.md": "# notes, changed\n" }, "nor a skill's file under it in another case");
   deep({ ".Kiro/Hooks/lint.json": "{}\n" }, { ".Kiro/Hooks/new.json": "{}\n" }, "nor a hook file added under it");
   fails(run(pr(project({ ...listing() }), { ".claude/skills/notes/Skill.md": "# notes\n" })), "and a skill whose SKILL.md is in another case", "Mend: rename it to .claude/skills/notes/SKILL.md");
-  const deepStood = run(pr(project({ ".Kiro/Hooks/lint.json": "{}\n", ".Claude/Skills/notes/skill.md": "# notes\n", ...listing() }), { "README.md": "a change of its own\n" }));
-  ok(deepStood.status === 0 && /\.Kiro is \.kiro in another case/.test(deepStood.out) && /\.Claude is \.claude in another case/.test(deepStood.out), "while what stands under it is noted, not failed", deepStood.out);
+  // (a skill's folder in another case is left out where the file system ignores case, as Windows' and macOS's do: there
+  // the working tree gives the tool's own name what git's tree holds under another, so the skill reads as new)
+  const caseless = (() => { const d = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-")); made.push(d); fs.writeFileSync(path.join(d, "a"), ""); return fs.existsSync(path.join(d, "A")); })();
+  const deepStood = run(pr(project({ ".Kiro/Hooks/lint.json": "{}\n", ...(caseless ? {} : { ".Claude/Skills/notes/skill.md": "# notes\n" }), ...listing() }), { "README.md": "a change of its own\n" }));
+  ok(deepStood.status === 0 && /\.Kiro is \.kiro in another case/.test(deepStood.out) && (caseless || /\.Claude is \.claude in another case/.test(deepStood.out)), "while what stands under it is noted, not failed", deepStood.out);
   if (LINKS) {
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
