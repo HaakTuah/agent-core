@@ -31,6 +31,7 @@ const MARKS = process.argv[2];
 if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
 try { marks = JSON.parse(fs.readFileSync(MARKS, "utf8")); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
+if (!marks || typeof marks !== "object" || Array.isArray(marks)) marks = {}; // (JSON's null, a list or a value alone: the form below refuses it)
 const num = v => Number.isInteger(v) && v > 0, nums = o => o && typeof o === "object" && !Array.isArray(o) && Object.values(o).every(num);
 const shape = [num(marks.each), nums(marks.read), num(marks.total), num(marks.split), marks.past === undefined || nums(marks.past),
   marks.skip === undefined || Array.isArray(marks.skip) && marks.skip.every(s => typeof s === "string" && s.length)];

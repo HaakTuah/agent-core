@@ -39,6 +39,8 @@ export const FLOOR = "floor/security.md";
 export const START = "Reads at its start:";
 // The line of a pull request's description that lists what its changed paths called for (pr-description.mjs asks it).
 export const READ_LINE = "Read for it:";
+// A description as text: one that is none (left out, or of another type) is read as empty, never as its String().
+export const textOf = body => (typeof body === "string" ? body : "");
 // The folders of the units a task calls for or a role's file names, each file saying when it is read: who (a role's
 // shared files, a tool's part) or when (a kind of task, a topic of the floor).
 export const UNITS = ["roles/shared", "tasks", "tools", "floor/topics"];
@@ -225,7 +227,7 @@ export function faults(lib, exists) {
 
 // The files a description's line lists: its last line that starts "Read for it:", or null where there is none.
 export function listed(body) {
-  const line = String(body ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(READ_LINE)).at(-1);
+  const line = textOf(body).split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(READ_LINE)).at(-1);
   return line === undefined ? null : ticks(line);
 }
 // What a description's line lacks of what the changed paths called for, as the failure with its mend; null where

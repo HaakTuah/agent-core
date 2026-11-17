@@ -69,6 +69,12 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(throwsMended(() => nugetConfig({ nuget: [] })) && throwsMended(() => nugetConfig({ nuget: { ships: "packages.lock.json" } })) && throwsMended(() => nugetConfig({ nuget: { sources: [5] } })), "a NuGet config of the wrong type is refused, with its mend");
   ok([{ version: "1", dependencies: {} }, { version: 1, dependencies: [] }, { version: 1, dependencies: { net9: [] } }, nuEntry("M", { resolved: 1 }), nuEntry("M", { type: 5 })].every((l) => { const r = nuLock(l); return r.packages.length === 0 && said(r.failures); }) && said(nuLock(nuEntry("M", { contentHash: 5 })).failures), "NuGet's lock reader refuses a version, list, entry, kind or content hash of the wrong type, with its mend");
   ok(said(settings("[]").problems) && said(settings("null").problems) && said(settings("5").problems), "agent settings that are a list, null or a number are no JSON object, and fail with their mend");
+  for (const [what, v] of [["a list", ["moss@market"]], ["a text", "moss@market"], ["a number", 5]]) {
+    const r = settings(JSON.stringify({ enabledPlugins: v }));
+    ok(r.tools.size === 0 && r.problems.length === 1 && said(r.problems), `an "enabledPlugins" that is ${what} is refused as the wrong shape, with its mend, never read by its indexes`);
+  }
+  const servers = configured((f) => (f === ".mcp.json" ? JSON.stringify({ mcpServers: ["moss"] }) : null), () => []);
+  ok(servers.tools.size === 0 && said(servers.problems), "an \"mcpServers\" that is a list is refused as the wrong shape, with its mend, never read by its indexes");
   const entries = listed({ agentTools: [5, { kind: 1, name: "x", publisher: "y", version: "1.0.0" }, { kind: "plugin", name: 5, publisher: [], version: 1 }] }, "c.json");
   ok(entries.keys.size === 0 && said(entries.problems) && said(listed({ agentTools: "all" }, "c.json").problems), "an agentTools list, or an entry of it, of the wrong type is taken as no entry, with its mend");
   ok(!readable("o\0n\0:\0") && !readable("on: \ufffd"), "a workflow in UTF-16, or holding bytes that are no UTF-8, is not text the search trusts");
@@ -119,7 +125,13 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
 // ---- nothing at all ----
 {
   ok(said(exactOn("")) && said(exactOn({ packages: { "": {} } })), "an empty lock file, or a lock entry with no package.json beside it, fails with its mend");
-  ok(exactOn("{}").length === 1 && exactOn("null").length === 1, "a lock file of nothing but braces, or null, holds no packages and is refused");
+  ok(exactOn("{}").length === 1 && exactOn("null").length === 1 && said(exactOn("{}")) && said(exactOn("null")), "a lock file of nothing but braces, or null, holds no packages and is refused with its mend");
+  for (const [what, files] of [["an empty lock file", { "package-lock.json": "", "package.json": "{}" }], ["a lock file that is no JSON", { "package-lock.json": "lock", "package.json": "{}" }],
+    ["an empty package.json", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": "" }], ["a package.json that is no JSON", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": "list" }]]) {
+    let got = "";
+    try { licences(fresh(files)); } catch (e) { got = e instanceof SyntaxError ? `raw ${e.message}` : `FAIL: ${e.message}`; }
+    ok(mended(got) && !/^raw /u.test(got) && (!what.includes("package.json") || /Mend: correct it to JSON/u.test(got)), `the licence check refuses ${what} in its own words, with its mend, never JSON's own error`);
+  }
   ok(["", "   ", "()", "MIT AND"].every((l) => !licenceOk(l, ALLOW)), "an empty licence, blanks alone, empty brackets or an expression cut short are not allowed");
   const none = licences(lockProject({ "node_modules/moss-a": { version: "1.0.0" } }));
   ok(none.failures.length === 1 && said(none.failures), "a package with no licence fails the licence check with its mend");
