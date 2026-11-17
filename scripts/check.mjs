@@ -34,7 +34,7 @@ import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "./workflow-run.mjs";
+import { evaluate, parseYaml, pathsLetThrough, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
 // The core's workflows a project calls that only the host can run, each with why: check-test.mjs holds that every
 // workflow the starter kit calls is run here or named here.
@@ -47,7 +47,9 @@ export const HOST_OWN = {
   "versions.yml": "it is started by the host's schedule",
 };
 
-const env = plainEnv();
+// (the caller's environment, its PATH held to absolute folders: an empty or relative entry is the folder a program
+// starts in, which the change under check fills, on any system; #513)
+const env = withAbsolutePath(plainEnv());
 // What the steps run with, since they run the change's own code (its copy's scripts, its packages' restore): only what
 // a program needs to start and reach the network, by name, with a home folder of its own in the scratch folder, no
 // system git settings, and of git's settings given here only the rewrites of an address (url.*.insteadOf), so no token
@@ -82,7 +84,9 @@ if (started(import.meta.url)) main();
 function main() {
   // (on Windows, no program is looked for in the folder a check runs in, which the change under check fills: neither git
   // here nor bash and what it starts in a step, as checks.mjs holds too; every other system looks only on the PATH; #513)
+  // (and what this process starts, git and gh, looks only in the PATH's absolute folders)
   if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
+  for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
   const p = project(options());
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });

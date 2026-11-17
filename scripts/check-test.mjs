@@ -53,11 +53,13 @@ for (const f of planted) {
 }
 commit(dir, "programs named as the checks' own");
 {
-  const untold = Object.fromEntries(Object.entries(env).filter(([name]) => name.toLowerCase() !== "nodefaultcurrentdirectoryinexepath"));
+  // (and with "." and an empty entry ahead on its PATH, each the folder it starts in, which the check must not look in)
+  const untold = Object.fromEntries(Object.entries(env).filter(([name]) => name.toLowerCase() !== "nodefaultcurrentdirectoryinexepath")
+    .map(([name, value]) => [name, /^path$/iu.test(name) ? `.${path.delimiter}${path.delimiter}${value}` : value]));
   const u = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: untold, encoding: "utf8" });
   r = { status: u.status, out: `${u.stdout}${u.stderr}` };
 }
-ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out), "programs named bash and git at the change's root run in place of none the checks start", r.out);
+ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out), "programs named bash and git at the change's root run in place of none the checks start, \".\" and an empty entry on the PATH too", r.out);
 git(dir, "reset", "-q", "--hard", "HEAD~1");
 // (and bash is taken from the PATH as the system takes it: on POSIX, a file of that name the user may not run, in a
 // folder ahead on the PATH, is passed over for the one it may)
@@ -67,6 +69,15 @@ if (process.platform !== "win32") {
   fs.writeFileSync(path.join(ahead, "bash"), "#!/bin/sh\nexit 3\n", { mode: 0o644 });
   const found = onPath("bash", { PATH: `${ahead}${path.delimiter}${process.env.PATH}` });
   ok(found !== null && found !== path.join(ahead, "bash"), "a file named bash ahead on the PATH that may not be run is passed over for one that may", found);
+  // (an empty or relative entry, which names the folder a program starts in, is passed over, wherever it starts)
+  const here = path.join(tmp, "here");
+  fs.mkdirSync(here, { recursive: true });
+  fs.writeFileSync(path.join(here, "bash"), "#!/bin/sh\nexit 3\n", { mode: 0o755 });
+  const was = process.cwd();
+  process.chdir(here);
+  const fromHere = [".", "", "./", "../here"].map(entry => onPath("bash", { PATH: `${entry}${path.delimiter}${process.env.PATH}` }));
+  process.chdir(was);
+  ok(fromHere.every(f => f !== null && path.isAbsolute(f) && path.dirname(f) !== here), "an empty or relative entry on the PATH, the folder a program starts in, is passed over", fromHere.join(", "));
 }
 
 const config = path.join(dir, "checks", "copies.json");

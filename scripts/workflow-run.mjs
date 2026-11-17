@@ -433,13 +433,27 @@ function runUses(jr, step, name, env) {
   result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
 }
 
+// The key a PATH stands under in an environment: PATH on POSIX, in any letter case on Windows, as each system reads it.
+const pathKey = env => Object.keys(env).find(k => (process.platform === "win32" ? k.toUpperCase() === "PATH" : k === "PATH"));
+
+// A PATH with only its absolute folders, each unquoted: an empty or relative entry, "." or a trailing ":" among them,
+// is the folder a program starts in, which a change under check fills (#513).
+export const absolutePath = value => String(value ?? "").split(path.delimiter).map(f => f.replace(/^"(.*)"$/u, "$1")).filter(f => path.isAbsolute(f)).join(path.delimiter);
+
+// An environment whose PATH holds only absolute folders.
+export function withAbsolutePath(env) {
+  const key = pathKey(env);
+  return key === undefined ? { ...env } : { ...env, [key]: absolutePath(env[key]) };
+}
+
 // The program a name stands for, by its full path from the PATH's own folders, never from the folder it would start in:
 // on Windows a program started by its bare name is looked for there first, by Node and by cmd.exe alike, and a step's
-// folder holds the change under check (#513). Null where the PATH holds none it may run.
+// folder holds the change under check (#513). As the system looks, the name as it is, and on Windows with .com and
+// .exe, which alone Node starts. Null where the PATH holds none it may run.
 export function onPath(name, env = process.env) {
-  const exts = process.platform === "win32" ? ["", ...String(env.PATHEXT ?? ".COM;.EXE").split(";").filter(Boolean)] : [""];
-  const pathOf = Object.entries(env).find(([k]) => k.toUpperCase() === "PATH")?.[1] ?? "";
-  for (const folder of String(pathOf).split(path.delimiter).filter(f => path.isAbsolute(f))) {
+  const exts = process.platform === "win32" ? ["", ".com", ".exe"] : [""];
+  const key = pathKey(env);
+  for (const folder of absolutePath(key === undefined ? "" : env[key]).split(path.delimiter).filter(Boolean)) {
     for (const ext of exts) {
       const file = path.join(folder, `${name}${ext}`);
       // (a file it may run: on POSIX one with its execute bit for this user, as the system's own search asks)
