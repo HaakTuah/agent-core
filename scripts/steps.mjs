@@ -33,7 +33,7 @@ import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
-import { Unread, call, calls, copiesConfig, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
+import { Unread, call, calls, commands, copiesConfig, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
@@ -371,18 +371,22 @@ function movedPaths(p) {
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
 }
 
-// The jobs of a workflow that run the lookup with no checkout of the base beside the head (a fetch-depth of 0, or 2 or
-// more, on the same job's checkout): each such job reads nothing new. A workflow whose YAML cannot be read is read
-// whole, as one job.
-function blindJobs(w, deep) {
+// Each job of a workflow, with the commands its steps run (shell comments left out, as check-configs.mjs's reader
+// reads them) and whether its checkout holds the base beside the head (a fetch-depth of 0, or 2 or more). A workflow
+// whose YAML cannot be read is read as one job, its whole text its one command list.
+function jobsOf(w) {
+  const deep = (v) => /^(?:0|[2-9]|\d{2,})$/u.test(String(v ?? "").trim());
   const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
-  if (!jobs) return /core\/scripts\/lookup\.mjs/u.test(w.text ?? "") && !deep.test(w.text ?? "") ? [w] : [];
-  return jobs.filter(job => {
+  if (!jobs) return [{ runs: commands(w.text ?? ""), deep: /fetch-depth:\s*["']?(?:0|[2-9]|\d{2,})\b/u.test(w.text ?? "") }];
+  return jobs.map(job => {
     const steps = Array.isArray(job?.steps) ? job.steps : [];
-    if (!steps.some(st => typeof st?.run === "string" && /core\/scripts\/lookup\.mjs/u.test(st.run))) return false;
-    return !steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep.test(`fetch-depth: ${st.with?.["fetch-depth"]}`));
+    return { runs: steps.flatMap(st => (typeof st?.run === "string" ? commands(st.run) : [])),
+      deep: steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"])) };
   });
 }
+// Whether a command runs the copy's script `name`, and, given `flag`, with that flag (true) or without it (false).
+const running = (words, name, flag) => words.some(w => new RegExp(`(?:^|/)core/scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
+  && (flag === undefined || words.some(w => w.text === "--nuget") === flag);
 
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
@@ -579,16 +583,13 @@ export const STEPS = [
       // checks from a workflow of its own, as a private repository does, or a NuGet project whose sources need a
       // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
       // where it runs the NuGet check)
-      const lookups = text => [...text.matchAll(/core\/scripts\/lookup\.mjs[^\n]*/gu)].map(m => m[0]);
-      // (and a workflow that runs a lookup fetches the base beside the head, or the lookup finds nothing new: a checkout
-      // fetches one commit unless its fetch-depth is 0, all, or 2 or more)
-      const deep = /fetch-depth:\s*["']?(?:0|[2-9]|\d{2,})["']?\s*(?:#.*)?$/mu;
       const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
-        const text = w.text ?? "", runs = lookups(text), at = `\`.github/workflows/${shown(f)}\``;
+        const jobs = jobsOf(w), at = `\`.github/workflows/${shown(f)}\``;
+        const any = (name, flag) => jobs.some(j => j.runs.some(c => running(c, name, flag)));
         return [
-          /core\/scripts\/exact-versions\.mjs/u.test(text) && !runs.some(l => !/--nuget/u.test(l)) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
-          /core\/scripts\/nuget(?:-fetch)?\.mjs/u.test(text) && !runs.some(l => /--nuget/u.test(l)) ? `in ${at}, before the step that restores or runs \`core/scripts/nuget.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
-          runs.length && blindJobs(w, deep).length ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
+          any("exact-versions.mjs") && !any("lookup.mjs", false) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
+          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !any("lookup.mjs", true) ? `in ${at}, before the step that restores or runs \`core/scripts/nuget.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+          jobs.some(j => !j.deep && j.runs.some(c => running(c, "lookup.mjs"))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
         ].filter(Boolean);
       });
       return wrong.length ? `On every pull request, ${wrong.join("; ")}; the checkout with \`fetch-depth: 2\` holds the pull request's base, which the lookup reads against.` : null;

@@ -194,6 +194,9 @@ try {
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: echo first\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `a fetch depth in another job than the lookup's does not count (${missed.map((m) => m.mend)})`);
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: |\n          node core/scripts/exact-versions.mjs c.json\n          # node core/scripts/lookup.mjs c.json\n");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup in a shell comment runs nothing, and does not count (${missed.map((m) => m.mend)})`);
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");
