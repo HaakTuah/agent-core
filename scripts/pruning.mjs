@@ -12,6 +12,11 @@
 //     read from GitHub's record of each failed run's jobs and their steps, and from the workflows' steps as the core's
 //     own reader of YAML gives them (workflow-run.mjs, beside this file); a check no step names is not judged so;
 //   - is held by a staged case that passed without it.
+// Ahead of those, the rules holders.mjs (beside this file) counts as having no holder, worst first, a rule read at a
+// role's start before one read on need, each with its proposal from UNHELD (#545): "check" or "case" (a check or a
+// staged case could hold it, "by" the issue queued to build it), "move" (to a module read on need), "goes", or
+// "describes"; one with none, or a rule that guards against rare and severe harm proposed to go, is said so, and a
+// proposal whose rule now has a holder or no longer stands is named to be taken out.
 // Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
 // move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
 // fewer than EARLY merged pull requests came under since it joined (read from git: the first commit that wrote its lead
@@ -40,7 +45,8 @@ import { KINDS, MEASURES, NUMBER } from "./outcomes.mjs";
 import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 
-export const RECORD = "reports/pruning.json";
+export const RECORD = "reports/pruning.json", UNHELD = "reports/unheld.json";
+export const MARKS = ["check", "case", "move", "goes", "describes"];
 export const EVERY = 2, EARLY = 20;
 // The outcomes' direct measures (outcomes.mjs; #302) that a count gives, whose counts a pruning records: a median's
 // measure gives only how many cases it read, not its value, so it is left out.
@@ -77,7 +83,7 @@ export function due({ month, record, model = null }) {
 // The state report's lines on the pruning, for `month`.
 export function said({ month, record = readRecord() }) {
   const d = due({ month, record });
-  if (d.due) return [`- Due: ${d.why}. The session that takes this report prunes as the core's \`AGENTS.md\`, "Rules are pruned by their numbers", says: each staged case set with the rules it holds taken out (\`node scripts/pruning.mjs --set <case> <dir>\`), run in a fresh helper and read (\`--read\`), the counts recorded (\`--record --repo <this repository> --model <its model's id>\`), and the list \`node scripts/pruning.mjs\` prints added here as a note, \`${RECORD}\` in a pull request of its own.`];
+  if (d.due) return [`- Due: ${d.why}. The session that takes this report prunes as the core's \`AGENTS.md\`, "Rules are pruned by their numbers", says: each staged case set with the rules it holds taken out (\`node scripts/pruning.mjs --set <case> <dir>\`), run in a fresh helper and read (\`--read\`), the counts recorded (\`--record --repo <this repository> --model <its model's id>\`), each rule with no holder given its proposal in \`${UNHELD}\` and its checks queued worst first, and the list \`node scripts/pruning.mjs\` prints added here as a note, \`${RECORD}\` in a pull request of its own.`];
   return [`- Not due: ${d.why}, or sooner where the session that takes a report runs on a newer generation of model than the last pruning's (\`node scripts/pruning.mjs --due --model <its id>\`).`];
 }
 
@@ -156,12 +162,38 @@ function closing({ all, numbers, now, early, unread }) {
   ];
 }
 
+// The proposals for the rules with no holder (UNHELD's "proposals"): { key: { mark, by, why } }, or none where it
+// cannot be read.
+export function readUnheld(root = ROOT) {
+  try { const j = JSON.parse(fs.readFileSync(path.join(root, UNHELD), "utf8")); return j?.proposals && typeof j.proposals === "object" ? j.proposals : {}; } catch { return {}; }
+}
+
+// The list's leading lines: each rule of `all` whose key `none` (holders.mjs's rules with no holder) names, those
+// `starts` names first, each with its proposal of `proposals`; then the proposals whose rule now has a holder or no
+// longer stands.
+export function unheldLines({ all, none, starts, proposals, numbers = {} }) {
+  const without = new Set(none), keys = all.filter(r => without.has(r.key)), rest = Object.keys(proposals).filter(k => !without.has(k));
+  if (!keys.length && !rest.length) return [];
+  const say = r => {
+    const x = proposals[r.key], where = starts.has(r.key) ? "read at a role's start" : "read on need";
+    if (!x || !MARKS.includes(x.mark)) return `- ${r.key}: no holder, ${where}. No proposal yet: the session that takes the pruning gives it one in \`${UNHELD}\`, a check or staged case that could hold it, a move to a module read on need, or that it goes.`;
+    const warn = x.mark === "goes" && rare(r, numbers[r.key]) ? " It guards against rare and severe harm, so it is never proposed to go: the session proposes it a holder." : "";
+    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${x.by})` : x.mark === "check" || x.mark === "case" ? ", not queued: the owner's" : ""}, ${x.why ?? "with no reason given"}.${warn}`;
+  };
+  return [
+    `- No holder: ${keys.length} rule${keys.length === 1 ? "" : "s"} (\`scripts/holders.mjs\`), worst first, each with its proposal (\`${UNHELD}\`). The checks are queued without a further word; the moves and removals are the owner's, a few at a time.`,
+    ...[...keys.filter(r => starts.has(r.key)), ...keys.filter(r => !starts.has(r.key))].map(say),
+    ...(rest.length ? [`- Proposed for a rule that now has a holder or no longer stands, to take out of \`${UNHELD}\`: ${rest.join("; ")}.`] : []),
+  ];
+}
+
 // The list's lines. `all`: the rules (rules.mjs's); `named`: holders.json's "holders"; `numbers`: its "numbers";
 // `record`; `cases`: the staged cases ({ name, holds }); `steps`: the workflows' steps, { path: [{ name, run }] };
-// `starts`: the keys of the rules a role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null.
-export function list({ all, named, numbers, record, cases, steps, starts, joined }) {
-  const p = ordered(record), now = p.at(-1);
-  if (!now) return ["- No pruning is recorded yet: nothing to list (`node scripts/pruning.mjs --due`)."];
+// `starts`: the keys of the rules a role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null;
+// `none`: the keys of the rules with no holder (holders.mjs), and `proposals`, UNHELD's, which lead the list.
+export function list({ all, named, numbers, record, cases, steps, starts, joined, none = [], proposals = {} }) {
+  const p = ordered(record), now = p.at(-1), first = unheldLines({ all, none, starts, proposals, numbers });
+  if (!now) return [...first, "- No pruning is recorded yet: no other sign to list (`node scripts/pruning.mjs --due`)."];
   const listed = [], early = [], unread = [];
   for (const r of all) {
     const n = numbers[r.key], signs = signsOf(r, { p, n, checks: checksOf(r.key, named), steps, cases: cases.filter(c => c.holds.includes(r.key)) });
@@ -175,6 +207,7 @@ export function list({ all, named, numbers, record, cases, steps, starts, joined
     }
   }
   return [
+    ...first,
     `- Read: the pruning of ${now.at}, against ${p.at(-2)?.at ?? "none before it"}; ${Object.keys(now.without ?? {}).length} staged cases run with their rules taken out; counts from ${now.from ?? "the start"} (\`scripts/pruning.mjs\`).`,
     ...(listed.length ? listed : ["- Nothing listed: no rule shows a sign that it may go."]),
     ...closing({ all, numbers, now, early, unread }),
@@ -364,7 +397,8 @@ async function main(argv) {
   const { CASES } = await import("./staged.mjs");
   // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
   const all = rules(ROOT, { agents: true }), h = holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
-  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, joined: r => joinedIn(r) }).join("\n"));
+  const { counts: heldCounts, holders } = await import("./holders.mjs");
+  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, joined: r => joinedIn(r), none: heldCounts(holders()).none, proposals: readUnheld() }).join("\n"));
 }
 
 if (started(import.meta.url)) await main(process.argv.slice(2));

@@ -1,6 +1,7 @@
 // Tests of the rules' pruning (pruning.mjs; AGENTS.md, "Rules are pruned by their numbers"; #303): when one is due, the
-// rules taken out of a case's core, and the list: each sign, the step, "too early", the floor and "in use". Node's own
-// modules only; the calls to gh and git are the script's own and are not made here, save a run that fails.
+// rules taken out of a case's core, and the list: the rules with no holder, which lead it (#545), each sign, the step,
+// "too early", the floor and "in use". Node's own modules only; the calls to gh and git are the script's own and are
+// not made here, save a run that fails.
 //
 //   node scripts/pruning-test.mjs
 import { spawnSync } from "node:child_process";
@@ -80,6 +81,28 @@ ok(out.includes(`- In use: 2 of 12 rules cited in the span; the most cited: ${st
 ok(list({ all: [still], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40 })[0].startsWith("- No pruning is recorded yet")
   && list({ all: [moved], named, numbers, record: rec(p[2]), cases, steps, starts: new Set(), joined: () => 40 })[1] === "- Nothing listed: no rule shows a sign that it may go.",
   "with no pruning recorded there is nothing to list, and with no sign nothing is listed");
+
+// ---- the rules with no holder lead the list (#545) ----
+const bare = R("tasks/e.md", "Bare"), early = R("roles/shared/e.md", "At start"), floorBare = R("floor/security.md", "3. Bare"), unproposed = R("tasks/e.md", "Unproposed");
+const proposals = { [bare.key]: { mark: "goes", why: "no breach recorded" }, [early.key]: { mark: "check", by: "#9", why: "a script reads it" },
+  [floorBare.key]: { mark: "goes", why: "it costs much" }, [loud.key]: { mark: "move", why: "held now" }, "tasks/gone.md: Gone": { mark: "case", why: "gone" } };
+const led = list({ all: [still, bare, early, floorBare, unproposed, loud], named, numbers, record: rec(...p), cases, steps, starts: new Set([still.key, early.key]), joined: () => 40,
+  none: [bare.key, early.key, floorBare.key, unproposed.key], proposals });
+const at = k => led.findIndex(l => l.startsWith(`- ${k}:`));
+ok(/^- No holder: 4 rules \(`scripts\/holders\.mjs`\), worst first, each with its proposal \(`reports\/unheld\.json`\)\./u.test(led[0])
+  && at(early.key) === 1 && at(bare.key) > at(early.key) && at(bare.key) < led.findIndex(l => l.startsWith("- Read:")),
+  "the rules with no holder lead the list, ahead of what the pruning read, one read at a role's start first", led.slice(0, 7).join("\n"));
+ok(led[at(early.key)] === `- ${early.key}: no holder, read at a role's start. Its proposal: check (#9), a script reads it.` && led[at(bare.key)] === `- ${bare.key}: no holder, read on need. Its proposal: goes, no breach recorded.`,
+  "each says where it is read and its proposal, a check with the issue that builds it", `${led[at(early.key)]}\n${led[at(bare.key)]}`);
+ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: goes, it costs much\. It guards against rare and severe harm, so it is never proposed to go: the session proposes it a holder\.$/u.test(led[at(floorBare.key)])
+  && /No proposal yet: the session that takes the pruning gives it one in `reports\/unheld\.json`/u.test(led[at(unproposed.key)]),
+  "a floor rule proposed to go is said to need a holder instead, and a rule with no proposal is said to need one");
+ok(led.includes(`- Proposed for a rule that now has a holder or no longer stands, to take out of \`reports/unheld.json\`: ${loud.key}; tasks/gone.md: Gone.`) && !led.some(l => l.startsWith(`- ${loud.key}: no holder`)),
+  "a proposal whose rule now has a holder, or is gone, is named to be taken out");
+ok(list({ all: [bare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key], proposals: {} }).at(-1).startsWith("- No pruning is recorded yet")
+  && list({ all: [bare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key], proposals: {} })[0].startsWith("- No holder: 1 rule (")
+  && list({ all: [still], named, numbers, record: rec(p[2]), cases, steps, starts: new Set(), joined: () => 40 })[0].startsWith("- Read:"),
+  "with no pruning recorded the rules with no holder are still listed, and with none the list opens as before");
 
 const floorStood = R("floor/security.md", "2. Stood"), rec2 = rec({ at: "2026-09-01", numbers: { [floorStood.key]: 0, [marked.key]: 0 } }, { at: "2026-11-01", numbers: { [floorStood.key]: 0, [marked.key]: 0 }, without: { "f-case": { verdict: "pass" } } });
 const guarded = list({ all: [floorStood, marked], named, numbers: { [floorStood.key]: "check fires; outcome: robust", [marked.key]: "check fires; outcome: robust; rare harm" }, record: rec2, cases: [{ name: "f-case", holds: [floorStood.key] }], steps, starts: new Set(), joined: () => 40 });

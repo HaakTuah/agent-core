@@ -289,22 +289,29 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   check sees how a session behaves, and the core's two staged runs, each of which changed it, were never run again
   when the rules or the models changed. Held by `scripts/staged-test.mjs` (each case read as set, kept and broken;
   what is due; when the cases hold a release), in `.github/workflows/tests.yml`, and by the look's issue.
-- **Rules are pruned by their numbers** (#303). By default with every second monthly state report, and in a month
-  whose report a session of a newer generation of model takes than the last pruning's (`node scripts/pruning.mjs --due
-  --model <its id>`), the session that takes the report runs each staged case with the rules it holds taken out
-  (`scripts/pruning.mjs --set`, then `--read`), records the counts (`--record`) and adds as a note the list
-  `node scripts/pruning.mjs` prints, the record in a pull request of its own: the rules of the floor, the modules and
-  this file whose number did not move since the last pruning, whose check no failed step of a pull request's run
-  shows firing, whose case passed without them, or whose number, a stand-in, moved at two prunings while its outcome's
-  direct measures did not. A rule fewer than twenty merged pull requests have come under since it joined is "too
-  early" and not judged, and one that guards against rare and severe harm, the floor's and any whose number says so, is
-  judged by its staged case alone, never listed for a check that did not fire. Nothing changes it. The owner decides which
-  go, a few at a time, the numbers read again before more go; the list gives each rule its step: a rule read at a
-  role's start is at step 1, to move to a module read on need, and one read on need at step 2, to go where nothing
-  changed after its move, kept in the archive with its reason and its last number, and free to return. It does not mean that a session removes or moves a
-  rule by its own choice, or that a listed rule goes. Reason: the core tested that a rule holds and never whether it
-  is still needed, and an unneeded one costs every session that reads it. Held by `scripts/pruning.mjs`, which makes
-  the list, and by the state report, which says when a pruning is due.
+- **Rules are pruned by their numbers** (#303). By default with every second monthly state report, and in a month whose
+  report a session of a newer generation of model takes than the last pruning's (`node scripts/pruning.mjs --due --model
+  <its id>`), the session that takes the report runs each staged case with the rules it holds taken out
+  (`scripts/pruning.mjs --set`, then `--read`), records the counts (`--record`) and adds as a note the list `node
+  scripts/pruning.mjs` prints, the record in a pull request of its own: the rules of the floor, the modules and this
+  file whose number did not move since the last pruning, whose check no failed step of a pull request's run shows
+  firing, whose case passed without them, or whose number, a stand-in, moved at two prunings while its outcome's direct
+  measures did not. A rule fewer than twenty merged pull requests have come under since it joined is "too early" and not
+  judged, and one that guards against rare and severe harm, the floor's and any whose number says so, is judged by its
+  staged case alone, never listed for a check that did not fire. Ahead of all these, the list leads with the rules
+  `scripts/holders.mjs` counts as having no holder, worst first, a rule read at a role's start before one read on need,
+  each with its proposal in `reports/unheld.json` (#545): a check or staged case that could hold it, filed as a task; a
+  move to a module read on need; or that it goes. The session gives one to each that has none, a check only where it
+  never guesses and its upkeep pays, a maintained tool where one reads the breach (#534), and queues the checks without
+  a further word, worst first; a rule that guards against rare and severe harm is proposed a holder, never to go.
+  Nothing changes it. The owner decides which move or go, a few at a time, the numbers read again before more go; the
+  list gives each rule its step: a rule read at a role's start is at step 1, to move to a module read on need, and one
+  read on need at step 2, to go where nothing changed after its move, kept in the archive with its reason and its last
+  number, and free to return. It does not mean that a session removes or moves a rule by its own choice, that a listed
+  rule goes, or that a new rule waits for a holder. Reason: the core tested that a rule holds and never whether it is
+  still needed, and an unneeded one costs every session that reads it; on 17 November 2026, 189 of its 310 rules were
+  held by being read alone. Held by `scripts/pruning.mjs`, which makes the list, its test reading that the rules with no
+  holder lead it, and by the state report, which says when a pruning is due.
 - **Proof is sized to what a thing costs others** (#303). By default the design check of a pull request that adds a
   thing asks for a number that shows it pays only where the thing is text a role reads at its start, a check that can
   fail a pull request, a test that adds a tenth of its suite's time mark or more (`tasks/tests.md`), or a choice one
