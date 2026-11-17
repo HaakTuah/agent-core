@@ -24,7 +24,7 @@ ok(/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/u.test(CORE), "t
 ok(new RegExp(`^${CORE_SOURCE}$`, "u").test(CORE) && new RegExp(`^${CORE_SOURCE}$`).test(CORE), "its pattern's source matches it, with the u flag and without");
 
 // one place: no other script, and no workflow but core.yml's one line
-for (const f of list("scripts")) {
+for (const f of [...list("scripts"), ...list("tests")]) {
   if (f !== "scripts/core-address.mjs") ok(!read(f).toLowerCase().includes(account), `${f} names the account: it reads the address from core-address.mjs`);
 }
 for (const f of list(".github/workflows")) {
