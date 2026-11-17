@@ -55,7 +55,6 @@ it merges last.
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, which changes the same files |
-| #412 | builder | #481, of which it is one case |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line

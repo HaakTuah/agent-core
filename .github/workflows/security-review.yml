@@ -8,8 +8,10 @@
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
 # summary rewrites it, so that no project starts a job for it it did not start before).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
-# that opens "Security review:" from the repository's owner, or an account the caller names (the input "reviewers"),
-# which is how the fallback reviewer's or another reviewer's is posted (tasks/reviews.md, point 3); a review of an
+# that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
+# owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
+# names (the input "reviewers"), which is how the fallback reviewer's or another reviewer's is posted
+# (tasks/reviews.md, point 3); a review of an
 # earlier commit than the head only where updates from main alone follow it, each the merge git makes of its parents
 # (scripts/clean-merges.mjs proves which, #323), so that any other later commit needs such a comment naming the head,
 # or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after it began,
@@ -76,7 +78,7 @@ on:
         type: boolean
         default: false
       reviewers:
-        description: The accounts, besides the repository's owner, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
+        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
         required: false
         type: string
         default: ""
@@ -207,7 +209,23 @@ jobs:
             then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
           fi
-          BOUND=$(held security-review.mjs) PURE="$pure" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+          # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
+          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
+          # repository; its login, checked as one, is all that goes into the route, and an answer that cannot be read
+          # counts for no one (the script reads each strictly)
+          owner=$(jq -r '.base.repo.owner.login // "" | ascii_downcase' "$d/pull.json")
+          : > "$d/rights.txt"
+          for login in $(jq -r --arg o "$owner" '[.[][] | select(type == "object" and (.body | type) == "string"
+            and (.body | test("^(\\*\\*)?Security review:")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
+            and .user.type == "User" and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
+            | .user.login | ascii_downcase | select(. != $o)] | unique | .[:20][]' "$d/comments.json"); do
+            if timeout 20 gh api "repos/$REPO/collaborators/$login/permission" > "$d/right.json" 2> /dev/null \
+              && jq -e 'type == "object"' "$d/right.json" > /dev/null 2>&1
+            then cat "$d/right.json" >> "$d/rights.txt"
+            else echo "The host's rights of $login could not be read: a review of theirs counts only where the input reviewers names it."; fi
+          done
+          jq -s '.' "$d/rights.txt" > "$d/rights.json"
+          BOUND=$(held security-review.mjs) PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
             "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then

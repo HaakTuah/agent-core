@@ -65,3 +65,8 @@ The index, and how an item is written: `archive/instructions.md`.
      owner state something about the set-up that another owner would never say. It stands behind the mark on each slot
      of the README's table, the owner's account read where a person's account holds the repository, and the tools a
      project's record shows read before the core's default.
+
+249. **16 November 2026**, #412, a case of #481. A posted security review counts from each person the host lets write
+     to the repository, read from its rights each run, rather than from a list of a team's owners kept beside them,
+     which goes stale; a list named to the check stays for an account that is no owner. It stands behind who the
+     `security-review` status counts.

@@ -9,13 +9,12 @@ rule 14, which are the higher right's, its approvals aside.
 **Who is an owner** (#250). By default the owners are the people the host lets write to the repository
 (on GitHub: the role `write`, `maintain` or `admin`), read from the host each time and kept in no list: any of them may
 give the project's agents a task and settle an open reading, and their word is the owner's word (floor rule 4). Where
-the host's rights cannot be read, the *owner's account* alone is an owner, and the session says so in its report. Until
-the `security-review` status reads the host's rights (#412), a team's project names its owners in that check's input
-`reviewers`. It does not mean that an app or a bot the host lets write is an owner, nor an account the project's agents
+the host's rights cannot be read, the *owner's account* alone is an owner, and the session says so in its report. The
+`security-review` status reads them so (#412): a posted review counts from each, with nothing named. It does not mean that an app or a bot the host lets write is an owner, nor an account the project's agents
 sign in with (`setup/server.md`), whose words are an agent's, that a right to read or triage is one, nor that a comment
 from an owner's account with an agent's attribution line is that owner's word. Reason: in a team's project every person
-with the right to write is an owner, and a list kept beside the host's rights goes stale. Held by nothing yet: whose
-word a session followed leaves no mark a check reads.
+with the right to write is an owner, and a list kept beside the host's rights goes stale. Held, for a posted security
+review, by the `security-review` status; whose word a session followed leaves no mark a check reads.
 
 **The higher right gives the floor's yeses.** By default each yes floor rule 14 names, the approvals
 of rule 12 aside, is given by an owner the host gives its higher right (on GitHub: `maintain` or `admin`); a yes from an
