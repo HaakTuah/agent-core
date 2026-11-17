@@ -20,13 +20,11 @@
 // `.kiro/agents`, say), and where a plug-in's marketplace or a tool server's command points, are the review's.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
-// `main`): a hook of any tool read here whose command is plain and names a file the project holds, or is the starter
-// kit's form with such a word after its script, takes it from the working tree, which the branch it runs on can change,
-// and fails; one whose command is neither is not read, and is noted, where it takes its files from not shown and the
-// review's (hook-source.mjs says what it reads). One that stood before
-// is listed in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new
-// hook marked so fails, and so does a mark taken out while its hook stands, or a mark on a hook that takes nothing from
-// the working tree.
+// `main`): a hook of any tool read here runs its copy on main only where each of its commands is the starter kit's
+// form (hook-source.mjs), which fetches its script from main; any other fails, since nothing shows it does not run the
+// working tree's copy, which the branch it runs on can change. One that stood before is listed in the baseline, its
+// entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked so fails, and so does
+// a mark taken out while its hook stands, or a mark on a hook in the kit's form.
 //
 // A listed plug-in or tool server is held to the pin its own configuration gives, where it gives one in a form read here
 // (#352; Claude Code's plug-in and tool-server documentation): a plug-in by its marketplace in "extraKnownMarketplaces",
@@ -58,7 +56,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
-import { finder, fromTree } from "./hook-source.mjs";
+import { kitForm } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 import { parseToml } from "./toml.mjs";
@@ -79,22 +77,18 @@ const TREE = "the working tree";
 const show = value => JSON.stringify(value) ?? String(value);
 
 // The tools a project's files configure, as "kind name" keys, each with the file that configures it; the problems met
-// reading them; `sources`, each hook that takes a file of the project from the working tree, with those files, and
-// `unread`, each hook whose command hook-source.mjs does not read. `read(file)` gives a file's text or null; `skills()`
-// the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the names in a folder of the project
-// (here .kiro/hooks); `holds(file)` whether the project holds a file there, as read() would read it; `kit` that these
-// are the starter kit's own files (kitHooks()), whose hooks are read for their source too.
-export function configured(read, skills, files = () => [], holds = f => read(f) !== null, kit = false) {
+// reading them; `sources`, each hook with a command not in the starter kit's form (hook-source.mjs). `read(file)` gives a
+// file's text or null; `skills()` the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the
+// names in a folder of the project (here .kiro/hooks); `kit` that these are the starter kit's own files (kitHooks()),
+// whose hooks are read for their source too.
+export function configured(read, skills, files = () => [], kit = false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), unread = new Set(), servers = [], texts = new Map();
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Set(), servers = [], texts = new Map();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  // (whether the project holds a path is asked once a path: a hook may name one a thousand times, and the asking reads
-  // the file and may start git)
-  const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, unread, finds: finder(holdsOnce, files), servers, kit };
+  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, kit };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -117,7 +111,7 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, texts, sources, unread, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, sources, pins: pinsOf(plugins, markets, servers) };
 }
 
 // The tool servers of one file's "mcpServers" (or Codex's "mcp_servers"), into configured()'s `state`, each named
@@ -236,11 +230,10 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   if (!state.kit && kitIds().has(id)) return;
   readSource(state, name, commands);
 }
-// What a hook's commands take from the working tree, into `state.sources`, and whether one is not read, into `state.unread`.
+// Each hook with a command that is not the starter kit's form, into `state.sources`: nothing shows it runs its copy on
+// main (hook-source.mjs).
 function readSource(state, name, commands) {
-  const read = commands.map(c => fromTree(c, state.finds)), taken = read.flatMap(paths => paths ?? []);
-  if (read.includes(null)) state.unread.add(name);
-  if (taken.length) state.sources.set(name, [...new Set([...(state.sources.get(name) ?? []), ...taken])]);
+  if (!commands.every(kitForm)) state.sources.add(name);
 }
 
 // The pins of the plug-ins turned on and the tool servers, by their "kind name" keys, where their configuration gives
@@ -332,7 +325,7 @@ const kitIds = () => (kitOwn ??= new Set(kitHooks()));
 export function kitHooks(template = kitTemplate) {
   const read = f => (Object.hasOwn(KITS, f) ? template(KITS[f]) : null);
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
-  return [...configured(read, () => [], files, undefined, true).ids.values()].flatMap(set => [...set]);
+  return [...configured(read, () => [], files, true).ids.values()].flatMap(set => [...set]);
 }
 
 // The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
@@ -399,18 +392,16 @@ export function check(head, list, kit, file) {
   }
   return { problems, unlisted: list ? [] : unlisted, missing, pins, ...sourcesOf(head, list, file, problems) };
 }
-// check()'s `sources`, `marked` and `unread`, and into `problems` each mark on a hook that takes nothing from the
-// working tree, as far as its command is read.
+// check()'s `sources` and `marked`, and into `problems` each mark on a hook in the starter kit's form.
 function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
-  const unread = [...(head.unread ?? [])].map(k => `${describe(k)}, configured in ${head.tools.get(k)}, is neither the starter kit's form nor a plain command, so where it takes its files from is not shown here and stays the review's; to have it read, ${HOW}`);
-  for (const [k, paths] of head.sources ?? []) {
-    const said = `${describe(k)}, configured in ${head.tools.get(k)}, takes ${paths.map(show).join(", ")} from the working tree, which the branch it runs on can change, where floor rule 3 has what an agent tool starts by itself run from its copy on main`;
+  for (const k of head.sources ?? []) {
+    const said = `${describe(k)}, configured in ${head.tools.get(k)}, is not in the starter kit's form, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
     if (list?.from?.has(k)) marked.push([k, said]);
     else sources.push([k, `${said}. Mend: ${HOW}, in this pull request`]);
   }
-  for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k) && !head.unread?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but it takes no file of the project from the working tree. Mend: take "from" out of its entry, in this pull request`);
-  return { sources, marked, unread };
+  for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
+  return { sources, marked };
 }
 
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer, and `links`, each link on the
@@ -448,26 +439,14 @@ export function readProject(root, rev = null) {
     if (rev) {
       const d = resolve(dir);
       if (d?.type !== "tree") return [];
-      return [...(listing(root, rev).children.get(d.f) ?? [])];
+      const { blobs, links, dirs, others } = listing(root, rev), under = d.f === "." ? "" : `${d.f}/`;
+      return [...new Set([...blobs, ...links, ...dirs, ...others].filter(at => at.startsWith(under)).map(at => at.slice(under.length).split("/")[0]))];
     }
     if (outside(dir)) return [];
-    try { return owned(root, dir, fs.readdirSync(path.join(root, dir))); } catch { return []; }
+    try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
-  return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null), links };
-}
-
-// The names in the working tree's folder `dir` that a commit could hold too: not .git, the checkout's own, nor any git
-// ignores (an install's or a build's), as one `git check-ignore` asks them, at the folder links lead to.
-function owned(root, dir, entries) {
-  const list = entries.filter(n => n !== ".git");
-  if (!list.length) return list;
-  const real = path.relative(fs.realpathSync(root), fs.realpathSync(path.join(root, dir))).split(path.sep).join("/");
-  const at = n => (real ? `${real}/${n}` : n);
-  let out = "";
-  try { out = execFileSync("git", ["check-ignore", "-z", "--stdin"], { cwd: root, input: list.map(at).join("\0"), encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }); } catch (e) { out = e.stdout ?? ""; }
-  const ignored = new Set(out.split("\0"));
-  return list.filter(n => !ignored.has(at(n)));
+  return { ...configured(read, skills, names), links };
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
@@ -502,16 +481,7 @@ function reached(f, blobs, dirs) {
   return { f, type: blobs.has(f) ? "blob" : "commit" };
 }
 
-// Whether the commit `rev` holds a file at a path, as configured()'s `holds` asks it word by word of a hook's command:
-// from one listing of the commit, git asked once, and through read() only where a link stands on the path's way.
-function heldAt(root, rev, read) {
-  return f => {
-    const { blobs, links } = listing(root, rev);
-    return links.some(at => f === at || f.startsWith(`${at}/`)) ? read(f) !== null : blobs.has(f);
-  };
-}
-
-// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, others, dirs, children }.
+// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, others, dirs }.
 const listings = new Map();
 function listing(root, rev) {
   const key = `${root}\0${rev}`;
@@ -525,13 +495,6 @@ function listing(root, rev) {
   // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
   found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
   found.dirs = new Set(entries.flatMap(([, at]) => at.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
-  // (and the names in each folder, the root's under ".", so a folder's are found at once however often they are asked)
-  found.children = new Map();
-  for (const at of [...entries.map(([, e]) => e), ...found.dirs]) {
-    const dir = path.posix.dirname(at);
-    if (!found.children.has(dir)) found.children.set(dir, new Set());
-    found.children.get(dir).add(path.posix.basename(at));
-  }
   listings.set(key, found);
   return found;
 }
@@ -578,10 +541,9 @@ function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes
 // marked "from": "the working tree" in its entry, which lists it in the baseline. A new one fails, marked or not, and
 // so does one whose mark the pull request took out while it stands: the baseline only shrinks. In the core's own
 // repository none may stand.
-function sortSources({ sources, marked, unread }, { head, baseProject, baseList, core, file }, fail, notes) {
-  for (const said of unread) notes.push(said);
+function sortSources({ sources, marked }, { head, baseProject, baseList, core, file }, fail, notes) {
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []);
-  const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && head.sources.get(k).every(p => baseProject.sources.get(k)?.includes(p));
+  const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && baseProject.sources.has(k);
   const how = HOW;
   for (const [k, problem] of sources) {
     if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
