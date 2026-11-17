@@ -191,7 +191,7 @@ c = check("");
 ok(c.status === 0 && /No base to compare with/.test(c.out) && /listed, not failed: "half"/.test(c.out), "with no base, as on a push to main, nothing fails and each is listed", c.out);
 c = check("no-such-commit");
 ok(c.status === 0 && /no-such-commit is no commit here/.test(c.out), "a base that is no commit here fails nothing of this check's (the copies part fails the base itself)", c.out);
-ok(atCommit(base, "docs/choices.md", hist) === old && atCommit(empty, "docs/choices.md", hist) === null && atCommit("nowhere", "docs/choices.md", hist) === undefined,
+ok(atCommit(base, "docs/choices.md", hist) === old && atCommit(empty, "docs/choices.md", hist) === null && atCommit("nowhere", "docs/choices.md", hist) === undefined && atCommit("--output=x", "docs/choices.md", hist) === undefined,
   "a file is read at a commit, as none where the commit lacks it, and as nothing where there is no such commit");
 ok(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[1] === true && mended(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[0].join("\n"))
   && checkOf({ file: "docs/choices.md", unread: "a link" }, empty, hist)[1] === false && checkOf({ file: "docs/choices.md", text: null }, base, hist)[1] === false,

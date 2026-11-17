@@ -225,9 +225,11 @@ export function argued(head, base) {
 }
 
 // A file's text at a commit, read from git, or null where the commit does not hold it as a file of at most MOST bytes;
-// undefined where `commit` is no commit here.
+// undefined where `commit` is no commit here, or a name git would read as an option.
 export function atCommit(commit, file, root = ".") {
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
+  // (a name that opens with "-" would be read by git as an option: it is no commit)
+  if (String(commit).startsWith("-")) return undefined;
   try { git(["rev-parse", "--verify", "-q", `${commit}^{commit}`]); } catch { return undefined; }
   try {
     if (git(["cat-file", "-t", `${commit}:${file}`]).trim() !== "blob" || Number(git(["cat-file", "-s", `${commit}:${file}`])) > MOST) return null;
