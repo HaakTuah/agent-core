@@ -573,11 +573,13 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
 
   // the npm project, public
   const npmProject = project(`an-npm-project-from-${tag}`, from, { owner: "someone-else", kit: ["--npm", "."], isPrivate: false, files: dir => {
-    write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
+    write(dir, "package.json", '{\n  "name": "an-npm-project",\n  "version": "1.0.0",\n  "private": true,\n  "type": "module",\n  "dependencies": {\n    "ms": "2.1.3"\n  }\n}\n');
     write(dir, "package-lock.json", `${JSON.stringify({ name: "an-npm-project", version: "1.0.0", lockfileVersion: 3, requires: true, packages: { "": { name: "an-npm-project", version: "1.0.0", dependencies: { ms: "2.1.3" } },
       "node_modules/ms": { version: "2.1.3", resolved: "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz", integrity: "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==", license: "MIT" } } }, null, 2)}\n`);
     write(dir, "README.md", "# An npm project\n");
-    write(dir, ".gitignore", "node_modules/\n");
+    // (the patterns a project's own .gitignore commonly holds, which the folder of packages the core's copy carries
+    // overrides, so that the sync commits it whole; and a package.json that makes .js a module, which its own overrides)
+    write(dir, ".gitignore", "node_modules/\ndist/\nbuild/\nlib/\nvendor/\n");
   } });
   seed(npmProject, "\n");
   synced = npmProject;
@@ -592,7 +594,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
     write(dir, "src/App/Program.cs", 'System.Console.WriteLine("Hello");\r\n');
     write(dir, "src/App/packages.lock.json", `{\r\n  "version": 1,\r\n  "dependencies": {\r\n    "${tfm}": {}\r\n  }\r\n}\r\n`);
     write(dir, "README.md", "# A .NET project\r\n");
-    write(dir, ".gitignore", "bin/\r\nobj/\r\n");
+    write(dir, ".gitignore", "bin/\r\nobj/\r\n**/[Pp]ackages/*\r\n[Dd]ist/\r\n");
   } });
   const config = path.join(dotnetProject.dir, "checks/licences.json");
   fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), nuget: { ships: ["src/App/packages.lock.json"], tools: [] } }, null, 2)}\n`);

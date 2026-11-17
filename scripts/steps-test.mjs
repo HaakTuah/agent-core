@@ -48,7 +48,7 @@ function kit(name, o) {
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "third-party", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
