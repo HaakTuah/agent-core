@@ -318,18 +318,23 @@ try {
   for (const [what, extra] of [
     ["a setup action given an env of its own", "      - uses: actions/setup-node@v4\n        env:\n          LD_PRELOAD: ./evil.so\n"],
     ["a checkout of another repository into the copy's folder", "      - uses: actions/checkout@v7\n        with:\n          repository: someone/else\n          path: core\n"],
+    ["a setup action that caches, running the package manager", "      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: yarn\n"],
     ["OPENSSL_CONF, though the step's words name it", "      - run: node core/scripts/licences.mjs $OPENSSL_CONF\n        env:\n          OPENSSL_CONF: evil.cnf\n"],
     ["a variable its words name, but not as its config", "      - run: node core/scripts/licences.mjs c.json $HOOK\n        env:\n          HOOK: ./build.sh\n"],
   ]) {
     lic(extra);
     ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with ${what} does not count`);
   }
-  for (const [what, runner] of [["a Windows runner, whose shell is pwsh", "windows-latest"], ["a runner a matrix names", "${{ matrix.os }}"]]) {
+  for (const [what, runner] of [["a Windows runner, whose shell is pwsh", "windows-latest"], ["a runner a matrix names", "${{ matrix.os }}"], ["a self-hosted runner, which may be Windows", "self-hosted"]]) {
     writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ${runner}\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/licences.mjs @(./evil.ps1)\n      - run: node core/scripts/lookup.mjs c.json --nuget\n        shell: bash\n      - run: node core/scripts/nuget.mjs c.json\n`);
     ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with no shell named on ${what} does not count`);
   }
   lic("      - run: node core/scripts/licences.mjs c.json\n");
   ok(notDone(tmp, step).length === 0, "and after the licence script alone, it does");
+  lic("      - uses: actions/setup-node@v4\n        with:\n          node-version-file: .node-version\n");
+  ok(notDone(tmp, step).length === 0, "and after a setup action given only its version, it does");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    container:\n      image: node:22\n      env:\n        NODE_OPTIONS: --require ./evil.js\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor a lookup in a job run in a container of its own");
   nugetJob("echo PATH=./tools >> \"$GITHUB_PATH\"", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
   ok(notDone(tmp, step).length === 1, "nor does an npm lookup after a step that writes to $GITHUB_PATH");
   writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);

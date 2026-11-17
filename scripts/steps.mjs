@@ -473,9 +473,9 @@ function stopsOn(st, job, w) {
   const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
   return shell === undefined ? notWindows(job) : /^(?:bash|sh)$/u.test(String(shell).trim());
 }
-// Whether a job's runner is named outright and is no Windows one, whose default shell is pwsh (a runner a matrix or an
-// expression names may be one).
-const notWindows = job => [job?.["runs-on"] ?? ""].flat().every(r => typeof r === "string" && !/\$\{\{|windows/iu.test(r));
+// Whether a job's runner is one of GitHub's own Linux or macOS runners, named outright, whose default shell is bash (a
+// runner a matrix, an expression, an organisation or a self-hosted machine names may be Windows, whose default is pwsh).
+const notWindows = job => { const r = [job?.["runs-on"] ?? ""].flat(); return r.length > 0 && r.every(x => typeof x === "string" && /^(?:ubuntu|macos)-[\w.-]+$/u.test(x)); };
 // The folder a step runs in, where it names one: its own, else (but in a composite action) its job's or workflow's default.
 function folderOf(st, job, w) {
   const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
@@ -499,9 +499,11 @@ const hides = (st, env, job, w) => {
     || visible(env, job, w).some(k => !plainKey(k) || !given.has(k));
 };
 // Whether an action's step may stand before a lookup as it is given: no env of its own and none a runner reads from its
-// job or workflow, and, for the checkout, no other repository, folder or commit than the pull request's.
+// job or workflow; for the checkout, no other repository, folder or commit than the pull request's; and for a setup
+// action, only the version, distribution and architecture to set up, never a cache or an install, which run the pull
+// request's own files.
 const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible({}, job, w).every(plainKey)
-  && (!/^actions\/checkout@/u.test(st.uses) || Object.keys(st.with ?? {}).every(k => ["fetch-depth", "persist-credentials"].includes(k)));
+  && Object.keys(st.with ?? {}).every(k => (/^actions\/checkout@/u.test(st.uses) ? ["fetch-depth", "persist-credentials"].includes(k) : /^(?:[\w-]*version(?:-file)?|distribution|architecture)$/u.test(k)));
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -510,7 +512,9 @@ function stepOf(st, job, w, started) {
   const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
-  return { cmds, counts, hidden: hides(st, env, job, w), plain: typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  // (a job run in a container of its own is run as that container is given, its env and options too: nothing counts there)
+  const boxed = job?.container !== undefined;
+  return { cmds, counts, hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -549,7 +553,7 @@ const lookupOf = (st, flag, copy, at, job) => {
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
 // Where a lookup stands, as the step's mend says it (beforeLookup).
-const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash, with no env but a variable its config is named by, so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
+const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container, with no env but a variable its config is named by, each setup action given only its version, so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
 // Whether a step may stand before a lookup: checkout or a setup action, or a run, by the runner's own `node`, from the
 // project's root, of one of the core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing
 // hidden (hides). Anything else (dotnet under any spelling, npm, a build script, make, a local action, a script of the
