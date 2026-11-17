@@ -72,9 +72,9 @@ makes a process measure its goal (`tasks/cleaning.md`).
   the core, those `scripts/holders.json` lists for it.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
   the core's `AGENTS.md`, "A rule is written to one pattern", or holding what that pattern keeps out.
-- Blocking: a new rule an agent cannot carry out, that only blocks, or that makes the product neither better nor
-  sturdier; and one whose owner's word was an order for one piece of work, not a standing word (`roles/shared/inbox.md`,
-  "An order for now is not a rule").
+- Blocking: a new rule that fails the core's test for a rule (the core's `AGENTS.md`, "A rule is for what an agent
+  can do"): one an agent cannot carry out, that only blocks, or that makes the product neither better nor sturdier,
+  and one whose owner's word was an order for one piece of work.
 - A finding: a rule that adds text without replacing any, or makes anyone wait for the owner beyond floor rules 3 and 14.
-- A finding: proof asked beyond what a thing costs others: a number asked of a fast test, a line of a module read on
-  need or an ordinary change, a measure counted by hand, or one that costs more than keeping the thing does.
+- A finding: proof asked beyond what a thing costs others (the core's `AGENTS.md`, "Proof is sized to what a thing
+  costs others").
