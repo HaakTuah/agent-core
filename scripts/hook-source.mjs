@@ -10,11 +10,12 @@
 // with the shell's quoting read, level after level, until reading it changes nothing (eight levels at most), its
 // backslashes, its backslash-newlines and the escapes of $'...' read as bash reads them; with every backslash read and
 // every quote taken out; and with cmd's "^" and PowerShell's backtick read as their escapes. A path written
-// `<the remote's main>:<path>` (refs/remotes/origin/main or origin/main) and given to git show or git cat-file -p, in
-// the one form FETCHED below reads, names main's copy, which is no file of the working tree; and a file only tested for, by "[", "[[" or "test" where a command starts
-// (`[ -f <path> ]`, `test -e <path>`), is neither run nor read, save where the command defines a function or alias of
-// that name. Not read here, and so the review's: a path the command builds from parts, reaches by changing folder or
-// through ".." past a link, names by a pattern (a glob or braces), or spells otherwise than the forms above; and
+// `<the remote's main>:<path>` (refs/remotes/origin/main or origin/main) and given to git show or git cat-file -p names
+// main's copy, which is no file of the working tree; and a file only tested for, by "[", "[[" or "test" where a command
+// starts (`[ -f <path> ]`, `test -e <path>`), is neither run nor read. Both hold only where nothing in the command can
+// change what git or test runs: in the starter kit's own two forms (KIT_FORMS), or in a plain command (plain()), and
+// nowhere else; every other path is reported, and the mend is the kit's form. Not read here, and so the review's: a
+// path the command builds from parts, reaches through ".." past a link, or spells otherwise than the forms above; and
 // whether a ref named `origin/main` is the remote's. Node's own modules only.
 //
 //   import { fromTree, pathsIndex } from "./hook-source.mjs";
@@ -35,18 +36,29 @@ const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
 const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`()]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
-// (a command that defines a name among `names` as a function, in either of bash's forms, by the name alone or a path to
-// it, ".exe" or not, as the exemptions read their commands)
-const PATHED = `(?:[^\\s;&|\`$()"'<>]*[/\\\\])?`;
-const defines = names => new RegExp(`(?:^|[\\s;&|(])${PATHED}(?:${names})(?:\\.exe)?[ \\t]*\\([ \\t]*\\)|\\bfunction[ \\t\\n]+${PATHED}(?:${names})(?:\\.exe)?(?=[\\s({]|$)`, "u");
-// (a command that could define a name at its run, by text no reading here sees whole: a builtin that runs text as
-// code (eval, source, ".", trap, mapfile's and readarray's callbacks, enable's loaded builtins, bind), an alias of any
-// name, bash's table of aliases, a function bash takes from its environment or a file it reads at its start, a function
-// whose name an expansion gives, or bash's ${ ...; }, which runs its commands in the shell itself)
-const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias|trap|mapfile|readarray|enable|bind)(?=[\s;&|)`]|$)|BASH_ALIASES|BASH_FUNC_|BASH_ENV|(?:^|[^\w])ENV=|[\u0001}][ \t]*\([ \t]*\)|\$\w+[ \t]*\([ \t]*\)|\bfunction[ \t]+[^\s(){};]*[$\u0001]|\$\{[\s|]/u;
-// (no file test of a command that defines test, "[", "[[" or a shell that runs one is one)
-const DEFINED = defines("test|\\[\\[?|sh|bash|zsh|dash");
-const redefined = raw => DEFINED.test(raw) || RUNTIME.test(raw);
+// A command in which a fetch from main or a file test is one: nothing in it expands (no "$", backtick, backslash, brace,
+// parenthesis, glob, "%" or "~"), "[" and "]" stand only as words of their own, it sets no variable, and it holds no word
+// that changes what a name runs or where git reads (BUILTINS, read with its quotes taken out, so ev"a"l is eval).
+// Anything else, however harmless, has neither: the starter kit's forms and a plain command are all that is read as safe.
+const BUILTINS = /(?<![\w./-])(?:eval|source|alias|unalias|hash|enable|trap|bind|mapfile|readarray|function|declare|typeset|export|readonly|local|unset|set|shopt|cd|pushd|popd|builtin|command|exec|env|PATH|ENV|command_not_found_handle|BASH_\w*|GIT_\w*)(?![\w-])|(?:^|[\s;&|])\.(?=[\s;&|]|$)/u;
+function plain(command) {
+  if (/[$`\\{}()*?%~\u0001]|(?:^|[\s;&|])\w+=/u.test(command)) return false;
+  if (/[[\]]/u.test(command.replace(/(?<![^\s;&|])(?:\[\[?|\]\]?)(?![^\s;&|])/gu, ""))) return false;
+  return !BUILTINS.test(command.replace(/["']/gu, ""));
+}
+// (a file at the project's root that a Windows shell runs in git's or test's place, since cmd looks in the folder it
+// stands in first)
+const shadows = (holds, name) => ["", ".exe", ".bat", ".cmd", ".com", ".ps1"].some(x => holds(`${name}${x}`));
+
+// The starter kit's two forms of a hook's command, whole, as setup/'s templates write them: its script fetched from
+// main into "$f" and run, perhaps with plain words after it, and nothing else, the second after one or more tests that a
+// file is there or is not; only the paths and those words change. Each is the core's, and of it only those words can name a file of the working tree.
+const KIT_PATH = "[\\w.-]+(?:/[\\w.-]+)*", KIT_ARGS = "((?: [\\w.-]+)*)";
+const kitFetch = dir => `f=\\$\\(git -C "${dir}" --no-replace-objects show refs/remotes/origin/main:${KIT_PATH} 2>/dev/null\\)`;
+const KIT_FORMS = [
+  new RegExp(`^bash -c '${kitFetch("\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}")} \\|\\| (?:exit 0|\\{ echo "[^"'$\`\\\\]*"; exit 0; \\}); (?:bash -c "\\$f"${KIT_ARGS}|node --input-type=module -e "\\$f"())'$`, "u"),
+  new RegExp(`^bash -c 'r=\\$\\(git rev-parse --show-toplevel 2>/dev/null\\) \\|\\| exit 0; (?:\\[ (?:! )?-f "\\$r/${KIT_PATH}" \\] \\|\\| exit 0; )+${kitFetch("\\$r")} \\|\\| exit 0; CLAUDE_PROJECT_DIR="\\$r" bash -c "\\$f"${KIT_ARGS}'$`, "u"),
+];
 // (what stands before a path read from the project's root: a variable or a command's output, as $(git rev-parse
 // --show-toplevel), or a ${...} with a default, perhaps closed by a quote)
 const ROOTED = /[\u0001)`}]\\?["']?$/u;
@@ -54,11 +66,9 @@ const ROOTED = /[\u0001)`}]\\?["']?$/u;
 // The quoted texts of a script, read left to right as the shell reads them: a single-quoted text is taken as written, a
 // double-quoted one with its backslashes read, and a backslash outside quotes keeps the next character; each quoted text
 // is read again as a script of its own, as bash -c '...' runs one, a few levels deep. Each is [its text, what stood
-// before it, whether no command word an expansion gives stood before it (riskAt)]; a text holding a blank is a name a
-// word alone would split, as "scripts/my hook.sh".
-function quotedTexts(script, depth = 0, out = [], safe = true) {
+// before it]; a text holding a blank is a name a word alone would split, as "scripts/my hook.sh".
+function quotedTexts(script, depth = 0, out = []) {
   if (depth > 4) return out;
-  const risk = riskAt(script);
   for (let i = 0; i < script.length; i++) {
     const c = script[i];
     if (c === "\\") { i++; continue; }
@@ -71,8 +81,8 @@ function quotedTexts(script, depth = 0, out = [], safe = true) {
     // (a quote never closed opens nothing, and reading goes on after it; an apostrophe in a comment or a here-document
     // that a later quote of its kind closes is read as a pair, which the shell would not, and stays the review's)
     if (j >= script.length) continue;
-    out.push([body, windowAt(script, i), safe && i < risk]);
-    quotedTexts(body, depth + 1, out, safe && i < risk);
+    out.push([body, windowAt(script, i)]);
+    quotedTexts(body, depth + 1, out);
     i = j;
   }
   return out;
@@ -94,30 +104,12 @@ export function pathsIndex(files) {
 const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
 const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
-// A path fetched from main, read in one form and no other, which the starter kit's hooks write: where a command starts
-// (at the start, after a newline, ";", "&", "|", "(", "$(" or a backtick), perhaps after keywords such as "then" or
-// "{" and the command's own variables (FOO=1), git (by its name or a path to it, ".exe" or not), its options -C or -c
-// each with one word, or --name or --name=word, then show or cat-file -p, then `<the remote's main>:<path>`. A word is
-// plain text, single- or double-quoted text, variables, $(...) without quotes in it and backtick spans, joined, and
-// holds no blank (each reading with the quotes taken out must still find the form). Any other form, git's or another
+// A path fetched from main in a plain command, in one form and no other: where a command starts (at the start, after a
+// newline, ";", or an "&" or "|" not of a redirection), perhaps after keywords such as "then", the bare word git, perhaps
+// --no-replace-objects, then show or cat-file -p, then `<the remote's main>:<path>`. Any other form, git's or another
 // program's (java -cp origin/main:x, say), is no fetch: its path is read as taken, and the mend is the kit's form.
-// (each alternative takes characters no other takes, the variable's mark among them, so no word is read two ways and
-// nothing backtracks without end)
-const ARG = `(?:"(?:[^"\`$\\\\\\u0001]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>\\u0001])+`;
-const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\w+=${ARG}?[ \\t]+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:[ \\t]+(?:-[Cc][ \\t]+${ARG}|--[\\w-]+(?:=${ARG})?))*[ \\t]+(?:show|cat-file[ \\t]+-p)[ \\t]+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
+const FETCHED = /(?:^|[\n;]|(?<![<>])[&|])[ \t]*(?:(?:then|do|else|elif|if|while|until|!)[ \t]+)*git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+["']?(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
 const fetched = before => FETCHED.test(before);
-// (words that run the word after them as a command: a builtin's, as builtin eval, or a program's)
-const DISPATCH = "(?:builtin|command|exec|env|time|nohup|nice|sudo|doas)";
-// Where a command word (perhaps after such words, options and assignments) or a -c script (a shell's, or any
-// program's: no reading here tells them apart) first starts with an expansion ($E, a ${...}, $(...), a backtick's output), which can define test or git, or anything, as it runs: no
-// file test nor fetch after it is one, a test or fetch before it, as the starter kit's f=$(git show ...) before its
-// bash -c "$f", keeping its own (each part takes characters no other takes, so nothing backtracks without end). The
-// index, or Infinity.
-const RISK = new RegExp(`(?:^|[\\n;&|(\`{]|(?<![^\\s])-\\w*c[ \\t])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\\\?["'])*(?:(?:(?:\\w+=(?:${ARG})?|${DISPATCH}|-[\\w-]+)[ \\t]+)+(?:\\\\?["'])*)?[\\u0001\\u0002$\`]`, "u");
-function riskAt(text) { const m = RISK.exec(text); return m ? m.index : Infinity; }
-// (no fetch of a command that defines git is one)
-const GIT_DEFINED = defines("git");
-const gitDefined = raw => GIT_DEFINED.test(raw) || RUNTIME.test(raw);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
 // backslashes read and a backslash-newline gone; the quotes themselves gone; a quote never closed runs to the end.
@@ -175,14 +167,13 @@ const windowAt = (text, i) => (i > 200 ? ` x ${text.slice(i - 200, i)}` : text.s
 
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
 function scan(text, index, holds, found, tests, fetches, only = () => true) {
-  const risk = riskAt(text);
   for (let i = 0; i < text.length; i++) {
     if (i > 0 && NAME.test(text[i - 1]) && text[i - 1] !== "/") continue;
     let node = index;
     for (let j = i; j < text.length && (node = node.get(text[j])); j++) { // (by UTF-16 unit, as pathsIndex keys them)
       if (!node.has("") || (j + 1 < text.length && /[\w./-]/u.test(text[j + 1]))) continue;
       const at = text.slice(i, j + 1);
-      if (!found.has(at) && only(at) && takenAt(windowAt(text, i), tests && i < risk, fetches && i < risk) && holds(at)) found.add(at);
+      if (!found.has(at) && only(at) && takenAt(windowAt(text, i), tests, fetches) && holds(at)) found.add(at);
     }
   }
 }
@@ -210,19 +201,43 @@ function fromRoot(p, before, ref, quoted) {
 // replacement, ${NAME/pattern/word}: read on its own too, since the expansion itself stands as one mark)
 const OPERAND = /\$\{\w+(?::?[-=+?]|\/\/?[#%]?[^/}$`]*\/)([^}$`]*)\}/gu;
 
+// Each of the project's files wherever its path stands whole in the command, in each reading of it, into `found`.
+function scanAll(written, raw, text, index, holds, found, tests, fetches) {
+  // (as written, Windows' separators read; with the shell's quoting read level after level, as scripts within scripts
+  // are, until reading it changes nothing; with every backslash read and every quote taken out; and with cmd's and
+  // PowerShell's escapes read)
+  const variants = [text, ...dequotings(raw)];
+  const bare = raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, "");
+  // (a closed backtick span holding a blank is the shell's command output, kept as one mark, not PowerShell's escape)
+  const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
+  variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
+  for (const variant of variants) scan(variant, index, holds, found, tests, fetches);
+  // (and, for a name that holds a "$" or a "%", the command as written, its variables not marked, with its quoting read:
+  // a "$" a quote or backslash keeps, as in 'scripts/$notify.sh', and a %name% a POSIX shell never reads, as in
+  // scripts/%notify%.sh, are part of a name, which marking would have taken)
+  const dollar = at => /[$%]/u.test(at);
+  for (const variant of [written, dequote(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
+}
+
+// Of a command in one of the kit's forms, the words after its script that name a file of the working tree; else null.
+function kitWords(command, holds) {
+  const kit = KIT_FORMS.map(f => f.exec(command)).find(Boolean);
+  return kit ? (kit[1] ?? "").split(" ").filter(w => w && holds(w)) : null;
+}
+
 export function fromTree(command, holds, index = null, operand = false) {
+  const kit = operand ? null : kitWords(String(command), holds);
+  if (kit) return kit;
   const operands = [...String(command).matchAll(OPERAND)].map(m => m[1]).filter(w => w.trim());
   const raw = String(command).replace(VARIABLE, "\u0001");
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
-  // (a ${...}'s default is a word, not a command of its own: no file test nor fetch stands at its start; and a definition of test
-  // or git is looked for in the command as written, its variables marked and not, and in every reading of its quoting,
-  // as alias g'it'=x defines git and ${ eval ...; } hides its eval from the marked form)
-  const forms = [raw, ...dequotings(raw), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, ""), String(command), ...dequotings(String(command))];
-  const found = new Set(), tests = !operand && !forms.some(redefined), fetches = !operand && !forms.some(gitDefined);
-  const take = (word, before, quoted = false, safe = true) => {
+  // (a ${...}'s default is a word, not a command of its own, and no command is plain that holds one)
+  const safe = !operand && plain(String(command));
+  const found = new Set(), tests = safe && !shadows(holds, "test"), fetches = safe && !shadows(holds, "git");
+  const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    if (exempt(ref, before, tests && safe, fetches && safe)) return;
+    if (exempt(ref, before, tests, fetches)) return;
     const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
     if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);
@@ -231,31 +246,14 @@ export function fromTree(command, holds, index = null, operand = false) {
   // (each word as written, and as the shell unquotes it, so a path through a link inside the checkout, which no list of
   // the project's files holds, is found however it is quoted)
   for (let level = text, n = 0; n < 4; n++) {
-    const risk = riskAt(level);
-    for (const m of level.matchAll(WORD)) take(m[0], windowAt(level, m.index), false, m.index < risk);
+    for (const m of level.matchAll(WORD)) take(m[0], windowAt(level, m.index));
     const next = dequote(level);
     if (next === level) break;
     level = next;
   }
-  const risk = riskAt(text);
-  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index), false, m.index < risk);
-  for (const [body, before, safe] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true, safe);
-  if (index) {
-    // (as written, Windows' separators read; with the shell's quoting read level after level, as scripts within scripts
-    // are, until reading it changes nothing; with every backslash read and every quote taken out; and with cmd's and
-    // PowerShell's escapes read)
-    const variants = [text, ...dequotings(raw)];
-    const bare = raw.replace(/\\\n/gu, "").replace(/\\(.)/gsu, "$1").replace(/["']/gu, "");
-    // (a closed backtick span holding a blank is the shell's command output, kept as one mark, not PowerShell's escape)
-    const escapes = text.replace(/`[^`]*\s[^`]*`/gu, "\u0002").replace(/[\^`](.)/gsu, "$1");
-    variants.push(bare, escapes, escapes.replace(/["']/gu, ""));
-    for (const variant of variants) scan(variant, index, holds, found, tests, fetches);
-    // (and, for a name that holds a "$" or a "%", the command as written, its variables not marked, with its quoting read:
-    // a "$" a quote or backslash keeps, as in 'scripts/$notify.sh', and a %name% a POSIX shell never reads, as in
-    // scripts/%notify%.sh, are part of a name, which marking would have taken)
-    const written = String(command), dollar = at => /[$%]/u.test(at);
-    for (const variant of [written, dequote(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
-  }
+  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index));
+  for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
+  if (index) scanAll(String(command), raw, text, index, holds, found, tests, fetches);
   for (const word of operands) for (const at of fromTree(word, holds, index, true)) found.add(at);
   return [...found];
 }

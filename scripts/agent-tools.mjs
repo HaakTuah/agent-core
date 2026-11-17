@@ -21,8 +21,9 @@
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here that names a file the project holds, other than by fetching it from the
-// remote's main (`git show refs/remotes/origin/main:<path>`) or testing that it is there, takes it from the working
-// tree, which the branch it runs on can change, and fails (hook-source.mjs says what it reads). One that stood before
+// remote's main (`git show refs/remotes/origin/main:<path>`) or testing that it is there, in the starter kit's own form
+// or a plain command, takes it from the working tree, which the branch it runs on can change, and fails (hook-source.mjs
+// says what it reads, and what a plain command is). One that stood before
 // is listed in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new
 // hook marked so fails, and so does a mark taken out while its hook stands, or a mark on a hook that takes nothing from
 // the working tree.
@@ -69,6 +70,8 @@ const commit = v => typeof v === "string" && COMMIT.test(v);
 // (how a "ref" or "sha" that pins nothing reads: none, a branch or tag, or what is no text at all)
 const takes = (v, none) => (v === undefined ? none : typeof v === "string" ? `the branch or tag ${show(v)}` : `the value ${show(v)}, which names no commit`);
 // (the starter kit's hooks: each file it writes in a project, by the template it writes it from, beside this copy)
+// (the mend of a hook that takes a file from the working tree)
+const HOW = "write its command in the starter kit's form, as setup/claude-settings.json.tmpl does: bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:<the file> 2>/dev/null) || exit 0; bash -c \"$f\"'; or, where it only fetches or tests a file, as a plain command (git show refs/remotes/origin/main:<the file>, test -f <the file>) with no variable, quote, brace or glob in it and nothing that changes what git or test runs";
 const KITS = { ".claude/settings.json": "claude-settings.json.tmpl", ".kiro/hooks/work-saved.json": "kiro-hook.json.tmpl", ".codex/hooks.json": "codex-hooks.json.tmpl" };
 const KIT_DIR = fileURLToPath(new URL("../setup/template/", import.meta.url));
 // (what an entry's "from" may say: that its hook takes a file of the project from the working tree, as the base held it)
@@ -399,7 +402,7 @@ function sourcesOf(head, list, file, problems) {
   for (const [k, paths] of head.sources ?? []) {
     const said = `${describe(k)}, configured in ${head.tools.get(k)}, takes ${paths.map(show).join(", ")} from the working tree, which the branch it runs on can change, where floor rule 3 has what an agent tool starts by itself run from its copy on main`;
     if (list?.from?.has(k)) marked.push([k, said]);
-    else sources.push([k, `${said}. Mend: have it fetch what it runs from main, as the starter kit's hooks do (git show refs/remotes/origin/main:<the file>), in this pull request`]);
+    else sources.push([k, `${said}. Mend: ${HOW}, in this pull request`]);
   }
   for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but it takes no file of the project from the working tree. Mend: take "from" out of its entry, in this pull request`);
   return { sources, marked };
@@ -542,7 +545,7 @@ function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes
 function sortSources({ sources, marked }, { head, baseProject, baseList, core, file }, fail, notes) {
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []);
   const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && head.sources.get(k).every(p => baseProject.sources.get(k)?.includes(p));
-  const how = `have it fetch what it runs from main, as the starter kit's hooks do (git show refs/remotes/origin/main:<the file>)`;
+  const how = HOW;
   for (const [k, problem] of sources) {
     if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
     else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(TREE)}`);

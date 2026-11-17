@@ -397,7 +397,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const holds = p => ["scripts/a.sh", "scripts/a b.sh", ".kiro/hooks/work-saved.json"].includes(p);
   const reads = [["bash scripts/a.sh", ["scripts/a.sh"]], ["node \"${CLAUDE_PROJECT_DIR:-.}/scripts/a.sh\"", ["scripts/a.sh"]], ["python3 \"$(git rev-parse --show-toplevel)/scripts/a.sh\"", ["scripts/a.sh"]],
     ["powershell -File %CLAUDE_PROJECT_DIR%\\scripts\\a.sh", ["scripts/a.sh"]], ["git show HEAD:scripts/a.sh | bash", ["scripts/a.sh"]], ["node -r ./scripts/a.sh x", ["scripts/a.sh"]], ["cat scripts/../scripts/a.sh", ["scripts/a.sh"]],
-    ["git show origin/main:scripts/a.sh | bash", []], ["git show refs/remotes/origin/main:scripts/a.sh | bash", []], ["[ -f \"$r/.kiro/hooks/work-saved.json\" ] || exit 0", []], ["test ! -e scripts/a.sh", []],
+    ["git show origin/main:scripts/a.sh | bash", []], ["git show refs/remotes/origin/main:scripts/a.sh | bash", []], ["[ -f \"$r/.kiro/hooks/work-saved.json\" ] || exit 0", [".kiro/hooks/work-saved.json"]], ["test ! -e scripts/a.sh", []],
     ["bash /scripts/a.sh", []], ["echo ../scripts/a.sh", []], ["npx -y tool@1.0.0", []],
     ["bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["cd \"$CLAUDE_PROJECT_DIR\" && bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["echo \"it's done\"; bash 'scripts/a b.sh'", ["scripts/a b.sh"]],
     ["jq -r '.x // \"none\"' f.json; bash \"scripts/a b.sh\"", ["scripts/a b.sh"]], ["bash -c 'echo \\\"; bash \"scripts/a b.sh\"'", ["scripts/a b.sh"]], ["bash -c \"echo \\\"hi\\\" && bash \\\"scripts/a b.sh\\\"\"", ["scripts/a b.sh"]],
@@ -478,30 +478,30 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["java -cp origin/main:./scripts/x.py Main", ["scripts/x.py"]], ["LD_PRELOAD=origin/main:scripts/x.py cmd", ["scripts/x.py"]], ["bash >&test -x scripts/x.py", ["scripts/x.py"]], ["bash >|[ -x scripts/x.py", ["scripts/x.py"]],
       ["function test { bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]], ["function [ { bash \"$2\"; }; [ -x scripts/x.py ]", ["scripts/x.py"]], ["function test\n{ bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases; alias a=b test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["cmd /c python \"scr\"^ipts\\x.py", ["scripts/x.py"]],
-      ["git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []], ["git cat-file -p origin/main:scripts/x.py | bash", []],
+      ["git -C \"$r\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git cat-file -p origin/main:scripts/x.py | bash", []],
       // (#476's fallback security review of 789f5c1: "show" only as a word of its own, and not across a command's output)
       ["java -Droot=\"$(git rev-parse --show-toplevel)\" -cp origin/main:scripts/x.py Main", ["scripts/x.py"]], ["env -C \"$(git rev-parse --show-toplevel)\" java -cp origin/main:scripts/x.py Main", ["scripts/x.py"]],
       ["git show HEAD:a $(java -cp origin/main:scripts/x.py M)", ["scripts/x.py"]], ["shopt -s expand_aliases; alias 'test=bash'\ntest -x scripts/x.py", ["scripts/x.py"]],
       // (#476's fallback security review of 64d440f: git's own arguments may hold a command's output; git by its path or
       // as git.exe; an alias after a keyword; "show" only as git's subcommand)
-      ["git -C \"$(git rev-parse --show-toplevel)\" show origin/main:scripts/x.py | bash", []], ["git -C \"$(git rev-parse --show-toplevel)\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []],
-      ["git -C `git rev-parse --show-toplevel` show origin/main:scripts/x.py | bash", []], ["git --git-dir=\"$(pwd)/.git\" show origin/main:scripts/x.py | python3 -", []],
-      ["/usr/bin/git show origin/main:scripts/x.py | bash", []], ["git.exe show origin/main:scripts/x.py | bash", []], ["git -c core.pager=cat show origin/main:scripts/x.py | bash", []],
+      ["git -C \"$(git rev-parse --show-toplevel)\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git -C \"$(git rev-parse --show-toplevel)\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", ["scripts/x.py"]],
+      ["git -C `git rev-parse --show-toplevel` show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git --git-dir=\"$(pwd)/.git\" show origin/main:scripts/x.py | python3 -", ["scripts/x.py"]],
+      ["/usr/bin/git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git.exe show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git -c core.pager=cat show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
       ["shopt -s expand_aliases\nif true; then alias test=bash; fi\ntest -x scripts/x.py", ["scripts/x.py"]], ["shopt -s expand_aliases\n{ alias test=bash; }\ntest -x scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases\nbuiltin alias test=bash\ntest -x scripts/x.py", ["scripts/x.py"]], ["java -cp git -cp show -cp origin/main:scripts/x.py Main", ["scripts/x.py"]],
       // (#476's code review of 64d440f: a command's output inside a ${...})
       [": \"${REVIEW_UNSET:-$(bash scripts/x.py)}\"", ["scripts/x.py"]], [": ${A:-`bash scripts/x.py`}", ["scripts/x.py"]],
       // (#476's fallback security review of 4ade650: a fetch from main in one form alone; a ${...} with a default roots)
       ["git show x '`' `java -cp origin/main:scripts/x.py M`", ["scripts/x.py"]], ["git show x \\` ; `java -cp origin/main:scripts/x.py M`", ["scripts/x.py"]],
-      ["if true; then git show origin/main:scripts/x.py | bash; fi", []], ["{ git show origin/main:scripts/x.py; } | bash", []], ["! git show origin/main:scripts/x.py | bash", []],
+      ["if true; then git show origin/main:scripts/x.py | bash; fi", []], ["{ git show origin/main:scripts/x.py; } | bash", ["scripts/x.py"]], ["! git show origin/main:scripts/x.py | bash", []],
       // (a fetch whose words hold a quoted blank is read with its quotes out too, where it is no longer the one form: it
       // fails, and its mend is the kit's form; failing so is safe, as letting any such form through is not)
-      ["FOO=\"a b\" git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git -C \"my dir\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["FOO=ab git -C \"$r\" show origin/main:scripts/x.py | bash", []],
+      ["FOO=\"a b\" git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git -C \"my dir\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["FOO=ab git -C \"$r\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
       ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/x.py\"", ["scripts/x.py"]], ["bash \"${CLAUDE_PROJECT_DIR:-$PWD}\"/scripts/x.py", ["scripts/x.py"]], ["bash ${CLAUDE_PROJECT_DIR:-`pwd`}/scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 4ade650: a ${...}'s word given as its default)
-      ["bash \"${REVIEW_UNSET:-scripts/x.py}\"", ["scripts/x.py"]], ["bash ${A=scripts/x.py}", ["scripts/x.py"]], ["git -C \"${CLAUDE_PROJECT_DIR:-.}\" show origin/main:scripts/x.py | bash", []],
+      ["bash \"${REVIEW_UNSET:-scripts/x.py}\"", ["scripts/x.py"]], ["bash ${A=scripts/x.py}", ["scripts/x.py"]], ["git -C \"${CLAUDE_PROJECT_DIR:-.}\" show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
       // (#476's fallback security review of a72dc88: a fetch is one line; a pattern's replacement is read)
-      ["show() { python3 \"${1#*:}\"; }\ngit\nshow origin/main:scripts/x.py", ["scripts/x.py"]], ["bash ${PWD/*/scripts/x.py}", ["scripts/x.py"]], [`git -C ${"$a".repeat(24)} show origin/main:scripts/x.py | bash`, []],
+      ["show() { python3 \"${1#*:}\"; }\ngit\nshow origin/main:scripts/x.py", ["scripts/x.py"]], ["bash ${PWD/*/scripts/x.py}", ["scripts/x.py"]], [`git -C ${"$a".repeat(24)} show origin/main:scripts/x.py | bash`, ["scripts/x.py"]],
       // (#476's code review of a72dc88: a hook that redefines git fetches nothing)
       ["git() { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]], ["function git { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["shopt -s expand_aliases; alias git=bash\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
@@ -530,13 +530,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["E=eval; G=git; $E \"$G(){ bash \\\"\\${2#*:}\\\";}\"; git show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["bash -c \"$(printf '\\164est(){ bash \"$2\";}'); test -f scripts/x.py\"", ["scripts/x.py"]],
       ["env 'BASH_FUNC_test%%=() { bash \"$2\"; }' bash -c ': ; test -f scripts/x.py'", ["scripts/x.py"]],
-      ["f=$(git show origin/main:scripts/x.py) || exit 0; bash -c \"$f\"", []], ["[ -f scripts/x.py ] || exit 0; $RUN", []],
+      ["f=$(git show origin/main:scripts/x.py) || exit 0; bash -c \"$f\"", ["scripts/x.py"]], ["[ -f scripts/x.py ] || exit 0; $RUN", ["scripts/x.py"]],
       // (#476's code review of 27032e7: a builtin reached through another word, as builtin $E; and the other ways a shell runs text as code)
       ["E=eval; G=git; builtin $E \"function $G { bash \\\"\\${2#*:}\\\"; }\"; git show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["E=eval; command $E \"test(){ bash \\\"\\$2\\\";}\"; test -f scripts/x.py", ["scripts/x.py"]], ["trap \"$E\" DEBUG; test -f scripts/x.py", ["scripts/x.py"]],
       ["X=${ eval \"git(){ bash \\\"\\${2#*:}\\\";}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["G=git; function $G { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
-      ["command -v git >/dev/null && git show origin/main:scripts/x.py | bash", []],
+      ["command -v git >/dev/null && git show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
+      // (#476's fallback security review of ec56fcb: a fetch or test is one only in the kit's forms or a plain command)
+      ["{eval,} \"$(printf '\\164est(){ python3 \"$2\";}')\"; test -f scripts/x.py", ["scripts/x.py"]], ["ev[a]l alias test=bash; test -f scripts/x.py", ["scripts/x.py"]],
+      ["hash -p /bin/sh git; git show origin/main:scripts/x.py", ["scripts/x.py"]], ["PATH=bin git show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
+      ["export PATH=bin; git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["command_not_found_handle(){ python3 \"${3#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["git -C scripts/ev show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git --git-dir=scripts/ev show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
+      ["GIT_DIR=scripts/ev git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["cd scripts/ev && git show origin/main:scripts/x.py | bash", ["scripts/x.py"]],
+      ["git --no-replace-objects show refs/remotes/origin/main:scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then echo ok; fi", []], ["git show 'origin/main:scripts/x.py' | bash", []],
+      ["bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || exit 0; bash -c \"$f\" a b'", []],
+      ["bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || { echo \"a'; bash scripts/x.py; '\"; exit 0; }; bash -c \"$f\"'", ["scripts/x.py"]],
+      ["bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || exit 0; bash -c \"$f\"'; bash scripts/x.py", ["scripts/x.py"]],
       ["source <(echo 'git() { bash \"${2#*:}\"; }')\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
       ["bash 'scripts/%notify%.sh'", ["scripts/%notify%.sh"]], ["bash scripts/%notify%.sh", ["scripts/%notify%.sh"]],
@@ -545,10 +555,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["cat -- /sh -c test -f scripts/x.py 2>/dev/null | bash", ["scripts/x.py"]], ["cat -- ${x:-test -f scripts/x.py} | bash", ["scripts/x.py"]], ["cat -- ${x:-/sh -c test -f scripts/x.py} | bash", ["scripts/x.py"]], ["tail -n +1 -- x/bash -c [ -e scripts/x.py | bash", ["scripts/x.py"]], ["bash -c 'test -f scripts/x.py'", []], ["x; /bin/sh -c test -f scripts/x.py", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
-      ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", []], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
+      ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", ["scripts/x.py"]], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", []]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
+    ok(JSON.stringify(fromTree("bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || exit 0; bash -c \"$f\" a.sh'", has, index)) === JSON.stringify(["a.sh"]),
+      "in the kit's form, a word after its script that names a file of the working tree is that file's");
+    for (const shadow of ["git.bat", "git.exe", "test.cmd"]) {
+      const own = [...files, shadow], ownHas = f => own.includes(f);
+      ok(JSON.stringify(fromTree(shadow.startsWith("git") ? "git show origin/main:scripts/x.py | bash" : "test -f scripts/x.py", ownHas, pathsIndex(own))) === JSON.stringify(["scripts/x.py"]),
+        `a ${shadow} the project holds at its root, which cmd runs in its name's place, takes the exemption away`);
+    }
     const began = Date.now();
-    for (const command of ["a.sh ".repeat(1 << 16), "test -f a.sh; ".repeat(1 << 15), "'".repeat(1 << 19), "$'".repeat(1 << 18), "alias\talias ".repeat(1 << 15), "git show ".repeat(1 << 15), `git ${"-C x ".repeat(1 << 15)}show origin/main:a.sh`, `git -C "${"$(a)".repeat(1 << 15)}`, `git -C ${"$a".repeat(1 << 12)} show origin/main:x y`, `FOO=${"$a".repeat(1 << 12)} git show origin/main:x y`, `git -C "${"$a".repeat(1 << 12)}" show origin/main:x y`, `git ${"--a=$a ".repeat(1 << 11)}show origin/main:x y`, `"'\"${"(/".repeat(50000)}\"'"`]) fromTree(command, has, index);
+    for (const command of ["a.sh ".repeat(1 << 16), "test -f a.sh; ".repeat(1 << 15), "'".repeat(1 << 19), "$'".repeat(1 << 18), "alias\talias ".repeat(1 << 15), "git show ".repeat(1 << 15), `git ${"-C x ".repeat(1 << 15)}show origin/main:a.sh`, `git -C "${"$(a)".repeat(1 << 15)}`, `git -C ${"$a".repeat(1 << 12)} show origin/main:x y`, `FOO=${"$a".repeat(1 << 12)} git show origin/main:x y`, `git -C "${"$a".repeat(1 << 12)}" show origin/main:x y`, `git ${"--a=$a ".repeat(1 << 11)}show origin/main:x y`, `"'\"${"(/".repeat(50000)}\"'"`, "a={ ".repeat(1 << 16), "-c ".repeat(1 << 17)]) fromTree(command, has, index);
     ok(Date.now() - began < 15000, "and a command half a megabyte long is read in seconds, never minutes", `${Date.now() - began} ms`);
   }
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
