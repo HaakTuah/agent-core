@@ -478,7 +478,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     for (const [command, want] of [["bash $'scripts/x\\x2epy'", ["scripts/x.py"]], ["bash $'\\163cripts/x.py'", ["scripts/x.py"]], ["bash scripts/x.\\\npy", ["scripts/x.py"]], ["sh -c 'bash \"scripts/x.\\\npy\"'", ["scripts/x.py"]],
       ["sh -c 'python3 \"scripts/it'\\''s😀.py\"'", ["scripts/it's😀.py"]], ["sh -c 'bash \"$3\"' do test -x scripts/x.py", ["scripts/x.py"]], ["sh -c 'bash \"$2\"' {test -x scripts/x.py", ["scripts/x.py"]],
       ["test(){ bash \"$2\"; }; test -x scripts/x.py", ["scripts/x.py"]], [wrap("cat \"scripts/it's.py\"", 6), ["scripts/it's.py"]], ["cmd /c python scr^ipts\\x.py", ["scripts/x.py"]],
-      ["python scr`ipts/x.py", ["scripts/x.py"]], ["bash `pwd`/scripts/x.py", ["scripts/x.py"]], ["git show refs/remotes/origin/main:./scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then :; fi", []], ["x; ! test -e scripts/x.py", []],
+      ["python scr`ipts/x.py", ["scripts/x.py"]], ["bash `pwd`/scripts/x.py", ["scripts/x.py"]], ["git show refs/remotes/origin/main:./scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then :; fi", []], ["x; ! test -e scripts/x.py", ["scripts/x.py"]],
       // (#476's fallback security review of 11acb4d: a ref of main in a list no git show reads, a redirection's "&" or
       // "|", and bash's other ways to define "test")
       ["java -cp origin/main:./scripts/x.py Main", ["scripts/x.py"]], ["LD_PRELOAD=origin/main:scripts/x.py cmd", ["scripts/x.py"]], ["bash >&test -x scripts/x.py", ["scripts/x.py"]], ["bash >|[ -x scripts/x.py", ["scripts/x.py"]],
@@ -558,7 +558,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["git show refs/remotes/origin/main:scripts/x.py --textconv | python3", ["scripts/x.py"]], ["printf -v HOME scripts; git show refs/remotes/origin/main:scripts/x.py | bash", ["scripts/x.py"]],
       ["git update-ref refs/remotes/origin/main HEAD; git show refs/remotes/origin/main:scripts/x.py | python3", ["scripts/x.py"]],
       ["git show origin/main:scripts/x.py | bash", ["scripts/x.py"]], ["git show refs/remotes/origin/main:scripts/x.py 2>/dev/null | bash", []],
-      ["if true; then git cat-file -p refs/remotes/origin/main:scripts/x.py | bash; fi", []], ["[ -f scripts/x.py ] && git show refs/remotes/origin/main:scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then echo ok; fi", []], ["git show 'origin/main:scripts/x.py' | bash", ["scripts/x.py"]],
+      ["if true; then git cat-file -p refs/remotes/origin/main:scripts/x.py | bash; fi", ["scripts/x.py"]],
+      // (#476's fallback security review of 95343ac: ";" and "^" start no command a test or fetch stands at, as cmd reads them, and no path before a shell's name)
+      ["make ;test -f scripts/x.py", ["scripts/x.py"]], ["make ^& test -f scripts/x.py", ["scripts/x.py"]], ["sed ; test -f scripts/x.py", ["scripts/x.py"]],
+      ["scripts/bash -c test -f scripts/x.py", ["scripts/x.py"]], ["if true\nthen git cat-file -p refs/remotes/origin/main:scripts/x.py | bash\nfi", []], ["x\n! test -e scripts/x.py", []], ["[ -f scripts/x.py ] && git show refs/remotes/origin/main:scripts/x.py | bash", []], ["if [ -f scripts/x.py ]; then echo ok; fi", []], ["git show 'origin/main:scripts/x.py' | bash", ["scripts/x.py"]],
       ["bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || exit 0; bash -c \"$f\" a b'", []],
       ["bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || { echo \"a'; bash scripts/x.py; '\"; exit 0; }; bash -c \"$f\"'", ["scripts/x.py"]],
       ["bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || exit 0; bash -c \"$f\"'; bash scripts/x.py", ["scripts/x.py"]],
@@ -569,7 +572,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["bash 'scripts/%notify%.sh'", ["scripts/%notify%.sh"]], ["bash scripts/%notify%.sh", ["scripts/%notify%.sh"]],
       ["bash 'scripts/$notify.sh'", ["scripts/$notify.sh"]], ["bash scripts/\\$notify.sh", ["scripts/$notify.sh"]],
       // (#476's fallback security review of 9dc381f: a shell's -c script starts a command only where the shell does)
-      ["cat -- /sh -c test -f scripts/x.py 2>/dev/null | bash", ["scripts/x.py"]], ["cat -- ${x:-test -f scripts/x.py} | bash", ["scripts/x.py"]], ["cat -- ${x:-/sh -c test -f scripts/x.py} | bash", ["scripts/x.py"]], ["tail -n +1 -- x/bash -c [ -e scripts/x.py | bash", ["scripts/x.py"]], ["bash -c 'test -f scripts/x.py'", ["scripts/x.py"]], ["x; /bin/sh -c test -f scripts/x.py", []]])
+      ["cat -- /sh -c test -f scripts/x.py 2>/dev/null | bash", ["scripts/x.py"]], ["cat -- ${x:-test -f scripts/x.py} | bash", ["scripts/x.py"]], ["cat -- ${x:-/sh -c test -f scripts/x.py} | bash", ["scripts/x.py"]], ["tail -n +1 -- x/bash -c [ -e scripts/x.py | bash", ["scripts/x.py"]], ["bash -c 'test -f scripts/x.py'", ["scripts/x.py"]], ["x; /bin/sh -c test -f scripts/x.py", ["scripts/x.py"]]])
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     for (const [command, want] of [["sh -c 'python3 \"scripts/it'\\''s.py\"'", ["scripts/it's.py"]], ["python3 'scripts/a(b).py'", ["scripts/a(b).py"]], ["python3 \"scripts/a=b.py\"", ["scripts/a=b.py"]], ["bash a.sh", ["a.sh"]],
       ["test -f scripts/x.py", []], ["test -e ./scripts/x.py", []], ["[ -f \"$CLAUDE_PROJECT_DIR\"/scripts/x.py ]", ["scripts/x.py"]], ["bash /usr/scripts/x.py", []], ["bash xscripts/x.py", []], ["bash scripts/x.pyc", []], ["git show origin/main:\"scripts/x.py\" | python3 -", ["scripts/x.py"]]])
@@ -583,12 +586,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     for (const command of ["bash tools/\"my hook.sh\"", "bash 'tools/my'\" hook.sh\"", "sh -c 'bash tools/\"my hook.sh\"'", "bash tools/$'my hook.sh'", "bash tools/$'my\\x20hook.sh'", "bash tools/$\"my hook.sh\"", "sh -c $'bash tools/\"my\\x20hook.sh\"'", "sh -c \"sh -c 'bash tools/\\\"my hook.sh\\\"'\"", "bash tools/my\\\n\\ hook.sh"])
       ok(JSON.stringify(fromTree(command, f => f === "tools/my hook.sh", index)) === JSON.stringify(["tools/my hook.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
     // (#476's code review of 2a76778: and a word with no blank, its quoting read)
-    for (const command of ["bash tools/$'r\\x75n.sh'", "bash tools/r\\un.sh", "bash tools/r''un.sh"])
+    for (const command of ["bash tools/$'r\\x75n.sh'", "bash tools/r\\un.sh", "bash tools/r''un.sh", "bash tools/run.sh"])
       ok(JSON.stringify(fromTree(command, f => f === "tools/run.sh", index)) === JSON.stringify(["tools/run.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
-    for (const shadow of ["git.bat", "git.exe", "test.cmd", "git.vbs"]) {
+    // (#476's fallback security review of 95343ac: a path with a colon, through such a link, is read whole too)
+    for (const command of ["bash tools/r:x.sh", "bash 'tools/r:x.sh'"])
+      ok(JSON.stringify(fromTree(command, f => f === "tools/r:x.sh", index)) === JSON.stringify(["tools/r:x.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
+    const fetch = "git show refs/remotes/origin/main:scripts/x.py | bash";
+    for (const [shadow, command] of [["git.bat", fetch], ["git.exe", fetch], ["git.vbs", fetch], ["test.cmd", "test -f scripts/x.py"], ["[.bat", "[ -f scripts/x.py ]"],
+      ["[[.bat", "[[ -f scripts/x.py ]]"], ["bash.cmd", "bash -c test -f scripts/x.py"], ["sh.bat", "sh -c test -f scripts/x.py"]]) {
       const own = [...files, shadow], ownHas = f => own.includes(f);
-      ok(JSON.stringify(fromTree(shadow.startsWith("git") ? "git show origin/main:scripts/x.py | bash" : "test -f scripts/x.py", ownHas, pathsIndex(own))) === JSON.stringify(["scripts/x.py"]),
-        `a ${shadow} the project holds at its root, which cmd runs in its name's place, takes the exemption away`);
+      ok(JSON.stringify(fromTree(command, has, pathsIndex(own))) === "[]" && JSON.stringify(fromTree(command, ownHas, pathsIndex(own))) === JSON.stringify(["scripts/x.py"]),
+        `a ${shadow} the project holds at its root, which cmd runs in its name's place, takes the exemption of ${JSON.stringify(command)} away`);
     }
     const began = Date.now();
     for (const command of ["a.sh ".repeat(1 << 16), "test -f a.sh; ".repeat(1 << 15), "'".repeat(1 << 19), "$'".repeat(1 << 18), "alias\talias ".repeat(1 << 15), "git show ".repeat(1 << 15), `git ${"-C x ".repeat(1 << 15)}show origin/main:a.sh`, `git -C "${"$(a)".repeat(1 << 15)}`, `git -C ${"$a".repeat(1 << 12)} show origin/main:x y`, `FOO=${"$a".repeat(1 << 12)} git show origin/main:x y`, `git -C "${"$a".repeat(1 << 12)}" show origin/main:x y`, `git ${"--a=$a ".repeat(1 << 11)}show origin/main:x y`, `"'\"${"(/".repeat(50000)}\"'"`, "a={ ".repeat(1 << 16), "-c ".repeat(1 << 17), "a \"b c\" ".repeat(1 << 16)]) fromTree(command, has, index);

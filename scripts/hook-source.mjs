@@ -32,11 +32,12 @@ const MAIN = /^refs\/remotes\/origin\/main$/u;
 // is read as written)
 const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // (what stands before a word that only tests a file: "[", "[[" or "test" where a command starts (at the start, after a
-// newline, ";", "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", after a quote that opens,
-// or where a shell itself standing so starts its -c script, its quotes read), perhaps after keywords such as "then", "!" or "{", each a
+// newline, "&", "|" or "(", but "&" or "|" not of a redirection such as ">&" or ">|", after a quote that opens, or
+// where a shell named by its name alone starts its -c script, its quotes read; never after ";", which cmd passes to the
+// program before it as an argument, as it does what "^" escapes), perhaps after keywords such as "then", "!" or "{", each a
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
-const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`()]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
+const TESTED = /(?:^|[\n(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
 // A command in which a fetch from main or a file test is one: nothing in it expands or quotes (no "$", backtick,
 // backslash, quote, brace, parenthesis, glob, "%", "~" or "<", so no here-document), "[" and "]" stand only as words of
 // their own, it sets no variable (by "=" or by a builtin that sets one, as for, read or printf -v do), it holds no word
@@ -48,12 +49,12 @@ const GIT = /(?<![\w./-])git(?![\w./-])/gu;
 const FETCH_AT = /git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+refs\/remotes\/origin\/main:[\w./-]+(?:[ \t]+2>\/dev\/null)?[ \t]*(?=$|[|;&\n])/uy;
 const fetchAt = (command, i) => { FETCH_AT.lastIndex = i; return FETCH_AT.test(command); };
 function plain(command) {
-  if (/[$`\\{}()*?%~<'"\u0001]|(?:^|[\s;&|])\w+=/u.test(command)) return false;
+  if (/[$`\\{}()*?%~<'"^\u0001]|(?:^|[\s;&|])\w+=/u.test(command)) return false;
   if (/[[\]]/u.test(command.replace(/(?<![^\s;&|])(?:\[\[?|\]\]?)(?![^\s;&|])/gu, ""))) return false;
   return !BUILTINS.test(command) && [...command.matchAll(GIT)].every(m => fetchAt(command, m.index));
 }
-// (a file at the project's root that a Windows shell runs in git's or test's place, since cmd looks in the folder it
-// stands in first)
+// (a file at the project's root that a Windows shell runs in the place of git, or of test, "[", "[[" or a shell a test
+// stands after, since cmd looks in the folder it stands in first)
 const shadows = (holds, name) => ["", ".exe", ".bat", ".cmd", ".com", ".ps1", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".msc"].some(x => holds(`${name}${x}`));
 
 // The starter kit's two forms of a hook's command, whole, as setup/'s templates write them: its script fetched from
@@ -111,10 +112,10 @@ const NAME = /[\w.-]/u;
 // (where a path may start: at the start, after a character no name holds, or after "./" or a root's "/" there)
 const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 // A path fetched from main in a plain command, in one form and no other: where a command starts (at the start, after a
-// newline, ";", or an "&" or "|" not of a redirection), perhaps after keywords such as "then", the bare word git, perhaps
+// newline, or an "&" or "|" not of a redirection; never after ";", as TESTED says), perhaps after keywords such as "then", the bare word git, perhaps
 // --no-replace-objects, then show or cat-file -p, then `refs/remotes/origin/main:<path>` (plain() has each git end there). Any other form, git's or another
 // program's (java -cp origin/main:x, say), is no fetch: its path is read as taken, and the mend is the kit's form.
-const FETCHED = /(?:^|[\n;]|(?<![<>])[&|])[ \t]*(?:(?:then|do|else|elif|if|while|until|!)[ \t]+)*git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+refs\/remotes\/origin\/main:(?:\.\/)?$/u;
+const FETCHED = /(?:^|\n|(?<![<>])[&|])[ \t]*(?:(?:then|do|else|elif|if|while|until|!)[ \t]+)*git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+refs\/remotes\/origin\/main:(?:\.\/)?$/u;
 const fetched = before => FETCHED.test(before);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
@@ -298,14 +299,18 @@ export function fromTree(command, holds, index = null, operand = false) {
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
   // (a ${...}'s default is a word, not a command of its own, and no command is plain that holds one)
   const safe = !operand && plain(String(command));
-  const found = new Set(), tests = safe && !shadows(holds, "test"), fetches = safe && !shadows(holds, "git");
+  const found = new Set(), fetches = safe && !shadows(holds, "git");
+  const tests = safe && !["test", "[", "[[", "sh", "bash", "zsh", "dash"].some(name => shadows(holds, name));
   const take = (word, before, quoted = false) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
     if (exempt(ref, before, tests, fetches)) return;
-    const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
-    if (p === null || !inProject(p)) return;
-    const at = path.posix.normalize(p);
-    if (at !== "." && holds(at)) found.add(at);
+    // (and a word with a colon that is no fetch is a path whole too, as tools/r:x.sh through a link tools -> scripts)
+    for (const part of colon >= 0 ? [word.slice(colon + 1), word] : [word]) {
+      const p = fromRoot(part, before, part === word ? null : ref, quoted);
+      if (p === null || !inProject(p)) continue;
+      const at = path.posix.normalize(p);
+      if (at !== "." && holds(at)) found.add(at);
+    }
   };
   // (each word as written, and as the shell unquotes it, so a path through a link inside the checkout, which no list of
   // the project's files holds, is found however it is quoted)
