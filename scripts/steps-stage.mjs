@@ -19,6 +19,8 @@ const write = (dir, f, text) => { fs.mkdirSync(path.dirname(at(dir, f)), { recur
 const SLOTS = /^(\| Slot \| Here \|\r?\n\| --- \| --- \|\r?\n)/m;
 
 const PIN = "0".repeat(40);
+// (whether the project's call to core.yml runs the NuGet check in its one job: #376)
+const folds = (dir, key) => fs.existsSync(at(dir, ".github/workflows/core.yml")) && new RegExp(`^ {6}${key}: `, "m").test(read(dir, ".github/workflows/core.yml"));
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
 // (a suite of the project's own whose path filter leaves the copy and the manifest out, as it was told, and not the
@@ -93,7 +95,7 @@ export const STAGES = {
     // licence check's config)
     mend: dir => {
       write(dir, "stage/packages.lock.json", "{\n  \"version\": 1,\n  \"dependencies\": {}\n}\n");
-      if (!fs.existsSync(at(dir, ".github/workflows/nuget.yml"))) write(dir, ".github/workflows/nuget.yml", NUGET);
+      if (!fs.existsSync(at(dir, ".github/workflows/nuget.yml")) && !folds(dir, "nuget")) write(dir, ".github/workflows/nuget.yml", NUGET);
       const config = JSON.parse(read(dir, "checks/licences.json"));
       config.nuget ??= { ships: [], tools: [] };
       config.nuget.ships = [...(config.nuget.ships ?? []), "stage/packages.lock.json"];
@@ -101,8 +103,10 @@ export const STAGES = {
     },
   },
   "13 November 2026, the NuGet check fails from the first day": {
-    stage: dir => write(dir, ".github/workflows/nuget-staged.yml", `${NUGET.replace("name: nuget", "name: nuget-staged")}      advisory: true\n`),
-    mend: dir => write(dir, ".github/workflows/nuget-staged.yml", read(dir, ".github/workflows/nuget-staged.yml").replace(/^      advisory: true\r?\n/m, "")),
+    // (where core.yml's one job runs the NuGet check, on that call: #376)
+    stage: dir => folds(dir, "nuget") ? write(dir, ".github/workflows/core.yml", read(dir, ".github/workflows/core.yml").replace(/^( {6}nuget: .*\r?\n)/m, "$1      advisory: true\n"))
+      : write(dir, ".github/workflows/nuget-staged.yml", `${NUGET.replace("name: nuget", "name: nuget-staged")}      advisory: true\n`),
+    mend: dir => { for (const f of ["nuget-staged.yml", "core.yml"]) if (fs.existsSync(at(dir, `.github/workflows/${f}`))) write(dir, `.github/workflows/${f}`, read(dir, `.github/workflows/${f}`).replace(/^      advisory: true\r?\n/m, "")); },
   },
   "13 November 2026, the core's scripts started through bash": {
     stage: dir => write(dir, ".github/workflows/publish-staged.yml", "name: publish-staged\n\non:\n  push:\n\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: core/scripts/site-publish.sh root site\n"),
@@ -161,7 +165,9 @@ export const STAGES = {
   },
   "16 November 2026, the NuGet check where it can matter": {
     // (a project file that imports a build file of another name than those the call's paths name)
+    // (on a call of its own to the core's nuget.yml: where core.yml's one job ran the check, it is moved to that call, #376)
     stage: dir => {
+      if (folds(dir, "nuget")) write(dir, ".github/workflows/core.yml", read(dir, ".github/workflows/core.yml").replace(/^ {6}nuget: .*\r?\n/m, ""));
       const call = fs.existsSync(at(dir, ".github/workflows/nuget.yml")) ? read(dir, ".github/workflows/nuget.yml") : NUGET;
       write(dir, ".github/workflows/nuget.yml", /^ {4}paths:/m.test(call) ? call : call.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${read(fileURLToPath(new URL("..", import.meta.url)), "setup/template/workflows/nuget-paths.yml.tmpl")}`));
       write(dir, "staged-import/Imports.csproj", '<Project Sdk="Microsoft.NET.Sdk">\n  <Import Project="deps.xml" />\n</Project>\n');
@@ -261,6 +267,17 @@ export const STAGES = {
       write(dir, ".github/workflows/core.yml", /^ {4}types: \[/m.test(text) ? text.replace(/^( {4}types: \[[^\]\r\n]*)\]/m, "$1, ready_for_review]")
         : text.replace(/^( {2}pull_request:(\r?\n))/m, (on, _, eol) => `${on}    types: [opened, reopened, synchronize, ready_for_review]${eol}`));
     },
+  },
+  "17 November 2026, the checks as one job": {
+    // (the call to core.yml folds the description check and leaves the copies checks out, their own call taken out too;
+    // the mend, as the step words it, passes core.yml their config and marks)
+    stage: dir => {
+      const call = read(dir, ".github/workflows/core.yml").replace(/^ {6}(copies|sizes|description): .*\r?\n/gm, "");
+      write(dir, ".github/workflows/core.yml", /^ {4}with:/m.test(call) ? call.replace(/^( {4}with:\r?\n)/m, "$1      description: true\n")
+        : call.replace(/^( {4}uses: \S+\/\.github\/workflows\/core\.yml@\S+.*\r?\n)/m, "$1    with:\n      description: true\n"));
+      for (const f of ["copies.yml", "pr-description.yml"]) fs.rmSync(at(dir, `.github/workflows/${f}`), { force: true });
+    },
+    mend: dir => write(dir, ".github/workflows/core.yml", read(dir, ".github/workflows/core.yml").replace(/^( {4}with:\r?\n)/m, "$1      copies: checks/copies.json\n      sizes: checks/sizes.json\n")),
   },
   "16 November 2026, a project in several repositories": {
     asked: true,

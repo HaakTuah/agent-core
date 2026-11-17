@@ -66,7 +66,13 @@ The index, and how an item is written: `archive/instructions.md`.
      of the README's table, the owner's account read where a person's account holds the repository, and the tools a
      project's record shows read before the core's default.
 
-249. **16 November 2026**, #412, a case of #481. A posted security review counts from each person the host lets write
+249. **15 November 2026**, #303. A rule joins the core only where an agent can carry it out and it makes the product
+     better or sturdier, and only from a standing word; each names the number it should lower and the outcome it
+     stands for, proof is sized to what a thing costs others, and the rules are pruned by those numbers every two
+     months and at each new generation of model, the owner deciding which go: the owner chose to start wide and cut
+     back by what makes a difference, and an unneeded rule costs every session that reads it.
+
+250. **16 November 2026**, #412, a case of #481. A posted security review counts from each person the host lets write
      to the repository, read from its rights each run, rather than from a list of a team's owners kept beside them,
      which goes stale; a list named to the check stays for an account that is no owner. It stands behind who the
      `security-review` status counts.

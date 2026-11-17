@@ -33,7 +33,7 @@ import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
-import { Unread, call, calls, copiesConfig, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
+import { Unread, call, calls, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
@@ -285,6 +285,24 @@ function readyOnlyHolds(p) {
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
 
+// A call to the core's core.yml that runs part of its one job (#376) runs every check the project ran before: the copies
+// checks and the description check each folded into it, still called on their own or run by a workflow of the project's,
+// the copies checks with their marks,
+// and none both folded and called, which would bill its job twice. Null where no call folds any part.
+const FOLDS = [["copies", "copies.yml"], ["description", "pr-description.yml"], ["signatures", "signatures.yml"], ["nuget", "nuget.yml"]];
+function oneJobHolds(p) {
+  readable(p, text => /\/\.github\/workflows\/(core|copies|pr-description|signatures|nuget)\.ya?ml@/i.test(text));
+  if (!FOLDS.some(([key]) => folded(p, key).length)) return null;
+  // (a check a workflow of the project's own runs, by its script, is run as well)
+  const script = { copies: "copies.mjs", description: "pr-description.mjs" };
+  const left = FOLDS.slice(0, 2).filter(([key, own]) => !folded(p, key).length && !calls(p, own).length && !runFiles(p, script[key]).length).map(([key]) => key === "copies"
+    ? "`copies: checks/copies.json` and `sizes: checks/sizes.json` (the copies check's config and marks, where the project keeps them elsewhere, their paths)" : "`description: true`");
+  if (folded(p, "copies").length && !folded(p, "sizes").length) left.push("`sizes: checks/sizes.json` beside its `copies:`");
+  const twice = FOLDS.filter(([key, own]) => folded(p, key).length && calls(p, own).length).map(([key, own]) => `the call of its own to the core's \`${own}\`, which its \`${key}:\` runs too`);
+  const wrong = [left.length ? `pass it ${left.join(" and ")}, as \`core/setup/template/workflows/core.yml.tmpl\` has it, or call the core's \`copies.yml\` or \`pr-description.yml\` again for what it leaves out` : "", twice.length ? `take out ${twice.join(", and ")}, since it bills its job twice` : ""].filter(Boolean);
+  return wrong.length ? `The project's call to the core's \`core.yml\` runs part of its one job and not every check the project ran: ${wrong.join("; ")}.` : null;
+}
+
 // Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
 // first without its number and title; null where there is none.
 function rule5(text) {
@@ -419,7 +437,7 @@ export const STEPS = [
       // (`on:` as GitHub takes it: one event's name, a list of names, or a mapping of each to its filters)
       const on = file.yaml?.on;
       const pr = on === "pull_request" || (Array.isArray(on) && on.includes("pull_request")) ? {} : on && typeof on === "object" && !Array.isArray(on) ? on.pull_request : undefined;
-      if (!file.yaml || pr === undefined) return "`.github/workflows/signatures.yml` runs on every pull request (`on: pull_request:`), as `core/setup/template/workflows/signatures.yml.tmpl` has it.";
+      if (!file.yaml || pr === undefined) return "`.github/workflows/signatures.yml` runs on every pull request (`on: pull_request:`), as the core's `signatures.yml` asks of its call.";
       return pr && (pr.paths || pr["paths-ignore"]) ? "`.github/workflows/signatures.yml` has no `paths:` or `paths-ignore:` under `pull_request:`: the core's workflow looks itself whether a package file changed." : null;
     } },
   { lead: "12 November 2026, exact versions", cost: COST.workflow,
@@ -450,7 +468,7 @@ export const STEPS = [
       const locks = [...new Set(projects.map(f => path.posix.join(path.posix.dirname(f), "packages.lock.json")))];
       const missing = locks.filter(l => !p.files.includes(l));
       if (missing.length) wrong.push(`each project file's \`packages.lock.json\` is committed, lock files turned on (\`RestorePackagesWithLockFile\`): ${missing.join(", ")}`);
-      if (!call(p, "nuget.yml")) wrong.push("a `.github/workflows/nuget.yml` calls the core's, as `core/setup/template/workflows/nuget.yml.tmpl` has it (in a private repository with the `paths:` of `nuget-paths.yml.tmpl` beside it), or its owner declines the check in the manifest's \"Differences\", as the entry \"16 November 2026, the NuGet check where it can matter\" says");
+      if (!call(p, "nuget.yml") && !folded(p, "nuget").length) wrong.push("the project's call to the core's `core.yml` passes `nuget:` the licence check's config, as `core/scripts/init.mjs --nuget` writes it, or a `.github/workflows/nuget.yml` calls the core's `nuget.yml`, or its owner declines the check in the manifest's \"Differences\", as the entry \"16 November 2026, the NuGet check where it can matter\" says");
       let config = null;
       const file = nugetConfig(p);
       try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as missing, below) */ }
@@ -462,8 +480,8 @@ export const STEPS = [
     } },
   { lead: "13 November 2026, the NuGet check fails from the first day", cost: COST.workflow,
     check: p => {
-      return given(p, "nuget.yml", "advisory").some(({ value }) => value === true || value === "true")
-        ? "The project's call to the core's `nuget.yml` no longer passes `advisory: true` (it stays only while a fault of the check's own is reported to the core)." : null;
+      return [...given(p, "nuget.yml", "advisory"), ...given(p, "core.yml", "advisory")].some(({ value }) => value === true || value === "true")
+        ? "The project's call to the core's `nuget.yml` (or `core.yml`) no longer passes `advisory: true` (it stays only while a fault of the check's own is reported to the core)." : null;
     },
     partly: "whether its audit holds an entry of \"kind\": \"nuget\" for a package that ships is read by the NuGet check where it counts" },
   { lead: "13 November 2026, where NuGet packages come from", cost: COST.check, held: "the NuGet check" },
@@ -547,7 +565,7 @@ export const STEPS = [
     partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
-    partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
+    partly: "whether the repository is private is GitHub's setting, not a file's; the starter kit now runs a private project's NuGet check as a step of `core.yml`'s one job (17 November 2026), so `core/scripts/fresh.mjs` lists that call, not these `paths:`" },
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/tasks/screens.md`, point 1), and the critique asks for it there" },
   { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
     partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },
@@ -578,6 +596,8 @@ export const STEPS = [
   { lead: "16 November 2026, the agent tools' files read for copies and pointers", cost: COST.config, check: toolFilesListed },
   { lead: "16 November 2026, checks once a pull request is ready", cost: COST.workflow, check: readyOnlyHolds,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the trigger and the condition a private project's calls lack" },
+  { lead: "17 November 2026, the checks as one job", cost: COST.workflow, check: oneJobHolds,
+    partly: "whether the repository is private, and whether a ruleset requires a check by a name the change takes away, are GitHub's settings, not files: `core/scripts/fresh.mjs`, which every sync runs, lists the one call a project's calls differ from, and a required check's name is the owner's to move" },
   { lead: "17 November 2026, a team's owners read from the host", cost: COST.workflow, unread: "whether an account the call to `security-review.yml` names is one the host lets write is GitHub's answer, not a file's: `gh api repos/<owner>/<repo>/collaborators/<login>/permission`" },
 ];
 

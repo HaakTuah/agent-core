@@ -12,7 +12,9 @@
 // reached through the core's address by a git rewrite, so no call reaches the network. On Linux and on Windows. Git,
 // tar, bash and Node's own modules.
 //
-//   node scripts/core-yml-test.mjs
+//   node scripts/core-yml-test.mjs [--part all | faults | places]
+// (a part runs alone, beside the other, in a job of its own on Windows, where the whole takes the longest of any step
+// of the suites: faults, the faults the check names; places, where the copy stands; #504)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -23,6 +25,13 @@ import { checkoutStandIn, scratchEnv } from "./scratch-core.mjs";
 import { runWorkflow } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
 
+const [flag = "--part", PART = "all", ...more] = process.argv.slice(2);
+if (flag !== "--part" || !["all", "faults", "places"].includes(PART) || more.length) {
+  console.error("FAIL: the core.yml test takes --part all, faults or places, and nothing else. Mend: run node scripts/core-yml-test.mjs, or name one of those parts after --part");
+  process.exit(1);
+}
+const inPart = part => PART === "all" || PART === part;
+let section = "faults";
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -82,8 +91,9 @@ function check(files = {}, { branch = "main", at = B, without = null, under = "c
   const [job] = runWorkflow(workflow, { github, base, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
-const passes = (what, ...args) => { const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
-const fails = (what, words, ...args) => { const r = check(...args); ok(!r.passed && r.out.includes(words) && mended(r.out), `${what}: fails, saying so and its mend`, r.out); };
+// (each case runs only in its section's part: a case that calls ok() itself stands in a block gated so too)
+const passes = (what, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
+const fails = (what, words, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(!r.passed && r.out.includes(words) && mended(r.out), `${what}: fails, saying so and its mend`, r.out); };
 
 passes("a project whose copy is the core at its pin, each call pinned where its workflow is the same");
 fails("a default branch of another name", "The default branch here is trunk", {}, { branch: "trunk" });
@@ -94,7 +104,7 @@ passes("a heading inside a fenced block, and the floor named outside the section
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
 fails("a manifest without the owner's account, an organisation's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });
-{ // (#481: read where the host says a person's account holds it; a row, there, still decides)
+if (inPart(section)) { // (#481: read where the host says a person's account holds it; a row, there, still decides)
   const r = check({ "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") }, { held: { login: "someone", type: "User" } });
   ok(r.passed && r.out.includes("The owner's account is read: someone"), "a manifest without the owner's account, a person's account holding the repository: passes, saying what it read", r.out);
 }
@@ -120,8 +130,11 @@ fails("a copy that holds the owner's words all the same", "core/ differs from th
 if (D) {
   passes("a copy of a commit with a top-level name that only ends in a tab and \"reports\", which the copy keeps", { "core-manifest.md": MANIFEST(D) }, { at: D });
   fails("and that copy without it", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(D) }, { at: D, without: tabbed });
-} else console.log("note a name holding a tab cannot be made here (Windows), so that case is not tried");
+} else if (inPart("faults")) console.log("note a name holding a tab cannot be made here (Windows), so that case is not tried");
+passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
+
 // where the copy stands (tasks/repositories.md): the path the manifest's line names, and a core a library carries
+section = "places";
 const AT = (path, pin = B) => MANIFEST(pin).replace("copied whole under core/", `copied whole under ${path}`);
 const CARRIED = (lib, under, floorCopy = "floor-copy/") => MANIFEST().replace(/^Core: .*$/m, `Core: ${CORE}, carried by ${lib} under ${under} (never edited here).${floorCopy ? `\nFloor copy: ${floorCopy}` : ""}`);
 const LIBRARY = { "lib/core-manifest.md": MANIFEST(), "AGENTS.md": "# A project\n\n@floor-copy/security.md\n@lib/core/roles/builder.md\n" };
@@ -139,7 +152,7 @@ fails("a carried core whose path is not the library's", "the library's manifest 
 fails("a carried core whose copy differs from the core at the library's pin", "lib/core/ differs from the core at its pin", { "core-manifest.md": CARRIED("lib/", "lib/core/"), ...LIBRARY, "lib/core/README.md": "edited\n" }, { under: "lib/core", floor: "floor-copy" });
 fails("a library that is not in this commit", "the library lib, which core-manifest.md says carries the core, is no folder or submodule", { "core-manifest.md": CARRIED("lib/", "lib/core/") }, { floor: "floor-copy" });
 fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one", { "core-manifest.md": CARRIED("lib/", "lib/core/"), "lib/core-manifest.md": "# Core manifest\n" }, { under: "lib/core", floor: "floor-copy" });
-{
+if (inPart("places")) {
   // (a submodule: the library's commit pinned here, fetched by the check from the https address .gitmodules gives it,
   // here a library of the test's own reached through a rewrite, and held to the core at the library's pin)
   const libRepo = path.join(tmp, "the-library"), address = "https://example.invalid/the-library";
@@ -160,7 +173,7 @@ fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one"
   fails("a submodule with no https address", "could not be fetched at the commit pinned here", files, sub(good, slash(libRepo)));
   fails("a floor's copy beside a submodule, that differs from the floor at the library's pin", "floor-copy/ differs from the floor", { ...files, "floor-copy/security.md": "edited\n" }, sub(good));
 }
-{
+if (inPart("places")) {
   // (the staged cases' record on the core's main: a tool counts as passed by its own runs alone)
   const record = tools => ({ runs: tools.map(tool => ({ at: "2026-11-16", tool, cases: { carried: { verdict: "pass" }, "no-floor": { verdict: "pass" } } })) });
   const onMain = (tools, what) => { write(theCore, "reports/staged-cases.json", `${JSON.stringify(record(tools))}\n`); git(theCore, "add", "-A"); git(theCore, "commit", "-q", "-m", what); };
@@ -173,7 +186,6 @@ fails("a library whose manifest pins no copy", "lib/core-manifest.md has no one"
   onMain(all, "every tool passed");
   passes("and once every tool the core names has passed both, it needs no floor's copy", { "core-manifest.md": CARRIED("lib/", "lib/core/", null), ...LIBRARY }, { under: "lib/core" });
 }
-passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
 
-console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check`);
+console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the copy of the core's check${PART === "all" ? "" : `, the part ${PART}`}`);
 process.exitCode = failed ? 1 : 0;
