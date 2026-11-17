@@ -4,17 +4,17 @@ The order this repository's open issues are built in (`AGENTS.md`, "The queue").
 waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
-the owner's own word. A line on points of #460, #484, #486 or #488 has its PR say "Part of" that issue, or "Fixes" it if
+the owner's own word. A line on points of #460, #484, #486, #488 or #515 has its PR say "Part of" that issue, or "Fixes" it if
 it merges last.
 
 ## In order
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #486, points 2 to 4 (the choice record) | rule builder, hard work with a challenger; it reopens `CHOICES.md`'s first choice | |
+| #519 | rule builder, hard work, by #515's process whether or not #515 has merged; #515's point 2 trial runs first or with it, as its evidence | |
+| #515, points 1 and 3 to 14 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
-| #376 | rule builder | #375, which changes the same files |
-| #488, points 3 to 5 and 7 | builder | #488's points 1 and 2 |
+| #488, points 3 to 5, 7 and 8 | builder | #488's points 1 and 2 |
 | #303 | rule builder | |
 | #306 | rule builder | |
 | #307 | rule builder | |
@@ -25,7 +25,7 @@ it merges last.
 | #325 | rule builder | |
 | #314 | rule builder | |
 | #456 | rule builder; it changes the floor (rules 5 and 10) | |
-| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #486's record | |
+| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #519's judgment | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
@@ -38,14 +38,14 @@ it merges last.
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
-| #426 | builder; a .NET reader it files waits on #486's record | |
+| #426 | builder; a .NET reader it files waits on #519's judgment | |
 | #404 | builder | |
 | #407 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
-| #492 | rule builder; it changes who may start the orchestrator, and what every role reads at its start | #397 and #467 |
+| #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
-| #486, point 5 | builder | #486's record |
+| #486, point 5 | builder | #519's judgment |
 | #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
 | #460, point 3 (a copy in a test) | builder | |
