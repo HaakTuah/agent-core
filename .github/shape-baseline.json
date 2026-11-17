@@ -103,11 +103,6 @@
       "depth": 2,
       "branches": 27
     },
-    "function: scripts/look.mjs#main": {
-      "lines": 140,
-      "depth": 4,
-      "branches": 81
-    },
     "function: scripts/state-report.mjs#projects": {
       "lines": 35,
       "depth": 2,
