@@ -110,7 +110,10 @@
       "check: scripts/versions.mjs, in part",
       "check: scripts/security-review.mjs, in part"
     ],
-    "tasks/updates.md: Node": "check: scripts/node.sh",
+    "tasks/updates.md: Node": [
+      "check: scripts/node.sh, in part",
+      "check: .github/workflows/tests.yml, in part"
+    ],
     "tasks/updates.md: CodeQL": "check: .github/workflows/codeql.yml",
     "roles/shared/work-flow.md: Review in the background": "check: GitHub's ruleset on the default branch, in part",
     "roles/shared/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part",
@@ -359,7 +362,7 @@
     "tasks/tools.md: One door in: `AGENTS.md`": [232],
     "tasks/tools.md: One script says what to read": [234],
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
-    "tasks/updates.md: Node": [39],
+    "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
     "tools/claude.md: Name models by family alone": [80, 81],
     "tools/claude.md: Pass both model and effort": [128],
@@ -367,6 +370,7 @@
     "tools/codex.md: On GitHub": [169]
   },
   "numbers": {
+    "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",
     "AGENTS.md: Rules are pruned by their numbers": "correction: misread; outcome: asked",
