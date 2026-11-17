@@ -58,3 +58,9 @@ The index, and how an item is written: `archive/instructions.md`.
      wants the core to read whatever stack is best for a project, not a project's stack fitted to what the core reads,
      and a format someone else defines read by a package, not by hand, how such a package reaches a project settled
      once in that record.
+
+248. **15 November 2026**, #303. A rule joins the core only where an agent can carry it out and it makes the product
+     better or sturdier, and only from a standing word; each names the number it should lower and the outcome it
+     stands for, proof is sized to what a thing costs others, and the rules are pruned by those numbers every two
+     months and at each new generation of model, the owner deciding which go: the owner chose to start wide and cut
+     back by what makes a difference, and an unneeded rule costs every session that reads it.

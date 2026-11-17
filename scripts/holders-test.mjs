@@ -47,8 +47,8 @@ const project = (holdersJson, extra = {}) => {
   fs.mkdirSync(path.join(dir, "tasks")); fs.mkdirSync(path.join(dir, "scripts"));
   fs.writeFileSync(path.join(dir, "tasks", "x.md"), text);
   fs.writeFileSync(path.join(dir, "scripts", "a-check.mjs"), "");
-  fs.writeFileSync(path.join(dir, "scripts", "holders.json"), typeof holdersJson === "string" ? holdersJson : JSON.stringify({ holders: holdersJson, ...(extra.behind ? { behind: extra.behind } : {}) }));
-  delete extra.behind;
+  fs.writeFileSync(path.join(dir, "scripts", "holders.json"), typeof holdersJson === "string" ? holdersJson : JSON.stringify({ holders: holdersJson, ...(extra.behind ? { behind: extra.behind } : {}), ...(extra.numbers ? { numbers: extra.numbers } : {}) }));
+  delete extra.behind; delete extra.numbers;
   for (const [f, t] of Object.entries(extra)) fs.writeFileSync(path.join(dir, f), t);
   return dir;
 };
@@ -107,11 +107,15 @@ ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of it
 
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
+const numbersBad = holders(project({}, { numbers: { "tasks/x.md: Gone": "findings; outcome: robust", "tasks/x.md: Numbered": "findings", "tasks/x.md: Its own item": "check fires; outcome: fast" } }), []);
+ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("\"numbers\", names \"tasks/x.md: Gone\"")) && numbersBad.wrong.some(w => w.includes("\"tasks/x.md: Numbered\": \"findings\" is in no form")) && numbersBad.wrong.every(w => /Mend: /.test(w)),
+  "numbers: a key that is no rule, and a number with no outcome, each fail, saying the mend; one in its form passes", numbersBad.wrong.join("\n"));
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
 for (const f of ["archive.mjs", "holders.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
+fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`), "where holders.json is wrong the check fails, each failure saying its mend", `${run.stdout}${run.stderr}`);
 

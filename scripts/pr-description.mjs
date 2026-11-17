@@ -30,7 +30,10 @@
 // (tasks/planning.md; #322), as milestones.mjs, beside this file, reads them, where the manifest takes that module.
 // It asks in the same way, of a pull request opened since the copy on its base held COST_SINCE, the line the cost script
 // prints (session-cost.mjs, beside this file), or in its place the mark NO_COST, so that a line left out by the rule can
-// be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302).
+// be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
+// "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
+// NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
+// outcomes.mjs's NUMBER; #303).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -40,6 +43,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
+import { NUMBER } from "./outcomes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -56,6 +60,24 @@ export const DONE_SINCE = "2026-11-17T00:00:00Z";
 // leaves a mark" in roles/shared/work-flow.md; #302), as the lines above are.
 export const COST_SINCE = "2026-11-17T00:00:00Z";
 export const NO_COST = "No cost line: the script printed none.";
+// The day from which the part "What holds it" is asked the number of each rule it names (AGENTS.md of the core, "Every
+// rule says what holds it"; #303), as the lines above are.
+export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
+export const HOLDS = "What holds it";
+
+// The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
+// NUMBER's form; null where it does, or where the part is not there (missing() names that).
+export function numberMend(body) {
+  const lines = String(body ?? "").split(/\r\n|\r|\n/u), heading = l => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(l)?.[1];
+  const at = lines.findIndex(l => heading(l) && isPart(heading(l), HOLDS));
+  if (at < 0) return null;
+  const end = lines.findIndex((l, i) => i > at && heading(l));
+  const part = lines.slice(at + 1, end < 0 ? undefined : end).map(l => l.trim()).filter(Boolean);
+  if (part.every(l => /^None\b/u.test(l))) return null;
+  const named = part.map(l => /(?:^|[\s*-])Number: (.+?)[.\s]*$/u.exec(l)?.[1]).filter(Boolean);
+  if (named.some(n => NUMBER.test(n))) return null;
+  return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, as scripts/holders.json keeps it under "numbers"; or write "None" alone under the heading where it adds no rule`;
+}
 
 // The mend where a description has neither the line session-cost.mjs prints ("Session so far: ...") nor the mark that
 // it printed none, each on a line of its own; null where it has one.
@@ -179,6 +201,9 @@ if (started(import.meta.url)) {
     } else console.log(`ok   the milestones are not asked here: ${planAsked(created, then) ? "the change could not be read against its base" : why}`);
     if (created >= COST_SINCE && then?.includes("export const COST_SINCE")) { const mend = costMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log("ok   the description has its cost line, or the mark that the script printed none"); }
     else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
+    // (asked only where the part is, which is where the rules change)
+    if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
+    else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);

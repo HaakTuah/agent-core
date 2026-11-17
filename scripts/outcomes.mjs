@@ -35,6 +35,11 @@ export const OUTCOMES = [["asked", "The product does what was asked"], ["fast", 
   ["usable", "A new user can use it"], ["robust", "It does not break"], ["cost", "What the work cost (no outcome: the price of the five)"]];
 export const KINDS = ["misread", "looks wrong", "does not work", "rule missing"];
 export const LABEL = "correction";
+// The number a rule names (AGENTS.md of the core, "Every rule says what holds it"; #303): the count it is meant to
+// lower, `findings` (the review findings that name it), `check fires` (the pull requests its check failed) or
+// `correction: <kind>`, and the one of the five outcomes it stands for; held in holders.json's "numbers" and on a
+// description's line "Number:" (pr-description.mjs), both beside this file, in this one form.
+export const NUMBER = new RegExp(`^(findings|check fires|correction: (?:${KINDS.join("|")})); outcome: (${OUTCOMES.slice(0, 5).map(([k]) => k).join("|")})$`, "u");
 export const LEAST = 30, MONTHS = 3, SAMPLE = 60, SPLIT = 20 * 1024, DAYS = 14, HOUR = 3600e3;
 export const FIRST = "reports/outcomes-first-reading.json";
 export const HEADING = "The outcomes";

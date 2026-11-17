@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { asked, calledFor, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { asked, calledFor, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 import { lineMend } from "./reading.mjs";
 
 let failed = 0;
@@ -41,6 +41,12 @@ ok(costMend("x\nSession so far: 1,204 answers (opus); tokens in 3, cache written
   "the cost line, or the mark that the script printed none, on a line of its own, is enough");
 ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMend(null)].every(m => /Mend: run `node core\/scripts\/session-cost\.mjs`/.test(m ?? "") && m.includes(NO_COST)),
   "a description with neither, or the mark inside a line, is to mend, the mend naming the script and the mark");
+ok(numberMend("## What holds it\n\nNone\n") === null && numberMend("x") === null
+  && numberMend("## What holds it\n- \"A rule\": held by its check.\n  Number: correction: misread; outcome: asked.\n## Readings taken\nNumber: x") === null,
+  "the number is asked only where \"What holds it\" stands and holds more than None, and one line in its form is enough");
+ok([numberMend("## What holds it\n- \"A rule\": held by its check.\n## Readings taken\nNumber: findings; outcome: robust"), numberMend("### What holds it\n- Number: findings; outcome: cost")].every(m => /Mend: under it, .*"Number: <findings \| check fires \| correction: <kind>>; outcome: <asked/.test(m ?? ""))
+  && /it reads "findings; outcome: cost"/.test(numberMend("### What holds it\n- Number: findings; outcome: cost")),
+  "a rule with no number under the heading, one under another heading, or one in no form, is to mend, the mend giving the form");
 ok(waitsMend("Waits on: nothing") === null && /has no line "Waits on:"/.test(waitsMend("x")) && /"Waits on: soon" is in none of the forms/.test(waitsMend("Waits on: soon")) && /needs-owner/.test(waitsMend("")),
   "the mend names what is missing or wrong, and the forms, with the label for the owner");
 const cs = [{ sha: "c", date: "2026-11-20T00:00:00Z" }, { sha: "b", date: "2026-11-18T00:00:00Z" }, { sha: "a", date: "2026-11-17T00:00:00Z" }];
@@ -82,5 +88,5 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("./pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
 const none = run("The change, and nothing else.");
 ok(none.status === 1 && /has no heading "Readings taken"\. Mend: add "## Readings taken"/.test(none.stdout) && mended(none.stdout) && run(whole).status === 0, "run, a description without its headings fails, each failure saying its mend, and one with them passes");
-ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`), "so do the lines' own failures, as the script prints them");
+ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`) && mended(`FAIL ${numberMend("## What holds it\n- a rule")}`), "so do the lines' own failures, as the script prints them");
 process.exit(failed ? 1 : 0);
