@@ -7,8 +7,8 @@
 // the project's .github/workflows, or, where it has none, as on another host, the starter kit's in the base's copy,
 // each with the inputs the kit gives them (a template the kit fills in with more than the core's address and pin is
 // left out, and said so). core.yml runs first, and where the copy of the core is not the core at its pin no other check
-// runs, since each runs the copy's scripts (the steps core.yml runs after its own, given its inputs, among them: a step that
-// fails in its job stops the rest here, as a run cancelled there; #376); with no call to core.yml, or none run, it fails. Each called workflow is
+// runs, since each runs the copy's scripts (the steps core.yml runs after its own, given its inputs, among them: a step of
+// its own that fails stops the rest here, as a run cancelled there; #376); with no call to core.yml, or none run, it fails. Each called workflow is
 // read from the core at the call's pin, fetched from the core's address by git, as GitHub reads it, never from the
 // copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
 // not from that copy (tasks/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
@@ -245,12 +245,21 @@ function runner(p, tmp) {
     if (name === "core.yml" && inputs.description === true && !p.described) { inputs.description = false; say(`note ${file}/${id}: core.yml's description check is not run here: give --description <a file> that holds the pull request's description`); }
     const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v, { PERSONAL_TERMS: terms })]));
     try {
-      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, stop: name === "core.yml" }), p.event);
+      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
     } catch (e) {
       warn(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
     }
   };
+}
+
+// core.yml's own steps, before those it runs of the copy's scripts (which begin where it reads where the copy stands):
+// one of them that fails stops the rest, since the copy is then not proved the core (#376). A predicate on a step's name.
+function ownSteps(text) {
+  const steps = Object.values(parseYaml(text).jobs ?? {})[0]?.steps ?? [];
+  const parts = steps.findIndex(s => String(s.name ?? "").startsWith("Where the core's copy stands"));
+  const own = new Set(steps.slice(0, parts < 0 ? steps.length : parts).map(s => s.name ?? s.uses ?? String(s.run ?? "").split("\n")[0]));
+  return name => own.has(name);
 }
 
 // A file of the core at a commit (with `list`, the names in a folder), from a clone of the core's address made once (never from the project's copy, which

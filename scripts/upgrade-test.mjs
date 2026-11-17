@@ -410,7 +410,7 @@ function nugetInPrivate(p) {
   const projectFile = dir => fs.appendFileSync(path.join(dir, "src/App/App.csproj"), "<!-- a note -->\n");
   const nuget = jobs => jobs.some(w => w.startsWith("nuget.yml/"));
   const had = fs.readFileSync(wf, "utf8");
-  ok(/^on:\r?\n {2}pull_request:\r?\n\r?\n/m.test(had) ? /nuget\.yml: lacks [^\n]*paths:/.test(fresh()) : true, `${p.name}: where its call to the NuGet check has no paths, fresh.mjs lists the starter kit's as lacking`, fresh());
+  ok(!/nuget\.yml/.test(fresh()), `${p.name}: its own call to the NuGet check, which the starter kit no longer writes (#376), is no difference fresh.mjs lists`, fresh());
   fs.writeFileSync(wf, readyOnly(had.replace(/^ {2}pull_request:\r?\n(?! {4}paths:)/m, on => `${on}${fs.readFileSync(path.join(theCore, "setup/template/workflows/nuget-paths.yml.tmpl"), "utf8")}`)));
   const kit = commit("the NuGet check where it can matter");
   ok(!/nuget\.yml/.test(fresh()), `${p.name}: with the starter kit's paths, fresh.mjs lists nothing of its NuGet call`, fresh());
@@ -437,13 +437,14 @@ function readyInPrivate(p) {
   const change = from => { git(p.dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(p.dir, "README.md"), "\nMore words.\n"); git(p.dir, "commit", "-q", "-am", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); const head = git(p.dir, "rev-parse", "HEAD"); git(p.dir, "checkout", "-q", "main"); return head; };
   const ofThem = (head, base, o) => started(checks(p, "pull_request", head, { baseSha: base, dry: true, ...o })).filter(w => gated.some(f => w.startsWith(`${path.posix.basename(f)}/`)));
   const listed = fresh();
-  ok(gated.length >= 3 && ofThem(change(main0), main0, { draft: true }).length === gated.length && gated.every(f => new RegExp(`${f}: lacks [^\\n]*ready_for_review`).test(listed) && new RegExp(`${f}: lacks [^\\n]*pull_request\\.draft`).test(listed)),
-    `${p.name}: its calls kept as they were, a push to a draft starts each of its ${gated.length} pull-request checks as before, and fresh.mjs lists the trigger and condition they lack`, listed);
+  const kitGated = gated.filter(f => /\/(core|personal-terms)\.yml$/.test(f));
+  ok(gated.length >= 3 && kitGated.length === 2 && ofThem(change(main0), main0, { draft: true }).length === gated.length && kitGated.every(f => new RegExp(`${f}: lacks [^\\n]*ready_for_review`).test(listed) && new RegExp(`${f}: lacks [^\\n]*pull_request\\.draft`).test(listed)),
+    `${p.name}: its calls kept as they were, a push to a draft starts each of its ${gated.length} pull-request checks as before, and fresh.mjs lists the trigger and condition the starter kit's two lack`, listed);
   for (const f of gated) fs.writeFileSync(path.join(p.dir, f), readyOnly(fs.readFileSync(path.join(p.dir, f), "utf8")));
   git(p.dir, "commit", "-q", "-am", "checks once a pull request is ready");
   git(p.dir, "push", "-q", "origin", "main");
   const main1 = git(p.dir, "rev-parse", "HEAD"), head = change(main1);
-  ok(!gated.some(f => new RegExp(`${f}: lacks [^\\n]*(ready_for_review|pull_request\\.draft)`).test(fresh())), `${p.name}: with the starter kit's trigger and condition, fresh.mjs lists neither of those calls`, fresh());
+  ok(!gated.some(f => new RegExp(`${f}: lacks [^\\n]*pull_request\\.draft`).test(fresh())) && !fresh().includes(".github/workflows/personal-terms.yml:"), `${p.name}: with the starter kit's trigger and condition, fresh.mjs lists the condition for none of those calls, and nothing of personal-terms`, fresh());
   ok(!ofThem(head, main1, { draft: true }).length && ofThem(head, main1, { action: "ready_for_review" }).length === gated.length && ofThem(head, main1).length === gated.length,
     `${p.name}: and a push to a draft starts none of their jobs, marking it ready starts each, and so does a push once it is ready`);
 }
@@ -458,7 +459,7 @@ function oneJobInPrivate(p) {
   const folded = [".github/workflows/copies.yml", ".github/workflows/pr-description.yml", ".github/workflows/nuget.yml"].filter(f => fs.existsSync(path.join(p.dir, f)));
   const change = (from, extra = () => {}) => { git(p.dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(p.dir, "README.md"), "\nMore words again.\n"); extra(); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); return git(p.dir, "rev-parse", "HEAD"); };
   const before = started(checks(p, "pull_request", change(main0), { baseSha: main0, dry: true }));
-  ok(folded.length === 3 && before.length >= 4 && folded.every(f => before.some(w => w.startsWith(`${path.posix.basename(f)}/`))) && /\.github\/workflows\/core\.yml: lacks [^\n]*copies: checks\/copies\.json/.test(fresh()),
+  ok(folded.length >= 2 && before.length >= 4 && folded.filter(f => !f.endsWith("/nuget.yml")).every(f => before.some(w => w.startsWith(`${path.posix.basename(f)}/`))) && /\.github\/workflows\/core\.yml: lacks [^\n]*copies: checks\/copies\.json/.test(fresh()),
     `${p.name}: its calls kept as they were, a pull request once ready starts ${before.length} jobs, each check its own, and fresh.mjs lists the one call`, `${before.join(", ")}\n${fresh()}`);
   git(p.dir, "checkout", "-q", "main");
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];

@@ -71,6 +71,11 @@ fs.writeFileSync(path.join(dir, "src", "two.js"), `${block}\n`);
 commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
 ok(r.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks" failed/.test(r.out) && /^ +== No new copies$/m.test(r.out) && !/the copy of the core is not the core at its pin/.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend, a step of core.yml's one job and no failure of the copy", r.out);
+fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
+commit(dir, "and an edit to the copy");
+r = check(dir, "--base", "base");
+ok(r.status === 1 && /the copy of the core is not the core at its pin, so no other check runs/.test(r.out) && !/its step "The copies, pointer/.test(r.out) && mended(r.out),
+  "where the copy is not the core, the steps core.yml runs of the copy's scripts run no more, the new copy unread", r.out);
 
 // a change that takes a check's call out still runs it: the calls are the base's
 git(dir, "reset", "-q", "--hard", "base");
