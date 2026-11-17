@@ -435,13 +435,16 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], ["env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash a.sh", ["a.sh", "scripts/a.sh"]],
     ["env -Cscripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["bash a.sh -C scripts", ["a.sh", "scripts/a.sh"]], ["env -C scripts env -C in bash a.sh", ["a.sh", "scripts/a.sh", "scripts/in/a.sh"]],
     ["bash scripts/a.sh", ["scripts/a.sh"]],
+    // (#476's code review of 2647550: an option's path in the same word is held to the same guards, and a piece of a quoted
+    // script that sets a variable too)
+    ["ruby -r/tmp/project/scripts/a.sh -e 0", null], ["ruby -r../a.sh -e 0", null], ["sh -c 'true PATH=scripts runner'", null], ["env -S'PATH=scripts runner'", null], ["env --split-string='PATH=scripts runner'", null], ["java -Dx=y -jar a.sh", null],
     // (#476's code review of 28a6bb0: the root is a whole path, read only where nothing of its part stands before it and
     // a path, a blank or the end after it)
     ["bash scripts${CLAUDE_PROJECT_DIR}/a.sh", null], ["bash x$CLAUDE_PROJECT_DIR/a.sh", null], ["bash ${CLAUDE_PROJECT_DIR}x", null], ["bash \"$CLAUDE_PROJECT_DIR\"x", null],
     ["bash $CLAUDE_PROJECT_DIR\"/scripts/a.sh\"", null], ["bash -r$CLAUDE_PROJECT_DIR/a.sh", null], ["node --require=$CLAUDE_PROJECT_DIR/scripts/a.sh", ["scripts/a.sh"]],
     ["sh -c \"bash $CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["cd $CLAUDE_PROJECT_DIR", []],
     // (#476's code review of 002e060: a path given to an option in the same word)
-    ["ruby -r./scripts/a.sh -e 0", ["scripts/a.sh"]], ["ruby -rscripts/a.sh -e 0", ["scripts/a.sh"]], ["gcc -vIscripts/in a.sh", ["a.sh", "scripts/in/a.sh"]], ["node --x-scripts/a.sh", []], [Array.from({ length: 300 }, (_, i) => `-${"w".repeat(100)}${i}`).join(" "), null]])
+    ["ruby -r./scripts/a.sh -e 0", ["scripts/a.sh"]], ["ruby -rscripts/a.sh -e 0", null], ["gcc -vI./scripts/in a.sh", ["a.sh", "scripts/in/a.sh"]], ["node --x-scripts/a.sh", []], [Array.from({ length: 300 }, (_, i) => `-${"w".repeat(100)}${i}`).join(" "), null]])
     ok(JSON.stringify(fromTree(command, holds, folder)) === JSON.stringify(want), `the command ${JSON.stringify(command).slice(0, 100)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds, folder)));
   // (a file at the root that cmd runs in the place of the first word)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])

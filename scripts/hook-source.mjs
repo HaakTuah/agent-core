@@ -10,12 +10,12 @@
 // agent tool sets it.
 // A word that sets a variable (PATH=x and the like change which program runs), a path with a ".." (read by the file
 // system after the links before it) or one from the root ("/", which may lead into the checkout) makes it no plain
-// command. Of a plain command, each word, and each part of a word between spaces (a quoted script given to sh -c) or
-// `=`, `:`, `,` and `@`, or after an option's letters (-r./x.rb), that names a file the project holds, at the root or
-// in a folder another part names (a folder a program may be told to work in), through a link inside the checkout too,
-// and in any case, as holds() reads it, is taken from the working tree, whatever program it is given to; and so is a file at the
-// project's root that a Windows shell runs in the place of its first word. No other
-// command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
+// command, wherever it stands in a word. Of a plain command, each word, and each part of a word between spaces (a
+// quoted script given to sh -c) or `=`, `:`, `,` and `@`, or after an option's letters (-r./x.rb), that names a file
+// the project holds, at the root or in a folder another part names (a folder a program may be told to work in), through
+// a link inside the checkout too, and in any case, as holds() reads it, is taken from the working tree, whatever
+// program it is given to; and so is a file at the project's root that a Windows shell runs in the place of its first
+// word. No other command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
 // so nothing a reading here could get wrong grants a hook anything. Node's own modules only.
 //
 //   import { fromTree } from "./hook-source.mjs";
@@ -140,6 +140,21 @@ function named(list, holds, folder) {
 // ignores case reads it)
 const take = (found, asked, held) => { if (held) found.add(typeof held === "string" ? held : asked); };
 
+// Whether a word makes the command no plain one: a piece of it between blanks that sets a variable, itself, after an
+// `=` (env --split-string=PATH=x) or after a single dash's letters (env -SPATH=x); or any part, a path given to an
+// option in the same word too (-r/x), with a ".." or from the file system's root, which may lead into the checkout from
+// wherever it stands. Where an option's letters end is the program's, so -rscripts/x, read as -rscripts and /x, is not
+// read either.
+function unsafe(word) {
+  if (word.split(/ +/u).some(sets)) return true;
+  return [...parts(word)].flatMap(readings).some(p => p.startsWith("/") || PARENT.test(p));
+}
+function sets(piece) {
+  const at = piece.split("=");
+  const tails = [piece, ...at.slice(1).map((_, i) => at.slice(i + 1).join("=")), ...(/^-[^-]/u.test(piece) ? readings(piece) : [])];
+  return tails.some(tail => SETS.test(tail));
+}
+
 export function fromTree(command, holds, folder) {
   try { return read(String(command), holds, folder); } catch (e) { if (e === OVER) return null; throw e; }
 }
@@ -149,8 +164,7 @@ function read(text, holds, folder) {
   if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), holds, folder)];
   if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
   const list = nested(text) ? null : words(text);
-  // (and a path from the file system's root, which may lead into the checkout from wherever it stands: not read)
-  if (list === null || list.some(w => PARENT.test(w) || SETS.test(w) || [...parts(w)].some(p => p.startsWith("/")))) return null;
+    if (list === null || list.some(unsafe)) return null;
   const found = named(list, holds, folder);
   // (its first word, as a Windows shell runs it from the project's root)
   const first = list[0];
