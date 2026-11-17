@@ -5,15 +5,15 @@
 //
 // Read only where it can be read exactly, two ways and no other. The starter kit's own two forms (KIT_FORMS), whole,
 // are the core's: of one, only the plain words after its script are read. A plain command (PLAIN) holds nothing a shell
-// reads otherwise than as written: letters, digits, blanks and `_ . / : = @ + , -`, quotes that only group (balanced,
-// none within another, and nothing in them a shell reads either), and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an
-// agent tool sets it; a path with a ".." is no plain command, since the file system reads ".." after the links before it.
-// Of it, each word, and each part of a word between blanks (a quoted script given to sh -c) or `=`, `:`, `,` and `@`,
-// that names a file the project holds (through
-// a link inside the checkout too, as holds() reads it) is taken from the working tree, whatever program it is given to;
-// and so is a file at the project's root that a Windows shell runs in the place of its first word. No other command is
-// read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read, so nothing a
-// reading here could get wrong grants a hook anything. Node's own modules only.
+// reads otherwise than as written: letters, digits, spaces and `_ . / : = @ + , -`; quotes that only group (balanced,
+// none within another); and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an agent tool sets it.
+// A word that sets a variable (PATH=x and the like change which program runs) or a path with a ".." (read by the file
+// system after the links before it) makes it no plain command. Of a plain command, each word, and each part of a word
+// between spaces (a quoted script given to sh -c) or `=`, `:`, `,` and `@`, that names a file the project holds
+// (through a link inside the checkout too, as holds() reads it) is taken from the working tree, whatever program it is
+// given to; and so is a file at the project's root that a Windows shell runs in the place of its first word. No other
+// command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
+// so nothing a reading here could get wrong grants a hook anything. Node's own modules only.
 //
 //   import { fromTree } from "./hook-source.mjs";
 //   fromTree(command, holds) -> the paths it takes from the working tree, where holds(path) says the project holds one;
@@ -33,7 +33,10 @@ const KIT_FORMS = [
 
 // (the project's root, as an agent tool sets it, written so or in braces, and nothing after it that would join its name)
 const ROOT = /\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/uy;
-const PLAIN = /^[\w \t./:=@+,'"-]*$/u;
+const PLAIN = /^[\w ./:=@+,'"-]*$/u;
+// (a word that sets a variable, for the program after it or, through env and the like, for one it runs: PATH and the
+// like change which program runs, and no plain reading follows them)
+const SETS = /^[A-Za-z_]\w*=/u;
 // (a ".." in a path is read by the file system after the links before it, which a plain reading cannot follow)
 const PARENT = /(?:^|[/=:,@\s])\.\.(?:$|[/=:,@\s])/u;
 // (a file at the project's root that a Windows shell runs in the place of a command's first word, since cmd looks in
@@ -56,7 +59,7 @@ function words(command) {
     }
     if (quote) { if (c === quote) quote = null; else word += c; continue; }
     if (c === "'" || c === '"') { quote = c; word ??= ""; continue; }
-    if (c === " " || c === "\t") { if (word !== null) out.push(word); word = null; continue; }
+    if (c === " ") { if (word !== null) out.push(word); word = null; continue; }
     word = (word ?? "") + c;
   }
   if (quote) return null;
@@ -87,7 +90,7 @@ function named(list, holds) {
   const found = new Set();
   for (const word of list) {
     // (whole, at its blanks, as a quoted script given to sh -c holds its words, and at each = : , @ besides)
-    for (const part of new Set([word, ...word.split(/[ \t]+/u), ...word.split(/[=:,@]/u), ...word.split(/[ \t=:,@]+/u)])) {
+    for (const part of new Set([word, ...word.split(/ +/u), ...word.split(/[=:,@]/u), ...word.split(/[ =:,@]+/u)])) {
       if (!inProject(part)) continue;
       const at = path.posix.normalize(part);
       if (at !== "." && holds(at)) found.add(at);
@@ -102,10 +105,10 @@ export function fromTree(command, holds) {
   if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), holds)];
   if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
   const list = nested(text) ? null : words(text);
-  if (list === null || list.some(w => PARENT.test(w))) return null;
+  if (list === null || list.some(w => PARENT.test(w) || SETS.test(w))) return null;
   const found = named(list, holds);
-  // (its first word, past the variables it sets, as a Windows shell runs it from the project's root)
-  const first = list.find(w => !/^\w+=/u.test(w));
+  // (its first word, as a Windows shell runs it from the project's root)
+  const first = list[0];
   if (first && !first.includes("/")) for (const ext of RUNS) if (holds(`${first}${ext}`)) found.add(`${first}${ext}`);
   return [...found];
 }

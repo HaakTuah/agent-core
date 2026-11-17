@@ -402,7 +402,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   for (const [command, want] of [["bash scripts/a.sh", ["scripts/a.sh"]], ["node \"$CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["\"$CLAUDE_PROJECT_DIR\"/scripts/a.sh", ["scripts/a.sh"]],
     ["bash ${CLAUDE_PROJECT_DIR}/scripts/a.sh", ["scripts/a.sh"]], ["bash 'scripts/a b.sh'", ["scripts/a b.sh"]], ["bash scripts/'a b'.sh", ["scripts/a b.sh"]], ["node --require=scripts/a.sh x", ["scripts/a.sh"]],
     ["java -cp lib:scripts/a.sh Main", ["scripts/a.sh"]], ["git show refs/remotes/origin/main:scripts/a.sh", ["scripts/a.sh"]], ["test -f scripts/a.sh", ["scripts/a.sh"]], ["cat ./scripts/a.sh", ["scripts/a.sh"]],
-    ["bash scripts/r:x.sh", ["scripts/r:x.sh"]], ["FOO=1 bash a.sh", ["a.sh"]], ["sh -c 'python3 scripts/a.sh'", ["scripts/a.sh"]], ["bash /scripts/a.sh", []], ["npx -y tool@1.0.0", []], ["", []],
+    ["bash scripts/r:x.sh", ["scripts/r:x.sh"]], ["sh -c 'python3 scripts/a.sh'", ["scripts/a.sh"]], ["bash /scripts/a.sh", []], ["npx -y tool@1.0.0", []], ["", []],
     // (anything a shell reads otherwise than as written is not read at all: no exemption, nothing taken, only "not shown")
     ["bash scripts/a.sh | cat", null], ["bash scripts/a.sh; true", null], ["bash $X/scripts/a.sh", null], ["bash $CLAUDE_PROJECT_DIRX/scripts/a.sh", null], ["bash scripts/a\\ b.sh", null],
     ["bash \"scripts/a b.sh", null], ["bash ~/a.sh", null], ["bash scripts/*.sh", null], ["bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/a.sh\"", null], ["git show refs/remotes/origin/main:scripts/a.sh | bash", null],
@@ -410,11 +410,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (#476's code review of 0cf9828: the root's name in single quotes is written, not read; and ".." is read after the links before it)
     ["bash 'scripts/$CLAUDE_PROJECT_DIR/a.sh'", null], ["bash tools/../a.sh", null], ["cat scripts/../scripts/a.sh", null], ["bash scripts/a.sh --x=..", null],
     // (#476's code review of 6d32c8c: a quote within a quote is quoting for a shell run in turn)
-    ["sh -c 'bash \"scripts/a b.sh\"'", null], ["sh -c \"bash 'scripts/a b.sh'\"", null]])
+    ["sh -c 'bash \"scripts/a b.sh\"'", null], ["sh -c \"bash 'scripts/a b.sh'\"", null],
+    // (#476's code review of a5359ea: a word that sets a variable, as PATH, changes which program runs; and a tab is no plain blank)
+    ["PATH=scripts runner", null], ["FOO=1 bash a.sh", null], ["env PATH=scripts runner", null], ["bash 'scripts/a\tb.sh'", null], ["bash\tscripts/a.sh", null]])
     ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${JSON.stringify(command)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds)));
-  // (a file at the root that cmd runs in the place of the first word, past the variables it sets)
+  // (a file at the root that cmd runs in the place of the first word)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])
-    ok(JSON.stringify(fromTree("FOO=1 git status", f => f === shadow)) === JSON.stringify([shadow]), `a ${shadow} at the project's root, which cmd runs in git's place, is taken`);
+    ok(JSON.stringify(fromTree("git status", f => f === shadow)) === JSON.stringify([shadow]), `a ${shadow} at the project's root, which cmd runs in git's place, is taken`);
   // (a path through a link inside the checkout is what holds() reads: the word itself is asked)
   ok(JSON.stringify(fromTree("bash tools/run.sh", f => f === "tools/run.sh")) === '["tools/run.sh"]', "a path through a link inside the checkout is asked as written");
   // (the kit's forms are the core's: of one, only the plain words after its script are read)
