@@ -452,8 +452,10 @@ counter and its commands are in the pull request that adds this record (#487).
     list, the owner's yes, the week's wait, the same publisher, failures that say the mend) the core's own. With 12
     bugs between them, the most of any stand-in, they go with the second group.
   - **Kept:** the finding of copies (`scripts/copies.mjs`, 314 lines, 9 bugs), since what a copy is the core's own
-    rule defines; its reading of code goes through the parser once the readers of languages do. Left as they are, as
-    #486 says: the core's own mutation tool, and the readers of the core's own rule files.
+    rule defines; its reading of code goes through the parser once the readers of languages do. Left as they are: the
+    readers of the core's own rule files. The core's own mutation tool stood here until 17 November 2026, when #534
+    widened this inventory to every part of the core, the mutation tool and the finding of copies weighed again among
+    them, in `INVENTORY.md`; the lines above stay the word on the readers inside the checks.
 - Judged again on 17 November 2026 (#519): it stands, carried and never fetched while a check runs. A grammar comes
   with the reader that needs it, never all at once, and Microsoft's `@vscode/tree-sitter-wasm` (one publisher's runtime
   and grammars) is weighed as their source when the first arrives (the path's third and fourth steps).

@@ -188,6 +188,13 @@ const accented = fresh("stack-choice");
 git(accented, "checkout", "-q", "-b", "first-version"); write(accented, "docs/décision.md", "notes\n"); git(accented, "add", "-A"); git(accented, "commit", "-q", "-m", "notes");
 write(accented, "docs/choices.md", choiceRecord(accented, "Go", GO)); write(accented, "main.go", "package main\n"); git(accented, "add", "-A"); git(accented, "commit", "-q", "-m", "record and code"); git(accented, "push", "-q", "origin", "first-version");
 ok(verdict("stack-choice", accented).pass, "stack-choice: a doc named beyond ASCII, before the record, is not read as code", verdict("stack-choice", accented).why);
+// (a package file of a runtime the aims rule out fails, at the root and in a folder named beyond ASCII, whose name git
+// would quote but for -z; #437)
+for (const [at, where] of [["package.json", "at the root"], ["\u00e9/package.json", "in a folder named beyond ASCII"]]) {
+  const ruledOut = fresh("stack-choice");
+  branch(ruledOut, "stack", { "docs/choices.md": choiceRecord(ruledOut, "Go", GO), [at]: "{}\n" });
+  ok(/stack adds a package file of a runtime the aims rule out/.test(verdict("stack-choice", ruledOut).why), `stack-choice: a ruled-out runtime's package file ${where} fails`, verdict("stack-choice", ruledOut).why);
+}
 const shell = fresh("stack-choice");
 branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
 ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);
@@ -305,7 +312,34 @@ if (process.platform !== "win32") {
   fs.renameSync(path.join(swapped, "origin.git", "refs"), path.join(swapped, "elsewhere-refs")); fs.symlinkSync(path.join(swapped, "elsewhere-refs"), path.join(swapped, "origin.git", "refs"));
   const r = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "stop", swapped], { encoding: "utf8" });
   ok(/stop: fail: its repositories could not be read: .* is not a plain folder/.test(r.stdout), "a case whose repositories hold a link the reader would follow fails, read as unreadable", `${r.stdout}${r.stderr}`);
+  // (GitHub's state, github.json, read through a link to a file outside the case: unreadable, none of its text shown; #435)
+  const secret = path.join(s.tmp, "someone-elses-key"), aside = fresh("finish");
+  fs.writeFileSync(secret, "K3YW0RD5 of a key\n");
+  fs.rmSync(path.join(aside, "github.json")); fs.symlinkSync(secret, path.join(aside, "github.json"));
+  const viaLink = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", aside], { encoding: "utf8" });
+  ok(/finish: fail: .*github\.json is not a plain file/.test(viaLink.stdout) && !/K3YW0RD5/.test(`${viaLink.stdout}${viaLink.stderr}`),
+    "a case whose github.json is a link to a file outside it fails, read as unreadable, and shows none of that file's text", `${viaLink.stdout}${viaLink.stderr}`);
+  // (the seal's folder swapped for a link to another holding memos of the session's making: unreadable)
+  const sealSwap = fresh("finish"), forged = path.join(s.tmp, "forged-seal");
+  fs.cpSync(`${sealSwap}.seal`, forged, { recursive: true }); fs.rmSync(`${sealSwap}.seal`, { recursive: true }); fs.symlinkSync(forged, `${sealSwap}.seal`);
+  const viaSeal = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", sealSwap], { encoding: "utf8" });
+  ok(/finish: fail: .*\.seal is not a plain folder/.test(viaSeal.stdout), "a case whose seal's folder is a link to another fails, read as unreadable", `${viaSeal.stdout}${viaSeal.stderr}`);
 }
+const garbled = fresh("finish"); fs.writeFileSync(path.join(garbled, "github.json"), "S3SSW0RD what the session wrote\n");
+const notJson = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", garbled], { encoding: "utf8" });
+ok(/finish: fail: .*github\.json is not JSON/.test(notJson.stdout) && !/S3SSW0RD/.test(`${notJson.stdout}${notJson.stderr}`),
+  "a case whose github.json is no JSON fails, read as unreadable, and shows none of its text", `${notJson.stdout}${notJson.stderr}`);
+// (github.json as a second name of a file outside the case, a hard link, which a check of a link alone would pass: unreadable)
+const hard = fresh("finish"), elsewhere = path.join(s.tmp, `someone-elses-state-${n}.json`);
+fs.writeFileSync(elsewhere, '{"pulls":[],"comments":[],"issues":[]}\n');
+fs.rmSync(path.join(hard, "github.json")); fs.linkSync(elsewhere, path.join(hard, "github.json"));
+const viaHard = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", hard], { encoding: "utf8" });
+ok(/finish: fail: .*github\.json is not a plain file of its own/.test(viaHard.stdout), "a case whose github.json is a hard link to a file outside it fails, read as unreadable", `${viaHard.stdout}${viaHard.stderr}`);
+// (a memo of the case's seal, which stands beside the case, read the same way: one that is no JSON is unreadable, unquoted)
+const badMemo = fresh("finish"); fs.writeFileSync(path.join(`${badMemo}.seal`, "refs.json"), "M3M0W0RD not json\n");
+const viaMemo = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", badMemo], { encoding: "utf8" });
+ok(/finish: fail: .*refs\.json is not JSON/.test(viaMemo.stdout) && !/M3M0W0RD/.test(`${viaMemo.stdout}${viaMemo.stderr}`),
+  "a memo of the case's seal that is no JSON fails, read as unreadable, and shows none of its text", `${viaMemo.stdout}${viaMemo.stderr}`);
 const common = fresh("stop"); fs.writeFileSync(path.join(common, "project", ".git", "commondir"), "../../elsewhere\n");
 let threw = null; try { touched(common); } catch (e) { threw = e; }
 ok(threw instanceof Unreadable, "a project whose git folder names another as its common one is not read");

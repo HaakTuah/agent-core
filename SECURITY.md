@@ -44,8 +44,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
-   (`node-linux-<arch>` at the exact version in `.node-version`), which `scripts/node.sh` fetches for projects' cloud
-   machines with `npm pack --ignore-scripts`, never installing it, and checks against its SHA-256 before it runs.
+   (`node-linux-<arch>` at the exact version in `.node-version`), which `scripts/node.sh` fetches for a project's cloud
+   machine whose own Node is below the least long-term line in `.node-least`, or that has none, with
+   `npm pack --ignore-scripts`, or with no npm by curl from the registry's own address over HTTPS, never installing it,
+   and checks against its SHA-256 before it runs.
 17. **Dependabot** updates only the workflows' GitHub actions (`.github/dependabot.yml`); this repository names no
     manifest or lock file, so no other PR of Dependabot's meets it.
 

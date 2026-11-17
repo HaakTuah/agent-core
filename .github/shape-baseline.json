@@ -33,21 +33,6 @@
       "depth": 3,
       "branches": 25
     },
-    "function: scripts/exact-versions.mjs#check": {
-      "lines": 35,
-      "depth": 4,
-      "branches": 34
-    },
-    "function: scripts/exact-versions.mjs#overrides": {
-      "lines": 17,
-      "depth": 2,
-      "branches": 18
-    },
-    "function: scripts/fresh.mjs#kind": {
-      "lines": 20,
-      "depth": 0,
-      "branches": 16
-    },
     "function: scripts/licence-commands.mjs#atCommand": {
       "lines": 43,
       "depth": 2,

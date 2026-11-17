@@ -50,7 +50,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
 
 // ---- the wrong type ----
 {
-  for (const [what, body] of [["a number", 42], ["NaN", NaN], ["true", true], ["an object", { body: whole }], ["a function", () => whole]]) {
+  for (const [what, body] of [["a number", 42], ["NaN", NaN], ["true", true], ["an object", { body: whole }], ["a function", () => whole], ["a list holding a whole body", [whole]], ["an object that writes itself as one", { toString: () => whole }]]) {
     ok(both(body) && waitsOn(body) === null && listed(body) === null && waitsMend(body) !== null && lineMend(body, called, "cmd") !== null, `a body that is ${what} reads as no body: both headings missing, no line, each mend given`);
   }
   // (the parts' argument, asked(), is the project's own workflow input, never the body's: no case of this input)
@@ -85,7 +85,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
 
 // ---- a number out of range ----
 {
-  ok(["#-1", "#1.5", "#1e9", "#", "#0x10", "# 241", "#\u0661\u0662"].every(w => waitsOn(`Waits on: ${w}`)?.kind === null), "an item that is negative, a fraction, an exponent, empty, hex, spaced or in other digits is in none of the forms");
+  ok(["#-1", "#1.5", "#1e9", "#", "#0x10", "# 241", "#\u0661\u0662", "#0", "#007", "#1234567890"].every(w => waitsOn(`Waits on: ${w}`)?.kind === null), "an item that is negative, a fraction, an exponent, empty, hex, spaced, in other digits, nought, led by a nought or past nine digits is in none of the forms");
   ok(missing("####### What the owner can try\n####### Readings taken\n").length === 2, "seven # are no heading");
   ok(both(42e300) && both(-Infinity), "a body that is a huge or infinite number is no body");
   // (the commits' dates heldAt() reads are GitHub's, never the body's: no case of this input)

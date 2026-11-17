@@ -26,6 +26,7 @@
 // "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
 // (tasks/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git and Node's own
 // modules only; it changes nothing.
+import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
 import { started } from "./started.mjs";
 
@@ -43,7 +44,7 @@ const HEADER = /^[|>](?:[1-9][+-]?|[+-][1-9]?)?(?: +(#.*)?)?$/u; // a block scal
 // git's own attributes and submodules; a container's build; and a name with "~" and a digit, which Windows can read as
 // another folder's short name (CLAUDE~1 for .claude). It is asked first: a file of the copy of the core is refused even
 // where it is one this proof reads.
-export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|(?:[^/]*\.)?(?:Dockerfile|Containerfile)[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:(?:cs|fs|vb)?proj(?:\.user)?|projitems|shproj|props|targets)|Directory\.Build\.rsp|\.pnpmfile\.cjs)$|(?:^|\/)\.(?:vscode|devcontainer|husky|yarn\/releases|kiro|codex|agents?|gemini|cursor|windsurf|amazonq|continue|roo)(?:\/|$)|^core\/|(?:^|\/)[^/]*~\d/iu;
+export const RUNS_TOO = /(?:^|\/)(?:\.mcp\.json|package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.node-version|\.node-least|\.nvmrc|\.envrc|\.devcontainer\.json|\.pre-commit-config\.ya?ml|\.gitmodules|\.gitattributes|(?:[^/]*\.)?(?:Dockerfile|Containerfile)[^/]*|Makefile|GNUmakefile|justfile|Taskfile\.ya?ml|\.tool-versions|\.?mise\.toml|nuget\.config|global\.json|dotnet-tools\.json|packages\.lock\.json|[^/]+\.(?:(?:cs|fs|vb)?proj(?:\.user)?|projitems|shproj|props|targets)|Directory\.Build\.rsp|\.pnpmfile\.cjs)$|(?:^|\/)\.(?:vscode|devcontainer|husky|yarn\/releases|kiro|codex|agents?|gemini|cursor|windsurf|amazonq|continue|roo)(?:\/|$)|^core\/|(?:^|\/)[^/]*~\d/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
 const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemgrep|semgrep|nolint|noinspection|nocheck|codeql|lgtm|nosonar|ggignore|zizmor|actionlint|shellcheck|checkov|trivy|gitleaks|lint|pragma)/iu;
 // a plain step's name YAML 1.1 or 1.2 reads as no string
@@ -244,8 +245,8 @@ if (started(import.meta.url)) {
   }
   let base = git(["merge-base", main, head]).trim();
   if (process.argv[2]) {
-    base = git(["rev-parse", "--verify", "--end-of-options", `${process.argv[2]}^{commit}`]).trim();
-    let grew = base !== head;
+    try { base = git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${process.argv[2]}^{commit}`]).trim(); } catch { base = ""; }
+    let grew = Boolean(base) && base !== head;
     try { git(["merge-base", "--is-ancestor", base, head]); } catch { grew = false; }
     if (!grew) {
       console.log(`${clean(process.argv[2])} is no commit before the head that it grew from: a later commit is read only against one before it`);

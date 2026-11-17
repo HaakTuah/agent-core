@@ -10,16 +10,14 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #534, point 4 (the inventory) | rule builder, hard work | |
 | #486, points 6 to 8 and 11 | rule builder | |
-| #526, path step 1 | rule builder | |
 | #527, step 2 | rule builder | #526 |
-| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | the inventory, and #488's points 1 and 3 to 5 |
-| #528, step 3 | rule builder | #527, the inventory, and #488's points 1 and 3 to 5 |
+| #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue, as #534's line below does | |
+| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | #488's points 1 and 3 to 5 |
+| #528, step 3 | rule builder | #527, and #488's points 1 and 3 to 5 |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder | #529 |
 | #534, point 8 | rule builder | #530 |
-| #545 | rule builder; it changes `AGENTS.md`, which every session here reads at its start | |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
@@ -70,6 +68,17 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #548 | builder | |
+| #549 | builder; a workflow, two security reviews | #548, on `scripts/holders.json` |
+| #550 | builder; a case a PR | |
+| #551 | builder | #549; #355 and #391, for its point 3 |
+| #552 | builder | #551 |
+| #553 | builder | #552, #355 and #391 |
+| #554 | builder | #553 and #355 |
+| #555 | builder | #534's tools, and #554 |
+| #556 | builder | #554; #534's tools, for its linter rules |
+| #557 | builder | #556 |
+| #558 | builder | #557 |
 
 ## Not taken up
 

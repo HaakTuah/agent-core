@@ -55,6 +55,7 @@ import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
+import { timeOf } from "./moment.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
@@ -128,7 +129,7 @@ function relabel({ repo, issue, finding, dry }) {
 }
 
 // The time of the last run its record holds, or null.
-export const lastRun = body => /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.exec(String(body ?? ""))?.[1] ?? null;
+export const lastRun = body => { const at = /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.exec(String(body ?? ""))?.[1]; return timeOf(at) === null ? null : at; };
 
 // Hours from one time to another, as a number with one decimal.
 const hoursBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 360000) / 10;
@@ -137,6 +138,8 @@ const hoursBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)
 // security-review and code-review among them) as GitHub gives them: green where every one ended well, red where one
 // failed, waiting while one runs or a status is pending, none where there are none.
 export function checksOf(runs, status = null) {
+  // (a status whose count is no whole number, text "1" among them, is not read, and so never counted green)
+  if (status !== null && !(Number.isSafeInteger(status?.total_count) && status.total_count >= 0)) return "not read (the commit's status is not in GitHub's form)";
   const states = status && status.total_count > 0 ? [status.state] : [];
   if (!runs.length && !states.length) return "none";
   if (runs.some(r => ["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"].includes(r.conclusion)) || states.some(s => s === "failure" || s === "error")) return "red";

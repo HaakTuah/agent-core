@@ -559,4 +559,5 @@ address, until the core's owner types another name there by hand (floor rule 11)
 ## This repository
 
 How it takes its own core, and how changes are made here: `AGENTS.md`; the order of its own work: `QUEUE.md`; its
-choices that are hard to undo: `CHOICES.md`; its security: `SECURITY.md`.
+choices that are hard to undo: `CHOICES.md`; its parts, and what else does each: `INVENTORY.md`; its security:
+`SECURITY.md`.
