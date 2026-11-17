@@ -50,6 +50,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
   check reads").
+- **The number each rule names, and the pruning:** each rule names the count it is meant to lower and the outcome it
+  stands for (`scripts/holders.json`, "numbers"); every second month, and with a newer generation of model,
+  `scripts/pruning.mjs` lists the rules whose number did not move, whose check never fired or whose staged case passed
+  without them, for the owner to decide which go; its record is `reports/pruning.json` (`AGENTS.md`, "Rules are pruned
+  by their numbers").
 
 ## How a project takes the core
 
@@ -176,8 +181,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
-     line, or in its place "No cost line: the script printed none."; the lines only of a pull request opened since
-     the project's copy held them.
+     line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
+     line there "Number:" in its form; the lines only of a pull request opened since the project's copy held them.
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record

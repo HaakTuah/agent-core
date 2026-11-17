@@ -66,7 +66,13 @@ The index, and how an item is written: `archive/instructions.md`.
      of the README's table, the owner's account read where a person's account holds the repository, and the tools a
      project's record shows read before the core's default.
 
-249. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
+249. **15 November 2026**, #303. A rule joins the core only where an agent can carry it out and it makes the product
+     better or sturdier, and only from a standing word; each names the number it should lower and the outcome it
+     stands for, proof is sized to what a thing costs others, and the rules are pruned by those numbers every two
+     months and at each new generation of model, the owner deciding which go: the owner chose to start wide and cut
+     back by what makes a difference, and an unneeded rule costs every session that reads it.
+
+250. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
      fails a name it does not know and one first published under 90 days ago, a bad package has a procedure, and a
      new one is taken in an order: a model sometimes names a package that does not exist and someone registers the
      name, such a name is new and has no history, which a script can read, and the floor said what to do about a

@@ -178,6 +178,9 @@ jobs:
       - name: The scheduled look and its state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/look-test.mjs ')) }}
         run: node scripts/look-test.mjs
+      - name: The rules' pruning, when it is due and what it lists
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pruning-test.mjs ')) }}
+        run: node scripts/pruning-test.mjs
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/choices-test.mjs ')) }}
         run: node scripts/choices-test.mjs
