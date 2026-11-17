@@ -432,6 +432,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   // (a folder the project's own helper writes none of, so a file system that ignores case keeps the name as written)
   const oddStood = run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { "README.md": "a change of its own\n" }));
   ok(oddStood.status === 0 && /\.Codex\/config\.toml is \.codex\/config\.toml in another case/.test(oddStood.out), "one the base held is noted, not failed", oddStood.out);
+  fails(run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { ".Codex/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once the pull request changes it", "Mend: rename it to .codex/config.toml");
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {

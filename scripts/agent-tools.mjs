@@ -465,7 +465,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
     project.problems.push(problem);
-    project.texts.set(problem, `${at}\0`);
+    // (with its text, so one the base held is noted only while it stands letter for letter)
+    project.texts.set(problem, `${at}\0${read(at)}`);
   }
   return { ...project, links };
 }
