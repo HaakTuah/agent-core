@@ -231,6 +231,18 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/site-publish.sh`, `.github/workflows/preview.yml`: a game's site and each pull request's preview on its pages
   branch. *Runs:* the runners. *Else:* preview actions of others, dropped on fact: a vendor's wrapper (#534, point 6);
   hosted previews, dropped on fact: a hosted product. *Bugs:* 0. **Keep:** small and stable.
+- **What a session runs by hand,** a part the inventory did not list, found by the challenge: `scripts/session-cost.mjs`
+  (the cost line a pull request ends with), `scripts/labels.mjs` (the labels and openers), `scripts/state-report.mjs`,
+  `scripts/pruning.mjs`, and the records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`,
+  `scripts/core-cost.mjs`). *Runs:* any session. *Else:* for the cost line, ccusage (MIT, 20.0.48, 7 packages, 5.6 MB, a
+  program for each system behind a small wrapper, 69 releases in the year to 17 November 2026), which reads the same
+  record of Claude Code's and reports each session's tokens, kept, untried: the session's permission check refused
+  running it over this session's own record; for the labels, the host's CLI (`gh label create --force`), which writes a
+  list of labels, dropped on fact: `labels.mjs` writes none and reads the issues' labels and openers, which no tool
+  found does; for the state report, pruning and the records, none found: each reads the core's own forms. *Bugs:* 2, 1,
+  0, 0, 0, 2 and 2. **Try**, proposed, ccusage under the cost line, the line's form and its tally staying the core's;
+  **keep** the rest: nothing fits. The other files of `scripts/` that no line names are the libraries of the parts above
+  (the shape check's readers among them) and the staged cases', weighed with their parts.
 
 ## Hooks and set-up
 
@@ -366,15 +378,17 @@ as the trials above were, over the scripts on `main` that day (36,896 lines of J
 
 A fresh session that wrote no part of the inventory read it whole on 17 November 2026, searched the web and the
 registries for a tool it missed, took each of the seven drops that rested on an assumption, and weighed what the
-inventory did not list: what the starter kit holds, the owner's steps on the host's account, and a standard definition
-of a session's environment. What it found stands in each line above, marked "found by the challenge" or "weighed by the
-challenge"; the twelve verdicts the owner agreed to stand as they were.
+inventory did not list: what the starter kit holds, the owner's steps on the host's account, a standard definition of a
+session's environment, and the scripts a session runs by hand, which no workflow or hook names. What it found stands in
+each line above, marked "found by the challenge" or "weighed by the challenge"; the twelve verdicts the owner agreed to
+stand as they were.
 
 `Looked for:` tools for each part, by the part's job, on the web and in the npm, NuGet and Go registries; found and
 weighed, each in its line: TruffleHog again, ghalint and poutine, npm's `min-release-age`, updatecli, textlint,
 promptfoo again, `claude plugin eval`, each tool's rule files for paths, aqua and mise again, git's own hooks and the
 adapters that write one hook into each tool's form, the host's template repositories and issue forms, the host's ruleset
-JSON, the Probot Settings app, safe-settings, Terraform and OpenTofu, ghset, and the Dev Container standard.
+JSON, the Probot Settings app, safe-settings, Terraform and OpenTofu, ghset, the Dev Container standard, ccusage, and
+the host's CLI for labels.
 
 The seven drops, each now on a fact or a measure:
 
@@ -406,6 +420,7 @@ wait on any of them.
    of digests standing as point 5's list, in place of **keep**.
 6. The owner's steps on the host's account: **try** the rulesets of `README.md` kept as the host's own JSON, applied
    with one command, a new line.
+7. What a session runs by hand: **try** ccusage under the cost line (`scripts/session-cost.mjs`), a new line.
 
 ## What the verdicts ask, in #534's order
 
