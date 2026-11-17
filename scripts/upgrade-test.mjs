@@ -20,8 +20,10 @@
 // step a release asks reads done (steps.mjs), but one the commit under test adds that it asks of every project (a
 // check's own list to write), which is reported, alone, and done by its mend as written; each step the commit under
 // test adds over the release started from, taken out, is reported, and its mend as written makes it done; and steps
-// taken out at random are reported, exactly those; then that a release changing only the core's own files (a test, its queue, a workflow no project calls) asks no
-// sync, and the next one syncs all the same.
+// taken out at random are reported, exactly those. Of the private one, its NuGet call with the starter kit's paths
+// starts no job where nothing NuGet reads changed, and its pull-request checks with the kit's trigger and condition
+// start none on a push to a draft and each once it is marked ready (#375); then that a release changing only the
+// core's own files (a test, its queue, a workflow no project calls) asks no sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
 // queued, built and closed there passes every check on each pull request. And a copy older than the first release,
 // written by hand since no starter kit stood then, takes the release as the sync notes say (preRelease, below). It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the
@@ -38,6 +40,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { fill, oneJob, readyOnly } from "./init.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { STEPS, callers, leads, project as read } from "./steps.mjs";
@@ -173,13 +176,14 @@ const write = (dir, to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to))
 
 let runs = 0;
 // Every workflow of the project's that one event starts, and in it each call to a workflow of the core's, as GitHub
-// would run it on the commit `sha` (a pull request: the head, against `baseSha`). Each result: [file/job, result].
-function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, dry = false, only = null, ownToo = false } = {}) {
+// would run it on the commit `sha` (a pull request: the head, against `baseSha`, pushed to, or as `action` says, a
+// draft where `draft`). Each result: [file/job, result].
+function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, dry = false, only = null, ownToo = false, action = "synchronize", draft = false } = {}) {
   const repository = { default_branch: "main", private: p.isPrivate, full_name: p.repo };
-  const pull = { number: 1, state: "open", draft: false, title, body, base: { sha: baseSha, ref: "main" }, head: { sha, ref: "change", repo: { full_name: p.repo } }, user: { login: p.owner } };
+  const pull = { number: 1, state: "open", draft, title, body, base: { sha: baseSha, ref: "main" }, head: { sha, ref: "change", repo: { full_name: p.repo } }, user: { login: p.owner } };
   const github = { event_name: event, repository: p.repo, actor: p.owner, server_url: "https://github.com", run_id: "1", token: "", sha,
     base_ref: event === "pull_request" ? "main" : "", head_ref: event === "pull_request" ? "change" : "", ref: event === "pull_request" ? "refs/pull/1/merge" : "refs/heads/main",
-    event: event === "pull_request" ? { action: "synchronize", pull_request: pull, repository } : event === "push" ? { ref: "refs/heads/main", before: baseSha, after: sha, repository } : { repository } };
+    event: event === "pull_request" ? { action, pull_request: pull, repository } : event === "push" ? { ref: "refs/heads/main", before: baseSha, after: sha, repository } : { repository } };
   fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [summary(sha)], "pulls/1/comments": [], "pulls/1/commits": [{ sha, commit: { author: { name: p.owner } }, author: { login: p.owner } }], "pulls/1/files": [], "/issues\\?": [] }));
   const workspace = () => {
     const ws = path.join(tmp, "ws", String(++runs));
@@ -209,7 +213,8 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     const trigger = typeof on === "string" ? (on === event ? {} : null) : Array.isArray(on) ? (on.includes(event) ? {} : null) : on?.[event] === undefined ? null : on[event] ?? {};
     if (trigger === null) continue;
     if (trigger.branches && !trigger.branches.includes("main")) continue;
-    if (event === "pull_request" && trigger.types && !trigger.types.includes("synchronize") && !trigger.types.includes("opened")) continue;
+    // (GitHub's own types where it lists none; a push to a pull request counted as one opened with it, as before)
+    if (event === "pull_request" && !(trigger.types ?? ["opened", "synchronize", "reopened"]).some(t => (action === "synchronize" ? ["synchronize", "opened"] : [action]).includes(t))) continue;
     // (a path filter, as GitHub reads it against what the pull request changes from its base)
     if (event === "pull_request" && (trigger.paths || trigger["paths-ignore"])) {
       const changed = git(p.dir, "diff", "--name-only", `${baseSha}...${sha}`).split("\n").filter(Boolean);
@@ -225,6 +230,10 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     for (const [id, job] of Object.entries(wf.jobs ?? {})) {
       const call = new RegExp(`^${CORE.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
       if (!call) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [], own: true }]); continue; }
+      // (a call whose own condition is false starts no job, as a call skipped on a draft: #375)
+      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {} })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
+      // (the NuGet check as a step of core.yml's one job, #376: its input left out where there is no SDK, and said so)
+      if (call[1] === "core.yml" && !sdk && job.with?.nuget) { job.with = { ...job.with }; delete job.with.nuget; console.log(`note ${p.name}: no .NET SDK here, so core.yml's NuGet step is not run`); }
       if (call[1] === "nuget.yml" && !sdk) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [] }]); console.log(`note ${p.name}: no .NET SDK here, so the NuGet check is not run`); continue; }
       const text = git(theCore, "show", `${call[2]}:.github/workflows/${call[1]}`);
       const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
@@ -240,7 +249,8 @@ const failures = results => results.filter(([, r]) => !r.passed).map(([where, r]
 const started = results => results.filter(([, r]) => r.ran).map(([where]) => where).sort();
 
 // Whether a step of a workflow of the project's ran, in a set of results.
-const ran = (results, file, step) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.steps.some(x => x.name === step && x.ran));
+// (a step of the core's own, or one of those scripts/checks.mjs runs within it, which it names on a line "== <name>")
+const ran = (results, file, step) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.steps.some(x => x.ran && (x.name === step || (x.out ?? "").split(/\r?\n/).includes(`== ${step}`))));
 const jobRan = (results, file) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.ran);
 
 function upgrade(p, from, ownChanges, expect) {
@@ -400,8 +410,8 @@ function nugetInPrivate(p) {
   const projectFile = dir => fs.appendFileSync(path.join(dir, "src/App/App.csproj"), "<!-- a note -->\n");
   const nuget = jobs => jobs.some(w => w.startsWith("nuget.yml/"));
   const had = fs.readFileSync(wf, "utf8");
-  ok(/^on:\r?\n {2}pull_request:\r?\n\r?\n/m.test(had) ? /nuget\.yml: lacks [^\n]*paths:/.test(fresh()) : true, `${p.name}: where its call to the NuGet check has no paths, fresh.mjs lists the starter kit's as lacking`, fresh());
-  fs.writeFileSync(wf, had.replace(/^ {2}pull_request:\r?\n(?! {4}paths:)/m, on => `${on}${fs.readFileSync(path.join(theCore, "setup/template/workflows/nuget-paths.yml.tmpl"), "utf8")}`));
+  ok(!/nuget\.yml/.test(fresh()), `${p.name}: its own call to the NuGet check, which the starter kit no longer writes (#376), is no difference fresh.mjs lists`, fresh());
+  fs.writeFileSync(wf, readyOnly(had.replace(/^ {2}pull_request:\r?\n(?! {4}paths:)/m, on => `${on}${fs.readFileSync(path.join(theCore, "setup/template/workflows/nuget-paths.yml.tmpl"), "utf8")}`)));
   const kit = commit("the NuGet check where it can matter");
   ok(!/nuget\.yml/.test(fresh()), `${p.name}: with the starter kit's paths, fresh.mjs lists nothing of its NuGet call`, fresh());
   ok(!nuget(pr(kit, docs)), `${p.name}: a pull request that changes nothing NuGet reads by name starts no NuGet job`);
@@ -413,6 +423,61 @@ function nugetInPrivate(p) {
   const r = node(p.dir, "core/scripts/steps.mjs"), after = pr(declined, projectFile);
   ok(r.out.includes("Every step a check reads is done") && !/nuget\.yml/.test(fresh()), `${p.name}: its owner declining the NuGet check in "Differences", no step and no difference is reported for it`, `${r.out}\n${fresh()}`);
   ok(!nuget(after) && after.every(w => before.includes(w)), `${p.name}: and a pull request that changes a project file starts no NuGet job, and no job it did not start before`, after.join("\n"));
+}
+
+// A private repository's pull-request checks start only once a pull request is ready (#375): its calls kept as they
+// were, a push to a draft starts each as before the sync, and fresh.mjs lists what they lack of the starter kit's; with
+// the kit's trigger and condition, a push to a draft starts none of those jobs, and marking it ready starts each, as
+// does a push once it is ready.
+function readyInPrivate(p) {
+  git(p.dir, "checkout", "-q", "main");
+  // (the calls the kit wrote before its checks were one job, #376, each of which the entry of 16 November gates)
+  const gated = ["core.yml", "copies.yml", "personal-terms.yml", "signatures.yml", "nuget.yml"].map(f => `.github/workflows/${f}`).filter(f => fs.existsSync(path.join(p.dir, f))), main0 = git(p.dir, "rev-parse", "HEAD");
+  const fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
+  const change = from => { git(p.dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(p.dir, "README.md"), "\nMore words.\n"); git(p.dir, "commit", "-q", "-am", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); const head = git(p.dir, "rev-parse", "HEAD"); git(p.dir, "checkout", "-q", "main"); return head; };
+  const ofThem = (head, base, o) => started(checks(p, "pull_request", head, { baseSha: base, dry: true, ...o })).filter(w => gated.some(f => w.startsWith(`${path.posix.basename(f)}/`)));
+  const listed = fresh();
+  const kitGated = gated.filter(f => /\/(core|personal-terms)\.yml$/.test(f));
+  ok(gated.length >= 3 && kitGated.length === 2 && ofThem(change(main0), main0, { draft: true }).length === gated.length && kitGated.every(f => new RegExp(`${f}: lacks [^\\n]*ready_for_review`).test(listed) && new RegExp(`${f}: lacks [^\\n]*pull_request\\.draft`).test(listed)),
+    `${p.name}: its calls kept as they were, a push to a draft starts each of its ${gated.length} pull-request checks as before, and fresh.mjs lists the trigger and condition the starter kit's two lack`, listed);
+  for (const f of gated) fs.writeFileSync(path.join(p.dir, f), readyOnly(fs.readFileSync(path.join(p.dir, f), "utf8")));
+  git(p.dir, "commit", "-q", "-am", "checks once a pull request is ready");
+  git(p.dir, "push", "-q", "origin", "main");
+  const main1 = git(p.dir, "rev-parse", "HEAD"), head = change(main1);
+  ok(!gated.some(f => new RegExp(`${f}: lacks [^\\n]*pull_request\\.draft`).test(fresh())) && !fresh().includes(".github/workflows/personal-terms.yml:"), `${p.name}: with the starter kit's trigger and condition, fresh.mjs lists the condition for none of those calls, and nothing of personal-terms`, fresh());
+  ok(!ofThem(head, main1, { draft: true }).length && ofThem(head, main1, { action: "ready_for_review" }).length === gated.length && ofThem(head, main1).length === gated.length,
+    `${p.name}: and a push to a draft starts none of their jobs, marking it ready starts each, and so does a push once it is ready`);
+}
+
+// The checks as one job (#376), on a private project that took the entry of 16 November: with its calls as they were, a
+// pull request once ready starts each check's own job, and fresh.mjs lists the one call; with the starter kit's call in
+// their place it starts two jobs, the one job and personal-terms, its status still "core / core", and each check of the
+// calls it took out runs as a step of it (that a failure of one fails the job, saying its mend, check-test.mjs holds).
+function oneJobInPrivate(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const main0 = git(p.dir, "rev-parse", "HEAD"), fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
+  const folded = [".github/workflows/copies.yml", ".github/workflows/pr-description.yml", ".github/workflows/nuget.yml"].filter(f => fs.existsSync(path.join(p.dir, f)));
+  const change = (from, extra = () => {}) => { git(p.dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(p.dir, "README.md"), "\nMore words again.\n"); extra(); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); return git(p.dir, "rev-parse", "HEAD"); };
+  const before = started(checks(p, "pull_request", change(main0), { baseSha: main0, dry: true }));
+  ok(folded.length >= 2 && before.length >= 4 && folded.filter(f => !f.endsWith("/nuget.yml")).every(f => before.some(w => w.startsWith(`${path.posix.basename(f)}/`))) && /\.github\/workflows\/core\.yml: lacks [^\n]*copies: checks\/copies\.json/.test(fresh()),
+    `${p.name}: its calls kept as they were, a pull request once ready starts ${before.length} jobs, each check its own, and fresh.mjs lists the one call`, `${before.join(", ")}\n${fresh()}`);
+  git(p.dir, "checkout", "-q", "main");
+  const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];
+  const kit = readyOnly(oneJob(fill(fs.readFileSync(path.join(p.dir, "core/setup/template/workflows/core.yml.tmpl"), "utf8"), { core: CORE, pin }), { nuget: "." }));
+  fs.writeFileSync(path.join(p.dir, ".github/workflows/core.yml"), kit.replace(/\n/g, "\r\n"));
+  for (const f of folded) fs.rmSync(path.join(p.dir, f));
+  git(p.dir, "add", "-A");
+  git(p.dir, "commit", "-q", "-m", "the checks as one job");
+  git(p.dir, "push", "-q", "origin", "main");
+  const main1 = git(p.dir, "rev-parse", "HEAD"), head = change(main1);
+  const listed = fresh();
+  ok(![".github/workflows/core.yml", ...folded].some(f => listed.includes(`${f}:`)), `${p.name}: with the starter kit's one call, fresh.mjs lists nothing of the calls`, listed);
+  const after = started(checks(p, "pull_request", head, { baseSha: main1, dry: true }));
+  const results = checks(p, "pull_request", head, { baseSha: main1 });
+  ok(after.length === 2 && after.includes("core.yml/core/core") && after.some(w => w.startsWith("personal-terms.yml/")) && !failures(results)
+    && ["No new copies", "Nothing new in how the code is put together", "The description has its parts", ...(sdk ? ["Does the pull request change what NuGet reads?"] : [])].every(s => ran(results, "core.yml", s)),
+    `${p.name}: and a pull request starts two jobs, the one job, whose status is still "core / core", and personal-terms; each check of the calls taken out runs as its step and passes`, `${after.join(", ")}\n${failures(results)}`);
+  git(p.dir, "checkout", "-q", "main");
 }
 
 // The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo` (left out: gh gives no answer at
@@ -539,6 +604,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
   nugetInPrivate(dotnetProject);
+  if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
 }
 
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
@@ -691,7 +757,7 @@ function preRelease(name, { windows }) {
     git(dir, "push", "-q", "origin", "main");
     const main2 = git(dir, "rev-parse", "HEAD");
     const look = checks(p, "pull_request", docs(main2), { baseSha: main2, only: "nuget.yml" });
-    const said = look.flatMap(([, r]) => r.steps).find(x => x.name === "Does the pull request change what NuGet reads?")?.out ?? "";
+    const said = look.flatMap(([, r]) => r.steps).find(x => x.name === "Does the pull request change what NuGet reads?" || (x.out ?? "").includes("== Does the pull request change what NuGet reads?"))?.out ?? "";
     if (sdk) ok(!failures(look) && /nothing to restore/.test(said) && !ran(look, "nuget.yml", "Restore each project file from its lock file alone"),
       `${name}: with packageSourceMapping, the NuGet check's first look finds nothing to restore on a pull request that changes nothing NuGet reads, and its restore does not run (#380)`, `${failures(look)}\n${said}`);
     git(dir, "checkout", "-q", "main");

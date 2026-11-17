@@ -5,9 +5,10 @@
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack
 // (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
-// which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar and Node's own modules
-// only; the core's address: core-address.mjs, beside this file. Where the line says a library carries the core, it
-// syncs nothing: the library's own repository does (tasks/repositories.md).
+// which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
+// account holds the repository (releases.mjs, hostAccount) and Node's own modules only; the core's address:
+// core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
+// own repository does (tasks/repositories.md).
 //
 //   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main, or its newest
 //                                           release where it follows the releases (releases.mjs, beside this file),
@@ -24,7 +25,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -55,38 +56,30 @@ function ownCopy(text) {
   return null;
 }
 
-function sync(tmp) {
-  const manifest = "core-manifest.md";
-  if (!fs.existsSync(manifest)) fail(`run it from a project's root, beside ${manifest}`);
-  const text = fs.readFileSync(manifest, "utf8"), line = ownCopy(text);
-  if (!line) return;
-  const at = line.path, dir = at.slice(0, -1), old = line.pin, lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
-  const first = !fs.existsSync(dir); // (the first copy: the manifest is written, the copy not yet)
-
-  fetchCore(tmp);
+// The commit the copy moves to and the release it is, if one (" (release-N)", or ""): the SHA given, the pin the
+// manifest names for the first copy, or the newest of what the project follows; null, said, where there is nothing to
+// sync.
+function targetOf({ manifest, text, old, first, at }, tmp) {
   const arg = process.argv[2];
   if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
-  let pin = arg ?? (first ? old : null), release = "";
-  if (!pin) {
-    const follows = followsOf(text) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out beside one *owner's account* row`);
-    if (follows === "main") pin = git(["rev-parse", "refs/heads/main"], tmp);
-    else {
-      const newest = newestRelease(old, tmp);
-      if (!newest) { console.log("the core has cut no release yet: nothing to sync (a full SHA takes a commit of its main)"); return; }
-      if (!newest.moved) { console.log(`${at} is at or past the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}): nothing to sync`); return; }
-      if (staysAt(old, text, tmp)) { console.log(`the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}), changes nothing this project takes since ${old.slice(0, 7)}, the release before it: ${at} stays there, nothing to sync until the next release (README.md, point 1; a full SHA takes it all the same)`); return; }
-      pin = newest.sha; release = ` (${newest.name})`;
-    }
-  }
-  if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
-  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); return; }
+  const pin = arg ?? (first ? old : null);
+  if (pin) return { pin, release: "" };
+  const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
+  if (follows === "main") return { pin: git(["rev-parse", "refs/heads/main"], tmp), release: "" };
+  return releaseToTake({ text, old, at }, tmp);
+}
 
-  fs.rmSync(dir, { recursive: true, force: true });
-  fs.mkdirSync(dir, { recursive: true });
-  // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
-  execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
-  fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+// The core's newest release, where the project follows the releases; null, said, where it brings nothing to sync.
+function releaseToTake({ text, old, at }, tmp) {
+  const newest = newestRelease(old, tmp);
+  if (!newest) { console.log("the core has cut no release yet: nothing to sync (a full SHA takes a commit of its main)"); return null; }
+  if (!newest.moved) { console.log(`${at} is at or past the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}): nothing to sync`); return null; }
+  if (staysAt(old, text, tmp)) { console.log(`the core's newest release, ${newest.name} (${newest.sha.slice(0, 7)}), changes nothing this project takes since ${old.slice(0, 7)}, the release before it: ${at} stays there, nothing to sync until the next release (README.md, point 1; a full SHA takes it all the same)`); return null; }
+  return { pin: newest.sha, release: ` (${newest.name})` };
+}
 
+// Each call to a core workflow whose workflow changed between its pin and `pin`, moved to `pin`; the list of those moved.
+function moveCalls(pin, tmp) {
   const moved = [];
   const wf = ".github/workflows";
   for (const file of fs.existsSync(wf) ? fs.readdirSync(wf).filter(f => /\.ya?ml$/.test(f)) : []) {
@@ -102,8 +95,11 @@ function sync(tmp) {
       });
     if (out !== src) fs.writeFileSync(p, out);
   }
+  return moved;
+}
 
-  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
+// What the sync moved (the copy, the manifest's line and the workflow calls), and what it asks beyond the copy.
+function sayMoved({ at, old, pin, release, manifest, moved }, tmp) {
   const changed = git(["diff", "--stat", "--format=", old, pin], tmp).split("\n").pop() || "no files";
   console.log(`${at} ${old.slice(0, 7)} -> ${pin.slice(0, 7)}${release} (${changed.trim()}); ${manifest} moved.`);
   console.log(moved.length
@@ -117,9 +113,11 @@ function sync(tmp) {
     : asks.length
       ? `This sync asks more of the project than the copy (${at}${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.\n${asks.join("\n")}`
       : `This sync asks nothing of the project beyond the copy (${at}${NOTES}).`);
-  // Every step not done, a standing one too, every difference from a fresh start, where the owner's inbox is and what its
-  // labels and openers lack, as the new copy reads them; for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
-  // (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
+}
+
+// The folder of the earlier starter kits, each in a folder named for its commit.
+// (fresh.mjs is given the starter kit of the old pin and of every release, to find the wording the core has left)
+function kitsOf(old, tmp) {
   const kits = path.join(tmp, "kits");
   for (const sha of new Set([old, ...releasesIn(tmp).map(r => r.sha)])) {
     const to = path.join(kits, sha);
@@ -127,6 +125,12 @@ function sync(tmp) {
     try { execFileSync("tar", ["-x", "-f", "-", "-C", to], { input: inBare(tmp, ["archive", sha, "setup/template"], { encoding: "buffer", maxBuffer: 1 << 28 }) }); }
     catch { fs.rmSync(to, { recursive: true, force: true }); } // (a commit from before the starter kit: no kit to compare)
   }
+  return kits;
+}
+
+// Every step not done, a standing one too, every difference from a fresh start, where the owner's inbox is and what its
+// labels and openers lack, as the new copy reads them; for the sync PR's description. (A copy from before these scripts has neither: nothing is said of them.)
+function report(at, dir, kits) {
   console.log("For the sync PR's description (each a task, none in this PR; nothing waits on them):");
   for (const [script, ...args] of REPORTS(kits)) {
     if (!fs.existsSync(path.join(dir, "scripts", script))) continue;
@@ -139,6 +143,33 @@ function sync(tmp) {
     if (r.error?.code === "ETIMEDOUT") console.log(`${at}scripts/${script} was stopped after ten minutes: run it again by itself`);
     else if (r.status !== 0 && !said) console.log(`${at}scripts/${script} failed: run it again by itself to see why`);
   }
+}
+
+function sync(tmp) {
+  const manifest = "core-manifest.md";
+  if (!fs.existsSync(manifest)) fail(`run it from a project's root, beside ${manifest}`);
+  const text = fs.readFileSync(manifest, "utf8"), line = ownCopy(text);
+  if (!line) return;
+  const at = line.path, dir = at.slice(0, -1), old = line.pin, lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
+  const first = !fs.existsSync(dir); // (the first copy: the manifest is written, the copy not yet)
+
+  fetchCore(tmp);
+  const target = targetOf({ manifest, text, old, first, at }, tmp);
+  if (!target) return;
+  const { pin, release } = target;
+  if (!past(pin, "refs/heads/main", tmp)) fail(`${pin} is not a commit of the core's main`);
+  if (pin === old && !first) { console.log(`${at} is already at ${pin}: nothing to sync`); return; }
+
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
+  execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
+  fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+
+  const moved = moveCalls(pin, tmp);
+  if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
+  sayMoved({ at, old, pin, release, manifest, moved }, tmp);
+  report(at, dir, kitsOf(old, tmp));
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.

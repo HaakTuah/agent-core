@@ -1,4 +1,6 @@
-    # (a private repository, where each job is a billed minute: the job starts only on a pull request that changes a
+    # (no longer written by the starter kit, whose NuGet check is a step of core.yml's one job (#376); kept for a project
+    # that keeps a call of its own to the core's nuget.yml, as core/scripts/steps.mjs reads it. A private repository, where
+    # each job is a billed minute: the job starts only on a pull request that changes a
     # file NuGet reads by name, the names the core's nuget.yml looks at first, in any case, as Windows takes them. A
     # file a build file brings in under another name is added here by its exact path: core/scripts/steps.mjs lists
     # each. What is left to the next such pull request: a lock file a build no longer matches through a property

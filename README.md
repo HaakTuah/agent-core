@@ -5,9 +5,9 @@
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
 alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the owner's own
 words stay in this repository alone (`words/`; #252). A project of another owner takes the core the same way, its
-*owner's account* filled in, and in its copy "the owner" is its own (core archive 148), save in `archive/`, whose
-reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and marks an answer that rests
-on it alone unsure (`roles/shared/inbox.md`; core archive 166).
+*owner's account* its own (read, or filled in: "Slots"), and in its copy "the owner" is its own (core archive 148),
+save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and
+marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
@@ -50,6 +50,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
   check reads").
+- **The number each rule names, and the pruning:** each rule names the count it is meant to lower and the outcome it
+  stands for (`scripts/holders.json`, "numbers"); every second month, and with a newer generation of model,
+  `scripts/pruning.mjs` lists the rules whose number did not move, whose check never fired or whose staged case passed
+  without them, for the owner to decide which go; its record is `reports/pruning.json` (`AGENTS.md`, "Rules are pruned
+  by their numbers").
 
 ## How a project takes the core
 
@@ -110,11 +115,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    a release that may bring it nothing. Held by `scripts/releases-test.mjs`, `scripts/core-moved-test.mjs` and
    `scripts/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
-   core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
-   itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
-   step of the copies workflow, reads the list against the core's modules on every pull request: a module the list
-   neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
-   with the line to add, and never fail.
+   core's words, and a row for each slot it fills otherwise than the core reads it or leaves it ("Slots"). Every
+   session reads it at the start. A list of modules does not grow by itself: when the core gains a module, a note says
+   so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a step of the copies workflow, reads the list against
+   the core's modules on every pull request: a module the list neither takes nor leaves out with a reason is reported
+   with the line to add, and never fails.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file a builder reads at the start of every task, each
    on a line of its own, and the reading script for any other role and for the modules a task calls for
    (`core/scripts/reading.mjs`; Claude Code imports the lines through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
@@ -175,8 +180,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
-     line, or in its place "No cost line: the script printed none."; the lines only of a pull request opened since
-     the project's copy held them.
+     line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
+     line there "Number:" in its form; the lines only of a pull request opened since the project's copy held them.
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -191,6 +196,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`), each with the triggers, the
      permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
+   - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
+     check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (`copies`,
+     `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
+     and the package checks (`signatures`, the folder of `package-lock.json`, and `nuget`, the licence check's
+     config), last, the NuGet check after all since it runs the pull request's build files; each a step that runs even
+     where one before it failed. One job bills one runner's minutes where four or five did, and its status is one,
+     `core / core`: the starter kit writes it so for a private repository, in place of those checks' own calls
+     (below). Their steps are the copy's `scripts/checks.mjs`, which a session may also run by hand
+     (`node core/scripts/checks.mjs`), a tool and no duty; the core's `copies.yml`, `pr-description.yml`,
+     `signatures.yml` and `nuget.yml` run the same steps, each in a job of its own, for a project that calls them.
    - **A project whose orchestrator does not wake every day** also has a `look.yml` of its own, as its template has it
      (a daily schedule or a start by hand, and one job that may read the repository, its pull requests, checks and
      statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while the core has
@@ -224,15 +239,15 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      reads whatever the live game keeps in the browser: a game keeps nothing there that matters beyond its own saves,
      and its threat model says so (core archive 201).
    - **A project whose packages come from npm** has a `signatures.yml` of its own, on every pull request, which calls
-     the core's with the folder of its lock file: where the pull request changes a package list, a lock file, an
+     the core's with the folder of its lock file (a private one, the one job's `signatures:`): where the pull request changes a package list, a lock file, an
      `.npmrc`, the Node version or that workflow, an install from the registry alone, running no package's install
      script, then npm's own check of the registry's signature on each installed name and version (floor rule 7), and
      `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
      itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
    - **A project whose packages come from NuGet** has a `nuget.yml` of its own that calls the core's on every pull
-     request (in a private repository, as the starter kit writes it, only on one that changes a file NuGet reads by
-     name, so no other bills a job), with the licence check's config: a restore of each project file git knows from its
+     request (a private one, the one job's `nuget:`; or its own call, started only on a pull request that changes a
+     file NuGet reads by name, so no other bills a job), with the licence check's config: a restore of each project file git knows from its
      lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
      what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
      from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
@@ -259,7 +274,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
      request or by a comment that opens "Security review:" from an account `tasks/reviews.md`, point 3, counts (the
-     repository owner's, or one the project names in its call, the input `reviewers`), the second alone where Codex
+     repository owner's, a person's the host lets write, read from its rights, or one the project names in its call, the
+     input `reviewers`), the second alone where Codex
      marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
      never a note posted before it; a review of an earlier commit than the head stands only
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
@@ -289,7 +305,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      for its agents' tools, and its own check holds its
      packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
-     over them: floor rule 14), so each runs only where a change can affect it, and the core is synced once a day at
+     over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
+     its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
+     is marked ready and skip their job on a draft, so a push to a draft bills none of them and a draft shows no check
+     until it is marked ready (#375; `setup/sync-notes.md`, "16 November 2026, checks once a pull request is ready"),
+     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes.md`,
+     "17 November 2026, the checks as one job"); and the core is synced once a day at
      most, a sync PR opened that day being the day's ("Sessions" in `roles/shared/work-flow.md`). On GitHub's free plan it
      has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
      (`roles/shared/work-flow.md`, point 1). The core's scripts read npm's lockfiles and NuGet's: what another installer
@@ -338,46 +359,47 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 ## Slots
 
 Where projects differ only in a name, a path or an example, the core leaves a **slot**, in italics (*progress file*),
-and each manifest says what fills it. A task is a project's unit of work; the main lane is its queue.
-A slot whose description says "left out" has a default and needs no row; every other slot a module the project takes
-uses needs one (`scripts/manifest-reads.mjs` says which).
+and a manifest's row says what fills it. A task is a project's unit of work; the main lane is its queue.
+Each slot carries the mark the core's `AGENTS.md` asks ("What can be read is never asked or declared"), in the third
+column; a row overrides what was read and the default alike, and a slot with no row takes them, so no row is asked
+for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit still writes its rows.
 
-| Slot | What the project fills in |
-| --- | --- |
-| *owner's account* | the owner's GitHub login, in backticks (`core.yml` fails a manifest without it): the owner's word (floor rule 4) and inbox (`roles/shared/inbox.md`); in a team's project one of its owners, who are each person the host lets write, and the one owner where the host's rights cannot be read (`roles/shared/teams.md`) |
-| *shares its counts* | `yes`, in backticks, where a project of another owner's lets the core's state report read its counts though it gave the core's owner no access (`scripts/state-report.mjs`); left out, no |
-| *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1); left out, the releases where the core's owner is another, `main` otherwise |
-| *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`roles/shared/inbox.md`) |
-| *milestone* | what a milestone is where it is not an issue that a heading of the *progress file* names (`tasks/planning.md`); left out, such an issue |
-| *report* | where a task's report, with its "Readings taken", goes |
-| *settling references* | what open points are settled against, with the owner's past words |
-| *descriptions* | every place that describes what a change changes, for each kind of reader |
-| *copies check* | the check that fails a new copy, and its config for `scripts/copies.mjs` |
-| *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` |
-| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`tasks/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`tasks/tests.md`); left out, `checks/shape.json`, which the starter kit writes |
-| *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`tasks/cleaning.md`; `scripts/dose.mjs` reads it); left out, the state read from the shape check's baseline |
-| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language |
-| *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`tasks/cleaning.md`); left out, `docs/audits/` |
-| *large file* | how large a file is before it is never read whole |
-| *one at a time* | what never runs as parallel lanes |
-| *design-checked PRs* | which PRs get the design check |
-| *review reference* | what reviewers judge the work against besides the task's text |
-| *planning design* | what planning design plans |
-| *hard work* | what counts as the hard work |
-| *major version checks* | the extra checks a new major version gets |
-| *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`tasks/choices.md`; `scripts/choices.mjs` reads it); left out, `docs/choices.md`, which the starter kit writes |
-| *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`); left out, none |
-| *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync |
-| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so; left out, or a row left out, the core's default (`tasks/roles.md`, "Tools are preferences") |
-| *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names; left out, no pace but the default |
-| *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row; left out, that row |
-| *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2); left out, `docs/direction.md`, written before its first screen |
-| *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`tasks/screens.md`); left out, 360, 768 and 1280 wide |
-| *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`tasks/screens.md`, point 9); left out, the module's own |
-| *desktop platforms* | the desktop platforms a program of the project's is made for (`tasks/screens.md`, point 15); left out, none |
-| *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`tasks/screens.md`, "What holds it"); left out, `checks/screens.json` where it stands, and otherwise every check off |
-| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"): one for each game, or one with a section for each; left out, `docs/game.md` |
-| *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of |
+| Slot | What the project fills in | Mark |
+| --- | --- | --- |
+| *owner's account* | the owner's GitHub login, in backticks: the owner's word (floor rule 4) and inbox (`roles/shared/inbox.md`); in a team's project one of its owners, who are each person the host lets write, and the one owner where the host's rights cannot be read (`roles/shared/teams.md`) | read: the repository's own account, where the host says a person holds it (`.github/workflows/core.yml`, `scripts/releases.mjs`); where an organisation holds it, the host names no one person, and the row is needed: the core workflow fails a manifest without it |
+| *shares its counts* | `yes`, in backticks, where a project of another owner's lets the core's state report read its counts though it gave the core's owner no access (`scripts/state-report.mjs`) | choice: left out, no |
+| *follows* | `main` or `releases`, in backticks: where its syncs take the core from ("How a project takes the core", point 1) | choice: left out, the releases where the core's owner is another, `main` otherwise |
+| *progress file* | the file that holds the queue: what is next and in flight, in order, nothing done (`roles/shared/inbox.md`) | choice: left out, `docs/PROGRESS.md`, which the starter kit writes |
+| *milestone* | what a milestone is where it is not an issue that a heading of the *progress file* names (`tasks/planning.md`) | choice: left out, such an issue |
+| *report* | where a task's report, with its "Readings taken", goes | choice: left out, the pull request's description |
+| *settling references* | what open points are settled against, with the owner's past words | choice: left out, `AGENTS.md` and the task's own text |
+| *descriptions* | every place that describes what a change changes, for each kind of reader | choice: left out, the project's README and `AGENTS.md` |
+| *copies check* | the check that fails a new copy, and its config for `scripts/copies.mjs` | choice: left out, `core/scripts/copies.mjs` with `checks/copies.json`, which the starter kit writes |
+| *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` | choice: left out, `checks/sizes.json` |
+| *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`tasks/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`tasks/tests.md`) | choice: left out, `checks/shape.json`, which the starter kit writes |
+| *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`tasks/cleaning.md`) | read: the state the shape check's baseline shows (`scripts/dose.mjs`) |
+| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language | cannot be read: a build file names the tool at most, never the command that runs it on given lines into a given report, and even the tool waits on #501's reader; left out, no measure, and the sync's step asks the project's builder for the row |
+| *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`tasks/cleaning.md`) | choice: left out, `docs/audits/` |
+| *large file* | how large a file is before it is never read whole | choice: left out, past about 50 KB |
+| *one at a time* | what never runs as parallel lanes | choice: left out, the main lane's tasks |
+| *design-checked PRs* | which PRs get the design check | choice: left out, none |
+| *review reference* | what reviewers judge the work against besides the task's text | choice: left out, the task's own text alone |
+| *planning design* | what planning design plans | choice: left out, nothing |
+| *hard work* | what counts as the hard work | choice: left out, a task's hardest problems |
+| *major version checks* | the extra checks a new major version gets | choice: left out, the project's own tests |
+| *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`tasks/choices.md`; `scripts/choices.mjs` reads it) | choice: left out, `docs/choices.md`, which the starter kit writes |
+| *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`) | choice: left out, none |
+| *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
+| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
+| *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
+| *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
+| *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2) | choice: left out, `docs/direction.md`, written before its first screen |
+| *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`tasks/screens.md`) | choice: left out, 360, 768 and 1280 wide |
+| *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`tasks/screens.md`, point 9) | choice: left out, the module's own |
+| *desktop platforms* | the desktop platforms a program of the project's is made for (`tasks/screens.md`, point 15) | cannot be read: the build files that say it (a .NET project's target frameworks and runtime identifiers, a desktop shell's config) are read once the parser #486's record picked arrives (#501); left out, none |
+| *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`tasks/screens.md`, "What holds it") | choice: left out, `checks/screens.json` where it stands, and otherwise every check off |
+| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"): one for each game, or one with a section for each | choice: left out, `docs/game.md` |
+| *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of | cannot be read: they name parts of a game's own code, which no script reads by meaning; left out, the module's own words, each found in the game's code by the session that needs it |
 
 ## The manifest's format
 

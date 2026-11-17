@@ -301,36 +301,10 @@ const ACCEPTED_NPM = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*@[0
 
 /** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word. */
 export function loadConfig(path) {
-  let config;
-  try { config = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
-  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("the config is not a JSON object. Mend: write it as one, as the starter kit writes it");
-  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
-  // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file; "agentTools" the agent-tools
-  // check's: agent-tools.mjs)
-  const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted", "agentTools"].includes(k));
-  if (unknown.length) throw new Error(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out, or correct their spelling`);
-  for (const key of lists) {
-    const v = config[key];
-    if (v !== undefined && (!Array.isArray(v) || v.some((x) => typeof x !== "string" || !x))) throw new Error(`the config's "${key}" is not a list of names. Mend: correct it in the config: a list of non-empty strings`);
-  }
-  if (!Array.isArray(config.ships)) throw new Error('the config does not say what ships. Mend: add "ships", the package.json of each lockfile whose packages reach users, or "ships": [] if none does');
-  if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
-  if (!config.lockfiles?.length && !config.audit) throw new Error('the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"');
-  if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
-  if (config.scan !== undefined) {
-    const { scan: s } = config;
-    if (!s || typeof s !== "object" || Array.isArray(s)) throw new Error('the config\'s "scan" is not a JSON object. Mend: write it as one: { "served": [...], "skip": [...] }');
-    const odd = Object.keys(s).filter((k) => !["served", "tools", "skip"].includes(k));
-    if (odd.length) throw new Error(`the config's "scan" holds keys it does not know: ${odd.join(", ")}. Mend: take them out, or correct their spelling`);
-    for (const key of ["served", "tools", "skip"]) {
-      const v = s[key];
-      // (each written as git lists it: "site/" for a folder, never "./site/" or "site//", which would match nothing)
-      const ok = (p) => typeof p === "string" && (p === "" ? key === "served" : posix.normalize(p) === p && p !== "." && !p.startsWith("/") && !p.startsWith("../"));
-      if (v !== undefined && (!Array.isArray(v) || !v.every(ok))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
-    }
-    if (!Array.isArray(s.served)) throw new Error('the config\'s "scan" does not say what reaches users. Mend: add "served", the folders whose files reach users, or "served": [] if none does');
-    if (!config.audit) throw new Error('the config\'s "scan" needs an "audit" to hold what it finds. Mend: name the audit\'s file in "audit"');
-  }
+  let config = configRead(path);
+  configLists(config);
+  configPaths(config);
+  if (config.scan !== undefined) configScan(config);
   within(config);
   config = normalised(config);
   const beside = (config.lockfiles ?? []).map((f) => posix.join(posix.dirname(f), "package.json"));
@@ -342,6 +316,54 @@ export function loadConfig(path) {
   acceptedList(config.accepted, "accepted", ACCEPTED_NPM, "<name>@<version>", { entries: true });
   if ((config.accepted ?? []).some((a) => a.entry !== undefined) && !config.audit) throw new Error('the config\'s "accepted" names an audit entry, and the config names no "audit". Mend: name the audit\'s file in "audit", or take that yes out');
   return config;
+}
+
+/** The config at `path`, read as JSON: a JSON object, or refused. */
+function configRead(path) {
+  let config;
+  try { config = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error(`cannot read the config ${path} as JSON. Mend: name the config the licence workflow is given, and write it as JSON`); }
+  if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("the config is not a JSON object. Mend: write it as one, as the starter kit writes it");
+  return config;
+}
+
+/** The config's keys, each one it knows, its lists each a list of names, and "ships" among them. */
+function configLists(config) {
+  const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
+  // ("nuget" is the NuGet check's own, which reads and checks it: nuget.mjs, beside this file; "agentTools" the agent-tools
+  // check's: agent-tools.mjs)
+  const unknown = Object.keys(config).filter((k) => !lists.includes(k) && !["audit", "notices", "scan", "nuget", "accepted", "agentTools"].includes(k));
+  if (unknown.length) throw new Error(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out, or correct their spelling`);
+  for (const key of lists) {
+    const v = config[key];
+    if (v !== undefined && (!Array.isArray(v) || v.some((x) => typeof x !== "string" || !x))) throw new Error(`the config's "${key}" is not a list of names. Mend: correct it in the config: a list of non-empty strings`);
+  }
+  if (!Array.isArray(config.ships)) throw new Error('the config does not say what ships. Mend: add "ships", the package.json of each lockfile whose packages reach users, or "ships": [] if none does');
+}
+
+/** The config's "audit" and "notices", each a path where it stands, and something named to check. */
+function configPaths(config) {
+  if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
+  if (!config.lockfiles?.length && !config.audit) throw new Error('the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"');
+  if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
+}
+
+/** The config's "scan": an object of lists of paths in the project, saying what reaches users, beside an "audit". */
+function configScan(config) {
+  const { scan: s } = config;
+  if (!s || typeof s !== "object" || Array.isArray(s)) throw new Error('the config\'s "scan" is not a JSON object. Mend: write it as one: { "served": [...], "skip": [...] }');
+  const odd = Object.keys(s).filter((k) => !["served", "tools", "skip"].includes(k));
+  if (odd.length) throw new Error(`the config's "scan" holds keys it does not know: ${odd.join(", ")}. Mend: take them out, or correct their spelling`);
+  for (const key of ["served", "tools", "skip"]) {
+    const v = s[key];
+    if (v !== undefined && (!Array.isArray(v) || !v.every((p) => scanPathOk(key, p)))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
+  }
+  if (!Array.isArray(s.served)) throw new Error('the config\'s "scan" does not say what reaches users. Mend: add "served", the folders whose files reach users, or "served": [] if none does');
+  if (!config.audit) throw new Error('the config\'s "scan" needs an "audit" to hold what it finds. Mend: name the audit\'s file in "audit"');
+}
+
+// (each written as git lists it: "site/" for a folder, never "./site/" or "site//", which would match nothing)
+function scanPathOk(key, p) {
+  return typeof p === "string" && (p === "" ? key === "served" : posix.normalize(p) === p && p !== "." && !p.startsWith("/") && !p.startsWith("../"));
 }
 
 /** The config's paths, each held to the project: one rooted, or with a ".." that leads above the project's root, is
@@ -414,88 +436,21 @@ function lockfilePackages(root, lockPath, ships, text = (f) => ownText(root, f))
  */
 export function check(config, root, base = null, baseConfig = null) {
   config = normalised(within(config, root));
-  const lists = policy(config), { allowedFor } = lists;
-  const failures = [], reports = [];
-  // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the
-  // base held only as a tool, or in a lock file whose packages did not ship then, was not shipped)
-  const heldIn = new Map(), then = baseConfig ? normalised(baseConfig) : { ships: [] };
-  // (with no base to read it against, as in a checkout of one commit, what ships under a licence moved off is reported
-  // and passes, as it passed before: held or not cannot be told, and no sync fails a project over it)
-  // (a package is known by what it is, not the name it is installed under: its registry's name and version, or where it
-  // has none, its name, version and where it came from, so that an alias moved to another package is another)
-  const identity = (q) => (q.registryName !== undefined ? `${q.registryName}@${q.registryVersion}` : `${q.name}@${q.version}@${q.resolved ?? ""}`);
-  const held = (lockPath, p) => {
-    if (!base) return true;
-    if (!heldIn.has(lockPath)) {
-      let names = new Set();
-      const shipped = Array.isArray(then.ships) && then.ships.includes(posix.join(posix.dirname(lockPath), "package.json"));
-      try { names = new Set(lockfilePackages(root, lockPath, shipped, (f) => textAt(root, base, f)).filter((q) => q.shipped).map(identity)); } catch { /* (none held) */ }
-      heldIn.set(lockPath, names);
-    }
-    return heldIn.get(lockPath).has(identity(p));
+  const lists = policy(config);
+  const ctx = {
+    config, root, base, lists, failures: [], reports: [],
+    // (what each lock file shipped at the base, by name@version, read once each, by the base's own config: a package the
+    // base held only as a tool, or in a lock file whose packages did not ship then, was not shipped)
+    heldIn: new Map(), then: baseConfig ? normalised(baseConfig) : { ships: [] },
+    // (the owner's yeses, by what each names; `needed`: those something off its list stood on, `onList`: those nothing did)
+    accepted: config.accepted ?? [], needed: new Set(), onList: new Set(),
   };
-  const report = (what, licence) => `${what} ships under ${licence}, which since ${[...MOVED_OFF].filter(([id]) => licence.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "accepted" or has it replaced`;
-  // (the owner's yeses, by what each names; `needed`: those something off its list stood on, `onList`: those nothing did)
-  const accepted = config.accepted ?? [], needed = new Set(), onList = new Set();
-  const yesFor = (kind, name) => accepted.find((a) => a[kind] === name);
+  const { failures, reports } = ctx;
   const packages = (config.lockfiles ?? []).flatMap((f) => lockfilePackages(root, f, config.ships.includes(posix.join(posix.dirname(f), "package.json"))));
-  // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
-  for (const f of config.lockfiles ?? []) {
-    const other = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
-    if (existsSync(join(root, other))) failures.push(`${f}: ${other} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
-  }
-  for (const p of packages) {
-    // (a yes names a package and its version as the registry's address does, like "data" and "fonts": never by a
-    // name or a version a lockfile could be given beside it)
-    const a = p.registryName === undefined || p.registryVersion !== p.version ? undefined : yesFor("package", `${p.registryName}@${p.version}`);
-    if (licenceOk(p.license, allowedFor(p.registryName ?? "", p.shipped))) { if (a) onList.add(a); continue; }
-    if (a) { needed.add(a); failures.push(...yesFaults(a.package, a, p.shipped, [p.license], lists, '"accepted"')); continue; }
-    if (p.shipped && movedOff(p.license, allowedFor(p.registryName ?? "", true)) && held(p.lockPath, p)) { reports.push(report(`${p.name}@${p.version}, in ${p.lockPath},`, p.license)); continue; }
-    const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
-    failures.push(`off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? ". Mend: replace it with a package under a licence on that list; floor rule 10 never takes these terms in" : `. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`}`);
-  }
-  let entries = [];
-  if (config.audit) {
-    try { entries = parseBounded(readFileSync(join(root, config.audit), "utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
-    if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
-    // (an entry held at the base as it stands: the same name, version and licence)
-    let before = [];
-    try { before = base ? JSON.parse(textAt(root, base, config.audit)).entries ?? [] : []; } catch { /* (none held) */ }
-    const auditHeld = (e) => !base || (Array.isArray(before) && before.some((b) => b && b.name === e.name && b.version === e.version && b.licence === e.licence && b.ships === true));
-    // (the notices file the config names; null when it names none there, which fails once, not for every entry)
-    const noticesFile = config.notices === undefined ? undefined : join(root, config.notices);
-    const notices = noticesFile === undefined ? undefined : existsSync(noticesFile) && statSync(noticesFile).isFile() ? readFileSync(noticesFile, "utf8") : null;
-    if (notices === null) failures.push(`the config's "notices", ${config.notices}, names no file. Mend: write the notices file there, or correct the path`);
-    for (const e of entries) {
-      if (!e || typeof e.name !== "string" || !e.name || typeof e.licence !== "string" || !e.licence) { failures.push(`${config.audit}: an entry without a name or licence: ${JSON.stringify(e)}. Mend: give it its "name" and its "licence"`); continue; }
-      // (a "ships" or "kind" of the wrong shape would check less without a word)
-      if ((e.ships !== undefined && typeof e.ships !== "boolean") || (e.kind !== undefined && typeof e.kind !== "string")) { failures.push(`${config.audit}: ${e.name}: "ships" is not true or false, or "kind" not a word. Mend: write "ships" as true or false, and "kind" as a word`); continue; }
-      if (e.licence === GITHUB_TERMS && e.kind === "github-service" && GITHUB_SERVICES.has(e.name) && !e.ships) continue;
-      if (e.kind === "own" || e.licence === OWNER) {
-        if (e.kind !== "own" || e.licence !== OWNER) failures.push(`${config.audit}: ${e.name}: the owner's own work is "kind": "own" with ${OWNER}, and only it. Mend: give it both, or neither`);
-        continue;
-      }
-      // (a yes names an entry with its version, where it has one: a new version is a new entry to it)
-      const a = accepted.find((y) => y.entry === e.name && y.version === e.version);
-      if (licenceOk(e.licence, allowedFor(e.name, e.ships === true, e.kind ?? null))) { if (a) onList.add(a); }
-      // (a NuGet package's yes stands in "nuget.accepted" alone, where the NuGet check holds it to its exact version)
-      else if (a && e.kind === "nuget") { needed.add(a); failures.push(`${config.audit}: ${e.name}: a NuGet package's yes stands in "nuget.accepted", never in "accepted". Mend: move the yes to "nuget.accepted"`); }
-      else if (a) {
-        needed.add(a);
-        // (the audit's own words for the licence are the yes's, letter for letter, readable or not)
-        if (a.licence !== e.licence) failures.push(`${config.audit}: ${e.name}: accepted under ${a.licence}, and recorded as under ${e.licence}, and another licence is another yes. Mend: replace it, or file an issue asking the owner's yes under ${e.licence}`);
-        failures.push(...yesFaults(`${config.audit}: ${e.name}`, a, e.ships === true, [e.licence], lists, null));
-      }
-      else if (e.ships === true && movedOff(e.licence, allowedFor(e.name, true, e.kind ?? null)) && auditHeld(e)) reports.push(report(`${config.audit}: ${e.name}`, e.licence));
-      else failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`);
-      if (e.ships === true && notices !== null && !(notices === undefined ? typeof e.notice === "string" && e.notice.trim() : notices.includes(e.name))) {
-        failures.push(`${config.audit}: ${e.name}: it ships, so its notice ships too (floor rule 10): ${notices === undefined ? 'its "notice", for the notices the project builds' : `its name in ${config.notices}`}. Mend: add it there`);
-      }
-    }
-  }
-  for (const a of accepted) {
-    if (!needed.has(a)) failures.push(`"accepted" names ${a.package ?? `the audit entry ${a.entry}${a.version === undefined ? "" : ` at version ${a.version}`}`}, which ${onList.has(a) ? "is on its list and needs no yes" : a.package ? "nothing installs" : "the audit does not hold"}. Mend: take that yes out of "accepted"`);
-  }
+  failures.push(...shrinkwrapFaults(root, config.lockfiles ?? []));
+  for (const p of packages) checkPackage(ctx, p);
+  const entries = config.audit ? checkAudit(ctx) : [];
+  unneededYeses(ctx);
   const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? []) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
@@ -503,11 +458,155 @@ export function check(config, root, base = null, baseConfig = null) {
     if (!existsSync(join(root, f)) || !scriptsOff(readFileSync(join(root, f), "utf8"))) failures.push(`${f} does not set ignore-scripts=true (floor rule 15). Mend: add the line ignore-scripts=true to ${f}`);
   }
   const all = [...new Set(failures)]; // (a package a lockfile holds twice fails once)
+  return { failures: all, reports, summary: summaryOf(ctx, packages, entries, scanned, all.length) };
+}
+
+// (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
+function shrinkwrapFaults(root, lockfiles) {
+  const faults = [];
+  for (const f of lockfiles) {
+    const other = posix.join(posix.dirname(f), posix.basename(f) === "npm-shrinkwrap.json" ? "package-lock.json" : "npm-shrinkwrap.json");
+    if (existsSync(join(root, other))) faults.push(`${f}: ${other} stands beside it, and an install reads the shrinkwrap file of the two. Mend: delete one, keeping the file the project installs from`);
+  }
+  return faults;
+}
+
+// (a package is known by what it is, not the name it is installed under: its registry's name and version, or where it
+// has none, its name, version and where it came from, so that an alias moved to another package is another)
+function identity(q) {
+  return q.registryName !== undefined ? `${q.registryName}@${q.registryVersion}` : `${q.name}@${q.version}@${q.resolved ?? ""}`;
+}
+
+// (with no base to read it against, as in a checkout of one commit, what ships under a licence moved off is reported
+// and passes, as it passed before: held or not cannot be told, and no sync fails a project over it)
+function held(ctx, lockPath, p) {
+  const { root, base, heldIn, then } = ctx;
+  if (!base) return true;
+  if (!heldIn.has(lockPath)) {
+    let names = new Set();
+    const shipped = Array.isArray(then.ships) && then.ships.includes(posix.join(posix.dirname(lockPath), "package.json"));
+    try { names = new Set(lockfilePackages(root, lockPath, shipped, (f) => textAt(root, base, f)).filter((q) => q.shipped).map(identity)); } catch { /* (none held) */ }
+    heldIn.set(lockPath, names);
+  }
+  return heldIn.get(lockPath).has(identity(p));
+}
+
+/** The report on what ships under a licence moved off the list and passes, held at the base or with none to read. */
+function movedOffReport(base, what, licence) {
+  return `${what} ships under ${licence}, which since ${[...MOVED_OFF].filter(([id]) => licence.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "accepted" or has it replaced`;
+}
+
+/** One package a lockfile installs, held to its list, or to the owner's yes for it. */
+function checkPackage(ctx, p) {
+  const { allowedFor } = ctx.lists;
+  // (a yes names a package and its version as the registry's address does, like "data" and "fonts": never by a
+  // name or a version a lockfile could be given beside it)
+  const a = p.registryName === undefined || p.registryVersion !== p.version ? undefined : ctx.accepted.find((y) => y.package === `${p.registryName}@${p.version}`);
+  if (licenceOk(p.license, allowedFor(p.registryName ?? "", p.shipped))) { if (a) ctx.onList.add(a); return; }
+  if (a) { ctx.needed.add(a); ctx.failures.push(...yesFaults(a.package, a, p.shipped, [p.license], ctx.lists, '"accepted"')); return; }
+  if (p.shipped && movedOff(p.license, allowedFor(p.registryName ?? "", true)) && held(ctx, p.lockPath, p)) { ctx.reports.push(movedOffReport(ctx.base, `${p.name}@${p.version}, in ${p.lockPath},`, p.license)); return; }
+  ctx.failures.push(offList(p));
+}
+
+/** The failure of a package off its list. */
+function offList(p) {
+  const never = p.license !== undefined && NEVER.test(typeof p.license === "string" ? p.license : JSON.stringify(p.license));
+  return `off the ${p.shipped ? "list for what ships" : "tools' list"}: ${p.name}@${p.version} (${p.license === undefined ? "no licence" : typeof p.license === "string" ? p.license : JSON.stringify(p.license)}), in ${p.lockPath}${never ? ". Mend: replace it with a package under a licence on that list; floor rule 10 never takes these terms in" : `. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`}`;
+}
+
+/** The audit the config names, each entry held to its list and its notice: its entries, for the scan. */
+function checkAudit(ctx) {
+  const { config, root, base } = ctx;
+  const entries = auditEntries(root, config.audit);
+  const auditHeld = heldInAudit(root, base, config.audit);
+  const notices = noticesText(root, config.notices);
+  if (notices === null) ctx.failures.push(`the config's "notices", ${config.notices}, names no file. Mend: write the notices file there, or correct the path`);
+  for (const e of entries) checkEntry(ctx, e, notices, auditHeld);
+  return entries;
+}
+
+/** The audit's entries, or refused. */
+function auditEntries(root, audit) {
+  let entries;
+  try { entries = parseBounded(readFileSync(join(root, audit), "utf8")).entries; } catch { throw new Error(`${audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
+  if (!Array.isArray(entries)) throw new Error(`${audit} has no "entries" list. Mend: write it as { "entries": [...] }, as the starter kit does`);
+  return entries;
+}
+
+// (an entry held at the base as it stands: the same name, version and licence)
+function heldInAudit(root, base, audit) {
+  let before = [];
+  try { before = base ? JSON.parse(textAt(root, base, audit)).entries ?? [] : []; } catch { /* (none held) */ }
+  return (e) => !base || (Array.isArray(before) && before.some((b) => b && b.name === e.name && b.version === e.version && b.licence === e.licence && b.ships === true));
+}
+
+// (the notices file the config names; null when it names none there, which fails once, not for every entry)
+function noticesText(root, notices) {
+  const noticesFile = notices === undefined ? undefined : join(root, notices);
+  return noticesFile === undefined ? undefined : existsSync(noticesFile) && statSync(noticesFile).isFile() ? readFileSync(noticesFile, "utf8") : null;
+}
+
+/** One entry of the audit, held to its shape, its list or the owner's yes, and, where it ships, its notice. */
+function checkEntry(ctx, e, notices, auditHeld) {
+  const { config, failures } = ctx;
+  const fault = entryShapeFault(config.audit, e);
+  if (fault) { failures.push(fault); return; }
+  if (outsideLists(config.audit, e, failures)) return;
+  entryLicence(ctx, e, auditHeld);
+  if (e.ships === true && notices !== null && !(notices === undefined ? typeof e.notice === "string" && e.notice.trim() : notices.includes(e.name))) {
+    failures.push(`${config.audit}: ${e.name}: it ships, so its notice ships too (floor rule 10): ${notices === undefined ? 'its "notice", for the notices the project builds' : `its name in ${config.notices}`}. Mend: add it there`);
+  }
+}
+
+/** What is wrong with an audit entry's shape, or null. */
+function entryShapeFault(audit, e) {
+  if (!e || typeof e.name !== "string" || !e.name || typeof e.licence !== "string" || !e.licence) return `${audit}: an entry without a name or licence: ${JSON.stringify(e)}. Mend: give it its "name" and its "licence"`;
+  // (a "ships" or "kind" of the wrong shape would check less without a word)
+  if ((e.ships !== undefined && typeof e.ships !== "boolean") || (e.kind !== undefined && typeof e.kind !== "string")) return `${audit}: ${e.name}: "ships" is not true or false, or "kind" not a word. Mend: write "ships" as true or false, and "kind" as a word`;
+  return null;
+}
+
+/** Whether an audit entry stands outside both lists: one of GitHub's services, or the owner's own work (failing where
+ *  it is half written so). */
+function outsideLists(audit, e, failures) {
+  if (e.licence === GITHUB_TERMS && e.kind === "github-service" && GITHUB_SERVICES.has(e.name) && !e.ships) return true;
+  if (e.kind !== "own" && e.licence !== OWNER) return false;
+  if (e.kind !== "own" || e.licence !== OWNER) failures.push(`${audit}: ${e.name}: the owner's own work is "kind": "own" with ${OWNER}, and only it. Mend: give it both, or neither`);
+  return true;
+}
+
+/** An audit entry held to its list, or to the owner's yes for it. */
+function entryLicence(ctx, e, auditHeld) {
+  const { config, needed, failures } = ctx;
+  // (a yes names an entry with its version, where it has one: a new version is a new entry to it)
+  const a = ctx.accepted.find((y) => y.entry === e.name && y.version === e.version);
+  if (licenceOk(e.licence, ctx.lists.allowedFor(e.name, e.ships === true, e.kind ?? null))) { if (a) ctx.onList.add(a); }
+  // (a NuGet package's yes stands in "nuget.accepted" alone, where the NuGet check holds it to its exact version)
+  else if (a && e.kind === "nuget") { needed.add(a); failures.push(`${config.audit}: ${e.name}: a NuGet package's yes stands in "nuget.accepted", never in "accepted". Mend: move the yes to "nuget.accepted"`); }
+  else if (a) {
+    needed.add(a);
+    // (the audit's own words for the licence are the yes's, letter for letter, readable or not)
+    if (a.licence !== e.licence) failures.push(`${config.audit}: ${e.name}: accepted under ${a.licence}, and recorded as under ${e.licence}, and another licence is another yes. Mend: replace it, or file an issue asking the owner's yes under ${e.licence}`);
+    failures.push(...yesFaults(`${config.audit}: ${e.name}`, a, e.ships === true, [e.licence], ctx.lists, null));
+  }
+  else if (e.ships === true && movedOff(e.licence, ctx.lists.allowedFor(e.name, true, e.kind ?? null)) && auditHeld(e)) ctx.reports.push(movedOffReport(ctx.base, `${config.audit}: ${e.name}`, e.licence));
+  else failures.push(`${config.audit}: ${e.name}: ${e.licence} is not on the list for ${e.ships === true ? "what ships" : "tools that only run"}. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner's yes, which goes in the config's "accepted" with the owner's words (floor rule 10)`);
+}
+
+/** Each yes in "accepted" that nothing off its list stood on fails. */
+function unneededYeses(ctx) {
+  for (const a of ctx.accepted) {
+    if (!ctx.needed.has(a)) ctx.failures.push(`"accepted" names ${a.package ?? `the audit entry ${a.entry}${a.version === undefined ? "" : ` at version ${a.version}`}`}, which ${ctx.onList.has(a) ? "is on its list and needs no yes" : a.package ? "nothing installs" : "the audit does not hold"}. Mend: take that yes out of "accepted"`);
+  }
+}
+
+/** The check's summary line. */
+function summaryOf(ctx, packages, entries, scanned, failing) {
+  const { config, needed, reports } = ctx;
   const shippedCount = packages.filter((p) => p.shipped).length;
-  const summary = `${packages.length} packages checked (${shippedCount} shipped or may be, ${packages.length - shippedCount} tools that only run)` +
+  return `${packages.length} packages checked (${shippedCount} shipped or may be, ${packages.length - shippedCount} tools that only run)` +
     `${config.audit ? `, ${entries.length} audit entries` : ""}${scanned ? `, ${scanned.scanned} files scanned for what the audit must hold` : ""}; ` +
-    `${needed.size ? `${needed.size} accepted on the owner's yes; ` : ""}${reports.length ? `${reports.length} shipped at the base under a licence moved off the list, reported; ` : ""}${all.length} failing (floor rule 10)`;
-  return { failures: all, reports, summary };
+    `${needed.size ? `${needed.size} accepted on the owner's yes; ` : ""}${reports.length ? `${reports.length} shipped at the base under a licence moved off the list, reported; ` : ""}${failing} failing (floor rule 10)`;
 }
 
 /**

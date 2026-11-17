@@ -213,24 +213,26 @@ async function fromSource(source, id, version) {
   return get(fileAddress(base, id, version));
 }
 
-/**
- * Every package and tool, fetched into `into`, read against the pull request's `base` (a commit, or null):
- * { failures, notes, reports, summary }.
- */
-export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null, baseConfig = null } = {}) {
-  const { ships, tools: toolLocks } = nugetConfig(config);
-  // (a tool counts as the base's only where the base held this config, with the same sources: one a pull request's new
-  // source gives, or read by a config the base did not hold, is judged as new)
+// Whether the base held this config with the same sources: true with no base to read against.
+// (a tool counts as the base's only where the base held this config, with the same sources: one a pull request's new
+// source gives, or read by a config the base did not hold, is judged as new)
+function sameSourcesOf(config, base, baseConfig) {
   let sameSources = base === null;
   try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n") === [...nugetConfig(config).sources].sort().join("\n"); } catch { /* (judged as new) */ }
-  const failures = [], notes = [], reports = [], wanted = new Map();
-  // (a lock file as the base held it, and listed by the base's config, so the check read it there: two content hashes
-  // it already named are reported; one a pull request lists for the first time is not held)
-  let listedThen = [];
-  try { if (baseConfig) listedThen = [...nugetConfig(baseConfig).ships, ...nugetConfig(baseConfig).tools]; } catch { /* (none listed) */ }
-  // (a lock file or a tools manifest is read only where it is a file of bytes: a device would never end)
+  return sameSources;
+}
+// The lock files the base's config listed.
+// (a lock file as the base held it, and listed by the base's config, so the check read it there: two content hashes
+// it already named are reported; one a pull request lists for the first time is not held)
+function listedBy(baseConfig) {
+  try { if (baseConfig) return [...nugetConfig(baseConfig).ships, ...nugetConfig(baseConfig).tools]; } catch { /* (none listed) */ }
+  return [];
+}
+// A file's text, read once; null, failed in `failures`, where it is no file of bytes.
+// (a lock file or a tools manifest is read only where it is a file of bytes: a device would never end)
+function reader(root, failures) {
   const texts = new Map();
-  const textOf = (f) => {
+  return (f) => {
     if (!texts.has(f)) {
       const bytes = readProject(root, f);
       if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe), and this check reads none. Mend: make it a file`);
@@ -238,8 +240,10 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     }
     return texts.get(f);
   };
-  const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === textOf(f));
-  for (const f of [...ships, ...toolLocks].filter((l) => tracked.includes(l))) {
+}
+// The packages each tracked lock file names, into `wanted`, its failures and reports said.
+function readLocks(locks, { tracked, textOf, asBase, failures, reports, wanted }) {
+  for (const f of locks.filter((l) => tracked.includes(l))) {
     if (textOf(f) === null) continue;
     const read = lockPackages(textOf(f), f);
     failures.push(...read.failures);
@@ -253,6 +257,11 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
       wanted.set(k, { ...p, from: f }); // (the last lock file's entry, as before this was said: the file fetched then)
     }
   }
+}
+// The tools each tracked manifest of dotnet's names, outside the core's copy, into `wanted`, its failures and reports
+// said.
+function readTools(ctx) {
+  const { root, base, tracked, sameSources, textOf, failures, reports } = ctx;
   for (const f of tracked.filter((t) => !t.startsWith(copyOf(root)) && isTools(t))) {
     const text = textOf(f);
     if (text === null) continue;
@@ -263,63 +272,99 @@ export async function fetchAll(config, root, tracked, into, sources = sourcesOf(
     const held = (id, version) => same || (sameSources && before.has(`${id}@${version}`.toLowerCase()));
     for (const x of read.failures.filter((x) => !read.failed.some((t) => t.failure === x))) (same ? reports : failures).push(x);
     for (const t of read.failed) (held(t.id, t.version) ? reports : failures).push(t.failure);
-    // (a tool a lock file also names is fetched as the lock names it, and its restore, which holds it to no hash, must
-    // find no other file of it at a source before that one: alsoTool)
-    for (const t of read.tools) {
-      const k = `${t.id}@${t.version}`.toLowerCase(), was = wanted.get(k);
-      if (!was) wanted.set(k, { ...t, from: f, tool: true, held: held(t.id, t.version) });
-      else if (!was.tool) {
-        // (held only where every manifest that names it held it: one the pull request brings decides, whatever its place)
-        const h = held(t.id, t.version) && asBase(was.from), first = !was.alsoTool;
-        wanted.set(k, { ...was, alsoTool: first || (was.alsoHeld && !h) ? f : was.alsoTool, alsoHeld: (first || was.alsoHeld) && h });
-      }
-    }
+    for (const t of read.tools) wantTool(t, f, held, ctx);
   }
-  // (each package on its own: what failed for a tool the base held is reported instead)
-  const one = async (p) => {
-    const name = `${p.id}@${p.version} (${p.from})`, out = { failures: [], notes: [], reports: [], fetched: false };
-    let bytes = null, taken = null, hashed = null, unread = false, other = null;
-    for (const source of sources) {
-      let got;
-      try { got = await fromSource(source, p.id, p.version); } catch (e) { out.failures.push(`${name}: ${source} could not be read (${shown(e.message)}). Mend: run the check again; where the source stays unreadable, take the package from NuGet's registry or another source the config names`); break; }
-      if (got === undefined) { unread = true; continue; }
-      if (!got) continue;
-      let h;
-      try { h = contentHash(got); } catch (e) { out.failures.push(`${name}: the file ${source} gives: ${shown(e.message)}. Mend: take the package from a source that gives it as NuGet packs one`); break; }
-      // (a locked package is the file its lock file names: one source's other file leaves the next source to try)
-      if (!p.tool && h !== p.contentHash) { other ??= source; continue; }
-      bytes = got; taken = source; hashed = h; break;
-    }
-    if (bytes && p.alsoTool && other) (p.alsoHeld ? out.reports : out.failures).push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${other} gives. Mend: take the tool from the source that gives the locked file, or name that source first${p.alsoHeld ? ` ${heldBefore}` : ""}`);
-    if (!bytes && !out.failures.length) {
-      if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15). Mend: take it from the source that gives the locked file, named in the config's "nuget.sources"; where the new file is meant, move to a new version in a pull request of its own, never writing the lock file anew over this one`);
-      else if (unread && !p.tool) out.notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);
-      else if (unread) out.failures.push(`${name}: a tool held by no source this reads (a feed not of NuGet's v3 form), and no restore brings a tool. Mend: take it from a source of NuGet's v3 form`);
-      else out.failures.push(`${name}: in neither NuGet's registry nor a source the config names. Mend: take it from NuGet's registry, or name its source in the config's "nuget.sources"`);
-    }
-    if (bytes) {
-      let nuspec;
-      try { nuspec = nuspecOf(bytes); } catch (e) { out.failures.push(`${name}: ${shown(e.message)}. Mend: replace the package, or file an issue on the core naming it, so that its reader learns that form`); }
-      // (a tool has no content hash: the file is the one its manifest names, by id and version as NuGet compares them)
-      const says = nuspec === undefined ? null : named(nuspec);
-      if (nuspec !== undefined && p.tool && (!says || says.id.toLowerCase() !== p.id.toLowerCase() || normal(says.version) !== normal(p.version))) {
-        out.failures.push(`${name}: the file ${taken} gives names ${says ? `${shown(says.id)}@${shown(says.version)}` : "no one id and version"} in its manifest. Mend: take the package from a source whose file names it as the lock file does`);
-        nuspec = undefined;
-      }
-      if (nuspec !== undefined) {
-        const dir = join(into, p.id.toLowerCase(), p.version.toLowerCase());
-        mkdirSync(dir, { recursive: true });
-        writeFileSync(join(dir, `${p.id.toLowerCase()}.nuspec`), nuspec);
-        writeFileSync(join(dir, ".nupkg.metadata"), JSON.stringify({ version: 2, contentHash: hashed, source: taken }));
-        out.fetched = true;
-      }
-    }
-    if (p.tool && p.held) { out.reports.push(...out.failures.map((f) => `${f} (a tool held before this check read tools: reported, and passes)`)); out.failures = []; }
-    return out;
-  };
-  const list = [...wanted.values()], results = new Array(list.length);
+}
+// One tool of the manifest `f`, into `wanted`.
+// (a tool a lock file also names is fetched as the lock names it, and its restore, which holds it to no hash, must
+// find no other file of it at a source before that one: alsoTool)
+function wantTool(t, f, held, { asBase, wanted }) {
+  const k = `${t.id}@${t.version}`.toLowerCase(), was = wanted.get(k);
+  if (!was) wanted.set(k, { ...t, from: f, tool: true, held: held(t.id, t.version) });
+  else if (!was.tool) {
+    // (held only where every manifest that names it held it: one the pull request brings decides, whatever its place)
+    const h = held(t.id, t.version) && asBase(was.from), first = !was.alsoTool;
+    wanted.set(k, { ...was, alsoTool: first || (was.alsoHeld && !h) ? f : was.alsoTool, alsoHeld: (first || was.alsoHeld) && h });
+  }
+}
+
+// A package's file from the first source that gives it (a locked one's as its lock file names it): { bytes, taken,
+// hashed, unread, other }, bytes null where none does; a source that cannot be read, or a file no zip, failed in `out`.
+async function fileOf(p, name, sources, out) {
+  let unread = false, other = null;
+  for (const source of sources) {
+    let got;
+    try { got = await fromSource(source, p.id, p.version); } catch (e) { out.failures.push(`${name}: ${source} could not be read (${shown(e.message)}). Mend: run the check again; where the source stays unreadable, take the package from NuGet's registry or another source the config names`); break; }
+    if (got === undefined) { unread = true; continue; }
+    if (!got) continue;
+    let h;
+    try { h = contentHash(got); } catch (e) { out.failures.push(`${name}: the file ${source} gives: ${shown(e.message)}. Mend: take the package from a source that gives it as NuGet packs one`); break; }
+    // (a locked package is the file its lock file names: one source's other file leaves the next source to try)
+    if (!p.tool && h !== p.contentHash) { other ??= source; continue; }
+    return { bytes: got, taken: source, hashed: h, unread, other };
+  }
+  return { bytes: null, taken: null, hashed: null, unread, other };
+}
+// Why no source gave a package's file, said in `out`.
+function sayMissing(name, p, { unread, other }, out) {
+  if (other) out.failures.push(`${name}: the file ${other} gives is not the one its lock file names by its content hash, and no other source gives that one (floor rule 15). Mend: take it from the source that gives the locked file, named in the config's "nuget.sources"; where the new file is meant, move to a new version in a pull request of its own, never writing the lock file anew over this one`);
+  else if (unread && !p.tool) out.notes.push(`${name}: held by no source this reads before the restore (a feed not of NuGet's v3 form): its licence is read after the restore`);
+  else if (unread) out.failures.push(`${name}: a tool held by no source this reads (a feed not of NuGet's v3 form), and no restore brings a tool. Mend: take it from a source of NuGet's v3 form`);
+  else out.failures.push(`${name}: in neither NuGet's registry nor a source the config names. Mend: take it from NuGet's registry, or name its source in the config's "nuget.sources"`);
+}
+// A package file's manifest, written into `into` with NuGet's record of where it was taken from; what is wrong with it
+// failed in `out`.
+function unpack(p, name, { bytes, taken, hashed }, into, out) {
+  let nuspec;
+  try { nuspec = nuspecOf(bytes); } catch (e) { out.failures.push(`${name}: ${shown(e.message)}. Mend: replace the package, or file an issue on the core naming it, so that its reader learns that form`); }
+  // (a tool has no content hash: the file is the one its manifest names, by id and version as NuGet compares them)
+  const says = nuspec === undefined ? null : named(nuspec);
+  if (nuspec !== undefined && p.tool && (!says || says.id.toLowerCase() !== p.id.toLowerCase() || normal(says.version) !== normal(p.version))) {
+    out.failures.push(`${name}: the file ${taken} gives names ${says ? `${shown(says.id)}@${shown(says.version)}` : "no one id and version"} in its manifest. Mend: take the package from a source whose file names it as the lock file does`);
+    nuspec = undefined;
+  }
+  if (nuspec !== undefined) {
+    const dir = join(into, p.id.toLowerCase(), p.version.toLowerCase());
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${p.id.toLowerCase()}.nuspec`), nuspec);
+    writeFileSync(join(dir, ".nupkg.metadata"), JSON.stringify({ version: 2, contentHash: hashed, source: taken }));
+    out.fetched = true;
+  }
+}
+// One package or tool, fetched into `into`: { failures, notes, reports, fetched }.
+// (each package on its own: what failed for a tool the base held is reported instead)
+async function fetchOne(p, sources, into) {
+  const name = `${p.id}@${p.version} (${p.from})`, out = { failures: [], notes: [], reports: [], fetched: false };
+  const file = await fileOf(p, name, sources, out);
+  if (file.bytes && p.alsoTool && file.other) (p.alsoHeld ? out.reports : out.failures).push(`${name}: also a tool of ${p.alsoTool}, whose restore holds it to no content hash and may take the other file of it ${file.other} gives. Mend: take the tool from the source that gives the locked file, or name that source first${p.alsoHeld ? ` ${heldBefore}` : ""}`);
+  if (!file.bytes && !out.failures.length) sayMissing(name, p, file, out);
+  if (file.bytes) unpack(p, name, file, into, out);
+  if (p.tool && p.held) { out.reports.push(...out.failures.map((f) => `${f} (a tool held before this check read tools: reported, and passes)`)); out.failures = []; }
+  return out;
+}
+// Each item's work, eight at a time; the results in the items' order.
+async function eightAtATime(list, work) {
+  const results = new Array(list.length);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(8, list.length) }, async () => { while (next < list.length) { const i = next++; results[i] = await one(list[i]); } }));
+  await Promise.all(Array.from({ length: Math.min(8, list.length) }, async () => { while (next < list.length) { const i = next++; results[i] = await work(list[i]); } }));
+  return results;
+}
+
+/**
+ * Every package and tool, fetched into `into`, read against the pull request's `base` (a commit, or null):
+ * { failures, notes, reports, summary }.
+ */
+export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null, baseConfig = null } = {}) {
+  const { ships, tools: toolLocks } = nugetConfig(config);
+  const sameSources = sameSourcesOf(config, base, baseConfig);
+  const failures = [], notes = [], reports = [], wanted = new Map();
+  const listedThen = listedBy(baseConfig);
+  const textOf = reader(root, failures);
+  const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === textOf(f));
+  const ctx = { root, base, tracked, sameSources, textOf, asBase, failures, reports, wanted };
+  readLocks([...ships, ...toolLocks], ctx);
+  readTools(ctx);
+  const results = await eightAtATime([...wanted.values()], (p) => fetchOne(p, sources, into));
   let fetched = 0;
   for (const r of results) {
     failures.push(...r.failures); notes.push(...r.notes); reports.push(...r.reports);

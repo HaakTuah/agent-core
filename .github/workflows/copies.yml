@@ -14,7 +14,8 @@
 # that only shrinks), which holds a project that has not written its config yet to the starter kit's own, with the
 # pull request's base as its baseline. A project calls it (workflow_call) on every pull request and push to main, docs-only changes
 # included, since the rule files are what it guards most, pinned to a full commit SHA ("How a project takes the core"
-# in README.md, point 5). It runs the project's own core/scripts/copies.mjs, pointers.mjs, reading-size.mjs,
+# in README.md, point 5), or calls core.yml with its inputs copies and sizes, which runs the same in its one job (#376). It runs, through
+# the project's own core/scripts/checks.mjs, which holds their steps, its copies.mjs, pointers.mjs, reading-size.mjs,
 # workflows.mjs, entry-files.mjs, manifest-reads.mjs and shape.mjs, with the configs the project names (the shape check's by its
 # manifest's row, or where the starter kit writes it), on the core's one exact Node; Node's own modules only, no
 # package installed. Read-only, with no secret.
@@ -56,42 +57,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The base branch's latest commit, for its baseline and marks (not the whole history)
-        if: github.event_name == 'pull_request'
+      - name: The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
-          BASE: ${{ github.base_ref }}
-        run: git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-      - name: No new copies
-        env:
-          COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           CONFIG: ${{ inputs.config }}
-        run: node "$CORE_AT"scripts/copies.mjs "$CONFIG"
-      - name: Every pointer in the rule files leads somewhere
-        if: ${{ !cancelled() }}
-        env:
-          POINTERS_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node "$CORE_AT"scripts/pointers.mjs
-      - name: The files every session reads keep to their marks
-        if: ${{ !cancelled() }}
-        env:
-          SIZES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
           SIZES: ${{ inputs.sizes }}
-        run: node "$CORE_AT"scripts/reading-size.mjs "$SIZES"
-      - name: No workflow names the forbidden trigger or gives a key twice
-        if: ${{ !cancelled() }}
-        env:
-          WORKFLOWS_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node "$CORE_AT"scripts/workflows.mjs
-      - name: Each agent tool's entry file pulls in every file AGENTS.md names
-        if: ${{ !cancelled() }}
-        env:
-          ENTRY_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node "$CORE_AT"scripts/entry-files.mjs
-      - name: The manifest takes or leaves out each module and fills each slot they use (reports, never fails)
-        if: ${{ !cancelled() }}
-        run: node "$CORE_AT"scripts/manifest-reads.mjs
-      - name: Nothing new in how the code is put together
-        if: ${{ !cancelled() }}
-        env:
-          SHAPE_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: node "$CORE_AT"scripts/shape.mjs
+        run: node "$CORE_AT"scripts/checks.mjs copies --copies "$CONFIG" --sizes "$SIZES" --base "$BASE"

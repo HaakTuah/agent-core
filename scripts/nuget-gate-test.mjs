@@ -1,5 +1,6 @@
-// Checks the NuGet check's own steps (.github/workflows/nuget.yml): first "Does the pull request change what NuGet
-// reads?", then the whole job, each run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull
+// Checks the NuGet check's own steps: first its look, "Does the pull request change what NuGet reads?"
+// (scripts/nuget-look.sh, run as scripts/checks.mjs runs it), then the whole job of .github/workflows/nuget.yml, whose
+// steps scripts/checks.mjs holds, run as GitHub runs it (workflow-run.mjs, beside this file), on scratch pull
 // requests of a .NET project that holds one real package in its lock file: it says to restore wherever a pull request
 // changes a file it names (a file an Import brings in among them, as the project's copy of the core's script lists
 // them), and, where none changed, wherever NuGet finds a lock file that no longer holds what its
@@ -69,11 +70,13 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   if (typeof files === "function") files(dir); else put(files);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "--allow-empty", "-m", "a change");
-  const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: `someone/project/.github/workflows/${caller}@refs/pull/1/merge`,
-    event: { pull_request: { base: { sha: base ? baseSha : "" } } } };
-  const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, until: "what", temp: tmp });
-  const step = job.steps.find(s => s.name === "Does the pull request change what NuGet reads?");
-  return { run: job.outputs.what?.outputs.run, out: step?.out ?? JSON.stringify(job.steps) };
+  const output = path.join(tmp, `look-${n}`);
+  fs.writeFileSync(output, "");
+  const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...env, BASE: base ? baseSha : "", CONFIG: "checks/licences.json",
+    CALLER: `someone/project/.github/workflows/${caller}@refs/pull/1/merge`, GITHUB_REPOSITORY: "someone/project", CORE_AT: "core/", NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`),
+    GITHUB_OUTPUT: output, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" } });
+  const said = /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim();
+  return { run: r.status === 0 ? said : undefined, out: `${r.stdout}${r.stderr}` };
 }
 const restores = (what, ...args) => { const r = gate(...args); ok(r.run === "true", `${what}: it restores`, r.out); return r; };
 const skips = (what, ...args) => { const r = gate(...args); ok(r.run === "false", `${what}: no restore`, r.out); };
@@ -139,7 +142,8 @@ if (sdk) {
     git(dir, "commit", "-q", "-m", "a change");
     const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: "someone/project/.github/workflows/nuget.yml@refs/pull/1/merge", event: { pull_request: { base: { sha: baseSha } } } };
     const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, temp: tmp });
-    return { passed: job.passed, ran: job.steps.filter(x => x.ran).map(x => x.name), out: job.steps.map(x => x.out).join("") };
+    const out = job.steps.map(x => x.out).join("");
+    return { passed: job.passed, ran: [...out.matchAll(/^== (.+)$/gm)].map(m => m[1].trim()), out };
   };
   const good = whole({ "src/App/App.csproj": project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "").replace("</Project>", "  <!-- a note -->\n</Project>") });
   ok(good.passed && good.ran.includes("Restore each project file from its lock file alone") && good.ran.includes("Every package one exact version, and under a licence on its list"), "the whole job: a project file changed, the restore runs from the lock file and the check passes", good.out);
@@ -151,9 +155,9 @@ if (sdk) {
   // (a text file a build file reads, which only NuGet's own word sees: any project file, whatever brings it in, the first
   // look names by itself)
   const built = whole({ "build/flag.txt": "yes\n" }, { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" });
-  ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out);
+  ok(!built.passed && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out.slice(-1500));
   const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
-  ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out);
+  ok(!imported.passed && imported.ran.includes(FETCH) && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
   ok(!stale.passed && /NU1004/.test(stale.out) && /A restore from a lock file failed .*\. Mend: /.test(stale.out) && mended(stale.out), "and where the project asks for a package its lock file does not hold, the restore fails the job", stale.out);
 }

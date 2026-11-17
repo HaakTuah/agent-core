@@ -7,7 +7,8 @@
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
 // It reads too the archive's items behind each rule ("behind" in holders.json; #252): it fails a key that is no rule nor
 // rule file, an item that is not in the archive, a pointer to the archive ("core archive N") written in a rule file
-// itself, and the archive's two forms out of step (archive.mjs, beside this file).
+// itself, and the archive's two forms out of step (archive.mjs, beside this file). And the number each rule names
+// ("numbers" in holders.json; #303): it fails a key that is no rule, and a number in no form outcomes.mjs's NUMBER reads.
 // The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
 //
 //   node scripts/holders.mjs          the counts, and each wrong entry with its mend
@@ -15,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { inStep, items } from "./archive.mjs";
+import { NUMBER } from "./outcomes.mjs";
 import { FOLDERS, ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
@@ -36,8 +38,8 @@ function holderOf(key, value, root) {
 
 // What holders.json names, and the items behind each rule, or the line of why it cannot be read.
 function named(root) {
-  try { const j = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")); return { named: j.holders ?? {}, behind: j.behind ?? {} }; }
-  catch (e) { return { named: {}, behind: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
+  try { const j = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")); return { named: j.holders ?? {}, behind: j.behind ?? {}, numbers: j.numbers ?? {} }; }
+  catch (e) { return { named: {}, behind: {}, numbers: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
 }
 
 // The rule files a pointer to the archive may not stand in: the core's AGENTS.md and the files of the floor and the
@@ -68,6 +70,17 @@ function behindWrong(root, behind) {
   return [...wrong, ...inStep(root)];
 }
 
+// What is wrong with the number each rule names ("numbers"), each a line with its mend: keyed as "behind" is, by a
+// rule of the floor, the modules or AGENTS.md.
+function numbersWrong(root, numbers) {
+  const keys = new Set(rules(root, { agents: true }).map(r => r.key)), wrong = [];
+  for (const [key, n] of Object.entries(numbers)) {
+    if (!keys.has(key)) wrong.push(`${FILE}, "numbers", names "${key}", which is no rule as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`);
+    else if (!NUMBER.test(String(n))) wrong.push(`${FILE}, "numbers", "${key}": "${n}" is in no form it reads. Mend: write "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm`);
+  }
+  return wrong;
+}
+
 // Each rule with its holders ([{ kind, by, part }]), and what is wrong with holders.json, each a line with its mend.
 export function holders(root = ROOT, cases = CASES) {
   const all = rules(root), keys = new Set(all.map(r => r.key)), read = named(root), wrong = read.wrong ? [read.wrong] : [];
@@ -79,7 +92,7 @@ export function holders(root = ROOT, cases = CASES) {
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
-  if (!read.wrong) wrong.push(...behindWrong(root, read.behind));
+  if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers));
   return { rules: all, by, wrong };
 }
 
