@@ -15,7 +15,7 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #528, step 3 | rule builder | #527 |
 | #529, step 4 | builder | #528 |
-| #530, step 5 | builder | #529 |
+| #530, step 5 | builder; the licence readers after #585 and #586 | #529 |
 | #593, point 5 | rule builder | |
 | #534, point 13 | rule builder | |
 | #593, points 1 to 3 | rule builder | |
@@ -54,10 +54,10 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391 |
-| #355 | builder | |
-| #391 | builder; it overlaps #355 | |
-| #542 | rule builder; it changes what the orchestrator reads at its start | #457, #355 and #391 |
+| #471 | rule builder; it changes what the orchestrator reads at its start | |
+| #355 | builder | #530: the readers left go on the parser #529 brings |
+| #391 | builder; it overlaps #355 | #530, as #355 |
+| #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
@@ -91,10 +91,10 @@ They read and change no rule.
 | #548 | builder | |
 | #549 | builder; a workflow, two security reviews | #548 |
 | #550 | builder; a case a PR | |
-| #551 | builder | #549; #355 and #391, for its point 3 |
+| #551 | builder | #549 |
 | #552 | builder | #551 |
-| #553 | builder | #552, #355 and #391 |
-| #554 | builder | #553 and #355 |
+| #553 | builder | #552 |
+| #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
 | #556 | builder | #554; #534's tools, for its linter rules |
 | #557 | builder | #556 |
