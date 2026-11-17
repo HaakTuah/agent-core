@@ -95,6 +95,8 @@ const both = newPackages([["a/package-lock.json", [pkg("twin-moss", { from: "a g
 ok(both.length === 2 && both.some((p) => !p.from), "a name from git does not stand in for the same name the registry gives, which is still looked up");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]], true).length === 0, "NuGet: an id the base held in another case is not new");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]]).length === 1, "npm: a name is held by its exact spelling");
+ok(newPackages([["package-lock.json", [pkg("twin-moss")]]], [[pkg("twin-moss", { from: "a git address" })]]).length === 1, "a name the base took from git does not hold the same name the registry now gives");
+ok(newPackages([["package-lock.json", [pkg("twin-moss", { from: "a git address" })]]], [[pkg("twin-moss")]]).length === 1, "nor the registry's name one from git");
 
 // ---- The lookup
 const one = async (p, nuget = false) => lookUp([p], { get, now: NOW, nuget });
@@ -223,9 +225,21 @@ try {
   const nugetJob = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   nugetJob("dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /before any step that builds or restores/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /after only the checkout, `setup-` actions and the core's other scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and before it, it does");
+  nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/lookup.mjs c.json", "node core/scripts/nuget.mjs c.json");
+  ok(notDone(tmp, step).length === 0, "the core's other scripts may stand before it");
+  // Before the NuGet lookup only what cannot run the pull request's build files may stand: an allow-list, so a build
+  // spelled any way is caught.
+  for (const [what, line] of [["behind a variable", "env X=1 dotnet build"], ["under sudo", "sudo dotnet restore"], ["in a script", "./build.sh"], ["in PowerShell", "pwsh build.ps1"], ["by make", "make restore"], ["by node on another file", "node build.mjs"]]) {
+    nugetJob(line, "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
+    ok(notDone(tmp, step).length === 1, `a NuGet lookup after a build ${what} does not count`);
+  }
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: actions/setup-dotnet@v5\n      - uses: ./.github/actions/build\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor after a local action, though a setup action may stand before it");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: actions/setup-dotnet@v5\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
+  ok(notDone(tmp, step).length === 0, "and after the checkout and a setup action alone, it counts");
   writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);
   nugetJob("node shared/scripts/exact-versions.mjs c.json");
   missed = notDone(tmp, step);
@@ -269,6 +283,13 @@ try {
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  front:\n    runs-on: ubuntu-latest\n    env:\n      CONFIG: checks/frontend.json\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs \"$CONFIG\"\n      - run: node core/scripts/lookup.mjs \"$CONFIG\"\n  back:\n    runs-on: ubuntu-latest\n    env:\n      CONFIG: checks/backend.json\n    steps:\n      - run: node core/scripts/exact-versions.mjs \"$CONFIG\"\n");
   missed = notDone(tmp, step);
   ok(missed.length === 1, `a config named only when the workflow runs is matched in its own job alone (${missed.map((m) => m.mend)})`);
+  const stepEnv = (check, look) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs "$CONFIG"\n        env:\n          CONFIG: ${check}\n      - run: node core/scripts/lookup.mjs "$CONFIG"\n        env:\n          CONFIG: ${look}\n`);
+  stepEnv("checks/backend.json", "checks/frontend.json");
+  ok(notDone(tmp, step).length === 1, "a variable config the lookup's step gives another value does not count");
+  stepEnv("checks/backend.json", "checks/backend.json");
+  ok(notDone(tmp, step).length === 0, "and given the same value, it does");
+  nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json # waits & sees");
+  ok(notDone(tmp, step).length === 0, "an ampersand in a comment does not send the lookup to the background");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");

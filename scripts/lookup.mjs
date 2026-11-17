@@ -131,10 +131,11 @@ export function newPackages(head, base, nuget = false) {
   // (an entry from elsewhere than the registry is kept apart from one of the same name the registry gives, so that it
   // never stands in for the one the lookup asks of)
   const key = (p) => `${nuget ? p.name.toLowerCase() : p.name}${p.from ? "\u0000from" : ""}`;
-  const name = (p) => (nuget ? p.name.toLowerCase() : p.name);
-  const held = new Set(base.flat().map(name)), out = new Map();
+  // (a registry name is held only by the base's registry entry: a name the base took from git, which the pull request
+  // now takes from the registry, may be another publisher's package, and is looked up)
+  const held = new Set(base.flat().map(key)), out = new Map();
   for (const [lockPath, packages] of head) for (const p of packages) {
-    if (held.has(name(p))) continue;
+    if (held.has(key(p))) continue;
     const was = out.get(key(p));
     if (!was || (p.direct && !was.direct)) out.set(key(p), { ...p, lockPath });
   }

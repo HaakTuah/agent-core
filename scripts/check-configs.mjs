@@ -65,7 +65,7 @@ const inside = (f, what) => {
 const copyOf = p => { try { return (p.root && corePath(p.root)) || "core/"; } catch { return "core/"; } };
 
 // A shell's line without its comment: a "#" that starts a word, outside quotes and outside an expression of GitHub's.
-function uncommented(line) {
+export function uncommented(line) {
   for (let i = 0, quote = ""; i < line.length; i++) {
     const c = line[i];
     if (quote === "'") { if (c === "'") quote = ""; }
