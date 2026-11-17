@@ -54,6 +54,8 @@ const fail = [], notes = [];
 let total = 0, core = 0;
 for (const [f, mark] of Object.entries(marks.read)) {
   if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file. Mend: in ${MARKS}, name it as it now stands, or take it out where no session reads it`); continue; }
+  // (a device, a pipe or a folder, or a link to one, is never read: a device can be endless, and a pipe never ends; #446)
+  if (!fs.statSync(f, { throwIfNoEntry: false })?.isFile()) { fail.push(`${f} is listed under "read" in ${MARKS} but is no regular file (a folder, a device, a pipe, or a link to one), which no session reads. Mend: make it a file of the project's own, or take it out of "read" in ${MARKS}`); continue; }
   const n = size(f);
   if (ofCore.some(p => f.startsWith(p))) core += n; else total += n;
   if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}. Mend: make it smaller, moving what no session needs at every start to a file read when needed; or, once a fresh session that wrote none of it has read the project's own such files whole for more to trim and found too little, raise its mark in ${MARKS}`);
