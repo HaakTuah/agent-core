@@ -63,7 +63,8 @@ ok(!doneAsked("2026-11-16T23:59:59Z", holds) && !doneAsked("2026-11-18T00:00:00Z
   "not of one opened before, one whose base's copy lacked it or could not be read, nor one with no day");
 const slow = Date.now();
 missing(`${"#".repeat(300000)} x\n${"## ".repeat(100000)}\n${" ".repeat(300000)}# Readings taken\n`.repeat(3));
-ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time");
+numberMend(`## What holds it\n- Number: x${".".repeat(64000)}y${" ".repeat(64000)}\n`);
+ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in no time, its line \"Number:\" too");
 // what a pull request's changed paths call for, in a scratch project: the merge commit against its base, the kinds of
 // the project's own paths as the base holds them, the copy's own paths left out
 {

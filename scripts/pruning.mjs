@@ -239,14 +239,15 @@ async function outcomesOf({ repo, from, to, owner, gh }) {
 }
 
 // The steps that failed on a pull request from `from` to `to`, each "<workflow>#<step's name>": { step: count }, read
-// from each failed run's jobs.
-function firedOf({ repo, from, to, gh }) {
+// from each failed run's jobs; only those of `known` (the core's own steps), so that no name a fork's own workflow
+// gives its steps reaches the record.
+function firedOf({ repo, from, to, gh, known }) {
   const out = {};
   for (let page = 1; page <= 50; page++) {
     const runs = JSON.parse(gh(`repos/${repo}/actions/runs?event=pull_request&status=failure&created=${from.slice(0, 10)}..${to.slice(0, 10)}&per_page=100&page=${page}`) || "{}").workflow_runs ?? [];
     for (const run of runs.filter(x => x.path && Number.isInteger(x.id))) {
       const jobs = JSON.parse(gh(`repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`) || "{}").jobs ?? [];
-      for (const st of jobs.flatMap(j => j.steps ?? []).filter(x => x.conclusion === "failure")) out[`${run.path}#${st.name}`] = (out[`${run.path}#${st.name}`] ?? 0) + 1;
+      for (const id of jobs.flatMap(j => j.steps ?? []).filter(x => x.conclusion === "failure").map(x => `${run.path}#${x.name}`).filter(x => known.has(x))) out[id] = (out[id] ?? 0) + 1;
     }
     if (runs.length < 100) break;
   }
@@ -265,10 +266,10 @@ async function citedOf({ repo, from, to, gh, all }) {
 
 // The counts of `repo` from `from` to `to` (ISO times), through `gh` (labels.mjs's ghApi form): { numbers, direct,
 // corrections, fired, cited }, each rule's number as `numbers` (holders.json's) names it: its findings, its check's
-// fires (of the steps `stepsOfRule(key)` gives), or the corrections of a kind (null where they were not read).
-export async function counts({ repo, from, to, owner, gh, all, numbers, stepsOfRule }) {
+// fires (of the steps `stepsOfRule(key)` gives), or the corrections of a kind; the failed steps only of `known`.
+export async function counts({ repo, from, to, owner, gh, all, numbers, stepsOfRule, known }) {
   const span = { repo, from, to, owner, gh }, { ruleOf } = await import("./review-record.mjs");
-  const findings = await findingsOf(span), { direct, corrections } = await outcomesOf(span), fired = firedOf(span), cited = await citedOf({ ...span, all });
+  const findings = await findingsOf(span), { direct, corrections } = await outcomesOf(span), fired = firedOf({ ...span, known }), cited = await citedOf({ ...span, all });
   const of = {
     findings: key => findings.get(ruleOf(key)) ?? 0,
     "check fires": key => stepsOfRule(key).reduce((sum, x) => sum + (fired[x] ?? 0), 0),
@@ -336,7 +337,7 @@ async function recordCmd(get) {
   const to = new Date().toISOString().replace(/\.\d{3}Z$/u, "Z"), from = last ? `${last.at}T00:00:00Z` : new Date(Date.now() - EVERY * 31 * 864e5).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let c;
   const h = holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
-  try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(ROOT, { agents: true }), numbers: h.numbers ?? {}, stepsOfRule }); }
+  try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(ROOT, { agents: true }), numbers: h.numbers ?? {}, stepsOfRule, known: new Set(Object.entries(steps).flatMap(([w, list]) => list.map(x => `${w}#${x.name}`))) }); }
   catch (e) { return fail(`GitHub did not answer for ${repo}: ${String(e.message).split("\n")[0]}. Mend: run it where gh answers for the owner's account, or try again once GitHub does`); }
   Object.assign(open(record, get("--model")), { from, ...c, recorded: true });
   writeRecord(record);
