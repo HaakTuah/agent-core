@@ -40,8 +40,9 @@ const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then
 const PATHED = `(?:[^\\s;&|\`$()"'<>]*[/\\\\])?`;
 const defines = names => new RegExp(`(?:^|[\\s;&|(])${PATHED}(?:${names})(?:\\.exe)?[ \\t]*\\([ \\t]*\\)|\\bfunction[ \\t\\n]+${PATHED}(?:${names})(?:\\.exe)?(?=[\\s({]|$)`, "u");
 // (a command that could define a name at its run, by text no reading here sees whole: eval, source or ".", an alias of
-// any name, or bash's table of aliases)
-const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias)(?=[\s;&|)`]|$)|BASH_ALIASES/u;
+// any name, bash's table of aliases, a function bash takes from its environment or a file it reads at its start, or a
+// function whose name an expansion gives)
+const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias)(?=[\s;&|)`]|$)|BASH_ALIASES|BASH_FUNC_|BASH_ENV|(?:^|[^\w])ENV=|\u0001[ \t]*\([ \t]*\)/u;
 // (no file test of a command that defines test, "[", "[[" or a shell that runs one is one)
 const DEFINED = defines("test|\\[\\[?|sh|bash|zsh|dash");
 const redefined = raw => DEFINED.test(raw) || RUNTIME.test(raw);
@@ -52,9 +53,11 @@ const ROOTED = /[\u0001)`}]\\?["']?$/u;
 // The quoted texts of a script, read left to right as the shell reads them: a single-quoted text is taken as written, a
 // double-quoted one with its backslashes read, and a backslash outside quotes keeps the next character; each quoted text
 // is read again as a script of its own, as bash -c '...' runs one, a few levels deep. Each is [its text, what stood
-// before it]; a text holding a blank is a name a word alone would split, as "scripts/my hook.sh".
-function quotedTexts(script, depth = 0, out = []) {
+// before it, whether no command word an expansion gives stood before it (riskAt)]; a text holding a blank is a name a
+// word alone would split, as "scripts/my hook.sh".
+function quotedTexts(script, depth = 0, out = [], safe = true) {
   if (depth > 4) return out;
+  const risk = riskAt(script);
   for (let i = 0; i < script.length; i++) {
     const c = script[i];
     if (c === "\\") { i++; continue; }
@@ -67,8 +70,8 @@ function quotedTexts(script, depth = 0, out = []) {
     // (a quote never closed opens nothing, and reading goes on after it; an apostrophe in a comment or a here-document
     // that a later quote of its kind closes is read as a pair, which the shell would not, and stays the review's)
     if (j >= script.length) continue;
-    out.push([body, windowAt(script, i)]);
-    quotedTexts(body, depth + 1, out);
+    out.push([body, windowAt(script, i), safe && i < risk]);
+    quotedTexts(body, depth + 1, out, safe && i < risk);
     i = j;
   }
   return out;
@@ -102,6 +105,13 @@ const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 const ARG = `(?:"(?:[^"\`$\\\\\\u0001]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>\\u0001])+`;
 const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\w+=${ARG}?[ \\t]+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:[ \\t]+(?:-[Cc][ \\t]+${ARG}|--[\\w-]+(?:=${ARG})?))*[ \\t]+(?:show|cat-file[ \\t]+-p)[ \\t]+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
 const fetched = before => FETCHED.test(before);
+// Where a command word or a -c script (a shell's, or any program's: no reading here tells them apart) first starts with
+// an expansion ($E, a ${...}, $(...), a backtick's output), which can define test or git, or anything, as it runs: no
+// file test nor fetch after it is one, a test or fetch before it, as the starter kit's f=$(git show ...) before its
+// bash -c "$f", keeping its own (each part takes characters no other takes, so nothing backtracks without end). The
+// index, or Infinity.
+const RISK = new RegExp(`(?:^|[\\n;&|(\`{]|(?<![^\\s])-\\w*c[ \\t])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\\\?["'])*(?:(?:\\w+=(?:${ARG})?[ \\t]+)+(?:\\\\?["'])*)?[\\u0001\\u0002$\`]`, "u");
+function riskAt(text) { const m = RISK.exec(text); return m ? m.index : Infinity; }
 // (no fetch of a command that defines git is one)
 const GIT_DEFINED = defines("git");
 const gitDefined = raw => GIT_DEFINED.test(raw) || RUNTIME.test(raw);
@@ -162,19 +172,27 @@ const windowAt = (text, i) => (i > 200 ? ` x ${text.slice(i - 200, i)}` : text.s
 
 // Each of the project's files whose path stands whole in `text`, not fetched from main nor only tested for, into `found`.
 function scan(text, index, holds, found, tests, fetches, only = () => true) {
+  const risk = riskAt(text);
   for (let i = 0; i < text.length; i++) {
     if (i > 0 && NAME.test(text[i - 1]) && text[i - 1] !== "/") continue;
     let node = index;
     for (let j = i; j < text.length && (node = node.get(text[j])); j++) { // (by UTF-16 unit, as pathsIndex keys them)
       if (!node.has("") || (j + 1 < text.length && /[\w./-]/u.test(text[j + 1]))) continue;
       const at = text.slice(i, j + 1);
-      if (!found.has(at) && only(at) && takenAt(windowAt(text, i), tests, fetches) && holds(at)) found.add(at);
+      if (!found.has(at) && only(at) && takenAt(windowAt(text, i), tests && i < risk, fetches && i < risk) && holds(at)) found.add(at);
     }
   }
 }
 // Whether a path that `before` stands before is taken from the working tree: it starts where a path may, is not
 // fetched from main, and is not only tested for (a root's "/" or a "./" before a tested path is the test's).
 const takenAt = (before, tests, fetches) => STARTS.test(before) && !(fetches && fetched(before)) && !(tests && TESTED.test(before.replace(/(?:\.\/|\/+)$/u, "")));
+
+// Whether a word, `ref` before its colon (or null), that `before` stands before is fetched from main or only tested for,
+// where the command lets a test (`tests`) or a fetch (`fetches`) be one.
+function exempt(ref, before, tests, fetches) {
+  if (ref !== null) return MAIN.test(ref) && fetches && fetched(`${before}${ref}:`);
+  return (tests && TESTED.test(before)) || (fetches && fetched(before));
+}
 
 // A word's path relative to the project's root: a path after a variable, a command's output or a backtick's is read
 // from the root, which is what such a thing holds in a hook; another path that starts at "/" is none of the project's.
@@ -198,9 +216,9 @@ export function fromTree(command, holds, index = null, operand = false) {
   // or git is looked for in the command as written and in every reading of its quoting, as alias g'it'=x defines git)
   const forms = [raw, ...dequotings(raw), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, "")];
   const found = new Set(), tests = !operand && !forms.some(redefined), fetches = !operand && !forms.some(gitDefined);
-  const take = (word, before, quoted = false) => {
+  const take = (word, before, quoted = false, safe = true) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
-    if ((ref !== null && MAIN.test(ref) && fetches && fetched(`${before}${ref}:`)) || (ref === null && ((tests && TESTED.test(before)) || (fetches && fetched(before))))) return;
+    if (exempt(ref, before, tests && safe, fetches && safe)) return;
     const p = fromRoot(colon >= 0 ? word.slice(colon + 1) : word, before, ref, quoted);
     if (p === null || !inProject(p)) return;
     const at = path.posix.normalize(p);
@@ -209,13 +227,15 @@ export function fromTree(command, holds, index = null, operand = false) {
   // (each word as written, and as the shell unquotes it, so a path through a link inside the checkout, which no list of
   // the project's files holds, is found however it is quoted)
   for (let level = text, n = 0; n < 4; n++) {
-    for (const m of level.matchAll(WORD)) take(m[0], windowAt(level, m.index));
+    const risk = riskAt(level);
+    for (const m of level.matchAll(WORD)) take(m[0], windowAt(level, m.index), false, m.index < risk);
     const next = dequote(level);
     if (next === level) break;
     level = next;
   }
-  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index));
-  for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
+  const risk = riskAt(text);
+  for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index), false, m.index < risk);
+  for (const [body, before, safe] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true, safe);
   if (index) {
     // (as written, Windows' separators read; with the shell's quoting read level after level, as scripts within scripts
     // are, until reading it changes nothing; with every backslash read and every quote taken out; and with cmd's and

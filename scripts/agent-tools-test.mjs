@@ -523,6 +523,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["function /usr/bin/git { bash \"${2#*:}\"; }\n/usr/bin/git show origin/main:scripts/x.py", ["scripts/x.py"]],
       ["bash() { command bash \"$4\"; }; bash -c test -f scripts/x.py", ["scripts/x.py"]],
       ["/bin/sh() { command sh \"$4\"; }; /bin/sh -c test -f scripts/x.py", ["scripts/x.py"]],
+      // (#476's fallback security review of 2d27755: a name an expansion gives, or one bash takes from its environment, can
+      // define test or git as the command runs; a test or a fetch after it has no exemption, one before it, as the kit's, keeps its own)
+      ["E=eval; T=test; $E \"$T(){ bash \\\"\\$2\\\";}\"; test -f scripts/x.py", ["scripts/x.py"]], ["X= $E \"x\"; test -f scripts/x.py", ["scripts/x.py"]],
+      ["${X:-eval} \"${T:-test}(){ bash \\\"\\$2\\\";}\"; test -f scripts/x.py", ["scripts/x.py"]], ["E=ev; ${E}al \"${T:-test}(){ bash \\\"\\$2\\\";}\"; test -f scripts/x.py", ["scripts/x.py"]],
+      ["E=eval; G=git; $E \"$G(){ bash \\\"\\${2#*:}\\\";}\"; git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["bash -c \"$(printf '\\164est(){ bash \"$2\";}'); test -f scripts/x.py\"", ["scripts/x.py"]],
+      ["env 'BASH_FUNC_test%%=() { bash \"$2\"; }' bash -c ': ; test -f scripts/x.py'", ["scripts/x.py"]],
+      ["f=$(git show origin/main:scripts/x.py) || exit 0; bash -c \"$f\"", []], ["[ -f scripts/x.py ] || exit 0; $RUN", []],
       ["source <(echo 'git() { bash \"${2#*:}\"; }')\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
       ["bash 'scripts/%notify%.sh'", ["scripts/%notify%.sh"]], ["bash scripts/%notify%.sh", ["scripts/%notify%.sh"]],
