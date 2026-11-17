@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { HOST_OWN } from "./check.mjs";
+import { onPath } from "./workflow-run.mjs";
 import { CORE } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
 import { root, scratch, scratchEnv, tally } from "./scratch-core.mjs";
@@ -58,6 +59,15 @@ commit(dir, "programs named as the checks' own");
 }
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out), "programs named bash and git at the change's root run in place of none the checks start", r.out);
 git(dir, "reset", "-q", "--hard", "HEAD~1");
+// (and bash is taken from the PATH as the system takes it: on POSIX, a file of that name the user may not run, in a
+// folder ahead on the PATH, is passed over for the one it may)
+if (process.platform !== "win32") {
+  const ahead = path.join(tmp, "ahead");
+  fs.mkdirSync(ahead, { recursive: true });
+  fs.writeFileSync(path.join(ahead, "bash"), "#!/bin/sh\nexit 3\n", { mode: 0o644 });
+  const found = onPath("bash", { PATH: `${ahead}${path.delimiter}${process.env.PATH}` });
+  ok(found !== null && found !== path.join(ahead, "bash"), "a file named bash ahead on the PATH that may not be run is passed over for one that may", found);
+}
 
 const config = path.join(dir, "checks", "copies.json");
 fs.writeFileSync(config, JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), code: ["src"] }, null, 2));

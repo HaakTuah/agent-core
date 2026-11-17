@@ -435,14 +435,15 @@ function runUses(jr, step, name, env) {
 
 // The program a name stands for, by its full path from the PATH's own folders, never from the folder it would start in:
 // on Windows a program started by its bare name is looked for there first, by Node and by cmd.exe alike, and a step's
-// folder holds the change under check (#513). Null where the PATH holds none.
+// folder holds the change under check (#513). Null where the PATH holds none it may run.
 export function onPath(name, env = process.env) {
   const exts = process.platform === "win32" ? ["", ...String(env.PATHEXT ?? ".COM;.EXE").split(";").filter(Boolean)] : [""];
   const pathOf = Object.entries(env).find(([k]) => k.toUpperCase() === "PATH")?.[1] ?? "";
   for (const folder of String(pathOf).split(path.delimiter).filter(f => path.isAbsolute(f))) {
     for (const ext of exts) {
       const file = path.join(folder, `${name}${ext}`);
-      try { if (fs.statSync(file).isFile()) return file; } catch { /* (not here) */ }
+      // (a file it may run: on POSIX one with its execute bit for this user, as the system's own search asks)
+      try { if (fs.statSync(file).isFile() && (process.platform === "win32" || (fs.accessSync(file, fs.constants.X_OK), true))) return file; } catch { /* (not here, or not to run) */ }
     }
   }
   return null;
