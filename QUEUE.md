@@ -12,7 +12,12 @@ it merges last.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #519 | rule builder, hard work, by #515's process whether or not #515 has merged; #515's point 2 trial runs first or with it, as its evidence | |
-| #515, points 1 and 3 to 14 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
+| #515, points 1 and 3 to 16 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
+| #526, path step 1 | rule builder | |
+| #527, step 2 | rule builder | #526 |
+| #528, step 3 | rule builder | #527, and #488's points 1, 3 and 4 |
+| #529, step 4 | builder | #528 |
+| #530, step 5 | builder | #529 |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
 | #488, points 3 to 5, 7 and 8 | builder | #488's points 1 and 2 |
 | #306 | rule builder | |
@@ -24,7 +29,7 @@ it merges last.
 | #325 | rule builder | |
 | #314 | rule builder | |
 | #456 | rule builder; it changes the floor (rules 5 and 10) | |
-| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #519's judgment | |
+| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #529 | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
@@ -37,16 +42,16 @@ it merges last.
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
-| #426 | builder; a .NET reader it files waits on #519's judgment | |
+| #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
 | #407 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
 | #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
-| #486, point 5 | builder | #519's judgment |
+| #486, point 5 | builder | the types record reopening: #521's gives it no steps |
 | #460, point 1 | builder | |
-| #460, point 2 (the author's address) | builder | #376, which changes the jobs its step joins |
+| #460, point 2 (the author's address) | builder | |
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
 | #460, point 5 (a report's size) | builder | |
