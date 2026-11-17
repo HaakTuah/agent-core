@@ -307,16 +307,27 @@ if (process.platform !== "win32") {
   ok(/stop: fail: its repositories could not be read: .* is not a plain folder/.test(r.stdout), "a case whose repositories hold a link the reader would follow fails, read as unreadable", `${r.stdout}${r.stderr}`);
   // (GitHub's state, github.json, read through a link to a file outside the case: unreadable, none of its text shown; #435)
   const secret = path.join(s.tmp, "someone-elses-key"), aside = fresh("finish");
-  fs.writeFileSync(secret, "not json: the words of a key\n");
+  fs.writeFileSync(secret, "K3YW0RD5 of a key\n");
   fs.rmSync(path.join(aside, "github.json")); fs.symlinkSync(secret, path.join(aside, "github.json"));
   const viaLink = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", aside], { encoding: "utf8" });
-  ok(/finish: fail: .*github\.json is not a plain file/.test(viaLink.stdout) && !/words of a key/.test(`${viaLink.stdout}${viaLink.stderr}`),
+  ok(/finish: fail: .*github\.json is not a plain file/.test(viaLink.stdout) && !/K3YW0RD5/.test(`${viaLink.stdout}${viaLink.stderr}`),
     "a case whose github.json is a link to a file outside it fails, read as unreadable, and shows none of that file's text", `${viaLink.stdout}${viaLink.stderr}`);
 }
-const garbled = fresh("finish"); fs.writeFileSync(path.join(garbled, "github.json"), "not json: what the session wrote\n");
+const garbled = fresh("finish"); fs.writeFileSync(path.join(garbled, "github.json"), "S3SSW0RD what the session wrote\n");
 const notJson = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", garbled], { encoding: "utf8" });
-ok(/finish: fail: .*github\.json is not JSON/.test(notJson.stdout) && !/what the session wrote/.test(`${notJson.stdout}${notJson.stderr}`),
+ok(/finish: fail: .*github\.json is not JSON/.test(notJson.stdout) && !/S3SSW0RD/.test(`${notJson.stdout}${notJson.stderr}`),
   "a case whose github.json is no JSON fails, read as unreadable, and shows none of its text", `${notJson.stdout}${notJson.stderr}`);
+// (github.json as a second name of a file outside the case, a hard link, which a check of a link alone would pass: unreadable)
+const hard = fresh("finish"), elsewhere = path.join(s.tmp, `someone-elses-state-${n}.json`);
+fs.writeFileSync(elsewhere, '{"pulls":[],"comments":[],"issues":[]}\n');
+fs.rmSync(path.join(hard, "github.json")); fs.linkSync(elsewhere, path.join(hard, "github.json"));
+const viaHard = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", hard], { encoding: "utf8" });
+ok(/finish: fail: .*github\.json is not a plain file of its own/.test(viaHard.stdout), "a case whose github.json is a hard link to a file outside it fails, read as unreadable", `${viaHard.stdout}${viaHard.stderr}`);
+// (a memo of the case's seal, which stands beside the case, read the same way: one that is no JSON is unreadable, unquoted)
+const badMemo = fresh("finish"); fs.writeFileSync(path.join(`${badMemo}.seal`, "refs.json"), "M3M0W0RD not json\n");
+const viaMemo = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", badMemo], { encoding: "utf8" });
+ok(/finish: fail: .*refs\.json is not JSON/.test(viaMemo.stdout) && !/M3M0W0RD/.test(`${viaMemo.stdout}${viaMemo.stderr}`),
+  "a memo of the case's seal that is no JSON fails, read as unreadable, and shows none of its text", `${viaMemo.stdout}${viaMemo.stderr}`);
 const common = fresh("stop"); fs.writeFileSync(path.join(common, "project", ".git", "commondir"), "../../elsewhere\n");
 let threw = null; try { touched(common); } catch (e) { threw = e; }
 ok(threw instanceof Unreadable, "a project whose git folder names another as its common one is not read");
