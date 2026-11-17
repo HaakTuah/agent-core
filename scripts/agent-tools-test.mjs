@@ -522,6 +522,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const caseless = (() => { const d = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-")); made.push(d); fs.writeFileSync(path.join(d, "a"), ""); return fs.existsSync(path.join(d, "A")); })();
   const deepStood = run(pr(project({ ".Kiro/Hooks/lint.json": "{}\n", ...(caseless ? {} : { ".Claude/Skills/notes/skill.md": "# notes\n" }), ...listing() }), { "README.md": "a change of its own\n" }));
   ok(deepStood.status === 0 && /\.Kiro is \.kiro in another case/.test(deepStood.out) && (caseless || /\.Claude is \.claude in another case/.test(deepStood.out)), "while what stands under it is noted, not failed", deepStood.out);
+  // (#600's code review of 038f301: what the tool does not read under it changes nothing of what it reads, and a folder
+  // whose files are all ignored holds none of the project's)
+  const docStood = run(pr(project({ ".Kiro/hooks/lint.json": "{}\n", ".Kiro/hooks/README.md": "notes\n", ...listing() }), { ".Kiro/hooks/README.md": "notes, changed\n" }));
+  ok(docStood.status === 0 && /\.Kiro is \.kiro in another case/.test(docStood.out), "a file under it the tool does not read, changed, leaves it noted", docStood.out);
+  const ignoredBase = project({ ".gitignore": ".Codex/*\n", ...listing() });
+  write(ignoredBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
+  passes(run(pr(ignoredBase, { "README.md": "a change of its own\n" })), "and a folder in another case whose files are all ignored is none of the project's");
   if (LINKS) {
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });

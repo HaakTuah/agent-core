@@ -55,7 +55,7 @@
 //   node scripts/agent-tools.mjs .github/licences.json --core          in the core's own repository
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
@@ -481,8 +481,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
-  // (in the working tree, one ignored is no file of the project's, as `read` has it)
-  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : toolPaths(root)).filter(([at]) => rev || !ignored(at))) {
+  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : unignored(root, toolPaths(root)))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
     project.problems.push(problem);
     // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
@@ -542,15 +541,16 @@ function through(at, want, read, names) {
   const under = f => f === want || f.startsWith(`${want}/`);
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => n.toLowerCase() === step.toLowerCase()).sort().map(n => `${d}/${n}`)), [from]);
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).map(a => `${f}\0${a}\0${read(a)}`));
-  const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().map(n => {
-    const skill = found(`${dir}/${n}`, "SKILL.md").map(a => `${a}\0${read(a)}`);
-    return [`${d}${n}`, `${dir}/${n}`, read(`${dir}/${n}`), ...skill].join("\0");
+  // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md)
+  const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().flatMap(n => {
+    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : found(`${dir}/${n}`, "SKILL.md");
+    return reads.map(a => `${d}${n}\0${a}\0${read(a)}`);
   })));
   return [at, read(at), ...files, ...folders].join("\0\0");
 }
-// The paths of the working tree on the way to a tool's file, in whatever case they stand, read from the folders
-// themselves, so it costs no git process: each entry whose name in lower case is a step of WAYS, and what the tool
-// folders hold, a few deep; a link is named there, never followed.
+// The files of the working tree on the way to a tool's file, in whatever case they stand, read from the folders
+// themselves, so it costs no git process: each entry, not a folder, whose name in lower case is a step of WAYS or lies
+// in a tool folder, a few deep; a link is named there, never followed.
 function toolPaths(root) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
@@ -559,12 +559,20 @@ function toolPaths(root) {
     for (const e of entries) {
       const p = at ? `${at}/${e.name}` : e.name, low = p.toLowerCase();
       if (!WAYS.has(low) && !folders.some(d => low.startsWith(`${d}/`))) continue;
-      out.push(p);
-      if (e.isDirectory() && depth < 4) visit(p, depth + 1);
+      if (!e.isDirectory()) out.push(p);
+      else if (depth < 4) visit(p, depth + 1);
     }
   };
   visit("", 0);
   return out;
+}
+// Of those files, the ones git does not ignore, as `read` has it: one ignored is no file of the project's, so a folder
+// whose files are all ignored holds none. Git is asked once, and only where one stands in another case.
+function unignored(root, paths) {
+  if (!misnamed(paths).length) return paths;
+  const asked = spawnSync("git", ["check-ignore", "--stdin", "-z"], { cwd: root, input: paths.join("\0"), encoding: "utf8" });
+  const out = new Set(String(asked.stdout ?? "").split("\0").filter(Boolean));
+  return paths.filter(p => !out.has(p));
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
