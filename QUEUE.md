@@ -77,8 +77,8 @@ They read and change no rule.
 | #552 | builder | #551 |
 | #553 | builder | #552, #355 and #391 |
 | #554 | builder | #553 and #355 |
-| #555 | builder | #534's inventory and its secrets tool, and #554 |
-| #556 | builder | #554 |
+| #555 | builder | #534's tools, and #554 |
+| #556 | builder | #554; #534's tools, for its linter rules |
 | #557 | builder | #556 |
 | #558 | builder | #557 |
 

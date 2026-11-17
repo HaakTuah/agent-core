@@ -1,5 +1,5 @@
 {
-  "about": "The rules of the floor and the modules that scripts/holders.mjs counts as having no holder, each with its proposal (AGENTS.md, \"Rules are pruned by their numbers\"; #545), worst first: a rule read at a role's start before one read on need. \"mark\": \"check\" (a check that never guesses could hold it), \"case\" (only a staged case could), \"move\" (to a module read on need), \"goes\" (kept in the archive with its reason, free to return), or \"describes\" (it binds no one, and holders.json should say so). \"by\": the queued issue that builds the check or case, or \"project\" for a check a project of that kind keeps; a check or case with none has no issue filed yet, since its upkeep does not pay yet or the owner's answer comes first; the owner decides moves and removals, a few at a time. A floor rule is never proposed to go. Sorted first on 17 November 2026; each pruning's session brings it up to date.",
+  "about": "The rules of the floor and the modules that scripts/holders.mjs counts as having no holder, each with its proposal (AGENTS.md, \"Rules are pruned by their numbers\"; #545), worst first: a rule read at a role's start before one read on need. \"mark\": \"check\" (a check that never guesses could hold it, a maintained linter's rule first where one reads the breach), \"case\" (only a staged case could), \"move\" (to a module read on need), \"goes\" (kept in the archive with its reason, free to return), or \"describes\" (it binds no one, and holders.json should say so). \"by\": the queued issue that builds the check or case, or \"project\" for a check a project of that kind keeps; a check or case with none has no issue filed yet, since its upkeep does not pay yet or the owner's answer comes first; the owner decides moves and removals, a few at a time. A floor rule is never proposed to go. Sorted first on 17 November 2026; each pruning's session brings it up to date.",
   "proposals": {
     "floor/security.md: The owner's yes in the PR": {
       "mark": "check",
@@ -126,7 +126,7 @@
     "roles/shared/how-to-work.md: Keep it lean": {
       "mark": "check",
       "by": "#555",
-      "why": "a maintained tool reads code left unused (knip for JavaScript and TypeScript, the .NET analysers' unused members), weighed in #534's inventory; commented-out code stays unread, so in part"
+      "why": "a maintained linter's rules, switched on, read it before any check written by hand: ESLint's no-unused-vars and sonarjs/no-commented-code for JavaScript and TypeScript, the .NET analysers' unused members (IDE0051, IDE0052, IDE0060), and knip for files and exports nothing imports; findings that stood before join a baseline that only shrinks"
     },
     "roles/shared/how-to-work.md: Principles over rules": {
       "mark": "move",
@@ -303,7 +303,7 @@
     "floor/topics/input.md: 6. Nothing untrusted becomes markup or code": {
       "mark": "check",
       "by": "#556",
-      "why": "CodeQL's XSS and code-injection queries read markup and eval from untrusted data: name them, in part"
+      "why": "a maintained linter's rules read its second half exactly, ESLint's no-eval, no-implied-eval and no-new-func; CodeQL's XSS and code-injection queries read markup built from untrusted data: name both, in part"
     },
     "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": {
       "mark": "case",
@@ -502,7 +502,7 @@
     "tasks/code-shape.md: A test taken out or weakened is said": {
       "mark": "check",
       "by": "#557",
-      "why": "a PR that deletes a test file, or a test's case line, and names none under \"Readings taken\" is read exactly; an assertion loosened stays unread, so in part"
+      "why": "a PR that deletes a test file, or a test's case line, and names none under \"Readings taken\" is read exactly; a case skipped in a test framework is read by its linter's rule (eslint-plugin-jest's or vitest's no-disabled-tests) where a project lints; an assertion loosened stays unread, so in part"
     },
     "tasks/code-shape.md: Near-copies are reported": {
       "mark": "check",
