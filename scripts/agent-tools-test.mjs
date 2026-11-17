@@ -457,7 +457,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(fromTree(kitForm("'; bash scripts/a.sh; '"), holds, folder) === null, "and one broken out of its quote is no kit's form, and not read");
   {
     const began = Date.now();
-    for (const command of ["a.sh ".repeat(1 << 18), "\"".repeat(1 << 20), "'a b' ".repeat(1 << 17), "a=b:c,d@e ".repeat(1 << 16), `${kitForm("")}${" x".repeat(1 << 18)}`]) fromTree(command, holds, folder);
+    for (const command of ["a.sh ".repeat(1 << 18), "\"".repeat(1 << 20), "'a b' ".repeat(1 << 17), "a=b:c,d@e ".repeat(1 << 16), `${kitForm("")}${" x".repeat(1 << 18)}`,
+      // (#476's code review of 77481d7: a word of many `=`, and one long option, are read in one pass)
+      `echo ${"=".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 19)}=x`, `echo ${"a=".repeat(1 << 19)}`]) fromTree(command, holds, folder);
     ok(Date.now() - began < 5000, "and a command a megabyte long is read at once", `${Date.now() - began} ms`);
     // (#476's code review of 378a61a: two quoted words of a thousand parts each, in a project where each names a folder)
     const wide = n => `'${Array.from({ length: n }, (_, i) => `${"ab"[n % 2]}${i}`).join(" ")}'`, also = Date.now();

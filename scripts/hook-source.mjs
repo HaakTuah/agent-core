@@ -38,9 +38,6 @@ const KIT_FORMS = [
 // (the project's root, as an agent tool sets it, written so or in braces, and nothing after it that would join its name)
 const ROOT = /\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/uy;
 const PLAIN = /^[\w ./:=@+,'"-]*$/u;
-// (a word that sets a variable, for the program after it or, through env and the like, for one it runs: PATH and the
-// like change which program runs, and no plain reading follows them)
-const SETS = /^[A-Za-z_]\w*=/u;
 // (a ".." in a path is read by the file system after the links before it, which a plain reading cannot follow)
 const PARENT = /(?:^|[/=:,@\s])\.\.(?:$|[/=:,@\s])/u;
 // (a file at the project's root that a Windows shell runs in the place of a command's first word, since cmd looks in
@@ -100,11 +97,16 @@ const parts = word => new Set([word, ...word.split(/ +/u), ...word.split(/[=:,@]
 
 // What a part may name: itself and, of an option (-x, +x), each tail from after its signs through its first letters,
 // where a program reads a path given to it in the same word (ruby -r./scripts/run.rb, env -Cscripts, gcc -Iinclude).
-function readings(part) {
-  const option = /^[-+]+(\w*)/u.exec(part);
+// Each tail is charged to `spend` before it is made, so a long option asks no more than the budget allows.
+const OPTION = /^[-+]+(\w*)/u;
+function readings(part, spend) {
+  const option = OPTION.exec(part);
   if (!option) return [part];
   const out = [part];
-  for (let i = option[0].length - option[1].length; i <= option[0].length && i < part.length; i++) out.push(part.slice(i));
+  for (let i = option[0].length - option[1].length; i <= option[0].length && i < part.length; i++) {
+    spend(part.length - i);
+    out.push(part.slice(i));
+  }
   return out;
 }
 
@@ -115,11 +117,11 @@ function readings(part) {
 // command that would ask more is not read.
 const BUDGET = 1_000_000, OVER = new Error("over its budget");
 function named(list, holds, folder) {
-  const each = new Set(list.flatMap(word => [...parts(word)]).filter(Boolean).flatMap(readings));
   let spent = 0;
+  const spend = n => { spent += n; if (spent > BUDGET) throw OVER; };
+  const each = new Set(list.flatMap(word => [...parts(word)]).filter(Boolean).flatMap(part => readings(part, spend)));
   const at = (dir, part) => {
-    spent += 1 + part.length;
-    if (spent > BUDGET) throw OVER;
+    spend(1 + part.length);
     const p = dir === "." ? part : `${dir}/${part}`;
     return inProject(p) ? path.posix.normalize(p) : ".";
   };
@@ -141,18 +143,27 @@ function named(list, holds, folder) {
 const take = (found, asked, held) => { if (held) found.add(typeof held === "string" ? held : asked); };
 
 // Whether a word makes the command no plain one: a piece of it between blanks that sets a variable, itself, after an
-// `=` (env --split-string=PATH=x) or after a single dash's letters (env -SPATH=x); or any part, a path given to an
-// option in the same word too (-r/x), with a ".." or from the file system's root, which may lead into the checkout from
-// wherever it stands. Where an option's letters end is the program's, so -rscripts/x, read as -rscripts and /x, is not
-// read either.
+// `=` (env --split-string=PATH=x) or after a single dash's letters (env -SPATH=x); or any part with a ".." or from the
+// file system's root, which may lead into the checkout from wherever it stands, a path given to an option in the same
+// word too (-r/x). Where an option's letters end is the program's, so -rscripts/x, read as -rscripts and /x, is not
+// read either. Each is read in one pass of the word, no tail of it made.
 function unsafe(word) {
   if (word.split(/ +/u).some(sets)) return true;
-  return [...parts(word)].flatMap(readings).some(p => p.startsWith("/") || PARENT.test(p));
+  return [...parts(word)].some(part => [part, afterOption(part)].some(p => p !== null && (p.startsWith("/") || PARENT.test(p))));
 }
+// (of an option's tails, only the one after all its letters can begin with "/" or ".."; one within them begins with a
+// letter, and a ".." further on is in the part itself)
+function afterOption(part) {
+  const option = OPTION.exec(part);
+  return option && option[0].length < part.length ? part.slice(option[0].length) : null;
+}
+// (a word that sets a variable, for the program after it or, through env and the like, for one it runs: PATH and the
+// like change which program runs, and no plain reading follows them)
+const ASSIGNS = /(?:^|=)[A-Za-z_]\w*=/u;
 function sets(piece) {
-  const at = piece.split("=");
-  const tails = [piece, ...at.slice(1).map((_, i) => at.slice(i + 1).join("=")), ...(/^-[^-]/u.test(piece) ? readings(piece) : [])];
-  return tails.some(tail => SETS.test(tail));
+  if (ASSIGNS.test(piece)) return true;
+  const option = /^-(?!-)(\w*)/u.exec(piece);
+  return option !== null && piece[option[0].length] === "=" && /[A-Za-z_]/u.test(option[1]);
 }
 
 export function fromTree(command, holds, folder) {
