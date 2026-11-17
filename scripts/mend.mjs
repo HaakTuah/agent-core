@@ -3,7 +3,7 @@
 // one like it, where one does), or, of a check that marks a pull request with a status that waits, the status's
 // description, which starts "Waiting: ". It says what is wrong and where, then "Mend: " and what a session does about
 // it, in words it acts on with no rule file open. Lines after a failure that do not start so are its details (the
-// files, the lines), read with it. Each check's own test reads its failures here (scripts/mend-test.mjs holds that it
+// files, the lines), read with it. Each check's own test reads its failures here (tests/mend-test.mjs holds that it
 // does). Node's own modules only.
 //
 //   import { mended, unmended } from "./mend.mjs";

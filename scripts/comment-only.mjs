@@ -207,30 +207,55 @@ export function proof(before, after) {
   const a = readYaml(before), b = readYaml(after);
   if (a.unread.length) return { why: `before: ${a.unread.join("; ")}` };
   if (b.unread.length) return { why: `after: ${b.unread.join("; ")}` };
-  const kept = l => l.content ? `C${l.text}${l.last ? "\u0000no line break after it" : ""}` : `L${l.stepName ? `${l.text.slice(0, l.valueAt)}\u0000a step's name` : l.text}`;
+  const why = lineChanged(a, b) ?? directiveMoved(a, b) ?? usesNoteChanged(a, b);
+  return why === null ? { same: true } : { why };
+}
+
+// what of a line the proof holds to: a block scalar's text as it stands, an entry's without its comment, a step's name
+// left out
+function kept(l) {
+  return l.content ? `C${l.text}${l.last ? "\u0000no line break after it" : ""}` : `L${l.stepName ? `${l.text.slice(0, l.valueAt)}\u0000a step's name` : l.text}`;
+}
+
+// the first line that changed beyond a comment or a step's name, or null
+function lineChanged(a, b) {
   const x = a.lines.map(kept), y = b.lines.map(kept);
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
     if (x[i] === y[i]) continue;
     const where = (lines, side) => lines[i] ? `${side} line ${lines[i].n}` : `${side}: nothing`;
-    return { why: `more than a comment or a step's name changed (${where(a.lines, "before")}, ${where(b.lines, "after")})` };
+    return `more than a comment or a step's name changed (${where(a.lines, "before")}, ${where(b.lines, "after")})`;
   }
-  // a comment that a tool may read as an instruction, added, changed or moved (a tool reads it on its own line, or on
-  // the line after it): each must stand, word for word, beside the same line as before, by its place, the two versions'
-  // lines being matched one to one by now (two lines may read alike); the note beside an action's version (`uses:`)
-  const placed = (side, c) => `${c.own ? "before" : "on"} ${c.at}\u0000${c.text}`;
+  return null;
+}
+
+// a comment that a tool may read as an instruction, added, changed or moved (a tool reads it on its own line, or on
+// the line after it): each must stand, word for word, beside the same line as before, by its place, the two versions'
+// lines being matched one to one by now (two lines may read alike); or null
+function directiveMoved(a, b) {
   const left = new Map();
   for (const c of a.comments) if (DIRECTIVE.test(c.text)) left.set(placed(a, c), (left.get(placed(a, c)) ?? 0) + 1);
   for (const c of b.comments) {
     if (!DIRECTIVE.test(c.text)) continue;
     const key = placed(b, c);
     if (left.get(key)) { left.set(key, left.get(key) - 1); continue; }
-    return { why: `a comment a tool may read as an instruction, added or moved: ${c.text.slice(0, 80)}` };
+    return `a comment a tool may read as an instruction, added or moved: ${c.text.slice(0, 80)}`;
   }
-  // (the key however it is written: quoted, or with an escape that could spell it, is taken for one)
-  const uses = key => typeof key === "string" && (/^(["']?)uses\1$/u.test(key) || (key.startsWith('"') && key.includes("\\")));
+  return null;
+}
+
+// a comment's place and words, by which the two versions' are matched
+function placed(side, c) { return `${c.own ? "before" : "on"} ${c.at}\u0000${c.text}`; }
+
+// the note beside an action's version (`uses:`), changed; or null
+function usesNoteChanged(a, b) {
   const note = a.lines.findIndex((l, i) => uses(l.key) && l.note !== b.lines[i].note);
-  if (note >= 0) return { why: `the note beside an action's version changed (before line ${a.lines[note].n}, after line ${b.lines[note].n})` };
-  return { same: true };
+  if (note >= 0) return `the note beside an action's version changed (before line ${a.lines[note].n}, after line ${b.lines[note].n})`;
+  return null;
+}
+
+// (the key however it is written: quoted, or with an escape that could spell it, is taken for one)
+function uses(key) {
+  return typeof key === "string" && (/^(["']?)uses\1$/u.test(key) || (key.startsWith('"') && key.includes("\\")));
 }
 
 if (started(import.meta.url)) {

@@ -10,8 +10,8 @@ under `core/`, as its manifest's `Core:` line says (`copied whole under core/`).
 folder, that line names the folder (`copied whole under <path>/`), and the sync, the core's checks and the work-saved
 hook read the path from it (`scripts/core-path.mjs`), never from a name they assume. It does not mean a project in one
 repository changes anything: its line names `core/` already. Reason: every script, check and rule assumed `core/` at
-the root, so a repository could hold the core in no other place. Held by `scripts/core-path-test.mjs`, and by
-`core.yml`, which fails a copy that does not stand at the path the line names (`scripts/core-yml-test.mjs`).
+the root, so a repository could hold the core in no other place. Held by `tests/core-path-test.mjs`, and by
+`core.yml`, which fails a copy that does not stand at the path the line names (`tests/core-yml-test.mjs`).
 
 **A repository may take the core through a dependency that carries it** (#285). By default each
 repository holds a copy of its own, pinned and synced there. Where a library the repository already depends on holds
