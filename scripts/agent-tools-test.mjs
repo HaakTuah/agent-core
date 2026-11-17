@@ -309,6 +309,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(project({ ...kits, ".kiro/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() })), "a Kiro hook of the project's own, not listed, fails", 'the hook "Kiro PostFileSave \\\\.ts$: npx eslint@9.0.0 --fix", configured in .kiro/hooks/lint.json, is not listed');
   passes(run(project({ ...kits, ".kiro/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing(LINT) })), "and passes once listed");
   passes(run(project({ ".kiro/hooks/notes.md": "# not a hook file\n", ...listing() })), "a file under .kiro/hooks that is no JSON is no hook Kiro reads");
+  // (#476's code review of adeba79: a folder linked to the checkout's root is read at the base as in the tree, so a hook it held stands)
+  const rootLinked = project({ "lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
+  fs.mkdirSync(path.join(rootLinked, ".kiro"), { recursive: true });
+  fs.symlinkSync("..", path.join(rootLinked, ".kiro/hooks"));
+  git(rootLinked, "add", "-A"); git(rootLinked, "commit", "-q", "-m", "hooks at the root");
+  const rootKept = run(pr(rootLinked, { "README.md": "a change of its own\n" }));
+  ok(rootKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(rootKept.out), "a hook under a folder linked to the checkout's root, the base's, is noted, not failed", rootKept.out);
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
   fails(run(project({ ...kiroServer, ".mcp.json": { mcpServers: { "Kiro docs": { command: "x" } } }, ...listing() })), "one server name in two files is refused", 'the tool server "Kiro docs" is configured in .mcp.json too');
@@ -390,7 +397,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   {
     // (a hook that names one file a thousand times asks whether the project holds it once: the asking reads the file and
     // may start git)
-    const many = `bash${" scripts/format.sh".repeat(1000)}`, began = Date.now();
+    const many = `bash${" scripts/format.sh".repeat(900)}`, began = Date.now();
     fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(many), ...listing(entry(many)) })), "a hook that names a file a thousand times is read at once", 'takes "scripts/format.sh"');
     ok(Date.now() - began < 20000, "in seconds", `${Date.now() - began} ms`);
   }
@@ -414,7 +421,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (#476's code review of a5359ea: a word that sets a variable, as PATH, changes which program runs; and a tab is no plain blank)
     ["PATH=scripts runner", null], ["FOO=1 bash a.sh", null], ["env PATH=scripts runner", null], ["bash 'scripts/a\tb.sh'", null], ["bash\tscripts/a.sh", null],
     // (#476's code review of 3ffa29e: a path from the root may lead into the checkout)
-    ["bash /tmp/project/scripts/a.sh", null], ["node --require=/x/scripts/a.sh", null], ["bash /scripts/a.sh", null]])
+    ["bash /tmp/project/scripts/a.sh", null], ["node --require=/x/scripts/a.sh", null], ["bash /scripts/a.sh", null],
+    // (#476's code review of adeba79: a word after one that names a folder a program works in is read from it too)
+    ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], [`bash${" x".repeat(1000)}`, null]])
     ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${JSON.stringify(command)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds)));
   // (a file at the root that cmd runs in the place of the first word)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])

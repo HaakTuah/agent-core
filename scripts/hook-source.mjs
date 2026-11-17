@@ -10,9 +10,9 @@
 // A word that sets a variable (PATH=x and the like change which program runs), a path with a ".." (read by the file
 // system after the links before it) or one from the root ("/", which may lead into the checkout) makes it no plain
 // command. Of a plain command, each word, and each part of a word
-// between spaces (a quoted script given to sh -c) or `=`, `:`, `,` and `@`, that names a file the project holds
-// (through a link inside the checkout too, as holds() reads it) is taken from the working tree, whatever program it is
-// given to; and so is a file at the project's root that a Windows shell runs in the place of its first word. No other
+// between spaces (a quoted script given to sh -c) or `=`, `:`, `,` and `@`, that names a file the project holds,
+// alone or after a word a few before it (a folder a program is told to work in), through a link inside the checkout
+// too, as holds() reads it, is taken from the working tree, whatever program it is given to; and so is a file at the project's root that a Windows shell runs in the place of its first word. No other
 // command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
 // so nothing a reading here could get wrong grants a hook anything. Node's own modules only.
 //
@@ -38,6 +38,8 @@ const PLAIN = /^[\w ./:=@+,'"-]*$/u;
 // (a word that sets a variable, for the program after it or, through env and the like, for one it runs: PATH and the
 // like change which program runs, and no plain reading follows them)
 const SETS = /^[A-Za-z_]\w*=/u;
+// (a command of more words than this is no plain command: each word is asked joined to those before it)
+const WORDS = 1000;
 // (a ".." in a path is read by the file system after the links before it, which a plain reading cannot follow)
 const PARENT = /(?:^|[/=:,@\s])\.\.(?:$|[/=:,@\s])/u;
 // (a file at the project's root that a Windows shell runs in the place of a command's first word, since cmd looks in
@@ -89,16 +91,20 @@ function rootAt(command, i, quote) {
 // A word and its parts: whole, at its spaces, as a quoted script given to sh -c holds its words, and at each = : , @.
 const parts = word => new Set([word, ...word.split(/ +/u), ...word.split(/[=:,@]/u), ...word.split(/[ =:,@]+/u)]);
 
-// Each word, and each part of it, that names a file the project holds.
+// Each word, and each part of it, that names a file the project holds; and each joined to a part of one of the
+// NEAR words before it, as a program given a folder to work in (env -C scripts bash run.sh, make -C, --prefix=...)
+// reads a path after it from there, whatever its option is called.
+const NEAR = 8;
 function named(list, holds) {
-  const found = new Set();
-  for (const word of list) {
-    for (const part of parts(word)) {
-      if (!inProject(part)) continue;
-      const at = path.posix.normalize(part);
-      if (at !== "." && holds(at)) found.add(at);
+  const found = new Set(), asked = new Set();
+  const ask = p => { if (asked.has(p) || !inProject(p)) return; asked.add(p); const at = path.posix.normalize(p); if (at !== "." && holds(at)) found.add(at); };
+  const each = list.map(word => [...parts(word)].filter(Boolean));
+  each.forEach((mine, i) => {
+    for (const part of mine) {
+      ask(part);
+      for (let j = Math.max(0, i - NEAR); j < i; j++) for (const folder of each[j]) ask(`${folder}/${part}`);
     }
-  }
+  });
   return found;
 }
 
@@ -109,7 +115,7 @@ export function fromTree(command, holds) {
   if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
   const list = nested(text) ? null : words(text);
   // (and a path from the file system's root, which may lead into the checkout from wherever it stands: not read)
-  if (list === null || list.some(w => PARENT.test(w) || SETS.test(w) || [...parts(w)].some(p => p.startsWith("/")))) return null;
+  if (list === null || list.length > WORDS || list.some(w => PARENT.test(w) || SETS.test(w) || [...parts(w)].some(p => p.startsWith("/")))) return null;
   const found = named(list, holds);
   // (its first word, as a Windows shell runs it from the project's root)
   const first = list[0];

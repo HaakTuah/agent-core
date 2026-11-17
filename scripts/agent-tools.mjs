@@ -435,13 +435,15 @@ export function readProject(root, rev = null) {
   // most), one that leads out of it is not, and names are read as git stores them (-z: no quoting); each part of a path
   // is looked up in the commit's one listing, so a file read costs git no process but its text's.
   const resolve = (f, hops = 0) => {
+    // (the checkout's root, which no listing names, as a link to ".." from a folder at the root leads to)
+    if (f === ".") return { f, type: "tree" };
     const parts = f.split("/"), { blobs, links, dirs, others } = listing(root, rev);
     for (let i = 1; i <= parts.length; i++) {
       const at = parts.slice(0, i).join("/");
       if (!links.includes(at)) { if (blobs.has(at) || dirs.has(at) || others.has(at)) continue; return null; }
       const to = path.posix.normalize(path.posix.join(path.posix.dirname(at), textAt(root, rev, at) ?? "/"));
       if (hops >= 8 || to === ".." || to.startsWith("../") || path.posix.isAbsolute(to)) return null;
-      return resolve([to, ...parts.slice(i)].join("/"), hops + 1);
+      return resolve(path.posix.normalize([to, ...parts.slice(i)].join("/")), hops + 1);
     }
     return { f, type: blobs.has(f) ? "blob" : dirs.has(f) ? "tree" : "commit" };
   };
@@ -461,7 +463,7 @@ export function readProject(root, rev = null) {
     if (rev) {
       const d = resolve(dir);
       if (d?.type !== "tree") return [];
-      const { blobs, links, dirs, others } = listing(root, rev), under = `${d.f}/`;
+      const { blobs, links, dirs, others } = listing(root, rev), under = d.f === "." ? "" : `${d.f}/`;
       return [...new Set([...blobs, ...links, ...dirs, ...others].filter(at => at.startsWith(under)).map(at => at.slice(under.length).split("/")[0]))];
     }
     if (outside(dir)) return [];
