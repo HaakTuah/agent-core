@@ -3,7 +3,7 @@
 # deserialization, in JavaScript and TypeScript, C# and Python. The core's own work, none of Semgrep's or Opengrep's
 # rules copied (CHOICES.md, "Choice: a private project's code is scanned by Semgrep's engine, with the core's own
 # rules"). Input is a request's query, body, parameters, headers or cookies in JavaScript, and a method's or function's
-# parameter in C# and Python. Each rule's planted and safe samples are in code-scan-test.mjs, which fails where a rule
+# parameter in C# and Python. Each rule's planted and safe samples are in tests/code-scan-test.mjs, which fails where a rule
 # misses one or flags the other.
 rules:
 - id: js-command

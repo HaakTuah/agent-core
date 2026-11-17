@@ -60,8 +60,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
-   `reports/`, the dated reports of this repository's own changes, and `words/`, the owner's own words behind the
-   archive, which stay here alone (`.gitattributes`; core archive 165; #252). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   `reports/`, the dated reports of this repository's own changes, `words/`, the owner's own words behind the
+   archive, and `tests/`, the tests of the core's own scripts, which stay here alone (`.gitattributes`; core archive
+   165; #252; #527). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -102,18 +103,18 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the project takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes
    nothing, and `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every
    file of the core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does
-   not name and its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a
-   project runs names), the core's own issue forms (`.github/ISSUE_TEMPLATE/`), and the core's own files that no project
+   not name and its "Not taken:" line does, the tests of the core's own scripts (`tests/`, which the copy leaves out,
+   and `scripts/*-test.mjs`, where releases before #527 held them), the core's own issue forms (`.github/ISSUE_TEMPLATE/`), and the core's own files that no project
    reads, each named (#342): its queue, `QUEUE.md`, and the workflows no project can call, `own-description.yml`,
    `own-look.yml`, `own-security-review.yml`, `release.yml`, `size.yml` and `tests.yml` under `.github/workflows/`
    (`OWN_FILES` in `scripts/releases.mjs`). In doubt it syncs: a change that cannot be read is a change, and a module is
    taken where the list forgot it or the line says "all" or cannot be read. One release at most is passed over, since
-   the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at the next release the
+   the upgrade test proves a sync from each of the last two (`tests/upgrade-test.mjs`): at the next release the
    project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays whole and exact at its
    pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a full SHA is refused.
    Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a private repository, for
-   a release that may bring it nothing. Held by `scripts/releases-test.mjs`, `scripts/core-moved-test.mjs` and
-   `scripts/upgrade-test.mjs`.
+   a release that may bring it nothing. Held by `tests/releases-test.mjs`, `tests/core-moved-test.mjs` and
+   `tests/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and a row for each slot it fills otherwise than the core reads it or leaves it ("Slots"). Every
    session reads it at the start. A list of modules does not grow by itself: when the core gains a module, a note says
@@ -149,9 +150,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      integrity value: floor rule 7; the licence check also holds each `.npmrc` of "ignoreScriptsIn" to the week's wait
      (`min-release-age=7`), and a program a file downloads by address to a version and a checksum, failing only what
      a pull request adds and reporting what its base held: floor rule 7; and
-     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
-     the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
-     configuration pins where it pins one: floor topic 15). A package or
+     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents, in
+     Claude Code's, Kiro's or Codex's files, that the config's "agentTools" does not list, with its publisher and
+     version, a plug-in or tool server at the version its configuration pins where it pins one: floor topic 15; and a
+     hook whose command is not the starter kit's form, which alone shows it runs its copy on `main`:
+     floor rule 3). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
@@ -198,7 +201,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` and, if it has versions Dependabot cannot see,
      `versions.yml` keep their triggers and call the core's of the same name
      (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`), each with the triggers, the
-     permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
+     permissions and the inputs its template has (`setup/template/workflows/`, which `tests/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
    - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
      check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records'
