@@ -244,13 +244,6 @@ export function pinFault(entries, auditPath, f, code) {
  *  code that runs, a script in a language it cannot read, and JSON but the audit and a lock file. */
 export const pinRead = (f, text, auditPath) => { const as = readAs({ binary: new Set() }, f, text); return as.runs || as.other || (/\.json[c5]?$/u.test(f) && f !== auditPath && !LOCKFILE.test(f)); };
 
-// Whether every item of `now` stands in `was` as often or more: no download added, nor one made twice.
-function fewer(now, was) {
-  const left = new Map();
-  for (const d of was) left.set(d, (left.get(d) ?? 0) + 1);
-  return now.every((d) => { const n = left.get(d) ?? 0; left.set(d, n - 1); return n > 0; });
-}
-
 // A download's pin, in every file read for its commands that an entry audits by hand.
 function pinnedIfRead(c, f, text) {
   if (!c.binary.has(f) && byHand(c, f) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
@@ -268,12 +261,14 @@ function baseEntries(c) {
   if (c.baseEntries === undefined) { try { const a = JSON.parse(atBase(c, c.baseAudit ?? c.auditPath) ?? "null"); c.baseEntries = Array.isArray(a?.entries) ? a.entries : []; } catch { c.baseEntries = []; } }
   return c.baseEntries;
 }
-// Whether the base held the file `f` unpinned as much or more than `fault` says of `text`, read by the base's own audit:
-// no download added, no entry newly with no version, no check fewer.
+// Whether the base held the file `f` unpinned as much or more than `fault` says of `text`, read by the base's own audit,
+// by counts alone, an allow-list of what may stand: no more downloads, no entry newly with no version, no check fewer.
+// (A download's own words are not compared: telling one command from the next on a line needs a reader of the shell,
+// and an unpinned download whose address changes is the same debt, reported, never a larger one.)
 function heldAtBase(c, f, text, fault) {
   const was = atBase(c, f);
   const then = was === null ? null : pinFault(baseEntries(c), c.auditPath, f, codeOf(f, was));
-  return then !== null && fewer(downloads(text), downloads(codeOf(f, was))) && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n));
+  return then !== null && downloads(text).length <= downloads(codeOf(f, was)).length && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n));
 }
 
 function pinned(c, f, text) {

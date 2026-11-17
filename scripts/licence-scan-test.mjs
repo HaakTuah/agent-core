@@ -286,6 +286,9 @@ for (const [what, change, why] of [
     put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}${GET}`);
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 1, "and so does the same download made twice", JSON.stringify(r));
+    put("scripts/get.sh", `#!/usr/bin/env bash\n${GET.trim()}; echo a note of its own\n`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 0 && pins(r).length === 1, "a held download whose line gains another command stays held and reported: downloads are counted, not compared word for word", JSON.stringify(r));
     put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}curl -fsSLo other.tgz https://mossgrip.example/other-1.0.0.tgz\necho "${SUM}  moss.tgz" | sha256sum -c -\n`);
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 1 && /holds 1 checksum and 1 check for 2 downloads/u.test(r.failures[0]), "one checksum for two downloads leaves one checked by none, and fails", JSON.stringify(r));
