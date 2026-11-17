@@ -1,6 +1,6 @@
 // Hostile tests of one input the core names under floor rule 5 (floor/topics/input.md): what GitHub's API answers
-// (releases and tags, workflow and check runs, pull requests and their merges, and whose account holds a repository,
-// releases.mjs's hostAccount). Each reader is tried, as its shape
+// (releases and tags, workflow and check runs, pull requests and their merges, whose account holds a repository,
+// releases.mjs's hostAccount, and an account's rights to a repository, security-review.mjs's writersOf). Each reader is tried, as its shape
 // allows, with too long, the wrong type, markup, a file path, a number or date out of range and nothing at all, and
 // takes nothing of it as a pass or a value: core-moved.mjs (with a stand-in git and gh), releases.mjs and release.mjs
 // (in a scratch repository), wait.mjs, stalled.mjs, core-cost.mjs, clean-merges.mjs and look.mjs's checksOf.
@@ -22,6 +22,7 @@ import { openPulls, print, stalled } from "./stalled.mjs";
 import { priced, reading, readings, sessionOf } from "./core-cost.mjs";
 import { isGits, proved } from "./clean-merges.mjs";
 import { checksOf } from "./look.mjs";
+import { writersOf } from "./security-review.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0;
@@ -171,5 +172,22 @@ for (const answer of ["", "null", "[]", '{"login":"a b","type":"User"}', '{"logi
   ok(host === null && ownerOf("# no row\n", host) === null, `the host's account answered as ${JSON.stringify(answer)} reads as nothing, and no owner is read from it`);
 }
 ok(ownerOf("# no row\n", { login: "x", type: "Organization" }) === null && ownerOf("# no row\n", { login: "x", type: "User\n" }) === null, "an account the host does not say a person holds gives no owner");
+
+// an account's rights to the repository, as GitHub answers them (#412): only a person's account whose role is write,
+// maintain or admin, with the permission GitHub gives that role, counts; any answer of another form makes no one an owner
+const user = { login: "a-writer", type: "User", permissions: { push: true } };
+ok(writersOf([{ permission: "write", role_name: "write", user }]).has("a-writer"), "a person's account with the role write is read as one the host lets write");
+for (const answer of [undefined, null, "", 7, "write", [], {}, { permission: "write" }, { role_name: "write", user }, { permission: "write", role_name: ["write"], user },
+  { permission: ["write"], role_name: "write", user }, { permission: "admin", role_name: "write", user }, { permission: "write", role_name: "admin", user },
+  { permission: "write", role_name: "toString", user }, { permission: "write", role_name: "__proto__", user }, { permission: "WRITE", role_name: "Write", user },
+  { permission: "write", role_name: "write", user: null }, { permission: "write", role_name: "write", user: { ...user, type: "Bot" } },
+  { permission: "write", role_name: "write", user: { ...user, type: "Organization" } }, { permission: "write", role_name: "write", user: { ...user, login: "x[bot]" } },
+  { permission: "write", role_name: "write", user: { ...user, login: "a b" } }, { permission: "write", role_name: "write", user: { ...user, login: "x".repeat(40) } },
+  { permission: "write", role_name: "write", user: { ...user, login: "x\n::error::y" } }, { permission: "write", role_name: "write", user: { ...user, login: 7 } },
+  { permission: "write", role_name: "write", user: { ...user, permissions: { push: "true" } } }, { permission: "write", role_name: "write", user: { ...user, permissions: { push: 1 } } },
+  { permission: "write", role_name: "write", user: { ...user, permissions: null } }, { permission: "write", role_name: "write", user: { ...user, permissions: { push: false } } }]) {
+  ok(writersOf([answer]).size === 0 && writersOf([[answer]]).size === 0, `rights answered as ${JSON.stringify(answer) ?? "undefined"} make no one an owner`);
+}
+for (const v of [undefined, null, "", 7, {}, "[]"]) ok(writersOf(v).size === 0, `a list of rights of ${JSON.stringify(v) ?? "undefined"} makes no one an owner`);
 
 process.exit(failed ? 1 : 0);
