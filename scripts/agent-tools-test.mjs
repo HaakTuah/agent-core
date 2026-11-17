@@ -507,6 +507,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const oddStood = run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { "README.md": "a change of its own\n" }));
   ok(oddStood.status === 0 && /\.Codex is \.codex in another case/.test(oddStood.out), "one the base held is noted, not failed", oddStood.out);
   fails(run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { ".Codex/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once the pull request changes it", "Mend: rename it to .codex");
+  const caseStep = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
+  ok(notDone(project({ ".Codex/config.toml": "# none\n", ...listing() }), caseStep)[0]?.mend.includes("Mend: rename it to .codex"), "the sync note's step reads not done while a tool's file stands in another case");
   // (what the tool reads under it is found through each folder's own names, in whatever case they stand, so one the base
   // held is noted only while each file the tool reads there stands)
   const deep = (files, changed, says) => fails(run(pr(project({ ...files, ...listing() }), changed)), says, "in another case", "Mend: rename it to");
