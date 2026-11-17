@@ -3,7 +3,7 @@
 The first line that waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
-the owner's own word. A line on points of #460, #484, #486, #488 or #534 has its PR say "Part of" that issue, or "Fixes" it if
+the owner's own word. A line on points of #460, #484, #486 or #534 has its PR say "Part of" that issue, or "Fixes" it if
 it merges last.
 
 ## In order
@@ -18,7 +18,6 @@ it merges last.
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder | #529 |
 | #534, point 8 | rule builder | #530 |
-| #488, points 3 to 5, 7 and 8 | builder; #534's tools wait on points 3 to 5 | #488's points 1 and 2 |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
