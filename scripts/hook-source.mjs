@@ -7,8 +7,9 @@
 // are the core's: of one, only the plain words after its script are read. A plain command (PLAIN) holds nothing a shell
 // reads otherwise than as written: letters, digits, spaces and `_ . / : = @ + , -`; quotes that only group (balanced,
 // none within another); and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an agent tool sets it.
-// A word that sets a variable (PATH=x and the like change which program runs) or a path with a ".." (read by the file
-// system after the links before it) makes it no plain command. Of a plain command, each word, and each part of a word
+// A word that sets a variable (PATH=x and the like change which program runs), a path with a ".." (read by the file
+// system after the links before it) or one from the root ("/", which may lead into the checkout) makes it no plain
+// command. Of a plain command, each word, and each part of a word
 // between spaces (a quoted script given to sh -c) or `=`, `:`, `,` and `@`, that names a file the project holds
 // (through a link inside the checkout too, as holds() reads it) is taken from the working tree, whatever program it is
 // given to; and so is a file at the project's root that a Windows shell runs in the place of its first word. No other
@@ -85,12 +86,14 @@ function rootAt(command, i, quote) {
   return quote !== "'" && ROOT.test(command) ? ROOT.lastIndex : -1;
 }
 
+// A word and its parts: whole, at its spaces, as a quoted script given to sh -c holds its words, and at each = : , @.
+const parts = word => new Set([word, ...word.split(/ +/u), ...word.split(/[=:,@]/u), ...word.split(/[ =:,@]+/u)]);
+
 // Each word, and each part of it, that names a file the project holds.
 function named(list, holds) {
   const found = new Set();
   for (const word of list) {
-    // (whole, at its blanks, as a quoted script given to sh -c holds its words, and at each = : , @ besides)
-    for (const part of new Set([word, ...word.split(/ +/u), ...word.split(/[=:,@]/u), ...word.split(/[ =:,@]+/u)])) {
+    for (const part of parts(word)) {
       if (!inProject(part)) continue;
       const at = path.posix.normalize(part);
       if (at !== "." && holds(at)) found.add(at);
@@ -105,7 +108,8 @@ export function fromTree(command, holds) {
   if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), holds)];
   if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
   const list = nested(text) ? null : words(text);
-  if (list === null || list.some(w => PARENT.test(w) || SETS.test(w))) return null;
+  // (and a path from the file system's root, which may lead into the checkout from wherever it stands: not read)
+  if (list === null || list.some(w => PARENT.test(w) || SETS.test(w) || [...parts(w)].some(p => p.startsWith("/")))) return null;
   const found = named(list, holds);
   // (its first word, as a Windows shell runs it from the project's root)
   const first = list[0];
