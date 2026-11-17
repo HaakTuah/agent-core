@@ -67,10 +67,10 @@ for (const [name, dir] of Object.entries(dirs)) {
     `${name}: its kind is read from what it holds, as the starter kit was told it`, JSON.stringify(o));
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
-  // (the core's own manifest check, on the modules and floor of this commit: a slot a module it takes uses, with no row,
-  // would be a note on the project's first day, #329)
-  const slotNotes = manifestNotes({ manifest: p.manifest, readme: fs.readFileSync(path.join(root, "README.md"), "utf8"), moduleTexts: { ...texts("roles/shared"), ...texts("tasks"), ...texts("tools") }, floorTexts: texts("floor") });
-  ok(!slotNotes.length, `${name}: its manifest takes or leaves out each module and fills each slot they use, so the manifest check gives no note`, slotNotes.join("\n"));
+  // (the core's own manifest check, on the modules of this commit: a module the list neither takes nor leaves out would
+  // be a note on the project's first day, #329)
+  const moduleNotes = manifestNotes({ manifest: p.manifest, moduleTexts: { ...texts("roles/shared"), ...texts("tasks"), ...texts("tools") } });
+  ok(!moduleNotes.length, `${name}: its manifest takes or leaves out each module, so the manifest check gives no note`, moduleNotes.join("\n"));
 }
 // (a named tool is done only where a workflow on pull requests runs the check with its base)
 {

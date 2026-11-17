@@ -13,11 +13,6 @@
     "screens"
   ],
   "listed": {
-    "function: scripts/code-review-wait.mjs#judgeWith": {
-      "lines": 24,
-      "depth": 1,
-      "branches": 20
-    },
     "function: scripts/comment-only.mjs#node": {
       "lines": 45,
       "depth": 4,
@@ -128,30 +123,10 @@
       "depth": 0,
       "branches": 24
     },
-    "function: scripts/licences.mjs#check": {
-      "lines": 97,
-      "depth": 3,
-      "branches": 98
-    },
-    "function: scripts/licences.mjs#loadConfig": {
-      "lines": 43,
-      "depth": 2,
-      "branches": 45
-    },
     "function: scripts/look.mjs#main": {
       "lines": 140,
       "depth": 4,
       "branches": 81
-    },
-    "function: scripts/security-review.mjs#judge": {
-      "lines": 45,
-      "depth": 2,
-      "branches": 39
-    },
-    "function: scripts/security-review.mjs#judgeWith": {
-      "lines": 64,
-      "depth": 3,
-      "branches": 58
     },
     "function: scripts/state-report.mjs#projects": {
       "lines": 35,

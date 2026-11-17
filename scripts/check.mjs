@@ -19,7 +19,8 @@
 // part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
-// Git, bash and Node's own modules.
+// Git, bash and Node's own modules, and gh where the manifest has no owner's row and no workflow's event says whose
+// account holds the repository (releases.mjs, hostAccount).
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
 //                               [--branch <the branch's name, where none is checked out>]
@@ -31,7 +32,7 @@ import { pathToFileURL } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
-import { plainEnv } from "./releases.mjs";
+import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "./workflow-run.mjs";
 
@@ -203,9 +204,12 @@ function context(p) {
   try { defaultBranch = git(root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD").replace(/^origin\//, ""); } catch { /* (none known: main) */ }
   let repo = "local/project";
   try { repo = /[:/]([^/:]+\/[^/]+?)(?:\.git)?$/.exec(git(root, "remote", "get-url", "origin"))?.[1] ?? repo; } catch { /* (no origin) */ }
-  const repository = { default_branch: defaultBranch, private: false, full_name: repo };
+  // (whose account holds the repository, as the host says it, asked only where the manifest has no owner's row: core.yml
+  // reads it there, #481)
+  const held = owner ? null : hostSaid(console.error)();
+  const repository = { default_branch: defaultBranch, private: false, full_name: repo, ...(held ? { owner: held } : {}) };
   const pull = { number: 0, state: "open", draft: false, title, body, base: { sha: base, ref: "main" }, head: { sha: head, ref: p.branch, repo: { full_name: repo } }, user: { login: owner } };
-  return { event_name: p.event, repository: repo, actor: owner, server_url: "https://github.com", run_id: "0", token: "", sha: head,
+  return { event_name: p.event, repository: repo, repository_owner: held?.login ?? repo.split("/")[0], actor: owner, server_url: "https://github.com", run_id: "0", token: "", sha: head,
     base_ref: base ? "main" : "", head_ref: base ? p.branch : "", ref: base ? "refs/pull/0/merge" : "refs/heads/main",
     event: base ? { action: "synchronize", pull_request: pull, repository } : { ref: "refs/heads/main", before: "", after: head, repository } };
 }

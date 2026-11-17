@@ -15,7 +15,8 @@ sessions.
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
    the cheapest tool that can do it;
 2. not the orchestrator's provider, while another has allowance left;
-3. among the rest, the project's order (its table's row "Builder"), Codex first where it names none;
+3. among the rest, the project's order (its table's row "Builder", else the record's: `tasks/roles.md`), Codex first
+   where neither names one;
 4. the orchestrator's provider last, and never below a reserve that keeps the orchestrator itself waking: by default,
    no new builder on that provider once its usage window shows its warning level.
 
