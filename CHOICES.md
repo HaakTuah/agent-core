@@ -452,8 +452,10 @@ counter and its commands are in the pull request that adds this record (#487).
     list, the owner's yes, the week's wait, the same publisher, failures that say the mend) the core's own. With 12
     bugs between them, the most of any stand-in, they go with the second group.
   - **Kept:** the finding of copies (`scripts/copies.mjs`, 314 lines, 9 bugs), since what a copy is the core's own
-    rule defines; its reading of code goes through the parser once the readers of languages do. Left as they are, as
-    #486 says: the core's own mutation tool, and the readers of the core's own rule files.
+    rule defines; its reading of code goes through the parser once the readers of languages do. Left as they are: the
+    readers of the core's own rule files. The core's own mutation tool stood here until 17 November 2026, when #534
+    widened this inventory to every part of the core, the mutation tool and the finding of copies weighed again among
+    them, in `INVENTORY.md`; the lines above stay the word on the readers inside the checks.
 - Judged again on 17 November 2026 (#519): it stands, carried and never fetched while a check runs. A grammar comes
   with the reader that needs it, never all at once, and Microsoft's `@vscode/tree-sitter-wasm` (one publisher's runtime
   and grammars) is weighed as their source when the first arrives (the path's third and fourth steps).
@@ -514,9 +516,13 @@ The same record weighs types for the core's own scripts (#486, point 4), written
 - Judged again on 17 November 2026 (#519): it stands. The checker over the 33 fixed bugs that changed a script and
   over 134 fixes inside pull requests, and 33 sessions writing and changing code in each form, found no fault a
   checker would have caught that the tests did not.
-- Reopens it: at a pass over these records, the trial's run (the checker in loose mode with null checks over the ten
-  scripts changed most, the settings in #487) finds a fault in code a project runs; or a move to one stable entry
-  (#376) renames the scripts for its own reasons.
+- Reopens it: at each pass over these records, the run of #515, point 2, over the fixes made since the last:
+  `node scripts/fixes.mjs --since <the day on "Read whole:">` lists each fix of a bug that changed a script that is no
+  test, the tree before it and the lines it changed; the checker, fetched into a scratch folder with its install scripts
+  off and never into the core, runs on each tree in loose mode and with its checks of null (the settings in #521). It
+  reopens where the fixes at whose changed lines a finding points at the fault reach 5, counted over every pass since
+  17 November 2026 and written here at each (0 of 33 then); or where a move to one stable entry (#376) renames the
+  scripts for its own reasons.
 
 ## Choice: the core reaches a project as an exact copy under `core/`, pinned to one commit
 

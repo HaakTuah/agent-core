@@ -42,7 +42,7 @@ jobs:
   # plain git and the sync on whole scratch projects, with the hostile tests of the core's inputs (projects); the
   # starter kit (kit); the steps' test (steps); the check of the core's copy (core.yml) on scratch projects (core), on
   # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
-  # personal-terms check's own job (terms); the licence, NuGet and agent-tools checks, with the hostile tests of build
+  # personal-terms check's own job (terms); the licence, NuGet, lookup and agent-tools checks, with the hostile tests of build
   # files and packages (licences); and the rest (rest). Each step's condition names its part in the job's list "parts",
   # read by substring: no name holds another, but that core is named beside its half. On Windows, where a suite that
   # starts many processes runs several times slower, a job takes kit with steps, the second half with terms, and each
@@ -112,6 +112,9 @@ jobs:
       - name: The exact-versions check
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/exact-versions-test.mjs ')) }}
         run: node scripts/exact-versions-test.mjs
+      - name: The lookup of a new package, on recorded answers
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/lookup-test.mjs ')) }}
+        run: node scripts/lookup-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/agent-tools-test.mjs ')) }}
         run: node scripts/agent-tools-test.mjs
@@ -181,6 +184,9 @@ jobs:
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/choices-test.mjs ')) }}
         run: node scripts/choices-test.mjs
+      - name: The fixed bugs the record on types reads at each pass
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/fixes-test.mjs ')) }}
+        run: node scripts/fixes-test.mjs
       - name: The description check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pr-description-test.mjs ')) }}
         run: node scripts/pr-description-test.mjs
@@ -363,6 +369,11 @@ jobs:
         env:
           COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: node scripts/copies.mjs .github/copies.json
+      - name: Each choice record the change adds is argued in full, one that stood before listed (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') }}
+        env:
+          CHOICES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: node scripts/choices.mjs
       - name: The suites kept to their time mark
         env:
           SUITE: ${{ matrix.suite }}
@@ -376,17 +387,18 @@ jobs:
           MUTATE_BUDGET: "240"
         run: node scripts/strength.mjs
 
-  # (on Windows the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
-  # of the two releases with the copy older than the first, and the newer release; the staged cases' test follows each,
-  # its first half after the older and its second after the newer, each half under the suite's own mark, since whole it
-  # took up to 1009 s of its 900 on Windows; on Linux one job runs both whole; #304, #508)
+  # (on each system the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the
+  # older of the two releases with the copy older than the first, and the newer release; the staged cases' test follows
+  # each, its first half after the older and its second after the newer, each half under the suite's own mark, since
+  # whole it took up to 1009 s of its 900 on Windows and up to 264 s of its 240 on Linux; #304, #508, #515)
   upgrade:
     name: upgrade (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, part: all }
+          - { os: ubuntu-latest, part: older }
+          - { os: ubuntu-latest, part: newer }
           - { os: windows-latest, part: older }
           - { os: windows-latest, part: newer }
     runs-on: ${{ matrix.os }}

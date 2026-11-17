@@ -14,9 +14,12 @@
 // session-cost.mjs kept a tally of its own (a session's record can lose answers, and the line then dropped), and
 // drops still where a tally is lost, so a pull request is priced only where its session's line rose in every part,
 // the rest are counted as not priced, and what is printed is a floor. It reads; it writes nothing and
-// changes nothing. Git, gh for --cost, and Node's own modules.
+// changes nothing. With --cap it reads the same and says the cap of a move that must happen all at once (core/tasks/
+// choices.md, "A move that pays is built in steps"; #515): what the pull requests merged in the 14 days up to the
+// newest merge took; with --pulls, what the pull requests named took, a move's own. Git, gh for --cost, --cap and
+// --pulls, and Node's own modules.
 //
-//   node core/scripts/core-cost.mjs [--since YYYY-MM-DD] [--split YYYY-MM-DD] [--cost]
+//   node core/scripts/core-cost.mjs [--since YYYY-MM-DD] [--split YYYY-MM-DD] [--cost] [--cap] [--pulls <n,n,...>]
 import { execFileSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { ruleFiles } from "./rule-files.mjs";
@@ -96,6 +99,44 @@ export function priced(pulls) {
     }
   }
   return took;
+}
+
+// What the pull requests numbered `numbers` took, of those `took` (priced()) prices: { answers, out, into, priced, of },
+// a floor, since one not priced adds nothing.
+export function sumOf(took, numbers) {
+  const sum = { answers: 0, out: 0, into: 0, priced: 0, of: numbers.length };
+  for (const n of numbers) { const t = took.get(n); if (t) { sum.answers += t.answers; sum.out += t.out; sum.into += t.into; sum.priced++; } }
+  return sum;
+}
+
+// The days a move's cap reads back from the newest merge (#515, point 9: a first guess).
+export const CAP_DAYS = 14;
+
+// The cap of a move that must happen all at once: what the pull requests `merged` (mergedPulls()) in the CAP_DAYS up
+// to the newest of them took, as sumOf() gives it, with the days it read from and to; null where none merged.
+export function cap(merged, took) {
+  if (!merged.length) return null;
+  const newest = Math.max(...merged.map(m => Date.parse(m.when)));
+  const from = newest - CAP_DAYS * 86400000;
+  return { ...sumOf(took, merged.filter(m => Date.parse(m.when) > from).map(m => m.number)), from: dayOf(new Date(from).toISOString()), to: dayOf(new Date(newest).toISOString()) };
+}
+
+// A sum as one line: what it is, then the answers, output tokens and tokens carried in, and how many were priced.
+export const summed = (what, s) => `${what}: ${s.answers.toLocaleString("en-US")} answers, ${s.out.toLocaleString("en-US")} output tokens, ${s.into.toLocaleString("en-US")} tokens carried in, from ${s.priced} of ${s.of} pull requests priced (a floor: one not priced adds nothing).`;
+
+// The pull requests --pulls names, as numbers, or null where it is not given; `fail` where it names none.
+export function pullsOf(argv, fail) {
+  if (!argv.includes("--pulls")) return null;
+  const named = String(argv[argv.indexOf("--pulls") + 1] ?? "");
+  if (!/^\d+(,\d+)*$/.test(named)) fail("--pulls takes the numbers of pull requests, separated by commas: --pulls 12,15,20");
+  return named.split(",").map(Number);
+}
+
+// What --cap and --pulls print: the cap of a move, and what the pull requests named took, each a line.
+export function sums(merged, took, capped, named) {
+  const c = capped ? cap(merged, took) : null;
+  return [c && summed(`The cap of a move (core/tasks/choices.md), what the pull requests merged from ${c.from} to ${c.to} took`, c),
+    named && summed(`What pull requests ${named.map(n => `#${n}`).join(", ")} took`, sumOf(took, named))].filter(Boolean).join("\n");
 }
 
 export const median = list => { const s = [...list].sort((a, b) => a - b); return s.length ? (s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2 : null; };
@@ -179,10 +220,38 @@ export function mergedPulls(rules, since = null) {
   return { repo, merged };
 }
 
+// What each pull request took (priced()), read from the descriptions gh gives of the repository's pull requests,
+// page by page, newest first, until the oldest of `merged` is passed: a cloud session's gh cannot follow pages by
+// itself. Every pull request of the repository's own from that one on is read, merged or not, open or closed: one a
+// session left unmerged between two merged ones holds a reading of its own, and without it the later one would be
+// charged for both.
+function tookFrom(repo, merged) {
+  const pulls = [], oldest = Math.min(...merged.map(m => m.number));
+  for (let page = 1; page <= 200; page++) {
+    const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
+      "--jq", ".[] | [.number, (.head.repo.full_name // \"\"), (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
+    const rows = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
+    pulls.push(...readings(rows, repo, oldest));
+    if (rows.length < 100 || rows.some(([number]) => number < oldest)) break;
+  }
+  return priced(pulls);
+}
+
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+
+// What each merged pull request took, each merge given its price in `took`; and what --cap and --pulls print, where
+// either is given (sums()).
+function addCosts(merged, repo, capped, named) {
+  if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
+  const took = tookFrom(repo, merged);
+  for (const m of merged) m.took = took.get(m.number) ?? null;
+  return sums(merged, took, capped, named);
+}
+
 function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
-  const since = value("--since"), split = value("--split"), cost = argv.includes("--cost");
+  const since = value("--since"), split = value("--split"), capped = argv.includes("--cap"), named = pullsOf(argv, fail);
+  const cost = [argv.includes("--cost"), capped, named].some(Boolean);
   for (const [name, v] of [["--since", since], ["--split", split]]) if (argv.includes(name) && !DAY.test(v ?? "")) fail(`${name} takes a day, YYYY-MM-DD`);
   let rules;
   try { process.chdir(git(["rev-parse", "--show-toplevel"]).trim()); rules = rulesFor(repoOf()); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
@@ -191,21 +260,8 @@ function main(argv) {
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
 
   if (cost) {
-    if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
-    const pulls = [], oldest = Math.min(...merged.map(m => m.number));
-    // (page by page, newest first, until the oldest merge here is passed: a cloud session's gh cannot follow pages by
-    // itself. Every pull request of the repository's own from that one on is read, merged or not, open or closed: one
-    // a session left unmerged between two merged ones holds a reading of its own, and without it the later one would
-    // be charged for both)
-    for (let page = 1; page <= 200; page++) {
-      const out = execFileSync("gh", ["api", `repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
-        "--jq", ".[] | [.number, (.head.repo.full_name // \"\"), (.body // \"\")] | @json"], { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], maxBuffer: 1 << 28 });
-      const rows = out.split("\n").filter(Boolean).map(l => JSON.parse(l));
-      pulls.push(...readings(rows, repo, oldest));
-      if (rows.length < 100 || rows.some(([number]) => number < oldest)) break;
-    }
-    const took = priced(pulls);
-    for (const m of merged) m.took = took.get(m.number) ?? null;
+    const said = addCosts(merged, repo, capped, named);
+    if (said) return console.log(said);
   }
 
   const groupOf = split ? m => (dayOf(m.when) < split ? `before ${split}` : `from ${split} on`) : m => `week of ${weekOf(m.when)}`;
