@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { HOST_OWN } from "./check.mjs";
+import { CORE } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
 import { root, scratch, scratchEnv, tally } from "./scratch-core.mjs";
 
@@ -70,7 +71,56 @@ fs.writeFileSync(path.join(dir, "src", "one.js"), `${block}\n`);
 fs.writeFileSync(path.join(dir, "src", "two.js"), `${block}\n`);
 commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
-ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "No new copies" failed/.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
+ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks/.test(r.out) && /^ +== No new copies$/m.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
+
+// a private project, as the kit writes it: its checks without a secret as steps of core.yml's one job (#376), which a
+// failure of the copy stops here, since each runs the copy's scripts
+{
+  const q = project("a-private-project", "--owner", "someone", "--private");
+  ok(q.status === 0, "the starter kit writes a private project", q.out);
+  commit(q.dir, "the starter kit");
+  const qConfig = path.join(q.dir, "checks", "copies.json");
+  fs.writeFileSync(qConfig, JSON.stringify({ ...JSON.parse(fs.readFileSync(qConfig, "utf8")), code: ["src"] }, null, 2));
+  commit(q.dir, "the code the copies check reads");
+  git(q.dir, "branch", "-q", "base");
+  let s = check(q.dir, "--base", "base", "--description", path.join(tmp, "description.md"));
+  ok(s.status === 0 && /ok {3}core\.yml\/core\/core/.test(s.out) && !/(copies|pr-description)\.yml\//.test(s.out), "its pull request passes, the copies and description checks run in core.yml's one job", s.out);
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 0 && s.out.includes("core.yml's description check is not run here: give --description"), "without a description, the one job's description check is named and not run", s.out);
+  fs.mkdirSync(path.join(q.dir, "src"), { recursive: true });
+  fs.writeFileSync(path.join(q.dir, "src", "one.js"), `${block}\n`);
+  fs.writeFileSync(path.join(q.dir, "src", "two.js"), `${block}\n`);
+  commit(q.dir, "a copy of code");
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks" failed/.test(s.out) && /^ +== No new copies$/m.test(s.out) && !/the copy of the core is not the core at its pin/.test(s.out) && mended(s.out),
+    "a new copy of code fails it, with the copies check's own failure and its mend, a step of the one job and no failure of the copy", s.out);
+  fs.writeFileSync(path.join(q.dir, "core", "README.md"), "edited here\n");
+  commit(q.dir, "and an edit to the copy");
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 1 && /the copy of the core is not the core at its pin, so no other check runs/.test(s.out) && !/its step "The copies, pointer/.test(s.out) && mended(s.out),
+    "where the copy is not the core, the steps the one job runs of the copy's scripts run no more, the new copy unread", s.out);
+  // (a pin that is no commit of the core, so the core's checkout at it fails, and the copy's own checks.mjs edited to
+  // leave a mark where it runs: it must not run, here or in the job, before the copy is proved the core)
+  git(q.dir, "reset", "-q", "--hard", "base");
+  const mark = path.join(tmp, "copy-scripts-ran");
+  fs.writeFileSync(path.join(q.dir, "core", "scripts", "checks.mjs"), `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\n`);
+  const qManifest = path.join(q.dir, "core-manifest.md");
+  fs.writeFileSync(qManifest, fs.readFileSync(qManifest, "utf8").replace(/^(Core: \S+ at )[0-9a-f]{40}/m, `$1${"f".repeat(40)}`));
+  commit(q.dir, "a pin that is no commit of the core, and an edited script of the copy");
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 1 && !fs.existsSync(mark) && mended(s.out), "where the core cannot be fetched at the pin, the copy's own scripts run not at all", s.out);
+  // (and where the call to core.yml itself is pinned to no commit of the core, so it cannot even be read, the separate
+  // checks after it, which run the copy's scripts, run not at all either)
+  git(q.dir, "reset", "-q", "--hard", "base");
+  fs.writeFileSync(path.join(q.dir, "core", "scripts", "checks.mjs"), `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\n`);
+  const calls = path.join(q.dir, ".github", "workflows", "core.yml");
+  fs.writeFileSync(calls, fs.readFileSync(calls, "utf8").replace(/(\/\.github\/workflows\/core\.yml@)[0-9a-f]{40}/, `$1${"e".repeat(40)}`));
+  fs.writeFileSync(path.join(q.dir, ".github", "workflows", "copies.yml"), fs.readFileSync(path.join(root, "setup", "template", "workflows", "copies.yml.tmpl"), "utf8").replaceAll("{{core}}", CORE).replaceAll("{{pin}}", /^Core: \S+ at ([0-9a-f]{40})/m.exec(fs.readFileSync(qManifest, "utf8"))[1]));
+  commit(q.dir, "a call to core.yml that cannot be read, a call of the copies check's own, and an edited script of the copy");
+  git(q.dir, "branch", "-f", "base");
+  s = check(q.dir);
+  ok(s.status === 1 && !fs.existsSync(mark) && /the copy of the core is not the core at its pin, so no other check runs/.test(s.out) && mended(s.out), "where core.yml cannot even be read at its call's pin, no check after it runs the copy's scripts", s.out);
+}
 
 // a change that takes a check's call out still runs it: the calls are the base's
 git(dir, "reset", "-q", "--hard", "base");
