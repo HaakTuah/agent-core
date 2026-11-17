@@ -58,7 +58,7 @@ export function npmPackages(text, lockPath) {
   const nameOf = (p) => entryName(packages[p], p);
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
-    .map(([p, e]) => ({ name: nameOf(p), ...(e.resolved === undefined || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
+    .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
       by: direct.has(p) ? [] : [...reached].filter(([, set]) => set.has(p)).map(([d]) => nameOf(d)) }));
 }
 
@@ -72,11 +72,12 @@ function source(resolved) {
 
 // The name a lock entry at `path` installs: the one its registry address gives, or, for an entry with no "resolved" at
 // all, which is npm's registry's as npm writes a lock file with that field left out (omit-lockfile-registry-resolved),
-// its "name" where an alias gives one; else its folder's.
+// its "name" where an alias gives one; else its folder's. An empty or null "resolved" is read so too: npm fetches it
+// from the registry.
 function entryName(entry, path) {
   const named = registryName(entry?.resolved);
   if (named) return named;
-  if (entry?.resolved === undefined && typeof entry?.name === "string" && entry.name) return entry.name;
+  if (!entry?.resolved && typeof entry?.name === "string" && entry.name) return entry.name;
   return path.slice(path.lastIndexOf("node_modules/") + 13);
 }
 

@@ -388,29 +388,39 @@ function movedPaths(p) {
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
-// them), in order; the commands that count as a run of the lookup, of a step that fails where the command fails (no
-// continue-on-error, no "||" after the lookup) in a workflow a pull request starts; and whether its checkout holds the
-// base beside the head (a fetch-depth of 0, or 2 or more, and no ref of another commit). A workflow whose YAML cannot
-// be read is read as one job, its whole text its one command list, and none of it counts as a lookup.
+// them), all of them and step by step in order; for each step, whether a lookup there counts; and whether its checkout
+// holds the base beside the head (a fetch-depth of 0, or 2 or more, and no ref of another commit). A lookup counts only
+// as the one command of its step, in a workflow a pull request starts, where neither the step nor its job carries an
+// `if:` or continue-on-error (conditions the reader cannot tell), under bash or sh, which stop on a failure (pwsh, the
+// default on Windows, and a shell given its own options do not). A workflow whose YAML cannot be read is read as one
+// job, its whole text its one command list, and none of it counts as a lookup.
 function jobsOf(w) {
   const deep = (v) => /^(?:0|[2-9]|\d{2,})$/u.test(String(v ?? "").trim());
   const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
-  if (!jobs) return [{ runs: commands(w.text ?? ""), counted: [], deep: false }];
+  if (!jobs) return [{ runs: commands(w.text ?? ""), steps: [], deep: false }];
   const started = onPullRequests(w.yaml?.on);
   return jobs.map(job => {
-    const steps = Array.isArray(job?.steps) ? job.steps : [];
-    const runOf = st => (typeof st?.run === "string" ? commands(st.run) : []);
-    // (a step or job under an `if:`, whose condition the reader cannot tell, does not count)
-    const fails = st => typeof st?.run === "string" && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"] && !/lookup\.mjs[^\n]*\|\|/u.test(st.run);
-    return { runs: steps.flatMap(runOf), counted: started ? steps.flatMap(st => (fails(st) ? runOf(st) : [[]])) : [],
-      deep: steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
+    const steps = (Array.isArray(job?.steps) ? job.steps : []).map(st => {
+      const cmds = typeof st?.run === "string" ? commands(st.run) : [];
+      const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
+      const stops = shell === undefined ? !/windows/iu.test(JSON.stringify(job?.["runs-on"] ?? "")) : /^(?:bash|sh)$/u.test(String(shell).trim());
+      // (a lone "|" or "&" in the step's text, a pipe or the background, hides the command's failure from the step)
+      const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.replace(/#.*$/gmu, ""));
+      const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
+      return { cmds, counts };
+    });
+    return { runs: steps.flatMap(st => st.cmds), steps,
+      deep: (job?.steps ?? []).some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
   });
 }
-// Whether a job runs the NuGet lookup, as counted, before anything that may build the pull request's code: dotnet,
-// msbuild or nuget, or the NuGet check's scripts, which a workflow runs after its restore.
+// The lookups of a job that count, as their commands.
+const counted = job => job.steps.filter(st => st.counts).map(st => st.cmds[0]);
+// Whether a job runs the NuGet lookup of `config`, counted, in a step before any that may build the pull request's
+// code (dotnet, msbuild or nuget, or the NuGet check's scripts, which a workflow runs after its restore), whatever that
+// step's condition.
 const lookedUpFirst = (job, copy, config) => {
-  const first = job.counted.findIndex(c => looksUp(c, true, copy) && configOf(c, "lookup.mjs", copy) === config);
-  const builds = job.counted.findIndex(c => /(?:^|[\\/])(?:dotnet|msbuild|nuget)(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs", undefined, copy) || running(c, "nuget-fetch.mjs", undefined, copy));
+  const first = job.steps.findIndex(st => st.counts && looksUp(st.cmds[0], true, copy) && configOf(st.cmds[0], "lookup.mjs", copy) === config);
+  const builds = job.steps.findIndex(st => st.cmds.some(c => /(?:^|[\\/])(?:dotnet|msbuild|nuget)(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs", undefined, copy) || running(c, "nuget-fetch.mjs", undefined, copy)));
   return first >= 0 && (builds < 0 || first < builds);
 };
 // Whether a command names the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given
@@ -627,14 +637,14 @@ export const STEPS = [
         // (each config a check is given is matched by a lookup given the same config, since the lookup reads only the
         // lock files of the config it is given)
         const configs = (...names) => [...new Set(jobs.flatMap(j => j.runs.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [configOf(c, n, copy)] : [])))))];
-        const looked = (flag, config) => jobs.some(j => j.counted.some(c => looksUp(c, flag, copy) && configOf(c, "lookup.mjs", copy) === config));
+        const looked = (flag, config) => jobs.some(j => counted(j).some(c => looksUp(c, flag, copy) && configOf(c, "lookup.mjs", copy) === config));
         return [
           configs("exact-versions.mjs").some(cfg => !looked(false, cfg)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
           configs("nuget.mjs", "nuget-fetch.mjs").some(cfg => !jobs.some(j => lookedUpFirst(j, copy, cfg))) ? `in ${at}, before any step that builds or restores (\`dotnet\`, \`msbuild\`, a build script) or runs \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
-          jobs.some(j => !j.deep && j.counted.some(c => looksUp(c, undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
+          jobs.some(j => !j.deep && counted(j).some(c => looksUp(c, undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
         ].filter(Boolean);
       });
-      return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (no \`if:\` or \`continue-on-error\` on it or its job, no \`||\` after it), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
+      return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (its step's one command, under bash or sh, with no \`if:\` or \`continue-on-error\` on the step or its job), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
     },
     partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
 ];

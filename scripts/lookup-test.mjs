@@ -65,6 +65,10 @@ const lock = { lockfileVersion: 3, packages: {
   local: { version: "1.0.0" },
 } };
 const read = npmPackages(JSON.stringify(lock), "package-lock.json");
+for (const resolved of [null, ""]) {
+  const blank = npmPackages(JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { "brand-new-moss": "1.1.0" } }, "node_modules/brand-new-moss": { version: "1.1.0", resolved } } }), "package-lock.json");
+  ok(blank.length === 1 && !blank[0].from && blank[0].name === "brand-new-moss", `npm: an entry whose "resolved" is ${JSON.stringify(resolved)}, which npm fetches from the registry, is the registry's (${JSON.stringify(blank)})`);
+}
 const omitted = npmPackages(JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { "brand-new-moss": "1.1.0", "moss-alias": "npm:tidy-moss-helper@1.1.0" } }, "node_modules/brand-new-moss": { version: "1.1.0", integrity: "sha512-AAAA" }, "node_modules/moss-alias": { name: "tidy-moss-helper", version: "1.1.0", integrity: "sha512-AAAA" } } }), "package-lock.json");
 ok(omitted.length === 2 && omitted.every((p) => !p.from) && omitted.map((p) => p.name).sort().join() === "brand-new-moss,tidy-moss-helper", `npm: a lock file written with the registry's address left out reads each entry as the registry's, by its name or its alias's real name (${JSON.stringify(omitted)})`);
 const by = (name) => read.find((p) => p.name === name);
@@ -237,6 +241,16 @@ try {
   ok(missed.length === 1 && /no `ref:`/u.test(missed[0].mend), `and a checkout of another commit than the merge does not hold the base (${missed.map((m) => m.mend)})`);
   nugetJob("msbuild -t:Restore", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 1, "a NuGet lookup after an msbuild restore does not count");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: dotnet restore --locked-mode\n        if: always()\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "a restore under a condition before the NuGet lookup is still a restore before it");
+  for (const [what, extra] of [["piped on", "node core/scripts/lookup.mjs c.json | tee out"], ["sent to the background", "node core/scripts/lookup.mjs c.json &"]]) {
+    nugetJob("node core/scripts/exact-versions.mjs c.json", extra);
+    ok(notDone(tmp, step).length === 1, `a lookup ${what}, whose failure the step does not see, does not count`);
+  }
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: windows-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor one under pwsh, Windows' default shell, which goes on past a failure");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: windows-latest\n    defaults:\n      run:\n        shell: bash\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  ok(notDone(tmp, step).length === 0, "and one under bash on Windows counts");
   nugetJob("node core/scripts/exact-versions.mjs checks/frontend.json", "node core/scripts/exact-versions.mjs checks/backend.json", "node core/scripts/lookup.mjs checks/frontend.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /with the same config, for each config/u.test(missed[0].mend), `a lookup of one config does not stand for another config's check (${missed.map((m) => m.mend)})`);
