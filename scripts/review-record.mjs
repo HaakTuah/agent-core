@@ -22,8 +22,11 @@
 // all the same: a bug counts against a pull request only where the owner's account filed it, and a line "Brought in by:
 // #N" (the bug form's last line) stands in its body or in a comment of the owner's account (the newest wins), N is a
 // pull request that was read and merged before the bug was filed; any other bug is not read, never none. No prose is
-// guessed at. Last it lists each rule the findings of two pull requests or more name, on their line "Rule:" (rulesNamed,
-// below). It reads; it writes nothing and changes nothing. Git, gh and Node's own modules.
+// guessed at. It lists each rule the findings of two pull requests or more name, on their line "Rule:" (rulesNamed,
+// below). Last it counts the rounds of review each pull request took (#477; review-rounds.mjs, beside this file), from
+// the head each review was asked or posted on (reviewEvents, below) and the pull request's commits, read for those it
+// counts, the last 30 merged and, given --since, the 30 merged before it. It reads; it writes nothing and changes
+// nothing. Git, gh and Node's own modules.
 //
 //   node core/scripts/review-record.mjs [--since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
@@ -31,12 +34,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
 import { seen } from "./guards.mjs";
-import { FINDING, codexState, codexs } from "./security-review.mjs";
+import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
+import { FINDING, codexState, codexs, named } from "./security-review.mjs";
 import { started } from "./started.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
 import { pages } from "./stand-in-record.mjs";
 
 const RECEIPT = /^<!-- codex-review-receipt:v1 -->/u;
+const REVIEWED = /^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`/mu; // (the commit a receipt of Codex's names, as its app writes it)
 const BADGE = /!\[(P[0-3]) Badge\]/u;
 
 export const REVIEWS = [
@@ -48,11 +53,12 @@ export const KINDS = ["own", "upkeep", "sync", "update"];
 
 // A comment's text as its lines, each carriage return taken out (the web editor ends a line with one before the line feed).
 const lines = body => String(body ?? "").replaceAll("\r", "").split("\n");
+const firstLine = body => lines(body).find(l => l.trim()) ?? "";
 
 // Which posted review a comment is, from its first line unquoted: security, code, design, or none-needed (a note that
 // no security review is needed), or null where it is none.
 export function postedKind(body) {
-  const first = lines(body).find(l => l.trim()) ?? "";
+  const first = firstLine(body);
   if (/^\s*>/.test(first)) return null;
   const m = /^\s*(?:\*\*)?(Security review|Code review|Design check):\s*(.*)$/su.exec(first); // (s: a line separator left in the line still matches, so the pattern never goes back over the spaces)
   if (!m) return null;
@@ -109,6 +115,29 @@ export function perPull(issueComments, inline, owner) {
       points: reads.reduce((s, n) => s + (n ?? 0), 0), other: others.reduce((s, n) => s + (n ?? 0), 0), otherUnread: others.some(n => n === null) };
   };
   return { codexCode: codex("code"), postedCode: posted("code"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
+}
+
+// What a pull request's reviews were asked or posted on, for its rounds (review-rounds.mjs): { sha, at, blocking }, sha
+// the commit the review names (a posted review's first line, the commit a receipt of Codex's names, the one a find of
+// Codex's was made on, and the one each review its summary says completed read, the newest alone, as its app keeps it)
+// and at the time it was asked or posted, read where no commit is named. A review asked is a line
+// "@codex review" alone, in a comment of the owner's account; a note that no security review is needed is none.
+export function reviewEvents(issueComments, inline, owner) {
+  const mine = c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase();
+  const out = [];
+  for (const c of issueComments) {
+    const kind = mine(c) ? postedKind(c.body) : null;
+    if (["security", "code", "design"].includes(kind)) out.push({ sha: named(firstLine(c.body))[0], at: c.at, blocking: blockingOf(c.body) > 0 });
+    else if (mine(c) && lines(seen(c.body)).some(l => l.trim() === "@codex review")) out.push({ at: c.at, blocking: false });
+    else if (codexs(c) && RECEIPT.test(c.body)) out.push({ sha: REVIEWED.exec(c.body)?.[1], at: c.at, blocking: false });
+  }
+  const { state } = codexState(issueComments);
+  for (const review of [state?.code_review, state?.security_review]) if (review?.status === "completed" && review.commit_sha) out.push({ sha: review.commit_sha, blocking: false });
+  for (const c of [...inline, ...issueComments]) {
+    const find = codexFind(c);
+    if (find) out.push({ sha: c.original_commit_id ?? c.commit_id, at: c.at, blocking: find.blocking });
+  }
+  return out;
 }
 
 // The rules a pull request's findings name (the core's tasks/reviews.md, point 8; #254): each on a line of its own
@@ -249,7 +278,7 @@ function main(args) {
   const issueComments = pages(`repos/${repo}/issues/comments?sort=created&direction=asc`,
     ".[] | {issue: (.issue_url | split(\"/\") | last | tonumber), created_at, at: .created_at, updated_at, login: .user.login, user: {login: .user.login, type: .user.type}, body} | @json");
   const inline = pages(`repos/${repo}/pulls/comments?sort=created&direction=asc`,
-    ".[] | {pull: (.pull_request_url | split(\"/\") | last | tonumber), in_reply_to_id, user: {login: .user.login, type: .user.type}, body} | @json");
+    ".[] | {pull: (.pull_request_url | split(\"/\") | last | tonumber), in_reply_to_id, at: .created_at, commit_id, original_commit_id, user: {login: .user.login, type: .user.type}, body} | @json");
   const issues = pages(`repos/${repo}/issues?state=all&labels=bug`,
     ".[] | {number, at: .created_at, login: .user.login, body, pull: (.pull_request != null)} | @json")
     .filter(b => !b.pull && (!since || b.at >= `${since}T00:00:00Z`)); // (pull requests are taken out after paging, so that a page's length is still GitHub's own)
@@ -260,6 +289,10 @@ function main(args) {
   const bug = bugs(issues, issueComments, new Map(merged.map(m => [m.number, m])), owner);
   const twice = foundTwice(all.map(m => ({ number: m.number, when: m.when, rules: named.get(m.number) })), since);
   console.log(print(repo, since, pulls, t, bug, twice, standing()));
+  const commitsOf = n => { try { return pages(`repos/${repo}/pulls/${n}/commits?`, ".[] | {sha, at: .commit.committer.date, parents: [.parents[] | {sha}]} | @json"); } catch { return null; } };
+  const want = wanted(merged, all, since);
+  const rounds = new Map(all.filter(m => want.has(m.number)).map(m => { const commits = commitsOf(m.number); return [m.number, commits && roundsOf(reviewEvents(...of(m)), commits)]; }));
+  console.log(`\n${roundsLines(merged, all, since, rounds)}`);
 }
 
 if (started(import.meta.url)) main(process.argv.slice(2));
