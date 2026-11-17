@@ -192,8 +192,7 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   rebuild is named on the line as not run, and why. It does not mean a tool must read every one to be taken. Reason: 11
   of the 30 bugs filed on the core by 17 November 2026 that were a case a check's writer had not thought of stood on
   the NuGet and copies checks, and whether a tool tried in their place reads those cases is the best evidence that the
-  move pays. Held, in the core, by the inventory's check (`tests/mend-test.mjs`), which fails a part's line that
-  records a trial and says nothing of its bugs; which bugs the line names, the review reads.
+  move pays.
 
 Held by: the records' check (`core/scripts/choices.mjs`, a step of the copies check), which fails a record a pull
 request adds without its lines `Looked for:`, `The blind pick:` and `The judgment:`, and lists, never fails, one that
