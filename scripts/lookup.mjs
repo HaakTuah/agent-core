@@ -23,7 +23,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { logged, parseBounded } from "./guards.mjs";
-import { baseOf, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
+import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { projectAt } from "./core-path.mjs";
 import { started } from "./started.mjs";
@@ -56,9 +56,18 @@ export function npmPackages(text, lockPath) {
   const next = (at) => names(packages[at]).map((n) => resolve(packages, at, n)).filter(Boolean);
   const reached = new Map([...direct].map((d) => [d, reach(d, next)]));
   const nameOf = (p) => registryName(packages[p]?.resolved) ?? p.slice(p.lastIndexOf("node_modules/") + 13);
-  return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link && registryName(e.resolved))
-    .map(([p, e]) => ({ name: registryName(e.resolved), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
+  // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
+  return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
+    .map(([p, e]) => ({ name: registryName(e.resolved) ?? nameOf(p), ...(registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
       by: direct.has(p) ? [] : [...reached].filter(([, set]) => set.has(p)).map(([d]) => nameOf(d)) }));
+}
+
+// Where an entry that npm's registry does not give comes from, in a few words for the report.
+function source(resolved) {
+  if (typeof resolved !== "string" || !resolved) return "no address the lock file names";
+  if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/u.test(resolved)) return "a git address";
+  const host = /^https?:\/\/([^/:@?#]{1,100})/u.exec(resolved)?.[1];
+  return host ? `a web address on ${host}` : "an address of another kind";
 }
 
 // The lock entry that an install puts in place for `name`, as seen from the package at `from`: the nearest node_modules going up.
@@ -139,7 +148,7 @@ export function repository(field) {
   if (!url) return null;
   const dir = typeof field?.directory === "string" && /^[\w./-]{1,200}$/u.test(field.directory) && !field.directory.split("/").includes("..") ? field.directory.replace(/^\.?\/+|\/+$/gu, "") : "";
   const gh = /^(?:git\+)?(?:https?|git|ssh):\/\/(?:git@)?github\.com\/([\w.-]{1,100})\/([\w.-]{1,100}?)(?:\.git)?\/?$/u.exec(url) ?? /^(?:github:)?([\w.-]{1,100})\/([\w.-]{1,100})$/u.exec(url);
-  return gh && gh[1] !== "." && gh[1] !== ".." ? { url: `github.com/${gh[1]}/${gh[2]}`, owner: gh[1], name: gh[2], dir } : { url };
+  return gh && ![gh[1], gh[2]].some((part) => part === "." || part === "..") ? { url: `github.com/${gh[1]}/${gh[2]}`, owner: gh[1], name: gh[2], dir } : { url };
 }
 
 /** What NuGet's registry says of a package, from its registration index and the pages `page(item)` gives. */
@@ -166,6 +175,7 @@ export async function lookUp(packages, { get, now = Date.now(), nuget = false, s
   const failures = [], reports = [], github = { asked: 0 };
   await pool(packages, 8, async (p) => {
     const at = `${said(p.lockPath)}: ${said(p.name)}@${said(p.version)}`, where = registryOf(nuget);
+    if (p.from) { reports.push(`${at}: not from ${where} but from ${said(p.from)}, so not looked up: the review reads where it comes from`); return; }
     let facts;
     try { facts = await registry(p, get, nuget, sources); } catch (e) {
       failures.push(`${at}: ${where} could not be read (${said(e.message)}). Mend: run the job again; if it fails the same way, say so in the pull request and leave the package out until it passes`);
@@ -248,13 +258,14 @@ async function pool(items, size, work) {
 // ---- The project
 
 /** The lock files of `nuget` or npm the config names, and the base's own of the same kind, each read to packages. */
-export function packagesOf(config, root, base, nuget) {
-  const named = nuget ? [...nugetConfig(config).ships, ...nugetConfig(config).tools] : config.lockfiles ?? [];
+/** The lock files of `nuget` or npm the config names, each read to packages, and the base's: the same paths, and those
+ *  the config as the base held it named (`baseConfig`), as the base held them. Only a lock file a config names counts
+ *  as held, so no file merged as data first makes a name count as held. */
+export function packagesOf(config, root, base, nuget, baseConfig = null) {
+  const named = (c) => { try { return nuget ? [...nugetConfig(c).ships, ...nugetConfig(c).tools] : Array.isArray(c?.lockfiles) ? c.lockfiles : []; } catch { return []; } };
   const read = nuget ? nugetPackages : npmPackages;
-  const head = named.map((f) => [f, read(readFileSync(posix.join(root, f), "utf8"), f)]);
-  const kind = nuget ? /^packages(?:\.[^/]+)?\.lock\.json$/iu : /^(?:package-lock|npm-shrinkwrap)\.json$/u;
-  const listed = execFileSync("git", ["ls-tree", "-r", "-z", "--name-only", base], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0");
-  const baseFiles = listed.filter((f) => kind.test(posix.basename(f)) && !f.startsWith("core/"));
+  const head = named(config).map((f) => [f, read(readFileSync(posix.join(root, f), "utf8"), f)]);
+  const baseFiles = [...new Set([...named(config), ...named(baseConfig)].map((f) => posix.normalize(f)))];
   const baseLists = baseFiles.map((f) => { try { return read(textAt(root, base, f) ?? "", f); } catch { return []; } });
   return { head, base: baseLists };
 }
@@ -269,12 +280,13 @@ const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${messag
 
 /** The check on the project at `root`, read against `base` (a commit, or null), its config at `configPath` as the
  *  working folder names it: { lines, code }, each line as the workflow prints it. */
-export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now() }) {
-  if (!base) return { lines: [`ok   no pull request's base here, so no package is new: nothing looked up${process.env.GITHUB_EVENT_NAME?.startsWith("pull_request") ? " (note: this is a pull request, so its checkout lacks the base: give it fetch-depth: 2, or the lookup reads nothing)" : ""}`], code: 0 };
+export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now(), event = process.env.GITHUB_EVENT_NAME }) {
+  if (!base && event?.startsWith("pull_request")) return { lines: ["FAIL: this is a pull request, and its checkout holds no base to read it against, so the lookup would read nothing. Mend: give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)"], code: 1 };
+  if (!base) return { lines: ["ok   no pull request's base here, so no package is new: nothing looked up"], code: 0 };
   let found, sources = 0;
   try {
     const config = nuget ? JSON.parse(readFileSync(configPath, "utf8")) : loadConfig(configPath);
-    const { head, base: held } = packagesOf(config, root, base, nuget);
+    const { head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath));
     found = newPackages(head, held, nuget);
     if (nuget) sources = nugetConfig(config).sources.length;
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
@@ -284,13 +296,22 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${registryOf(nuget)}, each printed above for the review`], code: failures.length ? 1 : 0 };
 }
 
+// The pull request's base as its workflow names it (LOOKUP_BASE, from the event's base commit), where the checkout holds
+// that commit: a checkout of the head alone, or of a head that merges main, would read no base, or the pull request's
+// own earlier commit as its first parent.
+function namedBase(root) {
+  const sha = process.env.LOOKUP_BASE;
+  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/u.test(sha)) return null;
+  try { execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { cwd: root, stdio: "ignore" }); return sha; } catch { return null; }
+}
+
 if (started(import.meta.url)) {
   const configPath = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!configPath) { console.error("FAIL: no config was named. Mend: name it: node core/scripts/lookup.mjs <the licence check's config> [--nuget]"); process.exit(1); }
   let root;
   try { root = projectAt(fileURLToPath(new URL(".", import.meta.url))).root || execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8" }).trim(); }
   catch (e) { console.error(`FAIL: ${logged(e.message)}. Mend: run it from the project's root, a git repository`); process.exit(1); }
-  const { lines, code } = await run(configPath, { root, base: baseOf(root), nuget: process.argv.includes("--nuget") });
+  const { lines, code } = await run(configPath, { root, base: namedBase(root) ?? baseOf(root), nuget: process.argv.includes("--nuget") });
   for (const line of lines) (line.startsWith("FAIL") ? console.error : console.log)(line);
   // (what is printed for the review, also on the run's summary page, where a reviewer finds it beside the checks)
   if (process.env.GITHUB_STEP_SUMMARY && lines.length > 1) {

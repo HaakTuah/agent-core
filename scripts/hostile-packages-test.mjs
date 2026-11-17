@@ -174,7 +174,7 @@ if (process.platform !== "win32") {
 {
   const pkg = { name: "hostile-moss", version: "1.0.0", path: "node_modules/hostile-moss", direct: true, brings: 0, lockPath: "package-lock.json" };
   const now = Date.parse("2026-11-16T12:00:00Z"), old = new Date(now - 800 * 86400000).toISOString();
-  ok(repository({ url: "https://github.com/a/b", directory: "../../etc" })?.dir === "" && repository({ url: "https://github.com/../b" })?.owner === undefined && repository({ url: "https://github.com/a/b/../../c" })?.owner === undefined, "lookup: a repository's folder or owner that leads up is not followed");
+  ok(repository({ url: "https://github.com/a/b", directory: "../../etc" })?.dir === "" && repository({ url: "https://github.com/../b" })?.owner === undefined && repository({ url: "https://github.com/a/b/../../c" })?.owner === undefined && repository({ url: "https://github.com/someone/.." })?.owner === undefined && repository("someone/.")?.owner === undefined, "lookup: a repository's folder or owner that leads up is not followed");
   let threw = 0;
   for (const doc of [null, [], "text", { time: { created: 5 }, versions: {} }, { time: { created: "yesterday" }, versions: {} }]) { try { npmFacts(doc, "1.0.0"); } catch { threw++; } }
   ok(threw === 5, "lookup: an answer that is no object, or whose first date is no date, is refused");

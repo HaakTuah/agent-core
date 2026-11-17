@@ -319,6 +319,19 @@ function movedPaths(p) {
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
 }
 
+// The jobs of a workflow that run the lookup with no checkout of the base beside the head (a fetch-depth of 0, or 2 or
+// more, on the same job's checkout): each such job reads nothing new. A workflow whose YAML cannot be read is read
+// whole, as one job.
+function blindJobs(w, deep) {
+  const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
+  if (!jobs) return /core\/scripts\/lookup\.mjs/u.test(w.text ?? "") && !deep.test(w.text ?? "") ? [w] : [];
+  return jobs.filter(job => {
+    const steps = Array.isArray(job?.steps) ? job.steps : [];
+    if (!steps.some(st => typeof st?.run === "string" && /core\/scripts\/lookup\.mjs/u.test(st.run))) return false;
+    return !steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep.test(`fetch-depth: ${st.with?.["fetch-depth"]}`));
+  });
+}
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
@@ -522,7 +535,7 @@ export const STEPS = [
         return [
           /core\/scripts\/exact-versions\.mjs/u.test(text) && !runs.some(l => !/--nuget/u.test(l)) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
           /core\/scripts\/nuget(?:-fetch)?\.mjs/u.test(text) && !runs.some(l => /--nuget/u.test(l)) ? `in ${at}, before the step that restores or runs \`core/scripts/nuget.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
-          runs.length && !deep.test(text) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
+          runs.length && blindJobs(w, deep).length ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
         ].filter(Boolean);
       });
       return wrong.length ? `On every pull request, ${wrong.join("; ")}; the checkout with \`fetch-depth: 2\` holds the pull request's base, which the lookup reads against.` : null;

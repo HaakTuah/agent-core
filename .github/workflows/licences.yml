@@ -85,6 +85,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           CONFIG: ${{ inputs.config }}
+          LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
         run: node "$CORE_AT"scripts/lookup.mjs "$CONFIG"
       - name: Every tool the agents load listed, with its publisher and version (floor topic 15)
         if: ${{ !cancelled() }}

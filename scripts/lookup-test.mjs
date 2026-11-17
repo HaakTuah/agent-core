@@ -66,7 +66,7 @@ const lock = { lockfileVersion: 3, packages: {
 const read = npmPackages(JSON.stringify(lock), "package-lock.json");
 const by = (name) => read.find((p) => p.name === name);
 ok(by("dev-moss")?.direct === true && by("dev-moss")?.brings === 0, "npm: a development dependency of the project's own is named by it, and an installed package's own development dependencies bring nothing");
-ok(read.length === 5, `npm: the five packages npm's registry gives are read, the one from git and the link left out (${read.map((p) => p.name)})`);
+ok(read.length === 6 && by("from-git")?.from === "a git address" && read.filter((p) => p.from).length === 1, `npm: the five packages npm's registry gives are read, and the one from git marked so, the link left out (${read.map((p) => p.name)})`);
 ok(by("tidy-moss-helper")?.direct === true, "npm: an alias is read by the name its registry address gives, and counts as named by the project");
 ok(by("tidy-moss-format")?.direct === true && by("tidy-moss-format")?.brings === 2, "npm: a package the project names brings what its dependencies bring, deep too");
 ok(by("brand-new-moss")?.direct === false && by("brand-new-moss")?.brings === 1 && by("@invented/scoped-moss")?.by.join() === "tidy-moss-format", "npm: a package another brings is not named by the project, and names what does");
@@ -81,7 +81,7 @@ ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.bri
 
 // ---- What is new
 const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-helper" }], [{ name: "@invented/scoped-moss" }]]);
-ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,dev-moss,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
+ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,dev-moss,from-git,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
 ok(newPackages([["a/package-lock.json", [pkg("x", { direct: false })]], ["b/package-lock.json", [pkg("x")]]], []).length === 1, "a package new in two lock files is looked up once, where the project names it");
 ok(newPackages([["a/package-lock.json", [pkg("x")]], ["b/package-lock.json", [pkg("x", { direct: false })]]], [])[0]?.lockPath === "a/package-lock.json", "and once named by the project, it stays so where another lock file only brings it");
 ok(newPackages([["packages.lock.json", [pkg("Invented.Moss.Core")]]], [[{ name: "invented.moss.core" }]], true).length === 0, "NuGet: an id the base held in another case is not new");
@@ -96,6 +96,8 @@ ok(!/[\r\n]/u.test(odd.reports[0] ?? "\n"), "a lock file's path is printed on on
 const report = r.reports[0] ?? "";
 for (const fact of ["named by the project", `first published ${ago(800).slice(0, 10)} (800 days ago)`, `last release ${ago(30).slice(0, 10)}`, "repository github.com/invented-org/tidy-moss-format, archived, naming the package back", "published by invented-publisher", "brings 2 packages with it", "provenance: yes"])
   ok(report.includes(fact), `the report says "${fact}" (${report})`);
+r = await one(pkg("from-git", { from: "a web address on example.invalid" }));
+ok(r.failures.length === 0 && r.reports[0]?.includes("not from the npm registry but from a web address on example.invalid, so not looked up") && !asked.some((u) => u.includes("from-git")), `a new entry from elsewhere than the registry is printed, never asked of it (${r.reports})`);
 r = await one(pkg("never-published-moss"));
 ok(r.failures.length === 1 && /has no such package/u.test(r.failures[0]) && mended(`FAIL: ${r.failures[0]}`), `a name the registry does not know fails, saying the mend (${r.failures})`);
 r = await one(pkg("taken-off-moss"));
@@ -155,18 +157,22 @@ try {
   writeFileSync(join(tmp, "package.json"), "{}");
   const write = (packages) => writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...packages } }));
   write({ "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format") } });
+  mkdirSync(join(tmp, "fixtures"), { recursive: true });
+  writeFileSync(join(tmp, "fixtures/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0") } } }));
   git("add", "-A"); git("commit", "-qm", "base");
   const base = git("rev-parse", "HEAD");
   const config = join(tmp, "licences.json");
-  r = await run(config, { root: tmp, base: null, get, now: NOW });
-  ok(r.code === 0 && /nothing looked up/u.test(r.lines.join("\n")), "with no base, nothing is new and nothing is asked");
+  r = await run(config, { root: tmp, base: null, get, now: NOW, event: "push" });
+  ok(r.code === 0 && /nothing looked up/u.test(r.lines.join("\n")), "with no base, as on a push, nothing is new and nothing is asked");
+  r = await run(config, { root: tmp, base: null, get, now: NOW, event: "pull_request" });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && /fetch-depth: 2/u.test(r.lines[0]), `with no base on a pull request, it fails, saying the mend (${r.lines})`);
   asked.length = 0;
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 0 && asked.length === 0 && /ok {3}0 new packages/u.test(r.lines.join("\n")), `what the base held is not looked up (${r.lines})`);
   write({ "node_modules/tidy-moss-format": { version: "1.2.0", resolved: tgz("tidy-moss-format", "1.2.0") }, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0") } });
   r = await run(config, { root: tmp, base, get, now: NOW });
   const out = r.lines.join("\n");
-  ok(r.code === 1 && mended(out) && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out), `an update passes unlooked, and a new name the registry lacks fails, saying the mend (${r.lines})`);
+  ok(r.code === 1 && mended(out) && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out), `an update passes unlooked, and a new name the registry lacks fails, saying the mend, though a lock file the config does not name held it (${r.lines})`);
   writeFileSync(join(tmp, "package-lock.json"), "{ not json");
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && mended(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend (${r.lines})`);
@@ -185,6 +191,9 @@ try {
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `with both, a checkout of one commit is still reported, since the lookup would read no base (${missed.map((m) => m.mend)})`);
   writeFileSync(join(tmp, ".github/workflows/own.yml"), `${readFileSync(join(tmp, ".github/workflows/own.yml"), "utf8").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n")}`);
   ok(notDone(tmp, step).length === 0, "and with both, on a checkout that holds the base, the step is done");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: echo first\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `a fetch depth in another job than the lookup's does not count (${missed.map((m) => m.mend)})`);
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");
