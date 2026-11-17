@@ -147,7 +147,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents, in
      Claude Code's, Kiro's or Codex's files, that the config's "agentTools" does not list, with its publisher and
      version, a plug-in or tool server at the version its configuration pins where it pins one: floor topic 15; and a
-     hook that takes a file of the project from the working tree, not from `main`: floor rule 3). A package or
+     hook that takes a file of the project from the working tree, not from `main`, where its command is plain or the
+     starter kit's form, noting any other as not read: floor rule 3). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
