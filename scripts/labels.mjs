@@ -211,7 +211,7 @@ const fail = msg => { console.error(`FAIL: ${msg}`); return 1; };
 
 // The wrong option given, as the words of its failure, or null where the options are right.
 function optionError(args, at, by, since) {
-  if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\dZ)?$/.test(since ?? "")) return "--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z";
+  if (at >= 0 && !/^\d{4}-\d\d-\d\d(?:T\d\d:\d\d:\d\dZ)?$/.test(since ?? "")) return "--since needs a date after it, as 2026-11-16 or 2026-11-16T00:00:00Z";
   if (by >= 0 && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(args[by + 1] ?? "")) return "--owner needs the owner's account after it";
   return null;
 }
