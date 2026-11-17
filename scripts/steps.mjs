@@ -269,6 +269,20 @@ function nugetPathsHold(p) {
   return wrong.length ? `The \`paths:\` of a call to the NuGet check let through a change to every file a build of the project's reads, or the check starts on none of its changes: add each, by its exact path, to ${wrong.map(([f, missed]) => `\`.github/workflows/${f}\`: ${missed.map(asPattern).join(", ")}`).join("; ")} (a name shown with "?" holds a control character or a backtick: rename it).` : null;
 }
 
+// A call to one of the core's pull-request checks whose job is skipped on a draft runs on a pull request once it is
+// ready only where its trigger starts it when one is marked ready (#375): without that, the check a draft skipped never
+// runs on that head, and a ruleset counts the skip as passed. Each workflow where a call does so is named.
+function readyOnlyHolds(p) {
+  const checks = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget)\.yml@/i;
+  readable(p, text => checks.test(text));
+  const types = on => [].concat(on?.types ?? []).map(String);
+  const wrong = Object.entries(p.workflows).filter(([, w]) => w.yaml?.on && typeof w.yaml.on === "object" && "pull_request" in w.yaml.on
+    && !types(w.yaml.on.pull_request).includes("ready_for_review")
+    && Object.values(w.yaml.jobs ?? {}).some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/`.toLowerCase()) && checks.test(job.uses)
+      && /\bpull_request\.draft\b/.test(String(job.if ?? ""))));
+  return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
+}
+
 // Rule 5 of a project's SECURITY.md, from its line "5. " to the next rule or heading at a line's start: its lines, the
 // first without its number and title; null where there is none.
 function rule5(text) {
@@ -560,6 +574,8 @@ export const STEPS = [
   { lead: "16 November 2026, corrections counted and the outcomes read", cost: COST.line,
     unread: "whether the repository holds a label is GitHub's, in no file: the labels check run at each sync reports the label `correction` missing, its mend `core/scripts/labels.mjs --make`; the cost line is held by the description check, and the bug form's line is a difference `core/scripts/fresh.mjs` lists" },
   { lead: "16 November 2026, the agent tools' files read for copies and pointers", cost: COST.config, check: toolFilesListed },
+  { lead: "16 November 2026, checks once a pull request is ready", cost: COST.workflow, check: readyOnlyHolds,
+    partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the trigger and the condition a private project's calls lack" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

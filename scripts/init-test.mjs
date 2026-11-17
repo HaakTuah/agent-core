@@ -12,9 +12,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
-import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, sizes, startOf, TEMPLATES } from "./init.mjs";
+import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, READY_ONLY, sizes, startOf, TEMPLATES } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
+import { evaluate, parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
@@ -87,6 +87,16 @@ const filter = privateCall.on.pull_request?.paths ?? [];
 ok(filter.length > 0 && pathsLetThrough(filter, ["App.csproj"]) && pathsLetThrough(filter, ["src/App/packages.lock.json"]) && pathsLetThrough(filter, ["NuGet.Config"]) && pathsLetThrough(filter, ["src/App.CSPROJ"]) && pathsLetThrough(filter, ["Packages.Lock.Json"]) && pathsLetThrough(filter, ["a/packages.net8.0.lock.json"]) && pathsLetThrough(filter, ["checks/licences.json"])
   && !pathsLetThrough(filter, ["README.md", "src/App/Program.cs", "core/scripts/nuget.mjs"]) && privateCall.jobs.nuget.with.config === "checks/licences.json" && publicCall.on.pull_request === null,
   "a private project's NuGet check starts only on a pull request that changes a file NuGet reads by name, in any case, so no other bills a job; a public one's on every pull request", JSON.stringify(privateCall.on));
+// a private repository's pull-request checks start only once a pull request is ready (#375): each call also triggers
+// when one is marked ready, its job skipped on a draft and run on a push to main; a public one's as they were
+const callsOf = o => Object.fromEntries(files({ owner: "someone", name: "P", nuget: ".", packages: ".", ...o }, A, ["git.md"], fromFolder).filter(([to]) => READY_ONLY.includes(to)).map(([to, text]) => [to, parseYaml(text)]));
+const privateCalls = callsOf({ private: true }), publicCalls = callsOf({});
+const asked = (wf, action, draft, event = "pull_request") => Object.values(wf.jobs).map(job => evaluate(String(job.if ?? "true").replace(/^\$\{\{|\}\}$/g, ""), { github: { event_name: event, event: event === "pull_request" ? { action, pull_request: { draft } } : {} } }))
+  .every(Boolean) && (event !== "pull_request" || (wf.on.pull_request?.types ?? ["opened", "reopened", "synchronize"]).includes(action));
+ok(Object.keys(privateCalls).length === READY_ONLY.length && Object.values(privateCalls).every(wf => !asked(wf, "synchronize", true) && !asked(wf, "opened", true) && asked(wf, "ready_for_review", false) && asked(wf, "synchronize", false) && asked(wf, "opened", false) && (!wf.on.push || asked(wf, null, null, "push")))
+  && privateCalls[".github/workflows/personal-terms.yml"].on.pull_request.types.join() === "opened,edited,synchronize,reopened,ready_for_review" && privateCalls[".github/workflows/nuget.yml"].on.pull_request.paths?.length > 0
+  && Object.values(publicCalls).every(wf => asked(wf, "synchronize", true) && Object.values(wf.jobs).every(job => job.if === undefined)),
+  "a private project's calls to the core's pull-request checks start no job on a push to a draft, and each once it is marked ready, pushed to once ready or opened ready, and on a push to main; its personal-terms and NuGet calls keep their own types and paths; a public one's start on every push as before", JSON.stringify(privateCalls));
 const both = dependabot({ packages: "web", nuget: "." });
 ok(ecosystems(both) === 3 && both.indexOf('directory: "/web"') > 0 && both.indexOf('directory: "/web"') < both.indexOf('"nuget"') && (both.match(/^version: 2$/gm) ?? []).length === 1, "a project with both installers gets both, in one config");
 ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");
