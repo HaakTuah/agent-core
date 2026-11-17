@@ -144,96 +144,132 @@ function linesIn(json, f, byHand, fail) {
 export function scan(settings, root, entries, auditPath, lockfiles = []) {
   const failures = [];
   const fail = (m) => { if (!failures.includes(m)) failures.push(m); };
-  const holds = (p, f) => typeof p === "string" && (p === "" || p === f || (p.endsWith("/") && f.startsWith(p)));
-  const under = (f, paths) => (paths ?? []).some((p) => holds(p, f));
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
   const tracked = git("ls-files", "-z").split("\0").filter(Boolean);
   const project = tracked.includes("core-manifest.md"); // (a project, whose copy of the core the core audits)
   const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
-  const served = (f) => under(f, settings.served) && !under(f, settings.tools);
-  const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));
-  const covering = (f) => entries.filter((e) => covers(e, f));
-  const need = (name, where, version) => {
-    const named = entries.filter((e) => e.name === name && e.kind !== "own");
-    if (!named.length) fail(`${name} (${where}) is not in ${auditPath}. Mend: add an entry for it there, with its name, exact version, licence and "ships"`);
-    else if (version && !named.some((e) => e.version === version)) fail(`${name}@${version} (${where}) is audited at ${named.map((e) => e.version ?? "no version").join(", ")}. Mend: audit the new version, and what it pulls in, in ${auditPath}`);
-  };
-  const needFile = (f, what, { own = true } = {}) => {
-    const by = covering(f).filter((e) => own || e.kind !== "own");
-    if (!by.length) fail(`${f} (${what}) is not in ${auditPath}${own ? "" : ", by an entry not the owner's own"}. Mend: name ${f} in the "files" of the entry that audits it`);
-    else if (served(f) && !by.every((e) => e.ships === true)) fail(`${f} (${what}) reaches users, so every entry covering it ships. Mend: set "ships": true on each entry whose "files" covers it`);
-  };
-  const byHand = (f) => covering(f).some((e) => e.kind !== "own");
-  const fetches = (text, f, literal = false) => {
-    for (const line of commands(text, JS.test(f) || WEB.test(f), literal)) {
-      const { specs, unreadable, packs } = fetched(String(line), line.atCommand === true, literal || line.literal === true);
-      const where = `${f}, ${line.trim().replaceAll("\u0000", " ").slice(0, 120)}`;
-      if (unreadable) fail(`${where}: ${unreadable}, which cannot be audited. Mend: fetch it as npx -p <name>@<exact version>`);
-      for (const spec of specs) {
-        const exact = EXACT.exec(spec);
-        if (exact) need(exact[1], where, exact[2]);
-        else if (!(packs && byHand(f))) fail(`${where}: ${spec} cannot be audited. Mend: write it as name@exact.version${packs ? `, or name ${f} in the "files" of the entry that audits it` : ""}`);
-      }
-    }
-    if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there. Mend: take that setting out`);
-    if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read. Mend: take that setting out`);
-    const other = byHand(f) ? undefined : otherFetch(text);
-    if (other) fail(`${f}: ${other.trim()} fetches what no entry's "files" says. Mend: name ${f} in the "files" of the entry that audits it`);
-  };
+  // (what the scan's parts share: scanned, below)
+  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail };
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
-  for (const e of entries) {
-    if (e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p))) { fail(`${auditPath}: ${e.name}: "files" is not a list of paths. Mend: write it as a list of paths from the project's root`); continue; }
-    if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text. Mend: write the version in quotes`);
-    if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version. Mend: list each file, no folder, and take "version" out`);
-    for (const p of e.files ?? []) if (!tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file. Mend: correct the path, or take it out`);
-    const shipped = files.find((f) => served(f) && covers(e, f));
-    if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
-  }
-  const locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
-  for (const f of files) {
-    if (LOCKFILE.test(f) && !lockfiles.includes(f)) fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
-    const text = binary.has(f) ? "" : trackedText(root, f, fail);
-    // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
-    // scan cannot read; with none, as shell)
-    const bare = !binary.has(f) && !/.\.\w+$/u.test(posix.basename(f)); // (".envrc" and the like have none either)
-    const interpreter = bare && text.startsWith("#!") ? /^#!\s*\S*?(?:env\s+(?:-\S+\s+)*)?([\w.-]+)/u.exec(text.split("\n")[0].replace(/^#!\s*\S*\//u, "#!"))?.[1] ?? "" : "";
-    const other = OTHER_LANGUAGE.test(f) || (bare && interpreter && !/^(sh|bash|dash|zsh|ksh|node|deno|bun|tsx|ts-node)$/u.test(interpreter));
-    const runs = !other && (SHELL.test(f) || JS.test(f) || WEB.test(f) || bare);
-    if (runs) {
-      // (a line that is only a comment fetches nothing; a comment after code stays, since a # or // in a string is none)
-      const comment = JS.test(f) || WEB.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
-      // (lines end as Windows writes them too, or a comment there would be read as code)
-      const src = (WEB.test(f) ? executable(text, f) : text).split(/\r?\n/u).map((l) => l.replace(comment, "")).join("\n");
-      if (YAML.test(f)) {
-        for (const m of src.matchAll(/(?:^|[\s{,])['"]?uses['"]?\s*:\s*['"]?([^\s'",}]+)/gu)) {
-          const used = m[1];
-          if (used.startsWith("./") || used.startsWith(OWN)) continue;
-          need(used.startsWith("docker://") ? used.split("@")[0] : used.split("@")[0].split("/").slice(0, 2).join("/"), f);
-        }
-      }
-      fetches(src, f);
-    } else if (/\.json[c5]?$/u.test(f) && f !== auditPath && !LOCKFILE.test(f)) {
-      let json;
-      try { json = JSON.parse(text); } catch {
-        // (a config with comments, as jsconfig.json and the like may hold: read whole, but a package.json must parse)
-        if (posix.basename(f) === "package.json") fail(`${f} cannot be read as JSON, so the commands in it cannot be scanned. Mend: correct it to JSON`);
-        else fetches(text.split(/\r?\n/u).map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
-      }
-      if (json !== undefined) {
-        for (const line of linesIn(json, f, byHand, fail)) fetches(String(line), f, line.literal === true);
-        const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
-        if (posix.basename(f) === "package.json" && deps && !locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
-          fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile with npm, by its install given --package-lock-only, and name it in the config's "lockfiles"`);
-      }
-    } else if (other) {
-      if (!byHand(f)) fail(`${f} is in a language the scan cannot read. Mend: name it in the "files" of the entries of what it uses`);
-      else if (served(f) && !covering(f).every((e) => e.ships === true)) fail(`${f} (a script in a language the scan cannot read) reaches users, so every entry covering it ships. Mend: set "ships": true on each entry whose "files" covers it`);
-    }
-    // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
-    if (!binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(f, "a file carrying a licence notice", { own: false });
-    if (ASSET.test(f) || binary.has(f)) needFile(f, binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
-  }
+  for (const e of entries) entryFaults(c, e);
+  c.locks = lockfiles.map((l) => ({ dir: posix.dirname(l) === "." ? "" : `${posix.dirname(l)}/`, packages: JSON.parse(readFileSync(join(root, l), "utf8")).packages ?? {} }));
+  for (const f of files) scanned(c, f);
   return { failures, scanned: files.length };
+}
+
+const holds = (p, f) => typeof p === "string" && (p === "" || p === f || (p.endsWith("/") && f.startsWith(p)));
+const under = (f, paths) => (paths ?? []).some((p) => holds(p, f));
+const served = (c, f) => under(f, c.settings.served) && !under(f, c.settings.tools);
+const covers = (e, f) => e.name === f || (Array.isArray(e.files) && e.files.some((p) => p !== "" && holds(p, f)));
+const covering = (c, f) => c.entries.filter((e) => covers(e, f));
+const byHand = (c, f) => covering(c, f).some((e) => e.kind !== "own");
+const badFiles = (e) => e.files !== undefined && (!Array.isArray(e.files) || e.files.some((p) => typeof p !== "string" || !p));
+
+/** What fails in an audit entry `e` itself (scan, above): its "files", its "version", the owner's own work, and
+ *  whether it ships what reaches users. */
+function entryFaults(c, e) {
+  const { auditPath, fail } = c;
+  if (badFiles(e)) { fail(`${auditPath}: ${e.name}: "files" is not a list of paths. Mend: write it as a list of paths from the project's root`); return; }
+  if (e.version !== undefined && typeof e.version !== "string") fail(`${auditPath}: ${e.name}: "version" is not text. Mend: write the version in quotes`);
+  if (e.kind === "own" && (e.version !== undefined || (e.files ?? []).some((p) => p.endsWith("/")))) fail(`${auditPath}: ${e.name}: the owner's own work names its files one by one, with no version. Mend: list each file, no folder, and take "version" out`);
+  for (const p of e.files ?? []) if (!c.tracked.some((f) => holds(p, f))) fail(`${auditPath}: ${e.name}: ${p} names no tracked file. Mend: correct the path, or take it out`);
+  const shipped = c.files.find((f) => served(c, f) && covers(e, f));
+  if (shipped && e.ships !== true) fail(`${auditPath}: ${e.name}: it covers ${shipped}, which reaches users, so it ships. Mend: set "ships": true on it`);
+}
+
+/** That the package `name` (used in `where`) has an entry, at `version` where one is given (scan, above). */
+function need(c, name, where, version) {
+  const named = c.entries.filter((e) => e.name === name && e.kind !== "own");
+  if (!named.length) c.fail(`${name} (${where}) is not in ${c.auditPath}. Mend: add an entry for it there, with its name, exact version, licence and "ships"`);
+  else if (version && !named.some((e) => e.version === version)) c.fail(`${name}@${version} (${where}) is audited at ${named.map((e) => e.version ?? "no version").join(", ")}. Mend: audit the new version, and what it pulls in, in ${c.auditPath}`);
+}
+
+/** That an entry covers the file `f` (`what` it is), but the owner's own where `own` is false, and that each ships
+ *  where it reaches users (scan, above). */
+function needFile(c, f, what, { own = true } = {}) {
+  const by = covering(c, f).filter((e) => own || e.kind !== "own");
+  if (!by.length) c.fail(`${f} (${what}) is not in ${c.auditPath}${own ? "" : ", by an entry not the owner's own"}. Mend: name ${f} in the "files" of the entry that audits it`);
+  else if (served(c, f) && !by.every((e) => e.ships === true)) c.fail(`${f} (${what}) reaches users, so every entry covering it ships. Mend: set "ships": true on each entry whose "files" covers it`);
+}
+
+/** What the commands in `text`, of the file `f`, fetch, each held to its entry (scan, above). */
+function fetches(c, text, f, literal = false) {
+  for (const line of commands(text, JS.test(f) || WEB.test(f), literal)) {
+    const { specs, unreadable, packs } = fetched(String(line), line.atCommand === true, literal || line.literal === true);
+    const where = `${f}, ${line.trim().replaceAll("\u0000", " ").slice(0, 120)}`;
+    if (unreadable) c.fail(`${where}: ${unreadable}, which cannot be audited. Mend: fetch it as npx -p <name>@<exact version>`);
+    for (const spec of specs) {
+      const exact = EXACT.exec(spec);
+      if (exact) need(c, exact[1], where, exact[2]);
+      else if (!(packs && byHand(c, f))) c.fail(`${where}: ${spec} cannot be audited. Mend: write it as name@exact.version${packs ? `, or name ${f} in the "files" of the entry that audits it` : ""}`);
+    }
+  }
+  if (/\bnpm_config_(@[\w-]+:)?registry\b|\bnpm_config_replace_registry_host\b|\bnpm_config_(user|global)config\b/iu.test(text)) c.fail(`${f}: it points npm at another registry than npm's, so no audited name can be trusted there. Mend: take that setting out`);
+  if (/\bnpm_config_(package_lock|shrinkwrap)\b/iu.test(text)) c.fail(`${f}: it installs without the lockfile, so what it installs is not what the lockfile's check read. Mend: take that setting out`);
+  const other = byHand(c, f) ? undefined : otherFetch(text);
+  if (other) c.fail(`${f}: ${other.trim()} fetches what no entry's "files" says. Mend: name ${f} in the "files" of the entry that audits it`);
+}
+
+/** The scan of one tracked file `f` (scan, above): by what it is, and for a licence notice it carries. */
+function scanned(c, f) {
+  if (LOCKFILE.test(f) && !c.lockfiles.includes(f)) c.fail(`${f} installs packages the config's "lockfiles" does not name, so nothing checks their licences. Mend: name ${f} in the config's "lockfiles"`);
+  const text = c.binary.has(f) ? "" : trackedText(c.root, f, c.fail);
+  const { other, runs } = readAs(c, f, text);
+  if (runs) scanRunning(c, f, text);
+  else if (/\.json[c5]?$/u.test(f) && f !== c.auditPath && !LOCKFILE.test(f)) scanJson(c, f, text);
+  else if (other) scanOther(c, f);
+  // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
+  if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
+  if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
+}
+
+/** How the scan reads the file `f` holding `text` (scanned, above): `other`, in a language it cannot read; `runs`, as
+ *  shell, JavaScript or a page. */
+function readAs(c, f, text) {
+  // (a file with no extension, a hook or a script, is read by its #! line: as shell or JavaScript, or as a language the
+  // scan cannot read; with none, as shell)
+  const bare = !c.binary.has(f) && !/.\.\w+$/u.test(posix.basename(f)); // (".envrc" and the like have none either)
+  const interpreter = bare && text.startsWith("#!") ? /^#!\s*\S*?(?:env\s+(?:-\S+\s+)*)?([\w.-]+)/u.exec(text.split("\n")[0].replace(/^#!\s*\S*\//u, "#!"))?.[1] ?? "" : "";
+  const other = OTHER_LANGUAGE.test(f) || (bare && interpreter && !/^(sh|bash|dash|zsh|ksh|node|deno|bun|tsx|ts-node)$/u.test(interpreter));
+  return { other, runs: !other && (SHELL.test(f) || JS.test(f) || WEB.test(f) || bare) };
+}
+
+/** A file that runs (scanned, above): the actions a workflow uses, and what its commands fetch. */
+function scanRunning(c, f, text) {
+  // (a line that is only a comment fetches nothing; a comment after code stays, since a # or // in a string is none)
+  const comment = JS.test(f) || WEB.test(f) ? /^\s*\/\/.*$/u : /^\s*#.*$/u;
+  // (lines end as Windows writes them too, or a comment there would be read as code)
+  const src = (WEB.test(f) ? executable(text, f) : text).split(/\r?\n/u).map((l) => l.replace(comment, "")).join("\n");
+  if (YAML.test(f)) {
+    for (const m of src.matchAll(/(?:^|[\s{,])['"]?uses['"]?\s*:\s*['"]?([^\s'",}]+)/gu)) {
+      const used = m[1];
+      if (used.startsWith("./") || used.startsWith(OWN)) continue;
+      need(c, used.startsWith("docker://") ? used.split("@")[0] : used.split("@")[0].split("/").slice(0, 2).join("/"), f);
+    }
+  }
+  fetches(c, src, f);
+}
+
+/** A script in a language the scan cannot read (scanned, above): the entries of what it uses cover it. */
+function scanOther(c, f) {
+  if (!byHand(c, f)) c.fail(`${f} is in a language the scan cannot read. Mend: name it in the "files" of the entries of what it uses`);
+  else if (served(c, f) && !covering(c, f).every((e) => e.ships === true)) c.fail(`${f} (a script in a language the scan cannot read) reaches users, so every entry covering it ships. Mend: set "ships": true on each entry whose "files" covers it`);
+}
+
+/** A JSON file (scanned, above): the commands it holds, and, of a package.json, that a lockfile installs its
+ *  dependencies. */
+function scanJson(c, f, text) {
+  let json;
+  try { json = JSON.parse(text); } catch {
+    // (a config with comments, as jsconfig.json and the like may hold: read whole, but a package.json must parse)
+    if (posix.basename(f) === "package.json") c.fail(`${f} cannot be read as JSON, so the commands in it cannot be scanned. Mend: correct it to JSON`);
+    else fetches(c, text.split(/\r?\n/u).map((l) => l.replace(/^\s*\/\/.*$/u, "")).join("\n"), f);
+  }
+  if (json === undefined) return;
+  for (const line of linesIn(json, f, (g) => byHand(c, g), c.fail)) fetches(c, String(line), f, line.literal === true);
+  const deps = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"].some((k) => Object.keys(json?.[k] ?? {}).length);
+  if (posix.basename(f) === "package.json" && deps && !c.locks.some(({ dir, packages }) => f.startsWith(dir) && packages[posix.dirname(f.slice(dir.length)).replace(/^\.$/u, "")]))
+    c.fail(`${f} has dependencies no lockfile the config names installs, so nothing checks their licences. Mend: write its lockfile with npm, by its install given --package-lock-only, and name it in the config's "lockfiles"`);
 }
