@@ -13,6 +13,9 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #486, points 6 to 8 and 11 | rule builder | |
 | #527, step 2 | rule builder | #526 |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
+| #528, step 3 | rule builder | #527 |
+| #529, step 4 | builder | #528 |
+| #530, step 5 | builder | #529 |
 | #593, point 5 | rule builder | |
 | #534, point 13 | rule builder | |
 | #593, points 1 to 3 | rule builder | |
@@ -31,9 +34,7 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #591 | builder | #589 |
 | #585 | builder | |
 | #586 | builder | |
-| #528, step 3 | rule builder | #527 |
-| #529, step 4 | builder | #528 |
-| #530, step 5 | builder | #529 |
+| #546 | rule builder; a workflow, two security reviews | |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #306 | rule builder | |
 | #307 | rule builder | |
@@ -55,7 +56,7 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391 |
 | #355 | builder | |
-| #391 | builder; the look's work-down of the core's listed functions, which overlaps #355 | |
+| #391 | builder; it overlaps #355 | |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457, #355 and #391 |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
@@ -79,7 +80,7 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
-| #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
+| #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
 
