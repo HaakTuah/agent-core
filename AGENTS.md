@@ -297,9 +297,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   is seen and overridden. It does not mean that a script guesses, nor that what only the owner can give (the personal
   terms, a setting on the owner's account, a certificate, the holder's name in a licence file, and whose word counts
   where the host cannot say it) is taken from elsewhere or given a default (floor rules 4, 11 and 14). Reason: a project
-  that takes the core on trust sets nothing, so a rule that waits for a setting gives it its worst case. Held by `scripts/manifest-reads.mjs --core`, which fails a slot with no mark, a
-  `read:` whose reader is not there and any other with no default; by each reader's own test; and by the review
-  guidelines ("A rule file changed").
+  that takes the core on trust sets nothing, so a rule that waits for a setting gives it its worst case. Held by
+  `scripts/manifest-reads.mjs --core`, which fails a slot with no mark, a `read:` whose reader is not there and any
+  other with no default; by each reader's own test; and by the review guidelines ("A rule file changed").
 - **Rules are written for any project.** The projects that take the core differ in what they build
   (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read
   them (anyone, the owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what
