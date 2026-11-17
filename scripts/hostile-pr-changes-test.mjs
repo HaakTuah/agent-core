@@ -148,6 +148,19 @@ if (process.platform !== "win32") {
 branch("gh-nothing", () => {});
 r = only();
 ok(r.status === 0 && r.out.includes("nothing changed in .github/") && !r.out.includes("comments and steps' names alone in"), "comment-only: an empty diff is read as no file proven");
+for (const [what, arg] of [["names no commit", "no-such-commit"], ["is a path", "../../etc/passwd"], ["is an option", "--output=x"], ["is all noughts", "0".repeat(40)]]) {
+  r = only(arg);
+  ok(r.status === 1 && r.out.includes("is no commit before the head") && !raw(r.out), `comment-only: an argument that ${what} is refused in its own words, no stack of git's`);
+}
+// (a refusal past what a pipe holds at once, printed whole before its script exits: whole-output.mjs, which pure-sync.mjs,
+// comment-only.mjs and copies.mjs import first)
+{
+  const last = "FAIL: the last line. Mend: none, a test's", script = path.join(tmp, "long-refusal.mjs");
+  fs.writeFileSync(script, `import ${JSON.stringify(new URL("./whole-output.mjs", import.meta.url).href)};\nfor (let i = 0; i < 20000; i++) console.error("x".repeat(99));\nconsole.error(${JSON.stringify(last)});\nprocess.exit(1);\n`);
+  const cut = spawnSync(process.execPath, [script], { encoding: "utf8", maxBuffer: 1 << 28 });
+  ok(cut.status === 1 && cut.stderr.length === 20000 * 100 + last.length + 1 && cut.stderr.trimEnd().endsWith(last), "two megabytes printed through a pipe before process.exit reach it whole, its last line, the mend, included");
+  ok([..."pure-sync.mjs comment-only.mjs copies.mjs".split(" ")].every(f => /^import "\.\/whole-output\.mjs";$/mu.test(fs.readFileSync(path.join(root, "scripts", f), "utf8"))), "pure-sync.mjs, comment-only.mjs and copies.mjs each import whole-output.mjs");
+}
 
 // ---- select.mjs: the changed paths, as the tests workflow reads them ----
 const envFile = path.join(tmp, "github-env");

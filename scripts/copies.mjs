@@ -26,6 +26,7 @@
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
 // to add the project's rule files: those floor rule 3 names, those its SECURITY.md adds, and an agent tool's
 // (rule-files.mjs, beside it).
+import "./whole-output.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

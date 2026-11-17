@@ -68,7 +68,7 @@ export function check(lockfile, read) {
   let lock;
   try { lock = parseBounded(read(lockfile)); } catch (e) { return [`${lockfile}: cannot be read as JSON (${logged(e.message)}). Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`]; }
   const packages = lock?.packages;
-  if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
+  if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed). Mend: write the lock file anew with npm 7 or later, never by hand: its install, given --package-lock-only`];
   const root = posix.dirname(lockfile);
   if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread. Mend: write the lock file anew with npm: its install, given --package-lock-only`);
   for (const key of Object.keys(packages).filter(own)) {

@@ -413,7 +413,7 @@ function lockfilePackages(root, lockPath, ships, text = (f) => ownText(root, f))
   const base = posix.dirname(lockPath) === "." ? "" : posix.dirname(lockPath);
   const read = (p) => {
     const f = posix.join(base, p), t = text(f);
-    try { return parseBounded(t); } catch (e) { throw new Error(`${f} cannot be read as JSON (${e.message}). Mend: write it as npm does, the lock file anew with npm, never by hand: its install, given --package-lock-only`); }
+    try { return parseBounded(t); } catch (e) { throw new Error(`${f} cannot be read as JSON (${e.message}). Mend: ${posix.basename(p) === "package.json" ? "correct it to JSON, then write" : "write"} the lock file anew with npm, never by hand: its install, given --package-lock-only`); }
   };
   const lock = read(posix.basename(lockPath));
   if (!lock.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) throw new Error(`${lockPath} has no "packages" (npm's lockfile version 2 or 3). Mend: write it anew with npm, version 7 or later: its install, given --package-lock-only`);

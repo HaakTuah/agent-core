@@ -93,6 +93,10 @@ const scanned = (files) => {
   ok([5, [{ type: "MIT" }], ["MIT"], { url: "x" }].every((l) => { const f = one({ version: "1.0.0", license: l }).failures; return f.length === 1 && said(f); }), "a package whose own licence is a number, a list or an object with no type, where the lock says MIT, fails with its mend");
   ok(["[]", "5", '"MIT"', "null"].every((t) => said(one(t).failures)), "a package.json that is a list, a number, a text or null cannot be read, and fails with its mend");
   ok(said(one({ version: 1, license: "MIT" }, { version: "1", license: "MIT" }).failures), "a package's version given as a number is not the lock's text");
+  for (const [what, entry] of [["a text", "1.0.0"], ["a list", [{ version: "1.0.0" }]], ["null", null], ["a number", 5]]) {
+    const r = installed(fresh({ "package-lock.json": lockOf({ "node_modules/moss-a": entry }) }), LINUX);
+    ok(r.failures.length === 1 && said(r.failures) && /not read/u.test(r.summary), `a lock entry that is ${what}, not written as npm writes one, is refused with its mend, and nothing of the lock read`);
+  }
   ok(["not a zip", "PK\u0005\u0006"].every((b) => throws(() => contentHash(Buffer.from(b))) && throws(() => nuspecOf(Buffer.from(b)))), "bytes that are no zip have no content hash and no manifest");
   ok(refusedFetch(await fetch(Buffer.from("not a zip at all"))), "a NuGet package file that is no zip is refused with its mend, and nothing is written");
   const broken = zip([["Moss.A.nuspec", nuspec("MIT")]]);
