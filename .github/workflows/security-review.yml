@@ -212,14 +212,21 @@ jobs:
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
           # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
           # repository; its login, checked as one, is all that goes into the route, and an answer that cannot be read
-          # counts for no one (the script reads each strictly)
+          # counts for no one (the script reads each strictly). All of them share 45 seconds, ten at most each, so both
+          # statuses are still written within the job's time; past that, the owner's and the named accounts count
           owner=$(jq -r '.base.repo.owner.login // "" | ascii_downcase' "$d/pull.json")
           : > "$d/rights.txt"
+          until=$((SECONDS + 45))
           for login in $(jq -r --arg o "$owner" '[.[][] | select(type == "object" and (.body | type) == "string"
             and (.body | test("^(\\*\\*)?Security review:")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
             and .user.type == "User" and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
             | .user.login | ascii_downcase | select(. != $o)] | unique | .[:20][]' "$d/comments.json"); do
-            if timeout 20 gh api "repos/$REPO/collaborators/$login/permission" > "$d/right.json" 2> /dev/null \
+            left=$((until - SECONDS))
+            if [ "$left" -le 0 ]; then
+              echo "The time for reading the host's rights is spent: a review of $login and those after counts only where the input reviewers names it."
+              break
+            fi
+            if timeout "$((left < 10 ? left : 10))" gh api "repos/$REPO/collaborators/$login/permission" > "$d/right.json" 2> /dev/null \
               && jq -e 'type == "object"' "$d/right.json" > /dev/null 2>&1
             then cat "$d/right.json" >> "$d/rights.txt"
             else echo "The host's rights of $login could not be read: a review of theirs counts only where the input reviewers names it."; fi
