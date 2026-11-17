@@ -16,6 +16,7 @@ import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, nam
 import { scratch } from "./scratch-core.mjs";
 import { evaluate, parseYaml } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
+import { BLOB_MAX, readBlobs } from "./blobs.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -266,6 +267,89 @@ if (p.status === 0) {
   git(core, "reset", "-q", "--hard", "main");
   ok(renamedOut.status === 1 && /reads 1 files fewer than main's config read: elsewhere\.md \(prose\)\. Mend: take the config back/u.test(renamedOut.out) && mended(renamedOut.out) && deleted.status === 0 && !renamedOut.left && !deleted.left,
     "against the base, a file its config read and renamed out of every spec fails, by its new name, with its mend; one deleted passes; and the base's index is taken away after", `${renamedOut.out}${deleted.out}`);
+  // (a file renamed out of every spec and rewritten past half, which git reads as deleted and added, or whose lines
+  // move into a file no spec reads, is followed to the file that took in most of its lines; one that took in half or
+  // less passes; #434)
+  const howText = fs.readFileSync(path.join(core, "roles/shared/how-to-work.md"), "utf8");
+  const fresh = Array.from({ length: howText.split("\n").length * 3 }, (_, i) => `A line of new text, the ${i}th.`).join("\n");
+  git(core, "mv", "roles/shared/how-to-work.md", "elsewhere.md");
+  fs.appendFileSync(path.join(core, "elsewhere.md"), `\n${fresh}\n`);
+  git(core, "add", "elsewhere.md");
+  const status = git(core, "diff", "-M", "--name-status", "--cached", "main");
+  const rewritten = baseRun();
+  git(core, "reset", "-q", "--hard", "main");
+  fs.appendFileSync(path.join(core, "CHOICES.md"), `\n${howText}`);
+  git(core, "rm", "-q", "roles/shared/how-to-work.md");
+  git(core, "add", "CHOICES.md");
+  const movedIn = baseRun();
+  git(core, "reset", "-q", "--hard", "main");
+  // (exactly half of a file's lines, each holding a word and counted once, is not most of them)
+  const distinct = f => [...new Set(fs.readFileSync(path.join(core, f), "utf8").split("\n").map(l => l.trim()).filter(l => /[\p{L}\p{N}]/u.test(l)))];
+  const even = ["roles/shared/how-to-work.md", ...fs.readdirSync(path.join(core, "tasks")).map(f => `tasks/${f}`)].find(f => f.endsWith(".md") && distinct(f).length % 2 === 0);
+  fs.writeFileSync(path.join(core, "notes.md"), `${distinct(even).slice(0, distinct(even).length / 2).join("\n")}\n`);
+  git(core, "rm", "-q", even);
+  git(core, "add", "notes.md");
+  const partly = baseRun();
+  git(core, "reset", "-q", "--hard", "main");
+  fs.rmSync(path.join(core, "notes.md"), { force: true });
+  // (a line in any script counts: a read file of a heading and lines in another alphabet, deleted, is not taken in by a
+  // file that holds the heading alone)
+  const branch = git(core, "rev-parse", "--abbrev-ref", "HEAD");
+  git(core, "checkout", "-q", "-b", "with-notes");
+  fs.writeFileSync(path.join(core, "roles/shared/notes.md"), "# Notes\n\nПервая строка\nВторая строка\nТретья строка\n");
+  git(core, "add", "roles/shared/notes.md");
+  git(core, "commit", "-q", "-m", "a read file in another alphabet");
+  git(core, "rm", "-q", "roles/shared/notes.md");
+  fs.writeFileSync(path.join(core, "elsewhere.md"), "# Notes\n");
+  git(core, "add", "elsewhere.md");
+  const alphabet = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "with-notes" }, encoding: "utf8" });
+  git(core, "checkout", "-q", "-f", branch);
+  git(core, "branch", "-q", "-D", "with-notes");
+  git(core, "reset", "-q", "--hard", "main");
+  fs.rmSync(path.join(core, "elsewhere.md"), { force: true });
+  // (a read file of fewer than three lines, deleted, is followed nowhere, though a new file holds both its lines)
+  git(core, "checkout", "-q", "-b", "with-stub");
+  fs.writeFileSync(path.join(core, "roles/shared/stub.md"), "# Notes\nTODO\n");
+  git(core, "add", "roles/shared/stub.md");
+  git(core, "commit", "-q", "-m", "a read file of two lines");
+  git(core, "rm", "-q", "roles/shared/stub.md");
+  fs.writeFileSync(path.join(core, "log.md"), "# Notes\nTODO\nA meeting log of its own.\n");
+  git(core, "add", "log.md");
+  const stub = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "with-stub" }, encoding: "utf8" });
+  git(core, "checkout", "-q", "-f", branch);
+  git(core, "branch", "-q", "-D", "with-stub");
+  git(core, "reset", "-q", "--hard", "main");
+  fs.rmSync(path.join(core, "log.md"), { force: true });
+  // (a new file named "0:u.md", which git would read as the index's u.md, steers nothing: the file that took the text
+  // in is named; off Windows, where a name may hold a colon)
+  let decoy = null;
+  if (process.platform !== "win32") {
+    git(core, "rm", "-q", "roles/shared/how-to-work.md");
+    fs.writeFileSync(path.join(core, "u.md"), `${howText}\n${fresh}\n`);
+    fs.writeFileSync(path.join(core, "0:u.md"), "Decoy.\n");
+    git(core, "add", "u.md", "0:u.md");
+    decoy = baseRun();
+    git(core, "reset", "-q", "--hard", "main");
+    for (const f of ["u.md", "0:u.md"]) fs.rmSync(path.join(core, f), { force: true });
+  }
+  const tookIn = file => new RegExp(`reads 1 files fewer than main's config read: ${file} \\(prose, which took in most of the lines of roles/shared/how-to-work\\.md, deleted\\)\\. Mend: take the config back`, "u");
+  ok(/^D\troles\/shared\/how-to-work\.md$/mu.test(status) && rewritten.status === 1 && tookIn("elsewhere\\.md").test(rewritten.out) && mended(rewritten.out)
+    && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0 && alphabet.status === 0 && stub.status === 0
+    && (decoy === null || (decoy.status === 1 && tookIn("u\\.md").test(decoy.out) && !/0:u\.md \(prose/u.test(decoy.out))),
+    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them, only the lines in one alphabet of a file in two, or a file of two lines, passes; a decoy named as an index path steers nothing", `${status}${rewritten.out}${movedIn.out}${partly.out}${alphabet.stdout}${alphabet.stderr}${stub.stdout}${stub.stderr}${decoy?.out ?? ""}`);
+  // (the blobs the follow reads: one batch, a binary or a file past its megabyte skipped; a read git fails, or an answer
+  // cut short, fails the check with its mend, never an empty answer that would switch the follow off; #434)
+  const answer = parts => (args, ids) => Buffer.from(args[1] === "--batch-check" ? parts.check(ids) : parts.read(ids), "latin1");
+  const asked = [];
+  const blobsRead = readBlobs(["a1", "b2", "c3", "a1"], answer({
+    check: () => `a1 blob 3\nb2 blob 2\nc3 blob ${BLOB_MAX + 1}\n`,
+    read: ids => { asked.push(...ids); return ids.map(id => (id === "a1" ? "a1 blob 3\nhi\n\n" : "b2 blob 2\nx\0\n")).join(""); } }));
+  const gitFails = readBlobs(["a1"], () => { throw Object.assign(new Error("spawn"), { stderr: Buffer.from("fatal: not a git repository\n") }); });
+  const cutShort = readBlobs(["a1"], answer({ check: () => "a1 blob 3\n", read: () => "a1 blob 3\nhi" }));
+  ok(blobsRead.text?.get("a1") === "hi\n" && !blobsRead.text.has("b2") && !blobsRead.text.has("c3") && blobsRead.text.size === 1 && asked.join() === "a1,b2"
+    && /^git could not read .*\(fatal: not a git repository\)/u.test(gitFails.failure) && mended(`FAIL: ${gitFails.failure}`)
+    && /did not parse to its end, at byte 0 of 12/u.test(cutShort.failure) && mended(`FAIL: ${cutShort.failure}`) && readBlobs([]).text.size === 0,
+    "the follow's blobs are read in one batch, a binary or a file past a megabyte skipped; a read git fails, or an answer cut short, fails with its mend", JSON.stringify([...(blobsRead.text ?? [])]) + (gitFails.failure ?? "") + (cutShort.failure ?? ""));
   // (a file of the core's copy that a sync moves out of what the project's config reads fails nothing: the core's own
   // pull request held the move)
   const coreFile = fs.readdirSync(path.join(p.dir, "core/tasks")).find(f => f.endsWith(".md"));

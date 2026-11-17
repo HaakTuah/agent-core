@@ -25,6 +25,10 @@
 # reads, by NuGet's own record beside each package it brought (.nupkg.metadata), that it took none from elsewhere; a
 # source that asks for a sign-in has none here. A project for Windows alone restores here all the same
 # (EnableWindowsTargeting); one whose SDK the runner lacks restores in a workflow of its own, and runs the script there.
+# Before that, and before anything of the pull request's runs, core/scripts/lookup.mjs asks NuGet's registry of each
+# package the pull request brings into a lock file that no lock file of its base held (floor topic 15, "A new one is
+# looked up in its registry"), failing an id the registry does not know and one first published under 90 days ago, and
+# printing the rest for the review; it reaches NuGet's registry and GitHub's public API, with no token.
 # It first looks whether the pull request changes anything NuGet reads, so that a private repository pays for no
 # restore a pull request cannot have changed, while the check still reports on every pull request (core archive 201).
 # Two looks: git's own diff against the base, as the signature check looks, for a project file, a lock file, a .props,

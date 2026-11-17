@@ -85,3 +85,16 @@ The index, and how an item is written: `archive/instructions.md`.
      by what the project's own recent work cost and is the owner's to sign off beyond it, and every move passes the same
      gates: the core's first records showed options limited to what an issue named and an author answering its own
      challenger, and the owner wants such picks robust, never a large rewrite for a small gain.
+
+252. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
+     fails a name it does not know and one first published under 90 days ago, a bad package has a procedure, and a
+     new one is taken in an order: a model sometimes names a package that does not exist and someone registers the
+     name, such a name is new and has no history, which a script can read, and the floor said what to do about a
+     leaked secret and nothing about a bad package, whose first hour is when it matters.
+
+253. **17 November 2026**, #526, the first step of the path #519's judgment set out. The core's scripts promise to run
+     on the least long-term Node line as well as on the pin: a project's machine keeps its own Node where it is at or
+     above that line, or fetches the pin where it is below or has none, and the core's suites run on both, so that every
+     later step of the path stands on a Node a project's machine already holds while the checks keep one exact Node. It
+     stands behind "Node" in `tasks/updates.md`, `.node-least`, `scripts/node.sh` and the suites' matrix in
+     `.github/workflows/tests.yml`.
