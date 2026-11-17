@@ -505,10 +505,10 @@ function shownNotBlob(root, rev, at) {
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
-// a link inside the repository is followed (eight hops at most), its target put before what is left of the path, so a
-// ".." in it steps back from the folder the links before it led to; one that leads out of the repository is not. Names
-// are read as git stores them (-z: no quoting), each looked up in the commit's one listing, so a file read costs git no
-// process but its text's.
+// a link inside the repository is followed (forty hops at most, as Linux follows them), its target put before what is
+// left of the path, so a ".." in it steps back from the folder the links before it led to; one that leads out of the
+// repository is not. Names are read as git stores them (-z: no quoting), each looked up in the commit's one listing, so
+// a file read costs git no process but its text's.
 function walk(root, rev, f) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
@@ -519,7 +519,7 @@ function walk(root, rev, f) {
     const here = [...at, name].join("/");
     if (linked.has(here)) {
       const to = textAt(root, rev, here) ?? "/";
-      if (++hops > 8 || path.posix.isAbsolute(to)) return null;
+      if (++hops > 40 || path.posix.isAbsolute(to)) return null;
       left.unshift(...to.split("/"));
       continue;
     }

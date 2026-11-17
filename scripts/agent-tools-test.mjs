@@ -336,6 +336,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "the link mended");
     git(blocked, "checkout", "-q", "main"); git(blocked, "merge", "-q", "--no-ff", "-m", "merge", "change");
     fails(run(blocked), "a hook a link turns on, where the base's link went through a file and so led nowhere, is new", 'the hook "Kiro PostFileSave');
+    // (#476's code review of 9a2907b: a folder reached through nine links is read at the base as in the tree, which follows forty)
+    const chained = project({ "hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
+    fs.symlinkSync("hooks", path.join(chained, "l1"));
+    for (let i = 2; i <= 8; i++) fs.symlinkSync(`l${i - 1}`, path.join(chained, `l${i}`));
+    fs.mkdirSync(path.join(chained, ".kiro"), { recursive: true });
+    fs.symlinkSync("../l8", path.join(chained, ".kiro/hooks"));
+    git(chained, "add", "-A"); git(chained, "commit", "-q", "-m", "hooks through nine links");
+    const chainedKept = run(pr(chained, { "README.md": "a change of its own\n" }));
+    ok(chainedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(chainedKept.out), "a hook under a folder reached through nine links, the base's, is noted, not failed", chainedKept.out);
   }
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
