@@ -91,7 +91,7 @@ function main() {
   for (const j of jobs) {
     const r = run(j.file, j.id, j.job);
     failed += r.failed; ran += r.ran;
-    if (j.name === "core.yml" && r.copy) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
+    if (j.name === "core.yml" && (r.copy ?? r.failed > 0)) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
   }
   if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
   say(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);

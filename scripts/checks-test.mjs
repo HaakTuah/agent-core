@@ -86,6 +86,10 @@ const run = (dir, args, extra = {}) => {
     ".github/workflows/signatures.yml": `name: signatures\non: pull_request\njobs:\n  signatures:\n    uses: ${CORE}/.github/workflows/signatures.yml@${"a".repeat(40)}\n    with:\n      directory: web\n` });
   const s = run(separate, []);
   ok(/^ran copies\.mjs \[own\/copies\.json\]/m.test(s.out) && /^ran reading-size\.mjs \[own\/sizes\.json\]/m.test(s.out) && /^== Does the pull request change what this check reads\?$/m.test(s.out), "the calls of their own: copies with its config and marks, and the signature check", s.out);
+  // (two calls of the signature check, each for a lock file's folder of its own: each runs, nothing merged into one)
+  const two = project({ "web/package.json": "{}\n", "api/package.json": "{}\n", ".github/workflows/signatures.yml": ["web", "api"].map((d, k) => `${k ? "" : "name: signatures\non: pull_request\njobs:\n"}  s${k}:\n    uses: ${CORE}/.github/workflows/signatures.yml@${"a".repeat(40)}\n    with:\n      directory: ${d}\n`).join("") });
+  const both = run(two, [], { BASE_SHA: git(two, "rev-parse", "HEAD") });
+  ok(both.status === 0 && (both.out.match(/^== Does the pull request change what this check reads\?$/gm) ?? []).length === 2, "two calls of the signature check, for two folders, each run by hand, as their workflows run them", both.out);
 }
 // the package checks look first: with nothing they read changed, nothing is installed or restored
 {

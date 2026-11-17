@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { HOST_OWN } from "./check.mjs";
+import { CORE } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
 import { root, scratch, scratchEnv, tally } from "./scratch-core.mjs";
 
@@ -108,6 +109,17 @@ ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, po
   commit(q.dir, "a pin that is no commit of the core, and an edited script of the copy");
   s = check(q.dir, "--base", "base");
   ok(s.status === 1 && !fs.existsSync(mark) && mended(s.out), "where the core cannot be fetched at the pin, the copy's own scripts run not at all", s.out);
+  // (and where the call to core.yml itself is pinned to no commit of the core, so it cannot even be read, the separate
+  // checks after it, which run the copy's scripts, run not at all either)
+  git(q.dir, "reset", "-q", "--hard", "base");
+  fs.writeFileSync(path.join(q.dir, "core", "scripts", "checks.mjs"), `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\n`);
+  const calls = path.join(q.dir, ".github", "workflows", "core.yml");
+  fs.writeFileSync(calls, fs.readFileSync(calls, "utf8").replace(/(\/\.github\/workflows\/core\.yml@)[0-9a-f]{40}/, `$1${"e".repeat(40)}`));
+  fs.writeFileSync(path.join(q.dir, ".github", "workflows", "copies.yml"), fs.readFileSync(path.join(root, "setup", "template", "workflows", "copies.yml.tmpl"), "utf8").replaceAll("{{core}}", CORE).replaceAll("{{pin}}", /^Core: \S+ at ([0-9a-f]{40})/m.exec(fs.readFileSync(qManifest, "utf8"))[1]));
+  commit(q.dir, "a call to core.yml that cannot be read, a call of the copies check's own, and an edited script of the copy");
+  git(q.dir, "branch", "-f", "base");
+  s = check(q.dir);
+  ok(s.status === 1 && !fs.existsSync(mark) && /the copy of the core is not the core at its pin, so no other check runs/.test(s.out) && mended(s.out), "where core.yml cannot even be read at its call's pin, no check after it runs the copy's scripts", s.out);
 }
 
 // a change that takes a check's call out still runs it: the calls are the base's

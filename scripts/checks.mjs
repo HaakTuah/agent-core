@@ -68,7 +68,8 @@ function main() {
   const results = [];
   const check = (name, fn) => { console.log(`== ${name}`); const passed = fn(); results.push([name, passed]); return passed; };
   try {
-    for (const part of PARTS.filter(p => o.parts.includes(p))) RUN[part](o, { coreAt, temp, check });
+    // (each part once for each call that runs it with settings of its own, as two calls for two lock files' folders)
+    for (const part of PARTS.filter(p => o.parts.includes(p))) for (const settings of runsOf(o, part)) RUN[part]({ ...o, ...settings }, { coreAt, temp, check });
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
   const failed = results.filter(([, passed]) => !passed).map(([name]) => name);
   console.log(failed.length ? `${failed.length} of ${results.length} checks failed, each saying its mend above: ${failed.join("; ")}` : `ok   ${results.length} checks passed`);
@@ -126,21 +127,30 @@ function callsHere(root) {
     .map(job => [call.exec(String(job?.uses ?? ""))?.[1]?.toLowerCase(), job?.with ?? {}]).filter(([which]) => which);
 }
 
-// By hand, with no part named: what the project's own calls to the core's workflows run, with their inputs; what is
-// given on the command line wins.
+// By hand, with no part named: what the project's own calls to the core's workflows run, each call's part with its own
+// inputs, a part run once for each distinct call (runsOf), what the command line gives winning.
 export function fromCalls(root, given) {
-  const found = { parts: [] };
+  const runs = [];
   for (const [part, settings] of callsHere(root).flatMap(([which, w]) => FROM[which](w))) {
-    if (!found.parts.includes(part)) found.parts.push(part);
-    for (const [k, v] of Object.entries(settings)) if (k === "advisory") found.advisory ||= v === true; else if (v !== undefined && v !== null && v !== "") found[k] ??= String(v);
+    const set = Object.fromEntries(Object.entries(settings).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => [k, k === "advisory" ? v === true : String(v)]));
+    if (!runs.some(r => r.part === part && JSON.stringify(r.settings) === JSON.stringify(set))) runs.push({ part, settings: set });
   }
-  if (!found.parts.length) fail("no part is named, and the project calls none of the core's workflows these parts run.", `name a part (${PARTS.join(", ")}) with its options, as the usage line at the top of scripts/checks.mjs shows.`);
+  if (!runs.length) fail("no part is named, and the project calls none of the core's workflows these parts run.", `name a part (${PARTS.join(", ")}) with its options, as the usage line at the top of scripts/checks.mjs shows.`);
+  let parts = [...new Set(runs.map(r => r.part))];
   // (the description, by hand, only where one is given)
   if (given.description === undefined && process.env.PR_BODY === undefined) {
-    found.parts = found.parts.filter(p => p !== "description");
+    parts = parts.filter(p => p !== "description");
     console.log("note the description check is not run: give --description <a file that holds the pull request's description>");
   }
-  return { ...found, ...Object.fromEntries(Object.entries(given).filter(([k, v]) => k !== "parts" && v !== undefined && v !== false)) };
+  return { parts, runs };
+}
+
+// The settings a part runs with, once for each call that runs it: the project's calls' (fromCalls), each with what the
+// command line gives over it; or, where parts are named on the command line, that line's alone.
+function runsOf(o, part) {
+  if (!o.runs) return [{}];
+  const given = Object.fromEntries(Object.entries(o).filter(([k, v]) => !["parts", "runs", "advisory"].includes(k) && v !== undefined));
+  return o.runs.filter(r => r.part === part).map(r => ({ ...r.settings, ...given, advisory: r.settings.advisory === true || o.advisory }));
 }
 
 // The base, as a commit: what --base names, fetched where it is origin/<branch> and not here yet (a checkout of one
