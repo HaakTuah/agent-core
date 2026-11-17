@@ -325,6 +325,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   same way. Reason: in one evening three rules were read against what the owner meant, each for want of an observable
   trigger or a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
   guidelines ("A rule file changed").
+- **What can be read is never asked or declared** (#481). By default a fact about a project's set-up
+  that can be read exactly, from its repository, its host, the tools at hand or the record of its past work, is read by
+  a script, and a row of its manifest, or the owner's word, only overrides what was read; what the owner wants (a pace,
+  a taste, what a product ships for, which kinds of choice the owner keeps) is no fact, is never guessed, and has a
+  default the owner's word changes, so nothing waits on it. Where a fact cannot be read exactly, it has a default and an
+  override, as a choice has. Whoever writes a rule or a slot that takes a fact about the set-up says where it is read
+  from, or why it cannot be; each slot of the README's table carries one mark, `read:` with its reader, `choice:` with
+  its default, or `cannot be read:` with the reason and a default; and a reader prints what it read, so a wrong reading
+  is seen and overridden. It does not mean that a script guesses, nor that what only the owner can give (the personal
+  terms, a setting on the owner's account, a certificate, the holder's name in a licence file, and whose word counts
+  where the host cannot say it) is taken from elsewhere or given a default (floor rules 4, 11 and 14). Reason: a project
+  that takes the core on trust sets nothing, so a rule that waits for a setting gives it its worst case. Held by
+  `scripts/manifest-reads.mjs --core`, which fails a slot with no mark, a `read:` whose reader is not there and any
+  other with no default; by each reader's own test; and by the review guidelines ("A rule file changed").
 - **Rules are written for any project.** The projects that take the core differ in what they build
   (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read
   them (anyone, the owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what
