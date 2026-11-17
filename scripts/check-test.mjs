@@ -47,20 +47,27 @@ ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\
 // told so too, while check.mjs is given an environment that does not tell it; #513)
 if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
 const planted = process.platform === "win32" ? ["bash.exe", "git.exe"] : ["bash", "git"];
+// (elsewhere each leaves a mark where it runs, so a run the check's outcome would not show is seen too)
+const ranMark = path.join(tmp, "planted-ran");
 for (const f of planted) {
   if (process.platform === "win32") fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), path.join(dir, f));
-  else fs.writeFileSync(path.join(dir, f), "#!/bin/sh\nexit 3\n", { mode: 0o755 });
+  else fs.writeFileSync(path.join(dir, f), `#!/bin/sh\necho "$0" >> '${ranMark}'\nexit 3\n`, { mode: 0o755 });
 }
 commit(dir, "programs named as the checks' own");
-{
-  // (and with "." and an empty entry ahead on its PATH, each the folder it starts in, which the check must not look in)
-  const untold = Object.fromEntries(Object.entries(env).filter(([name]) => name.toLowerCase() !== "nodefaultcurrentdirectoryinexepath")
-    .map(([name, value]) => [name, /^path$/iu.test(name) ? `.${path.delimiter}${path.delimiter}${value}` : value]));
-  const u = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: untold, encoding: "utf8" });
-  r = { status: u.status, out: `${u.stdout}${u.stderr}` };
-}
-ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out), "programs named bash and git at the change's root run in place of none the checks start, \".\" and an empty entry on the PATH too", r.out);
-git(dir, "reset", "-q", "--hard", "HEAD~1");
+// (and with "." and an empty entry ahead on its PATH, each the folder it starts in, which the check must not look in)
+const untold = Object.fromEntries(Object.entries(env).filter(([name]) => name.toLowerCase() !== "nodefaultcurrentdirectoryinexepath")
+  .map(([name, value]) => [name, /^path$/iu.test(name) ? `.${path.delimiter}${path.delimiter}${value}` : value]));
+const checkUntold = () => { const u = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: untold, encoding: "utf8" }); return { status: u.status, out: `${u.stdout}${u.stderr}` }; };
+const ranPlanted = () => (fs.existsSync(ranMark) ? fs.readFileSync(ranMark, "utf8").trim() : "");
+r = checkUntold();
+ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && ranPlanted() === "", "programs named bash and git at the change's root run in place of none the checks start, \".\" and an empty entry on the PATH too", `${ranPlanted()}\n${r.out}`);
+// (with no owner's account in the manifest, the check asks the host who holds the repository, starting git and gh in
+// the project's folder from its own environment, held so too)
+fs.writeFileSync(path.join(dir, "core-manifest.md"), fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").replace(/^\| \*owner's account\*.*\n/mu, ""));
+commit(dir, "no owner's account");
+r = checkUntold();
+ok(!/owner's account\* \|/u.test(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")) && ranPlanted() === "", "with no owner's account in the manifest, the host is asked by no program of the change's", `${ranPlanted()}\n${r.out}`);
+git(dir, "reset", "-q", "--hard", "HEAD~2");
 // (and bash is taken from the PATH as the system takes it: on POSIX, a file of that name the user may not run, in a
 // folder ahead on the PATH, is passed over for the one it may)
 if (process.platform !== "win32") {
