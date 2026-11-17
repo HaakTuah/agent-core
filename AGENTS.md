@@ -302,9 +302,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/holders.mjs` counts as having no holder, worst first, a rule read at a role's start before one read on need,
   each with its proposal in `reports/unheld.json` (#545): a check or staged case that could hold it, filed as a task; a
   move to a module read on need; that it goes; or, where it binds no one, that it describes. The session gives one to
-  each that has none and takes out those whose rule gained a holder, a check only where it never guesses and its
-  upkeep pays, a maintained tool where one reads the breach (#534), and files each check as an issue, which joins the
-  queue as any check for a rule that stands does, worst first; a rule that guards against rare and severe harm is
+  each that has none, a check only where it never guesses and its upkeep pays, a maintained tool where one reads the
+  breach (#534), takes out those whose rule gained a holder, and files each check as an issue, which joins the queue as
+  any check for a rule that stands does, worst first; a rule that guards against rare and severe harm is
   proposed a holder, never to go.
   Nothing changes it. The owner decides which move or go, a few at a time, the numbers read again before more go; the
   list gives each rule its step: a rule read at a role's start is at step 1, to move to a module read on need, and one
