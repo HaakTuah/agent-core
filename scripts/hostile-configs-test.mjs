@@ -121,9 +121,8 @@ for (const [text, what] of [["", "empty"], ["null", "null"], ["{", "no JSON"]]) 
   ok(q.status === 1 && mended(`${q.stdout}${q.stderr}`) && !raw(q.stderr), `size.mjs: --raise refuses with its mend comments that are ${what}`);
 }
 
-// ---- manifest-reads.mjs: core-manifest.md, against the modules and slots ----
-const README = "# x\n\n## Slots\n\n| Slot | What |\n| --- | --- |\n| *progress file* | the queue |\n\n## Next\n";
-const read = manifest => notes({ manifest, readme: README, moduleTexts: { "a.md": "Reads the *progress file*." }, floorTexts: {} });
+// ---- manifest-reads.mjs: core-manifest.md, against the modules ----
+const read = manifest => notes({ manifest, moduleTexts: { "a.md": "Reads the *progress file*." } });
 for (const m of [null, undefined, 5, {}, ""]) {
   const n = read(m);
   ok(n.some(l => l.includes("cannot be read")), `manifest-reads.mjs: notes reads a manifest of ${JSON.stringify(m) ?? "undefined"} as taking no module it can tell, and says so`);
