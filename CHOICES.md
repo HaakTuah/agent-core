@@ -158,9 +158,34 @@ this record.
   15% of shipped JavaScript bugs to be caught by a checker (a study of 2017), "to test against" the core's own bugs, and
   named its pick wrong where fewer than about 5 of them a checker would catch, or where a hook's start as TypeScript
   passes 100 ms on Windows.
-- **Looked for:** (pending)
-- **The case against** (pending)
-- **The answer.** (pending)
+
+- **The case against** (the same challenger):
+  1. Criterion 1 is applied unevenly: Bun and Python can be fetched by digest as the pinned Node is, and the whole
+     sweep passed on Node 22.23.4, not the pin, so the exact pin bought nothing the trial measured; one long-term line
+     with a least version, as the blind pick has it, would use the Node most machines hold. Settled by the suites on the
+     Node 22 and 24 the runners hold, on Linux and Windows.
+  2. Bun's three failures are not Bun's: one test compares a folder's listing unsorted (Bun lists `x,tests`, Node
+     `tests,x`), a latent fault in the core's test; two start the hook with Node's `--input-type=module -`. Granted to
+     Node all the same: its long-term promises (8) and Windows, where `check-test.mjs` ran slower on Bun.
+  3. The types trial measures the wrong thing: bugs that reached `main` are those that survived the tests and reviews,
+     while a checker saves the faults found while writing (red runs, review findings within a pull request); a checker
+     over code with no annotation has only `any` to go on, and typed strict code was never tried; and the 4,951
+     annotations are a cost of moving, which this judgment leaves out. Settled by the checker on the heads of recent
+     pull requests that failed a check or drew a review finding, counting findings at lines the same pull request then
+     changed, and by 3 or 4 of the replayed faulty functions written fresh as strict typed code.
+  4. The 100 ms mark argues against TypeScript in a hook's entry file only: types in comments cost nothing at run time,
+     and a typed core may keep its hooks plain. Its own run: the hook 32 ms as JavaScript on Node 22 and 68 to 71 ms as
+     TypeScript, about 37 ms of stripping; the 76 ms above was the hook fed through a shell pipe.
+  5. How well agents write it (criterion 6) is what decides the blind pick, and it was never measured. Settled only by
+     sessions writing the same check three ways, counting red runs before green: a few hours.
+  6. Carrying grammars leaves out their cost over time: each update adds a binary, the C# one up to 5.4 MB, to every
+     project's history for good; a copy cut to the project's stacks can be proven exact the same way, from the commit
+     and the manifest. Settled by packing two versions of the C# grammar and measuring the growth.
+  7. Conceded: JavaScript on Node, tree-sitter over readers by hand, carried over fetched, the formats by packages,
+     the core's tests out of the copy, and the drops of the submodule, the container and the plug-in.
+- **The answer:** the author grants 2 (the listing is to be sorted in a pull request of its own, as a bug) and 4 (the
+  mark binds a hook's entry file, not the core's types), and leaves 1, 3, 5 and 6 to the judge, with the cheap trials
+  their case names.
 - **The judgment:** (pending)
 - **The second judgment, the path:** (pending)
 - **What a sync asks of a project:** nothing, by this record; each step of the path says what its own sync asks.
