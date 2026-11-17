@@ -78,13 +78,14 @@ const real = (p, kind) => {
   return true;
 };
 // A JSON file of the case's (github.json, a memo of its seal), read through one descriptor: a plain file, never a link
-// (refused as it is opened, where the system can) nor a second name of another file, of 16 MB or less; anything else,
-// and text that is no JSON, is Unreadable, its message naming the file and quoting none of its text (#435).
+// (refused as it is opened, where the system can, and opened without waiting, so that a pipe swapped in stops nothing)
+// nor a second name of another file, of 16 MB or less; anything else, and text that is no JSON, is Unreadable, its
+// message naming the file and quoting none of its text (#435).
 const JSON_MAX = 16 << 20;
 const jsonOf = at => {
   if (!real(at, "file")) throw new Unreadable(`${at} is not there`);
   let fd;
-  try { fd = fs.openSync(at, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0)); } catch { throw new Unreadable(`${at} is not a plain file`); }
+  try { fd = fs.openSync(at, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0)); } catch { throw new Unreadable(`${at} is not a plain file`); }
   try {
     const st = fs.fstatSync(fd);
     if (!st.isFile() || st.nlink !== 1 || st.size > JSON_MAX) throw new Unreadable(`${at} is not a plain file of its own, of 16 MB or less`);
@@ -324,7 +325,11 @@ export function branchesOf(dir) {
 // and each case's own memo.
 export const sealOf = dir => `${path.resolve(dir)}.seal`;
 export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
-export const memoOf = (dir, name) => jsonOf(path.join(sealOf(dir), `${name}.json`));
+// (the seal's own folder a real one, never a link to another holding memos of the session's making)
+export const memoOf = (dir, name) => {
+  if (!real(sealOf(dir), "dir")) throw new Unreadable(`${sealOf(dir)} is not there`);
+  return jsonOf(path.join(sealOf(dir), `${name}.json`));
+};
 // (the project's git objects by their files' names: a commit made and then undone, its reflog cleared, still leaves one)
 // (a plain folder, none of its own folders a link, at most a few deep, as git writes it: anything else is Unreadable)
 const objectsOf = dir => {

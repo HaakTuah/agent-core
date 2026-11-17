@@ -312,6 +312,11 @@ if (process.platform !== "win32") {
   const viaLink = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", aside], { encoding: "utf8" });
   ok(/finish: fail: .*github\.json is not a plain file/.test(viaLink.stdout) && !/K3YW0RD5/.test(`${viaLink.stdout}${viaLink.stderr}`),
     "a case whose github.json is a link to a file outside it fails, read as unreadable, and shows none of that file's text", `${viaLink.stdout}${viaLink.stderr}`);
+  // (the seal's folder swapped for a link to another holding memos of the session's making: unreadable)
+  const sealSwap = fresh("finish"), forged = path.join(s.tmp, "forged-seal");
+  fs.cpSync(`${sealSwap}.seal`, forged, { recursive: true }); fs.rmSync(`${sealSwap}.seal`, { recursive: true }); fs.symlinkSync(forged, `${sealSwap}.seal`);
+  const viaSeal = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", sealSwap], { encoding: "utf8" });
+  ok(/finish: fail: .*\.seal is not a plain folder/.test(viaSeal.stdout), "a case whose seal's folder is a link to another fails, read as unreadable", `${viaSeal.stdout}${viaSeal.stderr}`);
 }
 const garbled = fresh("finish"); fs.writeFileSync(path.join(garbled, "github.json"), "S3SSW0RD what the session wrote\n");
 const notJson = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", garbled], { encoding: "utf8" });
