@@ -21,7 +21,10 @@
 //     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the
 //     shape check keeps, while it holds.
-//   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again.
+//   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again; and, in a
+//     project, the packages it holds that have gone stale (held.mjs, beside this file, run as a process of its own, since
+//     it asks the registries over the network): no release within the year, gone from their registry, or their
+//     repository archived, each a task.
 // Its record is the body of one closed issue, "The scheduled look's record", which it writes on each run. A run by a
 // session (not GitHub's job) where the record shows a run less than SOON hours before does nothing more, so an
 // orchestrator's hourly wake makes one look a day. Where this repository's issues cannot be read and written
@@ -39,6 +42,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { look as choicesDue, signs } from "./choices.mjs";
 import { report as citedReport } from "./cited.mjs";
 import { report as outcomesReport } from "./outcomes-read.mjs";
@@ -66,6 +70,7 @@ export const TITLES = {
   steps: "Steps of a release not done",
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
+  stale: "Packages gone stale",
 };
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
@@ -247,6 +252,14 @@ function idleFinding(repo, add) {
   }
 }
 
+// The packages the project holds that have gone stale (held.mjs's --issue): its body, null where none has, or unread
+// where they could not be looked up.
+export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToPath(new URL("./held.mjs", import.meta.url)), "--issue"], { encoding: "utf8", timeout: 180000, maxBuffer: 1 << 24 })) {
+  const r = run();
+  if (r.status === 0) return { title: TITLES.stale, what: r.stdout.trim() || null, unread: null };
+  return { title: TITLES.stale, what: null, unread: "the packages the project holds could not be looked up in their registries this time" };
+}
+
 // What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
 // done (null where they were not read), for the state report.
 function findingsOf({ repo, manifest, owner, at }, reach, last) {
@@ -395,6 +408,8 @@ function main(args) {
   const { findings, stepsLeft } = findingsOf(ctx, reach, last);
   // the state report, once a month
   const report = monthlyOf(ctx, reach, kept, stepsLeft);
+  // (what the project holds, looked up again once a month, with the state report: #488, point 8)
+  if (report.monthly !== null && ctx.manifest !== null) findings.push(staleFinding());
 
   // what is done with each
   if (!reach.yes) { toFolder(ctx, reach, findings, report); return 0; }
