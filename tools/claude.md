@@ -7,7 +7,7 @@ Read by the tool `claude` at the start of every task.
 | Builder | Opus for the main lane, design readings and the *hard work*; Sonnet for routine lanes (polish, docs, splits, tests) | high |
 | Search helper | Haiku | low |
 | Parallel helper (`tasks/helpers.md`) | Sonnet; Opus where it needs design judgement | medium; high for the hard work |
-| Orchestrator (the owner starts it), fallback reviewer, design check, leanness check, stand-in, a choice's challenger | Opus | high |
+| Orchestrator (the owner starts it), fallback reviewer, design check, leanness check, stand-in, a choice's challenger, blind picker and judge | Opus | high |
 | Planning design | Fable | high |
 | Escalation (`tasks/roles.md`) | Opus, then Fable | high, or xhigh if you run at high |
 

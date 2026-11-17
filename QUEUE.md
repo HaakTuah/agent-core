@@ -4,7 +4,7 @@ The order this repository's open issues are built in (`AGENTS.md`, "The queue").
 waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
-the owner's own word. A line on points of #460, #484, #486, #488, #515 or #534 has its PR say "Part of" that issue, or "Fixes" it if
+the owner's own word. A line on points of #460, #484, #486, #488 or #534 has its PR say "Part of" that issue, or "Fixes" it if
 it merges last.
 
 ## In order
@@ -13,7 +13,6 @@ it merges last.
 | --- | --- | --- |
 | #534, point 4 (the inventory) | rule builder, hard work | |
 | #486, points 6 to 8 and 11 | rule builder | |
-| #515, points 1 and 3 to 16 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
 | #526, path step 1 | rule builder | |
 | #527, step 2 | rule builder | #526 |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | the inventory, and #488's points 1 and 3 to 5 |
