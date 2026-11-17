@@ -171,12 +171,11 @@ function readCodex(state, json, read) {
   readHooks(state, ".codex/config.toml", config, "Codex");
   const notify = config.notify;
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
-    // (its words are a program and its arguments, each one whole, so each is read as a single-quoted word of a command:
-    // "scripts/my hook.py" stays one path)
-    // (and its words as written, joined, and each as a script of its own, as "sh -c" runs one: the project's files are
-    // found in them wherever they stand)
-    const quoted = notify.map(w => `'${w.replace(/'/gu, "'\\''")}'`).join(" ");
-    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [quoted, notify.join(" "), ...notify] });
+    // (its words are a program and its arguments, each one whole: they are read as the one command a shell would run them
+    // as, a word that needs no quote as written and any other single-quoted, so a fetch keeps its context, the kit's form
+    // given as bash, -c and its script reads as the kit's, and "scripts/my hook.py" stays one path)
+    const command = notify.map(w => (/^[\w./:@%+,=-]+$/u.test(w) ? w : `'${w.replace(/'/gu, "'\\''")}'`)).join(" ");
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
   }
   addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
 }

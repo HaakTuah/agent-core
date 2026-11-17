@@ -376,6 +376,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     "Kiro's and Codex's hooks are read for it too", 'the hook "Kiro Stop: node', 'takes "scripts/fmt.mjs"', 'the hook "Codex notify: python3 scripts/notify.py"', 'takes "scripts/notify.py"');
   fails(run(pr(project({ ...listing() }), { "scripts/my hook.py": "", ".codex/config.toml": "notify = [\"python3\", \"scripts/my hook.py\"]\n", ...listing({ kind: "hook", name: "Codex notify: python3 scripts/my hook.py", publisher: "this project" }) })),
     "Codex's notify keeps each of its words whole, a path with a blank among them", 'takes "scripts/my hook.py" from the working tree');
+  // (#476's code review of 2a76778: notify's words are read as the one command they make, so a fetch keeps its context and the kit's form passes)
+  const fetchNotify = ["git", "show", "refs/remotes/origin/main:scripts/notify.sh"];
+  const kitNotify = ["bash", "-c", "f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/notify.sh 2>/dev/null) || exit 0; bash -c \"$f\""];
+  for (const [words, what] of [[fetchNotify, "a fetch from main"], [kitNotify, "the kit's form as bash, -c and its script"]])
+    passes(run(pr(project({ ...listing() }), { "scripts/notify.sh": "", ".codex/config.toml": `notify = ${JSON.stringify(words)}\n`, ...listing({ kind: "hook", name: `Codex notify: ${words.join(" ")}`, publisher: "this project" }) })),
+      `Codex's notify given as ${what} takes nothing from the working tree`);
   for (const [words, file] of [[["sh", "-c", "echo \"don't wait\" && python3 \"scripts/x y.py\""], "scripts/x y.py"], [["bash", "-c", "python3 \"scripts/it's hook.py\""], "scripts/it's hook.py"], [["python3", "scripts/it's hook.py"], "scripts/it's hook.py"],
     [["sh", "-c", "python3 \"scripts/it's.py\""], "scripts/it's.py"], [["node", "--require=scripts/it's.py"], "scripts/it's.py"], [["sh", "-c", "python3 scripts/it\\'s.py"], "scripts/it's.py"],
     [["bash", "-c", "python3 $'scripts/it\\'s.py'"], "scripts/it's.py"], [["python3", "-c", "exec(open(\"scripts/it's.py\").read())"], "scripts/it's.py"], [["sh", "-c", "python3 scripts/a,b.py"], "scripts/a,b.py"]]) {
@@ -576,6 +582,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (#476's code review of 0f4ae74: a word whose quoted and unquoted parts join, holding a blank, through such a link)
     for (const command of ["bash tools/\"my hook.sh\"", "bash 'tools/my'\" hook.sh\"", "sh -c 'bash tools/\"my hook.sh\"'", "bash tools/$'my hook.sh'", "bash tools/$'my\\x20hook.sh'", "bash tools/$\"my hook.sh\"", "sh -c $'bash tools/\"my\\x20hook.sh\"'", "sh -c \"sh -c 'bash tools/\\\"my hook.sh\\\"'\"", "bash tools/my\\\n\\ hook.sh"])
       ok(JSON.stringify(fromTree(command, f => f === "tools/my hook.sh", index)) === JSON.stringify(["tools/my hook.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
+    // (#476's code review of 2a76778: and a word with no blank, its quoting read)
+    for (const command of ["bash tools/$'r\\x75n.sh'", "bash tools/r\\un.sh", "bash tools/r''un.sh"])
+      ok(JSON.stringify(fromTree(command, f => f === "tools/run.sh", index)) === JSON.stringify(["tools/run.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
     for (const shadow of ["git.bat", "git.exe", "test.cmd", "git.vbs"]) {
       const own = [...files, shadow], ownHas = f => own.includes(f);
       ok(JSON.stringify(fromTree(shadow.startsWith("git") ? "git show origin/main:scripts/x.py | bash" : "test -f scripts/x.py", ownHas, pathsIndex(own))) === JSON.stringify(["scripts/x.py"]),
