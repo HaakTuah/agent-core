@@ -10,13 +10,14 @@
 // with the shell's quoting read, level after level, until reading it changes nothing (eight levels at most), its
 // backslashes, its backslash-newlines and the escapes of $'...' read as bash reads them; with every backslash read and
 // every quote taken out; and with cmd's "^" and PowerShell's backtick read as their escapes. A path written
-// `<the remote's main>:<path>` (refs/remotes/origin/main or origin/main) and given to git show or git cat-file -p names
+// `refs/remotes/origin/main:<path>` (the remote's main, written whole: a local branch or tag named origin/main would
+// take the short form's place) and given to git show or git cat-file -p names
 // main's copy, which is no file of the working tree; and a file only tested for, by "[", "[[" or "test" where a command
 // starts (`[ -f <path> ]`, `test -e <path>`), is neither run nor read. Both hold only where nothing in the command can
 // change what git or test runs: in the starter kit's own two forms (KIT_FORMS), or in a plain command (plain()), and
 // nowhere else; every other path is reported, and the mend is the kit's form. Not read here, and so the review's: a
 // path the command builds from parts, reaches through ".." past a link, or spells otherwise than the forms above; and
-// whether a ref named `origin/main` is the remote's. Node's own modules only.
+// whether refs/remotes/origin/main holds what the remote does, which a command before the hook's could change. Node's own modules only.
 //
 //   import { fromTree, pathsIndex } from "./hook-source.mjs";
 //   fromTree(command, holds, index) -> the paths it takes from the working tree, where holds(path) says the project
@@ -25,7 +26,7 @@ import path from "node:path";
 import { inProject } from "./guards.mjs";
 
 const WORD = /[^\s'"`;|&()<>{}$\\=,\u0001]+/gu;
-const MAIN = /^(?:refs\/remotes\/)?origin\/main$/u;
+const MAIN = /^refs\/remotes\/origin\/main$/u;
 // (a variable, as the shell, cmd and PowerShell write one, read as one mark: what it holds is not the command's text;
 // but a ${...} that holds a command's output or another expansion, as ${X:-$(bash run.sh)}, is no mere variable, and
 // is read as written)
@@ -36,19 +37,24 @@ const VARIABLE = /\$env:\w+|\$\{[^}$`]*\}|\$\w+|%\w+%/gu;
 // word of its own, then a test's operator, perhaps a quote and a variable; an option of another program, as node's -r,
 // is no test, nor is "test" given to another program, as in "go test -v", or after a word that is no keyword)
 const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then|else|elif|while|until|do|!|\{)[ \t]+)*(?:(?:[^\s;&|<>"'`()]*\/)?(?:sh|bash|zsh|dash)(?:\.exe)?[ \t]+(?:-\w+[ \t]+)*-c[ \t]+)?(?:\[\[?|test)[ \t]+(?:![ \t]+)?-[A-Za-z][ \t]+\\?["']?\u0001?\\?["']?$/u;
-// A command in which a fetch from main or a file test is one: nothing in it expands (no "$", backtick, backslash, brace,
-// parenthesis, glob, "%" or "~"), "[" and "]" stand only as words of their own, it sets no variable, and it holds no word
-// that changes what a name runs or where git reads (BUILTINS, read with its quotes taken out, so ev"a"l is eval).
-// Anything else, however harmless, has neither: the starter kit's forms and a plain command are all that is read as safe.
-const BUILTINS = /(?<![\w./-])(?:eval|source|alias|unalias|hash|enable|trap|bind|mapfile|readarray|function|declare|typeset|export|readonly|local|unset|set|shopt|cd|pushd|popd|builtin|command|exec|env|PATH|ENV|command_not_found_handle|BASH_\w*|GIT_\w*)(?![\w-])|(?:^|[\s;&|])\.(?=[\s;&|]|$)/u;
+// A command in which a fetch from main or a file test is one: nothing in it expands or quotes (no "$", backtick,
+// backslash, quote, brace, parenthesis, glob, "%", "~" or "<", so no here-document), "[" and "]" stand only as words of
+// their own, it sets no variable (by "=" or by a builtin that sets one, as for, read or printf -v do), it holds no word
+// that changes what a name runs or where git reads its settings (BUILTINS), and each git in it is a whole fetch
+// (FETCH_AT), followed by no option of its own. Anything else, however harmless, has neither: the starter kit's forms
+// and a plain command are all that is read as safe.
+const BUILTINS = /(?<![\w./-])(?:eval|source|alias|unalias|hash|enable|trap|bind|mapfile|readarray|function|declare|typeset|export|readonly|local|unset|set|shopt|cd|pushd|popd|builtin|command|exec|env|for|select|read|printf|getopts|wait|PATH|ENV|HOME|command_not_found_handle|BASH_\w*|GIT_\w*|XDG_\w*)(?![\w-])|(?:^|[\s;&|])\.(?=[\s;&|]|$)/u;
+const GIT = /(?<![\w./-])git(?![\w./-])/gu;
+const FETCH_AT = /git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+refs\/remotes\/origin\/main:[\w./-]+(?:[ \t]+2>\/dev\/null)?[ \t]*(?=$|[|;&\n])/uy;
+const fetchAt = (command, i) => { FETCH_AT.lastIndex = i; return FETCH_AT.test(command); };
 function plain(command) {
-  if (/[$`\\{}()*?%~\u0001]|(?:^|[\s;&|])\w+=/u.test(command)) return false;
+  if (/[$`\\{}()*?%~<'"\u0001]|(?:^|[\s;&|])\w+=/u.test(command)) return false;
   if (/[[\]]/u.test(command.replace(/(?<![^\s;&|])(?:\[\[?|\]\]?)(?![^\s;&|])/gu, ""))) return false;
-  return !BUILTINS.test(command.replace(/["']/gu, ""));
+  return !BUILTINS.test(command) && [...command.matchAll(GIT)].every(m => fetchAt(command, m.index));
 }
 // (a file at the project's root that a Windows shell runs in git's or test's place, since cmd looks in the folder it
 // stands in first)
-const shadows = (holds, name) => ["", ".exe", ".bat", ".cmd", ".com", ".ps1"].some(x => holds(`${name}${x}`));
+const shadows = (holds, name) => ["", ".exe", ".bat", ".cmd", ".com", ".ps1", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".msc"].some(x => holds(`${name}${x}`));
 
 // The starter kit's two forms of a hook's command, whole, as setup/'s templates write them: its script fetched from
 // main into "$f" and run, perhaps with plain words after it, and nothing else, the second after one or more tests that a
@@ -106,9 +112,9 @@ const NAME = /[\w.-]/u;
 const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 // A path fetched from main in a plain command, in one form and no other: where a command starts (at the start, after a
 // newline, ";", or an "&" or "|" not of a redirection), perhaps after keywords such as "then", the bare word git, perhaps
-// --no-replace-objects, then show or cat-file -p, then `<the remote's main>:<path>`. Any other form, git's or another
+// --no-replace-objects, then show or cat-file -p, then `refs/remotes/origin/main:<path>` (plain() has each git end there). Any other form, git's or another
 // program's (java -cp origin/main:x, say), is no fetch: its path is read as taken, and the mend is the kit's form.
-const FETCHED = /(?:^|[\n;]|(?<![<>])[&|])[ \t]*(?:(?:then|do|else|elif|if|while|until|!)[ \t]+)*git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+["']?(?:refs\/remotes\/)?origin\/main:["']?(?:\.\/)?$/u;
+const FETCHED = /(?:^|[\n;]|(?<![<>])[&|])[ \t]*(?:(?:then|do|else|elif|if|while|until|!)[ \t]+)*git[ \t]+(?:--no-replace-objects[ \t]+)?(?:show|cat-file[ \t]+-p)[ \t]+refs\/remotes\/origin\/main:(?:\.\/)?$/u;
 const fetched = before => FETCHED.test(before);
 // A script with one level of the shell's quoting read, as the shell reads it before running it: a single-quoted text as
 // written; $'...' with its escapes read as bash reads them; a double-quoted one and a word outside quotes with their
