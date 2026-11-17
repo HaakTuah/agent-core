@@ -1,5 +1,5 @@
 {
-  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"Every rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it only points elsewhere or says what is protected, and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it. \"behind\": the core archive's items behind each rule, keyed the same way (with the rules of AGENTS.md), or by a rule file alone for its text outside any rule; a rule file names no item itself (AGENTS.md, \"The archive is pointed to from the list\"; #252), and a session that needs a rule's reason looks its items up here (archive/instructions.md).",
+  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"Every rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it only points elsewhere or says what is protected, and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it. \"behind\": the core archive's items behind each rule, keyed the same way (with the rules of AGENTS.md), or by a rule file alone for its text outside any rule; a rule file names no item itself (AGENTS.md, \"The archive is pointed to from the list\"; #252), and a session that needs a rule's reason looks its items up here (archive/instructions.md). \"numbers\": the number each rule names, keyed the same way (AGENTS.md, \"Every rule says what holds it\"; #303), \"<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>\", the count it is meant to lower and the outcome it stands for, which pruning.mjs, beside this file, reads.",
   "holders": {
     "floor/security.md: 3. The protected files": [
       "check: .github/workflows/security-review.yml, in part",
@@ -149,15 +149,17 @@
     "AGENTS.md: A release says what it asks, step by step": [215],
     "AGENTS.md: A rule is written to one pattern": [214],
     "AGENTS.md: What can be read is never asked or declared": [248],
-    "AGENTS.md: A rule moves here only when it holds in every project": [246],
+    "AGENTS.md: A rule is for what an agent can do": [246, 249],
     "AGENTS.md: An idea is built only from a line, and a line joins in a PR of its own": [211],
-    "AGENTS.md: Every rule says what holds it": [195, 228],
+    "AGENTS.md: Every rule says what holds it": [195, 228, 249],
     "AGENTS.md: Never create a repository named `agent-rules`": [121],
     "AGENTS.md: Nothing locks a project": [201, 202, 207, 215],
     "AGENTS.md: One batch, then one release": [210, 211],
     "AGENTS.md: Queued means wanted: nothing queued waits for a second word": [211],
     "AGENTS.md: Rules are written for any project": [150, 201],
     "AGENTS.md: Staged cases hold what no check reads": [228],
+    "AGENTS.md: Rules are pruned by their numbers": [249],
+    "AGENTS.md: Proof is sized to what a thing costs others": [249],
     "AGENTS.md: The archive is pointed to from the list": [246],
     "AGENTS.md: The archive keeps the reasoning; the owner's words stay here": [246],
     "AGENTS.md: The core abides by its own rules, to the full extent": [209, 213],
@@ -206,7 +208,7 @@
     "roles/orchestrator.md: The scheduled look": [218],
     "roles/reviewer.md: It judges by what the change calls for": [234],
     "roles/shared/how-to-work.md": [17, 57],
-    "roles/shared/how-to-work.md: A project's own rules add to the core's": [161],
+    "roles/shared/how-to-work.md: A project's own rules add to the core's": [161, 249],
     "roles/shared/how-to-work.md: A question from the owner is a question": [25],
     "roles/shared/how-to-work.md: Keep it lean": [24],
     "roles/shared/how-to-work.md: Match effort to the task": [25],
@@ -234,7 +236,7 @@
     "roles/shared/review-guidelines.md: A brief written in a pull request": [229],
     "roles/shared/review-guidelines.md: A finding names its rule": [219],
     "roles/shared/review-guidelines.md: A mark on what every session reads": [182, 184, 188],
-    "roles/shared/review-guidelines.md: A rule file changed": [134, 214, 246, 248],
+    "roles/shared/review-guidelines.md: A rule file changed": [134, 214, 246, 248, 249],
     "roles/shared/review-guidelines.md: A screen changed": [230],
     "roles/shared/review-guidelines.md: Every reviewer": [155],
     "roles/shared/review-guidelines.md: For every reviewer": [36],
@@ -340,5 +342,11 @@
     "tools/claude.md: Pass both model and effort": [128],
     "tools/claude.md: Who to call": [70, 71, 73],
     "tools/codex.md: On GitHub": [169]
+  },
+  "numbers": {
+    "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
+    "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",
+    "AGENTS.md: Rules are pruned by their numbers": "correction: misread; outcome: asked",
+    "AGENTS.md: Proof is sized to what a thing costs others": "findings; outcome: robust"
   }
 }
