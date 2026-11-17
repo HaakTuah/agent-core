@@ -43,7 +43,7 @@ export const RECORD = "reports/pruning.json";
 export const EVERY = 2, EARLY = 20;
 // The outcomes' direct measures (outcomes.mjs; #302) that a count gives, whose counts a pruning records: a median's
 // measure gives only how many cases it read, not its value, so it is left out.
-export const DIRECT = MEASURES.filter(m => m.direct && !/, the median$/u.test(m.label));
+export const DIRECT = MEASURES.filter(m => m.direct && !m.median);
 const ABOUT = "The prunings of the core's rules (scripts/pruning.mjs; AGENTS.md, \"Rules are pruned by their numbers\"): each pruning's day, the model of the session that took it, the span its counts read (from its day back to the last pruning's), each rule's number as it counted then (\"numbers\"), the count of each outcome's direct measure (\"direct\") and of each kind of correction (\"corrections\"), the failed steps of the runs on a pull request, by workflow and step (\"fired\"), each rule's citations (\"cited\"), and each staged case's verdict with the rules it holds taken out (\"without\"). Written by `node scripts/pruning.mjs --read` and `--record`; committed in a pull request of its own.";
 
 // The record: { prunings: [{ at, model, from, numbers, direct, corrections, fired, cited, without }] }, oldest first.
