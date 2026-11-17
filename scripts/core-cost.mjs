@@ -237,8 +237,18 @@ function tookFrom(repo, merged) {
   return priced(pulls);
 }
 
+const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+
+// What each merged pull request took, each merge given its price in `took`; and what --cap and --pulls print, where
+// either is given (sums()).
+function addCosts(merged, repo, capped, named) {
+  if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
+  const took = tookFrom(repo, merged);
+  for (const m of merged) m.took = took.get(m.number) ?? null;
+  return sums(merged, took, capped, named);
+}
+
 function main(argv) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const value = name => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
   const since = value("--since"), split = value("--split"), capped = argv.includes("--cap"), named = pullsOf(argv, fail);
   const cost = [argv.includes("--cost"), capped, named].some(Boolean);
@@ -250,10 +260,7 @@ function main(argv) {
   if (!merged.length) fail("no merged pull request found on the default branch's first-parent line");
 
   if (cost) {
-    if (!repo) fail("--cost: the repository is not known (GITHUB_REPOSITORY, or origin's address)");
-    const took = tookFrom(repo, merged);
-    for (const m of merged) m.took = took.get(m.number) ?? null;
-    const said = sums(merged, took, capped, named);
+    const said = addCosts(merged, repo, capped, named);
     if (said) return console.log(said);
   }
 
