@@ -16,6 +16,7 @@ import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, nam
 import { scratch } from "./scratch-core.mjs";
 import { evaluate, parseYaml } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
+import { BLOB_MAX, readBlobs } from "./blobs.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -336,6 +337,18 @@ if (p.status === 0) {
     && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0 && alphabet.status === 0 && stub.status === 0
     && (decoy === null || (decoy.status === 1 && tookIn("u\\.md").test(decoy.out) && !/0:u\.md \(prose/u.test(decoy.out))),
     "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them, only the lines in one alphabet of a file in two, or a file of two lines, passes; a decoy named as an index path steers nothing", `${status}${rewritten.out}${movedIn.out}${partly.out}${alphabet.stdout}${alphabet.stderr}${stub.stdout}${stub.stderr}${decoy?.out ?? ""}`);
+  // (the blobs the follow reads: one batch, a binary or a file past its megabyte skipped; a read git fails, or an answer
+  // cut short, fails the check with its mend, never an empty answer that would switch the follow off; #434)
+  const answer = parts => (args, ids) => Buffer.from(args[1] === "--batch-check" ? parts.check(ids) : parts.read(ids), "latin1");
+  const blobsRead = readBlobs(["a1", "b2", "c3", "a1"], answer({
+    check: () => `a1 blob 3\nb2 blob 2\nc3 blob ${BLOB_MAX + 1}\n`,
+    read: ids => ids.map(id => (id === "a1" ? "a1 blob 3\nhi\n\n" : "b2 blob 2\nx\0\n")).join("") }));
+  const gitFails = readBlobs(["a1"], () => { throw Object.assign(new Error("spawn"), { stderr: Buffer.from("fatal: not a git repository\n") }); });
+  const cutShort = readBlobs(["a1"], answer({ check: () => "a1 blob 3\n", read: () => "a1 blob 3\nhi" }));
+  ok(blobsRead.text?.get("a1") === "hi\n" && !blobsRead.text.has("b2") && !blobsRead.text.has("c3") && blobsRead.text.size === 1
+    && /^git could not read .*\(fatal: not a git repository\)/u.test(gitFails.failure) && mended(`FAIL: ${gitFails.failure}`)
+    && /did not parse to its end, at byte 0 of 12/u.test(cutShort.failure) && mended(`FAIL: ${cutShort.failure}`) && readBlobs([]).text.size === 0,
+    "the follow's blobs are read in one batch, a binary or a file past a megabyte skipped; a read git fails, or an answer cut short, fails with its mend", JSON.stringify([...(blobsRead.text ?? [])]) + (gitFails.failure ?? "") + (cutShort.failure ?? ""));
   // (a file of the core's copy that a sync moves out of what the project's config reads fails nothing: the core's own
   // pull request held the move)
   const coreFile = fs.readdirSync(path.join(p.dir, "core/tasks")).find(f => f.endsWith(".md"));

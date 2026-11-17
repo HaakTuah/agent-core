@@ -34,6 +34,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
+import { readBlobs } from "./blobs.mjs";
 import { projectAt } from "./core-path.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
@@ -199,34 +200,6 @@ function renamed(commit) {
   }
   return { to, gone, grown };
 }
-// The text of blobs by their ids, in one read: each of a megabyte or less that holds no NUL byte, so that a binary or
-// a large file, and a pull request of many files, costs no more than one process and what it reads. A read git fails,
-// or one that does not parse to its end, fails the check: a follow switched off without a word would pass every
-// narrowing it is there to stop.
-const BLOB_MAX = 1 << 20;
-function blobs(ids) {
-  const out = new Map(), want = [...new Set(ids)].filter(Boolean);
-  if (!want.length) return out;
-  const unread = why => fail(`git could not read the text of the files this change adds or changes (${why}), so whether a file the base's config read moved out of what it reads cannot be told. Mend: run the check again; where it fails the same way, the change's added and changed files are too much to read at once, so split it into pull requests that each change fewer`);
-  const run = (args, list) => {
-    try { return execFileSync("git", args, { input: Buffer.from(`${list.join("\n")}\n`), maxBuffer: 1 << 30, stdio: ["pipe", "pipe", "pipe"] }); }
-    catch (e) { return unread(String(e.stderr || e.code || e.message).trim().split(/\r?\n/u)[0]); }
-  };
-  const small = run(["cat-file", "--batch-check"], want).toString("utf8").split("\n").map(l => l.split(" "))
-    .filter(([, type, size]) => type === "blob" && Number(size) <= BLOB_MAX).map(([id]) => id);
-  if (!small.length) return out;
-  const read = run(["cat-file", "--batch"], small);
-  let at = 0;
-  while (at < read.length) {
-    const end = read.indexOf(10, at), [id, type, size] = read.subarray(at, end).toString("utf8").split(" "), n = Number(size);
-    if (end < 0 || type !== "blob" || !Number.isInteger(n) || end + 1 + n >= read.length) break;
-    const body = read.subarray(end + 1, end + 1 + n);
-    if (!body.includes(0)) out.set(id, body.toString("utf8"));
-    at = end + 1 + n + 1;
-  }
-  if (at !== read.length) unread(`its answer did not parse to its end, at byte ${at} of ${read.length}`);
-  return out;
-}
 // The lines of a text that hold a letter or a number of any script, as proseUnits reads them, each once, trimmed: what
 // a file "holds" of another's.
 const wordLines = text => new Set(String(text ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => /[\p{L}\p{N}]/u.test(l)));
@@ -236,14 +209,16 @@ const wordLines = text => new Set(String(text ?? "").split(/\r\n|\r|\n/u).map(l 
 // its text. Only the lines a file gained count, so a copy that stood before is never taken for the text moved; a file
 // of fewer than three such lines is never followed, since two lines as common as a heading and a "TODO" are no text
 // moved. No file of the core's copy takes it in, as a sync moves those, and a file whose text cannot be read, binary
-// or past a megabyte, takes none. The files are read only once a deleted file is looked up.
+// or past a megabyte, takes none (blobs.mjs). The files are read only once a deleted file is looked up.
 const FOLLOWED_FROM = 3;
 function linesMoved(commit, grown) {
   const to = new Map(), show = readAt(commit);
   let index = null;
   const indexed = () => {
     const map = new Map(), mine = [...grown].filter(([f]) => !(CORE && f.startsWith(CORE)));
-    const text = blobs(mine.flatMap(([, b]) => [b.was, b.now]));
+    const read = readBlobs(mine.flatMap(([, b]) => [b.was, b.now]));
+    if (read.failure) fail(read.failure);
+    const text = read.text;
     for (const [f, { was, now }] of mine) {
       if (!text.has(now) || (was && !text.has(was))) continue;
       const had = wordLines(was && text.get(was));
