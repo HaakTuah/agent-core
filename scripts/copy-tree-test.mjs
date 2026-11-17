@@ -141,7 +141,7 @@ ok(!coreIsFolder(git(core, "commit-tree", plain, "-m", "none"), repo), "nor a co
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const loop = fs.readFileSync(path.join(root, ".github/workflows/core.yml"), "utf8").match(/^\s*for kept in ([^;]*); do$/m);
 ok(loop && loop[1].trim() === KEPT.join(" "), "core.yml's loop names exactly the folders copy-tree.mjs keeps out", loop ? loop[1] : "no loop found");
-const lines = fs.readFileSync(path.join(root, ".gitattributes"), "utf8").split("\n").filter((line) => !/^\s*#/.test(line) && /export-ignore/.test(line)); // (a comment, which git reads as none, may name it)
+const lines = fs.readFileSync(path.join(root, ".gitattributes"), "utf8").split("\n").filter((line) => !/^[ \t\r]*#/.test(line) && /export-ignore/.test(line)); // (a comment, which git reads as none, may name it: "#" after spaces, tabs or carriage returns alone, as git skips them)
 ok(lines.every((line) => KEPT.some((name) => line === `/${name} export-ignore`)), "each export-ignore line of the core's .gitattributes names a folder both know, spelled as both read it", lines.join(" | "));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
