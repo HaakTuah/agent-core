@@ -242,7 +242,7 @@ function runner(p, tmp) {
     // (a caller's `with:` reads no secret, as on GitHub; its `secrets:` reads the one list this script is given)
     const value = (v, secrets) => (typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\s*\$\{\{|\}\}\s*$/g, ""), { github, inputs: {}, secrets, vars: {} }) : v);
     const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, value(v, {})]));
-    if (name === "core.yml" && inputs.description === true && !p.described) { inputs.description = false; say(`note ${file}/${id}: core.yml's description check is not run here: give --description <a file> that holds the pull request's description`); }
+    undescribed(name, inputs, p.described, `${file}/${id}`);
     const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v, { PERSONAL_TERMS: terms })]));
     try {
       return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
@@ -260,6 +260,13 @@ function ownSteps(text) {
   const parts = steps.findIndex(s => String(s.name ?? "").startsWith("Where the core's copy stands"));
   const own = new Set(steps.slice(0, parts < 0 ? steps.length : parts).map(s => s.name ?? s.uses ?? String(s.run ?? "").split("\n")[0]));
   return name => own.has(name);
+}
+
+// core.yml's description check, as a step of its one job (#376), left out where no description is given, and said so.
+function undescribed(name, inputs, described, where) {
+  if (name !== "core.yml" || inputs.description !== true || described) return;
+  inputs.description = false;
+  say(`note ${where}: core.yml's description check is not run here: give --description <a file> that holds the pull request's description`);
 }
 
 // A file of the core at a commit (with `list`, the names in a folder), from a clone of the core's address made once (never from the project's copy, which

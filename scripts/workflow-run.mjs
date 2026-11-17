@@ -328,6 +328,13 @@ function carryEnv(file, env, id) {
   fs.rmSync(file);
 }
 
+// A step that failed: its job fails, and, where `stop` holds for its name, the rest of the job is cancelled.
+function failed(state, result, stop, name) {
+  state.failed = true;
+  result.passed = false;
+  if (stop && stop(name)) state.cancelled = true;
+}
+
 export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
   const defaults = wf.defaults?.run?.shell;
@@ -390,7 +397,7 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
       carryEnv(path.join(tmp, "env"), ctx.env, id);
       result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
       if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
-      if (!passed) { state.failed = true; result.passed = false; state.cancelled ||= !!stop?.(name); }
+      if (!passed) failed(state, result, stop, name);
       if (until && step.id === until) return;
     }
   }
