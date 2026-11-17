@@ -281,6 +281,11 @@ adds this record.
   move (#515, point 11) is the inventory's stand-ins replaced. The bug the Bun run found, an unsorted folder listing in
   a test, is #522, fixed apart.
 - **What a sync asks of a project:** nothing, by this record; each step of the path says what its own sync asks.
+- **Step 2 came without the release between its two pull requests** (17 November 2026, #527), on the owner's order for
+  this batch, which asked first whether the gap was needed. It was not: a project that skips a release takes both
+  halves at once in any case, so the gap protected none that synced straight across it, and the upgrade test, a
+  project from the starter kit of release-4 and one of release-5 each synced straight to the second pull request's
+  commit, passed every check unchanged. A release cut between the two would have stopped the batch's queue for nothing.
 - Reopens it: the suites' verdicts differ between the least Node and the pin, on Linux or Windows (the least
   goes); a hook's start passes 100 ms on Windows; a carried file turns a project's check red or raises its code
   scanning's alerts; a port's comparison differs beyond its definition's mend (that reader stays); the replay of fixed
@@ -555,6 +560,8 @@ The same record weighs types for the core's own scripts (#486, point 4), written
 - Chosen for: a workflow, a hook and a project's copy each call a script by its path, with nothing to build; each
   check's test stands next to it, and `.github/workflows/tests.yml` runs every one (the audit of #245 found the folder
   flat, with no import cycle: `reports/2026-11-14-how-code-is-put-together.md`).
+- Changed on 17 November 2026 (#527, the path's second step): each test stands in `tests/`, which the copy leaves out,
+  under its script's name; the folder of scripts stays flat.
 - Reopens it: `scripts/` passes 150 files of code, or the shape check (`scripts/shape.mjs`) finds a cycle between them.
 - Trips when: `files > 150`, `cycles > 0`
 
