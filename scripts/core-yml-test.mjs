@@ -7,10 +7,10 @@
 // a submodule, with the floor's own copy it keeps until every tool has passed the staged cases. The copy's own faults
 // (an edit, a file added, a link, a submodule, one whose id is the copy's own tree; the executable bit no difference)
 // are pure-sync-test.mjs's, which runs this job on each; a report whose name git quotes is left out here as the copy
-// leaves it out, and so is the folder of the owner's words (#252), while a top-level name that only ends in a tab and
-// "reports" is kept, as the copy keeps it. A scratch core of two commits on its main and one off it,
-// reached through the core's address by a git rewrite, so no call reaches the network. On Linux and on Windows. Git,
-// tar, bash and Node's own modules.
+// leaves it out, and so is the folder of the owner's words (#252), and the core's tests where the pin's .gitattributes
+// keeps them (#527), while a top-level name that only ends in a tab and "reports" is kept, as the copy keeps it. A
+// scratch core of a few commits on its main and one off it, reached through the core's address by a git rewrite, so no
+// call reaches the network. On Linux and on Windows. Git, tar, bash and Node's own modules.
 //
 //   node scripts/core-yml-test.mjs [--part all | faults | places]
 // (a part runs alone, beside the other, in a job of its own on Windows, where the whole takes the longest of any step
@@ -66,6 +66,12 @@ const C = git(theCore, "rev-parse", "HEAD");
 const tabbed = process.platform === "win32" ? null : `x\treports`;
 if (tabbed) { write(theCore, tabbed, "kept\n"); git(theCore, "add", "-A"); git(theCore, "commit", "-q", "-m", "D"); }
 const D = tabbed ? git(theCore, "rev-parse", "HEAD") : null;
+// E: the core's tests in a folder of their own, kept to the core by the line its .gitattributes gains (#527)
+write(theCore, "tests/one-test.mjs", "a test of the core's\n");
+write(theCore, ".gitattributes", `${fs.readFileSync(path.join(theCore, ".gitattributes"), "utf8")}/tests export-ignore\n`);
+git(theCore, "add", "-A");
+git(theCore, "commit", "-q", "-m", "E");
+const E = git(theCore, "rev-parse", "HEAD");
 const workflow = git(theCore, "show", `${B}:.github/workflows/core.yml`);
 
 const MANIFEST = (pin = B, more = "") => `# Core manifest\n\nCore: ${CORE} at ${pin}, copied whole under core/ (never edited here).\nFloor: whole. Modules: all.\n\n## Slots\n| Slot | Here |\n| --- | --- |\n| *owner's account* | \`${OWNER}\` |\n${more}`;
@@ -131,6 +137,8 @@ if (D) {
   passes("a copy of a commit with a top-level name that only ends in a tab and \"reports\", which the copy keeps", { "core-manifest.md": MANIFEST(D) }, { at: D });
   fails("and that copy without it", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(D) }, { at: D, without: tabbed });
 } else if (inPart("faults")) console.log("note a name holding a tab cannot be made here (Windows), so that case is not tried");
+passes("a copy of a commit whose .gitattributes keeps the core's tests to it, without them (#527)", { "core-manifest.md": MANIFEST(E) }, { at: E, then: dir => ok(!fs.existsSync(path.join(dir, "core", "tests")), "  (the copy holds no tests/)") });
+fails("at that commit, a copy that holds the core's tests all the same", "core/ differs from the core at its pin", { "core-manifest.md": MANIFEST(E), "core/tests/one-test.mjs": "a test of the core's\n" }, { at: E });
 passes("a call in a comment, which is no call", { ".github/workflows/core.yml": `${CALLS()}# once: ${CORE}/.github/workflows/core.yml@main\n` });
 
 // where the copy stands (tasks/repositories.md): the path the manifest's line names, and a core a library carries

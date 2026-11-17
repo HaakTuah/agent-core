@@ -8,7 +8,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
+import { fileURLToPath } from "node:url";
+import { KEPT, copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -53,6 +54,7 @@ write("reportsx/near.md", "a name that only starts the same stays\n");
 write("reports/one.md", "the core's own\n");
 write("reports/deep/two.md", "the core's own\n");
 write("words/items-001.md", "the owner's own words\n");
+write("tests/one-test.mjs", "the core's own tests\n");
 
 const before = commit("* -text\n");
 ok(copyTree(before, repo) === whole(before), "a pin from before the line: the whole tree");
@@ -71,6 +73,11 @@ const bothTree = copyTree(both, repo);
 ok(bothTree === archived(both) && !paths(bothTree).some((p) => p.startsWith("reports/") || p.startsWith("words/")), "a pin with both lines: neither folder, exactly as git archive copies (#252)", `${bothTree} against ${archived(both)}`);
 const wordsOnly = commit("* -text\n/words export-ignore\n");
 ok(copyTree(wordsOnly, repo) === archived(wordsOnly) && paths(copyTree(wordsOnly, repo)).includes("reports/one.md"), "a pin with the words line alone: that folder out, reports kept");
+// the core's tests (#527): known before any pin holds their line, so a pin without it keeps them, as every release did
+ok(paths(bothTree).includes("tests/one-test.mjs"), "a pin without the tests line keeps tests/ (#527)");
+const all = commit("* -text\n/reports export-ignore\n/words export-ignore\n/tests export-ignore\n");
+const allTree = copyTree(all, repo);
+ok(allTree === archived(all) && !paths(allTree).some((p) => /^(reports|words|tests)\//.test(p)), "a pin with the tests line too: none of the three, exactly as git archive copies (#527)", `${allTree} against ${archived(all)}`);
 
 // any other spelling of the line: the whole tree, so only a copy that still holds the folder can equal it
 for (const [what, attributes] of [
@@ -84,6 +91,7 @@ for (const [what, attributes] of [
   ["another folder", "/floor export-ignore\n"],
   ["a Windows line ending", "/reports export-ignore\r\n"],
   ["the words folder's, a space after it", "/words export-ignore \n"],
+  ["the tests folder's, a trailing slash", "/tests/ export-ignore\n"],
 ]) {
   const other = commit(`* -text\n${attributes}`);
   ok(copyTree(other, repo) === whole(other), `the line with ${what}: the whole tree`);
@@ -127,6 +135,14 @@ ok(coreIsFolder(git(core, "commit-tree", treeOf(`040000 tree ${inner}\tcore`), "
 ok(!folder("160000", inner), "a submodule's pointer named core, whose id is a tree, is none");
 ok(!folder("100644", blob) && !folder("120000", blob), "nor a file or a link named core");
 ok(!coreIsFolder(git(core, "commit-tree", plain, "-m", "none"), repo), "nor a commit with no core at all");
+
+// one list, read in two places: core.yml's loop names the folders KEPT names, in its order, and each line of the core's
+// own .gitattributes that keeps a folder here names one of them (else every project's check of its copy fails)
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const loop = fs.readFileSync(path.join(root, ".github/workflows/core.yml"), "utf8").match(/^\s*for kept in ([^;]*); do$/m);
+ok(loop && loop[1].trim() === KEPT.join(" "), "core.yml's loop names exactly the folders copy-tree.mjs keeps out", loop ? loop[1] : "no loop found");
+const lines = fs.readFileSync(path.join(root, ".gitattributes"), "utf8").split("\n").filter((line) => !/^[ \t\r]*#/.test(line) && /export-ignore/.test(line)); // (a comment, which git reads as none, may name it: "#" after spaces, tabs or carriage returns alone, as git skips them)
+ok(lines.every((line) => KEPT.some((name) => line === `/${name} export-ignore`)), "each export-ignore line of the core's .gitattributes names a folder both know, spelled as both read it", lines.join(" | "));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

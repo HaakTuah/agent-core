@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { asked, calledFor, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
+import { asked, calledFor, copyAtBase, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 import { lineMend } from "./reading.mjs";
 
 let failed = 0;
@@ -86,6 +86,20 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`", called, "cmd") === null, "and the line is held to them");
   git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
+}
+// the copy whose history says which lines are asked: where the base's manifest puts the core, never the head's (#455)
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-copy-"));
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
+  const manifest = under => `# Core manifest\n\nCore: an-owner/agent-core at ${"a".repeat(40)}, copied whole under ${under} (never edited here).\n`;
+  const commit = text => { if (text === null) fs.rmSync(path.join(tmp, "core-manifest.md"), { force: true }); else fs.writeFileSync(path.join(tmp, "core-manifest.md"), text); git("add", "-A"); git("commit", "-q", "--allow-empty", "-m", "x"); };
+  git("init", "-q");
+  commit(manifest("vendor/core/")); commit(manifest("elsewhere/"));
+  ok(copyAtBase(tmp) === "vendor/core/scripts/pr-description.mjs", "the copy is read where the base's manifest puts it, under another path than core/, whatever the head's manifest says");
+  commit(null); commit(manifest("vendor/core/"));
+  ok(copyAtBase(tmp) === "scripts/pr-description.mjs", "where the base holds no manifest, the core's own scripts/ are read, though the head adds one");
 }
 // run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("./pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
