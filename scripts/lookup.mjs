@@ -8,6 +8,11 @@
 // who publishes it and whether its repository names it back, how many packages it brings with it, and whether it has
 // provenance. A package updated, or one any lock file of the base held, is not looked up: nothing that stood before
 // fails (AGENTS.md, "Nothing locks a project"). With no base, as on a push, nothing is new.
+// On npm it holds as well that every entry of those lock files, deep in the tree too, comes from npm's registry with an
+// integrity value (floor rule 7, "from a known publisher" and "one exact version"; #488, point 4): it fails one that
+// points at a git address or another web address, or names no integrity value, and reports one the base held so. A
+// package inside another's file, and a packed file of the project's own, are held by that file and by git. NuGet's lock
+// files are held so by the NuGet check: its content hash, and its source at the restore.
 //
 // npm: the licence check's "lockfiles", each package that npm's registry gives (licences.mjs's registryName), read
 // against every package-lock.json and npm-shrinkwrap.json of the base; NuGet (--nuget): its "nuget" lock files, read
@@ -70,14 +75,24 @@ export function npmPackages(text, lockPath) {
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
     .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p),
+      integrity: typeof e.integrity === "string" && e.integrity !== "", bundled: e.inBundle === true, own: ownFile(e.resolved, lockPath),
       get brings() { return reach(p, next).size; },
       get by() { return direct.has(p) ? [] : [...reach(p, before)].filter((d) => direct.has(d)).map(nameOf); } }));
+}
+
+// Whether a lock entry's address is a packed file of the project's own, which git holds: `file:` and a path that stays
+// inside the project from the lock file's folder.
+function ownFile(resolved, lockPath) {
+  if (typeof resolved !== "string" || !resolved.startsWith("file:")) return false;
+  const to = posix.normalize(posix.join(posix.dirname(lockPath), resolved.slice(5)));
+  return !posix.isAbsolute(resolved.slice(5)) && to !== ".." && !to.startsWith("../") && !/[\\:]/u.test(resolved.slice(5));
 }
 
 // Where an entry that npm's registry does not give comes from, in a few words for the report.
 function source(resolved) {
   if (typeof resolved !== "string" || !resolved) return "no address the lock file names";
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/u.test(resolved)) return "a git address";
+  if (resolved.startsWith("file:")) return "a packed file named by its path";
   const host = /^https?:\/\/([^/:@?#]{1,100})/u.exec(resolved)?.[1];
   return host ? `a web address on ${host}` : "an address of another kind";
 }
@@ -154,6 +169,33 @@ export function newPackages(head, base, nuget = false) {
     if (!was || (p.direct && !was.direct)) out.set(key(p), { ...p, lockPath });
   }
   return [...out.values()];
+}
+
+// ---- Where each comes from (floor rule 7, "from a known publisher" and "one exact version"; #488, point 4)
+
+/** What keeps an npm lock entry from being npm's registry's own, held to what was locked: the address it comes from
+ *  instead, or that it names no integrity value; null where it is the registry's with one, and for a package inside
+ *  another's file (inBundle), which that file's integrity holds, or a packed file of the project's own, which git holds. */
+export function offRegistry(p) {
+  if (p.bundled || p.own) return null;
+  if (p.from) return `it comes from ${p.from}, not npm's registry`;
+  return p.integrity ? null : "it names no integrity value, so an install cannot hold it to what was locked";
+}
+
+/** Each entry of the lock files `head` that offRegistry finds: { failures, reports }, one the base's lock files held
+ *  the same (its name and version, and the same fault) reported, never failed (AGENTS.md, "Nothing locks a project"). */
+export function sourceFaults(head, base) {
+  const key = (p) => `${p.name}@${p.version}\u0000${offRegistry(p)}`;
+  const held = new Set(base.flat().filter(offRegistry).map(key)), failures = [], reports = [];
+  for (const [lockPath, packages] of head) for (const p of packages) {
+    const fault = offRegistry(p);
+    if (!fault) continue;
+    const at = `${said(lockPath)}: ${said(p.name)}@${said(p.version)} (at ${said(p.path)}): ${said(fault)}`;
+    const mend = `take it from npm's registry at one exact version (npm install ${said(p.name)}@<version> --save-exact --ignore-scripts in the lock file's folder; for one another package brings, a version of that package which takes it from the registry), so that npm writes its address and integrity value; never edit the lock file by hand`;
+    if (held.has(key(p))) reports.push(`${at}; the pull request's base held it so, so it passes: ${mend}, as the sync's step asks`);
+    else failures.push(`${at} (floor rule 7). Mend: ${mend}`);
+  }
+  return { failures: failures.sort(), reports: reports.sort() };
 }
 
 // ---- What the registry says
@@ -247,7 +289,7 @@ async function described(p, facts, now, { get, nuget, github }) {
 // What the registry says of the package: its facts, { missing } where it has no such package, or, on NuGet where the
 // config names sources of its own, { elsewhere } where NuGet's registry has no such id or version, which one of those
 // gives (the NuGet check holds what is restored to the lock file's content hash).
-async function registry(p, get, nuget, sources = 0) {
+export async function registry(p, get, nuget, sources = 0) {
   if (!nuget) {
     if (!NPM_NAME.test(p.name)) throw new Error("its name is not one npm's registry gives");
     const r = await get(`${NPM}${p.name.replaceAll("/", "%2F")}`);
@@ -277,14 +319,21 @@ async function registry(p, get, nuget, sources = 0) {
 // Whether the repository is archived, and, on npm, whether its package.json (in the folder the package names) names
 // the package back: as text for the report.
 async function onGitHub(repo, name, get, nuget) {
-  const r = await get(`https://api.github.com/repos/${repo.owner}/${repo.name}`).catch(() => ({ status: 0 }));
-  const archived = r.status === 200 && typeof r.json?.archived === "boolean" ? (r.json.archived ? ", archived" : ", not archived") : r.status === 404 ? ", which GitHub does not show" : ", archived or not: GitHub did not answer";
-  if (nuget) return archived;
+  const is = await archived(repo, get);
+  const said = is === true ? ", archived" : is === false ? ", not archived" : is === "unknown" ? ", which GitHub does not show" : ", archived or not: GitHub did not answer";
+  if (nuget) return said;
   const file = await get(`https://raw.githubusercontent.com/${repo.owner}/${repo.name}/HEAD/${repo.dir ? `${repo.dir}/` : ""}package.json`).catch(() => ({ status: 0 }));
-  return `${archived}, ${file.status === 200 && file.json?.name === name ? "naming the package back" : "not naming the package back where it says"}`;
+  return `${said}, ${file.status === 200 && file.json?.name === name ? "naming the package back" : "not naming the package back where it says"}`;
 }
 
-async function pool(items, size, work) {
+/** Whether GitHub shows the repository `repo` ({ owner, name }) archived: true or false, "unknown" where it does not
+ *  show it, null where it did not answer. */
+export async function archived(repo, get) {
+  const r = await get(`https://api.github.com/repos/${repo.owner}/${repo.name}`).catch(() => ({ status: 0 }));
+  return r.status === 200 && typeof r.json?.archived === "boolean" ? r.json.archived : r.status === 404 ? "unknown" : null;
+}
+
+export async function pool(items, size, work) {
   const queue = [...items];
   await Promise.all(Array.from({ length: Math.min(size, queue.length) }, async () => { while (queue.length) await work(queue.shift()); }));
 }
@@ -309,7 +358,7 @@ export function packagesOf(config, root, base, nuget, baseConfig = null) {
   return { head, base: baseLists };
 }
 
-async function fetched(url) {
+export async function fetched(url) {
   const r = await fetch(url, { headers: { "user-agent": "agent-core-lookup", accept: "application/json" }, signal: AbortSignal.timeout(30000) });
   if (r.status !== 200) return { status: r.status };
   return { status: 200, json: parseBounded(await r.text()) };
@@ -325,21 +374,24 @@ const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${messag
 export async function run(configPath, { root, base, nuget = false, get = fetched, now = Date.now(), event = process.env.GITHUB_EVENT_NAME }) {
   if (!base && event?.startsWith("pull_request")) return { lines: ["FAIL: this is a pull request, and its checkout holds no base to read it against, so the lookup would read nothing. Mend: give the job's checkout fetch-depth: 2 (the pull request merged into its base, with both parents)"], code: 1 };
   if (!base) return { lines: ["ok   no pull request's base here, so no package is new: nothing looked up"], code: 0 };
-  let found, sources = 0;
+  let found, head, held, sources = 0;
   try {
     // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
     // error quotes none of its text; the project's folder and the config's are each read by the system's own spelling,
     // since on Windows one folder may be named short or long)
     if (leadsOut(native(root), path.join(native(path.dirname(path.resolve(configPath))), path.basename(configPath)))) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
     const config = loadConfig(configPath);
-    const { head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath));
+    ({ head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath)));
     found = newPackages(head, held, nuget);
     if (nuget) sources = nugetConfig(config).sources.length;
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
   const { failures, reports } = await lookUp(found, { get, now, nuget, sources });
-  const s = found.length === 1 ? "" : "s";
-  return { lines: [...reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`),
-    failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${registryOf(nuget)}, each printed above for the review`], code: failures.length ? 1 : 0 };
+  // (on NuGet the lock file's content hash is held by the NuGet check, and where each package comes from by its restore)
+  const sourced = nuget ? { failures: [], reports: [] } : sourceFaults(head, held);
+  const s = found.length === 1 ? "" : "s", off = sourced.failures.length;
+  return { lines: [...reports.map((r) => `REPORT: ${r}`), ...sourced.reports.map((r) => `REPORT: ${r}`), ...failures.map((f) => `FAIL: ${f}`), ...sourced.failures.map((f) => `FAIL: ${f}`),
+    failures.length ? `${failures.length} of ${found.length} new package${s} fail the lookup (floor rule 15)` : `ok   ${found.length} new package${s} looked up in ${registryOf(nuget)}, each printed above for the review`,
+    ...(off ? [`${off} lock entr${off === 1 ? "y" : "ies"} the pull request brings not from npm's registry with an integrity value (floor rule 7)`] : [])], code: failures.length || off ? 1 : 0 };
 }
 
 // The pull request's base as its workflow names it (LOOKUP_BASE, from the event's base commit), where the checkout holds

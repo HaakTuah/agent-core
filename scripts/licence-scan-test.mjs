@@ -11,6 +11,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { mended } from "./mend.mjs";
+import { execFileSync } from "node:child_process";
+import { check as licenceCheck } from "./licences.mjs";
 
 // (each failure as the check prints it, one a config's fault throws too: each says its mend)
 const mendSaid = (failures) => mended(failures.map((m) => `FAIL: ${m.replace(/^threw: /u, "")}`).join("\n"));
@@ -234,6 +236,55 @@ for (const [what, change, why] of [
   ok(deepLock.some((m) => /package-lock\.json cannot be read as JSON \(it nests deeper than 200 objects and lists\)\. Mend: /u.test(m)), "a lock file nested past the bound is refused as JSON that cannot be read, saying its mend", deepLock.join("\n").slice(0, 400));
   const long = run(write("site/tools/long.json", JSON.stringify({ command: Array.from({ length: 150000 }, (_, k) => `arg${k}`) })));
   ok(long.length === 0, "reads a command's list of any length", long.join("\n"));
+}
+
+// A program a file downloads by its address is pinned by version and checksum (#488, point 5): read against the pull
+// request's base, a file that stood unpinned is reported, and one a pull request adds or unpins fails, saying the mend.
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "licence-scan-pins-"));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); git("add", "-A"); };
+  const audit = (entries) => put("audit.json", JSON.stringify({ entries }));
+  const config = { ships: [], lockfiles: [], audit: "audit.json", scan: { served: [], skip: [] } };
+  const pins = (r) => [...r.failures, ...r.reports].filter((m) => m.includes("pinned by version and checksum"));
+  const SUM = "0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9";
+  const GET = "curl -fsSLo moss.tgz https://mossgrip.example/moss-1.2.0.tgz\n";
+  try {
+    git("init", "-q");
+    audit([{ name: "mosstool", licence: "MIT", ships: false, files: ["scripts/get.sh"] }]);
+    put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}`);
+    git("add", "-A"); git("commit", "-q", "-m", "base");
+    put("README.md", "a change of its own\n"); git("add", "-A"); git("commit", "-q", "-m", "c");
+    let r = licenceCheck(config, dir, "HEAD^1", config);
+    ok(r.failures.length === 0 && pins(r).length === 1 && r.reports.some((m) => m.includes("scripts/get.sh") && m.includes("at the pull request's base")), "a download that stood unpinned at the base is reported and passes", JSON.stringify(r));
+    r = licenceCheck(config, dir, null, config);
+    ok(r.failures.length === 0 && r.reports.some((m) => m.includes("pinned by version and checksum") && m.includes("no base to read")), "with no base to read, it is reported and passes", JSON.stringify(r));
+    put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}wget -q https://mossgrip.example/moss-extra-1.2.0.tgz\n`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && /mosstool, in audit\.json, names no version/u.test(r.failures[0]) && mendSaid(r.failures), "a download a pull request adds to an unpinned file fails, saying the mend", JSON.stringify(r));
+    audit([{ name: "mosstool", licence: "MIT", ships: false, version: "1.2.0", files: ["scripts/get.sh"] }]);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && /holds no checksum/u.test(r.failures[0]) && /sha256sum -c/u.test(r.failures[0]), "with its version named and no checksum in the file, it fails, saying the mend", JSON.stringify(r));
+    put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}echo "${SUM}  moss.tgz" | sha256sum -c -\n`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 0 && pins(r).length === 0, "with its version and its checksum, it passes, saying nothing", JSON.stringify(r));
+    const WF = ".github/workflows/get.yml", job = (lines) => `name: get\non: push\njobs:\n  get:\n    runs-on: windows-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`;
+    put(WF, job(["Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip"]));
+    audit([{ name: "mosstool", licence: "MIT", ships: false, version: "1.2.0", files: ["scripts/get.sh", WF] }]);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && r.failures[0].startsWith(`${WF}:`) && /holds no checksum/u.test(r.failures[0]), "PowerShell's download is read too", JSON.stringify(r));
+    put(WF, job(["Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip", `if ((Get-FileHash moss.zip).Hash -ne "${SUM.toUpperCase()}") { exit 1 }`]));
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 0 && pins(r).length === 0, "a checksum as PowerShell writes it, in capitals, is one", JSON.stringify(r));
+    put("scripts/key.sh", "curl -fsS https://github.com/web-flow.gpg | gpg --import\n");
+    put("site/data.sh", "curl -fsSLo words.txt https://mossgrip.example/words.txt\n");
+    audit([{ name: "mosstool", licence: "MIT", ships: false, version: "1.2.0", files: ["scripts/get.sh", WF] },
+      { name: "GitHub's commit signing key", licence: "LicenseRef-GitHub-Terms", kind: "github-service", ships: false, files: ["scripts/key.sh"] },
+      { name: "moss words", licence: "CC-BY-4.0", kind: "data", ships: false, files: ["site/data.sh"] }]);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 0 && pins(r).length === 0, "what no program could be, a key of GitHub's service or data, needs no pin", JSON.stringify(r));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 done();

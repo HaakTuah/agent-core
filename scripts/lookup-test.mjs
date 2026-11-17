@@ -180,6 +180,38 @@ ok(r.failures.length === 1 && /NuGet registry has no such package/u.test(r.failu
 r = await one(pkg("Invented.Moss.Astray"), true);
 ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGet: a page the index places outside the registry is not fetched");
 
+// ---- Every lock entry from npm's registry, with an integrity value (#488, point 4)
+{
+  const at = mkdtempSync(join(tmpdir(), "lookup-source-"));
+  const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: at, encoding: "utf8" }).trim();
+  try {
+    g("init", "-q");
+    writeFileSync(join(at, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
+    const put = (packages) => writeFileSync(join(at, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), integrity: "sha512-invented" }, ...packages } }));
+    const old = { "node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" } };
+    put(old);
+    g("add", "-A"); g("commit", "-qm", "base");
+    const base = g("rev-parse", "HEAD"), config = join(at, "licences.json");
+    let r = await run(config, { root: at, base, get, now: NOW });
+    ok(r.code === 0 && r.lines.some((l) => /^REPORT: package-lock\.json: from-git@1\.0\.0 .*a git address.*the pull request's base held it so/u.test(l)), `an entry from git the base held is reported and passes (${r.lines})`);
+    const cases = [
+      ["a web address", { "node_modules/from-web": { version: "2.0.0", resolved: "https://example.invalid/from-web-2.0.0.tgz", integrity: "sha512-invented" } }, /from-web@2\.0\.0 .*a web address on example\.invalid/u],
+      ["no integrity value, deep in the tree", { "node_modules/tidy-moss-format/node_modules/deep-moss": { version: "1.0.0", resolved: tgz("deep-moss", "1.0.0") } }, /deep-moss@1\.0\.0 .*no integrity value/u],
+      ["a git address at another commit", { "node_modules/from-git": { version: "1.0.1", resolved: "git+https://example.invalid/from-git.git#89abcde" } }, /from-git@1\.0\.1 .*a git address/u],
+      ["a packed file outside the project", { "node_modules/far-moss": { version: "1.0.0", resolved: "file:../elsewhere/far-moss-1.0.0.tgz", integrity: "sha512-invented" } }, /far-moss@1\.0\.0 .*a packed file named by its path/u],
+    ];
+    for (const [what, packages, said] of cases) {
+      put(packages);
+      r = await run(config, { root: at, base, get, now: NOW });
+      const out = r.lines.join("\n");
+      ok(r.code === 1 && mended(out) && r.lines.some((l) => l.startsWith("FAIL: ") && said.test(l)) && /not from npm's registry with an integrity value/u.test(out), `an entry the pull request brings with ${what} fails, saying the mend (${r.lines})`);
+    }
+    put({ ...old, "node_modules/tidy-moss-format/node_modules/tidy-moss-helper": { version: "1.1.0", inBundle: true }, "node_modules/own-moss": { version: "1.0.0", resolved: "file:vendor/own-moss-1.0.0.tgz", integrity: "sha512-invented" } });
+    r = await run(config, { root: at, base, get, now: NOW });
+    ok(r.code === 0 && !r.lines.some((l) => /tidy-moss-helper|own-moss/u.test(l) && /integrity|not npm.s registry/u.test(l)), `a package inside another's file, and a packed file of the project's own, pass (${r.lines})`);
+  } finally { rmSync(at, { recursive: true, force: true }); }
+}
+
 // ---- The check on a project
 const tmp = mkdtempSync(join(tmpdir(), "lookup-test-"));
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" }).trim();
@@ -187,10 +219,11 @@ try {
   git("init", "-q");
   writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
   writeFileSync(join(tmp, "package.json"), "{}");
-  const write = (packages) => writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...packages } }));
+  // (each entry with an integrity value, as npm writes one, unless the test says otherwise)
+  const write = (packages) => writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...Object.fromEntries(Object.entries(packages).map(([k, e]) => [k, { integrity: "sha512-invented", ...e }])) } }));
   write({ "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format") } });
   mkdirSync(join(tmp, "fixtures"), { recursive: true });
-  writeFileSync(join(tmp, "fixtures/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0") } } }));
+  writeFileSync(join(tmp, "fixtures/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0"), integrity: "sha512-invented" } } }));
   git("add", "-A"); git("commit", "-qm", "base");
   const base = git("rev-parse", "HEAD");
   const config = join(tmp, "licences.json");
