@@ -71,6 +71,17 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #548 | builder | |
+| #549 | builder; a workflow, two security reviews | #548, on `scripts/holders.json` |
+| #550 | builder; a case a PR | |
+| #551 | builder | #549; #355 and #391, for its point 3 |
+| #552 | builder | #551 |
+| #553 | builder | #552, #355 and #391 |
+| #554 | builder | #553 and #355 |
+| #555 | builder | #534's tools, and #554 |
+| #556 | builder | #554; #534's tools, for its linter rules |
+| #557 | builder | #556 |
+| #558 | builder | #557 |
 
 ## Not taken up
 
