@@ -157,7 +157,7 @@ function expressionFunctions(state) {
     contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
     fromjson: a => JSON.parse(str(a)), tojson: a => JSON.stringify(a ?? null),
     format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
-    always: () => true, cancelled: () => false, success: () => !state.failed, failure: () => state.failed,
+    always: () => true, cancelled: () => !!state.cancelled, success: () => !state.failed, failure: () => state.failed,
   };
 }
 
@@ -278,7 +278,9 @@ const outputsOf = file => {
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
  * With `dry`, it only says which jobs would start: each one that starts is a job the repository's owner pays for.
- * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). Each job's own
+ * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). With `stop`, a
+ * step that fails where `stop(its name)` holds cancels the rest of its job, as a run cancelled there: a step that runs
+ * where `!cancelled()` runs no more. Each job's own
  * temporary folder is made under `temp` and removed when the job ends.
  */
 // Whether a trigger's `paths:` filter lets a change through, as GitHub's cheat sheet reads one: `*` (no slash), `**`
@@ -369,9 +371,9 @@ function callInputs(wf, inputs, secrets) {
   return given;
 }
 
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
-  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, temp };
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp };
   const given = callInputs(wf, inputs, secrets);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
@@ -425,7 +427,7 @@ function runUses(jr, step, name, env) {
   } catch (e) {
     // (a stand-in that refuses what the step asks of it fails the step, as the action would)
     result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
-    state.failed = true; result.passed = false;
+    failed(state, result, rt.stop, name);
     return;
   }
   result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
@@ -448,5 +450,12 @@ function runScript(jr, step, name, env) {
   carryEnv(path.join(tmp, "env"), ctx.env, id);
   result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
   if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
-  if (!passed) { state.failed = true; result.passed = false; }
+  if (!passed) failed(state, result, rt.stop, name);
+}
+
+// A step that failed: its job fails, and, where `stop` holds for its name, the rest of the job is cancelled.
+function failed(state, result, stop, name) {
+  state.failed = true;
+  result.passed = false;
+  if (stop && stop(name)) state.cancelled = true;
 }

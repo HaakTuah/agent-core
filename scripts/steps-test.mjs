@@ -359,6 +359,8 @@ rewrite("config/licences.json", t => { const { nuget, ...rest } = JSON.parse(t);
 rewrite("config/copies.json", t => t.replace('"checks/copies-baseline.json"', '"config/copies-base.json"'));
 rewrite("core-manifest.md", t => t.replace("`core/scripts/copies.mjs` with `checks/copies.json`", "`core/scripts/copies.mjs` with `config/copies.json`"));
 for (const f of fs.readdirSync(path.join(ownDir, ".github/workflows"))) if (/^(copies|licences|nuget)\.yml$/.test(f)) fs.rmSync(path.join(ownDir, ".github/workflows", f));
+// (the parts of core.yml's one job those calls stood for, left out with them: #376)
+rewrite(".github/workflows/core.yml", t => t.replace(/^ {6}(copies|sizes|nuget): .*\n/gm, ""));
 fs.mkdirSync(path.join(ownDir, "src/App"), { recursive: true });
 fs.writeFileSync(path.join(ownDir, "src/App/App.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
 const ownRun = "name: checks\n\non:\n  pull_request:\n\njobs:\n  checks:\n    runs-on: ubuntu-latest\n    steps:\n      # core/scripts/licences.mjs reads the list below\n      - run: |\n          # core/scripts/licences.mjs takes its config first\n          node core/scripts/copies.mjs config/copies.json\n          node core/scripts/licences.mjs config/licences.json # core/scripts/licences.mjs reads\n          node core/scripts/agent-tools.mjs config/licences.json\n";
@@ -812,6 +814,19 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   const reported = ["  pull_request", " pull_request", " [push, pull_request]", "\n  pull_request:", "\n  pull_request:\n    types: [opened, synchronize]"].filter(on => step.check(call(on)));
   ok(reported.length === 5 && !step.check(call("\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]")) && !step.check(call("\n  push:")),
     "a call that skips its job on a draft is reported wherever its pull_request trigger leaves ready_for_review out, in each form `on:` takes, and read done where it lists it or where no pull request starts it", reported.join(" | "));
+}
+
+// ---- a call to core.yml that folds part of the one job: what it leaves out, and what it runs twice (#376) ----
+{
+  const step = STEPS.find(s => s.lead === "17 November 2026, the checks as one job");
+  const wf = (name, uses, w = "") => [name, { text: `jobs:\n  j:\n    uses: ${CORE}/.github/workflows/${uses}@${PIN}\n${w}`, yaml: parseYaml(`jobs:\n  j:\n    uses: ${CORE}/.github/workflows/${uses}@${PIN}\n${w}`) }];
+  const of = (...files) => step.check({ workflows: Object.fromEntries(files), files: [], read: () => null, root: "." });
+  const all = "    with:\n      copies: c.json\n      sizes: s.json\n      description: true\n      signatures: web\n";
+  ok(of(wf("core.yml", "core.yml")) === null && of(wf("core.yml", "core.yml", all)) === null && of(wf("core.yml", "core.yml", "    with:\n      signatures: web\n"), wf("copies.yml", "copies.yml"), wf("d.yml", "pr-description.yml")) === null,
+    "a call to core.yml alone, or one that folds each check, or one whose other checks are still called on their own, reads done");
+  const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
+  ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
+    "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);

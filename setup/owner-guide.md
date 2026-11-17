@@ -48,7 +48,12 @@ each commit, and stops. Delete the branch to let them go on. It stops only that 
 - **Billed minutes.** On a private repository on GitHub's free plan each job costs a whole minute, and Actions stop once
   the month's are spent. A release adds no billed job to a project, and the job of the security-review check, which runs
   most often, is skipped there unless you turn it on; the other checks there run once a pull request is ready, not at
-  each push to a draft, so a draft shows no check until then (`README.md`, "A private repository").
+  each push to a draft, so a draft shows no check until then, and as one job, with `personal-terms` beside it: two jobs a
+  push where there were four or five (`README.md`, "A private repository"). Where your ruleset requires a check by the
+  name of one folded into that job (`copies`, `pr-description`, `signatures`, `nuget`), take the name out of it when
+  your project takes the one job; `core / core` still reports. Requiring `core / core` does not hold which checks the
+  call names: a pull request that takes an input out of `.github/workflows/core.yml` still passes it, and only that
+  protected file's reviews hold its inputs.
 
 What a release adds never turns an old breach of your own red: it is listed, and your agents work it down by tasks.
 Nothing it brings stops your project or waits on you (`AGENTS.md`, "Nothing locks a project"). The one exception is the
