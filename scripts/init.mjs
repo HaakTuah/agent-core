@@ -19,8 +19,9 @@
 //   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
 //   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
-//              workflows, which need it (README.md, point 5, "A private repository"), and a NuGet check started only
-//              by a pull request that changes a file NuGet reads by name
+//              workflows, which need it (README.md, point 5, "A private repository"), a NuGet check started only
+//              by a pull request that changes a file NuGet reads by name, and each pull-request check started only
+//              once a pull request is no draft (READY_ONLY)
 //   --game     a game: the module game-design.md with the others
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -194,9 +195,23 @@ export function files(o, pin, moduleNames, read) {
     // (a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name: no other
     // pull request bills its job; AGENTS.md, "Nothing locks a project")
     if (to === ".github/workflows/nuget.yml" && o.private) text = text.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${fill(read("workflows/nuget-paths.yml.tmpl"), words)}`);
+    if (READY_ONLY.includes(to) && o.private) text = readyOnly(text);
     return [to, text];
   });
 }
+
+// A private repository's pull-request checks start only once a pull request is ready (#375): each of these calls also
+// triggers when one is marked ready, and its job is skipped on a draft, so a push to a draft bills no job and marking
+// it ready runs each once. The trigger and the condition stand together in the project's own file, so a project that
+// keeps its calls as they were runs every check as before (AGENTS.md, "Nothing locks a project").
+export const READY_ONLY = ["core.yml", "copies.yml", "personal-terms.yml", "signatures.yml", "nuget.yml"].map(f => `.github/workflows/${f}`);
+export const READY = "${{ !github.event.pull_request.draft }}";
+export const readyOnly = text => text
+  // (the trigger's own types, where it lists them, gain the one more; else it lists them: GitHub's three and that one)
+  .replace(/^ {2}pull_request:(\r?\n)((?: {4}.*\r?\n)*)/m, (on, eol, block) => /^ {4}types: \[/m.test(block)
+    ? on.replace(/^( {4}types: \[[^\]\r\n]*)\]/m, "$1, ready_for_review]")
+    : `  pull_request:${eol}    types: [opened, reopened, synchronize, ready_for_review]${eol}${block}`)
+  .replace(/^(jobs:\r?\n {2}[\w-]+:(\r?\n))/m, (job, _, eol) => `${job}    if: ${READY}${eol}`);
 
 // The reading-size check's first marks: each file every session reads at about 20 KB, and the total of the project's
 // own among them (the core's copy under core/ is held to the core's own cap) at what they come to today, rounded up
@@ -225,9 +240,9 @@ function firstBaselines(here) {
   }
 }
 
-function init(argv) {
-  const o = options(argv);
-  const here = process.cwd();
+// The project the kit is run in, held to what the kit writes into: the root of its git repository, not the core, a
+// name that serves, and no filter of its own that `git add` would run. Its name is set where --name left it out.
+function checkProject(o, here) {
   // (asked of git as a path from the repository's root, empty at the root itself: no two spellings of one folder,
   // such as Windows' short names, are ever compared)
   let below;
@@ -239,24 +254,31 @@ function init(argv) {
   let filters = "";
   try { filters = raw(["config", "--local", "--includes", "--get-regexp", "^filter\\."], here, guarded()); } catch { /* (none: git ends with 1) */ }
   if (filtered(filters).length) fail(`the project's own git settings hold ${filtered(filters).join(", ")}, which would run a command when the kit adds its files: take it out of .git/config first, or start from a fresh git init`);
+}
 
+// The commit of the core the project starts from: --at, or the clone's own HEAD.
+function pinOf(o) {
   let pin;
   try { pin = git(["rev-parse", `${o.at ?? "HEAD"}^{commit}`], ROOT); } catch { fail(o.at ? `${o.at} is no commit of this clone of the core` : "run it from a clone of the core (the script's own folder is no git repository)"); }
   // (a clone knows the core's main as origin/main: where it does, the pin is held to it here; core.yml holds it always)
   let main = null;
   try { main = git(["rev-parse", "--verify", "--quiet", "refs/remotes/origin/main"], ROOT); } catch { /* (no such ref: core.yml decides) */ }
   if (main) { try { git(["merge-base", "--is-ancestor", pin, main], ROOT); } catch { fail(`${pin} is not a commit of the core's main, as this clone knows it`); } }
-  const moduleNames = modulesAt(pin);
+  return pin;
+}
 
-  const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
-  const out = files(o, pin, moduleNames, read);
+// A Failure where a path the kit writes is a link or is there already: it then writes nothing.
+function refuseTaken(here, out) {
   const targets = [...out.map(([to]) => to), ...MADE];
   const links = [...new Set(targets.map(to => linked(here, to)).filter(Boolean))];
   if (links.length) fail(`the project holds a link at ${links.join(", ")}: the starter kit writes through no link, and wrote nothing`);
   // (a link whose target is missing is there all the same: asked without following it)
   const taken = targets.filter(to => { try { fs.lstatSync(path.join(here, to)); return true; } catch { return false; } });
   if (taken.length) fail(`the project already has ${taken.join(", ")}: the starter kit never overwrites, and wrote nothing`);
+}
 
+// The kit's files, the first copy of the core, and the checks' first configs and baselines, written and staged.
+function writeKit(o, here, pin, out) {
   // ("wx": a file that has appeared since, a link too, is refused and never written over)
   const write = (to, text) => { fs.mkdirSync(path.dirname(path.join(here, to)), { recursive: true }); fs.writeFileSync(path.join(here, to), text, { flag: "wx" }); };
   for (const [to, text] of out) write(to, text);
@@ -269,7 +291,10 @@ function init(argv) {
   write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
   git(["add", "--", ...out.map(([to]) => to), "checks/sizes.json", "checks/licences.json", "core"], here, guarded());
   firstBaselines(here);
+}
 
+// What the kit wrote, and what it leaves for the project and for the owner.
+function sayLeft(o, pin, out) {
   console.log(`The starter kit is written: ${out.length + 4} files (the last four checks/sizes.json, checks/licences.json, checks/copies-baseline.json and checks/shape-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
@@ -283,6 +308,20 @@ function init(argv) {
   console.log(`\nLeft for the owner (the core's README, "Setting up"): the ruleset on main, with the checks \`core / core\` and the project's own required;`);
   console.log("  the Actions setting that every action is pinned to a full commit SHA; the Actions secret PERSONAL_TERMS; and the security reviewer's app.");
   console.log("\nWhat owning this project asks of the owner, in one plain page: core/setup/owner-guide.md");
+}
+
+function init(argv) {
+  const o = options(argv);
+  const here = process.cwd();
+  checkProject(o, here);
+  const pin = pinOf(o);
+  const moduleNames = modulesAt(pin);
+
+  const read = name => { try { return raw(["show", `${pin}:${TEMPLATES}/${name}`], ROOT); } catch { return fail(`${pin} holds no ${TEMPLATES}/${name}: take a commit of the core that has the starter kit`); } };
+  const out = files(o, pin, moduleNames, read);
+  refuseTaken(here, out);
+  writeKit(o, here, pin, out);
+  sayLeft(o, pin, out);
 }
 
 if (started(import.meta.url)) {

@@ -292,7 +292,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `core/scripts/agent-tools.mjs` for its agents' tools, and its own check holds its
      packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
-     over them: floor rule 14), so each runs only where a change can affect it, and the core is synced once a day at
+     over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
+     its calls to `core.yml`, `copies.yml`, `personal-terms.yml`, `signatures.yml` and `nuget.yml`, as the starter kit
+     writes them, also start when a pull request is marked ready and skip their job on a draft, so a push to a draft
+     bills none of them and a draft shows no check until it is marked ready (#375; `setup/sync-notes.md`, "16 November
+     2026, checks once a pull request is ready"); and the core is synced once a day at
      most, a sync PR opened that day being the day's ("Sessions" in `roles/shared/work-flow.md`). On GitHub's free plan it
      has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
      (`roles/shared/work-flow.md`, point 1). The core's scripts read npm's lockfiles and NuGet's: what another installer

@@ -805,5 +805,14 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   }
 }
 
+// ---- a call that skips a draft is read in every form of its trigger (#375) ----
+{
+  const step = STEPS.find(s => s.lead === "16 November 2026, checks once a pull request is ready");
+  const call = (on, types = "") => { const text = `name: core\n\non:${on}${types}\n\njobs:\n  core:\n    if: \${{ !github.event.pull_request.draft }}\n    uses: ${CORE}/.github/workflows/core.yml@${PIN}\n`; return { workflows: { "core.yml": { text, yaml: parseYaml(text) } } }; };
+  const reported = ["  pull_request", " pull_request", " [push, pull_request]", "\n  pull_request:", "\n  pull_request:\n    types: [opened, synchronize]"].filter(on => step.check(call(on)));
+  ok(reported.length === 5 && !step.check(call("\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]")) && !step.check(call("\n  push:")),
+    "a call that skips its job on a draft is reported wherever its pull_request trigger leaves ready_for_review out, in each form `on:` takes, and read done where it lists it or where no pull request starts it", reported.join(" | "));
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
 process.exitCode = failed ? 1 : 0;
