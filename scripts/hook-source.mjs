@@ -6,20 +6,21 @@
 // Read only where it can be read exactly, two ways and no other. The starter kit's own two forms (KIT_FORMS), whole,
 // are the core's: of one, only the plain words after its script are read. A plain command (PLAIN) holds nothing a shell
 // reads otherwise than as written: letters, digits, spaces and `_ . / : = @ + , -`; quotes that only group (balanced,
-// none within another); and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an agent tool sets it.
+// none within another); and $CLAUDE_PROJECT_DIR outside single quotes and alone in its part, the project's root, as an
+// agent tool sets it.
 // A word that sets a variable (PATH=x and the like change which program runs), a path with a ".." (read by the file
 // system after the links before it) or one from the root ("/", which may lead into the checkout) makes it no plain
 // command. Of a plain command, each word, and each part of a word between spaces (a quoted script given to sh -c) or
 // `=`, `:`, `,` and `@`, or after an option's letters (-r./x.rb), that names a file the project holds, at the root or
 // in a folder another part names (a folder a program may be told to work in), through a link inside the checkout too,
-// as holds() reads it, is taken from the working tree, whatever program it is given to; and so is a file at the
+// and in any case, as holds() reads it, is taken from the working tree, whatever program it is given to; and so is a file at the
 // project's root that a Windows shell runs in the place of its first word. No other
 // command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
 // so nothing a reading here could get wrong grants a hook anything. Node's own modules only.
 //
 //   import { fromTree } from "./hook-source.mjs";
 //   fromTree(command, holds, folder) -> the paths it takes from the working tree, where holds(path) says the project
-//                               holds a file there and folder(path) a folder; or null, where the command is neither the
+//                               holds a file there (true, or the path it holds it at) and folder(path) a folder; or null, where the command is neither the
 //                               kit's nor plain, or would ask too much, and so not read
 import path from "node:path";
 import { inProject } from "./guards.mjs";
@@ -54,7 +55,7 @@ function words(command) {
   for (let i = 0; i < command.length; i++) {
     const c = command[i];
     if (c === "$") {
-      const end = rootAt(command, i, quote);
+      const end = rootAt(command, i, quote, word);
       if (end < 0) return null;
       word = (word ?? "") + ".";
       i = end - 1;
@@ -82,10 +83,16 @@ function nested(command) {
   return false;
 }
 
-// Where the root's name that starts at `i` ends, or -1 where none does or it stands in single quotes, written as is.
-function rootAt(command, i, quote) {
+// Where the root's name that starts at `i` ends; or -1 where none does, it stands in single quotes, written as is, or
+// it does not stand alone in its part, a path the root then begins: the root is a whole path, so `scripts$ROOT/x`
+// names a file under scripts/ that "." would not show. Before it, nothing of its part (`word` empty, or ending at a
+// blank or `= : , @`); after it, a closing quote at most, then `/`, a blank, `= : , @` or the end.
+const BOUNDARY = /[ =:,@]$/u, AFTER = /^[/ =:,@]?$/u;
+function rootAt(command, i, quote, word) {
   ROOT.lastIndex = i;
-  return quote !== "'" && ROOT.test(command) ? ROOT.lastIndex : -1;
+  if (quote === "'" || !ROOT.test(command) || (word && !BOUNDARY.test(word))) return -1;
+  const end = ROOT.lastIndex, closes = quote !== null && command[end] === quote;
+  return AFTER.test(command[closes ? end + 1 : end] ?? "") ? end : -1;
 }
 
 // A word and its parts: whole, at its spaces, as a quoted script given to sh -c holds its words, and at each = : , @.
@@ -125,9 +132,13 @@ function named(list, holds, folder) {
     }
   }
   const found = new Set();
-  for (const dir of folders) for (const part of each) { const f = at(dir, part); if (f !== "." && holds(f)) found.add(f); }
+  for (const dir of folders) for (const part of each) { const f = at(dir, part); if (f !== ".") take(found, f, holds(f)); }
   return found;
 }
+
+// (holds() answers true, or the path the project holds a file at where it is not the one asked, as a file system that
+// ignores case reads it)
+const take = (found, asked, held) => { if (held) found.add(typeof held === "string" ? held : asked); };
 
 export function fromTree(command, holds, folder) {
   try { return read(String(command), holds, folder); } catch (e) { if (e === OVER) return null; throw e; }
@@ -143,6 +154,6 @@ function read(text, holds, folder) {
   const found = named(list, holds, folder);
   // (its first word, as a Windows shell runs it from the project's root)
   const first = list[0];
-  if (first && !first.includes("/")) for (const ext of RUNS) if (holds(`${first}${ext}`)) found.add(`${first}${ext}`);
+  if (first && !first.includes("/")) for (const ext of RUNS) take(found, `${first}${ext}`, holds(`${first}${ext}`));
   return [...found];
 }

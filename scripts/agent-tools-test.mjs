@@ -405,6 +405,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (a folder a hook tells its program to work in, as the project's own reader answers it)
     const moved = "env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash format.sh";
     fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(moved), ...listing(entry(moved)) })), "a hook that runs a file from a folder it tells its program to work in takes it from the working tree", 'takes "scripts/format.sh"');
+    // (#476: as a file system that ignores case and a name's trailing dots reads a path, macOS's and Windows')
+    for (const odd of ["bash Scripts/Format.SH", "bash scripts/format.sh.", "env -C SCRIPTS bash format.sh"])
+      fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(odd), ...listing(entry(odd)) })), `a hook that names a file in another case or with a trailing dot (${odd}) takes it from the working tree`, 'takes "scripts/format.sh"');
   }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes('takes "scripts/format.sh" from the working tree'), "the sync note's step reads not done while a hook takes a file from the working tree unmarked");
@@ -432,6 +435,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], ["env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash a.sh", ["a.sh", "scripts/a.sh"]],
     ["env -Cscripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["bash a.sh -C scripts", ["a.sh", "scripts/a.sh"]], ["env -C scripts env -C in bash a.sh", ["a.sh", "scripts/a.sh", "scripts/in/a.sh"]],
     ["bash scripts/a.sh", ["scripts/a.sh"]],
+    // (#476's code review of 28a6bb0: the root is a whole path, read only where nothing of its part stands before it and
+    // a path, a blank or the end after it)
+    ["bash scripts${CLAUDE_PROJECT_DIR}/a.sh", null], ["bash x$CLAUDE_PROJECT_DIR/a.sh", null], ["bash ${CLAUDE_PROJECT_DIR}x", null], ["bash \"$CLAUDE_PROJECT_DIR\"x", null],
+    ["bash $CLAUDE_PROJECT_DIR\"/scripts/a.sh\"", null], ["bash -r$CLAUDE_PROJECT_DIR/a.sh", null], ["node --require=$CLAUDE_PROJECT_DIR/scripts/a.sh", ["scripts/a.sh"]],
+    ["sh -c \"bash $CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["cd $CLAUDE_PROJECT_DIR", []],
     // (#476's code review of 002e060: a path given to an option in the same word)
     ["ruby -r./scripts/a.sh -e 0", ["scripts/a.sh"]], ["ruby -rscripts/a.sh -e 0", ["scripts/a.sh"]], ["gcc -vIscripts/in a.sh", ["a.sh", "scripts/in/a.sh"]], ["node --x-scripts/a.sh", []], [Array.from({ length: 300 }, (_, i) => `-${"w".repeat(100)}${i}`).join(" "), null]])
     ok(JSON.stringify(fromTree(command, holds, folder)) === JSON.stringify(want), `the command ${JSON.stringify(command).slice(0, 100)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds, folder)));

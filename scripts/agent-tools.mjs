@@ -93,8 +93,11 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
   // (whether the project holds a path is asked once a path: a hook may name one a thousand times, and the asking reads
   // the file and may start git)
-  const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
-  const listed = new Map(), folder = f => { if (!listed.has(f)) listed.set(f, files(f).length > 0); return listed.get(f); };
+  // (and as a file system that ignores case and a name's trailing dots and blanks reads it, as macOS's and Windows' do,
+  // a path not held as written answers with the one it is held at)
+  const listed = new Map(), names = d => { if (!listed.has(d)) listed.set(d, files(d)); return listed.get(d); };
+  const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f) || (folded(f, names).find(holds) ?? false)); return asked.get(f); };
+  const isFolder = new Map(), folder = f => { if (!isFolder.has(f)) isFolder.set(f, [f, ...folded(f, names)].some(d => names(d).length > 0)); return isFolder.get(f); };
   const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, unread, holds: holdsOnce, folder, servers, kit };
   const json = file => {
     const text = read(file);
@@ -119,6 +122,18 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   readKiro(state, json, files);
   readCodex(state, json, read);
   return { tools, ids, problems, texts, sources, unread, pins: pinsOf(plugins, markets, servers) };
+}
+
+// The paths of the project a path names where case and a name's trailing dots and blanks are not read, as macOS's and
+// Windows' file systems do not read them: each name on its way matched to those `names(folder)` gives.
+const bare = name => name.replace(/[. ]+$/u, "").toLowerCase();
+function folded(f, names) {
+  let at = ["."];
+  for (const name of f.split("/")) {
+    at = at.flatMap(d => names(d).filter(n => bare(n) === bare(name)).map(n => (d === "." ? n : `${d}/${n}`)));
+    if (!at.length) break;
+  }
+  return at.filter(p => p !== f);
 }
 
 // The tool servers of one file's "mcpServers" (or Codex's "mcp_servers"), into configured()'s `state`, each named
