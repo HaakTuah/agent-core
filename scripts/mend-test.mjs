@@ -118,7 +118,8 @@ const left = runs.filter(name => !parts.has(name)).sort();
 ok(left.length === 0, `each script a workflow or a hook names, and each workflow, has its line in INVENTORY.md${left.length
   ? `: not so for ${left.join(", ")}. Mend: add a line for each to INVENTORY.md, under the heading it belongs to, as its "How a line reads" says: what it does, where it must run, what else does it (searched on the web too), and a verdict`
   : ""}`);
-const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(name) && !fs.existsSync(path.join(root, name))).sort();
+const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(name)
+  && (name.split("/").includes("..") || !fs.existsSync(path.join(root, name)))).sort();
 ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
   ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
   : ""}`);
