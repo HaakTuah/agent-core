@@ -390,6 +390,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(added(MAIN_HOOK), "and so does one that fetches from main in a form of its own: no command but the kit's is read", NOT_KIT);
   fails(added("npx -y tool@1.0.0"), "and one that names no file of the project", NOT_KIT);
   fails(added(kitCommand("'; bash scripts/format.sh; '")), "and one broken out of the kit's quote", NOT_KIT);
+  // (#476's code review of e76b2bb: the path fetched is written one way alone, so the file the check reads is the one fetched)
+  for (const spelt of ["./scripts/format.sh", "scripts/./format.sh", "x/../scripts/format.sh"])
+    fails(added(KIT_HOOK.replace("main:scripts/format.sh", `main:${spelt}`)), `and one that fetches ${spelt}, another spelling of a file`, NOT_KIT);
   passes(added(KIT_HOOK), "a new hook in the kit's form passes");
   passes(added(kitCommand(" check now")), "and so does one with plain words after its script, which main's copy reads");
   fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) })), "a new one marked as the baseline's fails all the same: the baseline lists only what stood", "the base held no such hook");
