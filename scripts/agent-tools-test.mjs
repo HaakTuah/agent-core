@@ -439,6 +439,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   git(sub, "add", "-A"); git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},scripts/format.sh`);
   git(sub, "commit", "-q", "-m", "a submodule's entry"); git(sub, "checkout", "-q", "main"); git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
   fails(run(sub), "and one whose fetched path is a submodule's entry", NOT_FILE);
+  // (#476's fallback security review of bf7b3b2: what git shows at the path is asked of git, whatever the listing says,
+  // as of an empty folder, which the listing leaves out)
+  const emptyBase = project({ ...listing() }), inEmpty = { cwd: emptyBase, env, encoding: "utf8" };
+  const emptyTree = execFileSync("git", ["mktree"], { ...inEmpty, input: "" }).trim();
+  const withEmpty = execFileSync("git", ["mktree"], { ...inEmpty, input: `${git(emptyBase, "ls-tree", "HEAD")}\n040000 tree ${emptyTree}\tformat.sh\n` }).trim();
+  git(emptyBase, "update-ref", "refs/heads/main", git(emptyBase, "commit-tree", withEmpty, "-p", "HEAD", "-m", "an empty folder at the path"));
+  git(emptyBase, "reset", "-q", "--hard");
+  const rootKit = KIT_HOOK.replace("main:scripts/format.sh", "main:format.sh");
+  fails(run(pr(emptyBase, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) })), "and one whose fetched path main holds as an empty folder", 'fetches "format.sh" from main, which the project holds as no plain file');
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {

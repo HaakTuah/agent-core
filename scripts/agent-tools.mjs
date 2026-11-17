@@ -461,7 +461,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   // (or on main, as `linkedOnMain` says: the base, which a hook fetches from until the pull request merges)
   // (anything but a plain file: a link, a folder or a submodule, in the commit's listing; in the working tree, the
   // commit it stands on too, where a submodule shows as an empty folder)
-  const own = at => notFile(listing(root, rev ?? "HEAD"), at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
+  const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
   return { ...project, links };
@@ -469,6 +469,19 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
 const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at);
+// Whether what git shows at `rev:at` is an object of another kind than a file's, as git show resolves it, whatever its
+// mode says (a folder the listing leaves out as empty, an entry whose mode names a file and whose object is not one);
+// git asked once a path a commit, and a path it shows nothing at is no script either way.
+const shown = new Map();
+function shownNotBlob(root, rev, at) {
+  const key = `${root}\0${rev}\0${at}`;
+  if (!shown.has(key)) {
+    let type = "";
+    try { type = execFileSync("git", ["cat-file", "-t", `${rev}:${at}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { /* (nothing there) */ }
+    shown.set(key, type !== "" && type !== "blob");
+  }
+  return shown.get(key);
+}
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
 // a link inside the repository is followed (eight hops at most), its target put before what is left of the path, so a
@@ -598,7 +611,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
-  const head = readProject(root, null, base ? at => notFile(listing(root, base), at) : undefined);
+  const head = readProject(root, null, base ? at => notFile(listing(root, base), at) || shownNotBlob(root, base, at) : undefined);
   const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
   const kit = [...kitHooks(), ...(base ? kitHooks(atBase) : [])];
   let list = listed(config, file);
