@@ -3,7 +3,8 @@
 // (floor rule 14): led by the five outcomes and what the work cost (outcomes.mjs, beside this file; #302), each measure that keeps a baseline against the last report, in the core the rules of the floor and
 // the modules by what holds them, those with none listed (holders.mjs, beside this file), which rules each role cited in
 // the month before (cited.mjs, beside this file), what the look keeps open past a week, and the step that files a check
-// for each rule the reviews found twice (review-record.mjs). In a project it ends with its counts for the core,
+// for each rule the reviews found twice and the step that adds the rounds of review the pull requests took (#477), both
+// read by review-record.mjs. In a project it ends with its counts for the core,
 // counts and conclusions only: the commit its copy holds and how far behind the core's main that is, the steps of a
 // release not done, and of the pull requests merged the month before, how many were the core's upkeep (core-cost.mjs,
 // beside this file, sorts them). In the core it says that a session adds the projects' part, which --projects prints:
@@ -127,7 +128,9 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
   if (core) lines.push("", "**The projects that take the core**",
     "- Not read by GitHub's job, whose token reaches this repository alone. A session where gh answers for the owner's account runs `node scripts/state-report.mjs --projects` and adds what it prints here as a note; where its tool cannot reach a project, a session started in that project reads it and passes back counts and conclusions alone.");
   lines.push("", "**What the reviews found twice**",
-    `- Not read by GitHub's job. The session that takes this report runs \`node ${scripts}/review-record.mjs --since ${before(month)}-01\` and, for each rule it lists under "Found twice" that no open issue takes, files an issue as \`${scripts.replace(/scripts$/u, "tasks")}/reviews.md\`, point 8, says.`);
+    `- Not read by GitHub's job. The session that takes this report runs \`node ${scripts}/review-record.mjs --since ${before(month)}-01\` and, for each rule it lists under "Found twice" that no open issue takes, files an issue as \`${scripts.replace(/scripts$/u, "tasks")}/reviews.md\`, point 8, says.`,
+    "", "**The rounds of review**",
+    `- Not read by GitHub's job. The same session adds, as a note, the last two lines that run printed under "Rounds of review": the median over the last 30 merged pull requests beside the last report's, and the five that took the most rounds.`);
   if (counts) lines.push("", `**${COUNTS}**`,
     `- copy: ${counts.pin ?? "not read"}${counts.behind === null ? "" : `, ${counts.behind} commits behind the core's main`}.`,
     `- steps not done: ${counts.steps ?? "not read"}.`,
