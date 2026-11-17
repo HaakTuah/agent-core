@@ -208,7 +208,7 @@ export function npmFacts(doc, version) {
   const created = when(time.created);
   if (Number.isNaN(created)) throw new Error("its answer gives no date it was first published");
   const releases = Object.entries(time).filter(([k]) => k !== "created" && k !== "modified").map(([, v]) => when(v)).filter((t) => !Number.isNaN(t));
-  return { first: created, last: releases.length ? Math.max(...releases) : created, ...ofVersion(doc, version) };
+  return { first: created, last: releases.length ? Math.max(...releases) : created, has: Object.hasOwn(doc.versions, version), ...ofVersion(doc, version) };
 }
 
 // What the document says of the one version: its repository, its publisher and whether it has provenance.

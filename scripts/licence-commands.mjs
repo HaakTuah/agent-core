@@ -106,10 +106,17 @@ export const WINDOWS_FETCHER = (() => {
 export const otherFetch = (text) => (OTHER_FETCHER.exec(text) ?? WINDOWS_FETCHER.exec(text))?.[0];
 // The fetchers among those that download a file by its address, a program among them: curl and wget, and PowerShell's.
 const DOWNLOADER = /(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|(?<![\w-])(?:iwr|irm)(?![\w-]))/iu;
-/** Each download by address in text, as the two readers above find their fetches: the words each matched, once each. */
-export const downloads = (text) => [...new Set([OTHER_FETCHER, WINDOWS_FETCHER]
-  .flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))].map((m) => m[0].trim()))
-  .filter((m) => DOWNLOADER.test(m)))];
+/** Each download by address in text, as the two readers above find their fetches: the whole command each stands in,
+ *  its line and the lines it runs on to (after a "\\" or PowerShell's "`" at a line's end), trimmed, once for each
+ *  download, so that two alike count twice. */
+export function downloads(text) {
+  const at = [OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))].filter((m) => DOWNLOADER.test(m[0])).map((m) => m.index + m[0].search(/\S/u)));
+  return [...new Set(at)].sort((a, b) => a - b).map((i) => {
+    let end = text.indexOf("\n", i);
+    while (end !== -1 && /[\\`]\r?$/u.test(text.slice(text.lastIndexOf("\n", end - 1) + 1, end))) end = text.indexOf("\n", end + 1);
+    return text.slice(text.lastIndexOf("\n", i - 1) + 1, end === -1 ? text.length : end).trim();
+  });
+}
 
 /**
  * What one command line fetches: { specs, unreadable, packs } where specs are the packages written for npx, npm exec,

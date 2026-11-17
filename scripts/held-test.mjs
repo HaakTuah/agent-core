@@ -50,6 +50,14 @@ const body = report(r);
 ok(body.startsWith("Packages the project holds that have gone stale") && body.includes("- package-lock.json: old-moss@1.1.0:") && /Left unread this time \(1\)/u.test(body) && body.includes("core/tasks/updates.md"), "the report lists each as a task, then what was left unread", body);
 ok(report({ stale: [], unread: [], asked: 3, notOnGitHub: 0 }) === null, "with nothing stale, there is no report");
 
+// a held npm version gone from the registry, while others stand, is stale; GitHub that does not answer leaves it unread
+answers["https://registry.npmjs.org/moved-on-moss"] = { status: 200, json: { ...npmDoc("moved-on-moss", ago(5)), versions: { "2.0.0": { name: "moved-on-moss" } } } };
+answers["https://registry.npmjs.org/quiet-moss"] = { status: 200, json: npmDoc("quiet-moss", ago(20)) };
+answers["https://api.github.com/repos/invented-org/quiet-moss"] = { status: 503 };
+r = await lookAgain([pkg("moved-on-moss"), pkg("quiet-moss")], { get, now: NOW });
+ok(r.stale.length === 1 && /moved-on-moss@1\.1\.0: its registry no longer has this version/u.test(r.stale[0]), "a held version its registry no longer has is stale, though newer ones stand", r.stale);
+ok(r.unread.length === 1 && /quiet-moss@1\.1\.0: GitHub did not answer whether its repository/u.test(r.unread[0]), "GitHub not answering leaves the package unread, never taken as not archived", r.unread);
+
 // GitHub, asked of at most GITHUB_MOST named packages, the oldest last release first
 asked.length = 0;
 const many = Array.from({ length: GITHUB_MOST + 3 }, (_, i) => `many-moss-${String(i).padStart(2, "0")}`);
@@ -92,6 +100,20 @@ try {
   try { held = heldPackages(dir, [["absent.json", false]]); } finally { process.chdir(here); }
   ok(held.packages.length === 0 && held.unread.length === 1 && held.unread[0].startsWith("absent.json:"), "a config that cannot be read is said, never taken as holding nothing", JSON.stringify(held));
 } finally { rmSync(dir, { recursive: true, force: true }); }
+
+// ---- A config the workflows name only when they run is said unread, and the issue left as it stands (exit 3)
+{
+  const at = mkdtempSync(join(tmpdir(), "held-unnamed-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: at });
+    mkdirSync(join(at, ".github/workflows"), { recursive: true });
+    writeFileSync(join(at, ".github/workflows/licences.yml"), "name: l\non:\n  pull_request:\njobs:\n  l:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/licences.mjs ${{ vars.LICENCE_CONFIG }}\n");
+    mkdirSync(join(at, "checks"));
+    writeFileSync(join(at, "checks/licences.json"), JSON.stringify({ lockfiles: [], ships: [] }));
+    const run = spawnSync(process.execPath, [fileURLToPath(new URL("./held.mjs", import.meta.url)), "--issue"], { cwd: at, encoding: "utf8" });
+    ok(run.status === 3 && run.stdout.trim() === "", "a config named only when the workflow runs is not stood in for by the kit's: the issue is left as it stands", `${run.status} ${run.stdout} ${run.stderr}`);
+  } finally { rmSync(at, { recursive: true, force: true }); }
+}
 
 // ---- Its options: a wrong one fails, saying the mend
 const wrong = spawnSync(process.execPath, [fileURLToPath(new URL("./held.mjs", import.meta.url)), "--wrong"], { encoding: "utf8" });

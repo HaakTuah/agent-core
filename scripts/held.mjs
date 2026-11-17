@@ -11,7 +11,8 @@
 // with the state report (look.mjs). What a registry or GitHub answers is a publisher's text: printed on one line.
 // Node's own modules.
 //
-//   node core/scripts/held.mjs            from a project's root: the configs its workflows name, else the kit's
+//   node core/scripts/held.mjs            from a project's root: the configs its workflows name, else the kit's; one
+//                                         they name only when they run is said unread
 //   node core/scripts/held.mjs <config>   that config, for both npm and NuGet
 //   node core/scripts/held.mjs --issue    the look's issue body: nothing where nothing is stale; exit 3 where nothing
 //                                         could be read
@@ -61,6 +62,7 @@ export async function lookAgain(packages, { get, now = Date.now(), until = Date.
     try { facts = await registry(p, get, p.nuget, p.sources); } catch (e) { unread.push(`${at}: ${p.nuget ? "NuGet's registry" : "the registry of npm"} could not be read (${said(e.message)})`); return; }
     if (facts.elsewhere) return;
     if (facts.missing) { stale.push(`${at}: its registry no longer has it (${said(facts.missing)})`); return; }
+    if (facts.has === false) { stale.push(`${at}: its registry no longer has this version, so it cannot be installed again`); return; }
     if (now - facts.last > STALE * DAY) { stale.push(`${at}: no release since ${day(facts.last)}, over ${STALE} days ago${p.direct ? "" : `, brought by ${(p.by ?? []).map(said).join(", ") || "another"}`}`); return; }
     if (p.direct && facts.repo?.owner) fresh.push({ p, at, facts });
   });
@@ -68,7 +70,9 @@ export async function lookAgain(packages, { get, now = Date.now(), until = Date.
   const ask = fresh.sort((a, b) => a.facts.last - b.facts.last), left = ask.slice(GITHUB_MOST).length;
   for (const { at, facts } of ask.slice(0, GITHUB_MOST)) {
     if (clock() > until) { unread.push(`${at}: GitHub not asked whether its repository is archived, past the ${SECONDS} seconds a look takes`); continue; }
-    if ((await archived(facts.repo, get)) === true) stale.push(`${at}: its repository, ${said(facts.repo.url)}, is archived`);
+    const is = await archived(facts.repo, get);
+    if (is === true) stale.push(`${at}: its repository, ${said(facts.repo.url)}, is archived`);
+    else if (is === null) unread.push(`${at}: GitHub did not answer whether its repository, ${said(facts.repo.url)}, is archived`);
   }
   return { stale: stale.sort(), unread: unread.sort(), asked, notOnGitHub: left };
 }
@@ -87,21 +91,22 @@ export function report({ stale, unread, asked, notOnGitHub }) {
 async function configsOf(root) {
   const { configs, project } = await import("./steps.mjs");
   const found = configs(project(root));
-  return [[found.licences ?? "checks/licences.json", false], [found.nuget ?? found.licences ?? "checks/licences.json", true]];
+  // (a config the workflows name only when they run is left unread, said, never stood in for by another file)
+  return { configs: [[found.licences, false], [found.nuget, true]].filter(([at]) => at !== null), unread: found.licences === null || found.nuget === null ? found.unread : [] };
 }
 
 if (started(import.meta.url)) {
   const args = process.argv.slice(2), issue = args.includes("--issue"), named = args.filter((a) => a !== "--issue");
   if (named.length > 1 || named.some((a) => a.startsWith("--"))) { console.error("FAIL: it takes a config and --issue, and nothing else. Mend: run node core/scripts/held.mjs [<the licence check's config>] [--issue]"); process.exit(2); }
   const root = process.cwd();
-  const configs = named.length ? [[named[0], false], [named[0], true]] : await configsOf(root);
+  const { configs, unread: unnamed } = named.length ? { configs: [[named[0], false], [named[0], true]], unread: [] } : await configsOf(root);
   const { packages, unread } = heldPackages(root, configs);
   const found = await lookAgain(packages, { get: fetched });
-  found.unread.unshift(...unread);
+  found.unread.unshift(...unnamed.map(said), ...unread);
   const text = report(found);
   if (issue) {
     if (text) console.log(text);
-    process.exit(text || (found.asked > 0 && found.unread.length === 0) || (!packages.length && !unread.length) ? 0 : 3);
+    process.exit(text || found.unread.length === 0 ? 0 : 3);
   }
   console.log(text ?? `ok   none of the ${found.asked} package${found.asked === 1 ? "" : "s"} asked has gone stale (\`core/scripts/held.mjs\`)${found.unread.length ? `; left unread (${found.unread.length}): ${found.unread.slice(0, 20).join("; ")}` : ""}`);
 }

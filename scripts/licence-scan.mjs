@@ -232,6 +232,13 @@ export function pinFault(entries, auditPath, f, code) {
   return null;
 }
 
+// Whether every item of `now` stands in `was` as often or more: no download added, nor one made twice.
+function fewer(now, was) {
+  const left = new Map();
+  for (const d of was) left.set(d, (left.get(d) ?? 0) + 1);
+  return now.every((d) => { const n = left.get(d) ?? 0; left.set(d, n - 1); return n > 0; });
+}
+
 /** A program the file `f` downloads by its address is pinned by version and checksum (floor rule 7, as the core pins
  *  Node): where it is not, a pull request that adds the download, or that makes the file lose its pin, fails; a file the
  *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
@@ -239,10 +246,12 @@ export function pinFault(entries, auditPath, f, code) {
 function pinned(c, f, text) {
   const fault = pinFault(c.entries, c.auditPath, f, text);
   if (!fault) return;
-  let was = null;
-  if (c.base) try { was = codeOf(f, execFileSync("git", ["show", `${c.base}:${f}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 })); } catch { /* (the base did not hold it) */ }
-  const held = !c.base || (was !== null && pinFault(c.entries, c.auditPath, f, was) !== null && downloads(text).every((d) => downloads(was).includes(d)));
-  const said = `${f}: it downloads what may be a program (${downloads(text)[0].replaceAll("\n", " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
+  // (the base read whole: its file, by the audit it held then, never by the pull request's)
+  const atBase = (path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
+  const was = c.base ? atBase(f) : null;
+  if (c.base && was !== null && c.baseEntries === undefined) { try { const a = JSON.parse(atBase(c.auditPath) ?? "null"); c.baseEntries = Array.isArray(a?.entries) ? a.entries : []; } catch { c.baseEntries = []; } }
+  const held = !c.base || (was !== null && pinFault(c.baseEntries, c.auditPath, f, codeOf(f, was)) !== null && fewer(downloads(text), downloads(codeOf(f, was))));
+  const said = `${f}: it downloads what may be a program (${downloads(text)[0].replace(/\s+/gu, " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
   if (held) c.reports.push(`${said}; it stood so ${c.base ? "at the pull request's base" : "with no base to read it against"}, so it passes: ${fault.mend}, as the sync's step asks`);
   else c.fail(`${said}. Mend: ${fault.mend}`);
 }
