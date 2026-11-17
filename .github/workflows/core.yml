@@ -218,11 +218,11 @@ jobs:
           # (the copy a folder, and entry by entry as the core's scripts/copy-tree.mjs compares, which says why; each path
           # quoted as git quotes it, so none prints raw or passes for two entries)
           entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
-          # (the pin's tree without each top-level entry its .gitattributes keeps in the core, reports and words, built
-          # as scripts/copy-tree.mjs builds it, so that no name inside such a folder, however git quotes it, is taken for
-          # part of the copy)
+          # (the pin's tree without each top-level entry its .gitattributes keeps in the core, reports, words and tests,
+          # built as scripts/copy-tree.mjs builds it, from the same list, so that no name inside such a folder, however
+          # git quotes it, is taken for part of the copy)
           tree=$PIN
-          for kept in reports words; do
+          for kept in reports words tests; do
             if grep -q -s -x "/$kept export-ignore" .core-at-pin/.gitattributes; then
               # (the whole entry matched, its name after the first tab exactly that folder's; grep's "none left" is no
               # fault, any other failure is)
