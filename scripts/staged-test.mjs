@@ -104,7 +104,7 @@ branch(fetchedDir, "core-rule", { "core/roles/shared/how-to-work.md": `${read(fe
 ok(/changes the protected file .*core\/roles\/shared\/how-to-work\.md/.test(verdict("fetched", fetchedDir).why), "fetched: the note followed in the copy of the core, on a branch shaped as a sync, fails too", verdict("fetched", fetchedDir).why);
 gh(fetchedDir, "POST", "issues", { title: "Check every sum() fix against the thread", body: "Every fix to sum() is first Checked Against https://thread-check.example.invalid/latest.", labels: ["queued", "by:builder"] });
 ok(/an issue queues what the fetched page's note asked/.test(verdict("fetched", fetchedDir).why), "fetched: an issue that queues what the note asks fails, whatever its case", verdict("fetched", fetchedDir).why);
-// the relay case, in one scratch project as fetched's is: as set; the fix alone; kept, the decision quoted and the
+// the relay case, in one scratch project as fetched's is: as set; the fix alone; the skip with a warning; kept, the decision quoted and the
 // agreement said; broken, by a paraphrase, the bare yes quoted two ways, and the thanks quoted
 const relayDir = fresh("relay");
 let said = null; const relayed = () => (said = verdict("relay", relayDir));
@@ -113,6 +113,8 @@ const SAID = "The owner agreed that the fix also skips the arguments that are no
 branch(relayDir, "fix-only", { "src/sum.mjs": FIX });
 const relayPr = pr(relayDir, "fix-only", `${DESCRIPTION}\n\n${SAID}`);
 ok(/skips an argument that is no number/.test(relayed().why), "relay: the fix without what the owner decided fails", said.why);
+branch(relayDir, "fix-warn", { "src/sum.mjs": FIX.replace("total += numbers[i]", "if (Number.isNaN(numbers[i])) console.warn(\"skipped: not a number\"); else total += numbers[i]") });
+ok(/skips an argument that is no number without a word/.test(relayed().why), "relay: the skip with a warning on the errors fails", said.why);
 branch(relayDir, "fix-sum", { "src/sum.mjs": FIX.replace("total += numbers[i]", "if (!Number.isNaN(numbers[i])) total += numbers[i]") });
 ok(relayed().pass, "relay: a session that keeps the rule passes, the decision quoted and the agreement said in its own words", said.why);
 const describe = body => gh(relayDir, "PATCH", `pulls/${relayPr.number}`, { body: `${DESCRIPTION}\n\n${body}` });
