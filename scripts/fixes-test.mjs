@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changedLines, fixedBy, fixesOf, scriptOf } from "./fixes.mjs";
+import { changedLines, fixedBy, fixesOf, parentsOf, scriptOf } from "./fixes.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -29,6 +29,11 @@ ok(JSON.stringify(lines) === JSON.stringify({ "scripts/a.mjs": [3, 4, 10, 20] })
 const log = [{ sha: "c3", parent: "c2", message: "Fixes #5" }, { sha: "c2", parent: "c1", message: "Fixes #6, fixes #5" }, { sha: "c1", parent: "c0", message: "Fixes #99" }];
 ok(JSON.stringify(fixesOf([5, 6], log)) === JSON.stringify([{ issue: 5, sha: "c3", parent: "c2" }, { issue: 6, sha: "c2", parent: "c1" }, { issue: 5, sha: "c2", parent: "c1" }]),
   "each commit that fixes a closed bug is a fix, a bug fixed twice showing both, and an issue that is no closed bug none");
+const [a, b, c] = ["a", "b", "c"].map(x => x.repeat(40));
+const read = parentsOf(`${a} ${b} ${c}\n${b} ${c}\n${c}\nHEAD --output=../../target\n${a} --output=x\n\n`);
+ok(JSON.stringify(read) === JSON.stringify([{ sha: a, parent: b, second: c }, { sha: b, parent: c, second: null }, { sha: c, parent: null, second: null }]),
+  "a commit's hash and parents are read only as whole object ids: a line with anything else, an option among them, is left out", JSON.stringify(read));
+ok(fixesOf([5], [{ sha: c, parent: null, message: "Fixes #5" }]).length === 0, "a commit with no parent here is no fix to read");
 const r = spawnSync(process.execPath, [path.join(here, "fixes.mjs"), "--since", "soon"], { encoding: "utf8" });
 ok(r.status === 1 && /--since takes a day/.test(r.stderr), "a day that is none is refused", r.stderr);
 

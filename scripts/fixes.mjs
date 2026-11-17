@@ -35,9 +35,17 @@ export function changedLines(diff) {
   return out;
 }
 
+// A whole object id of git's, as it prints one: 40 hex digits, or 64 in a repository of SHA-256.
+export const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+
+// The commits of `git log --format="%H %P"`, each { sha, parent, second }: a line whose ids are not all whole object
+// ids is left out, and a commit with no parent (the first, or one a shallow clone cut) has a null one.
+export const parentsOf = text => String(text ?? "").split("\n").map(l => l.trim().split(" ")).filter(ids => ids[0] && ids.every(id => OID.test(id)))
+  .map(([sha, parent = null, second = null]) => ({ sha, parent, second }));
+
 // The fixes of the issues `bugs` (their numbers) among the commits `log` ([{ sha, parent, message }], newest first),
-// each { issue, sha, parent }: every commit that says it fixes one, so a bug fixed twice shows both.
-export const fixesOf = (bugs, log) => log.flatMap(c => fixedBy(c.message).filter(n => bugs.includes(n)).map(issue => ({ issue, sha: c.sha, parent: c.parent })));
+// each { issue, sha, parent }: every commit with a parent that says it fixes one, so a bug fixed twice shows both.
+export const fixesOf = (bugs, log) => log.filter(c => c.parent).flatMap(c => fixedBy(c.message).filter(n => bugs.includes(n)).map(issue => ({ issue, sha: c.sha, parent: c.parent })));
 
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
@@ -53,10 +61,10 @@ function main(argv) {
     .split("\n").filter(Boolean).map(Number);
   // (the default branch's own commits since the day, and, of each merge of a pull request among them, the commits it
   // brought, through which it fixes; a merge whose second parent this clone lacks, a shallow one's, brings none)
-  const commits = range => git(["log", "--format=%H%x09%P%x1f%B%x1e", ...range]).split("\x1e").map(e => e.trim()).filter(Boolean).map(e => {
-    const [head, message] = e.split("\x1f"), [sha, parents = ""] = head.split("\t");
-    return { sha, parent: parents.split(" ")[0], second: parents.split(" ")[1] ?? null, message };
-  });
+  // (hashes and parents read apart from any message, each kept only as a whole object id, and each message read by its
+  // commit's id alone, so nothing a message holds reaches a git command as an argument)
+  const commits = range => parentsOf(git(["log", "--format=%H %P", ...range]))
+    .map(c => ({ ...c, message: git(["log", "-1", "--format=%B", c.sha]) }));
   const log = commits(["--first-parent", `--since=${since}T00:00:00Z`, ref]);
   const merged = log.filter(c => c.second && c.parent).flatMap(c => { try { return commits([`${c.parent}..${c.second}`]); } catch { return []; } });
   const fixes = fixesOf(bugs, [...log, ...merged]);
