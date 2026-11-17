@@ -190,7 +190,8 @@ function registryHolds(p, doc, signing, fail) {
   if (v.dist?.integrity !== p.integrity) fail(`${at}: the registry's integrity is ${logged(String(v.dist?.integrity))}`, "write the registry's, and take the files again from its tarball");
   if (doc.json.time?.[p.version] !== p.published) fail(`${at}: the registry gives ${logged(String(doc.json.time?.[p.version]))} as its date`, "write the registry's date as \"published\"");
   const message = Buffer.from(`${at}:${p.integrity}`);
-  const holds = (k, s) => { try { return k.keyid === s.keyid && verified("sha256", message, { key: Buffer.from(k.key, "base64"), format: "der", type: "spki" }, Buffer.from(s.sig, "base64")); } catch { return false; } };
+  const live = k => k.expires === null || k.expires === undefined || Date.parse(k.expires) > Date.parse(p.published); // (a key that expired before the version was published signs nothing of it)
+  const holds = (k, s) => { try { return k.keyid === s.keyid && live(k) && verified("sha256", message, { key: Buffer.from(k.key, "base64"), format: "der", type: "spki" }, Buffer.from(s.sig, "base64")); } catch { return false; } };
   if (!(v.dist?.signatures ?? []).some(s => signing.some(k => holds(k, s)))) fail(`${at}: no signature of the registry's key holds for its integrity`, "take no version the registry has not signed; if its keys could not be read, run this again");
   return true;
 }

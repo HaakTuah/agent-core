@@ -130,6 +130,12 @@ try {
       "an integrity and a date the registry does not give: each found, with its mend", out.failures.join("\n"));
   }
   {
+    const keys = cache.get("https://registry.npmjs.org/-/npm/v1/keys");
+    const expired = { ...keys, json: { keys: keys.json.keys.map(k => ({ ...k, expires: "2020-01-01T00:00:00.000Z" })) } };
+    const out = await verify(root, { get: url => (url.endsWith("/-/npm/v1/keys") ? expired : get(url)), getBytes });
+    ok(out.failures.some(f => /no signature of the registry's key holds/.test(f)) && mended(out.failures.join("\n")), "a signature by a key that expired before the version was published holds nothing", out.failures.join("\n"));
+  }
+  {
     const d = copy();
     const young = { ...cache.get("https://registry.npmjs.org/yaml"), json: { ...cache.get("https://registry.npmjs.org/yaml").json, time: { ...cache.get("https://registry.npmjs.org/yaml").json.time, created: new Date().toISOString() } } };
     const out = await verify(d, { get: url => (url === "https://registry.npmjs.org/yaml" ? young : get(url)), getBytes });
