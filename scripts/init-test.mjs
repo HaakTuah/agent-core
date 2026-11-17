@@ -283,7 +283,7 @@ if (p.status === 0) {
   const movedIn = baseRun();
   git(core, "reset", "-q", "--hard", "main");
   // (exactly half of a file's lines, each holding a word and counted once, is not most of them)
-  const distinct = f => [...new Set(fs.readFileSync(path.join(core, f), "utf8").split("\n").map(l => l.trim()).filter(l => /\w/u.test(l)))];
+  const distinct = f => [...new Set(fs.readFileSync(path.join(core, f), "utf8").split("\n").map(l => l.trim()).filter(l => /[\p{L}\p{N}]/u.test(l)))];
   const even = ["roles/shared/how-to-work.md", ...fs.readdirSync(path.join(core, "tasks")).map(f => `tasks/${f}`)].find(f => f.endsWith(".md") && distinct(f).length % 2 === 0);
   fs.writeFileSync(path.join(core, "notes.md"), `${distinct(even).slice(0, distinct(even).length / 2).join("\n")}\n`);
   git(core, "rm", "-q", even);
@@ -306,10 +306,36 @@ if (p.status === 0) {
   git(core, "branch", "-q", "-D", "with-notes");
   git(core, "reset", "-q", "--hard", "main");
   fs.rmSync(path.join(core, "elsewhere.md"), { force: true });
+  // (a read file of fewer than three lines, deleted, is followed nowhere, though a new file holds both its lines)
+  git(core, "checkout", "-q", "-b", "with-stub");
+  fs.writeFileSync(path.join(core, "roles/shared/stub.md"), "# Notes\nTODO\n");
+  git(core, "add", "roles/shared/stub.md");
+  git(core, "commit", "-q", "-m", "a read file of two lines");
+  git(core, "rm", "-q", "roles/shared/stub.md");
+  fs.writeFileSync(path.join(core, "log.md"), "# Notes\nTODO\nA meeting log of its own.\n");
+  git(core, "add", "log.md");
+  const stub = spawnSync(process.execPath, ["scripts/copies.mjs", ".github/copies.json"], { cwd: core, env: { ...env, COPIES_BASE: "with-stub" }, encoding: "utf8" });
+  git(core, "checkout", "-q", "-f", branch);
+  git(core, "branch", "-q", "-D", "with-stub");
+  git(core, "reset", "-q", "--hard", "main");
+  fs.rmSync(path.join(core, "log.md"), { force: true });
+  // (a new file named "0:u.md", which git would read as the index's u.md, steers nothing: the file that took the text
+  // in is named; off Windows, where a name may hold a colon)
+  let decoy = null;
+  if (process.platform !== "win32") {
+    git(core, "rm", "-q", "roles/shared/how-to-work.md");
+    fs.writeFileSync(path.join(core, "u.md"), `${howText}\n${fresh}\n`);
+    fs.writeFileSync(path.join(core, "0:u.md"), "Decoy.\n");
+    git(core, "add", "u.md", "0:u.md");
+    decoy = baseRun();
+    git(core, "reset", "-q", "--hard", "main");
+    for (const f of ["u.md", "0:u.md"]) fs.rmSync(path.join(core, f), { force: true });
+  }
   const tookIn = file => new RegExp(`reads 1 files fewer than main's config read: ${file} \\(prose, which took in most of the lines of roles/shared/how-to-work\\.md, deleted\\)\\. Mend: take the config back`, "u");
   ok(/^D\troles\/shared\/how-to-work\.md$/mu.test(status) && rewritten.status === 1 && tookIn("elsewhere\\.md").test(rewritten.out) && mended(rewritten.out)
-    && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0 && alphabet.status === 0,
-    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them, or only the lines in one alphabet of a file in two, passes", `${status}${rewritten.out}${movedIn.out}${partly.out}${alphabet.stdout}${alphabet.stderr}`);
+    && movedIn.status === 1 && tookIn("CHOICES\\.md").test(movedIn.out) && mended(movedIn.out) && partly.status === 0 && alphabet.status === 0 && stub.status === 0
+    && (decoy === null || (decoy.status === 1 && tookIn("u\\.md").test(decoy.out) && !/0:u\.md \(prose/u.test(decoy.out))),
+    "against the base, a file its config read, renamed out of every spec and rewritten past half or moved into a file no spec reads, fails by the file that took in its lines, with its mend; one that took in half of them, only the lines in one alphabet of a file in two, or a file of two lines, passes; a decoy named as an index path steers nothing", `${status}${rewritten.out}${movedIn.out}${partly.out}${alphabet.stdout}${alphabet.stderr}${stub.stdout}${stub.stderr}${decoy?.out ?? ""}`);
   // (a file of the core's copy that a sync moves out of what the project's config reads fails nothing: the core's own
   // pull request held the move)
   const coreFile = fs.readdirSync(path.join(p.dir, "core/tasks")).find(f => f.endsWith(".md"));
