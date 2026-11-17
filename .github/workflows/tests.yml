@@ -384,17 +384,18 @@ jobs:
           MUTATE_BUDGET: "240"
         run: node scripts/strength.mjs
 
-  # (on Windows the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
-  # of the two releases with the copy older than the first, and the newer release; the staged cases' test follows each,
-  # its first half after the older and its second after the newer, each half under the suite's own mark, since whole it
-  # took up to 1009 s of its 900 on Windows; on Linux one job runs both whole; #304, #508)
+  # (on each system the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the
+  # older of the two releases with the copy older than the first, and the newer release; the staged cases' test follows
+  # each, its first half after the older and its second after the newer, each half under the suite's own mark, since
+  # whole it took up to 1009 s of its 900 on Windows and up to 264 s of its 240 on Linux; #304, #508, #515)
   upgrade:
     name: upgrade (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, part: all }
+          - { os: ubuntu-latest, part: older }
+          - { os: ubuntu-latest, part: newer }
           - { os: windows-latest, part: older }
           - { os: windows-latest, part: newer }
     runs-on: ${{ matrix.os }}
