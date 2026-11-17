@@ -145,7 +145,7 @@ function linesIn(json, f, byHand, fail) {
 }
 
 /** The failures of the scan of the project at `root`, against its audit's `entries` (read from `auditPath`). */
-export function scan(settings, root, entries, auditPath, lockfiles = [], base = null) {
+export function scan(settings, root, entries, auditPath, lockfiles = [], base = null, baseAudit = null) {
   const failures = [], reports = [];
   const fail = (m) => { if (!failures.includes(m)) failures.push(m); };
   const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 << 20 });
@@ -154,7 +154,7 @@ export function scan(settings, root, entries, auditPath, lockfiles = [], base = 
   const files = tracked.filter((f) => !(project && f.startsWith(copyOf(root))) && !under(f, settings.skip)); // (at the manifest's path)
   const binary = new Set(git("ls-files", "--eol", "-z").split("\0").filter((l) => /^i\/-text\s/u.test(l)).map((l) => l.slice(l.indexOf("\t") + 1)));
   // (what the scan's parts share: scanned, below)
-  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base };
+  const c = { settings, root, entries, auditPath, lockfiles, tracked, files, binary, fail, reports, base, baseAudit };
 
   for (const key of ["served", "tools", "skip"]) for (const p of settings[key] ?? []) if (p !== "" && !tracked.some((f) => holds(p, f))) fail(`the config's "scan.${key}": ${p} names no tracked file. Mend: correct the path, a folder ending in "/", or take it out`);
   for (const e of entries) entryFaults(c, e);
@@ -260,16 +260,26 @@ function pinnedIfRead(c, f, text) {
  *  Node): where it is not, a pull request that adds the download, or that makes the file lose its pin, fails; a file the
  *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
  *  project"). Read from the scan's own readers of fetches: what a package manager fetches by name is not read here. */
+// A file of the base, as text, or null where the base held none.
+const atBase = (c, path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
+// The audit's entries as the base held them, at the path the base's own config named it (a pull request may move it),
+// read once for the scan.
+function baseEntries(c) {
+  if (c.baseEntries === undefined) { try { const a = JSON.parse(atBase(c, c.baseAudit ?? c.auditPath) ?? "null"); c.baseEntries = Array.isArray(a?.entries) ? a.entries : []; } catch { c.baseEntries = []; } }
+  return c.baseEntries;
+}
+// Whether the base held the file `f` unpinned as much or more than `fault` says of `text`, read by the base's own audit:
+// no download added, no entry newly with no version, no check fewer.
+function heldAtBase(c, f, text, fault) {
+  const was = atBase(c, f);
+  const then = was === null ? null : pinFault(baseEntries(c), c.auditPath, f, codeOf(f, was));
+  return then !== null && fewer(downloads(text), downloads(codeOf(f, was))) && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n));
+}
+
 function pinned(c, f, text) {
   const fault = pinFault(c.entries, c.auditPath, f, text);
   if (!fault) return;
-  // (the base read whole: its file, by the audit it held then, never by the pull request's)
-  const atBase = (path) => { try { return execFileSync("git", ["show", `${c.base}:${path}`], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 << 20 }); } catch { return null; } };
-  const was = c.base ? atBase(f) : null;
-  if (c.base && was !== null && c.baseEntries === undefined) { try { const a = JSON.parse(atBase(c.auditPath) ?? "null"); c.baseEntries = Array.isArray(a?.entries) ? a.entries : []; } catch { c.baseEntries = []; } }
-  // (held only where the base was unpinned as much or more: no download added, no entry newly bare, no check fewer)
-  const then = was === null ? null : pinFault(c.baseEntries, c.auditPath, f, codeOf(f, was));
-  const held = !c.base || (then !== null && fewer(downloads(text), downloads(codeOf(f, was))) && fault.deficit <= then.deficit && fault.bare.every((n) => then.bare.includes(n)));
+  const held = !c.base || heldAtBase(c, f, text, fault);
   const said = `${f}: it downloads what may be a program (${downloads(text)[0].replace(/\s+/gu, " ").slice(0, 120)}), and ${fault.what}, so what runs is not pinned by version and checksum (floor rule 7)`;
   if (held) c.reports.push(`${said}; it stood so ${c.base ? "at the pull request's base" : "with no base to read it against"}, so it passes: ${fault.mend}, as the sync's step asks`);
   else c.fail(`${said}. Mend: ${fault.mend}`);

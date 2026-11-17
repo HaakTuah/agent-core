@@ -260,6 +260,11 @@ for (const [what, change, why] of [
     ok(r.failures.length === 0 && pins(r).length === 1 && r.reports.some((m) => m.includes("scripts/get.sh") && m.includes("at the pull request's base")), "a download that stood unpinned at the base is reported and passes", JSON.stringify(r));
     r = licenceCheck(config, dir, null, config);
     ok(r.failures.length === 0 && r.reports.some((m) => m.includes("pinned by version and checksum") && m.includes("no base to read")), "with no base to read, it is reported and passes", JSON.stringify(r));
+    // (the audit moved by the pull request, unchanged: the base's is read where the base's config named it)
+    fs.renameSync(path.join(dir, "audit.json"), path.join(dir, "moved-audit.json")); git("add", "-A");
+    r = licenceCheck({ ...config, audit: "moved-audit.json" }, dir, "HEAD", config);
+    ok(r.failures.length === 0 && pins(r).length === 1, "an audit the pull request moves, unchanged, leaves an old unpinned download reported, not failing", JSON.stringify(r));
+    fs.renameSync(path.join(dir, "moved-audit.json"), path.join(dir, "audit.json")); git("add", "-A");
     put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}wget -q https://mossgrip.example/moss-extra-1.2.0.tgz\n`);
     r = licenceCheck(config, dir, "HEAD", config);
     ok(r.failures.length === 1 && /mosstool, in audit\.json, names no version/u.test(r.failures[0]) && mendSaid(r.failures), "a download a pull request adds to an unpinned file fails, saying the mend", JSON.stringify(r));

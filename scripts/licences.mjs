@@ -477,7 +477,7 @@ export function check(config, root, base = null, baseConfig = null) {
   for (const p of packages) checkPackage(ctx, p);
   const entries = config.audit ? checkAudit(ctx) : [];
   unneededYeses(ctx);
-  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base) : undefined;
+  const scanned = config.scan ? scan(config.scan, root, entries, config.audit, config.lockfiles ?? [], base, auditOf(ctx.then)) : undefined;
   if (scanned) failures.push(...scanned.failures);
   failures.push(...npmrcFailures(root));
   for (const f of config.ignoreScriptsIn ?? []) {
@@ -489,6 +489,9 @@ export function check(config, root, base = null, baseConfig = null) {
   const summary = summaryOf(ctx, packages, entries, scanned, all.length);
   return { failures: all, reports: [...reports, ...wait.reports, ...(scanned?.reports ?? [])], summary };
 }
+
+// (the audit's path a config names, or null)
+const auditOf = (config) => (typeof config?.audit === "string" ? config.audit : null);
 
 // (npm installs from a shrinkwrap file where one stands, whatever lock file a config names: only one of the two may)
 function shrinkwrapFaults(root, lockfiles) {
