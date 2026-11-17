@@ -81,14 +81,16 @@ code is held to: `tasks/code-shape.md`.
   no standard, so two audits could not be compared; and checks piled on make code harder to change. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
-- **The state report leads with the outcomes** (#302). By default the monthly state report names the
-  five outcomes the owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can
-  be used by a new user, does not break, each with its direct measure first or the words that it has none yet, every
-  other number under the outcome it stands for, and what the work cost last; each count stands with the range chance
-  alone gives it, twice its square root, and where one is under 30 the months before are added.
-  `core/scripts/outcomes.mjs` writes it so, and whoever changes that script keeps the form. It does not mean a number
-  is shown under an outcome it does not measure. Reason: most of what was counted were stand-ins, and a small count
-  read as a trend misleads. Held by `core/scripts/outcomes.mjs`, which writes the report so, its test holding the form.
+- **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
+  owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can be used by a new
+  user, does not break, each with its direct measure first or the words that it has none yet, every other number under
+  the outcome it stands for, and what the work cost last; each count stands with the range chance alone gives it, twice
+  its square root, and where one is under 30 the months before are added; while a move from one stack to another is
+  open, the share of its code moved, which the session adds from the move's issue (`tasks/choices.md`, "A move has an
+  end and states its cost"). `core/scripts/outcomes.mjs` writes the rest so, and whoever changes that script keeps the
+  form. It does not mean a number is shown under an outcome it does not measure. Reason: most of what was counted were
+  stand-ins, and a small count read as a trend misleads. Held by `core/scripts/outcomes.mjs`, which writes the report
+  so, its test holding the form.
 - **No process number is a builder's goal** (#302). By default the state report's numbers are read
   by the owner and the audits; whoever writes a brief, a rule or an entry sets none of them as a target, and only a
   property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
