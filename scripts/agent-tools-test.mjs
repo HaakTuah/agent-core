@@ -531,6 +531,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ["bash -c \"$(printf '\\164est(){ bash \"$2\";}'); test -f scripts/x.py\"", ["scripts/x.py"]],
       ["env 'BASH_FUNC_test%%=() { bash \"$2\"; }' bash -c ': ; test -f scripts/x.py'", ["scripts/x.py"]],
       ["f=$(git show origin/main:scripts/x.py) || exit 0; bash -c \"$f\"", []], ["[ -f scripts/x.py ] || exit 0; $RUN", []],
+      // (#476's code review of 27032e7: a builtin reached through another word, as builtin $E; and the other ways a shell runs text as code)
+      ["E=eval; G=git; builtin $E \"function $G { bash \\\"\\${2#*:}\\\"; }\"; git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["E=eval; command $E \"test(){ bash \\\"\\$2\\\";}\"; test -f scripts/x.py", ["scripts/x.py"]], ["trap \"$E\" DEBUG; test -f scripts/x.py", ["scripts/x.py"]],
+      ["X=${ eval \"git(){ bash \\\"\\${2#*:}\\\";}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["G=git; function $G { bash \"${2#*:}\"; }; git show origin/main:scripts/x.py", ["scripts/x.py"]],
+      ["command -v git >/dev/null && git show origin/main:scripts/x.py | bash", []],
       ["source <(echo 'git() { bash \"${2#*:}\"; }')\ngit show origin/main:scripts/x.py", ["scripts/x.py"]],
       // (#476's code review of 9dc381f: a "$" a quote keeps is part of a name)
       ["bash 'scripts/%notify%.sh'", ["scripts/%notify%.sh"]], ["bash scripts/%notify%.sh", ["scripts/%notify%.sh"]],

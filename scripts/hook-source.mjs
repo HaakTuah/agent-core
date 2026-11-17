@@ -39,10 +39,11 @@ const TESTED = /(?:^|[\n;(]|(?<![<>])[&|]|(?:^|[\s=])\\?["'])[ \t]*(?:(?:if|then
 // it, ".exe" or not, as the exemptions read their commands)
 const PATHED = `(?:[^\\s;&|\`$()"'<>]*[/\\\\])?`;
 const defines = names => new RegExp(`(?:^|[\\s;&|(])${PATHED}(?:${names})(?:\\.exe)?[ \\t]*\\([ \\t]*\\)|\\bfunction[ \\t\\n]+${PATHED}(?:${names})(?:\\.exe)?(?=[\\s({]|$)`, "u");
-// (a command that could define a name at its run, by text no reading here sees whole: eval, source or ".", an alias of
-// any name, bash's table of aliases, a function bash takes from its environment or a file it reads at its start, or a
-// function whose name an expansion gives)
-const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias)(?=[\s;&|)`]|$)|BASH_ALIASES|BASH_FUNC_|BASH_ENV|(?:^|[^\w])ENV=|\u0001[ \t]*\([ \t]*\)/u;
+// (a command that could define a name at its run, by text no reading here sees whole: a builtin that runs text as
+// code (eval, source, ".", trap, mapfile's and readarray's callbacks, enable's loaded builtins, bind), an alias of any
+// name, bash's table of aliases, a function bash takes from its environment or a file it reads at its start, a function
+// whose name an expansion gives, or bash's ${ ...; }, which runs its commands in the shell itself)
+const RUNTIME = /(?:^|[\s;&|(`])(?:eval|source|\.|alias|unalias|trap|mapfile|readarray|enable|bind)(?=[\s;&|)`]|$)|BASH_ALIASES|BASH_FUNC_|BASH_ENV|(?:^|[^\w])ENV=|[\u0001}][ \t]*\([ \t]*\)|\$\w+[ \t]*\([ \t]*\)|\bfunction[ \t]+[^\s(){};]*[$\u0001]|\$\{[\s|]/u;
 // (no file test of a command that defines test, "[", "[[" or a shell that runs one is one)
 const DEFINED = defines("test|\\[\\[?|sh|bash|zsh|dash");
 const redefined = raw => DEFINED.test(raw) || RUNTIME.test(raw);
@@ -105,12 +106,14 @@ const STARTS = /(?:^|[^\w./-])(?:\.\/|[\u0001)`}]["']?\/+)?$/u;
 const ARG = `(?:"(?:[^"\`$\\\\\\u0001]|\\u0001|\\$\\([^()"\`]*\\))*"|'[^']*'|\\u0001|\\$\\([^()"'\`]*\\)|\`[^\`]*\`|[^\\s;&|\`$()"'<>\\u0001])+`;
 const FETCHED = new RegExp(`(?:^|[\\n;&|(\`])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\w+=${ARG}?[ \\t]+)*(?:[^\\s;&|\`$()"'<>]*[/\\\\])?git(?:\\.exe)?(?:[ \\t]+(?:-[Cc][ \\t]+${ARG}|--[\\w-]+(?:=${ARG})?))*[ \\t]+(?:show|cat-file[ \\t]+-p)[ \\t]+["']?(?:refs\\/remotes\\/)?origin\\/main:["']?(?:\\.\\/)?$`, "u");
 const fetched = before => FETCHED.test(before);
-// Where a command word or a -c script (a shell's, or any program's: no reading here tells them apart) first starts with
-// an expansion ($E, a ${...}, $(...), a backtick's output), which can define test or git, or anything, as it runs: no
+// (words that run the word after them as a command: a builtin's, as builtin eval, or a program's)
+const DISPATCH = "(?:builtin|command|exec|env|time|nohup|nice|sudo|doas)";
+// Where a command word (perhaps after such words, options and assignments) or a -c script (a shell's, or any
+// program's: no reading here tells them apart) first starts with an expansion ($E, a ${...}, $(...), a backtick's output), which can define test or git, or anything, as it runs: no
 // file test nor fetch after it is one, a test or fetch before it, as the starter kit's f=$(git show ...) before its
 // bash -c "$f", keeping its own (each part takes characters no other takes, so nothing backtracks without end). The
 // index, or Infinity.
-const RISK = new RegExp(`(?:^|[\\n;&|(\`{]|(?<![^\\s])-\\w*c[ \\t])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\\\?["'])*(?:(?:\\w+=(?:${ARG})?[ \\t]+)+(?:\\\\?["'])*)?[\\u0001\\u0002$\`]`, "u");
+const RISK = new RegExp(`(?:^|[\\n;&|(\`{]|(?<![^\\s])-\\w*c[ \\t])[ \\t]*(?:(?:then|do|else|elif|if|while|until|!|\\{)[ \\t]+)*(?:\\\\?["'])*(?:(?:(?:\\w+=(?:${ARG})?|${DISPATCH}|-[\\w-]+)[ \\t]+)+(?:\\\\?["'])*)?[\\u0001\\u0002$\`]`, "u");
 function riskAt(text) { const m = RISK.exec(text); return m ? m.index : Infinity; }
 // (no fetch of a command that defines git is one)
 const GIT_DEFINED = defines("git");
@@ -213,8 +216,9 @@ export function fromTree(command, holds, index = null, operand = false) {
   // (a backslash before a name's letter is Windows' separator; one before a quote, a blank or a "$" is the shell's escape)
   const text = raw.replace(/\\(?=[\w.%-])/gu, "/");
   // (a ${...}'s default is a word, not a command of its own: no file test nor fetch stands at its start; and a definition of test
-  // or git is looked for in the command as written and in every reading of its quoting, as alias g'it'=x defines git)
-  const forms = [raw, ...dequotings(raw), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, "")];
+  // or git is looked for in the command as written, its variables marked and not, and in every reading of its quoting,
+  // as alias g'it'=x defines git and ${ eval ...; } hides its eval from the marked form)
+  const forms = [raw, ...dequotings(raw), raw.replace(/\\(.)/gsu, "$1").replace(/["']/gu, ""), String(command), ...dequotings(String(command))];
   const found = new Set(), tests = !operand && !forms.some(redefined), fetches = !operand && !forms.some(gitDefined);
   const take = (word, before, quoted = false, safe = true) => {
     const colon = word.lastIndexOf(":"), ref = colon > 0 ? word.slice(0, colon) : null;
