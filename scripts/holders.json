@@ -152,10 +152,7 @@
     "roles/stand-in.md: Hands over, gets back": "describes",
     "floor/security.md: 18. Where agents hold sign-ins": "check: .github/workflows/personal-terms.yml, in part",
     "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": "check: scripts/agent-tools.mjs, in part",
-    "floor/topics/input.md: Every named input has hostile tests": [
-      "check: scripts/steps.mjs, in part",
-      "check: scripts/own-inputs-test.mjs, in part"
-    ],
+    "floor/topics/input.md: Every named input has hostile tests": "check: scripts/steps.mjs, in part",
     "floor/topics/weaknesses.md: In a PR's own change": [
       "check: scripts/security-review.mjs, in part",
       "check: GitHub's ruleset on the default branch, in part"
