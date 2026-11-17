@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
 import { asked, calledFor, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "./pr-description.mjs";
 import { lineMend } from "./reading.mjs";
+import { asking, found, issuesOf, readable, textsOf, yesOf } from "./owner-yes.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -92,4 +93,34 @@ const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("./pr-des
 const none = run("The change, and nothing else.");
 ok(none.status === 1 && /has no heading "Readings taken"\. Mend: add "## Readings taken"/.test(none.stdout) && mended(none.stdout) && run(whole).status === 0, "run, a description without its headings fails, each failure saying its mend, and one with them passes");
 ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`) && mended(`FAIL ${numberMend("## What holds it\n- a rule")}`), "so do the lines' own failures, as the script prints them");
+// the owner's yes where the core's floor or review guidelines change (owner-yes.mjs; #549)
+{
+  const said = "> Queue it from its current text; the floor's two points need my yes, and it is given.";
+  const record = `**The owner's word**\n\n${said}\n\nThe owner agreed to all six.`;
+  const pr = (quote, issue = "Fixes #9") => `${issue}\n\n## The owner's word\n\n${quote}\n\n## Readings taken\nNone`;
+  const texts = [readable(record)];
+  const floor = asking(["floor/security.md", "scripts/x.mjs"], "");
+  ok(floor.join() === "floor/security.md" && asking(["roles/shared/review-guidelines.md"], "").length === 1 && asking(["roles/shared/inbox.md", "tasks/x.md"], "").length === 0,
+    "the floor and the review guidelines ask the yes; another rule file does not");
+  ok(asking(["core/floor/security.md", "floor/tiles.png"], "core/").length === 0 && asking(["floor/security.md"], null).length === 0,
+    "in a project, a sync's copy of the floor and a folder of the project's own named floor ask nothing: only the core's own change does");
+  ok(yesOf({ paths: floor, body: pr(said), texts }).note?.startsWith("the owner's yes is quoted"), "a line quoted word for word from the issue passes");
+  ok(yesOf({ paths: floor, body: pr("> Queue it from its current text;   the floor's two\n> points need my yes, and it is given."), texts }).note && yesOf({ paths: floor, body: pr("> Queue it from its current text; […] and it is given."), texts }).note,
+    "blanks count as one, the issue's own > marks are read through, and \"[…]\" leaves details out");
+  const wrong = [yesOf({ paths: floor, body: pr("> Queue it, and my yes is given for the floor."), texts }), yesOf({ paths: floor, body: pr(said), texts: [] }), yesOf({ paths: floor, body: pr("Queue it from its current text") , texts }), yesOf({ paths: floor, body: pr(said, "Builds the floor change."), texts })];
+  ok(wrong.every(w => w.mend && mended(`FAIL ${w.mend}`)) && /no line it quotes/.test(wrong[0].mend) && /no line it quotes/.test(wrong[1].mend) && /quotes nothing/.test(wrong[2].mend) && /names no issue/.test(wrong[3].mend),
+    "words not on the issue, words found only in a text of an account without the higher right, a yes not quoted with >, and no issue named each fail, saying the mend");
+  ok(yesOf({ paths: [], body: "x", texts: [] }).note && yesOf({ paths: floor, body: pr("> Not on the issue."), texts, read: false }).note && yesOf({ paths: floor, body: pr(said), texts, read: false }).note?.startsWith("the owner's yes is quoted"),
+    "a change of no such file is asked nothing; where a text or a right could not be read the line is said, never failed, and a quote found in what was read still passes");
+  ok(issuesOf("Fixes #548. Part of #545, closes #12, resolved #7, Fixes #548").join() === "548,545,12" && issuesOf("See #3 and #4.").length === 0, "the issues a description names as its own, at most three, each once; one only mentioned is none");
+  ok(found("a […] c", [readable("a b c")]) && !found("a […] c", [readable("a b"), readable("c")]) && !found("[…]", [readable("x")]), "the pieces of a quote stand in one text, and a quote of marks alone is none");
+  // the texts, through a host that answers as gh would: the description and comments of each issue, those by an account with maintain or admin
+  const host = { "repos/o/r/issues/9": { user: { login: "boss" }, body: record }, "repos/o/r/issues/9/comments?per_page=100&page=1": [{ user: { login: "writer" }, body: "> my yes, as a writer" }, { user: { login: "helper[bot]" }, body: "> my yes, as a bot" }, { user: { login: "keeper" }, body: "> my yes, as a maintainer" }],
+    "repos/o/r/collaborators/boss/permission": { role_name: "admin" }, "repos/o/r/collaborators/writer/permission": { role_name: "write" }, "repos/o/r/collaborators/keeper/permission": { role_name: "maintain" } };
+  const asked = [], got = textsOf("o/r", [9], route => (asked.push(route), host[route] ?? null));
+  ok(got.read && got.texts.length === 2 && got.texts.some(x => x.includes("my yes, as a maintainer")) && !got.texts.some(x => /as a (writer|bot)/.test(x)) && !asked.some(r => r.includes("helper")),
+    "the issue's text by an admin and a comment by a maintainer count; a writer's and a bot's do not, and no right is asked of a bot");
+  const lost = textsOf("o/r", [9], route => (route.endsWith("keeper/permission") ? null : host[route] ?? null));
+  ok(!lost.read && lost.texts.length === 1 && textsOf("o/r", [10], route => host[route] ?? null).read === false, "an account the host does not answer on, or an issue it does not give, leaves it unread, what was read kept");
+}
 process.exit(failed ? 1 : 0);

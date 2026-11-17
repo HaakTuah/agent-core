@@ -69,7 +69,6 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #549 | builder; a workflow, two security reviews | #548, on `scripts/holders.json` |
 | #550 | builder; a case a PR | |
 | #551 | builder | #549; #355 and #391, for its point 3 |
 | #552 | builder | #551 |

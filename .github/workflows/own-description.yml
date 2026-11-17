@@ -5,7 +5,9 @@
 # (AGENTS.md, "Every rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
 # setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (AGENTS.md, "Nothing locks a
 # project"): whether it does is read from git alone, the merge commit against its first parent, the base, and nothing
-# of the pull request's own text reaches that step's script. This repository only;
+# of the pull request's own text reaches that step's script. One that changes the floor or the review guidelines quotes
+# the owner's yes found word for word on its issue, from an account the host gives maintain or admin, which the script
+# reads with this run's token (scripts/owner-yes.mjs; floor rule 3; #549). This repository only;
 # no project calls it. Reads only, with no secret: the description reaches the script through env and is never
 # written into a run line (floor rule 2).
 name: own-description
@@ -39,7 +41,7 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_CREATED: ${{ github.event.pull_request.created_at }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, for the day it gained a line, and the issues a pull request queues or closes)
+          GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, for the day it gained a line, the issues a pull request queues or closes, and the right of each account that wrote on the issue it names)
         run: |
           # (a diff that cannot be read counts as a change: each heading is asked for, never waived)
           parts=""
