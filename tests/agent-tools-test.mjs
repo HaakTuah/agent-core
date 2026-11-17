@@ -552,6 +552,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       fs.symlinkSync(path.relative(path.dirname(path.join(behind, link)), path.join(behind, "cfg")), path.join(behind, link));
       fails(run(behind, "--core"), `a file in another case behind ${link}, a link of its own name, fails`, says);
     }
+    // (#600's code review of a21b252: a file in a tool folder the tool does not read is not looked at, so an ignored link
+    // out of the checkout there fails nothing; and a path beyond a link stops no other's question to git)
+    const docLink = project({ ".gitignore": ".claude/skills/notes/README.md\n", ".claude/skills/notes/notes.txt": "x\n", ...listing() });
+    fs.symlinkSync(path.join(os.tmpdir()), path.join(docLink, ".claude/skills/notes/README.md"));
+    passes(run(pr(docLink, { "README.md": "a change of its own\n" })), "an ignored link out of the checkout in a skill's folder, which the tool does not read, fails nothing");
+    const viaLink = project({ ".gitignore": ".codex/Config.toml\n", "config/settings.json": KIT, ".claude/settings.json": null, ...listing() });
+    fs.rmSync(path.join(viaLink, ".claude"), { recursive: true, force: true });
+    fs.symlinkSync("config", path.join(viaLink, ".claude"));
+    git(viaLink, "add", "-A"); git(viaLink, "commit", "-q", "-m", "settings through a link");
+    write(viaLink, ".codex/Config.toml", "notify = [\"bash\", \"x.sh\"]\n");
+    passes(run(pr(viaLink, { "README.md": "a change of its own\n" })), "an ignored file in another case is still read as ignored where a tool's folder is a link");
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
     fs.symlinkSync("config", path.join(aliased, ".Codex"));
