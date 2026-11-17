@@ -75,7 +75,7 @@ export function npmPackages(text, lockPath) {
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
     .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p),
-      integrity: SRI.test(String(e.integrity ?? "")), bundled: e.inBundle === true && !e.resolved, own: ownFile(e.resolved, lockPath), resolved: typeof e.resolved === "string" ? e.resolved : "",
+      integrity: SRI.test(String(e.integrity ?? "")), sum: typeof e.integrity === "string" ? e.integrity : "", bundled: e.inBundle === true && !e.resolved, own: ownFile(e.resolved, lockPath), resolved: typeof e.resolved === "string" ? e.resolved : "",
       get brings() { return reach(p, next).size; },
       get by() { return direct.has(p) ? [] : [...reach(p, before)].filter((d) => direct.has(d)).map(nameOf); } }));
 }
@@ -189,10 +189,11 @@ export function offRegistry(p) {
 }
 
 /** Each entry of the lock files `head` that offRegistry finds: { failures, reports }, one the base's lock files held
- *  the same (its name, version and address, and the same fault), as often, reported, never failed (AGENTS.md,
+ *  the same (its name, version, address and integrity value, and the same fault), as often, reported, never failed (AGENTS.md,
  *  "Nothing locks a project"): another address, or one more entry of the same, fails. */
 export function sourceFaults(head, base) {
-  const key = (p) => `${p.name}@${p.version}\u0000${p.resolved ?? ""}\u0000${offRegistry(p)}`;
+  // (its integrity value too, so that one taken off, or changed, beside a held address is no longer the base's)
+  const key = (p) => `${p.name}@${p.version}\u0000${p.resolved ?? ""}\u0000${p.sum ?? ""}\u0000${offRegistry(p)}`;
   const left = new Map(), failures = [], reports = [];
   for (const p of base.flat().filter(offRegistry)) left.set(key(p), (left.get(key(p)) ?? 0) + 1);
   for (const [lockPath, packages] of head) for (const p of packages) {

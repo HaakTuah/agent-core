@@ -190,7 +190,7 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
     g("init", "-q");
     writeFileSync(join(at, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
     const put = (packages) => writeFileSync(join(at, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), integrity: INVENTED_SUM }, ...packages } }));
-    const old = { "node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" } };
+    const old = { "node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" }, "node_modules/from-web-held": { version: "3.0.0", resolved: "https://example.invalid/from-web-held-3.0.0.tgz", integrity: INVENTED_SUM } };
     put(old);
     g("add", "-A"); g("commit", "-qm", "base");
     const base = g("rev-parse", "HEAD"), config = join(at, "licences.json");
@@ -204,6 +204,8 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
       ["a second entry of a held one, nested", { ...old, "node_modules/tidy-moss-format/node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" } }, /from-git@1\.0\.0 \(at node_modules\/tidy-moss-format\/node_modules\/from-git\)/u],
       ["a mark of being bundled, beside a git address of its own", { "node_modules/says-bundled": { version: "1.0.0", resolved: "git+ssh://git@example.invalid/anyone/says-bundled.git#0123456", inBundle: true } }, /says-bundled@1\.0\.0 .*a git address/u],
       ["an integrity value npm cannot read", { "node_modules/odd-sum": { version: "1.0.0", resolved: tgz("odd-sum", "1.0.0"), integrity: "x" } }, /odd-sum@1\.0\.0 .*no integrity value/u],
+      ["a held web address whose integrity value is taken off", { "node_modules/from-web-held": { version: "3.0.0", resolved: "https://example.invalid/from-web-held-3.0.0.tgz" } }, /from-web-held@3\.0\.0 .*a web address/u],
+      ["a held web address whose integrity value changes", { "node_modules/from-web-held": { version: "3.0.0", resolved: "https://example.invalid/from-web-held-3.0.0.tgz", integrity: `sha512-${"B".repeat(86)}==` } }, /from-web-held@3\.0\.0 .*a web address/u],
       ["a packed file outside the project", { "node_modules/far-moss": { version: "1.0.0", resolved: "file:../elsewhere/far-moss-1.0.0.tgz", integrity: INVENTED_SUM } }, /far-moss@1\.0\.0 .*a packed file named by its path/u],
     ];
     for (const [what, packages, said] of cases) {

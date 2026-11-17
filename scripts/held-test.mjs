@@ -86,7 +86,7 @@ try {
   mkdirSync(join(dir, "tools"));
   writeFileSync(join(dir, "tools/package-lock.json"), lock({ "node_modules/old-moss": { version: "1.1.0", resolved: tgz("old-moss") } }));
   mkdirSync(join(dir, "src"));
-  writeFileSync(join(dir, "src/packages.lock.json"), JSON.stringify({ version: 1, dependencies: { net8: { "Invented.Moss.Old": { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "abc=" } } } }));
+  writeFileSync(join(dir, "src/packages.lock.json"), JSON.stringify({ version: 1, dependencies: { net8: { "Invented.Moss.Old": { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "abc=" } }, net9: { "Invented.Moss.Old": { type: "Direct", requested: "[2.0.0, )", resolved: "2.0.0", contentHash: "def=" } } } }));
   writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json", "tools/package-lock.json"], ships: [], nuget: { ships: ["src/packages.lock.json"], tools: [] } }));
   writeFileSync(join(dir, "package.json"), "{}");
   writeFileSync(join(dir, "tools/package.json"), "{}");
@@ -95,7 +95,8 @@ try {
   let held;
   try { held = heldPackages(dir, [["licences.json", false], ["licences.json", true]]); } finally { process.chdir(here); }
   const names = held.packages.map((p) => `${p.nuget ? "nuget:" : ""}${p.name}`).sort();
-  ok(JSON.stringify(names) === JSON.stringify(["kept-moss", "nuget:Invented.Moss.Old", "old-moss"]) && held.unread.length === 0, "every lock file the config names is read, npm's and NuGet's, each package once", JSON.stringify(held));
+  const nugetVersions = held.packages.filter((p) => p.nuget).map((p) => p.version).sort().join();
+  ok(JSON.stringify([...new Set(names)]) === JSON.stringify(["kept-moss", "nuget:Invented.Moss.Old", "old-moss"]) && nugetVersions === "1.0.0,2.0.0" && held.unread.length === 0, "every lock file the config names is read, npm's and NuGet's, each package once for each version a framework locks", JSON.stringify(held));
   process.chdir(dir);
   try { held = heldPackages(dir, [["absent.json", false]]); } finally { process.chdir(here); }
   ok(held.packages.length === 0 && held.unread.length === 1 && held.unread[0].startsWith("absent.json:"), "a config that cannot be read is said, never taken as holding nothing", JSON.stringify(held));

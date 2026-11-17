@@ -16,11 +16,12 @@
 //   node core/scripts/held.mjs <config>   that config, for both npm and NuGet
 //   node core/scripts/held.mjs --issue    the look's issue body: nothing where nothing is stale; exit 3 where nothing
 //                                         could be read
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { leadsOut, logged } from "./guards.mjs";
 import { loadConfig } from "./licences.mjs";
 import { GITHUB_MOST, archived, fetched, packagesOf, pool, registry } from "./lookup.mjs";
-import { nugetConfig } from "./nuget.mjs";
+import { lockPackages, nugetConfig } from "./nuget.mjs";
 import { started } from "./started.mjs";
 
 export const STALE = 365;
@@ -43,13 +44,23 @@ export function heldPackages(root, configs) {
     try { sources = nuget ? nugetConfig(config).sources.length : 0; } catch { /* (no NuGet part: no sources of its own) */ }
     let head = [];
     try { ({ head } = packagesOf(config, root, null, nuget)); } catch (e) { unread.push(`${said(configPath)}: ${said(e.message)}`); continue; }
-    for (const [lockPath, packages] of head) for (const p of packages) {
+    for (const [lockPath, packages] of head) for (const p of [...packages, ...(nuget ? otherVersions(root, lockPath, packages) : [])]) {
       const key = `${nuget ? 1 : 0}\u0000${nuget ? p.name.toLowerCase() : p.name}@${p.version}`;
       const was = out.get(key);
       if (!was || (p.direct && !was.direct)) out.set(key, { ...p, lockPath, nuget, sources });
     }
   }
   return { packages: [...out.values()], unread };
+}
+
+// The versions of a NuGet lock file that its reader for what is new (one version for each id, the last a framework
+// gives) leaves out: each other version a target framework locks, as a package another brings, since the lock file
+// says of it only that it is held. NuGet's own reader of lock files, nuget.mjs's lockPackages, gives them all.
+function otherVersions(root, lockPath, packages) {
+  const seen = new Set(packages.map((p) => `${p.name.toLowerCase()}@${p.version.toLowerCase()}`));
+  let all = [];
+  try { all = lockPackages(readFileSync(path.join(root, lockPath), "utf8"), lockPath).packages; } catch { /* (read above, or said unread) */ }
+  return all.filter((q) => !seen.has(`${q.id.toLowerCase()}@${q.version.toLowerCase()}`)).map((q) => ({ name: q.id, version: q.version, path: q.id, direct: false }));
 }
 
 /** Each package looked up with `get(url)` ({ status, json }), as of `now`, until `clock()` passes `until`: { stale, unread, asked },
