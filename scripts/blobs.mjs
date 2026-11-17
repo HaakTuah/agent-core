@@ -14,7 +14,7 @@ export function readBlobs(ids, run = gitRun) {
   const text = new Map(), want = [...new Set(ids)].filter(Boolean);
   if (!want.length) return { text };
   const ask = (args, list) => {
-    try { return { got: Buffer.from(run(args, list)) }; }
+    try { const got = run(args, list); return { got: Buffer.isBuffer(got) ? got : Buffer.from(got) }; }
     catch (e) { return { failure: unread(String(e.stderr || e.code || e.message).trim().split(/\r?\n/u)[0]) }; }
   };
   const checked = ask(["cat-file", "--batch-check"], want);
