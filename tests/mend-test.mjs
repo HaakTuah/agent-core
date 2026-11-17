@@ -128,7 +128,7 @@ ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.len
 for (const [check, test] of Object.entries(CHECKS)) {
   let text = "";
   try { text = fs.readFileSync(path.join(root, test), "utf8"); } catch { /* read as missing below */ }
-  const reads = /from "\.\/mend\.mjs"/u.test(text) && /\bmended\(/u.test(text);
+  const reads = /from "\.\.\/scripts\/mend\.mjs"/u.test(text) && /\bmended\(/u.test(text);
   ok(fs.existsSync(path.join(root, check)) && reads, `${check}: its test, ${test}, reads its failures for their mend${reads ? ""
     : `${text ? "" : " (no such test)"}. Mend: in ${test}, run the check where it fails and ask mended() of scripts/mend.mjs of its output`}`);
 }

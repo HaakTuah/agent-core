@@ -141,7 +141,7 @@ ok(cycles(chain)[0]?.length === 20000, "a cycle of 20,000 files is found without
 // The measures on a small codebase.
 const texts = {
   "engine/rules.mjs": "import { draw } from '../ui/view.mjs';\nimport { roll } from './dice.mjs';\nexport const rule = () => roll();\n",
-  "engine/dice.mjs": "import { rule } from '../scripts/rules.mjs';\nexport function roll() { return rule; }\n",
+  "engine/dice.mjs": "import { rule } from './rules.mjs';\nexport function roll() { return rule; }\n",
   "ui/view.mjs": "import { rule } from '../engine/rules.mjs';\nimport { roll } from '../engine/dice.mjs';\nexport function draw() { return rule; }\n",
   "ui/menu.ts": "import { state } from '../engine/state.js';\nimport { helper } from '@game/tools/helper';\nimport lodash from 'lodash';\nimport './missing.mjs';\nimport './look.css';\nexport const m = 1;\n",
   "engine/state.ts": "export const state: number = 1;\n",

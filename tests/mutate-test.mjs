@@ -28,7 +28,7 @@ ok(same(pairs("s = 'a < b'; t = `x === ${y}`; r = /a<b/; // c && d\n"), []), "no
 ok(same(faults("a === b;\nc === d;\n", line => line === 2).map(f => f.at), [11]), "only the lines wanted take faults");
 
 // ---- the tests a file's faults run against ----
-ok(same(testsOf("scripts/shape.mjs", { "tests/dose-test.mjs": "from '../scripts/shape.mjs'", "tests/code-shape-test.mjs": "from '../scripts/code-shape.mjs'", "tests/shape-test.mjs": "from '../scripts/shape.mjs'" }), ["tests/shape-test.mjs", "tests/dose-test.mjs"]),
+ok(same(testsOf("scripts/shape.mjs", { "scripts/dose-test.mjs": "from './shape.mjs'", "scripts/code-shape-test.mjs": "from './code-shape.mjs'", "scripts/shape-test.mjs": "from './shape.mjs'" }), ["scripts/shape-test.mjs", "scripts/dose-test.mjs"]),
   "a file's tests are those that name it, not a longer name ending in it, its own first");
 
 // ---- the report ----

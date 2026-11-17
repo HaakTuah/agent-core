@@ -2,7 +2,7 @@
 // core abides by its own rules"): its SECURITY.md lists under rule 5 each input anyone but the user at hand can shape,
 // each naming its hostile tests, as the sync's step "16 November 2026, hostile tests for every named input" reads it in a
 // project (scripts/steps.mjs), which the core, holding no copy and running no sync, would otherwise never
-// read. And that the list and the tests stand together: each file of hostile tests here (`scripts/hostile-*-test.mjs`)
+// read. And that the list and the tests stand together: each file of hostile tests here (`tests/hostile-*-test.mjs`)
 // is named by an input and run by the tests workflow. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/own-inputs-test.mjs
@@ -23,8 +23,8 @@ ok(!missed.length, `the core's SECURITY.md lists its inputs under rule 5, each n
 
 const security = read("SECURITY.md"), workflow = read(".github/workflows/tests.yml");
 const rule5 = /^5\. [\s\S]*?(?=^\d+\. |^#|(?![\s\S]))/mu.exec(security)?.[0] ?? "";
-const named = new Set([...rule5.matchAll(/hostile\s+tests:\s+`(scripts\/hostile-[a-z-]+-test\.mjs)`/gu)].map(m => m[1]));
-const files = fs.readdirSync(path.join(root, "scripts")).filter(f => /^hostile-[a-z-]+-test\.mjs$/u.test(f)).map(f => `scripts/${f}`);
+const named = new Set([...rule5.matchAll(/hostile\s+tests:\s+`(tests\/hostile-[a-z-]+-test\.mjs)`/gu)].map(m => m[1]));
+const files = fs.readdirSync(path.join(root, "tests")).filter(f => /^hostile-[a-z-]+-test\.mjs$/u.test(f)).map(f => `tests/${f}`);
 ok(files.length > 0 && named.size > 0, "the core has files of hostile tests, and its rule 5 names them");
 for (const f of files) {
   ok(named.has(f), `${f} is named by an input in SECURITY.md, rule 5${named.has(f) ? "" : `. Mend: name it there, after the words "hostile tests:" of the input it tries, or take the file out`}`);

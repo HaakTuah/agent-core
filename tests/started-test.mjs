@@ -17,7 +17,7 @@ try {
   const real = path.join(tmp, "real"), link = path.join(tmp, "link");
   fs.mkdirSync(real);
   fs.copyFileSync(path.join(here, "started.mjs"), path.join(real, "started.mjs"));
-  fs.writeFileSync(path.join(real, "probe.mjs"), 'import { started } from "../scripts/started.mjs";\nconsole.log(started(import.meta.url) ? "started" : "imported");\n');
+  fs.writeFileSync(path.join(real, "probe.mjs"), 'import { started } from "./started.mjs";\nconsole.log(started(import.meta.url) ? "started" : "imported");\n');
   fs.writeFileSync(path.join(real, "other.mjs"), 'import "./probe.mjs";\n');
   fs.symlinkSync(real, link, "junction"); // (a junction on Windows, which needs no right to make; a link elsewhere)
   const says = (...args) => spawnSync(process.execPath, args, { cwd: tmp, encoding: "utf8" }).stdout.trim();
