@@ -94,13 +94,16 @@ const failedIn = { 2: "A and B", 3: "A and B", 4: "Its test", 5: "Anything a for
 const gh = route => {
   calls.push(route);
   if (route.includes("/actions/runs?")) return JSON.stringify({ workflow_runs: route.includes("page=1") ? runs : [] });
-  const id = Number(/runs\/(\d+)\/jobs/u.exec(route)[1]);
+  const id = Number(/runs\/(\d+)\/jobs/u.exec(route)[1]), page = Number(/[?&]page=(\d+)/u.exec(route)?.[1] ?? 1);
+  // (run 4 holds a hundred passing jobs on its first page, and its failure on the second)
+  if (id === 4 && page === 1) return JSON.stringify({ jobs: Array.from({ length: 100 }, () => ({ steps: [{ name: "C", conclusion: "success" }] })) });
+  if (page > 1 && id !== 4) return JSON.stringify({ jobs: [] });
   return JSON.stringify({ jobs: [{ steps: [{ name: failedIn[id], conclusion: "failure" }, { name: "C", conclusion: "success" }] }] });
 };
 const fired = firedOf({ repo: "o/r", from: "2026-09-01T00:00:00Z", to: "2026-11-01T00:00:00Z", gh, known: new Set([`${W}#A and B`, `${W}#Its test`]) });
 ok(JSON.stringify(fired) === JSON.stringify({ [`${W}#A and B`]: 2, [`${W}#Its test`]: 1 }) && !calls.some(c => c.includes("runs/1/jobs")) && calls.filter(c => c.includes("/jobs")).every(c => c.includes("filter=all"))
   && !calls.find(c => c.includes("/actions/runs?")).includes("status="),
-  "a failed step counts from a failed run, one a newer push cancelled, and an earlier attempt a re-run passed, every attempt read; a run that succeeded at once is not read; no step a fork's workflow names is kept", JSON.stringify(fired));
+  "a failed step counts from a failed run, one a newer push cancelled, and an earlier attempt a re-run passed, every attempt and every page of jobs read; a run that succeeded at once is not read; no step a fork's workflow names is kept", JSON.stringify(fired));
 
 // ---- the pruning in progress ----
 const r = rec({ at: "2026-09-01", recorded: true });
