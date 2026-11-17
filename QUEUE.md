@@ -21,6 +21,7 @@ it merges last.
 | #534, point 8 | rule builder | #530 |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
 | #488, points 3 to 5, 7 and 8 | builder; #534's tools wait on points 3 to 5 | #488's points 1 and 2 |
+| #545 | rule builder; it changes `AGENTS.md`, which every session here reads at its start | |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
@@ -42,6 +43,7 @@ it merges last.
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, which change `scripts/look.mjs` |
 | #355 | builder | |
 | #391 | builder; the look's work-down of the core's listed functions, which overlaps #355 | |
+| #542 | rule builder; it changes what the orchestrator reads at its start | #457, whose rule its point 5 follows, and #355 and #391, which change `scripts/look.mjs` |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
