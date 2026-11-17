@@ -159,6 +159,28 @@ adds this record.
   named its pick wrong where fewer than about 5 of them a checker would catch, or where a hook's start as TypeScript
   passes 100 ms on Windows.
 
+- Looked for: the challenger (a fresh session, Opus at high; this machine holds no second provider's tool, read from
+  what is installed, so both that argue are fresh sessions of the one tool), searching the web before its case, named
+  eight options the long list lacked:
+  1. Microsoft's `@vscode/tree-sitter-wasm` (MIT; the runtime 0.25.10 and 16 grammars built as WebAssembly by one
+     publisher, PowerShell among them), for criterion 4. Kept, as a source of the parser's grammars from one publisher,
+     weighed against the tree-sitter organisation's own when the first grammar arrives; the parser is the same, so no
+     trial of its own.
+  2. Lezer (MIT; parsers in plain JavaScript for Python, Rust, Java, Go and C++), for code a person reads. Dropped on
+     criterion 7: its maintainer keeps no C#.
+  3. TypeScript 7 (stable in July 2026, about ten times faster, reading fewer JSDoc forms). Weighed with the types: its
+     speed under criterion 3, its narrower JSDoc against types in comments; the trials ran on 6.0.2.
+  4. A value's shape checked where a configuration or a format is read. Kept, as #486's inventory already holds it
+     (its last group, schemas), and no foundation of its own.
+  5. Python fetched by digest, as Node is. Taken: it puts Python level with Node on criterion 1, and the judge weighed
+     the rest.
+  6. Node's permission model, for a check that reads hostile input. Dropped as a foundation: a flag any Node check may
+     take.
+  7. Template updates by a three-way merge (Copier), against the drop of the template. Dropped on criterion 1 (Python
+     and an install in the project) and on the exact copy a pure sync proves.
+  8. The host's required workflows set by a ruleset, with no copy. Dropped on criterion 1: they need an organisation,
+     and the projects stand under personal accounts.
+  It found no runtime beyond the niche (LLRT, txiki.js), which fall on criteria 1 and 8.
 - **The case against** (the same challenger):
   1. Criterion 1 is applied unevenly: Bun and Python can be fetched by digest as the pinned Node is, and the whole
      sweep passed on Node 22.23.4, not the pin, so the exact pin bought nothing the trial measured; one long-term line
