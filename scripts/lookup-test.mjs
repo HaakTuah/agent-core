@@ -180,13 +180,13 @@ try {
   const step = STEPS.filter((x) => x.lead === "16 November 2026, a new package looked up");
   mkdirSync(join(tmp, ".github/workflows"), { recursive: true });
   const own = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
-  own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
+  own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json");
   let missed = notDone(tmp, step);
   ok(missed.length === 1 && /runs `node core\/scripts\/lookup\.mjs <the licence check's config>`/u.test(missed[0].mend) && !/--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
   own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget-fetch.mjs c.json", "node core/scripts/lookup.mjs c.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
-  own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
+  own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `with both, a checkout of one commit is still reported, since the lookup would read no base (${missed.map((m) => m.mend)})`);
   writeFileSync(join(tmp, ".github/workflows/own.yml"), `${readFileSync(join(tmp, ".github/workflows/own.yml"), "utf8").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n")}`);
@@ -197,6 +197,12 @@ try {
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: |\n          node core/scripts/exact-versions.mjs c.json\n          # node core/scripts/lookup.mjs c.json\n");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup in a shell comment runs nothing, and does not count (${missed.map((m) => m.mend)})`);
+  const nugetJob = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
+  nugetJob("dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /before any step that runs `dotnet`/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
+  nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
+  ok(notDone(tmp, step).length === 0, "and before it, it does");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");

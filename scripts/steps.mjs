@@ -384,6 +384,13 @@ function jobsOf(w) {
       deep: steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"])) };
   });
 }
+// Whether a job runs the NuGet lookup before anything that may run the pull request's build files: dotnet, or the
+// NuGet check's scripts, which a workflow runs after its restore.
+const lookedUpFirst = (runs) => {
+  const first = runs.findIndex(c => running(c, "lookup.mjs", true));
+  const builds = runs.findIndex(c => /(?:^|[\\/])dotnet(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs") || running(c, "nuget-fetch.mjs"));
+  return first >= 0 && (builds < 0 || first < builds);
+};
 // Whether a command runs the copy's script `name`, and, given `flag`, with that flag (true) or without it (false).
 const running = (words, name, flag) => words.some(w => new RegExp(`(?:^|/)core/scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
   && (flag === undefined || words.some(w => w.text === "--nuget") === flag);
@@ -588,7 +595,7 @@ export const STEPS = [
         const any = (name, flag) => jobs.some(j => j.runs.some(c => running(c, name, flag)));
         return [
           any("exact-versions.mjs") && !any("lookup.mjs", false) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
-          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !any("lookup.mjs", true) ? `in ${at}, before the step that restores or runs \`core/scripts/nuget.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !jobs.some(j => lookedUpFirst(j.runs)) ? `in ${at}, before any step that runs \`dotnet\` or \`core/scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
           jobs.some(j => !j.deep && j.runs.some(c => running(c, "lookup.mjs"))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
         ].filter(Boolean);
       });
