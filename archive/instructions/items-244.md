@@ -76,3 +76,12 @@ The index, and how an item is written: `archive/instructions.md`.
      to the repository, read from its rights each run, rather than from a list of a team's owners kept beside them,
      which goes stale; a list named to the check stays for an account that is no owner. It stands behind who the
      `security-review` status counts.
+
+251. **17 November 2026**, #515. A choice that is hard to undo is argued as a case is: a long list before the options,
+     a challenger that first searches for what the list lacks, a pick made blind, sessions of two providers where two
+     are at hand, and a judge that wrote no part of the record, the owner told and able to overturn with nothing
+     waiting; each project is asked once what it would be built on today, a move that ships in steps is built, one
+     that must happen at once is capped by what the project's own recent work cost and is the owner's to sign off
+     beyond it, and every move passes the same gates: the core's first records showed options limited to what an
+     issue named and an author answering its own challenger, and the owner wants such picks robust, never a large
+     rewrite for a small gain.

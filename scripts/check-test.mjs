@@ -71,7 +71,7 @@ fs.writeFileSync(path.join(dir, "src", "one.js"), `${block}\n`);
 fs.writeFileSync(path.join(dir, "src", "two.js"), `${block}\n`);
 commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
-ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks/.test(r.out) && /^ +== No new copies$/m.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
+ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks/.test(r.out) && /^ +== No new copies$/m.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
 
 // a private project, as the kit writes it: its checks without a secret as steps of core.yml's one job (#376), which a
 // failure of the copy stops here, since each runs the copy's scripts
@@ -92,7 +92,7 @@ ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, po
   fs.writeFileSync(path.join(q.dir, "src", "two.js"), `${block}\n`);
   commit(q.dir, "a copy of code");
   s = check(q.dir, "--base", "base");
-  ok(s.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks" failed/.test(s.out) && /^ +== No new copies$/m.test(s.out) && !/the copy of the core is not the core at its pin/.test(s.out) && mended(s.out),
+  ok(s.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks" failed/.test(s.out) && /^ +== No new copies$/m.test(s.out) && !/the copy of the core is not the core at its pin/.test(s.out) && mended(s.out),
     "a new copy of code fails it, with the copies check's own failure and its mend, a step of the one job and no failure of the copy", s.out);
   fs.writeFileSync(path.join(q.dir, "core", "README.md"), "edited here\n");
   commit(q.dir, "and an edit to the copy");

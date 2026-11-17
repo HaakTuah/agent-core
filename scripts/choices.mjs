@@ -9,14 +9,20 @@
 // from what the shape check reads (dose.mjs, reading()): it compares numbers and never runs anything a records file
 // says, which is no protected file while the look's job holds a token that writes issues (#330). A session that takes
 // either issue runs this script to find again what stands, and writes the day on the line "Read whole:" once its pass
-// is done. It reads only, posts nothing and exits 0, save where the records cannot be read. git and Node's own modules.
+// is done. A record is argued on lines that open "Looked for:", "The blind pick:" and "The judgment:" (ARGUED; #515):
+// with CHOICES_BASE set, as the copies check sets it to the commit a pull request merges into, it is the records'
+// check, which fails a record the pull request adds without one of them and lists, never fails, one that stood there
+// (AGENTS.md, "Nothing locks a project"). It reads only, posts nothing and exits 0, save where the records cannot be
+// read or that check fails. git and Node's own modules.
 //
-//   node core/scripts/choices.mjs      from a project's root: each record, whether it names its sign, each condition
-//                                      and the number it reads, and whether the pass is due (in the core: node
-//                                      scripts/choices.mjs)
+//   node core/scripts/choices.mjs      from a project's root: each record, whether it names its sign and is argued,
+//                                      each condition and the number it reads, and whether the pass is due (in the
+//                                      core: node scripts/choices.mjs); with CHOICES_BASE=<a commit>, the check
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { reading, rulesOf } from "./dose.mjs";
+import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
 
 export const KIT = "docs/choices.md";
@@ -66,8 +72,18 @@ function tripsOf(body) {
   return { conditions: said.map(measured).filter(Boolean), unknown: said.filter(c => !measured(c)) };
 }
 
-// What a records file holds: each record's name, whether it names its sign, and its line "Trips when:" (`conditions`,
-// `unknown`), the day of the last pass (null where the line is missing or holds no day), and how many lines are still
+// The lines a record is argued on (tasks/choices.md, "A choice that is hard to undo gets a record"; #515): the
+// challenger's search for what the list lacks, the pick of a session that never saw the record, and the judge's.
+export const ARGUED = ["Looked for:", "The blind pick:", "The judgment:"];
+const opens = (body, label) => new RegExp(`^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*)?${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?:\\*\\*)?[ \\t]*\\S`, "mu").test(body);
+
+// The heading's end of the record of what a project would be built on today (tasks/choices.md, "What the project would
+// be built on today"; #515), whose line "The suggestion:" names the issue filed to the project's owner.
+export const TODAY = /judged again as if written today\s*$/u;
+
+// What a records file holds: each record's name, whether it names its sign, the lines of ARGUED it lacks (`lacks`),
+// whether it records a choice already made (a line "Stood before:"), the issue its line "The suggestion:" names ("#12",
+// or null), and its line "Trips when:" (`conditions`, `unknown`), the day of the last pass (null where the line is missing or holds no day), and how many lines are still
 // left to fill in (FILL IN). A record whose heading is still the starter kit's, left to fill in, is no record yet, so a
 // new project's file makes no pass due.
 export function parse(text) {
@@ -75,7 +91,8 @@ export function parse(text) {
   const heads = [...t.matchAll(/^## Choice: (.+)$/gmu)];
   const records = heads.map((m, i) => {
     const body = t.slice(m.index + m[0].length, i + 1 < heads.length ? heads[i + 1].index : t.length).split(/^#{1,2} /mu)[0];
-    return { name: plain(m[1]), sign: /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?Reopens it:(?:\*\*)?[ \t]*\S/mu.test(body), ...tripsOf(body) };
+    return { name: plain(m[1]), sign: opens(body, "Reopens it:"), lacks: ARGUED.filter(label => !opens(body, label)),
+      stood: opens(body, "Stood before:"), suggestion: /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?The suggestion:(?:\*\*)?[ \t]*(#\d+)\b/mu.exec(body)?.[1] ?? null, ...tripsOf(body) };
   }).filter(r => !r.name.startsWith("FILL IN:"));
   const read = /^(?:\*\*)?Read whole:(?:\*\*)?[ \t]*(\d{4}-\d\d-\d\d)\b/mu.exec(t)?.[1] ?? null;
   return { records, read: read && Number.isFinite(Date.parse(`${read}T00:00:00Z`)) ? read : null, open: (t.match(/FILL IN:/gu) ?? []).length };
@@ -182,6 +199,7 @@ export function signs({ manifest, root = "." }) {
 function recordLine(rec, r) {
   const read = c => (typeof r === "string" ? `${c.measure} ${c.op} ${c.limit} (${r})` : `${c.measure} ${c.op} ${c.limit} (${figure(MEASURES[c.measure][1](r))} now${OPS[c.op](MEASURES[c.measure][1](r), c.limit) ? ": it holds" : ""})`);
   return [`- ${rec.name}${rec.sign ? "" : ": names no sign on a line \"Reopens it:\""}`,
+    ...(rec.lacks.length ? [`  argued on no line that opens ${rec.lacks.map(l => `"${l}"`).join(", ")}`] : []),
     ...(rec.conditions.length ? [`  trips when: ${rec.conditions.map(read).join("; ")}`] : []),
     ...(rec.unknown.length ? [`  names no measure this reads, on its line "Trips when:": ${rec.unknown.map(shown).join(", ")} (the measures: ${Object.keys(MEASURES).join(", ")})`] : [])];
 }
@@ -196,6 +214,45 @@ export function report(got, at, r = "the measures were not read") {
     why ? `The pass over them is due: ${why}.` : found.records.length ? `The pass over them is not due until ${DAYS} days after ${found.read}.` : "No record yet, so no pass is due."].join("\n");
 }
 
+// The records' check (#515): of the records at the head (`head`, a records file's text), those the base (`base`, its
+// text there, null where it held none) did not hold by name and that lack a line of ARGUED fail, save one that records
+// a choice already made (tasks/choices.md, "The choices a project already made are recorded too"); those it held, and
+// those, are listed and never fail. { failed, listed }, each a list of records.
+export function argued(head, base) {
+  const before = new Set(parse(base ?? "").records.map(r => r.name));
+  const lacking = parse(head ?? "").records.filter(r => r.lacks.length), old = r => before.has(r.name) || r.stood;
+  return { failed: lacking.filter(r => !old(r)), listed: lacking.filter(old) };
+}
+
+// A file's text at a commit, read from git, or null where the commit does not hold it as a file of at most MOST bytes;
+// undefined where `commit` is no commit here.
+export function atCommit(commit, file, root = ".") {
+  const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
+  try { git(["rev-parse", "--verify", "-q", `${commit}^{commit}`]); } catch { return undefined; }
+  try {
+    if (git(["cat-file", "-t", `${commit}:${file}`]).trim() !== "blob" || Number(git(["cat-file", "-s", `${commit}:${file}`])) > MOST) return null;
+    return git(["show", `${commit}:${file}`]);
+  } catch { return null; }
+}
+
+// What the check prints and whether it failed: `got`, the records at the head (records()); `base`, the commit the
+// change merges into ("" for none). [lines, failed].
+export function checkOf(got, base, root = ".") {
+  const rule = 'core/tasks/choices.md, "A choice that is hard to undo gets a record"';
+  const then = base && got.file ? atCommit(base, got.file, root) : undefined;
+  if (got.unread) {
+    const was = then !== undefined && then !== null;
+    return [[was ? `FAIL: the choice records could not be read (${got.unread}), and the base held them as a file. ${MEND}name a regular file inside the project as the *choice records*, under ${MOST} bytes, as the base had it.`
+      : `The choice records could not be read (${got.unread}), as at the base: nothing to check.`], was];
+  }
+  if (got.text === null) return [["No choice records here: nothing to check."], false];
+  if (then === undefined) return [[`No base to compare with${base ? ` (${base} is no commit here)` : ""}, so no record is read as one this change adds.`, ...argued(got.text, got.text).listed.map(r => `- listed, not failed: "${r.name}", argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`)], false];
+  const { failed, listed } = argued(got.text, then);
+  return [[...failed.map(r => `FAIL: \`${got.file}\`: the record "${r.name}", which this change adds, is argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}. ${MEND}argue it as ${rule}, says, each on its own line in the record: "Looked for:", the challenger's search for options the list lacks, with the writer's answer to each; "The blind pick:", the pick of a fresh session given the problem and the criteria and never the record; "The judgment:", the decision of a fresh session that wrote no part of it.`),
+    ...listed.map(r => `- listed, not failed: "${r.name}" ${r.stood ? "records a choice already made" : "stood before this change"}, argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`),
+    `\`${got.file}\`: ${failed.length ? `${failed.length} record${failed.length === 1 ? "" : "s"} this change adds not argued in full` : "every record this change adds is argued in full"}${listed.length ? `; ${listed.length} that stood before listed` : ""}.`], failed.length > 0];
+}
+
 // The dose's reading the script reads the measures from, or why it could not.
 function measuresHere(rules) {
   try { return reading(rules) ?? "the shape check has no config here"; } catch (e) { return `the shape check could not be read: ${String(e.message).split(". Mend: ")[0]}`; }
@@ -206,7 +263,13 @@ if (started(import.meta.url)) {
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core's own AGENTS.md, or the kit's file) */ }
   const { rules } = rulesOf(manifest, ".");
   const got = records(rules);
-  const named = !got.unread && got.text !== null && parse(got.text).records.some(rec => rec.conditions.length);
-  console.log(report(got, new Date().toISOString(), named ? measuresHere(rules) : undefined));
-  if (got.unread) { console.error(`FAIL: the choice records could not be read (${got.unread}). Mend: name a regular file inside the project as the *choice records* in the manifest's slots, or leave the row out for ${KIT}`); process.exitCode = 1; }
+  if (process.env.CHOICES_BASE !== undefined) {
+    const [lines, failed] = checkOf(got, process.env.CHOICES_BASE);
+    console.log(lines.join("\n"));
+    if (failed) process.exitCode = 1;
+  } else {
+    const named = !got.unread && got.text !== null && parse(got.text).records.some(rec => rec.conditions.length);
+    console.log(report(got, new Date().toISOString(), named ? measuresHere(rules) : undefined));
+    if (got.unread) { console.error(`FAIL: the choice records could not be read (${got.unread}). Mend: name a regular file inside the project as the *choice records* in the manifest's slots, or leave the row out for ${KIT}`); process.exitCode = 1; }
+  }
 }

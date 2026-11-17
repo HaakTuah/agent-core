@@ -220,9 +220,13 @@ The same record weighs types for the core's own scripts (#486, point 4), written
   scripts; C adds to that a rename of every path a project calls. So point 5 of #486 has no steps to take while this
   stands.
 - **What a sync asks of a project:** nothing.
-- Reopens it: at a pass over these records, the trial's run (the checker in loose mode with null checks over the ten
-  scripts changed most, the settings in #487) finds a fault in code a project runs; or a move to one stable entry
-  (#376) renames the scripts for its own reasons.
+- Reopens it: at each pass over these records, the run of #515, point 2, over the fixes made since the last:
+  `node scripts/fixes.mjs --since <the day on "Read whole:">` lists each fix of a bug that changed a script that is no
+  test, the tree before it and the lines it changed; the checker, fetched into a scratch folder with its install scripts
+  off and never into the core, runs on each tree in loose mode and with its checks of null (the settings in #521). It
+  reopens where the fixes at whose changed lines a finding points at the fault reach 5, counted over every pass since
+  17 November 2026 and written here at each (0 of 33 then); or where a move to one stable entry (#376) renames the
+  scripts for its own reasons.
 
 ## Choice: the core reaches a project as an exact copy under `core/`, pinned to one commit
 

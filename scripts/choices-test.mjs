@@ -8,8 +8,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, due, look, parse, records, report, signs, tripped, trippedBody, where } from "./choices.mjs";
+import { ARGUED, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "./choices.mjs";
 import { DUE } from "./look.mjs";
+import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -157,6 +158,45 @@ ok(DUE.includes(signs), "the scheduled look reads the signs too");
 const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
 ok(!ownSigns.unread && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),
   "the core's own records name a measure the look reads, and every condition they write reads (whether one holds is the look's to say, never a test's: a sign that trips fails no pull request)", JSON.stringify(ownSigns));
+
+// ---- argued on its lines (#515) ----
+const full = "## Choice: full\n- Looked for: none found, in the registry and the web.\n- **The blind pick:** the same.\nThe judgment: it stands.\n- Reopens it: x.\n";
+const half = "## Choice: half\n- The blind pick: another.\n- Looked for:\n- Reopens it: x.\n";
+ok(parse(full).records[0].lacks.length === 0 && parse(half).records[0].lacks.join() === "Looked for:,The judgment:" && parse("## Choice: n\n").records[0].lacks.join() === ARGUED.join(),
+  "a record is read for each line it is argued on, as a list item, bold or plain, and an empty line is none", JSON.stringify(parse(half).records));
+ok(parse("## Choice: q\nSee: The judgment: elsewhere.\n## Choice: r\nThe judgment: x\n").records[0].lacks.includes("The judgment:"), "a line is read only where it opens so, and under its own record");
+const old = `## Choice: old\n- Reopens it: x.\n\n${full}`;
+const both = argued(`${old}\n${half}`, old);
+ok(both.failed.map(r => r.name).join() === "half" && both.listed.map(r => r.name).join() === "old", "a record the change adds that lacks a line fails; one that stood before is listed, never failed", JSON.stringify(both));
+const made = "## Choice: made\n- Stood before: chosen at the start, in 2025.\n- Reopens it: x.\n";
+ok(argued(`${old}\n${made}`, old).failed.length === 0 && argued(`${old}\n${made}`, old).listed.map(r => r.name).join() === "old,made", "a record of a choice already made is listed, never failed");
+ok(argued(`${old}\n${half}`, null).failed.length === 2 && argued(full, null).failed.length === 0, "where the base held no records, each record is the change's own");
+// the check from the command line, on a project's history
+const hist = fs.mkdtempSync(path.join(os.tmpdir(), "choices-argued-"));
+const h = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: hist, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+const put = text => { fs.mkdirSync(path.join(hist, "docs"), { recursive: true }); fs.writeFileSync(path.join(hist, "docs/choices.md"), text); h("add", "-A"); h("commit", "-q", "-m", "records"); return h("rev-parse", "HEAD").trim(); };
+h("init", "-q", "-b", "main");
+fs.writeFileSync(path.join(hist, "README.md"), "# p\n"); h("add", "-A"); h("commit", "-q", "-m", "start");
+const empty = h("rev-parse", "HEAD").trim();
+const base = put(old);
+const check = (b, cwd = hist) => { const r = spawnSync(process.execPath, [path.join(here, "choices.mjs")], { cwd, encoding: "utf8", env: { ...process.env, CHOICES_BASE: b } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+let c = check(base);
+ok(c.status === 0 && /listed, not failed: "old"/.test(c.out) && !/FAIL/.test(c.out), "the records as they stood pass, an old one lacking its lines listed", c.out);
+put(`${old}\n${half}`);
+c = check(base);
+ok(c.status === 1 && /FAIL: `docs\/choices\.md`: the record "half", which this change adds, is argued on no line that opens "Looked for:", "The judgment:"/.test(c.out) && mended(c.out), "a record a change adds without its lines fails, saying its mend", c.out);
+c = check(empty);
+ok(c.status === 1 && (c.out.match(/^FAIL/gm) ?? []).length === 2, "a base with no records file: each record lacking a line is the change's own", c.out);
+c = check("");
+ok(c.status === 0 && /No base to compare with/.test(c.out) && /listed, not failed: "half"/.test(c.out), "with no base, as on a push to main, nothing fails and each is listed", c.out);
+c = check("no-such-commit");
+ok(c.status === 0 && /no-such-commit is no commit here/.test(c.out), "a base that is no commit here fails nothing of this check's (the copies part fails the base itself)", c.out);
+ok(atCommit(base, "docs/choices.md", hist) === old && atCommit(empty, "docs/choices.md", hist) === null && atCommit("nowhere", "docs/choices.md", hist) === undefined,
+  "a file is read at a commit, as none where the commit lacks it, and as nothing where there is no such commit");
+ok(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[1] === true && mended(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[0].join("\n"))
+  && checkOf({ file: "docs/choices.md", unread: "a link" }, empty, hist)[1] === false && checkOf({ file: "docs/choices.md", text: null }, base, hist)[1] === false,
+  "records the change makes unreadable fail, saying the mend; ones unreadable at the base as well, or none at all, fail nothing");
+fs.rmSync(hist, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);

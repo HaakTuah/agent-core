@@ -85,7 +85,8 @@ code is held to: `tasks/code-shape.md`.
   five outcomes the owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can
   be used by a new user, does not break, each with its direct measure first or the words that it has none yet, every
   other number under the outcome it stands for, and what the work cost last; each count stands with the range chance
-  alone gives it, twice its square root, and where one is under 30 the months before are added.
+  alone gives it, twice its square root, and where one is under 30 the months before are added; while a move from one
+  stack to another is open, the share of its code moved (`tasks/choices.md`, "A move has an end and states its cost").
   `core/scripts/outcomes.mjs` writes it so, and whoever changes that script keeps the form. It does not mean a number
   is shown under an outcome it does not measure. Reason: most of what was counted were stand-ins, and a small count
   read as a trend misleads. Held by `core/scripts/outcomes.mjs`, which writes the report so, its test holding the form.

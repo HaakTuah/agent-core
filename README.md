@@ -196,8 +196,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
    - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
-     check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (`copies`,
-     `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
+     check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records'
+     checks (`copies`, `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
      and the package checks (`signatures`, the folder of `package-lock.json`, and `nuget`, the licence check's
      config), last, the NuGet check after all since it runs the pull request's build files; each a step that runs even
      where one before it failed. One job bills one runner's minutes where four or five did, and its status is one,

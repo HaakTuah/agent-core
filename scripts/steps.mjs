@@ -21,6 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
+import { TODAY, parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
@@ -48,6 +49,7 @@ export const COST = {
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
   config: "a check's config and its first baseline: one small pull request of a builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
+  record: "a choice record argued in full: a session's long list and trial, three fresh sessions (the blind picker, the challenger, the judge), one pull request and one issue",
 };
 
 // The entries' leads, in the order the notes hold them: "12 November 2026, builders named by role".
@@ -599,6 +601,19 @@ export const STEPS = [
   { lead: "17 November 2026, the checks as one job", cost: COST.workflow, check: oneJobHolds,
     partly: "whether the repository is private, and whether a ruleset requires a check by a name the change takes away, are GitHub's settings, not files: `core/scripts/fresh.mjs`, which every sync runs, lists the one call a project's calls differ from, and a required check's name is the owner's to move" },
   { lead: "17 November 2026, a team's owners read from the host", cost: COST.workflow, unread: "whether an account the call to `security-review.yml` names is one the host lets write is GitHub's answer, not a file's: `gh api repos/<owner>/<repo>/collaborators/<login>/permission`" },
+  { lead: "17 November 2026, a choice record argued in full", cost: COST.check, held: "the choice records' check" },
+  { lead: "17 November 2026, what the project would be built on today", cost: COST.record,
+    // (the record of core/tasks/choices.md, "What the project would be built on today", in the *choice records*: its
+    // heading's end, and the issue its line "The suggestion:" names; or records all argued by that module's process, a
+    // new project's among them, whose starter kit's file is still to fill in)
+    check: p => {
+      const file = choicesAt(p.manifest);
+      if (!file) throw new Unread("the *choice records* the manifest names is no plain path inside the project");
+      const text = p.read(file), found = parseChoices(text ?? "");
+      if (found.records.some(r => TODAY.test(r.name) && r.suggestion)) return null;
+      if (text !== null && (found.records.length || found.open) && found.records.every(r => !r.lacks.length)) return null;
+      return `Run once the process of \`core/tasks/choices.md\`, "What the project would be built on today", in a pull request of its own: write in \`${file}\` a record headed \`## Choice: \` and what the project is built on, ending "judged again as if written today", argued on its lines \`Looked for:\`, \`The blind pick:\` and \`The judgment:\`, with the second judgment, what a move would take and gain here, apart; file one issue to the project's owner, labelled \`enhancement\`, saying what the pick would have been and, apart, what a move would cost and gain; and write that issue's number on the record's line \`The suggestion: #<its number>\`.`;
+    } },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

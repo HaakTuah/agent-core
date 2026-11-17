@@ -181,6 +181,9 @@ jobs:
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/choices-test.mjs ')) }}
         run: node scripts/choices-test.mjs
+      - name: The fixed bugs the record on types reads at each pass
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/fixes-test.mjs ')) }}
+        run: node scripts/fixes-test.mjs
       - name: The description check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pr-description-test.mjs ')) }}
         run: node scripts/pr-description-test.mjs
@@ -363,6 +366,11 @@ jobs:
         env:
           COPIES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: node scripts/copies.mjs .github/copies.json
+      - name: Each choice record the change adds is argued in full, one that stood before listed (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') }}
+        env:
+          CHOICES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: node scripts/choices.mjs
       - name: The suites kept to their time mark
         env:
           SUITE: ${{ matrix.suite }}
