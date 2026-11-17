@@ -261,12 +261,23 @@ function shellWords(script) {
   end();
   return words;
 }
-// (each whole word that holds a blank, in the command and in each script quoted within it, read through take(), which
-// follows a link inside the checkout, as the list of the project's files alone would not find tools/"my hook.sh")
+// (each whole word that holds a blank, in the command and in each script within it, read through take(), which follows a
+// link inside the checkout, as the list of the project's files alone would not find tools/"my hook.sh"; a word that holds
+// a blank is read again as a script of its own, as sh -c runs one, its quoting already read, a few levels deep)
 function wholeWords(written, take) {
   const seen = new Set();
-  for (const script of [written, ...quotedTexts(written).map(([body]) => body)]) {
-    for (const [word, at, quoted] of shellWords(script)) if (/\s/u.test(word) && !seen.has(word)) { seen.add(word); take(word, windowAt(script, at), quoted); }
+  let scripts = [written];
+  for (let depth = 0; depth < 5 && scripts.length; depth++) {
+    const next = [];
+    for (const script of scripts) {
+      for (const [word, at, quoted] of shellWords(script)) {
+        if (!/\s/u.test(word) || seen.has(word)) continue;
+        seen.add(word);
+        take(word, windowAt(script, at), quoted);
+        next.push(word);
+      }
+    }
+    scripts = next;
   }
 }
 
