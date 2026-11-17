@@ -310,7 +310,10 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
   if (!base) return { lines: ["ok   no pull request's base here, so no package is new: nothing looked up"], code: 0 };
   let found, sources = 0;
   try {
-    const config = nuget ? JSON.parse(readFileSync(configPath, "utf8")) : loadConfig(configPath);
+    // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
+    // error quotes none of its text)
+    if (leadsOut(root, configPath)) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
+    const config = loadConfig(configPath);
     const { head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath));
     found = newPackages(head, held, nuget);
     if (nuget) sources = nugetConfig(config).sources.length;

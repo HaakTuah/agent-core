@@ -197,6 +197,17 @@ try {
   symlinkSync(join(outside, "secret.txt"), join(tmp, "package-lock.json"));
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && mended(r.lines.join("\n")) && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-secret/u.test(r.lines.join("\n")), `a lock file that links out of the project is refused, unread (${r.lines})`);
+  // The config itself, made a link out of the project: refused before it is opened, under either flag.
+  symlinkSync(join(outside, "secret.txt"), join(tmp, "linked.json"));
+  for (const nuget of [false, true]) {
+    r = await run(join(tmp, "linked.json"), { root: tmp, base, nuget, get, now: NOW });
+    ok(r.code === 1 && mended(r.lines.join("\n")) && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-secret/u.test(r.lines.join("\n")), `a config that links out of the project is refused, unread${nuget ? ", for NuGet too" : ""} (${r.lines})`);
+  }
+  rmSync(join(tmp, "linked.json"));
+  writeFileSync(join(tmp, "broken.json"), "{ invented-config-text");
+  r = await run(join(tmp, "broken.json"), { root: tmp, base, nuget: true, get, now: NOW });
+  ok(r.code === 1 && mended(r.lines.join("\n")) && !/invented-config-text/u.test(r.lines.join("\n")), `a NuGet config that is no JSON fails, quoting none of it (${r.lines})`);
+  rmSync(join(tmp, "broken.json"));
   rmSync(join(tmp, "package-lock.json")); rmSync(outside, { recursive: true, force: true });
   writeFileSync(join(tmp, "package-lock.json"), "{ not json");
   r = await run(config, { root: tmp, base, get, now: NOW });
@@ -288,6 +299,22 @@ try {
   ok(notDone(tmp, step).length === 1, "a variable config the lookup's step gives another value does not count");
   stepEnv("checks/backend.json", "checks/backend.json");
   ok(notDone(tmp, step).length === 0, "and given the same value, it does");
+  // A check run from a local composite action is seen where it runs, as are a lookup there and a build there.
+  const action = (...lines) => { mkdirSync(join(tmp, ".github/actions/packages"), { recursive: true }); writeFileSync(join(tmp, ".github/actions/packages/action.yml"), `name: packages\nruns:\n  using: composite\n  steps:\n${lines.map((l) => `    - run: ${l}\n      shell: bash\n`).join("")}`); };
+  const usesAction = () => writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: ./.github/actions/packages\n");
+  action("node core/scripts/exact-versions.mjs c.json"); usesAction();
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs`/u.test(missed[0].mend), `a check run from a local action, with no lookup, is not done (${missed.map((m) => m.mend)})`);
+  action("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
+  ok(notDone(tmp, step).length === 0, "and with the lookup beside it there, it is");
+  action("dotnet restore --locked-mode", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
+  ok(notDone(tmp, step).length === 1, "a restore in a local action, before its NuGet lookup, is read as a build");
+  action("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
+  ok(notDone(tmp, step).length === 0, "and a NuGet lookup first there counts");
+  writeFileSync(join(tmp, ".github/actions/packages/action.yml"), "name: [unclosed\n");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /cannot be read as YAML/u.test(missed[0].mend), `a local action that cannot be read is named, not taken as running nothing (${missed.map((m) => m.mend)})`);
+  rmSync(join(tmp, ".github/actions"), { recursive: true, force: true });
   nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json # waits & sees");
   ok(notDone(tmp, step).length === 0, "an ampersand in a comment does not send the lookup to the background");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
