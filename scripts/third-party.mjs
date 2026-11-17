@@ -70,6 +70,9 @@ export function digestOf(dir, files) {
 // Whether a carried path is one an entry's "files" names: the path itself, or under a folder it names.
 const named = (entries, f) => entries.some(e => (e.endsWith("/") ? f.startsWith(e) : f === e));
 
+// The text of a file, or `none` where it cannot be read.
+const textOf = (file, none = null) => { try { return fs.readFileSync(file, "utf8"); } catch { return none; } };
+
 /** What is wrong with the folder of third-party packages in the core at `root`, as of `now`: a line each, with its mend.
  *  Every entry is read, and every folder. */
 export function faults(root = ROOT, now = Date.now()) {
@@ -79,55 +82,77 @@ export function faults(root = ROOT, now = Date.now()) {
     fail(`list.json cannot be read as JSON (${logged(String(e.message).slice(0, 120))})`, "write it as the core holds it: an object whose \"packages\" lists an entry for each package the folder holds");
     return out;
   }
-  const packages = Array.isArray(list?.packages) ? list.packages : null;
-  if (!packages) { fail("list.json has no list \"packages\"", "give it one, an entry for each package the folder holds"); return out; }
-  const floor = new Set(floorList().any), names = new Set();
-  let notices = "";
-  try { notices = fs.readFileSync(path.join(at, "NOTICES.md"), "utf8"); } catch { fail("NOTICES.md is not there", "write it, a section for each package: its name, version and licence, and its copyright lines"); }
-  for (const p of packages) {
-    const name = typeof p?.name === "string" && NAME.test(p.name) ? p.name : null;
-    if (!name) { fail(`list.json: an entry whose "name" is no package name npm gives (${logged(JSON.stringify(p?.name ?? null).slice(0, 80))})`, "name the package as its registry does, lower case"); continue; }
-    const where = `list.json: ${name}`, wrong = KEYS.filter(k => p[k] === undefined).concat(Object.keys(p).filter(k => !KEYS.includes(k)));
-    if (names.has(name)) fail(`${where} is listed twice`, "keep one entry for it");
-    names.add(name);
-    if (wrong.length) fail(`${where} lacks or holds keys it should not: ${wrong.join(", ")}`, `give it exactly ${KEYS.join(", ")}`);
-    if (!exact(p.version)) fail(`${where}: "version" is not one exact version`, "write the one version carried, as its tarball's package.json gives it");
-    if (typeof p.integrity !== "string" || !SHA512.test(p.integrity)) fail(`${where}: "integrity" is no sha512 value`, "write the registry's sha512 of the tarball, its dist.integrity (sha512-...)");
-    if (!licenceOk(p.licence, floor)) fail(`${where}: its licence ${logged(String(p.licence))} is not on floor rule 10's list for what ships`, "take another package, one under a licence the list names: the copy reaches every project");
-    const published = typeof p.published === "string" && DATE.test(p.published) ? Date.parse(p.published) : NaN;
-    const taken = typeof p.taken === "string" && /^\d{4}-\d\d-\d\d$/u.test(p.taken) ? Date.parse(`${p.taken}T23:59:59Z`) : NaN;
-    if (Number.isNaN(published) || Number.isNaN(taken)) fail(`${where}: "published" or "taken" is no date`, "write \"published\" as the registry's time for the version (2026-01-31T12:00:00.000Z) and \"taken\" as the day the entry was written (2026-02-07)");
-    else if (taken - published < WEEK || taken - 86400000 > now) fail(`${where}: taken ${p.taken}, under a week after the version was published (${p.published}), or later than today`, "wait until the version is a week old (floor rule 7), and write the day it is taken");
-    const used = Array.isArray(p.used) && p.used.length ? p.used : null;
-    if (!used) fail(`${where}: "used" names no script`, "name each script that reads the package, from the core's root");
-    for (const s of used ?? []) {
-      let text = null;
-      try { text = typeof s === "string" && /^scripts\/[\w.-]+\.mjs$/u.test(s) ? fs.readFileSync(path.join(root, s), "utf8") : null; } catch { /* (not there) */ }
-      if (!text?.includes(`"../${THIRD_PARTY}${name}/`)) fail(`${where}: "used" names ${logged(String(s))}, which is no script of the core's that imports from ${THIRD_PARTY}${name}/`, "name only the scripts that import the package, and take the package out where none does");
-    }
-    const entries = Array.isArray(p.files) && p.files.length && p.files.every(f => typeof f === "string" && /^[\w.-]+(?:\/[\w.-]+)*\/?$/u.test(f)) ? p.files : null;
-    if (!entries) { fail(`${where}: "files" names no path of the tarball`, "list the paths carried, as they stand in the tarball without its package/ folder, a folder ending in /"); continue; }
-    let found;
-    try { found = filesIn(path.join(at, name)); } catch { fail(`${name}/ is not there`, `copy the package's files into ${THIRD_PARTY}${name}/, as list.json names them`); continue; }
-    if (found.odd.length) fail(`${name}/ holds what is no file: ${found.odd.slice(0, 5).map(logged).join(", ")}`, "carry the files alone, never a link");
-    const stray = found.files.filter(f => !named(entries, f)), empty = entries.filter(e => !found.files.some(f => named([e], f)));
-    if (stray.length || empty.length) fail(`${name}/ differs from "files": ${[...stray.slice(0, 5).map(f => `${logged(f)} not named`), ...empty.map(e => `${logged(e)} holds nothing`)].join(", ")}`, "carry exactly the paths \"files\" names");
-    const digest = digestOf(path.join(at, name), found.files);
-    if (p.digest !== digest) fail(`${where}: "digest" is not that of the files carried, ${digest}`, `where the files are the tarball's, as --verify proves, write ${digest}; else take the files back from the tarball`);
-    const licences = found.files.filter(f => LICENCE_FILE.test(f));
-    if (!licences.length) fail(`${name}/ carries no licence file`, "carry the package's own LICENSE, which its licence asks to travel with it");
-    const copyright = licences.flatMap(f => fs.readFileSync(path.join(at, name, f), "utf8").split(/\r?\n/u).map(l => l.trim()).filter(l => /^copyright\b/iu.test(l)));
-    const section = notices.split(/^## /mu).find(s => s.startsWith(`${name} ${p.version}\n`)) ?? "";
-    if (notices && (!section.includes(String(p.licence)) || copyright.some(c => !section.includes(c)))) fail(`NOTICES.md has no section "## ${name} ${p.version}" naming ${logged(String(p.licence))} and the package's copyright lines`, `write the section: its heading, the licence, each copyright line of ${name}/'s licence file, and where its text is`);
-  }
-  for (const e of fs.readdirSync(at, { withFileTypes: true })) if (e.isDirectory() && !names.has(e.name)) fail(`${e.name}/ is in no entry of list.json`, "write its entry, or take the folder out");
-  let boundary = null;
-  try { boundary = JSON.parse(fs.readFileSync(path.join(at, "package.json"), "utf8")); } catch { /* (said below) */ }
-  if (boundary?.type !== "commonjs" || Object.keys(boundary).some(k => !["description", "private", "type"].includes(k))) fail("package.json does not say \"type\": \"commonjs\" alone", "write it as the core holds it, with its description, \"private\" and \"type\" alone: a project's package.json would otherwise decide how Node reads the packages");
-  let ignore = "";
-  try { ignore = fs.readFileSync(path.join(at, ".gitignore"), "utf8"); } catch { /* (said below) */ }
-  if (!/^!\*$/mu.test(ignore)) fail(".gitignore holds no line !*", "write it as the core holds it: a project's own ignore patterns would keep carried files out of the commit that syncs the copy");
+  if (!Array.isArray(list?.packages)) { fail("list.json has no list \"packages\"", "give it one, an entry for each package the folder holds"); return out; }
+  const notices = textOf(path.join(at, "NOTICES.md"));
+  if (notices === null) fail("NOTICES.md is not there", "write it, a section for each package: its name, version and licence, and its copyright lines");
+  const c = { root, at, now, fail, notices: notices ?? "", floor: new Set(floorList().any), names: new Set() };
+  for (const p of list.packages) entryFaults(c, p);
+  folderFaults(c);
   return out;
+}
+
+// One entry of the list, and the files it names (faults, above).
+function entryFaults(c, p) {
+  const name = typeof p?.name === "string" && NAME.test(p.name) ? p.name : null;
+  if (!name) return c.fail(`list.json: an entry whose "name" is no package name npm gives, without a scope (${logged(JSON.stringify(p?.name ?? null).slice(0, 80))})`, "name the package as its registry does, lower case");
+  const where = `list.json: ${name}`, wrong = KEYS.filter(k => p[k] === undefined).concat(Object.keys(p).filter(k => !KEYS.includes(k)));
+  if (c.names.has(name)) c.fail(`${where} is listed twice`, "keep one entry for it");
+  c.names.add(name);
+  if (wrong.length) c.fail(`${where} lacks or holds keys it should not: ${wrong.join(", ")}`, `give it exactly ${KEYS.join(", ")}`);
+  if (!exact(p.version)) c.fail(`${where}: "version" is not one exact version`, "write the one version carried, as its tarball's package.json gives it");
+  if (typeof p.integrity !== "string" || !SHA512.test(p.integrity)) c.fail(`${where}: "integrity" is no sha512 value`, "write the registry's sha512 of the tarball, its dist.integrity (sha512-...)");
+  if (!licenceOk(p.licence, c.floor)) c.fail(`${where}: its licence ${logged(String(p.licence))} is not on floor rule 10's list for what ships`, "take another package, one under a licence the list names: the copy reaches every project");
+  dateFaults(c, p, where);
+  usedFaults(c, p, name, where);
+  filesFaults(c, p, name, where);
+}
+
+// The version's date and the day it was taken, a week after at least and no later than today.
+function dateFaults(c, p, where) {
+  const published = typeof p.published === "string" && DATE.test(p.published) ? Date.parse(p.published) : NaN;
+  const taken = typeof p.taken === "string" && /^\d{4}-\d\d-\d\d$/u.test(p.taken) ? Date.parse(`${p.taken}T23:59:59Z`) : NaN;
+  if (Number.isNaN(published) || Number.isNaN(taken)) c.fail(`${where}: "published" or "taken" is no date`, "write \"published\" as the registry's time for the version (2026-01-31T12:00:00.000Z) and \"taken\" as the day the entry was written (2026-02-07)");
+  else if (taken - published < WEEK || taken - 86400000 > c.now) c.fail(`${where}: taken ${p.taken}, under a week after the version was published (${p.published}), or later than today`, "wait until the version is a week old (floor rule 7), and write the day it is taken");
+}
+
+// Each script "used" names imports from the package's folder.
+function usedFaults(c, p, name, where) {
+  if (!Array.isArray(p.used) || !p.used.length) return c.fail(`${where}: "used" names no script`, "name each script that reads the package, from the core's root");
+  for (const s of p.used) {
+    const text = typeof s === "string" && /^scripts\/[\w.-]+\.mjs$/u.test(s) ? textOf(path.join(c.root, s)) : null;
+    if (!text?.includes(`"../${THIRD_PARTY}${name}/`)) c.fail(`${where}: "used" names ${logged(String(s))}, which is no script of the core's that imports from ${THIRD_PARTY}${name}/`, "name only the scripts that import the package, and take the package out where none does");
+  }
+}
+
+// The files carried, against "files" and "digest".
+function filesFaults(c, p, name, where) {
+  const entries = Array.isArray(p.files) && p.files.length && p.files.every(f => typeof f === "string" && /^[\w.-]+(?:\/[\w.-]+)*\/?$/u.test(f)) ? p.files : null;
+  if (!entries) return c.fail(`${where}: "files" names no path of the tarball`, "list the paths carried, as they stand in the tarball without its package/ folder, a folder ending in /");
+  let found;
+  try { found = filesIn(path.join(c.at, name)); } catch { return c.fail(`${name}/ is not there`, `copy the package's files into ${THIRD_PARTY}${name}/, as list.json names them`); }
+  if (found.odd.length) c.fail(`${name}/ holds what is no file: ${found.odd.slice(0, 5).map(logged).join(", ")}`, "carry the files alone, never a link");
+  const stray = found.files.filter(f => !named(entries, f)), empty = entries.filter(e => !found.files.some(f => named([e], f)));
+  if (stray.length || empty.length) c.fail(`${name}/ differs from "files": ${[...stray.slice(0, 5).map(f => `${logged(f)} not named`), ...empty.map(e => `${logged(e)} holds nothing`)].join(", ")}`, "carry exactly the paths \"files\" names");
+  const digest = digestOf(path.join(c.at, name), found.files);
+  if (p.digest !== digest) c.fail(`${where}: "digest" is not that of the files carried, ${digest}`, `where the files are the tarball's, as --verify proves, write ${digest}; else take the files back from the tarball`);
+  noticeFaults(c, p, name, found.files.filter(f => LICENCE_FILE.test(f)));
+}
+
+// The package's licence file, and its section of NOTICES.md: the licence and each copyright line of that file.
+function noticeFaults(c, p, name, licences) {
+  if (!licences.length) return c.fail(`${name}/ carries no licence file`, "carry the package's own LICENSE, which its licence asks to travel with it");
+  const copyright = licences.flatMap(f => (textOf(path.join(c.at, name, f), "")).split(/\r?\n/u).map(l => l.trim()).filter(l => /^copyright\b/iu.test(l)));
+  const section = c.notices.split(/^## /mu).find(s => s.startsWith(`${name} ${p.version}\n`)) ?? "";
+  if (c.notices && (!section.includes(String(p.licence)) || copyright.some(l => !section.includes(l)))) c.fail(`NOTICES.md has no section "## ${name} ${p.version}" naming ${logged(String(p.licence))} and the package's copyright lines`, `write the section: its heading, the licence, each copyright line of ${name}/'s licence file, and where its text is`);
+}
+
+// The folder itself: no folder the list leaves out, its package.json and its .gitignore.
+function folderFaults(c) {
+  for (const e of fs.readdirSync(c.at, { withFileTypes: true })) if (e.isDirectory() && !c.names.has(e.name)) c.fail(`${e.name}/ is in no entry of list.json`, "write its entry, or take the folder out");
+  let boundary = null;
+  try { boundary = JSON.parse(textOf(path.join(c.at, "package.json"), "null")); } catch { /* (said below) */ }
+  if (boundary?.type !== "commonjs" || Object.keys(boundary).some(k => !["description", "private", "type"].includes(k))) c.fail("package.json does not say \"type\": \"commonjs\" alone", "write it as the core holds it, with its description, \"private\" and \"type\" alone: a project's package.json would otherwise decide how Node reads the packages");
+  if (!/^!\*$/mu.test(textOf(path.join(c.at, ".gitignore"), ""))) c.fail(".gitignore holds no line !*", "write it as the core holds it: a project's own ignore patterns would keep carried files out of the commit that syncs the copy");
 }
 
 // ---- --verify: the registry asked
@@ -150,29 +175,41 @@ export async function verify(root = ROOT, { get = fetched, getBytes = bytes, now
   failures.push(...looked.failures.map(f => `FAIL ${f}`));
   reports.push(...looked.reports);
   for (const p of packages) {
-    const doc = await get(`${NPM}${p.name}`), v = doc.json?.versions?.[p.version];
-    if (doc.status !== 200 || !v) { fail(`${p.name}@${p.version}: the registry gives no such version (it answered ${doc.status})`, "name a version the registry has"); continue; }
-    if (v.dist?.integrity !== p.integrity) fail(`${p.name}@${p.version}: the registry's integrity is ${logged(String(v.dist?.integrity))}`, "write the registry's, and take the files again from its tarball");
-    if (doc.json.time?.[p.version] !== p.published) fail(`${p.name}@${p.version}: the registry gives ${logged(String(doc.json.time?.[p.version]))} as its date`, "write the registry's date as \"published\"");
-    const message = Buffer.from(`${p.name}@${p.version}:${p.integrity}`);
-    const signed = (v.dist?.signatures ?? []).some(s => signing.some(k => k.keyid === s.keyid && (() => {
-      try { return verified("sha256", message, { key: Buffer.from(k.key, "base64"), format: "der", type: "spki" }, Buffer.from(s.sig, "base64")); } catch { return false; }
-    })()));
-    if (!signed) fail(`${p.name}@${p.version}: no signature of the registry's key holds for its integrity`, "take no version the registry has not signed; if its keys could not be read, run this again");
-    const tarball = await getBytes(`${NPM}${p.name}/-/${p.name}-${p.version}.tgz`);
-    const sum = tarball.body ? `sha512-${createHash("sha512").update(tarball.body).digest("base64")}` : null;
-    if (sum !== p.integrity) { fail(`${p.name}@${p.version}: its tarball ${tarball.body ? `sums to ${sum}` : `could not be fetched (${tarball.status})`}`, "take the files from the tarball the integrity names, and run this again"); continue; }
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "third-party-"));
-    try {
-      fs.writeFileSync(path.join(dir, "p.tar"), gunzipSync(tarball.body));
-      execFileSync("tar", ["-x", "-f", "p.tar"], { cwd: dir, stdio: "ignore" });
-      const from = path.join(dir, "package"), theirs = filesIn(from).files.filter(f => named(p.files, f)), ours = filesIn(path.join(at, p.name)).files;
-      const differ = [...new Set([...theirs, ...ours])].filter(f => !theirs.includes(f) || !ours.includes(f) || !fs.readFileSync(path.join(from, f)).equals(fs.readFileSync(path.join(at, p.name, f))));
-      if (differ.length) fail(`${p.name}@${p.version}: ${differ.length} carried file${differ.length === 1 ? "" : "s"} differ from the tarball's (${differ.slice(0, 5).map(logged).join(", ")})`, "copy the tarball's files whole, the paths \"files\" names and no other");
-      else reports.push(`${THIRD_PARTY}${p.name}/: ${ours.length} files, each the same as the tarball's at ${p.version}, signed by the registry`);
-    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    if (!registryHolds(p, await get(`${NPM}${p.name}`), signing, fail)) continue;
+    const said = tarballFaults(at, p, await getBytes(`${NPM}${p.name}/-/${p.name}-${p.version}.tgz`));
+    if (said.fault) fail(...said.fault); else reports.push(said.report);
   }
   return { failures, reports };
+}
+
+// What the registry's document `doc` says of the entry `p`: its integrity, its date, and a signature of the registry's
+// keys (`signing`) on them; false where it gives no such version.
+function registryHolds(p, doc, signing, fail) {
+  const v = doc.json?.versions?.[p.version], at = `${p.name}@${p.version}`;
+  if (doc.status !== 200 || !v) { fail(`${at}: the registry gives no such version (it answered ${doc.status})`, "name a version the registry has"); return false; }
+  if (v.dist?.integrity !== p.integrity) fail(`${at}: the registry's integrity is ${logged(String(v.dist?.integrity))}`, "write the registry's, and take the files again from its tarball");
+  if (doc.json.time?.[p.version] !== p.published) fail(`${at}: the registry gives ${logged(String(doc.json.time?.[p.version]))} as its date`, "write the registry's date as \"published\"");
+  const message = Buffer.from(`${at}:${p.integrity}`);
+  const holds = (k, s) => { try { return k.keyid === s.keyid && verified("sha256", message, { key: Buffer.from(k.key, "base64"), format: "der", type: "spki" }, Buffer.from(s.sig, "base64")); } catch { return false; } };
+  if (!(v.dist?.signatures ?? []).some(s => signing.some(k => holds(k, s)))) fail(`${at}: no signature of the registry's key holds for its integrity`, "take no version the registry has not signed; if its keys could not be read, run this again");
+  return true;
+}
+
+// The tarball fetched (`tarball`, { status, body }) against the entry `p` and its folder under `at`: held to the
+// integrity, unpacked by tar, and each carried file compared with its own. { fault: [what, mend] } or { report }.
+function tarballFaults(at, p, tarball) {
+  const sum = tarball.body ? `sha512-${createHash("sha512").update(tarball.body).digest("base64")}` : null, id = `${p.name}@${p.version}`;
+  if (sum !== p.integrity) return { fault: [`${id}: its tarball ${tarball.body ? `sums to ${sum}` : `could not be fetched (${tarball.status})`}`, "take the files from the tarball the integrity names, and run this again"] };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "third-party-"));
+  try {
+    fs.writeFileSync(path.join(dir, "p.tar"), gunzipSync(tarball.body));
+    execFileSync("tar", ["-x", "-f", "p.tar"], { cwd: dir, stdio: "ignore" });
+    const from = path.join(dir, "package"), theirs = filesIn(from).files.filter(f => named(p.files, f)), ours = filesIn(path.join(at, p.name)).files;
+    const same = f => theirs.includes(f) && ours.includes(f) && fs.readFileSync(path.join(from, f)).equals(fs.readFileSync(path.join(at, p.name, f)));
+    const differ = [...new Set([...theirs, ...ours])].filter(f => !same(f));
+    if (differ.length) return { fault: [`${id}: ${differ.length} carried file${differ.length === 1 ? "" : "s"} differ from the tarball's (${differ.slice(0, 5).map(logged).join(", ")})`, "copy the tarball's files whole, the paths \"files\" names and no other"] };
+    return { report: `${THIRD_PARTY}${p.name}/: ${ours.length} files, each the same as the tarball's at ${p.version}, signed by the registry` };
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 async function main() {
