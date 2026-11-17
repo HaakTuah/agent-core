@@ -39,17 +39,17 @@ concurrency:
 
 jobs:
   # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
-  # plain git and the sync on whole scratch projects, with the hostile tests of the core's inputs (projects); the
-  # starter kit, with the personal-terms check's own job (kit); the check of the core's copy (core.yml) on scratch
-  # projects (core); the licence, NuGet and agent-tools checks, with the hostile tests of build files and packages
-  # (licences); and the rest (rest). Each step's condition names its part in the job's list "parts", whose names hold
-  # none of one another. On Windows, where a suite that starts many processes runs several times slower, each part is
-  # a job; on Linux two jobs take them, kit, core and licences in one, projects and rest, with the steps run once on
-  # Linux, in the other. Each part is sized by its steps' times on the slow runner, which takes half as long again as
-  # another, so that it ends within its mark there too, no mark raised: on Windows, by three runs on main before #425,
-  # about 370 of 600, 320 of 600, 270 of 450, 270 of 450 and 280 of 480 seconds; on Linux, by a858f14's run, which took
-  # 314 s for the whole (#489), about 160 and 150 of 240. Beside them the upgrade job, which takes longer; #387, #411,
-  # #424, #425, #489)
+  # plain git and the sync on whole scratch projects, with the hostile tests of the core's inputs and the steps' test,
+  # where the sync's steps on whole projects belong (projects); the starter kit, with the personal-terms check's own job
+  # (kit); the check of the core's copy (core.yml) on scratch projects (core); the licence, NuGet and agent-tools
+  # checks, with the hostile tests of build files and packages (licences); and the rest (rest). Each step's condition
+  # names its part in the job's list "parts", whose names hold none of one another. On Windows, where a suite that
+  # starts many processes runs several times slower, each part is a job; on Linux two jobs take them, kit, core and
+  # licences in one, projects and rest, with the steps run once on Linux, in the other. Each part is sized by its
+  # steps' times on the slow runner, which takes half as long again as another, so that it ends within its mark there
+  # too, no mark raised: on Windows, by three runs on main before #425, about 370 of 600, 320 of 600, 270 of 450, 270
+  # of 450 and 280 of 480 seconds; on Linux, by a858f14's run, which took 314 s for the whole (#489), about 160 and 150
+  # of 240. Beside them the upgrade job, which takes longer; #387, #405, #411, #424, #425, #489)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.parts }})
     strategy:
@@ -163,6 +163,9 @@ jobs:
       - name: The count of what the reviews find
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/review-record-test.mjs ')) }}
         run: node scripts/review-record-test.mjs
+      - name: The count of the rounds of review
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/review-rounds-test.mjs ')) }}
+        run: node scripts/review-rounds-test.mjs
       - name: The stalled lanes
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/stalled-test.mjs ')) }}
         run: node scripts/stalled-test.mjs
@@ -279,11 +282,14 @@ jobs:
       - name: The pointer check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/pointers-test.mjs ')) }}
         run: node scripts/pointers-test.mjs
+      - name: The copies check on the agent tools' files, what stood there noted until it is listed
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/copies-tools-test.mjs ')) }}
+        run: node scripts/copies-tools-test.mjs
       - name: The pointers in the core's own floor and modules lead somewhere
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/pointers.mjs --core
       - name: What a release asks of a project, step by step, and a project beside a fresh start
-        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/steps-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' scripts/steps-test.mjs ')) }}
         run: node scripts/steps-test.mjs
       - name: What holds each rule of the floor and the modules, read
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/holders-test.mjs ')) }}

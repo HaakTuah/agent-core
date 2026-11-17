@@ -148,7 +148,7 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   // that carries its scripts)
   {
     const lib2 = path.join(tmp, "a-library-with-scripts"), consumer = path.join(tmp, "a-consumer");
-    for (const f of ["pointers.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), "utf8"));
+    for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), "utf8"));
     put(lib2, "core/floor/security.md", "# The floor\n\n**1. Nothing secret in the repository.**\n");
     put(lib2, "core-manifest.md", copied());
     put(lib2, "AGENTS.md", "# The library\n");
