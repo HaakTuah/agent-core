@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed } from "./agent-tools.mjs";
-import { fromTree } from "./hook-source.mjs";
+import { finder, fromTree } from "./hook-source.mjs";
 import { mended } from "./mend.mjs";
 import { STEPS, notDone } from "./steps.mjs";
 import { parseToml } from "./toml.mjs";
@@ -404,18 +404,20 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   {
     // (a folder a hook tells its program to work in, as the project's own reader answers it)
     const moved = "env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash format.sh";
-    fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(moved), ...listing(entry(moved)) })), "a hook that runs a file from a folder it tells its program to work in takes it from the working tree", 'takes "scripts/format.sh"');
+    fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(moved), ...listing(entry(moved)) })), "a hook that names a folder it tells its program to work in takes it from the working tree", 'takes "scripts"');
     // (#476: as a file system that ignores case and a name's trailing dots reads a path, macOS's and Windows')
     for (const odd of ["bash Scripts/Format.SH", "bash scripts/format.sh.", "env -C SCRIPTS bash format.sh"])
-      fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(odd), ...listing(entry(odd)) })), `a hook that names a file in another case or with a trailing dot (${odd}) takes it from the working tree`, 'takes "scripts/format.sh"');
+      fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(odd), ...listing(entry(odd)) })), `a hook that names a file in another case or with a trailing dot (${odd}) takes it from the working tree`, 'takes "scripts');
   }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes('takes "scripts/format.sh" from the working tree'), "the sync note's step reads not done while a hook takes a file from the working tree unmarked");
   ok(!notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), step).length, "and done once it is marked, listed in the baseline");
   // (the reading itself, of a plain command only: each word and each part of it that names a file of the project)
-  const files = ["scripts/a.sh", "scripts/a b.sh", "scripts/r:x.sh", "scripts/in/a.sh", "a.sh"], holds = f => files.includes(f), folder = f => f === "scripts" || f === "scripts/in";
+  // (what a project of these files holds that a path names, as the project's reader asks it)
+  const findsIn = list => finder(f => list.includes(f), d => [...new Set(list.filter(f => d === "." || f.startsWith(`${d}/`)).map(f => (d === "." ? f : f.slice(d.length + 1)).split("/")[0]))]);
+  const files = ["scripts/a.sh", "scripts/a b.sh", "scripts/r:x.sh", "scripts/in/a.sh", "a.sh"], finds = findsIn(files);
   for (const [command, want] of [["bash scripts/a.sh", ["scripts/a.sh"]], ["node \"$CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["\"$CLAUDE_PROJECT_DIR\"/scripts/a.sh", ["scripts/a.sh"]],
-    ["bash ${CLAUDE_PROJECT_DIR}/scripts/a.sh", ["scripts/a.sh"]], ["bash 'scripts/a b.sh'", ["scripts/a b.sh"]], ["bash scripts/'a b'.sh", ["scripts/a b.sh"]], ["node --require=scripts/a.sh x", ["scripts/a.sh"]],
+    ["bash ${CLAUDE_PROJECT_DIR}/scripts/a.sh", ["scripts/a.sh"]], ["bash 'scripts/a b.sh'", ["scripts/a b.sh", "scripts/a.sh"]], ["bash scripts/'a b'.sh", ["scripts/a b.sh", "scripts/a.sh"]], ["node --require=scripts/a.sh x", ["scripts/a.sh"]],
     ["java -cp lib:scripts/a.sh Main", ["scripts/a.sh"]], ["git show refs/remotes/origin/main:scripts/a.sh", ["scripts/a.sh"]], ["test -f scripts/a.sh", ["scripts/a.sh"]], ["cat ./scripts/a.sh", ["scripts/a.sh"]],
     ["bash scripts/r:x.sh", ["scripts/r:x.sh"]], ["sh -c 'python3 scripts/a.sh'", ["scripts/a.sh"]],  ["npx -y tool@1.0.0", []], ["", []],
     // (anything a shell reads otherwise than as written is not read at all: no exemption, nothing taken, only "not shown")
@@ -432,8 +434,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["bash /tmp/project/scripts/a.sh", null], ["node --require=/x/scripts/a.sh", null], ["bash /scripts/a.sh", null],
     // (#476's code reviews of adeba79 and 378a61a: a part is read from each folder another part names or ends in, as a
     // program told to work there reads it, wherever the two stand; and a command that would ask too much is not read)
-    ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], ["env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash a.sh", ["a.sh", "scripts/a.sh"]],
-    ["env -Cscripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["bash a.sh -C scripts", ["a.sh", "scripts/a.sh"]], ["env -C scripts env -C in bash a.sh", ["a.sh", "scripts/a.sh", "scripts/in/a.sh"]],
+    ["env -C scripts bash a.sh", ["scripts", "a.sh"]], ["make --directory=scripts a.sh", ["scripts", "a.sh"]], ["env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash a.sh", ["scripts", "a.sh"]],
+    ["env -Cscripts bash a.sh", ["scripts", "a.sh"]], ["bash a.sh -C scripts", ["a.sh", "scripts"]], ["env -C scripts env -C in bash a.sh", ["scripts", "a.sh"]],
     ["bash scripts/a.sh", ["scripts/a.sh"]],
     // (#476's code review of 2647550: an option's path in the same word is held to the same guards, and a piece of a quoted
     // script that sets a variable too)
@@ -442,30 +444,33 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // a path, a blank or the end after it)
     ["bash scripts${CLAUDE_PROJECT_DIR}/a.sh", null], ["bash x$CLAUDE_PROJECT_DIR/a.sh", null], ["bash ${CLAUDE_PROJECT_DIR}x", null], ["bash \"$CLAUDE_PROJECT_DIR\"x", null],
     ["bash $CLAUDE_PROJECT_DIR\"/scripts/a.sh\"", null], ["bash -r$CLAUDE_PROJECT_DIR/a.sh", null], ["node --require=$CLAUDE_PROJECT_DIR/scripts/a.sh", ["scripts/a.sh"]],
-    ["sh -c \"bash $CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["cd $CLAUDE_PROJECT_DIR", []],
+    ["sh -c \"bash $CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["cd $CLAUDE_PROJECT_DIR", ["."]],
     // (#476's code review of 002e060: a path given to an option in the same word)
-    ["ruby -r./scripts/a.sh -e 0", ["scripts/a.sh"]], ["ruby -rscripts/a.sh -e 0", null], ["gcc -vI./scripts/in a.sh", ["a.sh", "scripts/in/a.sh"]], ["node --x-scripts/a.sh", []], [Array.from({ length: 300 }, (_, i) => `-${"w".repeat(100)}${i}`).join(" "), null]])
-    ok(JSON.stringify(fromTree(command, holds, folder)) === JSON.stringify(want), `the command ${JSON.stringify(command).slice(0, 100)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds, folder)));
+    ["ruby -r./scripts/a.sh -e 0", ["scripts/a.sh"]], ["ruby -rscripts/a.sh -e 0", null], ["gcc -vI./scripts/in a.sh", ["scripts/in", "a.sh"]],
+    // (#476's code review of 77481d7: a name a program adds an extension to, or reads as a dotted path)
+    ["node -r ./scripts/a -e 0", ["scripts/a.sh"]], ["python3 -m scripts.a", ["scripts/a.sh"]], ["bash Scripts/A.SH", ["scripts/a.sh"]], ["node --x-scripts/a.sh", []], [Array.from({ length: 300 }, (_, i) => `-${"w".repeat(100)}${i}`).join(" "), null]])
+    ok(JSON.stringify(fromTree(command, finds)) === JSON.stringify(want), `the command ${JSON.stringify(command).slice(0, 100)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, finds)));
   // (a file at the root that cmd runs in the place of the first word)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])
-    ok(JSON.stringify(fromTree("git status", f => f === shadow, folder)) === JSON.stringify([shadow]), `a ${shadow} at the project's root, which cmd runs in git's place, is taken`);
+    ok(JSON.stringify(fromTree("git status", findsIn([shadow]))) === JSON.stringify([shadow]), `a ${shadow} at the project's root, which cmd runs in git's place, is taken`);
   // (a path through a link inside the checkout is what holds() reads: the word itself is asked)
-  ok(JSON.stringify(fromTree("bash tools/run.sh", f => f === "tools/run.sh", folder)) === '["tools/run.sh"]', "a path through a link inside the checkout is asked as written");
+  ok(JSON.stringify(fromTree("bash tools/run.sh", findsIn(["tools/run.sh"]))) === '["tools/run.sh"]', "a path through a link inside the checkout is asked as written");
   // (the kit's forms are the core's: of one, only the plain words after its script are read)
   const kitForm = word => `bash -c 'f=$(git -C "\${CLAUDE_PROJECT_DIR:-.}" --no-replace-objects show refs/remotes/origin/main:scripts/a.sh 2>/dev/null) || exit 0; bash -c "$f"${word}'`;
-  ok(JSON.stringify(fromTree(kitForm(""), holds, folder)) === "[]" && JSON.stringify(fromTree(kitForm(" a.sh"), holds, folder)) === '["a.sh"]', "the kit's form takes nothing from the working tree, save a word after its script that names a file");
-  ok(fromTree(kitForm("'; bash scripts/a.sh; '"), holds, folder) === null, "and one broken out of its quote is no kit's form, and not read");
+  ok(JSON.stringify(fromTree(kitForm(""), finds)) === "[]" && JSON.stringify(fromTree(kitForm(" a.sh"), finds)) === '["a.sh"]', "the kit's form takes nothing from the working tree, save a word after its script that names a file");
+  ok(fromTree(kitForm("'; bash scripts/a.sh; '"), finds) === null, "and one broken out of its quote is no kit's form, and not read");
   {
     const began = Date.now();
     for (const command of ["a.sh ".repeat(1 << 18), "\"".repeat(1 << 20), "'a b' ".repeat(1 << 17), "a=b:c,d@e ".repeat(1 << 16), `${kitForm("")}${" x".repeat(1 << 18)}`,
       // (#476's code review of 77481d7: a word of many `=`, and one long option, are read in one pass)
-      `echo ${"=".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 19)}=x`, `echo ${"a=".repeat(1 << 19)}`]) fromTree(command, holds, folder);
+      `echo ${"=".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 19)}=x`, `echo ${"a=".repeat(1 << 19)}`]) fromTree(command, finds);
     ok(Date.now() - began < 5000, "and a command a megabyte long is read at once", `${Date.now() - began} ms`);
     // (#476's code review of 378a61a: two quoted words of a thousand parts each, in a project where each names a folder)
     const wide = n => `'${Array.from({ length: n }, (_, i) => `${"ab"[n % 2]}${i}`).join(" ")}'`, also = Date.now();
-    ok(fromTree(`echo ${wide(1000)} ${wide(1001)}`, () => false, () => true) === null && Date.now() - also < 5000, "and one that would ask a folder of each of its parts for each other part is not read, at once", `${Date.now() - also} ms`);
+    fromTree(`echo ${wide(1000)} ${wide(1001)}`, finder(() => false, () => ["x"]));
+    ok(Date.now() - also < 5000, "and one in a project where each of its parts names a folder is read at once", `${Date.now() - also} ms`);
   }
-  ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p), p => p === "scripts"))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
+  ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, finder(p => /\.(?:sh|mjs|json|md)$/u.test(p), () => [])))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
 }
 
 // ---- the TOML reader Codex's config is read with ----

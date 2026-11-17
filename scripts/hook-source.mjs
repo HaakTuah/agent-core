@@ -11,17 +11,17 @@
 // A word that sets a variable (PATH=x and the like change which program runs), a path with a ".." (read by the file
 // system after the links before it) or one from the root ("/", which may lead into the checkout) makes it no plain
 // command, wherever it stands in a word. Of a plain command, each word, and each part of a word between spaces (a
-// quoted script given to sh -c) or `=`, `:`, `,` and `@`, or after an option's letters (-r./x.rb), that names a file
-// the project holds, at the root or in a folder another part names (a folder a program may be told to work in), through
-// a link inside the checkout too, and in any case, as holds() reads it, is taken from the working tree, whatever
-// program it is given to; and so is a file at the project's root that a Windows shell runs in the place of its first
-// word. No other command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
+// quoted script given to sh -c) or `=`, `:`, `,` and `@`, or after an option's letters (-r./x.rb), names what the
+// project holds at its path, the folder there whole, and beside it with an extension added, as a program that resolves
+// a name reads it (finder()); all of it is taken from the working tree, whatever program it is given to. No other
+// command is read: fromTree() says so, and agent-tools.mjs notes it, the review's. A shell's own syntax is never read,
 // so nothing a reading here could get wrong grants a hook anything. Node's own modules only.
 //
-//   import { fromTree } from "./hook-source.mjs";
-//   fromTree(command, holds, folder) -> the paths it takes from the working tree, where holds(path) says the project
-//                               holds a file there (true, or the path it holds it at) and folder(path) a folder; or null, where the command is neither the
-//                               kit's nor plain, or would ask too much, and so not read
+//   import { finder, fromTree } from "./hook-source.mjs";
+//   finder(holds, names) -> finds, where holds(path) says whether the project holds a file there and names(folder)
+//                           gives the names in a folder
+//   fromTree(command, finds) -> what the command takes from the working tree, as paths of the project; or null, where
+//                               it is neither the kit's nor plain, or would ask too much, and so not read
 import path from "node:path";
 import { inProject } from "./guards.mjs";
 
@@ -40,9 +40,6 @@ const ROOT = /\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/uy;
 const PLAIN = /^[\w ./:=@+,'"-]*$/u;
 // (a ".." in a path is read by the file system after the links before it, which a plain reading cannot follow)
 const PARENT = /(?:^|[/=:,@\s])\.\.(?:$|[/=:,@\s])/u;
-// (a file at the project's root that a Windows shell runs in the place of a command's first word, since cmd looks in
-// the folder it stands in first)
-const RUNS = ["", ".exe", ".bat", ".cmd", ".com", ".ps1", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".msc"];
 
 // A plain command's words, its quotes taken out and $CLAUDE_PROJECT_DIR read as "." where the shell reads it (outside
 // single quotes), or null where a quote is never closed or holds the root's name in single quotes, as written.
@@ -110,37 +107,55 @@ function readings(part, spend) {
   return out;
 }
 
-// Each reading of a part that names a file the project holds, at the root or in a folder a program may be told to work
-// in: each folder the project holds that a reading names (env -C scripts, make --directory=scripts, -Cscripts),
-// wherever it stands in the command and from any such folder in turn, since which of a program's options moves it, and
-// to which word after or before, is the program's and not read here. Each path asked costs its length from BUDGET; a
-// command that would ask more is not read.
+// What the readings of a command's words name in the project, finds() asked of each (finder(), below), and of a
+// dotted name as a path too (python -m scripts.run, java com.x.Main). Each costs its length from BUDGET; a command that
+// would ask more is not read.
 const BUDGET = 1_000_000, OVER = new Error("over its budget");
-function named(list, holds, folder) {
+function named(list, finds) {
   let spent = 0;
   const spend = n => { spent += n; if (spent > BUDGET) throw OVER; };
   const each = new Set(list.flatMap(word => [...parts(word)]).filter(Boolean).flatMap(part => readings(part, spend)));
-  const at = (dir, part) => {
-    spend(1 + part.length);
-    const p = dir === "." ? part : `${dir}/${part}`;
-    return inProject(p) ? path.posix.normalize(p) : ".";
-  };
-  const folders = new Set(["."]), work = ["."];
-  while (work.length) {
-    const dir = work.pop();
-    for (const part of each) {
-      const f = at(dir, part);
-      if (f !== "." && !folders.has(f) && folder(f)) { folders.add(f); work.push(f); }
-    }
-  }
   const found = new Set();
-  for (const dir of folders) for (const part of each) { const f = at(dir, part); if (f !== ".") take(found, f, holds(f)); }
+  for (const part of each) for (const p of /^[\w-]+(?:\.[\w-]+)+$/u.test(part) ? [part, part.replaceAll(".", "/")] : [part]) {
+    spend(1 + p.length);
+    if (inProject(p)) for (const f of finds(path.posix.normalize(p))) found.add(f);
+  }
   return found;
 }
 
-// (holds() answers true, or the path the project holds a file at where it is not the one asked, as a file system that
-// ignores case reads it)
-const take = (found, asked, held) => { if (held) found.add(typeof held === "string" ? held : asked); };
+// What the project holds that a path names, as `finds(path)`: the file at it, the folder at it (all it holds, as a
+// program told to work there or to read it takes it), or a file or folder beside it whose name is its own and an
+// extension (scripts/run for scripts/run.js, as node, ruby and cmd add one); "." the project's root itself. Each is
+// matched as a file system that ignores case and a name's trailing dots and blanks reads it, as macOS's and Windows' do.
+// `holds(file)` says whether the project holds a file there, `names(folder)` the names in a folder.
+export function finder(holds, names) {
+  const listed = new Map(), list = d => { if (!listed.has(d)) listed.set(d, names(d)); return listed.get(d); };
+  const found = new Map();
+  return f => {
+    if (!found.has(f)) found.set(f, under(f, holds, list));
+    return found.get(f);
+  };
+}
+function under(f, holds, names) {
+  if (f === ".") return ["."];
+  const out = new Set(), at = [f, ...folded(f, names)];
+  for (const p of at) if (holds(p) || names(p).length) out.add(p);
+  const dir = path.posix.dirname(f), stem = `${bare(path.posix.basename(f))}.`;
+  for (const d of dir === "." ? ["."] : [dir, ...folded(dir, names)]) {
+    for (const n of names(d)) if (n.toLowerCase().startsWith(stem)) out.add(d === "." ? n : `${d}/${n}`);
+  }
+  return [...out];
+}
+// (each path a path names where case and a name's trailing dots and blanks are not read)
+const bare = name => name.replace(/[. ]+$/u, "").toLowerCase();
+function folded(f, names) {
+  let at = ["."];
+  for (const name of f.split("/")) {
+    at = at.flatMap(d => names(d).filter(n => bare(n) === bare(name)).map(n => (d === "." ? n : `${d}/${n}`)));
+    if (!at.length) break;
+  }
+  return at.filter(p => p !== f);
+}
 
 // Whether a word makes the command no plain one: a piece of it between blanks that sets a variable, itself, after an
 // `=` (env --split-string=PATH=x) or after a single dash's letters (env -SPATH=x); or any part with a ".." or from the
@@ -166,19 +181,15 @@ function sets(piece) {
   return option !== null && piece[option[0].length] === "=" && /[A-Za-z_]/u.test(option[1]);
 }
 
-export function fromTree(command, holds, folder) {
-  try { return read(String(command), holds, folder); } catch (e) { if (e === OVER) return null; throw e; }
+export function fromTree(command, finds) {
+  try { return read(String(command), finds); } catch (e) { if (e === OVER) return null; throw e; }
 }
 
-function read(text, holds, folder) {
+function read(text, finds) {
   const kit = KIT_FORMS.map(f => f.exec(text)).find(Boolean);
-  if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), holds, folder)];
+  if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), finds)];
   if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
   const list = nested(text) ? null : words(text);
-    if (list === null || list.some(unsafe)) return null;
-  const found = named(list, holds, folder);
-  // (its first word, as a Windows shell runs it from the project's root)
-  const first = list[0];
-  if (first && !first.includes("/")) for (const ext of RUNS) take(found, `${first}${ext}`, holds(`${first}${ext}`));
-  return [...found];
+  if (list === null || list.some(unsafe)) return null;
+  return [...named(list, finds)];
 }
