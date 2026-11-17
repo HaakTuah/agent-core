@@ -143,7 +143,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      of its own (the *copies check*; the licence check's with its audit of what no lockfile holds, which
      `licence-scan.mjs` holds whole, every action, fetched package, asset and copied-in code it uses, and each entry
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
-     dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; and
+     dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; `lookup.mjs`,
+     which asks npm's registry of each package new to the lockfiles, as floor topic 15's "A new one is looked up in
+     its registry" says; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
      the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
      configuration pins where it pins one: floor topic 15). A package or
@@ -196,8 +198,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
    - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
-     check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (`copies`,
-     `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
+     check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records'
+     checks (`copies`, `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
      and the package checks (`signatures`, the folder of `package-lock.json`, and `nuget`, the licence check's
      config), last, the NuGet check after all since it runs the pull request's build files; each a step that runs even
      where one before it failed. One job bills one runner's minutes where four or five did, and its status is one,
@@ -246,7 +248,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
    - **A project whose packages come from NuGet** has a `nuget.yml` of its own that calls the core's on every pull
      request (a private one, the one job's `nuget:`; or its own call, started only on a pull request that changes a
-     file NuGet reads by name, so no other bills a job), with the licence check's config: a restore of each project file git knows from its
+     file NuGet reads by name, so no other bills a job), with the licence check's config: first `lookup.mjs --nuget`,
+     which asks NuGet's registry of each package new to the lock files as the licence check asks npm's (floor topic 15);
+     then a restore of each project file git knows from its
      lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
      what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
      from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
@@ -300,8 +304,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
-     what no package list holds, `core/scripts/exact-versions.mjs` for its lockfiles and `core/scripts/agent-tools.mjs`
-     for its agents' tools, and its own check holds its
+     what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and
+     `core/scripts/agent-tools.mjs` for its agents' tools, and its own check holds its
      packages to floor rule 10's list. Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
@@ -551,4 +555,5 @@ address, until the core's owner types another name there by hand (floor rule 11)
 ## This repository
 
 How it takes its own core, and how changes are made here: `AGENTS.md`; the order of its own work: `QUEUE.md`; its
-choices that are hard to undo: `CHOICES.md`; its security: `SECURITY.md`.
+choices that are hard to undo: `CHOICES.md`; its parts, and what else does each: `INVENTORY.md`; its security:
+`SECURITY.md`.

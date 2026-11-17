@@ -1,7 +1,7 @@
 // Hostile tests for one input the core reads (floor topic 5, "Every named input has hostile tests"): what a package
 // brings, from a registry or installed, which its publisher writes: an npm package's own package.json and licence
-// files, installed or copied into a project, a NuGet package's file with its manifest (.nuspec) and content hash, and
-// Node's own tarball. Read by licence-installed.mjs, licence-scan.mjs, licences.mjs (licenceOk, on the licence npm
+// files, installed or copied into a project, a NuGet package's file with its manifest (.nuspec) and content hash,
+// Node's own tarball, and what a registry or GitHub answers of a package, read by lookup.mjs from answers made here. Read by licence-installed.mjs, licence-scan.mjs, licences.mjs (licenceOk, on the licence npm
 // copies from a package), nuget.mjs (manifestLicence), nuget-fetch.mjs (nuspecOf, contentHash, named, and fetchAll
 // from a folder source, so no network) and node.sh (its SHA-256 check, with a stand-in npm that hands it a tarball made
 // here). Each case is refused: a licence it cannot read is not allowed, a version it cannot read is no version, a path
@@ -22,6 +22,7 @@ import { licenceOk } from "./licences.mjs";
 import { quick, said, scratch } from "./hostile.mjs";
 import { manifestLicence } from "./nuget.mjs";
 import { contentHash, fetchAll, named, nuspecOf } from "./nuget-fetch.mjs";
+import { lookUp, npmFacts, repository } from "./lookup.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -142,12 +143,36 @@ const scanned = (files) => {
 }
 
 // ---- Node's own tarball (node.sh) ----
-// A stand-in npm hands node.sh a tarball made here; a stand-in node stands where the machine's would. Each tarball is
-// hostile, so the SHA-256 check refuses it: nothing is installed, the stand-in node is left as it was, nothing lands
-// outside the script's own folder, and the script exits 0 saying so. (Not on Windows, which runs no node.sh.)
+// A stand-in npm, or with no npm a stand-in curl, hands node.sh a tarball made here; a stand-in node stands where the
+// machine's would, below the least long-term line. Each tarball is hostile, so the SHA-256 check refuses it: nothing is
+// installed, the stand-in node is left as it was, nothing lands outside the script's own folder, and the script exits 0
+// saying so. A node at or above the least is kept and nothing is fetched; a version or a least that is no number keeps
+// nothing; with no node, nothing is fetched where it could not go. The PATH holds only the stand-ins and the system's
+// own tools, so the runner's node, npm and curl are never found. (Not on Windows, which runs no node.sh.)
 if (process.platform !== "win32") {
   const script = fileURLToPath(new URL("node.sh", import.meta.url));
   const want = /^\s*([0-9.]+)-x86_64\)/mu.exec(fs.readFileSync(script, "utf8"))?.[1];
+  const sys = path.join(tmp, "sys");
+  fs.mkdirSync(sys);
+  for (const tool of ["bash", "tr", "uname", "readlink", "mktemp", "tar", "gzip", "sha256sum", "cp", "chmod", "mv", "rm", "cat", "touch"]) {
+    const at = spawnSync("bash", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
+    if (at) fs.symlinkSync(at, path.join(sys, tool));
+  }
+  const CURL = word("cu", "rl");
+  const fetchers = {
+    [NPM]: '#!/bin/sh\ntouch "$MARK"; [ "$1" = pack ] && cp "$TARBALL" ./node-linux-moss.tgz\n',
+    [CURL]: '#!/bin/sh\ntouch "$MARK"; echo "$@" >"$MARK"; while [ $# -gt 0 ]; do [ "$1" = -o ] && out=$2; shift; done; cp "$TARBALL" "$out"\n',
+  };
+  // a scratch project with core/'s two Node files (each left out where null) and the bin/ files given, run once
+  const run = ({ least = "22", node = "v0.0.1", bin = {}, tarball = "" } = {}) => {
+    const files = { "core/.node-version": `${want}\n`, "tmp/.keep": "", ...(least === null ? {} : { "core/.node-least": `${least}\n` }), ...(node === null ? {} : { "bin/node": `#!/bin/sh\necho ${node}\n` }) };
+    for (const [name, text] of Object.entries(bin)) files[`bin/${name}`] = text;
+    const root = fresh(files);
+    for (const f of Object.keys(files).filter((f) => f.startsWith("bin/"))) fs.chmodSync(path.join(root, f), 0o755);
+    const mark = path.join(root, "fetched");
+    const r = spawnSync(path.join(sys, "bash"), [script], { cwd: root, encoding: "utf8", timeout: 20000, env: { PATH: `${path.join(root, "bin")}:${sys}`, TARBALL: tarball, MARK: mark, TMPDIR: path.join(root, "tmp") } });
+    return { root, r, fetched: fs.existsSync(mark) ? fs.readFileSync(mark, "utf8") : null, node: () => fs.readFileSync(path.join(root, "bin/node"), "utf8") };
+  };
   const tries = {
     "a binary of other bytes": (d) => fs.writeFileSync(path.join(d, "package/bin/node"), `#!/bin/sh\necho v${want}\n`, { mode: 0o755 }),
     "a binary that is a link out of the package": (d) => { fs.writeFileSync(path.join(tmp, "elsewhere"), `#!/bin/sh\necho v${want}\n`); fs.symlinkSync(path.join(tmp, "elsewhere"), path.join(d, "package/bin/node")); },
@@ -155,16 +180,63 @@ if (process.platform !== "win32") {
     "a binary beside a file whose name leaves the folder": (d) => { fs.writeFileSync(path.join(d, "package/bin/node"), "x"); fs.writeFileSync(path.join(d, "escape"), "x"); },
   };
   for (const [what, make] of Object.entries(tries)) {
-    const root = fresh({ "core/.node-version": `${want}\n`, "bin/node": "#!/bin/sh\necho v0.0.1\n", [`bin/${NPM}`]: '#!/bin/sh\n[ "$1" = pack ] && cp "$TARBALL" ./node-linux-moss.tgz\n', "tmp/.keep": "" });
-    const stage = path.join(root, "stage");
+    const stage = fs.mkdtempSync(path.join(tmp, "stage-"));
     fs.mkdirSync(path.join(stage, "package/bin"), { recursive: true });
     make(stage);
-    for (const f of ["bin/node", `bin/${NPM}`]) fs.chmodSync(path.join(root, f), 0o755);
-    const tarball = path.join(root, "node.tgz"), members = what.includes("leaves") ? ["package", "--transform=s,^escape,../escape,", "escape"] : ["package"];
+    const tarball = `${stage}.tgz`, members = what.includes("leaves") ? ["package", "--transform=s,^escape,../escape,", "escape"] : ["package"];
     execFileSync("tar", ["czf", tarball, "-C", stage, ...members], { stdio: "ignore" });
-    const r = spawnSync("bash", [script], { cwd: root, encoding: "utf8", timeout: 20000, env: { ...process.env, PATH: `${path.join(root, "bin")}:${process.env.PATH}`, TARBALL: tarball, TMPDIR: path.join(root, "tmp") } });
-    ok(r.status === 0 && /NOT INSTALLED/u.test(r.stdout) && fs.readFileSync(path.join(root, "bin/node"), "utf8").includes("v0.0.1") && !fs.existsSync(path.join(root, "tmp/escape")) && !fs.existsSync(path.join(tmp, "escape")), `node.sh refuses Node's tarball with ${what}: nothing installed, the machine's node kept`);
+    for (const [by, text] of Object.entries(fetchers)) {
+      const { root, r, fetched, node } = run({ bin: { [by]: text }, tarball });
+      ok(r.status === 0 && fetched !== null && /NOT INSTALLED/u.test(r.stdout) && node().includes("v0.0.1") && !fs.existsSync(path.join(root, "tmp/escape")) && !fs.existsSync(path.join(tmp, "escape")), `node.sh refuses Node's tarball with ${what}, fetched by ${by}: nothing installed, the machine's node kept`);
+    }
   }
+  const curled = run({ bin: { [CURL]: fetchers[CURL] } }).fetched?.trim(), arch = process.arch === "arm64" ? "arm64" : "x64";
+  ok(curled === `-fsS --proto =https --connect-timeout 30 --max-time 600 -o node-linux-${arch}.tgz https://registry.npmjs.org/node-linux-${arch}/-/node-linux-${arch}-${want}.tgz`, `with no ${NPM}, node.sh fetches only the pin, only from the registry's own address, over HTTPS alone`);
+  for (const [what, opts] of Object.entries({ "at the least long-term line": { node: "v22.0.0" }, "above it": { node: "v24.1.0" } })) {
+    const { r, fetched, node } = run({ ...opts, bin: { [NPM]: fetchers[NPM] } });
+    ok(r.status === 0 && fetched === null && new RegExp(`present, at or above the least long-term line, 22 \\(the checks run the pin, ${want.replaceAll(".", "\\.")}\\)`, "u").test(r.stdout) && node().includes(opts.node), `node.sh keeps a machine's node ${what} and fetches nothing`);
+  }
+  for (const [what, opts] of Object.entries({ "no .node-least": { least: null, node: "v99.0.0" }, "a .node-least that is no number": { least: "2x", node: "v99.0.0" }, "a .node-least of a sign and a number": { least: "-1", node: "v22.0.0" }, "a version that is no number": { node: "vxx.0.0" }, "a version with no v": { node: "99.0.0" }, "a version too long to compare": { node: "v99999999999999999999999.0.0" } })) {
+    const { r, fetched } = run({ ...opts, bin: { [NPM]: fetchers[NPM] } });
+    ok(r.status === 0 && fetched !== null && !/present/u.test(r.stdout), `node.sh keeps no node by ${what}: it fetches the pin`);
+  }
+  {
+    const { r, fetched } = run({ node: null, bin: { [CURL]: fetchers[CURL] } });
+    ok(r.status === 0 && fetched === null && /NOT INSTALLED: .*not on PATH/u.test(r.stdout), "with no node and /usr/local/bin not on PATH, node.sh fetches nothing and says where the pin would have gone");
+  }
+  {
+    const { r, fetched } = run({ bin: {} });
+    ok(r.status === 0 && fetched === null && /NOT INSTALLED: .*no curl/u.test(r.stdout), `with no ${NPM} and no ${CURL}, node.sh fetches nothing and says so`);
+  }
+}
+
+// What a registry or GitHub answers of a package (lookup.mjs): a publisher writes the repository it names and its own
+// name, so a folder or owner that leads up is not followed, an answer of another shape is a lookup that failed, and
+// whatever is printed stays on one line, never a command the workflow's log acts on.
+{
+  const pkg = { name: "hostile-moss", version: "1.0.0", path: "node_modules/hostile-moss", direct: true, brings: 0, lockPath: "package-lock.json" };
+  const now = Date.parse("2026-11-16T12:00:00Z"), old = new Date(now - 800 * 86400000).toISOString();
+  ok(repository({ url: "https://github.com/a/b", directory: "../../etc" })?.dir === "" && repository({ url: "https://github.com/../b" })?.owner === undefined && repository({ url: "https://github.com/a/b/../../c" })?.owner === undefined && repository({ url: "https://github.com/someone/.." })?.owner === undefined && repository("someone/.")?.owner === undefined, "lookup: a repository's folder or owner that leads up is not followed");
+  let threw = 0;
+  for (const doc of [null, [], "text", { time: { created: 5 }, versions: {} }, { time: { created: "yesterday" }, versions: {} }]) { try { npmFacts(doc, "1.0.0"); } catch { threw++; } }
+  ok(threw === 5, "lookup: an answer that is no object, or whose first date is no date, is refused");
+  const asked = [];
+  const answer = (doc) => async (url) => { asked.push(url); return url.startsWith("https://registry.npmjs.org/") ? { status: 200, json: doc } : { status: 200, json: { archived: "yes", name: ["hostile-moss"] } }; };
+  const doc = { time: { created: old, "1.0.0": old, modified: "never" }, versions: { "1.0.0": { _npmUser: { name: `x\n::error::y%0A${"z".repeat(500)}` }, repository: { url: "https://github.com/evil-org/moss", directory: "a/../../../b" }, dist: { attestations: "anything" } } } };
+  const r = await lookUp([pkg], { get: answer(doc), now });
+  const line = r.reports[0] ?? "";
+  ok(r.failures.length === 0 && !/[\r\n]/u.test(line) && !line.includes("::error::y%0A") && line.length < 700, `lookup: a publisher's name is printed cut short, on one line, with nothing GitHub reads as a command (${line.slice(0, 120)})`);
+  ok(asked.includes("https://raw.githubusercontent.com/evil-org/moss/HEAD/package.json") && line.includes("archived or not: GitHub did not answer") && line.includes("not naming the package back"), "lookup: a folder that leads up is not fetched, and GitHub's answers of another shape say nothing");
+  const pages = [{ "@id": "https://api.nuget.org.evil.invalid/page.json", lower: "1.0.0", upper: "2.0.0" },
+    { "@id": "https://api.nuget.org/v3/registration5-gz-semver2/hostile.moss/page/1.0.0/../../../../evil.json", lower: "1.0.0", upper: "../../evil" },
+    { "@id": "https://api.nuget.org/v3/registration5-gz-semver2/hostile.moss/page/1.0.0/2.0.0.json", lower: "1.0.0", upper: ["2.0.0"] }];
+  for (const item of pages) {
+    asked.length = 0;
+    const astray = await lookUp([{ ...pkg, name: "Hostile.Moss" }], { get: async (url) => { asked.push(url); return { status: 200, json: { items: [item] } }; }, now, nuget: true });
+    ok(astray.failures.length === 1 && /outside the registry/u.test(astray.failures[0]) && asked.length === 1, `lookup: a page of NuGet's versions an answer places elsewhere, or names in another form, is not fetched (${item["@id"]})`);
+  }
+  const future = await lookUp([pkg], { get: answer({ ...doc, time: { created: "9999-01-01T00:00:00Z" } }), now });
+  ok(future.failures.length === 1 && /under the 90 days/u.test(future.failures[0]), "lookup: a first date in the future is no age that passes");
 }
 
 console.log(failed ? `${failed} failing` : "ok   every hostile thing a package brings is refused");

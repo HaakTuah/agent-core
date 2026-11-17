@@ -33,16 +33,6 @@
       "depth": 3,
       "branches": 25
     },
-    "function: scripts/core-cost.mjs#main": {
-      "lines": 35,
-      "depth": 2,
-      "branches": 19
-    },
-    "function: scripts/core-moved.mjs#main": {
-      "lines": 47,
-      "depth": 2,
-      "branches": 22
-    },
     "function: scripts/exact-versions.mjs#check": {
       "lines": 35,
       "depth": 4,
@@ -57,16 +47,6 @@
       "lines": 20,
       "depth": 0,
       "branches": 16
-    },
-    "function: scripts/labels.mjs#check": {
-      "lines": 41,
-      "depth": 0,
-      "branches": 25
-    },
-    "function: scripts/labels.mjs#main": {
-      "lines": 36,
-      "depth": 3,
-      "branches": 21
     },
     "function: scripts/licence-commands.mjs#atCommand": {
       "lines": 43,
@@ -102,11 +82,6 @@
       "lines": 35,
       "depth": 2,
       "branches": 27
-    },
-    "function: scripts/state-report.mjs#projects": {
-      "lines": 35,
-      "depth": 2,
-      "branches": 24
     },
     "function: scripts/workflow-run.mjs#block": {
       "lines": 20,

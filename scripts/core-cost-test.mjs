@@ -3,7 +3,7 @@
 // to git and gh are the program's own and are not made here.
 //
 //   node scripts/core-cost-test.mjs
-import { EVERY, REPO, classify, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "./core-cost.mjs";
+import { CAP_DAYS, EVERY, REPO, cap, classify, pullsOf, sumOf, summed, sums, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "./core-cost.mjs";
 import { CORE } from "./core-address.mjs";
 import { line } from "./session-cost.mjs";
 
@@ -48,6 +48,20 @@ const gap = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number:
 ok(!gap.has(3) && gap.get(4)?.answers === 20, "after a pull request of the session with no line, the next is not priced with what both took, and the one after is again");
 const unmerged = priced([{ number: 1, session: "a", reading: r(100, 500) }, { number: 2, session: "a", reading: r(150, 700) }, { number: 3, session: "a", reading: r(180, 900) }]);
 ok(unmerged.get(3)?.answers === 30, "given every pull request of a session, one left unmerged between two merged ones keeps the later from being charged for both (the program reads them all)");
+// the cap of a move (#515): what the pull requests merged in the 14 days up to the newest merge took
+const tookOf = new Map([[1, { answers: 10, out: 100, into: 1000 }], [2, { answers: 20, out: 200, into: 2000 }], [3, { answers: 40, out: 400, into: 4000 }]]);
+const capOf = cap([{ number: 1, when: "2026-10-01T10:00:00Z" }, { number: 2, when: "2026-11-03T10:00:01Z" }, { number: 3, when: "2026-11-17T10:00:00Z" }, { number: 4, when: "2026-11-16T09:00:00Z" }], tookOf);
+ok(CAP_DAYS === 14 && capOf.answers === 60 && capOf.out === 600 && capOf.into === 6000 && capOf.priced === 2 && capOf.of === 3 && capOf.from === "2026-11-03" && capOf.to === "2026-11-17",
+  "the cap sums what the pull requests merged in the 14 days up to the newest merge took, one not priced counted and adding nothing, one older left out", JSON.stringify(capOf));
+ok(cap([], tookOf) === null && sumOf(tookOf, [1, 3, 9]).answers === 50 && sumOf(tookOf, [1, 3, 9]).priced === 2 && sumOf(tookOf, []).of === 0, "with no merge there is no cap, and a move's own pull requests are summed by their numbers");
+ok(summed("x", sumOf(tookOf, [2, 3])) === "x: 60 answers, 600 output tokens, 6,000 tokens carried in, from 2 of 2 pull requests priced (a floor: one not priced adds nothing).", "a sum is said in one line");
+const refused = [];
+ok(pullsOf(["--cap"], m => refused.push(m)) === null && pullsOf(["--pulls", "3,15"], m => refused.push(m)).join() === "3,15" && !refused.length, "--pulls names pull requests by their numbers, and with none given there are none");
+pullsOf(["--pulls", "3;rm"], m => refused.push(m)); pullsOf(["--pulls"], m => refused.push(m));
+ok(refused.length === 2 && refused.every(m => m.startsWith("--pulls takes the numbers")), "anything else after --pulls is refused", refused.join("\n"));
+const both = sums([{ number: 2, when: "2026-11-10T00:00:00Z" }, { number: 3, when: "2026-11-17T00:00:00Z" }], tookOf, true, [1]).split("\n");
+ok(both.length === 2 && both[0].startsWith("The cap of a move (core/tasks/choices.md), what the pull requests merged from 2026-11-03 to 2026-11-17 took: 60 answers") && both[1].startsWith("What pull requests #1 took: 10 answers")
+  && sums([], tookOf, false, null) === "", "--cap and --pulls each print their line, and neither asked prints nothing", both.join("\n"));
 // what gh gives of each pull request: only the repository's own count, a fork's is as if it were not there
 const link = "https://claude.ai/code/session_a", body = n => `x\n\nSession so far: ${n} answers (Opus); tokens in 1, cache written ${n * 10}, cache read ${n * 100}, out ${n * 5}.\n\n${link}`;
 const own = [[1, "Some/Project", body(100)], [3, "some/project", body(150)]];

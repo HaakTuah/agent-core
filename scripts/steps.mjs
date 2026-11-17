@@ -21,6 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
+import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
@@ -33,7 +34,7 @@ import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
-import { Unread, call, calls, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
+import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
@@ -48,6 +49,7 @@ export const COST = {
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
   config: "a check's config and its first baseline: one small pull request of a builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
+  record: "a choice record argued in full: a session's long list and trial, three fresh sessions (the blind picker, the challenger, the judge), one pull request and one issue",
 };
 
 // The entries' leads, in the order the notes hold them: "12 November 2026, builders named by role".
@@ -114,6 +116,15 @@ function testsStand(p) {
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
 // step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
 const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
+// Whether a workflow runs on every push to an open pull request: the event pull_request with no "types" that leaves out
+// its opening or a push, and no "paths" or "branches" filter that could leave out the change a lookup reads.
+const everyPush = on => {
+  if (!onPullRequests(on)) return false;
+  const pr = on && typeof on === "object" && !Array.isArray(on) ? on.pull_request : null;
+  if (!pr || typeof pr !== "object") return true;
+  const types = pr.types === undefined ? null : [pr.types].flat();
+  return (!types || ["opened", "synchronize"].every(t => types.includes(t))) && ["paths", "paths-ignore", "branches", "branches-ignore"].every(k => pr[k] === undefined);
+};
 const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
 const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
 function strengthRuns(p) {
@@ -405,6 +416,174 @@ function movedPaths(p) {
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
 }
 
+// A job's steps with each local composite action (`uses: ./…`) read in its place, its own steps in order, so a check or
+// a lookup run from one is seen where it runs: an inner step takes its caller's `if:`, continue-on-error and env where
+// it gives none of its own, and runs from the folder it names, never its caller's default; each `${{ inputs.x }}` in its
+// run, folder, `with:` and env is the caller's `with:` (or the input's default) where it gives one, and is left, never to
+// match, where not. An action no deeper than 10, never within itself, and no more than INLINED_MOST steps read in a
+// workflow, however the actions call each other; one whose file cannot be read as YAML, is past ACTION_MOST bytes, or
+// lies past that bound is named in `unread`, and its step kept as it stands.
+const INLINED_MOST = 5000, ACTION_MOST = 1 << 20;
+function inlined(list, read, unread, budget, chain = []) {
+  return list.flatMap(st => {
+    const uses = typeof st?.uses === "string" && st.uses.startsWith("./") ? path.posix.normalize(st.uses.slice(2)).replace(/\/+$/u, "") : null;
+    const steps = uses && !uses.startsWith("..") && !chain.includes(uses) && chain.length < 10 ? compositeSteps(uses, read, unread) : null;
+    if (!steps) return [st];
+    if ((budget.left -= steps.length) < 0) { unread.push(uses); return [st]; }
+    const given = inputsOf(st, steps.inputs);
+    const inner = steps.map(x => (x && typeof x === "object" ? (y => ({ ...y, composite: true, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(y.env ?? {}) } }))(given(x)) : x));
+    return inlined(inner, read, unread, budget, [...chain, uses]);
+  });
+}
+// A step of an action with each `${{ inputs.x }}` of its run, folder, `with:` and env put as its caller gives it.
+const inputsOf = (caller, declared) => x => {
+  const value = name => {
+    const v = caller?.with?.[name] ?? declared?.[name]?.default;
+    return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v) : null;
+  };
+  const put = t => (typeof t === "string" ? t.replace(/\$\{\{\s*inputs\.([\w-]+)\s*\}\}/gu, (whole, name) => value(name) ?? whole) : t);
+  const out = { ...x, run: put(x.run), "working-directory": put(x["working-directory"]) };
+  for (const key of ["with", "env"]) if (x[key] && typeof x[key] === "object") out[key] = Object.fromEntries(Object.entries(x[key]).map(([k, v]) => [k, put(v)]));
+  return out;
+};
+// The steps of the composite action at `at`, with its declared inputs as `inputs`, or null: none there, or not
+// composite, or (named in `unread`) no YAML or past ACTION_MOST bytes. Each action is read and parsed once for a project.
+const ACTIONS = new WeakMap();
+function compositeSteps(at, read, unread) {
+  if (!ACTIONS.has(read)) ACTIONS.set(read, new Map());
+  const seen = ACTIONS.get(read);
+  if (!seen.has(at)) seen.set(at, actionAt(at, read));
+  const found = seen.get(at);
+  if (found?.unread) unread.push(found.unread);
+  return found?.steps ?? null;
+}
+function actionAt(at, read) {
+  for (const f of [`${at}/action.yml`, `${at}/action.yaml`]) {
+    const text = read(f);
+    if (text === null) continue;
+    if (text.length > ACTION_MOST) return { unread: f };
+    let yaml = null;
+    try { yaml = parseYaml(text); } catch { /* (named below) */ }
+    if (!yaml || typeof yaml !== "object") return { unread: f };
+    return Array.isArray(yaml.runs?.steps) ? { steps: Object.assign([...yaml.runs.steps], { inputs: yaml.inputs }) } : null;
+  }
+  return null;
+}
+
+// Whether a step's shell stops on a failure: bash or sh, the default off Windows.
+function stopsOn(st, job, w) {
+  const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
+  return shell === undefined ? notWindows(job) : /^(?:bash|sh)$/u.test(String(shell).trim());
+}
+// Whether a job's runner is one of GitHub's own Linux or macOS runners, named outright, whose default shell is bash (a
+// runner a matrix, an expression, an organisation or a self-hosted machine names may be Windows, whose default is pwsh;
+// a label is the owner's, so one that names a Linux runner is taken at its word).
+const notWindows = job => { const r = [job?.["runs-on"] ?? ""].flat(); return r.length > 0 && r.every(x => typeof x === "string" && /^(?:ubuntu|macos)-[\w.-]+$/u.test(x)); };
+// The folder a step runs in, where it names one: its own, else (but in a composite action) its job's or workflow's default.
+function folderOf(st, job, w) {
+  const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
+  return typeof dir === "string" ? dir : undefined;
+}
+// Whether a step may run more than its words show: a command run inside another's words, a redirection, or an expansion
+// bash may evaluate (anything but a plain ${NAME}); a shell other than bash or sh (an unset one only where the runner is
+// no Windows one); or a variable in its env, its job's or its workflow's, but those its config word names (an
+// allow-list), and never one a runner, a shell, Node, OpenSSL or the loader reads, even named so.
+const READ_BY_RUNNERS = /^(?:LD_|BASH|ENV$|PATH$|NODE_|OPENSSL_|SSL_|SHELLOPTS$|PS4$|IFS$|CDPATH$|GLOBIGNORE$|TMPDIR$|INPUT_|ACTIONS_|RUNNER_|GITHUB_)/iu;
+const visible = (env, job, w) => [env, job?.env, w.yaml?.env].flatMap(e => (e && typeof e === "object" ? Object.keys(e) : []));
+const plainKey = k => /^[A-Za-z_]\w*$/u.test(k) && !READ_BY_RUNNERS.test(k);
+const hides = (st, env, job, w) => {
+  const text = typeof st?.run === "string" ? st.run : "";
+  const shell = st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell;
+  const word = commands(text)[0]?.[2]?.text ?? "";
+  const given = new Set([...word.matchAll(/\$\{?([A-Za-z_]\w*)|%([A-Za-z_]\w*)%/gu)].map(m => m[1] ?? m[2]));
+  // (a redirection, which may write a file, the lookup itself among them, before the program opens it, is refused too)
+  return /\$\(|`|[<>]|\$\{(?![A-Za-z_]\w*\})/u.test(text.split(/\r?\n/u).map(uncommented).join("\n"))
+    || (shell === undefined ? !notWindows(job) : !/^(?:bash|sh)$/u.test(String(shell).trim()))
+    || visible(env, job, w).some(k => !plainKey(k) || !given.has(k));
+};
+// Whether an action's step may stand before a lookup as it is given: no env of its own and none a runner reads from its
+// job or workflow; for the checkout, no other repository, folder or commit than the pull request's; and for a setup
+// action, only the version, distribution and architecture to set up, and its cache only turned off, by
+// package-manager-cache: false, or by cache: false in setup-dotnet alone (elsewhere a "cache" names a package
+// manager, not a switch), since a cache or an
+// install could run the pull request's own files (a cache an action takes by default runs the package manager in the
+// project's folder, under its config: the step's advisory reading, which a project's own workflow, a protected file, holds).
+const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible({}, job, w).every(plainKey)
+  && Object.entries(st.with ?? {}).every(([k, v]) => (/^actions\/checkout@/u.test(st.uses) ? ["fetch-depth", "persist-credentials"].includes(k)
+    : /^(?:[\w-]*version(?:-file)?|distribution|architecture)$/u.test(k) || (String(v) === "false" && (k === "package-manager-cache" || (k === "cache" && /^actions\/setup-dotnet@/u.test(st.uses))))));
+// Whether a job runs in a container of its own, or beside service containers, which may mount its folder: it runs as
+// they are given, their env and options too, so nothing counts there.
+const boxedJob = job => job?.container !== undefined || job?.services !== undefined;
+// A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
+function stepOf(st, job, w, started) {
+  const cmds = typeof st?.run === "string" ? commands(st.run) : [];
+  const stops = stopsOn(st, job, w);
+  // (a lone "|" or "&" in the step's text, a pipe or the background, hides the command's failure from the step)
+  const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
+  const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
+  const env = st?.env && typeof st.env === "object" ? st.env : {};
+  const boxed = boxedJob(job);
+  return { cmds, counts, hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+}
+
+// Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
+// them), all of them and step by step in order; for each step, whether a lookup there counts; and whether its checkout
+// holds the base beside the head (a fetch-depth of 0, or 2 or more, and no ref of another commit). A lookup counts only
+// as the one command of its step, in a workflow a pull request starts, where neither the step nor its job carries an
+// `if:` or continue-on-error (conditions the reader cannot tell), under bash or sh, which stop on a failure (pwsh, the
+// default on Windows, and a shell given its own options do not). A workflow whose YAML cannot be read is read as one
+// job, its whole text its one command list, and none of it counts as a lookup.
+function jobsOf(w, read = () => null) {
+  const deep = (v) => /^(?:0|[2-9]|\d{2,})$/u.test(String(v ?? "").trim());
+  const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
+  if (!jobs) return [{ runs: commands(w.text ?? ""), steps: [], deep: false, unread: [] }];
+  const started = everyPush(w.yaml?.on), budget = { left: INLINED_MOST };
+  return jobs.map(job => {
+    const unread = [];
+    const steps = inlined(Array.isArray(job?.steps) ? job.steps : [], read, unread, budget).map(st => stepOf(st, job, w, started));
+    return { runs: steps.flatMap(st => st.cmds), steps, unread,
+      deep: (job?.steps ?? []).some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
+  });
+}
+// A config as a step names it, from the folder the step runs in, so that one name in two folders is two configs.
+const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAbsolute(cfg) ? path.posix.normalize(path.posix.join(dir, cfg)) : cfg);
+// Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
+// named by a variable is matched only where both steps give that variable the same value (or neither sets it), one
+// an action's input names, where its caller gave none, is matched by none, and a lookup counts only where it is a step
+// that may stand before the lookup itself (beforeLookup: the runner's node running the copy's own script from the
+// project's root, nothing hidden), and every step before it in its job is one too, so nothing the pull request holds
+// has run before it.
+const lookupOf = (st, flag, copy, at, job) => {
+  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || !beforeLookup(st, copy)) return false;
+  const i = job.steps.indexOf(st);
+  if (i < 0 || !job.steps.slice(0, i).every(x => beforeLookup(x, copy))) return false;
+  if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
+  const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
+  return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
+};
+// Where a lookup stands, as the step's mend says it (beforeLookup).
+const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container or services, with no env but a variable its config is named by, each setup action given only its version, its cache, if named, turned off (\`package-manager-cache: false\`, or in \`setup-dotnet\` \`cache: false\`), so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
+// Whether a step may stand before a lookup: checkout or a setup action, or a run, by the runner's own `node`, from the
+// project's root, of one of the core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing
+// hidden (hides). Anything else (dotnet under any spelling, npm, a build script, make, a local action, a script of the
+// core's that restores or runs the project's tests) may run the pull request's own files, which could change what the
+// lookup reads or the lookup itself: an allow-list, not a search for a build.
+const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs"];
+const beforeLookup = (st, copy) => (st.uses ? st.plain && /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
+  : !st.hidden && (st.dir === undefined || st.dir === ".") && st.cmds.length > 0 && st.cmds.every(c => c.length > 1
+    && /^node(?:\.exe)?$/iu.test(c[0].text) && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
+// Whether a command names the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given
+// `flag`, with that flag (true) or without it (false).
+const running = (words, name, flag, copy = "core/") => words.some(w => new RegExp(`(?:^|/)${copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
+  && (flag === undefined || words.some(w => w.text === "--nuget") === flag);
+// The config a command gives the copy's script `name`: its first argument after the script that is no flag.
+const configOf = (words, name, copy) => {
+  const at = words.findIndex(w => running([w], name, undefined, copy));
+  return at < 0 ? null : words.slice(at + 1).find(w => !w.text.startsWith("--"))?.text ?? null;
+};
+// Whether a command runs the lookup itself: node, then the copy's script.
+const looksUp = (words, flag, copy) => /(?:^|[\\/])node(?:\.exe)?$/iu.test(words[0]?.text ?? "") && words.length > 1 && running([words[1]], "lookup.mjs", undefined, copy) && running(words, "lookup.mjs", flag, copy);
+
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
     check: p => {
@@ -596,9 +775,50 @@ export const STEPS = [
   { lead: "16 November 2026, the agent tools' files read for copies and pointers", cost: COST.config, check: toolFilesListed },
   { lead: "16 November 2026, checks once a pull request is ready", cost: COST.workflow, check: readyOnlyHolds,
     partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the trigger and the condition a private project's calls lack" },
+  { lead: "16 November 2026, a new package looked up", cost: COST.workflow,
+    check: p => {
+      // (a project that calls the core's licences.yml or nuget.yml takes the lookup with the call; one that runs the
+      // checks from a workflow of its own, as a private repository does, or a NuGet project whose sources need a
+      // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
+      // where it runs the NuGet check)
+      const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
+        const jobs = jobsOf(w, p.read), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
+        // (a workflow this reader cannot read as YAML, whose words name a package check, is said, never taken as done)
+        if (!w.yaml?.jobs && /(?:exact-versions|nuget|nuget-fetch)\.mjs/u.test(w.text ?? "")) return [`${at} cannot be read as YAML here, so where it runs its package checks and their lookups cannot be told: write it as plain YAML (quoted keys and values, no anchors)`];
+        // (each config a check is given is matched by a lookup given the same config, since the lookup reads only the
+        // lock files of the config it is given)
+        // (a config named only when the workflow runs, "$CONFIG", may name another file in each job: there the lookup is
+        // looked for in the check's own job alone)
+        const configs = (...names) => jobs.flatMap(j => j.steps.flatMap(step => step.cmds.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [{ cfg: placed(configOf(c, n, copy), step.dir), job: j, step }] : [])))));
+        const within = ({ cfg, job }) => (/[$%]/u.test(cfg ?? "") ? [job] : jobs);
+        const looked = (flag, at) => within(at).some(j => j.steps.some(st => lookupOf(st, flag, copy, at, j)));
+        return [
+          configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, for each config \`${copy}scripts/exact-versions.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config, ${FIRST(copy)}` : null,
+          configs("nuget.mjs", "nuget-fetch.mjs").some(at => !looked(true, at)) ? `in ${at}, for each config \`${copy}scripts/nuget.mjs\` is given, add a step that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, ${FIRST(copy)}` : null,
+          jobs.some(j => !j.deep && j.steps.some(st => st.counts && looksUp(st.cmds[0], undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
+          ...[...new Set(jobs.flatMap(j => j.unread))].map(f => `in ${at}, the local action \`${shown(f)}\` cannot be read whole (no YAML, or past ${INLINED_MOST} steps in all its actions call), so whether it runs a package check cannot be told: write it as YAML, its actions calling fewer`),
+        ].filter(Boolean);
+      });
+      return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (its step's one command, under bash or sh, with no \`if:\` or \`continue-on-error\` on the step or its job), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
+    },
+    partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
   { lead: "17 November 2026, the checks as one job", cost: COST.workflow, check: oneJobHolds,
     partly: "whether the repository is private, and whether a ruleset requires a check by a name the change takes away, are GitHub's settings, not files: `core/scripts/fresh.mjs`, which every sync runs, lists the one call a project's calls differ from, and a required check's name is the owner's to move" },
   { lead: "17 November 2026, a team's owners read from the host", cost: COST.workflow, unread: "whether an account the call to `security-review.yml` names is one the host lets write is GitHub's answer, not a file's: `gh api repos/<owner>/<repo>/collaborators/<login>/permission`" },
+  { lead: "17 November 2026, a choice record argued in full", cost: COST.check, held: "the choice records' check" },
+  { lead: "17 November 2026, what the project would be built on today", cost: COST.record,
+    // (the record of core/tasks/choices.md, "What the project would be built on today", in the *choice records*: its
+    // heading's end, and the issue its line "The suggestion:" names; or no record that lacks the lines that module's
+    // process writes, a new project's, and one with no record yet, among them: a done that holds only until a first audit
+    // records the choices the project already made, on lines "Stood before:", and the step reads not done again)
+    check: p => {
+      const file = choicesAt(p.manifest);
+      if (!file) throw new Unread("the *choice records* the manifest names is no plain path inside the project");
+      const text = p.read(file), found = parseChoices(text ?? "");
+      if (found.records.some(r => r.today && r.suggestion)) return null;
+      if (found.records.every(r => !r.lacks.length)) return null;
+      return `Run once the process of \`core/tasks/choices.md\`, "What the project would be built on today", in a pull request of its own: write in \`${file}\` a record headed \`## Choice: \` and what the project is built on, ending "judged again as if written today", argued on its lines \`Looked for:\`, \`The blind pick:\` and \`The judgment:\`, with the second judgment, what a move would take and gain here, apart; file one issue to the project's owner, labelled \`enhancement\`, saying what the pick would have been and, apart, what a move would cost and gain; and write that issue's number on the record's line \`The suggestion: #<its number>\`.`;
+    } },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

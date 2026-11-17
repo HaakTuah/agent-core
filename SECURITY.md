@@ -35,15 +35,18 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and
      agent-tools checks (`scripts/licences.mjs`, `scripts/exact-versions.mjs`, `scripts/nuget.mjs`,
      `scripts/workflows.mjs`, `scripts/agent-tools.mjs`); hostile tests: `scripts/hostile-build-files-test.mjs`.
-   - what a package brings, from a registry or installed (its manifest, licence files and content hash): read by the
-     licence scan and the installed licences (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`) and the
-     NuGet fetch (`scripts/nuget-fetch.mjs`); Node itself is checked against its SHA-256 by `scripts/node.sh`; hostile
+   - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
+     registry and GitHub answer of it: read by the licence scan and the installed licences
+     (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`) and
+     the lookup (`scripts/lookup.mjs`); Node itself is checked against its SHA-256 by `scripts/node.sh`; hostile
      tests: `scripts/hostile-packages-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
-   (`node-linux-<arch>` at the exact version in `.node-version`), which `scripts/node.sh` fetches for projects' cloud
-   machines with `npm pack --ignore-scripts`, never installing it, and checks against its SHA-256 before it runs.
+   (`node-linux-<arch>` at the exact version in `.node-version`), which `scripts/node.sh` fetches for a project's cloud
+   machine whose own Node is below the least long-term line in `.node-least`, or that has none, with
+   `npm pack --ignore-scripts`, or with no npm by curl from the registry's own address over HTTPS, never installing it,
+   and checks against its SHA-256 before it runs.
 17. **Dependabot** updates only the workflows' GitHub actions (`.github/dependabot.yml`); this repository names no
     manifest or lock file, so no other PR of Dependabot's meets it.
 

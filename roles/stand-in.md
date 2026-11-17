@@ -12,5 +12,5 @@ closed issues and the reports quoting the owner's corrections, never reading the
 
 **Hands over, gets back:**
 - the session that calls it (a builder, the orchestrator, a reviewer at the design check): what this file and
-  `roles/shared/inbox.md` have it give, its verdicts posted by it on each idea; back, the point left open with what it
+  `roles/shared/inbox.md` have it give; back, the point left open with what it
   rests on, or the call alone.
