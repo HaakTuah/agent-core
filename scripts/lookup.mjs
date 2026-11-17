@@ -19,8 +19,8 @@
 //
 //   node core/scripts/lookup.mjs <the licence check's config> [--nuget]
 import { execFileSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
-import { posix } from "node:path";
+import { appendFileSync, readFileSync, realpathSync } from "node:fs";
+import path, { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadsOut, logged, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
@@ -301,6 +301,9 @@ async function fetched(url) {
   return { status: 200, json: parseBounded(await r.text()) };
 }
 
+// A folder by the system's own spelling of it (on Windows, a short name made long), or as given where it cannot be read.
+const native = (dir) => { try { return realpathSync.native(dir); } catch { return dir; } };
+
 const mended = (message, mend) => (/Mend: /u.test(message) ? message : `${message}. Mend: ${mend}`);
 
 /** The check on the project at `root`, read against `base` (a commit, or null), its config at `configPath` as the
@@ -311,9 +314,9 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
   let found, sources = 0;
   try {
     // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
-    // error quotes none of its text; it is read against the working folder too, which names it, since on Windows the
-    // two may spell one folder differently, a short name against a long one)
-    if (leadsOut(root, configPath) && leadsOut(process.cwd(), configPath)) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
+    // error quotes none of its text; the project's folder and the working folder that names the config are each read
+    // by the system's own spelling, since on Windows one folder may be named short or long)
+    if (leadsOut(native(root), path.isAbsolute(configPath) ? configPath : path.join(native(process.cwd()), configPath))) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
     const config = loadConfig(configPath);
     const { head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath));
     found = newPackages(head, held, nuget);

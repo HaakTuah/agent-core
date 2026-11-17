@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "./lookup.mjs";
 import { CORE } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
@@ -203,6 +203,15 @@ try {
     r = await run(join(tmp, "linked.json"), { root: tmp, base, nuget, get, now: NOW });
     ok(r.code === 1 && mended(r.lines.join("\n")) && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-secret/u.test(r.lines.join("\n")), `a config that links out of the project is refused, unread${nuget ? ", for NuGet too" : ""} (${r.lines})`);
   }
+  // Run from the folder above the project, a config that links out of the project into that folder is refused too.
+  writeFileSync(join(tmp, "..", `${basename(tmp)}-beside.json`), JSON.stringify({ "invented-outside-key": 1 }));
+  rmSync(join(tmp, "linked.json"));
+  symlinkSync(join(tmp, "..", `${basename(tmp)}-beside.json`), join(tmp, "linked.json"));
+  const here = process.cwd();
+  process.chdir(join(tmp, ".."));
+  try { r = await run(join(basename(tmp), "linked.json"), { root: tmp, base, get, now: NOW }); } finally { process.chdir(here); }
+  ok(r.code === 1 && /leads out of the project/u.test(r.lines.join("\n")) && !/invented-outside-key/u.test(r.lines.join("\n")), `run from the folder above, a config that links into it is refused, unread (${r.lines})`);
+  rmSync(join(tmp, "..", `${basename(tmp)}-beside.json`));
   rmSync(join(tmp, "linked.json"));
   writeFileSync(join(tmp, "broken.json"), "{ invented-config-text");
   r = await run(join(tmp, "broken.json"), { root: tmp, base, nuget: true, get, now: NOW });
@@ -236,14 +245,14 @@ try {
   const nugetJob = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   nugetJob("dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /after only the checkout, `setup-` actions and the core's other scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /after only the checkout, `setup-` actions and the core's lookup, exact-versions and licence scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and before it, it does");
   nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/lookup.mjs c.json", "node core/scripts/nuget.mjs c.json");
-  ok(notDone(tmp, step).length === 0, "the core's other scripts may stand before it");
+  ok(notDone(tmp, step).length === 0, "the core's lookup and exact-versions scripts may stand before it");
   // Before the NuGet lookup only what cannot run the pull request's build files may stand: an allow-list, so a build
   // spelled any way is caught.
-  for (const [what, line] of [["behind a variable", "env X=1 dotnet build"], ["under sudo", "sudo dotnet restore"], ["in a script", "./build.sh"], ["in PowerShell", "pwsh build.ps1"], ["by make", "make restore"], ["by node on another file", "node build.mjs"]]) {
+  for (const [what, line] of [["by a script in another folder named core", "node src/core/scripts/restore.mjs"], ["inside a core script's words", 'node core/scripts/labels.mjs "$(dotnet restore)"'], ["by the core's mutation tool, which runs the project's tests", "node core/scripts/mutate.mjs --report r.json 1"], ["behind a variable", "env X=1 dotnet build"], ["under sudo", "sudo dotnet restore"], ["in a script", "./build.sh"], ["in PowerShell", "pwsh build.ps1"], ["by make", "make restore"], ["by node on another file", "node build.mjs"]]) {
     nugetJob(line, "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
     ok(notDone(tmp, step).length === 1, `a NuGet lookup after a build ${what} does not count`);
   }
@@ -251,6 +260,8 @@ try {
   ok(notDone(tmp, step).length === 1, "nor after a local action, though a setup action may stand before it");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: actions/setup-dotnet@v5\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
   ok(notDone(tmp, step).length === 0, "and after the checkout and a setup action alone, it counts");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n        env:\n          NODE_OPTIONS: --import ./build.mjs\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor after a core script Node is told to load a file of the project's before");
   writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);
   nugetJob("node shared/scripts/exact-versions.mjs c.json");
   missed = notDone(tmp, step);
@@ -323,6 +334,26 @@ try {
   const began = Date.now();
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /past 5000 steps/u.test(missed[0].mend) && Date.now() - began < 20000, `actions that call each other without end are read to a bound, and named (${missed.map((m) => m.mend.slice(0, 200))})`);
+  // An action's input is its caller's `with:`: two calls given two configs are two configs, and one given none matches none.
+  for (const [name, line] of [["look", "node core/scripts/lookup.mjs ${{ inputs.config }}"], ["check", "node core/scripts/exact-versions.mjs ${{ inputs.config }}"]]) {
+    mkdirSync(join(tmp, `.github/actions/${name}`), { recursive: true });
+    writeFileSync(join(tmp, `.github/actions/${name}/action.yml`), `name: ${name}\ninputs:\n  config:\n    required: false\nruns:\n  using: composite\n  steps:\n    - run: ${line}\n      shell: bash\n`);
+  }
+  const calls = (look, check) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - uses: ./.github/actions/look\n${look ? `        with:\n          config: ${look}\n` : ""}      - uses: ./.github/actions/check\n${check ? `        with:\n          config: ${check}\n` : ""}`);
+  calls("checks/a.json", "checks/b.json");
+  ok(notDone(tmp, step).length === 1, "a lookup an action is given one config for does not stand for a check another is given another for");
+  calls("checks/b.json", "checks/b.json");
+  ok(notDone(tmp, step).length === 0, "and given the same, it does");
+  calls(null, null);
+  ok(notDone(tmp, step).length === 1, "an input no caller gives matches nothing");
+  rmSync(join(tmp, ".github/actions"), { recursive: true, force: true });
+  // An action past a megabyte is named, not read, and each action is read once however often it is used.
+  mkdirSync(join(tmp, ".github/actions/big"), { recursive: true });
+  writeFileSync(join(tmp, ".github/actions/big/action.yml"), `name: big\n# ${"x".repeat(1 << 20)}\nruns:\n  using: composite\n  steps:\n    - run: node core/scripts/exact-versions.mjs c.json\n      shell: bash\n`);
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n${"      - uses: ./.github/actions/big\n".repeat(2000)}`);
+  const timed = Date.now();
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /cannot be read whole/u.test(missed[0].mend) && Date.now() - timed < 10000, `an action past a megabyte is named, and read once (${Date.now() - timed} ms; ${missed.map((m) => m.mend.slice(0, 160))})`);
   rmSync(join(tmp, ".github/actions"), { recursive: true, force: true });
   // One config's name in two folders is two configs: a lookup in one folder does not stand for the other's check.
   const dirs = (...pairs) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${pairs.map(([d, l]) => `      - run: ${l}\n        working-directory: ${d}\n`).join("")}`);

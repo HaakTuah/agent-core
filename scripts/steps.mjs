@@ -407,28 +407,56 @@ function movedPaths(p) {
 
 // A job's steps with each local composite action (`uses: ./…`) read in its place, its own steps in order, so a check or
 // a lookup run from one is seen where it runs: an inner step takes its caller's `if:`, continue-on-error and env where
-// it gives none of its own, and runs from the folder it names, never its caller's default. An action no deeper than 10,
-// never within itself, and no more than INLINED_MOST steps read in a workflow, however the actions call each other; one
-// whose file cannot be read as YAML, or past that bound, is named in `unread`, and its step kept as it stands.
-const INLINED_MOST = 5000;
+// it gives none of its own, and runs from the folder it names, never its caller's default; each `${{ inputs.x }}` in its
+// run, folder and `with:` is the caller's `with:` (or the input's default) where it gives one, and is left, never to
+// match, where not. An action no deeper than 10, never within itself, and no more than INLINED_MOST steps read in a
+// workflow, however the actions call each other; one whose file cannot be read as YAML, is past ACTION_MOST bytes, or
+// lies past that bound is named in `unread`, and its step kept as it stands.
+const INLINED_MOST = 5000, ACTION_MOST = 1 << 20;
 function inlined(list, read, unread, budget, chain = []) {
   return list.flatMap(st => {
     const uses = typeof st?.uses === "string" && st.uses.startsWith("./") ? path.posix.normalize(st.uses.slice(2)).replace(/\/+$/u, "") : null;
     const steps = uses && !uses.startsWith("..") && !chain.includes(uses) && chain.length < 10 ? compositeSteps(uses, read, unread) : null;
     if (!steps) return [st];
     if ((budget.left -= steps.length) < 0) { unread.push(uses); return [st]; }
-    const inner = steps.map(x => (x && typeof x === "object" ? { ...x, composite: true, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(x.env ?? {}) } } : x));
+    const given = inputsOf(st, steps.inputs);
+    const inner = steps.map(x => (x && typeof x === "object" ? { ...given(x), composite: true, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(x.env ?? {}) } } : x));
     return inlined(inner, read, unread, budget, [...chain, uses]);
   });
 }
-// The steps of the composite action at `at`, or null: none there, or not composite, or (named in `unread`) no YAML.
+// A step of an action with each `${{ inputs.x }}` of its run, folder and `with:` put as its caller gives it.
+const inputsOf = (caller, declared) => x => {
+  const value = name => {
+    const v = caller?.with?.[name] ?? declared?.[name]?.default;
+    return typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v) : null;
+  };
+  const put = t => (typeof t === "string" ? t.replace(/\$\{\{\s*inputs\.([\w-]+)\s*\}\}/gu, (whole, name) => value(name) ?? whole) : t);
+  const out = { ...x, run: put(x.run), "working-directory": put(x["working-directory"]) };
+  if (x.with && typeof x.with === "object") out.with = Object.fromEntries(Object.entries(x.with).map(([k, v]) => [k, put(v)]));
+  return out;
+};
+// The steps of the composite action at `at`, with its declared inputs as `inputs`, or null: none there, or not
+// composite, or (named in `unread`) no YAML or past ACTION_MOST bytes. Each action is read and parsed once for a project.
+const ACTIONS = new WeakMap();
 function compositeSteps(at, read, unread) {
-  const f = [`${at}/action.yml`, `${at}/action.yaml`].find(x => read(x) !== null);
-  if (!f) return null;
-  let yaml = null;
-  try { yaml = parseYaml(read(f)); } catch { /* (named below) */ }
-  if (!yaml || typeof yaml !== "object") { unread.push(f); return null; }
-  return Array.isArray(yaml.runs?.steps) ? yaml.runs.steps : null;
+  if (!ACTIONS.has(read)) ACTIONS.set(read, new Map());
+  const seen = ACTIONS.get(read);
+  if (!seen.has(at)) seen.set(at, actionAt(at, read));
+  const found = seen.get(at);
+  if (found?.unread) unread.push(found.unread);
+  return found?.steps ?? null;
+}
+function actionAt(at, read) {
+  for (const f of [`${at}/action.yml`, `${at}/action.yaml`]) {
+    const text = read(f);
+    if (text === null) continue;
+    if (text.length > ACTION_MOST) return { unread: f };
+    let yaml = null;
+    try { yaml = parseYaml(text); } catch { /* (named below) */ }
+    if (!yaml || typeof yaml !== "object") return { unread: f };
+    return Array.isArray(yaml.runs?.steps) ? { steps: Object.assign([...yaml.runs.steps], { inputs: yaml.inputs }) } : null;
+  }
+  return null;
 }
 
 // Whether a step's shell stops on a failure: bash or sh, the default off Windows.
@@ -441,6 +469,9 @@ function folderOf(st, job, w) {
   const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
   return typeof dir === "string" ? dir : undefined;
 }
+// Whether a step may run more than its words show: a command run inside another's words, or Node told to load a file first.
+const hides = (st, env, job, w) => /\$\(|`|<\(|>\(/u.test(typeof st?.run === "string" ? st.run : "")
+  || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && "NODE_OPTIONS" in e);
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -448,7 +479,8 @@ function stepOf(st, job, w, started) {
   // (a lone "|" or "&" in the step's text, a pipe or the background, hides the command's failure from the step)
   const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
-  return { cmds, counts, dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env: st?.env && typeof st.env === "object" ? st.env : {} };
+  const env = st?.env && typeof st.env === "object" ? st.env : {};
+  return { cmds, counts, hidden: hides(st, env, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -473,20 +505,23 @@ function jobsOf(w, read = () => null) {
 // A config as a step names it, from the folder the step runs in, so that one name in two folders is two configs.
 const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAbsolute(cfg) ? path.posix.normalize(path.posix.join(dir, cfg)) : cfg);
 // Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
-// named by a variable is matched only where both steps give that variable the same value (or neither sets it).
+// named by a variable is matched only where both steps give that variable the same value (or neither sets it), and one
+// an action's input names, where its caller gave none, is matched by none.
 const lookupOf = (st, flag, copy, at) => {
+  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "")) return false;
   if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
-// Whether a step may stand before the NuGet lookup: checkout or a setup action, or a run of the core's own scripts but
-// the NuGet check's and checks.mjs, whose part nuget restores. Anything else (dotnet under any spelling, a build
-// script, make, a local action) may run the pull request's build files, which could change what the lookup reads: an
-// allow-list, not a search for a build.
+// Whether a step may stand before the NuGet lookup: checkout or a setup action, or a run, by `node`, of one of the
+// core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing run inside its words and no
+// NODE_OPTIONS. Anything else (dotnet under any spelling, a build script, make, a local action, a script of the core's
+// that restores or runs the project's tests) may run the pull request's build files, which could change what the
+// lookup reads: an allow-list, not a search for a build.
+const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs"];
 const beforeLookup = (st, copy) => (st.uses ? /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
-  : st.cmds.length > 0 && st.cmds.every(c => /(?:^|[\\/])node(?:\.exe)?$/iu.test(c[0]?.text ?? "") && c.length > 1
-    && new RegExp(`(?:^|/)${copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}scripts/[\\w.-]+\\.mjs$`, "u").test(c[1].text)
-    && !["nuget.mjs", "nuget-fetch.mjs", "checks.mjs"].some(n => running([c[1]], n, undefined, copy))));
+  : !st.hidden && st.cmds.length > 0 && st.cmds.every(c => /(?:^|[\\/])node(?:\.exe)?$/iu.test(c[0]?.text ?? "") && c.length > 1
+    && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
 // Whether a job runs the NuGet lookup of the check at `at`, counted, with every step before it one that may stand there.
 const lookedUpFirst = (job, copy, at) => {
   const first = job.steps.findIndex(st => lookupOf(st, true, copy, at));
@@ -712,7 +747,7 @@ export const STEPS = [
         const looked = (flag, at) => within(at).some(j => j.steps.some(st => lookupOf(st, flag, copy, at)));
         return [
           configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
-          configs("nuget.mjs", "nuget-fetch.mjs").some(at => !within(at).some(j => lookedUpFirst(j, copy, at))) ? `in ${at}, after only the checkout, \`setup-\` actions and the core's other scripts, so before anything that may run the pull request's build files (\`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`), which could change what the lookup reads, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
+          configs("nuget.mjs", "nuget-fetch.mjs").some(at => !within(at).some(j => lookedUpFirst(j, copy, at))) ? `in ${at}, after only the checkout, \`setup-\` actions and the core's lookup, exact-versions and licence scripts, run by \`node\` with nothing inside their words, so before anything that may run the pull request's build files (\`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`), which could change what the lookup reads, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
           jobs.some(j => !j.deep && j.steps.some(st => st.counts && looksUp(st.cmds[0], undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
           ...[...new Set(jobs.flatMap(j => j.unread))].map(f => `in ${at}, the local action \`${shown(f)}\` cannot be read whole (no YAML, or past ${INLINED_MOST} steps in all its actions call), so whether it runs a package check cannot be told: write it as YAML, its actions calling fewer`),
         ].filter(Boolean);
