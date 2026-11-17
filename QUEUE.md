@@ -11,7 +11,6 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #519 | rule builder, hard work, by #515's process, merged or not; #515's point 2 trial runs first or with it, as its evidence | |
 | #515, points 1 and 3 to 16 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
 | #526, path step 1 | rule builder | |
 | #527, step 2 | rule builder | #526 |
