@@ -19,9 +19,10 @@
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
 // tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case fails,
-// as the tool may read it, save one the base held while what the tool reads through it stands. So does a variable a
-// tool's settings set (Claude Code's "env", Codex's shell environment policy) that changes how the programs a hook runs
-// start, save one the base held while its entry stands.
+// as the tool may read it, save one the base held while what the tool reads through it stands; so does a submodule
+// where a tool reads its files, save one the base held at that commit. So does a variable a tool's settings set
+// (Claude Code's "env", Codex's shell environment policy) that changes how the programs a hook runs start, save one the
+// base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
@@ -501,8 +502,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
-  // (the files and links on the way to a tool's file, found through `names`, which follows a link inside the checkout
-  // at the commit as in the working tree, as the rest of the check reads them)
+  // (found through `names`, which follows a link inside the checkout at the commit as in the working tree: toolPaths)
   const isFile = rev ? at => resolve(at)?.type === "blob" : at => !outside(at) && (() => { try { return fs.statSync(path.join(root, at)).isFile(); } catch { return false; } })();
   const isLink = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
   const paths = toolPaths(names, isFile, isLink);
@@ -512,7 +512,16 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
     // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
     project.texts.set(problem, through(at, want, read, names));
   }
+  for (const [problem, text] of submodules(listing(root, rev ?? "HEAD"))) { project.problems.push(problem); project.texts.set(problem, text); }
   return { ...project, links };
+}
+
+// Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
+// this check none of what it holds, and a clone that brings in its submodules gives the tool all of it, so one the base
+// held is noted while it names that commit.
+function submodules(l) {
+  return [...l.gitlinks].filter(([at]) => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))).map(([at, id]) =>
+    [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
 }
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
@@ -656,12 +665,14 @@ function listing(root, rev) {
   if (listings.has(key)) return listings.get(key);
   let out = "";
   try { out = execFileSync("git", ["--no-replace-objects", "ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
-  const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
+  const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"), [mode, , id] = l.slice(0, tab).split(" "); return [mode, l.slice(tab + 1), id]; });
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
   found.linked = new Set(found.links);
   // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
   found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
+  // (a submodule's entry by its path, with the commit it names)
+  found.gitlinks = new Map(entries.filter(([mode]) => mode === "160000").map(([, at, id]) => [at, id]));
   found.dirs = new Set(entries.flatMap(([, at]) => at.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
   listings.set(key, found);
   return found;

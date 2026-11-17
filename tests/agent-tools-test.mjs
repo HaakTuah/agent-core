@@ -587,6 +587,27 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(Date.now() - began < 5000, "and a command a megabyte long is told from the kit's form at once", `${Date.now() - began} ms`);
 }
 
+// ---- what git stores where a tool reads its files ----
+{
+  // (a submodule's entry, put in the index as git stores one, in a commit of its own on top of `dir`'s branch)
+  // (its folder left empty on disk, as a checkout that brings in no submodule leaves it, so `git add -A` keeps it)
+  const gitlink = (dir, at, id = git(dir, "rev-parse", "HEAD")) => { fs.mkdirSync(path.join(dir, at), { recursive: true }); git(dir, "update-index", "--add", "--cacheinfo", `160000,${id},${at}`); git(dir, "commit", "-q", "-m", `a submodule at ${at}`); };
+  const prLink = (dir, at, id) => { git(dir, "checkout", "-q", "-B", "change"); gitlink(dir, at, id); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
+  const SAYS = "is a submodule where an agent tool reads its files";
+  for (const at of [".codex", ".claude/skills/notes", ".Kiro/hooks", ".kiro"])
+    fails(run(prLink(project({ ...listing() }), at)), `a submodule at ${at} fails`, `${at} ${SAYS}`, "Mend: ");
+  passes(run(prLink(project({ ...listing() }), "vendor/lib")), "a submodule elsewhere is none of the agent tools'");
+  const held = project({ ...listing() });
+  gitlink(held, ".codex");
+  const heldRun = run(pr(held, { "README.md": "a change of its own\n" }));
+  ok(heldRun.status === 0 && heldRun.out.includes(`.codex ${SAYS}`), "one the base held is noted, not failed", heldRun.out);
+  fails(run(prLink(held, ".codex", git(held, "rev-parse", "HEAD~1"))), "but not once the pull request moves it", `.codex ${SAYS}`);
+  ok(notDone(held, STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed"))[0]?.mend.includes(`.codex ${SAYS}`), "the sync note's step reads not done while one stands");
+  const core = project({ ...listing() });
+  gitlink(core, ".codex");
+  fails(run(core, "--core"), "in the core's own repository none may stand", `.codex ${SAYS}`);
+}
+
 // ---- what the tools' settings set in the environment of the programs they start ----
 {
   const withEnv = (env, file = ".claude/settings.json") => ({ [file]: JSON.stringify({ ...JSON.parse(KIT), env }, null, 2) });
