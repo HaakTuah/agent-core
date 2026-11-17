@@ -590,13 +590,14 @@ function through(at, want, read, names) {
 // The files and links on the way to a tool's file, in whatever case they stand: each entry, not a folder, whose name
 // folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the checkout is
 // followed as the rest of the check follows it, and named itself where it is one.
-const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/skills\/[^/]+\/skill\.md)$/u;
+const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/skills\/[^/]+\/skill\.md)$/u, SKILL_DIR = /^\.claude\/skills\/[^/]+$/u;
 function toolPaths(names, isFile, isLink) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
     for (const n of names(at || ".")) {
       const p = at ? `${at}/${n}` : n, low = fold(p), inFolder = folders.some(d => low.startsWith(`${d}/`));
-      if (!WAYS.has(low) && !inFolder) continue;
+      // (nor, in a tool folder, a path that is neither what the tool reads nor a skill's folder on its way: never looked at)
+      if ((!WAYS.has(low) && !inFolder) || (inFolder && !READS.test(low) && !SKILL_DIR.test(low))) continue;
       const file = isFile(p);
       // (in a tool folder, only what the tool reads there names the folders on its way: a hook file, a skill's SKILL.md)
       if ((file || isLink(p)) && (!inFolder || READS.test(low))) out.push(p);
@@ -610,9 +611,13 @@ function toolPaths(names, isFile, isLink) {
 // whose files are all ignored holds none. Git is asked once, and only where one stands in another case.
 function unignored(root, paths) {
   if (!misnamed(paths).length) return paths;
-  const asked = spawnSync("git", ["check-ignore", "--stdin", "-z"], { cwd: root, input: paths.join("\0"), encoding: "utf8" });
-  const out = new Set(String(asked.stdout ?? "").split("\0").filter(Boolean));
-  return paths.filter(p => !out.has(p));
+  // (a path beyond a link is none git can say is ignored, and would stop its answer for every other: kept, not asked)
+  const beyond = p => p.split("/").slice(0, -1).some((_, i, parts) => { try { return fs.lstatSync(path.join(root, ...parts.slice(0, i + 1))).isSymbolicLink(); } catch { return false; } });
+  const asked = paths.filter(p => !beyond(p)), ask = list => spawnSync("git", ["check-ignore", "--stdin", "-z"], { cwd: root, input: list.join("\0"), encoding: "utf8" });
+  const answer = ask(asked);
+  // (git answers 0, some are ignored, or 1, none is; any other answer is no answer, so each is asked alone)
+  const out = answer.status === 0 || answer.status === 1 ? String(answer.stdout ?? "").split("\0").filter(Boolean) : asked.filter(p => ask([p]).status === 0);
+  return paths.filter(p => !new Set(out).has(p));
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
