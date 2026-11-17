@@ -15,14 +15,17 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 // ---- when a pruning is due ----
 const rec = (...ps) => ({ prunings: ps });
 ok(generation("claude-opus-5-5") === 5 && generation("Opus 4.8") === 4 && generation("not said") === null, "a model's generation is the first whole number of its id or name");
-ok(due({ month: "2026-11", record: rec() }).due && due({ month: "2027-01", record: rec({ at: "2026-11-20" }) }).due && due({ month: "2026-01", record: rec({ at: "2025-12-31" }) }).due === false,
+ok(due({ month: "2026-11", record: rec() }).due && due({ month: "2027-01", record: rec({ at: "2026-11-20", recorded: true }) }).due && due({ month: "2026-01", record: rec({ at: "2025-12-31", recorded: true }) }).due === false,
   "due where none is recorded, and with every second report, across a year too");
-const notDue = due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "claude-opus-5-5" }) });
-ok(!notDue.due && notDue.why.includes("the next is due in 2027-01") && due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "claude-opus-5-5" }), model: "claude-opus-6-0" }).due
-  && !due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "not said" }), model: "claude-opus-6-0" }).due && !due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "claude-opus-5-5" }), model: "claude-opus-5-6" }).due,
+const notDue = due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "claude-opus-5-5", recorded: true }) });
+ok(!notDue.due && notDue.why.includes("the next is due in 2027-01") && due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "claude-opus-5-5", recorded: true }), model: "claude-opus-6-0" }).due
+  && !due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "not said", recorded: true }), model: "claude-opus-6-0" }).due && !due({ month: "2026-12", record: rec({ at: "2026-11-20", model: "claude-opus-5-5", recorded: true }), model: "claude-opus-5-6" }).due,
   "in the month between, due only where the session's model is of a newer generation than the last pruning's, which must be known");
+ok(due({ month: "2026-11", record: rec({ at: "2026-09-01", recorded: true }, { at: "2026-11-01" }) }).why === "the pruning begun on 2026-11-01 has no counts recorded yet"
+  && due({ month: "2026-12", record: rec({ at: "2026-09-01", recorded: true }, { at: "2026-11-01", recorded: true }) }).due === false,
+  "a pruning begun stays due until its counts are recorded, and the next is counted from the last recorded");
 ok(/^- Due: no pruning is recorded yet\. .*--set <case> <dir>.*--read.*--record --repo .*reports\/pruning\.json` in a pull request of its own\.$/u.test(said({ month: "2026-11", record: rec() })[0])
-  && /^- Not due: the last pruning was in 2026-11; the next is due in 2027-01, or sooner .*--due --model <its id>/u.test(said({ month: "2026-12", record: rec({ at: "2026-11-02" }) })[0]),
+  && /^- Not due: the last pruning was in 2026-11; the next is due in 2027-01, or sooner .*--due --model <its id>/u.test(said({ month: "2026-12", record: rec({ at: "2026-11-02", recorded: true }) })[0]),
   "the state report's line says what the session does where one is due, and when the next is where not");
 
 // ---- the rules taken out of a case's core ----

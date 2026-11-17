@@ -60,10 +60,12 @@ export const generation = model => { const m = /\d+/u.exec(String(model ?? ""));
 const monthIndex = month => { const [y, m] = String(month).split("-").map(Number); return y * 12 + m - 1; };
 const monthAt = i => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
 
-// Whether a pruning is due in `month` (YYYY-MM): { due, why }. Due where none is recorded, where EVERY months have
-// passed since the newest, or where `model` is of a newer generation than the newest's.
+// Whether a pruning is due in `month` (YYYY-MM): { due, why }. Due while one begun has no counts recorded, where none
+// is recorded, where EVERY months have passed since the newest recorded, or where `model` is of a newer generation
+// than its.
 export function due({ month, record, model = null }) {
-  const last = ordered(record).at(-1);
+  const begun = ordered(record).find(x => !x.recorded), last = ordered(record).filter(x => x.recorded).at(-1);
+  if (begun) return { due: true, why: `the pruning begun on ${begun.at} has no counts recorded yet` };
   if (!last) return { due: true, why: "no pruning is recorded yet" };
   const then = last.at.slice(0, 7);
   if (monthIndex(month) - monthIndex(then) >= EVERY) return { due: true, why: `the last pruning was in ${then}, and one is due with every second report` };
@@ -239,14 +241,15 @@ async function outcomesOf({ repo, from, to, owner, gh }) {
 }
 
 // The steps that failed on a pull request from `from` to `to`, each "<workflow>#<step's name>": { step: count }, read
-// from each failed run's jobs; only those of `known` (the core's own steps), so that no name a fork's own workflow
-// gives its steps reaches the record.
+// from the jobs of every attempt (filter=all) of each run that failed or was run again, so that a failure a re-run
+// passed still counts; only those of `known` (the core's own steps), so that no name a fork's own workflow gives its
+// steps reaches the record.
 function firedOf({ repo, from, to, gh, known }) {
   const out = {};
   for (let page = 1; page <= 50; page++) {
-    const runs = JSON.parse(gh(`repos/${repo}/actions/runs?event=pull_request&status=failure&created=${from.slice(0, 10)}..${to.slice(0, 10)}&per_page=100&page=${page}`) || "{}").workflow_runs ?? [];
-    for (const run of runs.filter(x => x.path && Number.isInteger(x.id))) {
-      const jobs = JSON.parse(gh(`repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`) || "{}").jobs ?? [];
+    const runs = JSON.parse(gh(`repos/${repo}/actions/runs?event=pull_request&created=${from.slice(0, 10)}..${to.slice(0, 10)}&per_page=100&page=${page}`) || "{}").workflow_runs ?? [];
+    for (const run of runs.filter(x => x.path && Number.isInteger(x.id) && (x.conclusion === "failure" || x.run_attempt > 1))) {
+      const jobs = JSON.parse(gh(`repos/${repo}/actions/runs/${run.id}/jobs?filter=all&per_page=100`) || "{}").jobs ?? [];
       for (const id of jobs.flatMap(j => j.steps ?? []).filter(x => x.conclusion === "failure").map(x => `${run.path}#${x.name}`).filter(x => known.has(x))) out[id] = (out[id] ?? 0) + 1;
     }
     if (runs.length < 100) break;
