@@ -1,8 +1,9 @@
 // The tree a project's copy of the core must be: the core's at a pin, without the folders that commit's own
-// .gitattributes keeps in the core alone (the lines `/reports export-ignore` and `/words export-ignore`, which
-// `git archive` obeys when the sync makes the copy; #252). A pin from before such a line keeps that folder, and so
-// does any other spelling of the line: each is read as a whole line, byte for byte, as core.yml reads it (`grep -x`).
-// Only these names are read, so a line for another folder needs both changed first. Built in the repository whose git folder is
+// .gitattributes keeps in the core alone (the lines `/reports export-ignore`, `/words export-ignore` and
+// `/tests export-ignore`, which `git archive` obeys when the sync makes the copy; #252, #527). A pin from before such a
+// line keeps that folder, and so does any other spelling of the line: each is read as a whole line, byte for byte, as
+// core.yml reads it (`grep -x`). Only these names are read, the same list as core.yml's (copy-tree-test.mjs holds the
+// two and .gitattributes to it), so a line for another folder needs both changed first. Built in the repository whose git folder is
 // `gitDir` (a bare repository's own folder, or a clone's .git), from the pin's own entries: each call names that folder
 // outright, as releases.mjs says a bare repository must be. And how two trees are compared, here and in core.yml alike
 // (core archive 201): entry by entry, by git's object ids and types, so a file's content, a link and a submodule each
@@ -11,7 +12,7 @@
 // written; core.yml and pure-sync.mjs point here. Git and Node's own modules only; proven by copy-tree-test.mjs.
 import { inBare } from "./releases.mjs";
 
-export const KEPT = ["reports", "words"];
+export const KEPT = ["reports", "words", "tests"];
 const git = (args, gitDir, input) =>
   inBare(gitDir, args, { input, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], maxBuffer: 1 << 26 });
 
