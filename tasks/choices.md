@@ -181,6 +181,17 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   (`core/scripts/core-cost.mjs --pulls`). It does not mean a move is rolled back by a session's own choice. Reason: a
   move in steps is known to stall, a project left in two stacks pays for both, and a cap is only as good as the
   estimates it is compared with.
+- **A trial of a maintained tool replays the part's past bugs** (#593). By default a trial of a maintained tool in the
+  place of a part of the project's own shows the two, old against new, on the same inputs (#534). Where issues labelled
+  `bug` were filed against the part it would replace, whoever runs the trial also runs the tool on each bug's case, and
+  the trial's record says of each, by its number, whether the tool reads it, on a line that opens `Replayed:` ("none"
+  where no bug was filed): in the pull request that shows the trial, and on the part's line of the inventory where the
+  project keeps one, beside the line `Tried:` that records the trial. It does not mean a tool must read every one to be
+  taken, nor that a case no longer at hand is rebuilt: the line names it as not run, and why. Reason: 11 of the 30 bugs
+  filed on the core by 17 November 2026 that were a case a check's writer had not thought of stood on the NuGet and
+  copies checks, and whether a tool tried in their place reads those cases is the best evidence that the move pays.
+  Held, in the core, by the inventory's check (`tests/mend-test.mjs`), which fails a part's line that records a trial
+  and says nothing of its bugs; which bugs the line names, the review reads.
 
 Held by: the records' check (`core/scripts/choices.mjs`, a step of the copies check), which fails a record a pull
 request adds without its lines `Looked for:`, `The blind pick:` and `The judgment:`, and lists, never fails, one that

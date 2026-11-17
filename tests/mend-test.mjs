@@ -4,7 +4,8 @@
 // listed with why it fails no pull request; and each check's test calls mended() of mend.mjs. A new check, or a test
 // that stops reading the mend, fails here. It holds too that each script a workflow or a session's hook names, and each
 // workflow of the core, has its line in the inventory of the core's parts (INVENTORY.md; #534, point 4), and that each
-// file a line there names is there. Its tests workflow runs it on every pull request here. Node's own modules.
+// file a line there names is there, and that a line recording a trial says which of the part's bugs the tool read
+// (#593, point 7). Its tests workflow runs it on every pull request here. Node's own modules.
 //
 //   node tests/mend-test.mjs
 import fs from "node:fs";
@@ -123,6 +124,16 @@ const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(nam
   && (name.split("/").includes("..") || !fs.existsSync(path.join(root, name)))).sort();
 ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
   ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
+  : ""}`);
+// a part's line that records a trial of a maintained tool (*Tried:*) says which of the part's bugs the tool read
+// (*Replayed:*; tasks/choices.md, "A trial of a maintained tool replays the part's past bugs"; #593)
+const unreplayed = text => text.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l)).map(l => l.replace(/\s*\r?\n\s*/gu, " "))
+  .filter(l => /\*Tried:\*/u.test(l) && !/\*Replayed:\*/u.test(l)).map(l => l.split(": ")[0].replace(/^- /u, ""));
+ok(unreplayed("- `a.mjs`: reads.\n  *Tried:* a tool, 2 s.\n- `b.mjs`: reads. *Tried:* a tool. *Replayed:* #1 read.\n- `c.mjs`: reads.").join() === "`a.mjs`",
+  "a part's line that records a trial and replays none of its bugs is found, one that replays them or records no trial is not");
+const notReplayed = unreplayed(inventory);
+ok(notReplayed.length === 0, `each part's line of INVENTORY.md that records a trial says which of the part's bugs the tool read${notReplayed.length
+  ? `: not so for ${notReplayed.join(", ")}. Mend: run the tool on the case of each bug filed against the part, and add to its line "*Replayed:*" with each bug's number and whether the tool read it ("none" where no bug was filed; a case no longer at hand named as not run, and why), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
   : ""}`);
 
 for (const [check, test] of Object.entries(CHECKS)) {

@@ -19,7 +19,9 @@ session, on the host's runners, on the owner's own computer; a check that may de
 places that hold a session or a runner (#534, point 5). *Else:* what else does the job, found on the web and in the
 registries on 17 November 2026, each kept or dropped in a few words, a drop marked as a fact or as an assumption to
 measure (`tasks/choices.md`, "a drop says whether it rests on a fact"). *Bugs:* the issues labelled `bug` that name the
-part's files, of the 61 so labelled. Then the verdict: **replace** where a maintained tool does the job at the same
+part's files, of the 61 so labelled. Where a trial of a tool in its place has run, *Tried:* records it, and *Replayed:*
+says by number which of the part's bugs the tool read (`tasks/choices.md`, "A trial of a maintained tool replays the
+part's past bugs"; #593, point 7). Then the verdict: **replace** where a maintained tool does the job at the same
 level or better, the comparison to be shown when it is made; **try** where only a trial can tell; **keep**, with the
 exception of #486, point 6, it rests on: small and stable, nothing fits, fitting costs more than keeping, or it brings
 too much. A part that gives way keeps the core's glue (#534, point 10): its lists and baseline, the failure that says
