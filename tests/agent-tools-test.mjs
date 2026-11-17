@@ -534,6 +534,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   write(besideBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
   const besideRun = run(pr(besideBase, { "README.md": "a change of its own\n" }));
   ok(besideRun.status === 0 && /\.Codex is \.codex in another case/.test(besideRun.out), "an ignored file beside a tracked one under it leaves it noted", besideRun.out);
+  // (#600's code review of b2502b6: a file in a tool folder that the tool does not read names no folder on its way)
+  const unread = pr(project({ ".gitignore": ".Kiro/hooks/*.json\n", ...listing() }), { "README.md": "a change of its own\n" });
+  write(unread, ".Kiro/hooks/lint.json", "{}\n");
+  write(unread, ".Kiro/hooks/README.md", "notes\n");
+  passes(run(unread), "a file there the tool does not read, beside its ignored hooks, is no tool's file");
   // (#600's fallback security review of 72e6450: names are compared as a file system that folds case does)
   fails(run(pr(project({ ...listing() }), { ".claude/\u017fkills/notes/SKILL.md": "# notes\n" })), "a name that differs only by a letter a full case fold matches fails too", "in another case");
   if (LINKS) {
