@@ -148,8 +148,15 @@ function run(cmd, args, { env = {}, cwd = undefined } = {}) {
   return r.status === 0;
 }
 const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}scripts/${script}`, ...args], opts);
-// (npm is a script on Windows, started through its shell)
-const npm = (args, cwd) => process.platform === "win32" ? run("cmd.exe", ["/d", "/s", "/c", ["npm", ...args].join(" ")], { cwd }) : run("npm", args, { cwd });
+// npm with arguments of this script's own, each a fixed word: on Windows, where npm is a script, through its shell, in a
+// call of its own so that no path reaches that shell. Whether it passed.
+function npm(args, cwd) {
+  if (!args.every(a => /^[a-z-]+(=[a-z]+)?$/.test(a))) throw new Error(`npm is given a word of its own: ${args.join(" ")}`);
+  const r = process.platform === "win32" ? spawnSync("cmd.exe", ["/d", "/s", "/c", `npm ${args.join(" ")}`], { cwd, stdio: ["ignore", "inherit", "inherit"] })
+    : spawnSync("npm", args, { cwd, stdio: ["ignore", "inherit", "inherit"] });
+  if (r.error) console.log(`npm could not be started (${r.error.message}).`);
+  return r.status === 0;
+}
 
 const RUN = {
   copies(o, { coreAt, check }) {
