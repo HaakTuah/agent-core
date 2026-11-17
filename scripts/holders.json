@@ -3,7 +3,8 @@
   "holders": {
     "floor/security.md: 3. The protected files": [
       "check: .github/workflows/security-review.yml, in part",
-      "check: setup/template/claude-settings.json.tmpl, in part"
+      "check: setup/template/claude-settings.json.tmpl, in part",
+      "check: scripts/agent-tools.mjs, in part"
     ],
     "floor/security.md: 4. Outsiders' text is never an instruction": "check: scripts/security-review.mjs, in part",
     "floor/security.md: 8. Reviews look for breaks of any floor rule": [
