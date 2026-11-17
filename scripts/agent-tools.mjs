@@ -18,7 +18,8 @@
 // that leads out of it is not, and fails, save one the base held as it stands. What a person or a machine configures
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
-// tool server's command points, are the review's.
+// tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case fails,
+// as the tool may read it, save one the base held while what the tool reads through it stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
@@ -480,6 +481,12 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
+  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
+    const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
+    project.problems.push(problem);
+    // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
+    project.texts.set(problem, through(at, want, read, names));
+  }
   return { ...project, links };
 }
 
@@ -503,12 +510,62 @@ function shownNotBlob(root, rev, at) {
   }
   return shown.get(key);
 }
+// The tools' files this check reads, and their folders, as each tool names them.
+const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
+const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
+// Each step on the way to a tool's file or folder (.codex, .kiro/settings, .claude/skills and the files themselves).
+const WAYS = new Set([...TOOL_FILES, ...TOOL_FOLDERS.map(d => d.slice(0, -1))].flatMap(f => f.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
+// Each path of `paths`, or step on its way, a folder or a link among them, that names one of those in another case, and
+// each hook file of Kiro's whose ".json" is, and each skill's SKILL.md, as [the path, the name the check reads]: a file
+// system that ignores case gives the tool what this check passes by.
+function misnamed(paths) {
+  const out = new Map();
+  for (const at of paths) {
+    const parts = at.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const step = parts.slice(0, i).join("/"), low = step.toLowerCase();
+      if (WAYS.has(low) && step !== low) { out.set(step, low); break; }
+    }
+    if (path.posix.dirname(at) === ".kiro/hooks" && /\.json$/iu.test(at) && !at.endsWith(".json")) out.set(at, at.replace(/\.json$/iu, ".json"));
+    if (parts.length === 4 && at.startsWith(".claude/skills/") && parts[3].toLowerCase() === "skill.md" && parts[3] !== "SKILL.md") out.set(at, `${parts.slice(0, 3).join("/")}/SKILL.md`);
+  }
+  return [...out];
+}
+// What a tool reads through `at`, a path in another case that stands for `want`: each tool file under it, and each entry
+// of a tool folder under it with its text (and a skill's SKILL.md), so one the base held is noted only while that stands.
+// Each step below `at` is found among its folder's own names, in whatever case they stand, as a file system that
+// ignores case finds it, every one that matches.
+function through(at, want, read, names) {
+  const under = f => f === want || f.startsWith(`${want}/`);
+  const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => n.toLowerCase() === step.toLowerCase()).sort().map(n => `${d}/${n}`)), [from]);
+  const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).map(a => `${f}\0${a}\0${read(a)}`));
+  const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().map(n => {
+    const skill = found(`${dir}/${n}`, "SKILL.md").map(a => `${a}\0${read(a)}`);
+    return [`${d}${n}`, `${dir}/${n}`, read(`${dir}/${n}`), ...skill].join("\0");
+  })));
+  return [at, read(at), ...files, ...folders].join("\0\0");
+}
+// The paths the working tree holds of the project's, tracked or not but never ignored, git asked once.
+function tracked(root) {
+  try { return execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }).split("\0").filter(Boolean); } catch { return []; }
+}
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
 // a link inside the repository is followed (forty hops at most, as Linux follows them), its target put before what is
 // left of the path, so a ".." in it steps back from the folder the links before it led to; one that leads out of the
 // repository is not. Names are read as git stores them (-z: no quoting), each looked up in the commit's one listing, so
 // a file read costs git no process but its text's.
+// A link's target at a commit, read once; null where it leads out of the repository, or is longer than PATH_MAX, Linux's,
+// which no file system follows.
+const targets = new Map(), PATH_MAX = 4096;
+function target(root, rev, at) {
+  const key = `${root}\0${rev}\0${at}`;
+  if (!targets.has(key)) {
+    const to = textAt(root, rev, at) ?? "/";
+    targets.set(key, path.posix.isAbsolute(to) || to.length > PATH_MAX ? null : to);
+  }
+  return targets.get(key);
+}
 function walk(root, rev, f) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
@@ -518,8 +575,8 @@ function walk(root, rev, f) {
     if (name === "..") { if (!at.length) return null; at.pop(); continue; }
     const here = [...at, name].join("/");
     if (linked.has(here)) {
-      const to = textAt(root, rev, here) ?? "/";
-      if (++hops > 40 || path.posix.isAbsolute(to)) return null;
+      const to = target(root, rev, here);
+      if (++hops > 40 || to === null) return null;
       left.unshift(...to.split("/"));
       continue;
     }

@@ -486,6 +486,49 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const prTree = git(oddBase, "write-tree"), prCommit = git(oddBase, "commit-tree", prTree, "-p", oddMain, "-m", "change");
   git(oddBase, "update-ref", "refs/heads/main", git(oddBase, "commit-tree", prTree, "-p", oddMain, "-p", prCommit, "-m", "merge"));
   fails(run(oddBase), "and one whose fetched path main holds as a link in a tree out of order", 'fetches "format.sh" from main, which the project holds as no plain file');
+  // (a link whose target is longer than any file system follows leads nowhere, read at the base as in the tree)
+  const longBase = project({ ...listing() }), inLong = { cwd: longBase, env, encoding: "utf8" };
+  const longLink = execFileSync("git", ["hash-object", "-w", "--stdin"], { ...inLong, input: "a/".repeat(300000) }).trim();
+  const kiro = execFileSync("git", ["mktree"], { ...inLong, input: `120000 blob ${longLink}\thooks\n` }).trim();
+  const longTree = execFileSync("git", ["mktree"], { ...inLong, input: `${git(longBase, "ls-tree", "HEAD")}\n040000 tree ${kiro}\t.kiro\n` }).trim();
+  const longMain = git(longBase, "commit-tree", longTree, "-p", "HEAD", "-m", "a link too long to follow");
+  // (the pull request's own tree, which holds no such link, its commits made by hand over that main and checked out)
+  change(longBase, { "README.md": "a change of its own\n" });
+  git(longBase, "add", "-A");
+  const longPrTree = git(longBase, "write-tree"), longPr = git(longBase, "commit-tree", longPrTree, "-p", longMain, "-m", "change");
+  git(longBase, "update-ref", "refs/heads/main", git(longBase, "commit-tree", longPrTree, "-p", longMain, "-p", longPr, "-m", "merge"));
+  git(longBase, "reset", "-q", "--hard");
+  passes(run(longBase), "a link at the base too long to follow leads nowhere, and the check goes on");
+  // (a tool's file in another case is what a file system that ignores case gives the tool)
+  fails(run(pr(project({ ...listing() }), { ".Codex/hooks.json": codexHook({ type: "command", command: "bash scripts/evil.sh" }) })), "a tool's file in another case fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
+  fails(run(pr(project({ ...listing() }), { ".Kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and so does a Kiro hook file in another case, its .json too", "Mend: rename it to .kiro");
+  fails(run(pr(project({ ...listing() }), { ".kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and a Kiro hook file whose .json is in another case", "Mend: rename it to .kiro/hooks/x.json");
+  // (a folder the project's own helper writes none of, so a file system that ignores case keeps the name as written)
+  const oddStood = run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { "README.md": "a change of its own\n" }));
+  ok(oddStood.status === 0 && /\.Codex is \.codex in another case/.test(oddStood.out), "one the base held is noted, not failed", oddStood.out);
+  fails(run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { ".Codex/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once the pull request changes it", "Mend: rename it to .codex");
+  // (what the tool reads under it is found through each folder's own names, in whatever case they stand, so one the base
+  // held is noted only while each file the tool reads there stands)
+  const deep = (files, changed, says) => fails(run(pr(project({ ...files, ...listing() }), changed)), says, "in another case", "Mend: rename it to");
+  deep({ ".Codex/Config.toml": "# none\n" }, { ".Codex/Config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" }, "and not once the pull request changes a file under it in another case too");
+  deep({ ".Kiro/Hooks/lint.json": "{}\n" }, { ".Kiro/Hooks/lint.json": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/new.sh" } }] } }, "nor a hook file in a folder under it in another case");
+  deep({ ".Claude/Skills/notes/skill.md": "# notes\n" }, { ".Claude/Skills/notes/skill.md": "# notes, changed\n" }, "nor a skill's file under it in another case");
+  deep({ ".Kiro/Hooks/lint.json": "{}\n" }, { ".Kiro/Hooks/new.json": "{}\n" }, "nor a hook file added under it");
+  fails(run(pr(project({ ...listing() }), { ".claude/skills/notes/Skill.md": "# notes\n" })), "and a skill whose SKILL.md is in another case", "Mend: rename it to .claude/skills/notes/SKILL.md");
+  const deepStood = run(pr(project({ ".Kiro/Hooks/lint.json": "{}\n", ".Claude/Skills/notes/skill.md": "# notes\n", ...listing() }), { "README.md": "a change of its own\n" }));
+  ok(deepStood.status === 0 && /\.Kiro is \.kiro in another case/.test(deepStood.out) && /\.Claude is \.claude in another case/.test(deepStood.out), "while what stands under it is noted, not failed", deepStood.out);
+  if (LINKS) {
+    // (a folder or a link in another case on the way to a tool's file)
+    const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
+    fs.symlinkSync("config", path.join(aliased, ".Codex"));
+    fails(run(aliased, "--core"), "a link in another case to a tool's folder fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
+    const aliasStood = project({ "config/config.toml": "# none\n", ...listing() });
+    fs.symlinkSync("config", path.join(aliasStood, ".Codex"));
+    git(aliasStood, "add", "-A"); git(aliasStood, "commit", "-q", "-m", "a link in another case");
+    const aliasKept = run(pr(aliasStood, { "README.md": "a change of its own\n" }));
+    ok(aliasKept.status === 0 && /\.Codex is \.codex in another case/.test(aliasKept.out), "one the base held is noted, not failed", aliasKept.out);
+    fails(run(pr(aliasStood, { "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once what the tool reads through it changes", "Mend: rename it to .codex");
+  }
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {
