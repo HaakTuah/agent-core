@@ -149,9 +149,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      integrity value: floor rule 7; the licence check also holds each `.npmrc` of "ignoreScriptsIn" to the week's wait
      (`min-release-age=7`), and a program a file downloads by address to a version and a checksum, failing only what
      a pull request adds and reporting what its base held: floor rule 7; and
-     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
-     the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
-     configuration pins where it pins one: floor topic 15). A package or
+     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents, in
+     Claude Code's, Kiro's or Codex's files, that the config's "agentTools" does not list, with its publisher and
+     version, a plug-in or tool server at the version its configuration pins where it pins one: floor topic 15; and a
+     hook whose command is not the starter kit's form, which alone shows it runs its copy on `main`:
+     floor rule 3). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
