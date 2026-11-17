@@ -314,9 +314,9 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
   let found, sources = 0;
   try {
     // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
-    // error quotes none of its text; the project's folder and the working folder that names the config are each read
-    // by the system's own spelling, since on Windows one folder may be named short or long)
-    if (leadsOut(native(root), path.isAbsolute(configPath) ? configPath : path.join(native(process.cwd()), configPath))) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
+    // error quotes none of its text; the project's folder and the config's are each read by the system's own spelling,
+    // since on Windows one folder may be named short or long)
+    if (leadsOut(native(root), path.join(native(path.dirname(path.resolve(configPath))), path.basename(configPath)))) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
     const config = loadConfig(configPath);
     const { head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath));
     found = newPackages(head, held, nuget);
