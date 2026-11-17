@@ -70,6 +70,17 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #548 | builder | |
+| #549 | builder; a workflow, two security reviews | |
+| #550 | builder; a case a PR | |
+| #551 | builder | #355 and #391, for its point 3 |
+| #552 | builder | |
+| #553 | builder | #355 and #391 |
+| #554 | builder | #355 |
+| #555 | builder | #534's inventory and its secrets tool |
+| #556 | builder | |
+| #557 | builder | #549 |
+| #558 | builder | |
 
 ## Not taken up
 
