@@ -30,7 +30,7 @@ function project(files = {}) {
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
   for (const f of ["checks.mjs", "core-address.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   for (const [, script] of COPIES) fs.writeFileSync(path.join(dir, "core/scripts", script), STAND_IN(script));
-  for (const s of ["pr-description.mjs", "licence-installed.mjs", "nuget.mjs", "nuget-fetch.mjs"]) fs.writeFileSync(path.join(dir, "core/scripts", s), STAND_IN(s));
+  for (const s of ["pr-description.mjs", "licence-installed.mjs", "nuget.mjs", "nuget-fetch.mjs", "lookup.mjs"]) fs.writeFileSync(path.join(dir, "core/scripts", s), STAND_IN(s));
   fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), 'echo "ran nuget-look.sh BASE=$BASE CONFIG=$CONFIG"\necho "run=false" >> "$GITHUB_OUTPUT"\n');
   fs.writeFileSync(path.join(dir, "core/.node-version"), "22\n");
   git(dir, "init", "-q", "-b", "main");
@@ -90,6 +90,12 @@ const run = (dir, args, extra = {}) => {
   const two = project({ "web/package.json": "{}\n", "api/package.json": "{}\n", ".github/workflows/signatures.yml": ["web", "api"].map((d, k) => `${k ? "" : "name: signatures\non: pull_request\njobs:\n"}  s${k}:\n    uses: ${CORE}/.github/workflows/signatures.yml@${"a".repeat(40)}\n    with:\n      directory: ${d}\n`).join("") });
   const both = run(two, [], { BASE_SHA: git(two, "rev-parse", "HEAD") });
   ok(both.status === 0 && (both.out.match(/^== Does the pull request change what this check reads\?$/gm) ?? []).length === 2, "two calls of the signature check, for two folders, each run by hand, as their workflows run them", both.out);
+  // (two calls of the NuGet check, each with a config of its own: both lookups run before either look, which may restore)
+  const nugets = project({ ".github/workflows/nuget.yml": ["checks/a.json", "checks/b.json"].map((c, k) => `${k ? "" : "name: nuget\non: pull_request\njobs:\n"}  n${k}:\n    uses: ${CORE}/.github/workflows/nuget.yml@${"a".repeat(40)}\n    with:\n      config: ${c}\n`).join("") });
+  const order = run(nugets, [], { BASE_SHA: git(nugets, "rev-parse", "HEAD") });
+  const at = what => order.out.indexOf(what);
+  ok(at("ran lookup.mjs [checks/a.json") >= 0 && at("ran lookup.mjs [checks/b.json") >= 0 && at("ran lookup.mjs [checks/b.json") < at("ran nuget-look.sh"),
+    "two calls of the NuGet check: every config's lookup runs before any look, which may run the change's build files", order.out);
 }
 // the package checks look first: with nothing they read changed, nothing is installed or restored
 {
@@ -107,6 +113,13 @@ const run = (dir, args, extra = {}) => {
   ok(/^Changed:\n- \.github\/workflows\/core\.yml$/m.test(called.out) && /^== Install from the lock file/m.test(called.out), "and a change to the workflow that calls it, whatever it is named, is one it reads", called.out);
   const nuget = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base });
   ok(nuget.status === 0 && new RegExp(`^ran nuget-look\\.sh BASE=${base} CONFIG=checks/licences\\.json$`, "m").test(nuget.out) && !/^== (Every locked|Restore)/m.test(nuget.out), "nuget: where its look says nothing NuGet reads changed, nothing is fetched or restored", nuget.out);
+  ok(new RegExp(`^ran lookup\\.mjs \\[checks/licences\\.json --nuget\\] .*LOOKUP_BASE=${base}`, "m").test(nuget.out) && nuget.out.indexOf("ran lookup.mjs") < nuget.out.indexOf("ran nuget-look.sh"), "nuget: each new package is looked up first, against the base, before the look, which may restore", nuget.out);
+  fs.writeFileSync(path.join(dir, "fails.txt"), "lookup.mjs");
+  const looked = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base });
+  ok(looked.status === 1 && /^ran nuget-look\.sh/m.test(looked.out) && /1 of 2 checks failed/.test(looked.out), "and a failed lookup fails the run, the look still running after it", looked.out);
+  const advised = run(dir, ["nuget", "--nuget", "checks/licences.json", "--advisory"], { BASE_SHA: base });
+  ok(advised.status === 0 && /Advisory: nothing fails for it yet/.test(advised.out), "where advisory, it fails nothing", advised.out);
+  fs.rmSync(path.join(dir, "fails.txt"));
 }
 
 done("the one script of the core's checks");
