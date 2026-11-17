@@ -386,13 +386,14 @@ function jobsOf(w) {
 }
 // Whether a job runs the NuGet lookup before anything that may run the pull request's build files: dotnet, or the
 // NuGet check's scripts, which a workflow runs after its restore.
-const lookedUpFirst = (runs) => {
-  const first = runs.findIndex(c => running(c, "lookup.mjs", true));
-  const builds = runs.findIndex(c => /(?:^|[\\/])dotnet(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs") || running(c, "nuget-fetch.mjs"));
+const lookedUpFirst = (runs, copy) => {
+  const first = runs.findIndex(c => running(c, "lookup.mjs", true, copy));
+  const builds = runs.findIndex(c => /(?:^|[\\/])dotnet(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs", undefined, copy) || running(c, "nuget-fetch.mjs", undefined, copy));
   return first >= 0 && (builds < 0 || first < builds);
 };
-// Whether a command runs the copy's script `name`, and, given `flag`, with that flag (true) or without it (false).
-const running = (words, name, flag) => words.some(w => new RegExp(`(?:^|/)core/scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
+// Whether a command runs the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given
+// `flag`, with that flag (true) or without it (false).
+const running = (words, name, flag, copy = "core/") => words.some(w => new RegExp(`(?:^|/)${copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
   && (flag === undefined || words.some(w => w.text === "--nuget") === flag);
 
 export const STEPS = [
@@ -591,12 +592,12 @@ export const STEPS = [
       // sign-in, adds the step beside them: the npm lookup where it runs the exact-versions check, the NuGet lookup
       // where it runs the NuGet check)
       const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
-        const jobs = jobsOf(w), at = `\`.github/workflows/${shown(f)}\``;
-        const any = (name, flag) => jobs.some(j => j.runs.some(c => running(c, name, flag)));
+        const jobs = jobsOf(w), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
+        const any = (name, flag) => jobs.some(j => j.runs.some(c => running(c, name, flag, copy)));
         return [
-          any("exact-versions.mjs") && !any("lookup.mjs", false) ? `in ${at}, beside the step that runs \`core/scripts/exact-versions.mjs\`, add one that runs \`node core/scripts/lookup.mjs <the licence check's config>\`` : null,
-          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !jobs.some(j => lookedUpFirst(j.runs)) ? `in ${at}, before any step that runs \`dotnet\` or \`core/scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node core/scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
-          jobs.some(j => !j.deep && j.runs.some(c => running(c, "lookup.mjs"))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
+          any("exact-versions.mjs") && !any("lookup.mjs", false) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config>\`` : null,
+          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !jobs.some(j => lookedUpFirst(j.runs, copy)) ? `in ${at}, before any step that runs \`dotnet\` or \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+          jobs.some(j => !j.deep && j.runs.some(c => running(c, "lookup.mjs", undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
         ].filter(Boolean);
       });
       return wrong.length ? `On every pull request, ${wrong.join("; ")}; the checkout with \`fetch-depth: 2\` holds the pull request's base, which the lookup reads against.` : null;

@@ -7,6 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "./lookup.mjs";
+import { CORE } from "./core-address.mjs";
 import { mended } from "./mend.mjs";
 import { notDone, STEPS } from "./steps.mjs";
 
@@ -203,6 +204,12 @@ try {
   ok(missed.length === 1 && /before any step that runs `dotnet`/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and before it, it does");
+  writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);
+  nugetJob("node shared/scripts/exact-versions.mjs c.json");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /runs `node shared\/scripts\/lookup\.mjs/u.test(missed[0].mend), `where the manifest puts the core under shared/, its scripts are read there (${missed.map((m) => m.mend)})`);
+  nugetJob("node shared/scripts/lookup.mjs c.json", "node shared/scripts/exact-versions.mjs c.json");
+  ok(notDone(tmp, step).length === 0, "and its lookup there counts");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");
